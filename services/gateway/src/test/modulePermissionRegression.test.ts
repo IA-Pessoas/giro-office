@@ -31,6 +31,30 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
+  it("permite RH nível 1 no próprio perfil, sem liberar as demais mutações RH", () => {
+    const profilePolicy = requiredRoutePolicy("PUT", "/rh/profile/colaborator");
+    const createRequestPolicy = requiredRoutePolicy("POST", "/rh/requests");
+    const createMessagePolicy = requiredRoutePolicy("POST", "/rh/messages");
+    const requestsPolicy = requiredRoutePolicy("PUT", "/rh/requests");
+
+    expect(profilePolicy).toEqual({ modulePermission: { module: "rh", minPermission: 1 } });
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), profilePolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), createRequestPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), createMessagePolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), requestsPolicy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { rh: 2 } }), requestsPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 0 } }), profilePolicy)).toBe(false);
+  });
+
+  it("mantém notificações de RH no mesmo nível de acesso do módulo", () => {
+    const listPolicy = requiredRoutePolicy("GET", "/rh/notifications");
+    const readPolicy = requiredRoutePolicy("PUT", "/rh/notifications/read");
+
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), listPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), readPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 0 } }), listPolicy)).toBe(false);
+  });
+
   it("classifica todos os fluxos Contábil do milestone com leitura e escrita corretas", () => {
     const viewer = authContext({ modules: { contabil: 1 } });
     const editor = authContext({ modules: { contabil: 2 } });
@@ -340,6 +364,34 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(false);
   });
 
+  it("libera as rotas de responsável da Integração para os níveis 0 e 1", () => {
+    for (const [method, path] of [
+      ["POST", "/task/complete-request"],
+      ["DELETE", "/task/complete-request"],
+      ["GET", "/task/complete-request/list"],
+      ["POST", "/task/postponement"],
+      ["GET", "/task/postponement/list"],
+      ["POST", "/task/attachment"],
+      ["GET", "/task/attachment/list"],
+      ["GET", "/task/attachment/access"],
+      ["PUT", "/task/conclusion"],
+      ["GET", "/task"],
+      ["GET", "/task/list"],
+    ] as const) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(
+        canAccessRoute(authContext({ modules: { integracao: 0 } }), policy),
+        `${method} ${path}`,
+      ).toBe(true);
+    }
+  });
+
+  it("mantém as demais mutações de tarefa restritas ao nível 2", () => {
+    const policy = requiredRoutePolicy("PUT", "/task");
+    expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), policy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { integracao: 2 } }), policy)).toBe(true);
+  });
+
   it("protege os endpoints de projeto pelo módulo Integração", () => {
     const policy = requiredRoutePolicy("GET", "/project/list");
     expect(canAccessRoute(authContext({ modules: { integracao: 0 } }), policy)).toBe(false);
@@ -421,5 +473,34 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(requiredRoutePolicy("PUT", "/user/user-1")).toEqual({
       special: "manageUsers",
     });
+  });
+
+  it("reutiliza o módulo RH com limiares distintos por operação de ponto", () => {
+    const selfServicePolicy = requiredRoutePolicy("POST", "/rh/point/adjustment/request");
+    const registerPolicy = requiredRoutePolicy("POST", "/rh/point/register");
+    const signPolicy = requiredRoutePolicy("PUT", "/rh/timesheets/sign");
+    const pdfPolicy = requiredRoutePolicy("GET", "/rh/timesheets/sheet-1/pdf");
+    const managerPolicy = requiredRoutePolicy("PUT", "/rh/point/adjustment/approve-bulk");
+    const managementRoutes = [
+      ["POST", "/rh/point/recalculate"],
+      ["POST", "/rh/point/adjustment/retroactive"],
+      ["PUT", "/rh/timesheets/reopen"],
+      ["PUT", "/rh/timesheets/rebuild"],
+      ["POST", "/rh/point/point-1/calculate"],
+      ["POST", "/rh/timesheets"],
+    ] as const;
+
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), selfServicePolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), registerPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), signPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), pdfPolicy)).toBe(true);
+    expect(canAccessRoute(authContext({ modules: { rh: 1 } }), managerPolicy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { rh: 2 } }), managerPolicy)).toBe(true);
+
+    for (const [method, path] of managementRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(authContext({ modules: { rh: 2 } }), policy)).toBe(false);
+      expect(canAccessRoute(authContext({ modules: { rh: 3 } }), policy)).toBe(true);
+    }
   });
 });

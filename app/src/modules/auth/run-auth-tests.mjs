@@ -901,6 +901,7 @@ await (async () => {
       canUseRhWorkflowMessages: true,
       canViewRhDashboard: false,
       canManageRh: false,
+      canManageRhPointAdjustments: true,
       canManageRhRequests: false,
       canManageRhScore: false,
       canManageRhTimeBank: false,

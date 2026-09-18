@@ -12,7 +12,7 @@ export function parseExcludedDomains(value) {
   );
 }
 
-export function isSourceExcludedByPolicy(sourceTable, domain, excludedDomains) {
+export function isSourceExcludedByPolicy(_sourceTable, domain, excludedDomains) {
   const normalizedDomain = typeof domain === "string" ? domain.trim().toLowerCase() : "";
   if (normalizedDomain.length > 0 && excludedDomains.has(normalizedDomain)) {
     return true;

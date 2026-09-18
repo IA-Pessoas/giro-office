@@ -129,7 +129,7 @@ test("production Docker builds reuse common work and exclude local artifacts", (
   assert.match(ignore, /^\*\*\/\.env\*$/mu);
   assert.match(ignore, /^\.worktrees$/mu);
   assert.match(ignore, /^\.codex$/mu);
-  assert.match(ignore, /^\.agents$/mu);
+  assert.match(ignore, /^\.agent$/mu);
 });
 
 test("production builds minimize Prisma generation and preserve the Next cache", () => {

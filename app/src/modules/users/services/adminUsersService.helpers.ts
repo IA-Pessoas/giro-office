@@ -1,13 +1,19 @@
 import type { UserItem } from "../types";
+import {
+  ADMIN_USER_STATUS_LABELS,
+  getAdminUserStatusLabel,
+  normalizeAdminUserStatus,
+  type AdminUserStatus,
+} from "./adminUserStatusCatalog";
 
-export const ADMIN_USER_STATUS_LABELS = {
-  active: "Ativo",
-  inactive: "Inativo",
-} as const;
+export {
+  ADMIN_USER_STATUS_LABELS,
+  getAdminUserStatusLabel,
+  normalizeAdminUserStatus,
+  type AdminUserStatus,
+} from "./adminUserStatusCatalog";
 
 export const ADMIN_USERS_PAGE_SIZE = 100;
-
-export type AdminUserStatus = keyof typeof ADMIN_USER_STATUS_LABELS;
 
 export interface AdminUsersListPageParams {
   skip: number;
@@ -22,34 +28,6 @@ interface UsersListPageLike {
 interface CollectAdminUsersFromPagesParams {
   status?: AdminUserStatus;
   listPage: (params: AdminUsersListPageParams) => Promise<UsersListPageLike>;
-}
-
-export function normalizeAdminUserStatus(
-  status: string | null | undefined,
-): AdminUserStatus | null {
-  if (status === "active" || status === "inactive") {
-    return status;
-  }
-
-  if (status === "Ativo") {
-    return "active";
-  }
-
-  if (status === "Inativo") {
-    return "inactive";
-  }
-
-  return null;
-}
-
-export function getAdminUserStatusLabel(status: string | null | undefined): string {
-  const normalizedStatus = normalizeAdminUserStatus(status);
-
-  if (!normalizedStatus) {
-    return status ?? "";
-  }
-
-  return ADMIN_USER_STATUS_LABELS[normalizedStatus];
 }
 
 export function filterAdminUsersByStatus(

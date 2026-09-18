@@ -26,6 +26,8 @@ interface UserProps {
     organization_id?: string | null;
     type?: "owner" | "admin" | "user" | null;
     modules?: Record<string, number>;
+    /** Permissão específica que autoriza decidir conclusões de tarefa no nível 2. */
+    task_completion?: boolean;
     auth_kind?: "organization" | "platform";
     platform_role?: "super_admin";
 }

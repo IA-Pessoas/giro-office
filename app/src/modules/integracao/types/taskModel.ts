@@ -79,6 +79,14 @@ export interface TaskDependent {
   };
 }
 
+export interface TaskIntegrationRegularize {
+  id: string;
+  task_model_id: string;
+  referring: string;
+  referring_type: "process" | "license";
+  available: boolean;
+}
+
 export interface CreateTaskDependentData {
   task_model_id: string;
   dependent_id: string;

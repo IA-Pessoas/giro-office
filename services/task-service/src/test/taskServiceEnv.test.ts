@@ -11,6 +11,9 @@ const MANAGED_KEYS = [
   "NODE_ENV",
   "AI_EXTRACTION_MODE",
   "OPENAI_API_KEY",
+  "SUPABASE_URL",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "TASK_ATTACHMENT_STORAGE_BUCKET",
   "AI_EXTRACTION_RATE_LIMIT_MAX",
   "AI_EXTRACTION_TIMEOUT_MS",
   "AUDIT_SERVICE_TOKEN",
@@ -81,6 +84,16 @@ describe("configuração da extração de tarefas por IA", () => {
     process.env.AI_EXTRACTION_MODE = "openai";
 
     expect(() => getTaskServiceEnv()).toThrow(/OPENAI_API_KEY/);
+  });
+
+  it("exige bucket privado configurado para anexos em produção", () => {
+    process.env.NODE_ENV = "production";
+    process.env.AI_EXTRACTION_MODE = "openai";
+    process.env.OPENAI_API_KEY = "sk-test";
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
+
+    expect(() => getTaskServiceEnv()).toThrow(/TASK_ATTACHMENT_STORAGE_BUCKET/);
   });
 
   it("aceita o modo openai com a chave configurada", () => {

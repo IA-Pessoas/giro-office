@@ -1,0 +1,64 @@
+# Seguranca para agentes de codigo
+
+Fonte: incidente de 2026-09-17, em que 630 branches remotas foram reescritas por push
+forcado e receberam um bloco ofuscado em `app/postcss.config.js` e
+`lint-staged.config.mjs`. Vale para qualquer agente que escreva ou empurre codigo neste
+repositorio: Codex, Cursor, Claude Code e afins.
+
+## Nunca reescreva historico publicado
+
+- Nao empurre com as flags de forca (`--force`, `--force-with-lease`), com `--delete` nem com `+refspec`.
+- Nao use `git rebase`, `git reset --hard`, `git commit --amend`, `git filter-branch`,
+  `git filter-repo` nem `git gc --prune=now` sobre commits que ja foram empurrados.
+- Nao altere `.git/config`, hooks versionados ou `core.hooksPath` para contornar o gate.
+- Nao empurre com `--no-verify`. Se o hook reprovar, conserte a causa ou relate.
+- Historico divergiu? Traga o remoto com `git fetch` e reaplique o trabalho por cima,
+  com merge ou cherry-pick. Se nao der, pare e pergunte.
+- `main`, `develop` e `staging` nunca recebem reescrita, em nenhuma hipotese.
+- A unica excecao e a branch propria do agente, com autorizacao explicita e registrada
+  do usuario naquela conversa, declarando a intencao com `ALLOW_FORCE_PUSH=1`.
+  Autorizacao de uma vez nao vale para a proxima.
+
+O hook `pre-push` recusa qualquer push cujo commit remoto deixaria de existir
+(`scripts/git-hook-scope.mjs`). Ele e a rede, nao a permissao: a regra vale mesmo onde
+o hook nao roda, como em CI, automacao e maquinas de terceiros.
+
+## Nunca introduza codigo ofuscado
+
+Codigo que o revisor humano nao consegue ler nao entra no repositorio.
+
+- Nao gere nem cole conteudo minificado, empacotado, codificado em base64, hexadecimal
+  ou com nomes embaralhados em arquivo versionado.
+- Nao escreva codigo que remonta strings em tempo de execucao para esconder o que faz:
+  `String.fromCharCode`, `atob`, `eval`, `new Function`, `require` obtido por variavel.
+- Nao anexe nada depois do fim logico de um arquivo de configuracao. Config executavel
+  (`*.config.js|mjs|cjs|ts`, `lint-staged.config.*`, `postcss.config.*`, `next.config.*`,
+  hooks de husky, scripts de `package.json`) roda sozinha em build e em commit: e o alvo
+  preferido desse tipo de ataque.
+- Nao sobrescreva `global`, `globalThis`, `module`, `require`, `__dirname` ou
+  `__filename` em arquivo de configuracao.
+
+## Ao encontrar codigo suspeito
+
+1. Pare. Nao execute, nao construa, nao instale dependencias e nao rode hooks nesse
+   diretorio — buildar ja executa a config.
+2. Preserve a evidencia: copie o arquivo suspeito para fora do repositorio antes de
+   restaurar.
+3. Avise o usuario com o arquivo, o trecho e como voce percebeu.
+4. Só então restaure a versao limpa, de preferencia de um commit assinado.
+
+Sinais praticos, tirados do incidente e cobertos por `scripts/supply-chain-security.test.mjs`:
+
+- arquivo de configuracao que cresceu de forma desproporcional
+  (`app/postcss.config.js` limpo tem 94 bytes; infectado tinha 8.547);
+- linha unica com mais de 2.000 caracteres;
+- identificadores como `_$_827c`, `_$jsoToArr`, `global.o='8-17338'`;
+- commit de merge sem assinatura no lugar de um merge assinado pelo GitHub, com o mesmo
+  autor e a mesma mensagem, mas fuso do committer diferente do fuso do autor.
+
+## Verificacao
+
+- `pnpm test:policies` roda as politicas, incluindo a varredura de configs executaveis.
+- `node --test scripts/supply-chain-security.test.mjs` roda so essa varredura.
+- Depois de um `git fetch` e antes de buildar, confira o tamanho de
+  `app/postcss.config.js` (94 bytes) e `lint-staged.config.mjs` (766 bytes).

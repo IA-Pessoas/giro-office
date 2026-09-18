@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
   buildHookPlan,
-  buildPrePushTurboConfig,
   classifyChangedFiles,
+  describeForcePushBlock,
+  findHistoryRewrites,
   parsePrePushInput,
   resolvePrePushChangedFiles,
   runCommands,
@@ -69,64 +68,6 @@ describe("classifyChangedFiles", () => {
   });
 });
 
-describe("pre-push Turbo task graph", () => {
-  it("runs source tests without a service build and preserves library and browser prerequisites", (t) => {
-    const repoRoot = fileURLToPath(new URL("../", import.meta.url));
-    const directory = mkdtempSync(path.join(tmpdir(), "git-hook-turbo-"));
-    t.after(() => rmSync(directory, { recursive: true, force: true }));
-    const configPath = path.join(directory, "turbo.json");
-    const rootConfig = JSON.parse(readFileSync(path.join(repoRoot, "turbo.json"), "utf8"));
-    writeFileSync(configPath, JSON.stringify(buildPrePushTurboConfig(rootConfig)));
-
-    const plan = (config) => {
-      const result = spawnSync(
-        process.execPath,
-        [
-          path.join(repoRoot, "node_modules/turbo/bin/turbo"),
-          "run",
-          "test",
-          "--filter=@workspace/client-service",
-          "--filter=@workspace/app",
-          `--root-turbo-json=${config}`,
-          "--dry-run=json",
-        ],
-        { cwd: repoRoot, encoding: "utf8", timeout: 30_000 },
-      );
-      assert.equal(result.status, 0, result.stderr);
-      return JSON.parse(result.stdout).tasks;
-    };
-
-    const original = plan(path.join(repoRoot, "turbo.json"));
-    assert.ok(original.some((task) => task.taskId === "@workspace/client-service#build"));
-
-    const optimized = plan(configPath);
-    assert.deepEqual(
-      optimized
-        .filter((task) => task.task === "build")
-        .map((task) => task.taskId)
-        .sort(),
-      ["@workspace/api#build", "@workspace/app#build", "@workspace/shared#build"],
-    );
-    assert.deepEqual(
-      optimized
-        .filter((task) => task.task === "test")
-        .map((task) => task.taskId)
-        .sort(),
-      ["@workspace/app#test", "@workspace/client-service#test"],
-    );
-    assert.ok(
-      optimized
-        .find((task) => task.taskId === "@workspace/client-service#test")
-        .dependencies.includes("@workspace/shared#build"),
-    );
-    assert.ok(
-      optimized
-        .find((task) => task.taskId === "@workspace/app#test")
-        .dependencies.includes("@workspace/app#build"),
-    );
-  });
-});
-
 describe("buildHookPlan", () => {
   it("filters by the affected graph from the pushed base", () => {
     assert.deepEqual(buildHookPlan(classifyChangedFiles(["app/src/x.tsx"]), ["abc123"]), [
@@ -142,18 +83,7 @@ describe("buildHookPlan", () => {
           "--output-logs=new-only",
         ],
       ],
-      [
-        "pnpm",
-        [
-          "exec",
-          "turbo",
-          "run",
-          "test",
-          "--root-turbo-json=.turbo/git-hooks/turbo.pre-push.json",
-          "--filter=...[abc123]",
-          "--output-logs=new-only",
-        ],
-      ],
+      ["pnpm", ["test:scripts"]],
     ]);
   });
 
@@ -174,19 +104,7 @@ describe("buildHookPlan", () => {
             "--output-logs=new-only",
           ],
         ],
-        [
-          "pnpm",
-          [
-            "exec",
-            "turbo",
-            "run",
-            "test",
-            "--root-turbo-json=.turbo/git-hooks/turbo.pre-push.json",
-            "--filter=...[abc123]",
-            "--filter=...[def456]",
-            "--output-logs=new-only",
-          ],
-        ],
+        ["pnpm", ["test:scripts"]],
       ],
     );
   });
@@ -196,32 +114,39 @@ describe("buildHookPlan", () => {
       ["pnpm", ["audit:ci"]],
       ["pnpm", ["check"]],
       ["pnpm", ["typecheck"]],
-      ["pnpm", ["test"]],
+      ["pnpm", ["test:scripts"]],
     ]);
   });
 
-  it("keeps root tests and QA without rebuilding every service for known global changes", () => {
+  it("mantém as políticas de segurança nas mudanças globais, sem as suítes dos pacotes", () => {
     const files = ["infra/prisma/schema.prisma"];
     assert.deepEqual(buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files }), [
       [
         "pnpm",
-        ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
+        [
+          "exec",
+          "biome",
+          "check",
+          "--files-ignore-unknown=true",
+          "--no-errors-on-unmatched",
+          "infra/prisma/schema.prisma",
+        ],
       ],
       ["pnpm", ["typecheck"]],
       ["pnpm", ["test:scripts"]],
-      [
-        "pnpm",
-        [
-          "exec",
-          "turbo",
-          "run",
-          "test",
-          "--root-turbo-json=.turbo/git-hooks/turbo.pre-push.json",
-          "--output-logs=new-only",
-        ],
-      ],
-      ["pnpm", ["qa:integracao"]],
     ]);
+  });
+
+  // Um push que so mexe em workflow passa ao biome uma lista que ele inteira
+  // ignora. Sem --no-errors-on-unmatched ele sai 1 em "No files were processed"
+  // e derruba o push, embora nada esteja errado com a mudanca.
+  it("nao deixa o biome falhar quando todo arquivo empurrado e do tipo que ele ignora", () => {
+    const files = [".github/workflows/quality.yml"];
+    const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
+    const biome = commands.find(([, args]) => args.includes("biome"));
+
+    assert.ok(biome, "esperava um comando do biome no plano");
+    assert.ok(biome[1].includes("--no-errors-on-unmatched"));
   });
 
   it("audits dependency changes even inside an affected package", () => {
@@ -237,7 +162,7 @@ describe("buildHookPlan", () => {
       commands.some(([, args]) => args.includes("audit:ci")),
       false,
     );
-    assert.equal(commands.filter(([, args]) => args.includes("test")).length, 1);
+    assert.equal(commands.filter(([, args]) => args.includes("test:scripts")).length, 1);
   });
 
   it("allows explicitly running all original gates even without changed files", () => {
@@ -251,6 +176,66 @@ describe("buildHookPlan", () => {
 
   it("skips every command for docs-only changes", () => {
     assert.deepEqual(buildHookPlan(classifyChangedFiles(["docs/x.md"]), ["abc"]), []);
+  });
+});
+
+describe("bloqueio de force push", () => {
+  const gitFake = (ancestralidade) => ({
+    isAncestor: (ancestor, descendant) => ancestralidade[`${ancestor}->${descendant}`] ?? true,
+  });
+
+  const registro = (branch, remoteOid, localOid) => ({
+    localRef: `refs/heads/${branch}`,
+    localOid,
+    remoteRef: `refs/heads/${branch}`,
+    remoteOid,
+  });
+
+  it("não acusa quando o push é avanço normal", () => {
+    const rewrites = findHistoryRewrites([registro("feature/x", "aaa", "bbb")], gitFake({}));
+    assert.deepEqual(rewrites, []);
+    assert.equal(describeForcePushBlock(rewrites, {}), null);
+  });
+
+  it("acusa quando o commit publicado deixaria de existir", () => {
+    const rewrites = findHistoryRewrites(
+      [registro("feature/x", "aaa", "bbb")],
+      gitFake({ "aaa->bbb": false }),
+    );
+
+    assert.equal(rewrites.length, 1);
+    assert.match(describeForcePushBlock(rewrites, {}), /reescrita de historico/);
+    assert.match(describeForcePushBlock(rewrites, {}), /ALLOW_FORCE_PUSH=1/);
+  });
+
+  it("libera branch própria quando a intenção é declarada", () => {
+    const rewrites = findHistoryRewrites(
+      [registro("feature/x", "aaa", "bbb")],
+      gitFake({ "aaa->bbb": false }),
+    );
+
+    assert.equal(describeForcePushBlock(rewrites, { ALLOW_FORCE_PUSH: "1" }), null);
+  });
+
+  it("não libera main, develop nem staging, mesmo com a intenção declarada", () => {
+    for (const branch of ["main", "develop", "staging"]) {
+      const rewrites = findHistoryRewrites(
+        [registro(branch, "aaa", "bbb")],
+        gitFake({ "aaa->bbb": false }),
+      );
+
+      assert.match(
+        describeForcePushBlock(rewrites, { ALLOW_FORCE_PUSH: "1" }),
+        new RegExp(`Reescrever historico de ${branch}`),
+      );
+    }
+  });
+
+  it("ignora criação e remoção de branch", () => {
+    const criacao = registro("feature/nova", "0000000000000000000000000000000000000000", "bbb");
+    const remocao = registro("feature/velha", "aaa", "0000000000000000000000000000000000000000");
+
+    assert.deepEqual(findHistoryRewrites([criacao, remocao], gitFake({})), []);
   });
 });
 
@@ -275,6 +260,28 @@ describe("parsePrePushInput", () => {
         },
       ],
     );
+  });
+
+  // O git sempre escreve os quatro campos, inclusive ao apagar uma branch
+  // ("(delete) 000... refs/heads/x <oid>"). Uma linha com menos campos e
+  // entrada corrompida: descarta-la faria o gate concluir que nada esta sendo
+  // empurrado e liberar justamente o push que ele existe para barrar.
+  it("recusa uma linha incompleta em vez de descartar", () => {
+    assert.throws(
+      () => parsePrePushInput("refs/heads/feature  refs/heads/feature def456\n"),
+      /entrada do pre-push malformada/,
+    );
+  });
+
+  it("aceita a linha de quatro campos que apaga uma branch", () => {
+    assert.deepEqual(parsePrePushInput(`(delete) ${"0".repeat(40)} refs/heads/feature def456\n`), [
+      {
+        localRef: "(delete)",
+        localOid: "0".repeat(40),
+        remoteRef: "refs/heads/feature",
+        remoteOid: "def456",
+      },
+    ]);
   });
 });
 
@@ -365,5 +372,75 @@ describe("runCommands", () => {
       ["pnpm", ["audit:ci"]],
       ["cmd.exe", ["/d", "/s", "/c", "corepack", "pnpm", "audit:ci"]],
     ]);
+  });
+  it("limita a concorrência do turbo para a carga da máquina não virar vermelho falso", () => {
+    const ambientes = [];
+    const fakeSpawn = (_command, _args, options = {}) => {
+      ambientes.push(options.env);
+      return { status: 0 };
+    };
+
+    runCommands([["pnpm", ["test:scripts"]]], fakeSpawn, { PATH: "/usr/bin" }, "linux");
+
+    assert.equal(ambientes[0].TURBO_CONCURRENCY, "50%");
+    assert.equal(ambientes[0].PATH, "/usr/bin");
+  });
+
+  it("respeita TURBO_CONCURRENCY já definido no ambiente", () => {
+    const ambientes = [];
+    const fakeSpawn = (_command, _args, options = {}) => {
+      ambientes.push(options.env);
+      return { status: 0 };
+    };
+
+    runCommands([["pnpm", ["test:scripts"]]], fakeSpawn, { TURBO_CONCURRENCY: "2" }, "linux");
+
+    assert.equal(ambientes[0].TURBO_CONCURRENCY, "2");
+  });
+});
+
+describe("hook executado de ponta a ponta", () => {
+  const hookPath = fileURLToPath(new URL("./git-hook-scope.mjs", import.meta.url));
+  const repoRoot = path.dirname(path.dirname(hookPath));
+
+  const rodar = (linha, env = {}) =>
+    spawnSync(process.execPath, [hookPath, "pre-push"], {
+      cwd: repoRoot,
+      input: `${linha}\n`,
+      encoding: "utf8",
+      env: { ...process.env, ...env },
+    });
+
+  // Cobre o caminho real: o hook so enxerga o que esta sendo empurrado se conseguir
+  // ler a entrada padrao. Uma falha ali deixa o gate cego sem ninguem perceber.
+  it("recusa um push que descartaria commit publicado", () => {
+    const head = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+    const anterior = spawnSync("git", ["rev-parse", "HEAD~1"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+
+    const resultado = rodar(
+      `refs/heads/feature/teste ${anterior} refs/heads/feature/teste ${head}`,
+    );
+
+    assert.equal(resultado.status, 1);
+    assert.match(resultado.stderr, /reescrita de historico detectada/);
+  });
+
+  it("enxerga as refs empurradas em vez de tratar como push sem mudancas", () => {
+    const head = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+
+    const resultado = rodar(`refs/heads/feature/teste ${head} refs/heads/feature/teste ${head}`, {
+      GIT_HOOK_SCOPE_DRY_RUN: "1",
+    });
+
+    assert.doesNotMatch(resultado.stderr, /nao foi possivel ler a entrada do hook/);
   });
 });

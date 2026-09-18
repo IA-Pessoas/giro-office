@@ -146,6 +146,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.projectServiceUrl,
       auditTarget: "project-service",
       routePrefixes: [...PROJECT_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
     },
     {
       key: "client-service",
@@ -159,6 +160,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.regularizeServiceUrl,
       auditTarget: "regularize-service",
       routePrefixes: [...REGULARIZE_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
     },
     {
       key: "fiscal-service",

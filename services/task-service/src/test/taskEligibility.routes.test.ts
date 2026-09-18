@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock, authContext, auditMock, workflowMock } = vi.hoisted(() => ({
   prismaMock: {
+    $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(prismaMock)),
     department: { findFirst: vi.fn() },
     project: { findFirst: vi.fn() },
     client: { findFirst: vi.fn() },
@@ -21,6 +22,7 @@ const { prismaMock, authContext, auditMock, workflowMock } = vi.hoisted(() => ({
     },
     taskModel: { findFirst: vi.fn() },
     taskDependent: { findMany: vi.fn() },
+    taskCompletionRequest: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
     user: { findFirst: vi.fn(), findMany: vi.fn() },
     permissionSpecific: { findFirst: vi.fn() },
   },
@@ -34,6 +36,13 @@ vi.mock("../integrations/audit.js", () => auditMock);
 vi.mock("../services/taskWorkflowService.js", () => ({
   TaskWorkflowService: vi.fn(function TaskWorkflowService() {
     return workflowMock;
+  }),
+}));
+vi.mock("../services/taskOperationalNotificationService.js", () => ({
+  publishTaskOperationalNotifications: vi.fn(),
+  TASK_OPERATIONAL_NOTIFICATION_TYPE: { TASK_CHANGED: "task_changed" },
+  TaskOperationalNotificationService: vi.fn(function TaskOperationalNotificationService() {
+    return { list: vi.fn(), markRead: vi.fn() };
   }),
 }));
 vi.mock("../middlewares/isAuthenticated.js", () => ({

@@ -85,6 +85,15 @@ services:
   parcelamento-service:
     <<: *small_service
 
+  commercial-service:
+    <<: *small_service
+
+  reports-service:
+    <<: *medium_service
+
+  reports-worker:
+    <<: *medium_service
+
   audit-service:
     <<: *medium_service
 

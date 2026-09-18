@@ -5,10 +5,13 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const PORT = process.env.AUTH_SESSION_SMOKE_PORT || "3116";
 const configuredBaseUrl = process.env.AUTH_SESSION_SMOKE_BASE_URL?.replace(/\/$/, "");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const smokeEnv = browserSmokeEnv();
 const evidenceDir = fileURLToPath(
   new URL("../../../../docs/superpowers/evidence/", import.meta.url),
 );
@@ -163,6 +166,8 @@ async function withNextServer(test) {
     return;
   }
 
+  buildApp();
+
   const command = process.platform === "win32" ? "cmd" : "corepack";
   const args =
     process.platform === "win32"
@@ -170,7 +175,7 @@ async function withNextServer(test) {
       : ["pnpm", "exec", "next", "start", "--port", PORT];
   const serverProcess = spawn(command, args, {
     cwd: appRoot,
-    env: process.env,
+    env: smokeEnv,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -189,6 +194,21 @@ async function withNextServer(test) {
   } finally {
     stopServer(serverProcess);
   }
+}
+
+function buildApp() {
+  const command = process.platform === "win32" ? "cmd" : "corepack";
+  const args =
+    process.platform === "win32"
+      ? ["/c", "corepack", "pnpm", "run", "build"]
+      : ["pnpm", "run", "build"];
+
+  execFileSync(command, args, {
+    cwd: appRoot,
+    env: smokeEnv,
+    stdio: "inherit",
+    windowsHide: true,
+  });
 }
 
 async function waitForServer(serverProcess, getOutput) {
