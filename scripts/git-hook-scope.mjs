@@ -99,7 +99,22 @@ function buildBiomeCheckCommand(changedFiles) {
     return ["pnpm", ["check"]];
   }
 
-  return ["pnpm", ["exec", "biome", "check", "--files-ignore-unknown=true", ...changedFiles]];
+  // `--files-ignore-unknown` silencia o diagnostico por arquivo, mas se a lista
+  // inteira for de tipos que o biome ignora (um push so de workflow, por
+  // exemplo) ele ainda sai 1 em "No files were processed" e derruba o push.
+  // `--no-errors-on-unmatched` cobre esse caso sem esconder erro de arquivo que
+  // ele de fato entende.
+  return [
+    "pnpm",
+    [
+      "exec",
+      "biome",
+      "check",
+      "--files-ignore-unknown=true",
+      "--no-errors-on-unmatched",
+      ...changedFiles,
+    ],
+  ];
 }
 
 export function classifyChangedFiles(changedFiles) {
