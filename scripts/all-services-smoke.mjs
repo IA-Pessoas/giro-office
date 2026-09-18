@@ -4396,6 +4396,17 @@ const handlers = {
     });
   },
 
+  async triageStatementArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+        bank_id: "001",
+      },
+    });
+  },
+
   async triageClosingGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],

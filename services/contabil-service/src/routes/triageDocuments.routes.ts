@@ -14,6 +14,7 @@ import {
   triageEditabilityRequestSchema,
   triageMonthlyIdParamsSchema,
   triageMonthlyRequestSchema,
+  triageStatementArchiveBodySchema,
   triageStatementBodySchema,
 } from "../schemas/triageDocuments.schemas.js";
 import type {
@@ -30,6 +31,7 @@ export type TriageDocumentsRouteDeps = Pick<
   | "updateAll"
   | "listStatements"
   | "upsertStatement"
+  | "archiveStatement"
 >;
 
 function authenticatedContext(request: Request) {
@@ -163,6 +165,22 @@ export function createTriageDocumentsRoutes(
         );
       } catch (err) {
         logError("Erro ao atualizar extrato bancário", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    "/statements",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(triageStatementArchiveBodySchema, req.body);
+        res.json(
+          createSuccessResponse(await service.archiveStatement(body, authenticatedContext(req))),
+        );
+      } catch (err) {
+        logError("Erro ao arquivar marcador de extrato bancário", { err });
         next(err);
       }
     },

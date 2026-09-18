@@ -80,3 +80,10 @@ export const triageStatementBodySchema = z
     status: z.enum(TRIAGE_DOCUMENT_STATUSES),
   })
   .strict();
+
+export const triageStatementArchiveBodySchema = z
+  .object({
+    ...monthlyIdentityShape,
+    bank_id: z.string().trim().min(1, "bank_id é obrigatório.").max(100),
+  })
+  .strict();

@@ -97,6 +97,12 @@ export interface TriageStatementUpsert {
   status: TriageDocumentStatus;
 }
 
+export interface TriageStatementArchive {
+  client_id: string;
+  competence: string;
+  bank_id: string;
+}
+
 export interface TriageDocumentSummary {
   applicable: number;
   attention: number;
@@ -220,6 +226,10 @@ function isUniqueViolation(error: unknown): boolean {
     "code" in error &&
     (error as { code?: unknown }).code === "P2002"
   );
+}
+
+function triageStatementLockKey(identity: Record<string, string>): string {
+  return JSON.stringify(identity);
 }
 
 export class TriageDocumentsService {
@@ -513,6 +523,7 @@ export class TriageDocumentsService {
     if (!isTriageDocumentStatus(request.status) || request.bank_id.trim().length === 0) {
       throw new ServiceError(400, "Marcador de extrato bancário inválido.");
     }
+    await this.assertClientInOrganization(request.client_id, auth.organizationId);
     await this.assertCanEdit(request.client_id, auth, "CONTABIL");
     const identity = {
       organization_id: auth.organizationId,
@@ -520,13 +531,19 @@ export class TriageDocumentsService {
       competence: request.competence,
       bank_id: request.bank_id,
     };
-    const existing = await this.prisma.triageBankStatement.findFirst({
-      where: { ...identity, archived_at: null },
-    });
-    const statement = await this.prisma.triageBankStatement.upsert({
-      where: { organization_id_client_id_competence_bank_id: identity },
-      create: { ...identity, status: request.status },
-      update: { status: request.status },
+    const { existing, statement } = await this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${triageStatementLockKey(identity)}, 0))
+      `;
+      const existing = await transaction.triageBankStatement.findFirst({
+        where: { ...identity, archived_at: null },
+      });
+      const statement = await transaction.triageBankStatement.upsert({
+        where: { organization_id_client_id_competence_bank_id: identity },
+        create: { ...identity, status: request.status },
+        update: { status: request.status, archived_at: null },
+      });
+      return { existing, statement };
     });
 
     await this.audit.logUpdateIfChanged({
@@ -541,6 +558,54 @@ export class TriageDocumentsService {
     });
 
     return statement;
+  }
+
+  async archiveStatement(
+    request: TriageStatementArchive,
+    auth: TriageDocumentsAuthContext,
+  ): Promise<unknown> {
+    if (request.bank_id.trim().length === 0) {
+      throw new ServiceError(400, "Marcador de extrato bancário inválido.");
+    }
+    await this.assertClientInOrganization(request.client_id, auth.organizationId);
+    await this.assertCanEdit(request.client_id, auth, "CONTABIL");
+    const identity = {
+      organization_id: auth.organizationId,
+      client_id: request.client_id,
+      competence: request.competence,
+      bank_id: request.bank_id,
+    };
+    const { statement, archived } = await this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended(${triageStatementLockKey(identity)}, 0))
+      `;
+      const statement = await transaction.triageBankStatement.findFirst({
+        where: { ...identity, archived_at: null },
+      });
+
+      if (!statement) {
+        throw new ServiceError(404, "Marcador de extrato bancário não encontrado.");
+      }
+
+      const archived = await transaction.triageBankStatement.update({
+        where: { id: statement.id },
+        data: { archived_at: new Date() },
+      });
+      return { statement, archived };
+    });
+
+    await this.audit.logUpdateIfChanged({
+      userId: auth.userId,
+      organizationId: auth.organizationId,
+      permission: auth.permission ?? null,
+      action: "Arquivar marcador de extrato bancário",
+      referring: "triagem.bank_statements",
+      referringId: archived.id,
+      oldData: statement as Record<string, unknown>,
+      updatedData: archived as Record<string, unknown>,
+    });
+
+    return archived;
   }
 
   private async findMonthlyForUpdate(
@@ -585,6 +650,19 @@ export class TriageDocumentsService {
     });
     if (!assignment) {
       throw new ServiceError(403, "Permissão insuficiente para alterar pendências documentais.");
+    }
+  }
+
+  private async assertClientInOrganization(
+    clientId: string,
+    organizationId: string,
+  ): Promise<void> {
+    const client = await this.prisma.client.findFirst({
+      where: { id: clientId, organization_id: organizationId },
+      select: { id: true },
+    });
+    if (!client) {
+      throw new ServiceError(404, "Cliente não encontrado.");
     }
   }
 

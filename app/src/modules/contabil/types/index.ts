@@ -212,6 +212,7 @@ export interface TriageBankStatement {
   id: string;
   bank_id: string;
   status: TriageDocumentStatus;
+  archived_at: string | null;
 }
 
 export type TriageClosingStatus =
