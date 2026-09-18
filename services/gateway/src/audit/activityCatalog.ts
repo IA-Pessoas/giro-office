@@ -667,6 +667,26 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "as pendências documentais contábeis" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/triagem\/external-links\/?$/,
+    description: { action: "consultou", item: "os links externos da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/external-links\/?$/,
+    description: { action: "cadastrou", item: "um link externo da Triagem" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/external-links\/[^/]+\/?$/,
+    description: { action: "atualizou", item: "um link externo da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/external-links\/[^/]+\/archive\/?$/,
+    description: { action: "arquivou", item: "um link externo da Triagem" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/contabil\/controls\/year$/,
     description: { action: "criou", item: "os controles contábeis anuais" },
@@ -922,6 +942,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um marcador de extrato bancário",
     newSingular: "um novo marcador de extrato bancário",
     plural: "marcadores de extratos bancários",
+  },
+  {
+    pattern: /^\/triagem\/external-links(?:\/|$)/,
+    singular: "um link externo da Triagem",
+    newSingular: "um novo link externo da Triagem",
+    plural: "links externos da Triagem",
   },
   {
     pattern: /^\/rh\/point-config(?:\/|$)/,

@@ -7,6 +7,7 @@ import {
   useTriageCompetenceMutations,
   useTriageCompetences,
 } from "../hooks";
+import { TriageExternalLinksSection } from "./TriageExternalLinksSection";
 
 function currentCompetence(): string {
   const now = new Date();
@@ -78,29 +79,33 @@ export function TriageCompetenceSection({
     return (
       <ul className="mt-4 divide-y rounded-lg border border-gray-200 dark:divide-slate-800 dark:border-slate-700">
         {records.map((item) => (
-          <li
-            key={item.id}
-            className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <p className="font-medium capitalize text-gray-900 dark:text-white">
-                {formatCompetence(item.competence)}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-slate-400">
-                Criada em {new Date(item.created_at).toLocaleDateString("pt-BR")}
-              </p>
+          <li key={item.id} className="p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium capitalize text-gray-900 dark:text-white">
+                  {formatCompetence(item.competence)}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-slate-400">
+                  Criada em {new Date(item.created_at).toLocaleDateString("pt-BR")}
+                </p>
+              </div>
+              {canEdit ? (
+                <button
+                  type="button"
+                  onClick={() => archiveCompetence(item.id)}
+                  disabled={mutations.archive.isPending}
+                  className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:self-auto"
+                >
+                  <Archive className="h-4 w-4" aria-hidden="true" />
+                  Arquivar
+                </button>
+              ) : null}
             </div>
-            {canEdit ? (
-              <button
-                type="button"
-                onClick={() => archiveCompetence(item.id)}
-                disabled={mutations.archive.isPending}
-                className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:self-auto"
-              >
-                <Archive className="h-4 w-4" aria-hidden="true" />
-                Arquivar
-              </button>
-            ) : null}
+            <TriageExternalLinksSection
+              clientId={clientId}
+              competence={item.competence}
+              canEdit={canEdit}
+            />
           </li>
         ))}
       </ul>

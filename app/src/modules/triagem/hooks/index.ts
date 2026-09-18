@@ -3,3 +3,8 @@ export {
   useTriageCompetenceMutations,
   useTriageCompetences,
 } from "./useTriageCompetences";
+export {
+  triagemExternalLinksQueryKey,
+  useTriageExternalLinkMutations,
+  useTriageExternalLinks,
+} from "./useTriageExternalLinks";

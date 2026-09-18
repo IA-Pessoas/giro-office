@@ -18,7 +18,12 @@ import {
   createTriageCompetenceRoutes,
   type TriageCompetenceRouteDeps,
 } from "./routes/triageCompetence.routes.js";
+import {
+  createTriageExternalLinkRoutes,
+  type TriageExternalLinkRouteDeps,
+} from "./routes/triageExternalLinks.routes.js";
 import { TriageCompetenceService } from "./services/triageCompetenceService.js";
+import { TriageExternalLinkService } from "./services/triageExternalLinkService.js";
 
 function triagemServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const context = request.triagemContext;
@@ -38,6 +43,7 @@ export interface CreateTriagemAppOptions {
   logger: Logger;
   prisma?: TriagemPrismaClient;
   triageCompetenceRouteDeps?: TriageCompetenceRouteDeps;
+  triageExternalLinkRouteDeps?: TriageExternalLinkRouteDeps;
 }
 
 export function createTriagemApp({
@@ -45,9 +51,11 @@ export function createTriagemApp({
   logger,
   prisma = createTriagemPrismaClient(env.databaseUrl),
   triageCompetenceRouteDeps,
+  triageExternalLinkRouteDeps,
 }: CreateTriagemAppOptions): express.Express {
   const app = express();
   const competenceService = new TriageCompetenceService(prisma);
+  const externalLinkService = new TriageExternalLinkService(prisma);
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -76,6 +84,10 @@ export function createTriagemApp({
   }
 
   app.use("/triagem", createTriageCompetenceRoutes(triageCompetenceRouteDeps ?? competenceService));
+  app.use(
+    "/triagem",
+    createTriageExternalLinkRoutes(triageExternalLinkRouteDeps ?? externalLinkService),
+  );
   app.use(
     createExpressErrorHandler({
       logger,

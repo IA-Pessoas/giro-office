@@ -45,6 +45,42 @@ const competence = {
   },
 } as const;
 
+const externalLink = {
+  type: "object",
+  required: [
+    "id",
+    "client_id",
+    "competence",
+    "type",
+    "url",
+    "description",
+    "responsible_id",
+    "archived_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    client_id: { type: "string", format: "uuid" },
+    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    type: { type: "string", enum: ["CLOUD", "DRIVE"] },
+    url: { type: "string", format: "uri", pattern: "^https://" },
+    description: { type: ["string", "null"] },
+    responsible_id: { type: ["string", "null"], format: "uuid" },
+    responsible: {
+      type: ["object", "null"],
+      properties: {
+        id: { type: "string", format: "uuid" },
+        name: { type: "string" },
+        status: { type: "string" },
+      },
+    },
+    archived_at: { type: ["string", "null"], format: "date-time" },
+    created_at: { type: "string", format: "date-time" },
+    updated_at: { type: "string", format: "date-time" },
+  },
+} as const;
+
 export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiDocument {
   return {
     openapi: "3.0.3",
@@ -57,6 +93,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
     tags: [
       { name: "Health", description: "Saúde do serviço" },
       { name: "Competencies", description: "Competências mensais da Triagem" },
+      { name: "ExternalLinks", description: "Links externos por competência" },
     ],
     paths: {
       "/health": {
@@ -156,12 +193,137 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
           },
         },
       },
+      "/triagem/external-links": {
+        get: {
+          tags: ["ExternalLinks"],
+          summary: "Listar links externos",
+          security: bearer,
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+            { name: "include_archived", in: "query", schema: { type: "boolean" } },
+          ],
+          responses: {
+            "200": {
+              description: "Links externos",
+              ...successEnvelope({
+                type: "array",
+                items: { $ref: "#/components/schemas/TriageExternalLink" },
+              }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+          },
+        },
+        post: {
+          tags: ["ExternalLinks"],
+          summary: "Criar link externo",
+          security: bearer,
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "type", "url"],
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    type: { type: "string", enum: ["CLOUD", "DRIVE"] },
+                    url: { type: "string", format: "uri", pattern: "^https://" },
+                    description: { type: ["string", "null"] },
+                    responsible_id: { type: ["string", "null"], format: "uuid" },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Criado",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageExternalLink" }),
+            },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Cliente ou responsável não encontrado" },
+          },
+        },
+      },
+      "/triagem/external-links/{id}": {
+        put: {
+          tags: ["ExternalLinks"],
+          summary: "Revisar link externo",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["type", "url"],
+                  properties: {
+                    type: { type: "string", enum: ["CLOUD", "DRIVE"] },
+                    url: { type: "string", format: "uri", pattern: "^https://" },
+                    description: { type: ["string", "null"] },
+                    responsible_id: { type: ["string", "null"], format: "uuid" },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizado",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageExternalLink" }),
+            },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Link ou responsável não encontrado" },
+          },
+        },
+      },
+      "/triagem/external-links/{id}/archive": {
+        patch: {
+          tags: ["ExternalLinks"],
+          summary: "Arquivar link externo",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Arquivado",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageExternalLink" }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Link não encontrado" },
+          },
+        },
+      },
     },
     components: {
       securitySchemes: {
         bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
       },
-      schemas: { TriageCompetence: competence },
+      schemas: { TriageCompetence: competence, TriageExternalLink: externalLink },
     },
   };
 }

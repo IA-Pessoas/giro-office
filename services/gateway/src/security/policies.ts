@@ -45,7 +45,7 @@ const commercialEditPolicy = createModulePolicy("comercial", moduleEditPermissio
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
-    modules: ["rh", "contabil"],
+    modules: ["rh", "contabil", "triagem"],
     minPermission: moduleAccessPermission,
   },
 };

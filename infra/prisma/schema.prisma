@@ -227,6 +227,7 @@ model Organization {
   triageCompetences             TriageCompetence[]
   triageCompetenceHistories     TriageCompetenceHistory[]
   triageOutboxEvents            TriageOutboxEvent[]
+  triageExternalLinks           TriageExternalLink[]
 
   @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
@@ -365,6 +366,7 @@ model User {
   triageMonthlys              TriageMonthly[]
   responsiblesTriage          TriageResponsible[]
   triageCompetenceHistories   TriageCompetenceHistory[]
+  triageExternalLinks         TriageExternalLink[]       @relation("TriageExternalLinkResponsible")
   department                  Department             @relation(fields: [department_id], references: [id])
 
   @@unique([login], map: "users_login_key")
@@ -698,6 +700,7 @@ model Client {
   triageBankStatements          TriageBankStatement[]
   triageClosings                TriageClosing[]
   triageCompetences             TriageCompetence[]
+  triageExternalLinks           TriageExternalLink[]
   commercialProspectings        CommercialProspecting[]
 
   @@map("clients")
@@ -2533,6 +2536,27 @@ model TriageCompetence {
   @@index([organization_id, client_id, archived_at])
   @@index([organization_id, competence, archived_at])
   @@map("triagem.competences")
+}
+
+model TriageExternalLink {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      String
+  type            String
+  url             String
+  description     String?
+  responsible_id  String?
+  archived_at     DateTime?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  client          Client       @relation(fields: [client_id], references: [id], onDelete: Restrict)
+  responsible     User?        @relation("TriageExternalLinkResponsible", fields: [responsible_id], references: [id], onDelete: SetNull)
+
+  @@index([organization_id, client_id, competence, archived_at], map: "idx_triagem_external_links_scope")
+  @@index([organization_id, responsible_id], map: "idx_triagem_external_links_responsible")
+  @@map("triagem.external_links")
 }
 
 model TriageCompetenceHistory {
