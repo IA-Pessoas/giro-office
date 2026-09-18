@@ -66,9 +66,9 @@ const externalLink = {
     type: { type: "string", enum: ["CLOUD", "DRIVE"] },
     url: { type: "string", format: "uri", pattern: "^https://" },
     description: { type: ["string", "null"] },
-    responsible_id: { type: ["string", "null"], format: "uuid" },
+    responsible_id: { type: "string", format: "uuid" },
     responsible: {
-      type: ["object", "null"],
+      type: "object",
       properties: {
         id: { type: "string", format: "uuid" },
         name: { type: "string" },
@@ -76,6 +76,54 @@ const externalLink = {
       },
     },
     archived_at: { type: ["string", "null"], format: "date-time" },
+    created_at: { type: "string", format: "date-time" },
+    updated_at: { type: "string", format: "date-time" },
+  },
+} as const;
+
+const urgentRequest = {
+  type: "object",
+  required: [
+    "id",
+    "client_id",
+    "competence",
+    "requester_id",
+    "responsible_id",
+    "urgency_code",
+    "description",
+    "status",
+    "resolution_note",
+    "resolved_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    client_id: { type: "string", format: "uuid" },
+    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    requester_id: { type: "string", format: "uuid" },
+    responsible_id: { type: ["string", "null"], format: "uuid" },
+    urgency_code: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+    description: { type: "string", minLength: 1, maxLength: 2000 },
+    status: { type: "string", enum: ["OPEN", "CLOSED"] },
+    resolution_note: { type: ["string", "null"], maxLength: 2000 },
+    resolved_at: { type: ["string", "null"], format: "date-time" },
+    requester: {
+      type: "object",
+      properties: {
+        id: { type: "string", format: "uuid" },
+        name: { type: ["string", "null"] },
+        full_name: { type: ["string", "null"] },
+      },
+    },
+    responsible: {
+      type: ["object", "null"],
+      properties: {
+        id: { type: "string", format: "uuid" },
+        name: { type: ["string", "null"] },
+        full_name: { type: ["string", "null"] },
+      },
+    },
     created_at: { type: "string", format: "date-time" },
     updated_at: { type: "string", format: "date-time" },
   },
@@ -94,6 +142,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
       { name: "Health", description: "Saúde do serviço" },
       { name: "Competencies", description: "Competências mensais da Triagem" },
       { name: "ExternalLinks", description: "Links externos por competência" },
+      { name: "UrgentRequests", description: "Solicitações urgentes por competência" },
     ],
     paths: {
       "/health": {
@@ -318,12 +367,182 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
           },
         },
       },
+      "/triagem/urgent-requests": {
+        get: {
+          tags: ["UrgentRequests"],
+          summary: "Listar solicitações urgentes",
+          security: bearer,
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+            { name: "status", in: "query", schema: { type: "string", enum: ["OPEN", "CLOSED"] } },
+          ],
+          responses: {
+            "200": {
+              description: "Solicitações urgentes",
+              ...successEnvelope({
+                type: "array",
+                items: { $ref: "#/components/schemas/TriageUrgentRequest" },
+              }),
+            },
+            "400": { description: "Filtros inválidos" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+          },
+        },
+        post: {
+          tags: ["UrgentRequests"],
+          summary: "Criar solicitação urgente",
+          security: bearer,
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: [
+                    "client_id",
+                    "competence",
+                    "urgency_code",
+                    "description",
+                    "responsible_id",
+                  ],
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    urgency_code: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+                    description: { type: "string", minLength: 1, maxLength: 2000 },
+                    responsible_id: { type: "string", format: "uuid" },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Criada",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageUrgentRequest" }),
+            },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Cliente ou responsável não encontrado" },
+          },
+        },
+      },
+      "/triagem/urgent-requests/{id}": {
+        put: {
+          tags: ["UrgentRequests"],
+          summary: "Atualizar solicitação urgente",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    urgency_code: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+                    description: { type: "string", minLength: 1, maxLength: 2000 },
+                    responsible_id: { type: "string", format: "uuid" },
+                  },
+                  minProperties: 1,
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Atualizada",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageUrgentRequest" }),
+            },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Solicitação ou responsável não encontrado" },
+            "409": { description: "Solicitação fechada" },
+          },
+        },
+      },
+      "/triagem/urgent-requests/{id}/close": {
+        patch: {
+          tags: ["UrgentRequests"],
+          summary: "Fechar solicitação urgente",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["resolution_note"],
+                  properties: {
+                    resolution_note: { type: "string", minLength: 1, maxLength: 2000 },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Fechada",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageUrgentRequest" }),
+            },
+            "400": { description: "Nota inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Solicitação não encontrada" },
+          },
+        },
+      },
+      "/triagem/urgent-requests/{id}/reopen": {
+        patch: {
+          tags: ["UrgentRequests"],
+          summary: "Reabrir solicitação urgente",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Reaberta",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageUrgentRequest" }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Solicitação não encontrada" },
+          },
+        },
+      },
     },
     components: {
       securitySchemes: {
         bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
       },
-      schemas: { TriageCompetence: competence, TriageExternalLink: externalLink },
+      schemas: {
+        TriageCompetence: competence,
+        TriageExternalLink: externalLink,
+        TriageUrgentRequest: urgentRequest,
+      },
     },
   };
 }
