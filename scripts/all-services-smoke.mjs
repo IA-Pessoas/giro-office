@@ -248,6 +248,7 @@ const state = {
   contabilControlCompetence: "",
   triagemExternalLinkId: "",
   triagemExternalLinkCompetence: "",
+  triagemCatalogId: "",
   triagemUrgentRequestId: "",
   triagemUrgentRequestCompetence: "",
   contabilResponsibleId: "",
@@ -4525,6 +4526,43 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/triagem/competencies/${requireState("triagemCompetenceId")}/archive`,
+    });
+  },
+
+  async triagemCatalogList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { kind: "JUSTIFICATION" },
+    });
+  },
+
+  async triagemCatalogCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        kind: "JUSTIFICATION",
+        code: "SMOKE_NO_MOVEMENT",
+        label: "Sem movimento (smoke)",
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemCatalogId = id;
+  },
+
+  async triagemCatalogUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/catalogs/${requireState("triagemCatalogId")}`,
+      json: { label: "Sem movimento (smoke revisado)" },
+    });
+  },
+
+  async triagemCatalogArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/catalogs/${requireState("triagemCatalogId")}/archive`,
     });
   },
 

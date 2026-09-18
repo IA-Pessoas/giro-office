@@ -2,6 +2,7 @@ export {
   TriageCompetenceSection,
   TriageExternalLinksSection,
   TriageUrgentRequestsSection,
+  TriageCatalogSection,
 } from "./components";
 export {
   triagemCompetencesQueryKey,
@@ -10,10 +11,14 @@ export {
   triagemExternalLinksQueryKey,
   useTriageExternalLinkMutations,
   useTriageExternalLinks,
+  triagemCatalogsQueryKey,
+  useTriageCatalogMutations,
+  useTriageCatalogs,
 } from "./hooks";
 export { triagemCompetenceService } from "./services";
 export { triagemExternalLinkService } from "./services";
 export { triagemUrgentRequestService } from "./services";
+export { triagemCatalogService } from "./services";
 export type {
   TriageCompetence,
   TriageExternalLink,
@@ -23,4 +28,7 @@ export type {
   TriageUrgentRequestInput,
   TriageUrgentRequestStatus,
   TriageUrgencyCode,
+  TriageCatalogInput,
+  TriageCatalogItem,
+  TriageCatalogKind,
 } from "./services";

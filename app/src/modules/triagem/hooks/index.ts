@@ -13,3 +13,4 @@ export {
   useTriageUrgentRequestMutations,
   useTriageUrgentRequests,
 } from "./useTriageUrgentRequests";
+export { triagemCatalogsQueryKey, useTriageCatalogMutations, useTriageCatalogs } from "./useTriageCatalogs";

@@ -4,7 +4,7 @@ import Head from "next/head";
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import { AccessDeniedPanel, TriageDocumentsSection, useTriageEditability } from "@modules/contabil";
-import { TriageCompetenceSection } from "@modules/triagem";
+import { TriageCatalogSection, TriageCompetenceSection } from "@modules/triagem";
 
 export default function TriagemPage() {
   const { access, isLoading } = useModuleAccess("triagem");
@@ -48,6 +48,7 @@ export default function TriagemPage() {
               }}
             />
           </header>
+          <TriageCatalogSection canEdit={access.canEdit} />
           {client ? (
             <>
               <TriageCompetenceSection clientId={client.id} canEdit={access.canEdit} />
