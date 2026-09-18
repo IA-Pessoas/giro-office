@@ -2730,6 +2730,7 @@ model TriageCompetence {
   competence             String
   configuration_snapshot Json
   responsible_snapshot   Json
+  catalog_snapshot_initialized_at DateTime?
   archived_at            DateTime?
   created_at             DateTime                  @default(now())
   updated_at             DateTime                  @updatedAt

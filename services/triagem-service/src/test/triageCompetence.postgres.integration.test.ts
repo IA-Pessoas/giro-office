@@ -15,6 +15,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client.js";
+import { TriageCatalogService } from "../services/triageCatalogService.js";
 import { TriageCompetenceService } from "../services/triageCompetenceService.js";
 
 const runIntegration = process.env.TRIAGEM_POSTGRES_INTEGRATION === "1";
@@ -32,6 +33,7 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
   let fixtureA: OrganizationFixture;
   let fixtureB: OrganizationFixture;
   let service: TriageCompetenceService;
+  let catalogService: TriageCatalogService;
 
   async function createFixture(label: string): Promise<OrganizationFixture> {
     const stamp = `${Date.now()}-${randomUUID().slice(0, 8)}`;
@@ -132,6 +134,7 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
     fixtureA = await createFixture("Alfa");
     fixtureB = await createFixture("Beta");
     service = new TriageCompetenceService(runtimePrisma);
+    catalogService = new TriageCatalogService(runtimePrisma);
   });
 
   afterAll(async () => {
@@ -144,6 +147,9 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
         continue;
       }
       await adminPrisma.triageOutboxEvent.deleteMany({
+        where: { organization_id: fixture.organizationId },
+      });
+      await adminPrisma.triageCompetenceCatalogSnapshot.deleteMany({
         where: { organization_id: fixture.organizationId },
       });
       await adminPrisma.$executeRaw`
@@ -161,6 +167,9 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
         `;
       }
       await adminPrisma.triageCompetence.deleteMany({
+        where: { organization_id: fixture.organizationId },
+      });
+      await adminPrisma.triageCatalogItem.deleteMany({
         where: { organization_id: fixture.organizationId },
       });
       await adminPrisma.triageConfig.deleteMany({
@@ -232,6 +241,41 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
         `,
       ),
     ).rejects.toThrow(/row-level security|permission denied/u);
+  });
+
+  it("isola catálogos por organização e congela os valores da competência", async () => {
+    const codeA = `RLS_A_${randomUUID().slice(0, 8)}`;
+    const codeB = `RLS_B_${randomUUID().slice(0, 8)}`;
+    await catalogService.create({ kind: "JUSTIFICATION", code: codeA, label: "A" }, auth(fixtureA));
+    await catalogService.create({ kind: "JUSTIFICATION", code: codeB, label: "B" }, auth(fixtureB));
+
+    const visibleToA = await catalogService.list({ kind: "JUSTIFICATION" }, auth(fixtureA));
+    expect(visibleToA.map((item) => item.code)).toEqual([codeA]);
+
+    await expect(
+      withRuntimeOrganization(
+        fixtureA.organizationId,
+        (transaction) =>
+          transaction.$executeRaw`
+          INSERT INTO "triagem.catalog_items" (
+            id, organization_id, kind, code, label, updated_at
+          ) VALUES (
+            ${randomUUID()}, ${fixtureB.organizationId}, 'JUSTIFICATION',
+            ${`RLS_FORBIDDEN_${randomUUID().slice(0, 8)}`}, 'Forbidden', CURRENT_TIMESTAMP
+          )
+        `,
+      ),
+    ).rejects.toThrow(/row-level security|permission denied/u);
+
+    const competence = await service.create(
+      { client_id: fixtureA.clientId, competence: "2026-11" },
+      auth(fixtureA),
+    );
+    const snapshot = await catalogService.snapshotForCompetence(
+      fixtureA.organizationId,
+      competence.id,
+    );
+    expect(snapshot.map((item) => item.code)).toContain(codeA);
   });
 
   it("rejeita mutação direta do histórico append-only", async () => {

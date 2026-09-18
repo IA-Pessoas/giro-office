@@ -124,16 +124,16 @@ export function TriageDocumentsSection({
   const statements = useTriageStatements(clientId, competence, documentType);
   const closing = useTriageClosing(clientId, competence, documentType);
   const record = monthly.data;
+  const catalogError = justifications.error ?? deliveryMethods.error ?? stateSites.error;
+  const catalogsLoading =
+    justifications.isLoading || deliveryMethods.isLoading || stateSites.isLoading;
   const mutationError =
     mutations.create.error ??
     mutations.item.error ??
     mutations.all.error ??
     mutations.statement.error ??
     mutations.archiveStatement.error ??
-    mutations.closing.error ??
-    justifications.error ??
-    deliveryMethods.error ??
-    stateSites.error;
+    mutations.closing.error;
   const statementMutationPending =
     mutations.statement.isPending || mutations.archiveStatement.isPending;
 
@@ -222,6 +222,15 @@ export function TriageDocumentsSection({
           className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
         >
           {getContabilErrorMessage(mutationError)}
+        </p>
+      ) : null}
+      {catalogError ? (
+        <p
+          role="alert"
+          aria-live="polite"
+          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
+        >
+          Não foi possível carregar as opções catalogadas da competência. {getContabilErrorMessage(catalogError)}
         </p>
       ) : null}
       {documentType === "CONTABIL" ? (
@@ -405,6 +414,7 @@ export function TriageDocumentsSection({
                         <select
                           aria-label={`${label} Justificativa`}
                           value={documentDrafts[field].justification}
+                          disabled={catalogsLoading || Boolean(catalogError)}
                           onChange={(event) =>
                             updateDocumentDraft(field, "justification", event.target.value)
                           }
@@ -425,6 +435,7 @@ export function TriageDocumentsSection({
                             <select
                               aria-label={`${label} Método de entrega`}
                               value={record.item_notes[field]?.delivery_method ?? ""}
+                              disabled={catalogsLoading || Boolean(catalogError)}
                               onChange={(event) =>
                                 mutations.item.mutate({
                                   id: record.id,
@@ -448,6 +459,7 @@ export function TriageDocumentsSection({
                             <select
                               aria-label={`${label} Site estadual`}
                               value={documentDrafts[field].state_site}
+                              disabled={catalogsLoading || Boolean(catalogError)}
                               onChange={(event) =>
                                 updateDocumentDraft(field, "state_site", event.target.value)
                               }

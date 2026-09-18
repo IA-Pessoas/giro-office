@@ -1,7 +1,11 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
-import { TRIAGE_CATALOG_KINDS, type TriageCatalogKind } from "./triageCatalog.constants.js";
+import {
+  TRIAGE_CATALOG_CODE_MAX_LENGTH,
+  TRIAGE_CATALOG_KINDS,
+  type TriageCatalogKind,
+} from "./triageCatalog.constants.js";
 
 const catalogItemSelect = {
   id: true,
@@ -139,7 +143,10 @@ function assertCatalogValues(input: {
   if (input.kind && !TRIAGE_CATALOG_KINDS.includes(input.kind)) {
     throw new ServiceError(400, "Tipo de catálogo inválido.");
   }
-  if (input.code !== undefined && (!input.code.trim() || input.code.length > 100)) {
+  if (
+    input.code !== undefined &&
+    (!input.code.trim() || input.code.length > TRIAGE_CATALOG_CODE_MAX_LENGTH)
+  ) {
     throw new ServiceError(400, "Código inválido.");
   }
   if (input.label !== undefined && (!input.label.trim() || input.label.length > 255)) {
@@ -161,6 +168,85 @@ function catalogItemLockKey(organizationId: string, kind: string, code: string):
   return `triage.catalog.item:${organizationId}:${kind}:${code}`;
 }
 
+export async function snapshotTriageCatalogForCompetence(
+  transaction: TriageCatalogTransaction,
+  organizationId: string,
+  competenceId: string,
+): Promise<TriageCatalogSnapshotDto[]> {
+  await transaction.$executeRaw`
+    SELECT pg_advisory_xact_lock(hashtextextended(${`triage.catalog.snapshot:${competenceId}`}, 0))
+  `;
+  const competence = await transaction.triageCompetence.findFirst({
+    where: { id: competenceId, organization_id: organizationId },
+    select: { id: true, catalog_snapshot_initialized_at: true },
+  });
+  if (!competence) {
+    throw new ServiceError(404, "Competência da Triagem não encontrada.");
+  }
+
+  const existingSnapshot = await transaction.triageCompetenceCatalogSnapshot.findFirst({
+    where: { organization_id: organizationId, competence_id: competenceId },
+    select: { id: true },
+  });
+  if (existingSnapshot) {
+    if (competence.catalog_snapshot_initialized_at === null) {
+      await transaction.triageCompetence.update({
+        where: { id: competenceId },
+        data: { catalog_snapshot_initialized_at: new Date() },
+        select: { id: true },
+      });
+    }
+    const snapshots = await transaction.triageCompetenceCatalogSnapshot.findMany({
+      where: { organization_id: organizationId, competence_id: competenceId },
+      orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
+      select: snapshotSelect,
+    });
+    return snapshots.map(toSnapshotDto);
+  }
+
+  if (
+    competence.catalog_snapshot_initialized_at !== null &&
+    competence.catalog_snapshot_initialized_at !== undefined
+  ) {
+    return [];
+  }
+
+  const items = await transaction.triageCatalogItem.findMany({
+    where: { organization_id: organizationId, archived_at: null },
+    orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
+    select: catalogItemSelect,
+  });
+  if (items.length > 0) {
+    await transaction.triageCompetenceCatalogSnapshot.createMany({
+      data: items.map((item) => ({
+        organization_id: organizationId,
+        competence_id: competenceId,
+        catalog_item_id: item.id,
+        kind: item.kind,
+        code: item.code,
+        label: item.label,
+        url: item.url,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  if (competence.catalog_snapshot_initialized_at === null) {
+    await transaction.triageCompetence.update({
+      where: { id: competenceId },
+      data: { catalog_snapshot_initialized_at: new Date() },
+      select: { id: true },
+    });
+  }
+
+  const snapshots = await transaction.triageCompetenceCatalogSnapshot.findMany({
+    where: { organization_id: organizationId, competence_id: competenceId },
+    orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
+    select: snapshotSelect,
+  });
+  return snapshots.map(toSnapshotDto);
+}
+
 export class TriageCatalogService {
   constructor(private readonly prisma: TriageCatalogPrisma) {}
 
@@ -179,30 +265,31 @@ export class TriageCatalogService {
             client_id: input.clientId,
             competence: input.competence,
           },
-          select: { id: true },
+          select: { id: true, catalog_snapshot_initialized_at: true },
         });
         if (competence) {
-          const snapshots = await transaction.triageCompetenceCatalogSnapshot.findMany({
-            where: {
-              organization_id: auth.organizationId,
-              competence_id: competence.id,
-              ...(input.kind ? { kind: input.kind } : {}),
-            },
-            orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
-            select: snapshotSelect,
-          });
-          let snapshotItems = snapshots.map(snapshotAsCatalogItem);
-          if (snapshotItems.length === 0) {
-            const capturedSnapshots = await this.snapshotForCompetenceInTransaction(
+          let snapshotItems = (
+            await transaction.triageCompetenceCatalogSnapshot.findMany({
+              where: {
+                organization_id: auth.organizationId,
+                competence_id: competence.id,
+                ...(input.kind ? { kind: input.kind } : {}),
+              },
+              orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
+              select: snapshotSelect,
+            })
+          ).map(snapshotAsCatalogItem);
+          if (competence.catalog_snapshot_initialized_at === null) {
+            const capturedSnapshots = await snapshotTriageCatalogForCompetence(
               transaction,
               auth.organizationId,
               competence.id,
             );
-            snapshotItems = capturedSnapshots.map(snapshotAsCatalogItem);
+            snapshotItems = capturedSnapshots
+              .filter((snapshot) => !input.kind || snapshot.kind === input.kind)
+              .map(snapshotAsCatalogItem);
           }
-          if (snapshotItems.length > 0) {
-            return snapshotItems;
-          }
+          return snapshotItems;
         }
       }
 
@@ -360,69 +447,12 @@ export class TriageCatalogService {
     }
 
     if (transaction) {
-      return this.snapshotForCompetenceInTransaction(transaction, organizationId, competenceId);
+      return snapshotTriageCatalogForCompetence(transaction, organizationId, competenceId);
     }
 
     return this.withOrganization(organizationId, (transaction) =>
-      this.snapshotForCompetenceInTransaction(transaction, organizationId, competenceId),
+      snapshotTriageCatalogForCompetence(transaction, organizationId, competenceId),
     );
-  }
-
-  private async snapshotForCompetenceInTransaction(
-    transaction: TriageCatalogTransaction,
-    organizationId: string,
-    competenceId: string,
-  ): Promise<TriageCatalogSnapshotDto[]> {
-    await transaction.$executeRaw`
-      SELECT pg_advisory_xact_lock(hashtextextended(${`triage.catalog.snapshot:${competenceId}`}, 0))
-    `;
-    const competence = await transaction.triageCompetence.findFirst({
-      where: { id: competenceId, organization_id: organizationId },
-      select: { id: true },
-    });
-    if (!competence) {
-      throw new ServiceError(404, "Competência da Triagem não encontrada.");
-    }
-
-    const existingSnapshot = await transaction.triageCompetenceCatalogSnapshot.findFirst({
-      where: { organization_id: organizationId, competence_id: competenceId },
-      select: { id: true },
-    });
-    if (existingSnapshot) {
-      const snapshots = await transaction.triageCompetenceCatalogSnapshot.findMany({
-        where: { organization_id: organizationId, competence_id: competenceId },
-        orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
-        select: snapshotSelect,
-      });
-      return snapshots.map(toSnapshotDto);
-    }
-
-    const items = await transaction.triageCatalogItem.findMany({
-      where: { organization_id: organizationId, archived_at: null },
-      orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
-      select: catalogItemSelect,
-    });
-    if (items.length > 0) {
-      await transaction.triageCompetenceCatalogSnapshot.createMany({
-        data: items.map((item) => ({
-          organization_id: organizationId,
-          competence_id: competenceId,
-          catalog_item_id: item.id,
-          kind: item.kind,
-          code: item.code,
-          label: item.label,
-          url: item.url,
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    const snapshots = await transaction.triageCompetenceCatalogSnapshot.findMany({
-      where: { organization_id: organizationId, competence_id: competenceId },
-      orderBy: [{ kind: "asc" }, { label: "asc" }, { code: "asc" }],
-      select: snapshotSelect,
-    });
-    return snapshots.map(toSnapshotDto);
   }
 
   private async withOrganization<T>(

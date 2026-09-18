@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "../services/triageCatalog.constants.js";
+
 const competenceSchema = z
   .string({ required_error: "Competência é obrigatória." })
   .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Competência deve estar no formato AAAA-MM.");
@@ -10,7 +12,7 @@ const externalLinkTypeSchema = z
   .string()
   .trim()
   .min(1, "Tipo de link é obrigatório.")
-  .max(100, "Tipo de link excede o limite permitido.");
+  .max(TRIAGE_CATALOG_CODE_MAX_LENGTH, "Tipo de link excede o limite permitido.");
 const httpsUrlSchema = z
   .string({ required_error: "URL do link é obrigatória." })
   .url("URL do link inválida.")

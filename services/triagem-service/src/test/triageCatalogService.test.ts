@@ -35,7 +35,7 @@ function createMockPrisma(): TriageCatalogPrisma {
       create: vi.fn(),
       update: vi.fn(),
     },
-    triageCompetence: { findFirst: vi.fn() },
+    triageCompetence: { findFirst: vi.fn(), update: vi.fn() },
     triageCompetenceCatalogSnapshot: {
       findFirst: vi.fn(),
       createMany: vi.fn(),
@@ -171,6 +171,58 @@ describe("TriageCatalogService", () => {
 
     expect(result).toEqual([expect.objectContaining({ code: "ARCHIVED_LINK", archived_at: null })]);
     expect(prisma.triageCatalogItem.findMany).not.toHaveBeenCalled();
+  });
+
+  it("preserva o filtro de tipo ao inicializar um snapshot", async () => {
+    const prisma = createMockPrisma();
+    const deliveryMethod = {
+      ...record,
+      id: "d0000000-0000-4000-8000-000000000002",
+      kind: "DELIVERY_METHOD" as const,
+      code: "PORTAL",
+      label: "Portal",
+    };
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({
+      id: COMPETENCE_ID,
+      catalog_snapshot_initialized_at: null,
+    } as never);
+    vi.mocked(prisma.triageCompetenceCatalogSnapshot.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.triageCompetenceCatalogSnapshot.findMany)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([record, deliveryMethod] as never);
+    vi.mocked(prisma.triageCatalogItem.findMany).mockResolvedValue([
+      record,
+      deliveryMethod,
+    ] as never);
+
+    const result = await new TriageCatalogService(prisma).list(
+      {
+        kind: "DELIVERY_METHOD",
+        clientId: "b0000000-0000-4000-8000-000000000001",
+        competence: "2026-09",
+      },
+      editor(),
+    );
+
+    expect(result).toEqual([expect.objectContaining({ kind: "DELIVERY_METHOD", code: "PORTAL" })]);
+  });
+
+  it("mantém uma competência vazia congelada quando o catálogo recebe itens depois", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({
+      id: COMPETENCE_ID,
+      catalog_snapshot_initialized_at: new Date("2026-09-18T00:00:00.000Z"),
+    } as never);
+    vi.mocked(prisma.triageCompetenceCatalogSnapshot.findFirst).mockResolvedValue(null);
+
+    const result = await new TriageCatalogService(prisma).snapshotForCompetence(
+      ORGANIZATION_ID,
+      COMPETENCE_ID,
+    );
+
+    expect(result).toEqual([]);
+    expect(prisma.triageCatalogItem.findMany).not.toHaveBeenCalled();
+    expect(prisma.triageCompetenceCatalogSnapshot.createMany).not.toHaveBeenCalled();
   });
 
   it("arquiva logicamente e não altera item de outra organização", async () => {

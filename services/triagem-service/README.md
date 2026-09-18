@@ -13,7 +13,9 @@ O principal de `DATABASE_URL` deve ser membro de `giro_user_runtime`; cada trans
 
 ## Gateway
 
-O prefixo público será `/triagem`. A ativação do upstream fica controlada pela registry do gateway.
+O prefixo público será `/triagem`. A ativação do upstream fica controlada pela registry do gateway;
+quando habilitado, `TRIAGEM_SERVICE_URL` aponta para o upstream (por exemplo,
+`http://localhost:3046`).
 
 Endpoints públicos principais via gateway:
 

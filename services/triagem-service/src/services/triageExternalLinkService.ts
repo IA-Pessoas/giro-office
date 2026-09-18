@@ -1,6 +1,8 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "./triageCatalog.constants.js";
+import { snapshotTriageCatalogForCompetence } from "./triageCatalogService.js";
 
 const externalLinkSelect = {
   id: true,
@@ -99,7 +101,7 @@ function assertCompetence(value: string): void {
 }
 
 function assertLinkValues(input: Pick<UpdateTriageExternalLinkInput, "type" | "url">): void {
-  if (!input.type.trim() || input.type.length > 100) {
+  if (!input.type.trim() || input.type.length > TRIAGE_CATALOG_CODE_MAX_LENGTH) {
     throw new ServiceError(400, "Tipo de link inválido.");
   }
 
@@ -298,9 +300,12 @@ export class TriageExternalLinkService {
         client_id: clientId,
         competence,
       },
-      select: { id: true },
+      select: { id: true, catalog_snapshot_initialized_at: true },
     });
     if (competenceRecord) {
+      if (competenceRecord.catalog_snapshot_initialized_at === null) {
+        await snapshotTriageCatalogForCompetence(transaction, organizationId, competenceRecord.id);
+      }
       const snapshot = await transaction.triageCompetenceCatalogSnapshot.findFirst({
         where: {
           organization_id: organizationId,

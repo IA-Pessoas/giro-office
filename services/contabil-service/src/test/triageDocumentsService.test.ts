@@ -521,6 +521,35 @@ describe("TriageDocumentsService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("rejeita campos fiscais em atualização contábil no service", async () => {
+    const prisma = createMockPrisma();
+    const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
+
+    await expect(
+      service.updateItem(
+        MONTHLY_ID,
+        {
+          field: "triaged_transactions",
+          status: "ATTENTION",
+          delivery_method: "PORTAL",
+        },
+        contabilEditor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      service.updateItem(
+        MONTHLY_ID,
+        {
+          field: "triaged_transactions",
+          status: "ATTENTION",
+          state_site: "SP",
+        },
+        contabilEditor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("preserva atualizações distintas quando itens são alterados em paralelo", async () => {
     const prisma = createMockPrisma();
     const stored = {

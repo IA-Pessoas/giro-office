@@ -1,6 +1,7 @@
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { TriagemServiceEnv } from "../config/env.js";
+import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "../services/triageCatalog.constants.js";
 
 function successEnvelope(data: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -51,7 +52,7 @@ const catalogItem = {
   properties: {
     id: { type: "string", format: "uuid" },
     kind: { type: "string", enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"] },
-    code: { type: "string", minLength: 1, maxLength: 100 },
+    code: { type: "string", minLength: 1, maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH },
     label: { type: "string", minLength: 1, maxLength: 255 },
     url: { type: ["string", "null"], format: "uri", pattern: "^https://" },
     archived_at: { type: ["string", "null"], format: "date-time" },
@@ -78,7 +79,7 @@ const externalLink = {
     id: { type: "string", format: "uuid" },
     client_id: { type: "string", format: "uuid" },
     competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
-    type: { type: "string", minLength: 1, maxLength: 100 },
+    type: { type: "string", minLength: 1, maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH },
     url: { type: "string", format: "uri", pattern: "^https://" },
     description: { type: ["string", "null"] },
     responsible_id: { type: "string", format: "uuid" },
@@ -308,7 +309,11 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                       type: "string",
                       enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
                     },
-                    code: { type: "string", minLength: 1, maxLength: 100 },
+                    code: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                    },
                     label: { type: "string", minLength: 1, maxLength: 255 },
                     url: { type: "string", format: "uri", pattern: "^https://" },
                   },
@@ -349,7 +354,11 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                       type: "string",
                       enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
                     },
-                    code: { type: "string", minLength: 1, maxLength: 100 },
+                    code: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                    },
                     label: { type: "string", minLength: 1, maxLength: 255 },
                     url: { type: ["string", "null"], format: "uri", pattern: "^https://" },
                   },
@@ -436,7 +445,11 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   properties: {
                     client_id: { type: "string", format: "uuid" },
                     competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
-                    type: { type: "string", minLength: 1, maxLength: 100 },
+                    type: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                    },
                     url: { type: "string", format: "uri", pattern: "^https://" },
                     description: { type: ["string", "null"] },
                     responsible_id: { type: ["string", "null"], format: "uuid" },
@@ -474,7 +487,11 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   type: "object",
                   required: ["type", "url"],
                   properties: {
-                    type: { type: "string", minLength: 1, maxLength: 100 },
+                    type: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                    },
                     url: { type: "string", format: "uri", pattern: "^https://" },
                     description: { type: ["string", "null"] },
                     responsible_id: { type: ["string", "null"], format: "uuid" },

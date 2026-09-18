@@ -46,6 +46,7 @@ export const TRIAGE_DOCUMENT_STATUSES = [
   "NOT_APPLICABLE",
 ] as const;
 export const TRIAGE_DOCUMENT_NOTE_MAX_LENGTH = 2_000;
+export const TRIAGE_CATALOG_CODE_MAX_LENGTH = 100;
 
 export type TriageDocumentField = (typeof TRIAGE_DOCUMENT_FIELDS)[number];
 export type TriageFiscalChecklistField = (typeof TRIAGE_FISCAL_CHECKLIST_FIELDS)[number];
@@ -221,10 +222,70 @@ function normalizeOptionalCatalogCode(value: unknown, label: string): string | n
   if (value === null) {
     return null;
   }
-  if (typeof value !== "string" || value.trim().length === 0 || value.trim().length > 100) {
+  if (
+    typeof value !== "string" ||
+    value.trim().length === 0 ||
+    value.trim().length > TRIAGE_CATALOG_CODE_MAX_LENGTH
+  ) {
     throw new ServiceError(400, `${label} inválido.`);
   }
   return value.trim();
+}
+
+async function ensureCatalogSnapshotForCompetence(
+  transaction: TriageCatalogLookupClient,
+  organizationId: string,
+  competenceId: string,
+): Promise<void> {
+  await transaction.$executeRaw`
+    SELECT pg_advisory_xact_lock(hashtextextended(${`triage.catalog.snapshot:${competenceId}`}, 0))
+  `;
+  const competence = await transaction.triageCompetence.findFirst({
+    where: { id: competenceId, organization_id: organizationId },
+    select: { id: true, catalog_snapshot_initialized_at: true },
+  });
+  if (!competence) {
+    return;
+  }
+
+  const existingSnapshot = await transaction.triageCompetenceCatalogSnapshot.findFirst({
+    where: { organization_id: organizationId, competence_id: competenceId },
+    select: { id: true },
+  });
+  if (existingSnapshot || competence.catalog_snapshot_initialized_at !== null) {
+    if (existingSnapshot && competence.catalog_snapshot_initialized_at === null) {
+      await transaction.triageCompetence.update({
+        where: { id: competenceId },
+        data: { catalog_snapshot_initialized_at: new Date() },
+        select: { id: true },
+      });
+    }
+    return;
+  }
+
+  const items = await transaction.triageCatalogItem.findMany({
+    where: { organization_id: organizationId, archived_at: null },
+    select: { id: true, kind: true, code: true, label: true, url: true },
+  });
+  if (items.length > 0) {
+    await transaction.triageCompetenceCatalogSnapshot.createMany({
+      data: items.map((item) => ({
+        organization_id: organizationId,
+        competence_id: competenceId,
+        catalog_item_id: item.id,
+        kind: item.kind,
+        code: item.code,
+        label: item.label,
+        url: item.url,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  await transaction.triageCompetence.update({
+    where: { id: competenceId },
+    data: { catalog_snapshot_initialized_at: new Date() },
+    select: { id: true },
+  });
 }
 
 function normalizeOptionalValue(value: unknown, label: string): string | null | undefined {
@@ -402,8 +463,17 @@ export class TriageDocumentsService {
     const value = isBillingAmount
       ? normalizeOptionalValue(update.value, "Valor de faturamento")
       : undefined;
-    const deliveryMethod = update.delivery_method;
+    const deliveryMethod = normalizeOptionalCatalogCode(
+      update.delivery_method,
+      "Método de entrega fiscal",
+    );
     const stateSite = normalizeOptionalCatalogCode(update.state_site, "Site estadual");
+    if (type !== "FISCAL" && deliveryMethod !== undefined) {
+      throw new ServiceError(400, "método de entrega só é aceito na rotina fiscal.");
+    }
+    if (type !== "FISCAL" && stateSite !== undefined) {
+      throw new ServiceError(400, "site estadual só é aceito na rotina fiscal.");
+    }
     if (
       deliveryMethod !== undefined &&
       deliveryMethod !== null &&
@@ -849,8 +919,12 @@ export class TriageDocumentsService {
     }
     const competenceRecord = await transaction.triageCompetence.findFirst({
       where: { organization_id: organizationId, client_id: clientId, competence },
-      select: { id: true },
+      select: { id: true, catalog_snapshot_initialized_at: true },
     });
+
+    if (competenceRecord?.id && competenceRecord.catalog_snapshot_initialized_at === null) {
+      await ensureCatalogSnapshotForCompetence(transaction, organizationId, competenceRecord.id);
+    }
 
     const catalogCodes = competenceRecord?.id
       ? await transaction.triageCompetenceCatalogSnapshot.findMany({

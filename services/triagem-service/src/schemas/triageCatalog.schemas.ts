@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { TRIAGE_CATALOG_KINDS } from "../services/triageCatalog.constants.js";
+import {
+  TRIAGE_CATALOG_CODE_MAX_LENGTH,
+  TRIAGE_CATALOG_KINDS,
+} from "../services/triageCatalog.constants.js";
 
 export const triageCatalogKindSchema = z.enum(TRIAGE_CATALOG_KINDS);
 
@@ -7,7 +10,7 @@ const codeSchema = z
   .string({ required_error: "Código é obrigatório." })
   .trim()
   .min(1, "Código é obrigatório.")
-  .max(100, "Código excede o limite permitido.");
+  .max(TRIAGE_CATALOG_CODE_MAX_LENGTH, "Código excede o limite permitido.");
 const labelSchema = z
   .string({ required_error: "Rótulo é obrigatório." })
   .trim()
