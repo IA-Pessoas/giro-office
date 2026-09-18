@@ -3,6 +3,8 @@ import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const PLAYWRIGHT_PORT = process.env.PLAYWRIGHT_PORT || "3101";
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 let baseUrl = configuredBaseUrl || `http://localhost:${PLAYWRIGHT_PORT}`;
@@ -248,7 +250,7 @@ async function withNextServer(fn) {
       : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PLAYWRIGHT_PORT];
   const serverProcess = spawn(command, args, {
     cwd: APP_ROOT,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";

@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { chromium, expect } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const PORT = process.env.TASKS_BROWSER_PORT || "3116";
 const configuredBaseUrl = process.env.TASKS_BROWSER_BASE_URL?.replace(/\/$/, "");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
@@ -757,7 +759,7 @@ async function withNextServer(run) {
       : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PORT];
   const server = spawn(command, args, {
     cwd: appRoot,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";

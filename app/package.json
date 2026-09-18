@@ -14,7 +14,7 @@
     "test:platform-session": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/auth/run-platform-session-tests.mjs",
     "test:super-admin": "node src/modules/superAdmin/run-super-admin-tests.mjs",
     "test:auth-sidebar": "node src/modules/auth/run-auth-sidebar-browser-smoke.mjs",
-    "test:auth-session": "pnpm run build && node src/modules/auth/run-auth-session-browser-smoke.mjs",
+    "test:auth-session": "node src/modules/auth/run-auth-session-browser-smoke.mjs",
     "test:users": "node --experimental-strip-types src/modules/users/run-users-tests.mjs",
     "test:clients": "node --experimental-strip-types src/modules/clients/run-clients-tests.mjs",
     "test:departments": "node --experimental-strip-types src/modules/departments/run-departments-tests.mjs",
