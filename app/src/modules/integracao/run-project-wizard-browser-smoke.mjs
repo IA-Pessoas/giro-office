@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 
 import { chromium, expect } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const PORT = process.env.PROJECT_WIZARD_BROWSER_PORT || "3117";
 const configuredBaseUrl = process.env.PROJECT_WIZARD_BROWSER_BASE_URL?.replace(/\/$/, "");
 const useProductionBuild = process.argv.includes("--production");
@@ -1152,7 +1154,7 @@ async function withNextServer(run) {
     : ["dev", "--webpack", "--port", PORT];
   const server = spawn(process.execPath, [nextCli, ...nextArgs], {
     cwd: appRoot,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";

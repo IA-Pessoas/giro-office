@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { browserSmokeEnv } from "./testing/browserSmokeEnv.mjs";
+
 const PLAYWRIGHT_PORT = process.env.ME_PASSWORD_SMOKE_PORT || "3102";
 const configuredBaseUrl = process.env.ME_PASSWORD_SMOKE_BASE_URL?.replace(/\/$/, "");
 const useProductionBuild = process.argv.includes("--production");
@@ -211,7 +213,7 @@ async function withNextServer(run) {
       : ["pnpm", "exec", "next", ...nextArgs];
   const server = spawn(command, args, {
     cwd: appRoot,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";

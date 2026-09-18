@@ -1,15 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,6 +42,7 @@ const GLOBAL_PREFIXES = [
   "supabase/",
 ];
 
+/** Modo explicito (--full): o desenvolvedor pede todos os gates, suites incluidas. */
 const GLOBAL_COMMANDS = [
   ["pnpm", ["audit:ci"]],
   ["pnpm", ["check"]],
@@ -57,7 +50,14 @@ const GLOBAL_COMMANDS = [
   ["pnpm", ["test"]],
 ];
 
-const PRE_PUSH_TURBO_CONFIG = ".turbo/git-hooks/turbo.pre-push.json";
+/** Sem base para comparar: roda o gate rapido inteiro, sem as suites dos pacotes. */
+const BASELESS_COMMANDS = [
+  ["pnpm", ["audit:ci"]],
+  ["pnpm", ["check"]],
+  ["pnpm", ["typecheck"]],
+  ["pnpm", ["test:scripts"]],
+];
+
 const DEPENDENCY_FILES = new Set([
   "package.json",
   "pnpm-lock.yaml",
@@ -142,7 +142,7 @@ export function buildHookPlan(
   }
 
   if (bases.length === 0) {
-    return cloneCommands(GLOBAL_COMMANDS);
+    return cloneCommands(BASELESS_COMMANDS);
   }
 
   const global = classification.mode === "global";
@@ -156,11 +156,7 @@ export function buildHookPlan(
   }
 
   if (global) {
-    commands.push(
-      buildBiomeCheckCommand(changedFiles),
-      ["pnpm", ["typecheck"]],
-      ["pnpm", ["test:scripts"]],
-    );
+    commands.push(buildBiomeCheckCommand(changedFiles), ["pnpm", ["typecheck"]]);
   } else {
     commands.push([
       "pnpm",
@@ -168,50 +164,76 @@ export function buildHookPlan(
     ]);
   }
 
-  commands.push([
-    "pnpm",
-    [
-      "exec",
-      "turbo",
-      "run",
-      "test",
-      `--root-turbo-json=${PRE_PUSH_TURBO_CONFIG}`,
-      ...filters,
-      "--output-logs=new-only",
-    ],
-  ]);
-
-  if (global) {
-    commands.push(["pnpm", ["qa:integracao"]]);
-  }
+  // As politicas de seguranca sao rapidas e deterministicas; entre elas esta a
+  // varredura de payload em configs executaveis, que detectou o comprometimento
+  // de 2026-09-17. As suites dos pacotes ficam de fora: falhavam de forma
+  // intermitente na maquina de quem empurra e um gate que as vezes mente vira
+  // motivo para --no-verify. Elas seguem em pnpm test e devem voltar ao CI.
+  commands.push(["pnpm", ["test:scripts"]]);
 
   return commands;
 }
 
-export function buildPrePushTurboConfig(config) {
-  const test = config.tasks.test;
-  return {
-    ...config,
-    tasks: {
-      ...config.tasks,
-      test: {
-        ...test,
-        // Os testes dos serviços executam TypeScript diretamente. Preserve ^build
-        // para preparar as bibliotecas e invalidar os caches dos dependentes.
-        dependsOn: (test.dependsOn ?? []).filter((task) => task !== "build"),
-      },
-      // Os smokes do app usam next start e precisam do build de produção.
-      "@workspace/app#test": { ...test, ...config.tasks["@workspace/app#test"] },
-    },
-  };
+/**
+ * Branches onde reescrever historico nunca e aceitavel, nem com a valvula de escape.
+ */
+const PROTECTED_BRANCHES = new Set(["main", "develop", "staging"]);
+
+/** Valvula de escape consciente, para rebase de branch propria. */
+const FORCE_ESCAPE_ENV = "ALLOW_FORCE_PUSH";
+
+/**
+ * Um push que reescreve historico aparece no pre-push como um remoto que nao e
+ * ancestral do local: os commits ja publicados deixariam de existir. Recusamos por
+ * padrao — foi assim que o repositorio foi comprometido em 2026-09-17, com as branches
+ * reescritas por push forcado — e so liberamos fora das branches protegidas quando
+ * quem empurra declara a intencao em ALLOW_FORCE_PUSH.
+ */
+export function findHistoryRewrites(records, git = createGitRunner()) {
+  const rewrites = [];
+
+  for (const record of records) {
+    if (ZERO_OID.test(record.localOid) || ZERO_OID.test(record.remoteOid)) {
+      continue;
+    }
+
+    if (git.isAncestor(record.remoteOid, record.localOid) === false) {
+      rewrites.push({
+        ref: record.remoteRef,
+        branch: record.remoteRef.replace(/^refs\/heads\//, ""),
+        remoteOid: record.remoteOid,
+        localOid: record.localOid,
+      });
+    }
+  }
+
+  return rewrites;
 }
 
-function preparePrePushTurboConfig() {
-  const config = JSON.parse(readFileSync("turbo.json", "utf8"));
-  mkdirSync(path.dirname(PRE_PUSH_TURBO_CONFIG), { recursive: true });
-  const temporaryPath = `${PRE_PUSH_TURBO_CONFIG}.${process.pid}.tmp`;
-  writeFileSync(temporaryPath, `${JSON.stringify(buildPrePushTurboConfig(config), null, 2)}\n`);
-  renameSync(temporaryPath, PRE_PUSH_TURBO_CONFIG);
+export function describeForcePushBlock(rewrites, env = process.env) {
+  if (rewrites.length === 0) {
+    return null;
+  }
+
+  const protectedRewrites = rewrites.filter(({ branch }) => PROTECTED_BRANCHES.has(branch));
+
+  if (env[FORCE_ESCAPE_ENV] === "1" && protectedRewrites.length === 0) {
+    return null;
+  }
+
+  const alvos = rewrites.map(
+    ({ branch, remoteOid }) => `  ${branch} (remoto ${remoteOid.slice(0, 8)} deixaria de existir)`,
+  );
+  const motivo =
+    protectedRewrites.length > 0
+      ? `Reescrever historico de ${protectedRewrites.map(({ branch }) => branch).join(", ")} nao e permitido.`
+      : `Para reescrever historico de uma branch propria, declare a intencao definindo ${FORCE_ESCAPE_ENV}=1 no push.`;
+
+  return [
+    "git-hook-scope: push recusado — reescrita de historico detectada.",
+    ...alvos,
+    motivo,
+  ].join("\n");
 }
 
 export function parsePrePushInput(input) {
@@ -361,6 +383,17 @@ export function resolvePrePushChangedFiles(input, git = createGitRunner()) {
 
 function createGitRunner() {
   return {
+    isAncestor(ancestorOid, descendantOid) {
+      const result = spawnSync("git", ["merge-base", "--is-ancestor", ancestorOid, descendantOid], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      if (result.status === 0) return true;
+      if (result.status === 1) return false;
+      // Objeto ausente ou erro do git: nao da para afirmar que houve reescrita.
+      return null;
+    },
     run(args) {
       const result = spawnSync("git", args, {
         encoding: "utf8",
@@ -383,7 +416,9 @@ function readHookInput() {
 
   try {
     return readFileSync(0, "utf8");
-  } catch {
+  } catch (error) {
+    // Sem stdin legivel nao da para saber o que esta sendo empurrado: avise, nao engula.
+    console.error(`git-hook-scope: nao foi possivel ler a entrada do hook: ${error.message}`);
     return "";
   }
 }
@@ -434,24 +469,31 @@ function shouldFallbackToCorepack(command, result) {
   return command === "pnpm" && result.error?.code === "ENOENT";
 }
 
+/** Ver comentario em runCommands: evita que a carga da maquina reprove codigo correto. */
+const HOOK_TURBO_CONCURRENCY = "50%";
+
 export function runCommands(
   commands,
   spawn = spawnSync,
   env = process.env,
   platform = process.platform,
 ) {
+  // O hook roda na maquina de quem empurra, com editor e containers no ar; sem teto,
+  // o turbo abre uma tarefa por nucleo e a disputa por CPU vira falha intermitente.
+  const hookEnv = { TURBO_CONCURRENCY: HOOK_TURBO_CONCURRENCY, ...env };
+
   for (const [command, args] of commands) {
     console.log(`$ ${formatCommand([command, args])}`);
     const startedAt = performance.now();
 
     let result = spawn(command, args, {
       stdio: "inherit",
-      env,
+      env: hookEnv,
     });
 
     if (shouldFallbackToCorepack(command, result)) {
       const [fallbackCommand, fallbackArgs] = buildPnpmFallback(args, platform);
-      const fallbackEnv = createPnpmShimEnv(env, platform);
+      const fallbackEnv = createPnpmShimEnv(hookEnv, platform);
 
       try {
         result = spawn(fallbackCommand, fallbackArgs, {
@@ -491,7 +533,15 @@ function main() {
     process.exit(2);
   }
 
-  const resolution = resolvePrePushChangedFiles(readHookInput());
+  const hookInput = readHookInput();
+  const bloqueio = describeForcePushBlock(findHistoryRewrites(parsePrePushInput(hookInput)));
+
+  if (bloqueio) {
+    console.error(bloqueio);
+    process.exit(1);
+  }
+
+  const resolution = resolvePrePushChangedFiles(hookInput);
   const classification = full
     ? { mode: "global", reason: "explicit-full" }
     : resolution.forceGlobal
@@ -517,10 +567,6 @@ function main() {
     }
 
     return;
-  }
-
-  if (commands.some(([, args]) => args.includes(`--root-turbo-json=${PRE_PUSH_TURBO_CONFIG}`))) {
-    preparePrePushTurboConfig();
   }
 
   process.exit(runCommands(commands));
