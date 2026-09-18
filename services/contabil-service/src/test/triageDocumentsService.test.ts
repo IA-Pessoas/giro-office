@@ -143,6 +143,7 @@ describe("TriageDocumentsService", () => {
 
   it("rejeita justificativa ou método não cadastrado/arquivado", async () => {
     const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
     vi.mocked(prisma.triageCatalogItem.findMany).mockResolvedValue([] as never);
 
     await expect(
@@ -174,8 +175,41 @@ describe("TriageDocumentsService", () => {
     expect(prisma.triageMonthly.update).not.toHaveBeenCalled();
   });
 
+  it("valida o catálogo no mesmo transaction serializable que grava o mensal", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue(monthly as never);
+    const transactionCatalog = { findMany: vi.fn().mockResolvedValue([]) };
+    let transactionOptions: unknown;
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback, options) => {
+      transactionOptions = options;
+      return callback({
+        ...prisma,
+        triageCatalogItem: transactionCatalog,
+      } as never);
+    });
+
+    await expect(
+      new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+        MONTHLY_ID,
+        {
+          field: "nfce_documents",
+          type: "FISCAL",
+          status: "ATTENTION",
+          justification: "ARCHIVED_DURING_UPDATE",
+        },
+        fiscalEditor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(transactionOptions).toEqual({ isolationLevel: "Serializable" });
+    expect(transactionCatalog.findMany).toHaveBeenCalled();
+    expect(prisma.triageMonthly.update).not.toHaveBeenCalled();
+  });
+
   it("rejeita método de entrega fiscal não controlado antes da mutação", async () => {
     const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
     vi.mocked(prisma.triageCatalogItem.findMany).mockResolvedValue([] as never);
     const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
 
@@ -424,7 +458,7 @@ describe("TriageDocumentsService", () => {
         }),
       },
     });
-    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
   });
 

@@ -1,5 +1,5 @@
 import { error as logError, ServiceError } from "@workspace/shared";
-import type { Prisma } from "../generated/prisma/client.js";
+import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 
 import { type LogUpdateParams, logUpdateIfChanged } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
@@ -55,6 +55,7 @@ export type TriageDeliveryMethod = string;
 export type TriageItemPriority = (typeof TRIAGE_ITEM_PRIORITIES)[number];
 export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
 export type TriageDocumentsServicePrisma = typeof prismaClient;
+type TriageCatalogLookupClient = Pick<PrismaClient, "$executeRaw" | "triageCatalogItem">;
 
 type TriageDocumentsAudit = {
   logUpdateIfChanged: (params: LogUpdateParams) => Promise<void>;
@@ -386,65 +387,69 @@ export class TriageDocumentsService {
     ) {
       throw new ServiceError(400, "Método de entrega fiscal inválido.");
     }
-    await this.assertActiveCatalogItems(
-      "JUSTIFICATION",
-      justification ? [justification] : [],
-      auth.organizationId,
-    );
-    await this.assertActiveCatalogItems(
-      "DELIVERY_METHOD",
-      deliveryMethod ? [deliveryMethod] : [],
-      auth.organizationId,
-    );
-
-    const { monthly, updated } = await this.prisma.$transaction(async (transaction) => {
-      await transaction.$executeRaw`
+    const { monthly, updated } = await this.prisma.$transaction(
+      async (transaction) => {
+        await transaction.$executeRaw`
         SELECT pg_advisory_xact_lock(hashtextextended(${monthlyId}, 0))
       `;
 
-      const monthly = await this.findMonthlyForUpdate(
-        transaction,
-        monthlyId,
-        auth.organizationId,
-        type,
-      );
-      await this.assertCanEdit(monthly.client_id, auth, type);
-      const fields = checklistFields(type);
-      const checklist = asChecklist(monthly.checklist, fields);
-      const itemNotes = asItemNotes(
-        monthly.item_notes,
-        type === "FISCAL" ? TRIAGE_FISCAL_FIELDS : fields,
-      );
-      const currentNotes = itemNotes[update.field] ?? { note: null, justification: null };
-      const nextItemNotes =
-        isBillingAmount ||
-        (note === undefined && justification === undefined && deliveryMethod === undefined)
-          ? undefined
-          : {
-              ...itemNotes,
-              [update.field]: {
-                ...currentNotes,
-                note: note === undefined ? currentNotes.note : note,
-                justification:
-                  justification === undefined ? currentNotes.justification : justification,
-                ...(deliveryMethod !== undefined ? { delivery_method: deliveryMethod } : {}),
-              },
-            };
-      const updated = await transaction.triageMonthly.update({
-        where: { id: monthly.id },
-        data: {
-          ...(isBillingAmount
-            ? {}
-            : { checklist: { ...checklist, [update.field]: update.status } }),
-          ...(isBillingAmount ? { billing_amount: value } : {}),
-          ...(nextItemNotes
-            ? { item_notes: nextItemNotes as unknown as Prisma.InputJsonValue }
-            : {}),
-        },
-      });
+        const monthly = await this.findMonthlyForUpdate(
+          transaction,
+          monthlyId,
+          auth.organizationId,
+          type,
+        );
+        await this.assertCanEdit(monthly.client_id, auth, type);
+        await this.assertActiveCatalogItems(
+          transaction,
+          "JUSTIFICATION",
+          justification ? [justification] : [],
+          auth.organizationId,
+        );
+        await this.assertActiveCatalogItems(
+          transaction,
+          "DELIVERY_METHOD",
+          deliveryMethod ? [deliveryMethod] : [],
+          auth.organizationId,
+        );
+        const fields = checklistFields(type);
+        const checklist = asChecklist(monthly.checklist, fields);
+        const itemNotes = asItemNotes(
+          monthly.item_notes,
+          type === "FISCAL" ? TRIAGE_FISCAL_FIELDS : fields,
+        );
+        const currentNotes = itemNotes[update.field] ?? { note: null, justification: null };
+        const nextItemNotes =
+          isBillingAmount ||
+          (note === undefined && justification === undefined && deliveryMethod === undefined)
+            ? undefined
+            : {
+                ...itemNotes,
+                [update.field]: {
+                  ...currentNotes,
+                  note: note === undefined ? currentNotes.note : note,
+                  justification:
+                    justification === undefined ? currentNotes.justification : justification,
+                  ...(deliveryMethod !== undefined ? { delivery_method: deliveryMethod } : {}),
+                },
+              };
+        const updated = await transaction.triageMonthly.update({
+          where: { id: monthly.id },
+          data: {
+            ...(isBillingAmount
+              ? {}
+              : { checklist: { ...checklist, [update.field]: update.status } }),
+            ...(isBillingAmount ? { billing_amount: value } : {}),
+            ...(nextItemNotes
+              ? { item_notes: nextItemNotes as unknown as Prisma.InputJsonValue }
+              : {}),
+          },
+        });
 
-      return { monthly, updated };
-    });
+        return { monthly, updated };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     await this.audit.logUpdateIfChanged({
       userId: auth.userId,
@@ -744,25 +749,30 @@ export class TriageDocumentsService {
       ]),
     ) as Record<string, TriageDocumentItemNotes>;
 
-    await this.assertActiveCatalogItems(
-      "JUSTIFICATION",
-      Object.values(itemNotes)
-        .map((item) => item.justification)
-        .filter((value): value is string => typeof value === "string"),
-      organizationId,
-    );
-    await this.assertActiveCatalogItems(
-      "DELIVERY_METHOD",
-      Object.values(itemNotes)
-        .map((item) => item.delivery_method)
-        .filter((value): value is string => typeof value === "string"),
-      organizationId,
-    );
+    await this.prisma.$transaction(async (transaction) => {
+      await this.assertActiveCatalogItems(
+        transaction,
+        "JUSTIFICATION",
+        Object.values(itemNotes)
+          .map((item) => item.justification)
+          .filter((value): value is string => typeof value === "string"),
+        organizationId,
+      );
+      await this.assertActiveCatalogItems(
+        transaction,
+        "DELIVERY_METHOD",
+        Object.values(itemNotes)
+          .map((item) => item.delivery_method)
+          .filter((value): value is string => typeof value === "string"),
+        organizationId,
+      );
+    });
 
     return { checklist, itemNotes };
   }
 
   private async assertActiveCatalogItems(
+    transaction: TriageCatalogLookupClient,
     kind: "JUSTIFICATION" | "DELIVERY_METHOD",
     codes: readonly string[],
     organizationId: string,
@@ -772,18 +782,16 @@ export class TriageDocumentsService {
       return;
     }
 
-    const activeItems = await this.prisma.$transaction(async (transaction) => {
-      await transaction.$executeRaw`SET LOCAL ROLE "giro_user_runtime"`;
-      await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
-      return transaction.triageCatalogItem.findMany({
-        where: {
-          organization_id: organizationId,
-          kind,
-          code: { in: uniqueCodes },
-          archived_at: null,
-        },
-        select: { code: true },
-      });
+    await transaction.$executeRaw`SET LOCAL ROLE "giro_user_runtime"`;
+    await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
+    const activeItems = await transaction.triageCatalogItem.findMany({
+      where: {
+        organization_id: organizationId,
+        kind,
+        code: { in: uniqueCodes },
+        archived_at: null,
+      },
+      select: { code: true },
     });
     const activeCodes = new Set(activeItems.map((item) => item.code));
     const missing = uniqueCodes.find((code) => !activeCodes.has(code));

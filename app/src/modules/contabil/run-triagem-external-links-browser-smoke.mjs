@@ -12,6 +12,7 @@ const screenshotPath =
   "output/playwright/issue-1152-triagem-external-links.png";
 const clientId = "c1000000-0000-4000-8000-000000000001";
 const competence = "2026-09";
+const linkTypeCode = "SMOKE_LINK_TYPE";
 const externalLinks = [];
 const user = {
   id: "c0000000-0000-4000-8000-000000000001",
@@ -99,12 +100,13 @@ async function runBrowserProof() {
       return json(route, externalLinks.filter((link) => link.archived_at === null));
     }
     if (request.method() === "GET" && apiPath === "/triagem/catalogs") {
+      if (url.searchParams.get("kind") !== "LINK_TYPE") return json(route, []);
       return json(route, [
         {
-          id: "catalog-link-type-drive",
+          id: "catalog-link-type-smoke",
           kind: "LINK_TYPE",
-          code: "DRIVE",
-          label: "Drive",
+          code: linkTypeCode,
+          label: "Tipo de link do smoke",
           url: null,
           archived_at: null,
         },
@@ -149,17 +151,17 @@ async function runBrowserProof() {
     await page.getByRole("option", { name: /Cliente Demonstração/ }).click();
     await expect(page.getByRole("heading", { name: "Links externos" })).toBeVisible();
 
-    await page.getByLabel("Tipo do link externo").selectOption("DRIVE");
-    await page.getByLabel("Link HTTPS").fill("https://drive.example.test/competencia");
+    await page.getByLabel("Tipo do link externo").selectOption(linkTypeCode);
+    await page.getByLabel("Link HTTPS").fill("https://links.example.test/competencia");
     await page.getByLabel("Descrição do link externo").fill("Pasta da competência");
     await page.getByRole("button", { name: "Adicionar link" }).click();
-    await expect(page.getByText("https://drive.example.test/competencia")).toBeVisible();
+    await expect(page.getByText("https://links.example.test/competencia")).toBeVisible();
     assert.ok(requests.some((request) => request.method === "POST" && request.path === "/triagem/external-links"));
 
     await page.getByRole("button", { name: "Revisar" }).click();
-    await page.getByLabel("Link HTTPS").last().fill("https://drive.example.test/revisado");
+    await page.getByLabel("Link HTTPS").last().fill("https://links.example.test/revisado");
     await page.getByRole("button", { name: "Salvar revisão" }).click();
-    await expect(page.getByText("https://drive.example.test/revisado")).toBeVisible();
+    await expect(page.getByText("https://links.example.test/revisado")).toBeVisible();
     assert.ok(requests.some((request) => request.method === "PUT" && request.path.includes("/triagem/external-links/")));
 
     page.once("dialog", (dialog) => dialog.accept());

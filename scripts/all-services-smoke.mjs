@@ -249,6 +249,7 @@ const state = {
   triagemExternalLinkId: "",
   triagemExternalLinkCompetence: "",
   triagemCatalogId: "",
+  triagemLinkTypeCode: "",
   triagemUrgentRequestId: "",
   triagemUrgentRequestCompetence: "",
   contabilResponsibleId: "",
@@ -292,6 +293,14 @@ const actionExecutionRank = {
   rhPointAdjustmentApproveBulk: 2924,
   rhPointAdjustmentRetroactive: 2925,
   rhPointRecalculate: 2926,
+  triagemCatalogList: 4500,
+  triagemCatalogCreate: 4501,
+  triagemCatalogUpdate: 4502,
+  triagemExternalLinkList: 4503,
+  triagemExternalLinkCreate: 4504,
+  triagemExternalLinkUpdate: 4505,
+  triagemExternalLinkArchive: 4506,
+  triagemCatalogArchive: 4507,
   projectDelete: 8000,
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
@@ -4532,7 +4541,7 @@ const handlers = {
   async triagemCatalogList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      query: { kind: "JUSTIFICATION" },
+      query: { kind: "LINK_TYPE" },
     });
   },
 
@@ -4540,15 +4549,16 @@ const handlers = {
     const response = await httpRequest(op, {
       expectedStatus: [201],
       json: {
-        kind: "JUSTIFICATION",
-        code: "SMOKE_NO_MOVEMENT",
-        label: "Sem movimento (smoke)",
+        kind: "LINK_TYPE",
+        code: "SMOKE_LINK_TYPE",
+        label: "Tipo de link (smoke)",
       },
     });
     if (isBadExpectation(op)) return;
 
     const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
     if (id) state.triagemCatalogId = id;
+    state.triagemLinkTypeCode = "SMOKE_LINK_TYPE";
   },
 
   async triagemCatalogUpdate(op) {
@@ -4584,8 +4594,8 @@ const handlers = {
       json: {
         client_id: requireState("primaryClientId"),
         competence,
-        type: "DRIVE",
-        url: "https://drive.example.test/triagem-smoke",
+        type: requireState("triagemLinkTypeCode"),
+        url: "https://links.example.test/triagem-smoke",
         description: "Link externo criado pelo smoke",
       },
     });
@@ -4600,8 +4610,8 @@ const handlers = {
       expectedStatus: [200],
       path: `/triagem/external-links/${requireState("triagemExternalLinkId")}`,
       json: {
-        type: "CLOUD",
-        url: "https://cloud.example.test/triagem-smoke",
+        type: requireState("triagemLinkTypeCode"),
+        url: "https://links.example.test/triagem-smoke-revisado",
         description: "Link externo atualizado pelo smoke",
       },
     });
