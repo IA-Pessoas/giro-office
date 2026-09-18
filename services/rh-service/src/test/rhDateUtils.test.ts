@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   assertSameOrganizationDay,
   normalizeOrganizationDate,
-  organizationDayBounds,
   organizationDateKey,
+  organizationDayBounds,
 } from "../utils/rhDateUtils.js";
 
 describe("rhDateUtils", () => {

@@ -8,4 +8,6 @@ export * from "./response.js";
 export * from "./security-config.js";
 export * from "./security-headers.js";
 export * from "./session-security.js";
-export * from "./swaggerUi.js";
+// Só os tipos: o swagger-ui-express custa ~160ms de boot e fica atrás de
+// "@workspace/shared/openapi", carregado apenas por quem monta a documentação.
+export type { MountOpenApiDocsOptions, OpenApiDocument } from "./swaggerUi.js";

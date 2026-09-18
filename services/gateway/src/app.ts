@@ -11,7 +11,7 @@ import {
   type LogLevel,
   ServiceError,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { isGatewayRouteDisabled } from "./config/disabledRoutes.js";

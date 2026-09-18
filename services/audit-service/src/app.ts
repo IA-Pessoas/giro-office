@@ -6,7 +6,7 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   type Logger,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import express, { type Request } from "express";
 import "express-async-errors";
 
