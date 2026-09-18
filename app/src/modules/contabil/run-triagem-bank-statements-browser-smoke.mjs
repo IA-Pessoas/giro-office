@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { execFileSync, spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
-const baseUrl = (process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3126").replace(/\/$/, "");
+const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
+const port = process.env.TRIAGE_BROWSER_SMOKE_PORT ?? "3126";
+const baseUrl = configuredBaseUrl ?? `http://127.0.0.1:${port}`;
+const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const screenshotPath =
   process.env.TRIAGE_BROWSER_SCREENSHOT_PATH ??
   "output/playwright/issue-1150-triagem-bank-statements.png";
@@ -68,7 +73,8 @@ function json(route, data, status = 200) {
   });
 }
 
-const browser = await chromium.launch({ headless: true });
+async function runBrowserProof() {
+  const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({
   baseURL: baseUrl,
   viewport: { width: 1440, height: 1200 },
@@ -222,6 +228,73 @@ try {
       screenshotPath,
     }),
   );
-} finally {
-  await browser.close();
+  } finally {
+    await browser.close();
+  }
+}
+
+await withNextServer(runBrowserProof);
+
+async function withNextServer(test) {
+  if (configuredBaseUrl) {
+    await test();
+    return;
+  }
+
+  const command = process.platform === "win32" ? "cmd" : "corepack";
+  const args =
+    process.platform === "win32"
+      ? ["/c", "corepack", "pnpm", "exec", "next", "start", "--port", port]
+      : ["pnpm", "exec", "next", "start", "--port", port];
+  const serverProcess = spawn(command, args, {
+    cwd: appRoot,
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+  let output = "";
+  serverProcess.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  serverProcess.stderr.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+
+  try {
+    await waitForServer(serverProcess, () => output);
+    await test();
+  } finally {
+    stopServer(serverProcess);
+  }
+}
+
+async function waitForServer(serverProcess, getOutput) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 60_000) {
+    if (serverProcess.exitCode !== null) {
+      throw new Error(`Next production server exited before smoke test.\n${getOutput()}`);
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}/triagem`);
+      if (response.ok || response.status < 500) return;
+    } catch {
+      // Retry until Next binds the port.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(`Timed out waiting for the production build at ${baseUrl}.\n${getOutput()}`);
+}
+
+function stopServer(serverProcess) {
+  if (!serverProcess.pid || serverProcess.exitCode !== null) return;
+  if (process.platform === "win32") {
+    execFileSync("taskkill", ["/pid", String(serverProcess.pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return;
+  }
+  serverProcess.kill("SIGTERM");
 }

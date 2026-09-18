@@ -217,6 +217,11 @@ await (async () => {
     assert.match(source, /role="alert"/);
   });
 
+  await runTest("triagem bancária integra o smoke de navegador à suíte do app", () => {
+    const packageJson = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
+    assert.match(packageJson.scripts.test, /test:triagem-bank-statements-browser/);
+  });
+
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
     assert.match(contabilServiceSources.authMiddleware, /const CONTABIL_WRITE_PERMISSION = 2;/);
     assert.match(contabilServiceSources.authMiddleware, /requireContabilWritePermission/);
