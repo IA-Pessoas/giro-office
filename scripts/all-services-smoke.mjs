@@ -214,8 +214,10 @@ const state = {
   taskModelPrimaryId: "",
   taskModelSecondaryId: "",
   taskDependentId: "",
+  taskIntegrationProcessId: "",
   taskIntegrationId: "",
   taskId: "",
+  taskAttachmentId: "",
   projectWizardRevision: "",
   planId: "",
   planTaskId: "",
@@ -3700,6 +3702,13 @@ const handlers = {
     });
   },
 
+  async commercialProposalConfigDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/proposal-configs/${requireState("commercialProposalConfigId")}`,
+    });
+  },
+
   async commercialProspectingClientList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -3734,6 +3743,13 @@ const handlers = {
       expectedStatus: [200],
       path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
       json: { status: "Envio de Proposta", description: "Smoke commercial prospecting updated" },
+    });
+  },
+
+  async commercialProspectingArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/commercial/prospecting/${requireState("commercialProspectingId")}`,
     });
   },
 
@@ -4353,8 +4369,7 @@ const handlers = {
   },
 
   async contabilControlCreate(op) {
-    const competence =
-      `${env.namespace}`.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || `comp-${uniqueDigits(8)}`;
+    const competence = "2026-09";
     state.contabilControlCompetence = competence;
     const response = await httpRequest(op, {
       expectedStatus: [200, 201],
@@ -4376,7 +4391,48 @@ const handlers = {
   async contabilControlCreateInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],
-      json: { client_id: "not-a-uuid", competence: "" },
+      json: { client_id: requireState("primaryClientId"), competence: "2026-13" },
+    });
+  },
+
+  async contabilControlYearCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { client_id: requireState("primaryClientId"), year: 2026, confirmed: true },
+    });
+  },
+
+  async contabilControlArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+      },
+    });
+  },
+
+  async contabilControlRestore(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+      },
+    });
+  },
+
+  async contabilControlPortfolio(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { competence: requireState("contabilControlCompetence") },
+    });
+  },
+
+  async contabilControlPortfolioInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { competence: "2026-13" },
     });
   },
 
@@ -4398,11 +4454,110 @@ const handlers = {
     });
   },
 
+  async contabilControlCompleteAll(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/controls/${requireState("contabilControlId")}/items`,
+    });
+  },
+
   async contabilControlPatchNotFound(op) {
     await httpRequest(op, {
       expectedStatus: [404],
       path: "/contabil/controls/00000000-0000-0000-0000-000000000000",
       json: { field: "monthly_closing", value: false },
+    });
+  },
+
+  async triageMonthlyCreate(op) {
+    const competence = "2026-09";
+    state.triageMonthlyCompetence = competence;
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      json: { client_id: requireState("primaryClientId"), competence },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triageMonthlyId = id;
+  },
+
+  async triageMonthlyGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
+  async triageMonthlyItemUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/monthly/${requireState("triageMonthlyId")}/item`,
+      json: { field: "financial_transactions", status: "ATTENTION" },
+    });
+  },
+
+  async triageMonthlyBulkUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/monthly/${requireState("triageMonthlyId")}/items`,
+      json: { status: "COMPLETED" },
+    });
+  },
+
+  async triageStatementUpsert(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+        bank_id: "001",
+        status: "PENDING",
+      },
+    });
+  },
+
+  async triageStatementList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
+  async triageClosingGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
+  async triageClosingUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+        status: "UNDER_REVIEW",
+      },
+    });
+  },
+
+  async triageClosingArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+      },
     });
   },
 
@@ -4813,6 +4968,10 @@ const handlers = {
     });
   },
 
+  async pessoalGroupAssignmentAuditOutboxReconcile(op) {
+    await httpRequest(op, { expectedStatus: op.expectedStatus });
+  },
+
   async taskDepsList(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -4896,12 +5055,23 @@ const handlers = {
     });
   },
 
+  async taskIntegrationProcessList(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [200],
+      query: { status: "Todos" },
+    });
+    state.taskIntegrationProcessId =
+      pickFirst(response.body, "data.id") ??
+      pickFirst(response.body, "data.create.id") ??
+      findFirstId(response.body?.data);
+  },
+
   async taskIntegrationCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],
       json: {
         task_model_id: requireState("taskModelPrimaryId"),
-        referring: env.namespace,
+        referring: requireState("taskIntegrationProcessId"),
         referring_type: "process",
       },
     });
@@ -4929,8 +5099,10 @@ const handlers = {
         project_id: requireState("projectId"),
         client_id: requireState("primaryClientId"),
         prospecting_status: "Fechado",
+        status: "Em Andamento",
         observations: "Smoke task creation",
         urgency: "Alta",
+        prevision_date: "2020-01-01",
       },
     });
     if (isBadExpectation(op)) {
@@ -5003,11 +5175,59 @@ const handlers = {
     });
   },
 
-  async taskFinanceiroPut(op) {
+  async taskFinanceiroQueue(op) {
+    const response = await httpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) return;
+    state.taskFinanceiroDepartmentId = pickFirst(response.body, "data.0.department_id");
+  },
+
+  async taskFinanceiroCollectorsGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      path: "/task/financeiro",
-      json: { task_id: requireState("taskId") },
+      query: { department_id: requireState("taskFinanceiroDepartmentId") },
+    });
+  },
+
+  async taskFinanceiroCollectorsPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        department_id: requireState("taskFinanceiroDepartmentId"),
+        collector_ids: [requireState("session").id],
+      },
+    });
+  },
+
+  async taskFinanceiroExpress(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      headers: { "Idempotency-Key": uniqueText("smoke-financeiro-express") },
+      json: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async taskFinanceiroSettle(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      method: "POST",
+      path: "/task",
+      json: {
+        model_id: requireState("taskModelPrimaryId"),
+        project_id: requireState("projectId"),
+        client_id: requireState("primaryClientId"),
+        prospecting_status: "Fechado",
+        status: "Em Andamento",
+        observations: "Smoke financial settlement",
+        urgency: "Alta",
+        prevision_date: "2020-01-01",
+      },
+    });
+    if (isBadExpectation(op)) return;
+    const taskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
+    await httpRequest(op, {
+      expectedStatus: [200],
+      headers: { "Idempotency-Key": uniqueText("smoke-financeiro-settle") },
+      json: { task_ids: [taskId] },
     });
   },
 
@@ -5027,8 +5247,136 @@ const handlers = {
   async taskCompleteRequestPut(op) {
     await httpRequest(op, {
       expectedStatus: [200],
+      method: "POST",
+      path: "/task/complete-request",
+      json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
+    });
+    await httpRequest(op, {
+      expectedStatus: [200],
       path: "/task/complete-request",
       json: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskCompleteRequestPost(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/task/complete-request",
+      json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
+    });
+  },
+
+  async taskCompleteRequestListGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/task/complete-request/list",
+      query: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskPostponementCreate(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        task_id: requireState("taskId"),
+        new_prevision_date: "2030-01-01",
+        justification: "Prorrogação validada pelo smoke.",
+      },
+    });
+  },
+
+  async taskPostponementCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        task_id: requireState("taskId"),
+        new_prevision_date: "2030-02-30",
+        justification: "Data inválida.",
+      },
+    });
+  },
+
+  async taskPostponementListGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskOperationalNotificationList(op) {
+    const response = await httpRequest(op, { expectedStatus: [200] });
+    state.taskOperationalNotificationId = pickFirst(response.body, "data.items.0.id");
+  },
+
+  async taskOperationalNotificationRead(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: { notification_id: requireState("taskOperationalNotificationId") },
+    });
+  },
+
+  async taskAttachmentCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      form: {
+        fields: { task_id: requireState("taskId") },
+        file: {
+          fieldName: "file",
+          path: path.join(rootDir, "scripts", "fixtures", "smoke-upload.png"),
+          filename: "smoke-upload.png",
+          contentType: "image/png",
+        },
+      },
+    });
+    if (isBadExpectation(op)) return;
+    state.taskAttachmentId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async taskAttachmentList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskAttachmentAccess(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        task_id: requireState("taskId"),
+        attachment_id: isBadExpectation(op)
+          ? "00000000-0000-0000-0000-000000000000"
+          : requireState("taskAttachmentId"),
+      },
+    });
+  },
+
+  async taskAttachmentDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        task_id: requireState("taskId"),
+        attachment_id: isBadExpectation(op)
+          ? "00000000-0000-0000-0000-000000000000"
+          : requireState("taskAttachmentId"),
+      },
+    });
+  },
+
+  async taskCompleteRequestDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/task/complete-request",
+      json: { task_id: requireState("taskId") },
+    });
+  },
+
+  async taskReopenPut(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/task/reopen",
+      json: { task_id: requireState("taskId"), reason: "Reabertura validada pelo smoke." },
     });
   },
 

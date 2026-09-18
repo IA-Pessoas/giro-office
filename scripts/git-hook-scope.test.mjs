@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   buildHookPlan,
   classifyChangedFiles,
+  describeForcePushBlock,
+  findHistoryRewrites,
   parsePrePushInput,
   resolvePrePushChangedFiles,
   runCommands,
@@ -66,7 +71,19 @@ describe("classifyChangedFiles", () => {
 describe("buildHookPlan", () => {
   it("filters by the affected graph from the pushed base", () => {
     assert.deepEqual(buildHookPlan(classifyChangedFiles(["app/src/x.tsx"]), ["abc123"]), [
-      ["pnpm", ["exec", "turbo", "run", "check", "typecheck", "test", "--filter=...[abc123]"]],
+      [
+        "pnpm",
+        [
+          "exec",
+          "turbo",
+          "run",
+          "check",
+          "typecheck",
+          "--filter=...[abc123]",
+          "--output-logs=new-only",
+        ],
+      ],
+      ["pnpm", ["test:scripts"]],
     ]);
   });
 
@@ -82,11 +99,12 @@ describe("buildHookPlan", () => {
             "run",
             "check",
             "typecheck",
-            "test",
             "--filter=...[abc123]",
             "--filter=...[def456]",
+            "--output-logs=new-only",
           ],
         ],
+        ["pnpm", ["test:scripts"]],
       ],
     );
   });
@@ -96,12 +114,40 @@ describe("buildHookPlan", () => {
       ["pnpm", ["audit:ci"]],
       ["pnpm", ["check"]],
       ["pnpm", ["typecheck"]],
-      ["pnpm", ["test"]],
+      ["pnpm", ["test:scripts"]],
     ]);
   });
 
-  it("builds the current global command sequence for global changes", () => {
-    assert.deepEqual(buildHookPlan(classifyChangedFiles(["infra/prisma/schema.prisma"]), ["abc"]), [
+  it("mantém as políticas de segurança nas mudanças globais, sem as suítes dos pacotes", () => {
+    const files = ["infra/prisma/schema.prisma"];
+    assert.deepEqual(buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files }), [
+      [
+        "pnpm",
+        ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
+      ],
+      ["pnpm", ["typecheck"]],
+      ["pnpm", ["test:scripts"]],
+    ]);
+  });
+
+  it("audits dependency changes even inside an affected package", () => {
+    const files = ["services/user-service/package.json"];
+    const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
+    assert.deepEqual(commands[0], ["pnpm", ["audit:ci"]]);
+  });
+
+  it("does not contact the dependency registry for code-only pushes", () => {
+    const files = ["services/user-service/src/server.ts"];
+    const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
+    assert.equal(
+      commands.some(([, args]) => args.includes("audit:ci")),
+      false,
+    );
+    assert.equal(commands.filter(([, args]) => args.includes("test:scripts")).length, 1);
+  });
+
+  it("allows explicitly running all original gates even without changed files", () => {
+    assert.deepEqual(buildHookPlan(classifyChangedFiles([]), [], { full: true }), [
       ["pnpm", ["audit:ci"]],
       ["pnpm", ["check"]],
       ["pnpm", ["typecheck"]],
@@ -111,6 +157,66 @@ describe("buildHookPlan", () => {
 
   it("skips every command for docs-only changes", () => {
     assert.deepEqual(buildHookPlan(classifyChangedFiles(["docs/x.md"]), ["abc"]), []);
+  });
+});
+
+describe("bloqueio de force push", () => {
+  const gitFake = (ancestralidade) => ({
+    isAncestor: (ancestor, descendant) => ancestralidade[`${ancestor}->${descendant}`] ?? true,
+  });
+
+  const registro = (branch, remoteOid, localOid) => ({
+    localRef: `refs/heads/${branch}`,
+    localOid,
+    remoteRef: `refs/heads/${branch}`,
+    remoteOid,
+  });
+
+  it("não acusa quando o push é avanço normal", () => {
+    const rewrites = findHistoryRewrites([registro("feature/x", "aaa", "bbb")], gitFake({}));
+    assert.deepEqual(rewrites, []);
+    assert.equal(describeForcePushBlock(rewrites, {}), null);
+  });
+
+  it("acusa quando o commit publicado deixaria de existir", () => {
+    const rewrites = findHistoryRewrites(
+      [registro("feature/x", "aaa", "bbb")],
+      gitFake({ "aaa->bbb": false }),
+    );
+
+    assert.equal(rewrites.length, 1);
+    assert.match(describeForcePushBlock(rewrites, {}), /reescrita de historico/);
+    assert.match(describeForcePushBlock(rewrites, {}), /ALLOW_FORCE_PUSH=1/);
+  });
+
+  it("libera branch própria quando a intenção é declarada", () => {
+    const rewrites = findHistoryRewrites(
+      [registro("feature/x", "aaa", "bbb")],
+      gitFake({ "aaa->bbb": false }),
+    );
+
+    assert.equal(describeForcePushBlock(rewrites, { ALLOW_FORCE_PUSH: "1" }), null);
+  });
+
+  it("não libera main, develop nem staging, mesmo com a intenção declarada", () => {
+    for (const branch of ["main", "develop", "staging"]) {
+      const rewrites = findHistoryRewrites(
+        [registro(branch, "aaa", "bbb")],
+        gitFake({ "aaa->bbb": false }),
+      );
+
+      assert.match(
+        describeForcePushBlock(rewrites, { ALLOW_FORCE_PUSH: "1" }),
+        new RegExp(`Reescrever historico de ${branch}`),
+      );
+    }
+  });
+
+  it("ignora criação e remoção de branch", () => {
+    const criacao = registro("feature/nova", "0000000000000000000000000000000000000000", "bbb");
+    const remocao = registro("feature/velha", "aaa", "0000000000000000000000000000000000000000");
+
+    assert.deepEqual(findHistoryRewrites([criacao, remocao], gitFake({})), []);
   });
 });
 
@@ -225,5 +331,75 @@ describe("runCommands", () => {
       ["pnpm", ["audit:ci"]],
       ["cmd.exe", ["/d", "/s", "/c", "corepack", "pnpm", "audit:ci"]],
     ]);
+  });
+  it("limita a concorrência do turbo para a carga da máquina não virar vermelho falso", () => {
+    const ambientes = [];
+    const fakeSpawn = (_command, _args, options = {}) => {
+      ambientes.push(options.env);
+      return { status: 0 };
+    };
+
+    runCommands([["pnpm", ["test:scripts"]]], fakeSpawn, { PATH: "/usr/bin" }, "linux");
+
+    assert.equal(ambientes[0].TURBO_CONCURRENCY, "50%");
+    assert.equal(ambientes[0].PATH, "/usr/bin");
+  });
+
+  it("respeita TURBO_CONCURRENCY já definido no ambiente", () => {
+    const ambientes = [];
+    const fakeSpawn = (_command, _args, options = {}) => {
+      ambientes.push(options.env);
+      return { status: 0 };
+    };
+
+    runCommands([["pnpm", ["test:scripts"]]], fakeSpawn, { TURBO_CONCURRENCY: "2" }, "linux");
+
+    assert.equal(ambientes[0].TURBO_CONCURRENCY, "2");
+  });
+});
+
+describe("hook executado de ponta a ponta", () => {
+  const hookPath = fileURLToPath(new URL("./git-hook-scope.mjs", import.meta.url));
+  const repoRoot = path.dirname(path.dirname(hookPath));
+
+  const rodar = (linha, env = {}) =>
+    spawnSync(process.execPath, [hookPath, "pre-push"], {
+      cwd: repoRoot,
+      input: `${linha}\n`,
+      encoding: "utf8",
+      env: { ...process.env, ...env },
+    });
+
+  // Cobre o caminho real: o hook so enxerga o que esta sendo empurrado se conseguir
+  // ler a entrada padrao. Uma falha ali deixa o gate cego sem ninguem perceber.
+  it("recusa um push que descartaria commit publicado", () => {
+    const head = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+    const anterior = spawnSync("git", ["rev-parse", "HEAD~1"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+
+    const resultado = rodar(
+      `refs/heads/feature/teste ${anterior} refs/heads/feature/teste ${head}`,
+    );
+
+    assert.equal(resultado.status, 1);
+    assert.match(resultado.stderr, /reescrita de historico detectada/);
+  });
+
+  it("enxerga as refs empurradas em vez de tratar como push sem mudancas", () => {
+    const head = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+
+    const resultado = rodar(`refs/heads/feature/teste ${head} refs/heads/feature/teste ${head}`, {
+      GIT_HOOK_SCOPE_DRY_RUN: "1",
+    });
+
+    assert.doesNotMatch(resultado.stderr, /nao foi possivel ler a entrada do hook/);
   });
 });

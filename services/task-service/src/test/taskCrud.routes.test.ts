@@ -310,6 +310,18 @@ describe("task crud routes", () => {
     expect(taskCrudServiceMock.updateTask).toHaveBeenCalledTimes(1);
   });
 
+  it("PUT /task rejeita alteração direta da previsão", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).put("/task").send({
+      task_id: "task-1",
+      prevision_date: "2026-09-20",
+    });
+
+    expect(res.status).toBe(400);
+    expect(taskCrudServiceMock.updateTask).not.toHaveBeenCalled();
+  });
+
   it("PUT /task encaminha troca de modelo e departamento", async () => {
     const res = await request(createTestApp()).put("/task").send({
       task_id: "task-1",

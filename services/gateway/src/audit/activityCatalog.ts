@@ -87,6 +87,36 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "o estado de entrega da outbox comercial" },
   },
   {
+    methods: ["DELETE"],
+    pattern: /^\/pessoal\/groups\/[^/]+$/,
+    description: { action: "arquivou", item: "um grupo de pessoal" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/groups\/[^/]+\/reactivate$/,
+    description: { action: "reativou", item: "um grupo de pessoal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/eligible$/,
+    description: { action: "consultou", item: "os clientes elegíveis para atribuição de grupo" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/previews$/,
+    description: { action: "gerou", item: "uma prévia de atribuição de grupo" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/previews\/[^/]+$/,
+    description: { action: "consultou", item: "uma prévia de atribuição de grupo" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/apply$/,
+    description: { action: "aplicou", item: "uma atribuição de grupo" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },
@@ -280,6 +310,86 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST", "PATCH", "PUT"],
     pattern: /^\/task\/(?:conclusion|complete-request)$/,
     description: { action: "concluiu", item: "uma tarefa" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/task\/complete-request$/,
+    description: { action: "cancelou", item: "uma solicitação de conclusão de tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/complete-request\/list$/,
+    description: { action: "consultou", item: "o histórico de conclusão de uma tarefa" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/reopen$/,
+    description: { action: "reabriu", item: "uma tarefa" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/postponement$/,
+    description: { action: "prorrogou", item: "uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/postponement\/list$/,
+    description: { action: "consultou", item: "o histórico de prorrogações de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/notifications$/,
+    description: { action: "consultou", item: "as notificações operacionais" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/notifications\/read$/,
+    description: { action: "marcou como lida", item: "uma notificação operacional" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/attachment$/,
+    description: { action: "anexou", item: "um comprovante a uma tarefa" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/task\/attachment$/,
+    description: { action: "removeu", item: "um anexo de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/attachment\/list$/,
+    description: { action: "consultou", item: "os anexos de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/attachment\/access$/,
+    description: { action: "abriu", item: "um anexo de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/financeiro\/queue$/,
+    description: { action: "consultou", item: "a fila de cobrança financeira" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/financeiro\/collectors$/,
+    description: { action: "consultou", item: "os cobradores de um departamento" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/financeiro\/collectors$/,
+    description: { action: "configurou", item: "os cobradores de um departamento" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/financeiro\/settle$/,
+    description: { action: "deu baixa financeira em", item: "tarefas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/financeiro\/express$/,
+    description: { action: "deu Baixa Express em", item: "tarefas de um cliente" },
   },
   {
     methods: ["GET"],
@@ -728,6 +838,56 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/triagem\/(?:monthly|statements)\/?.*$/,
+    description: { action: "consultou", item: "as pendências documentais contábeis" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/controls\/year$/,
+    description: { action: "criou", item: "os controles contábeis anuais" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/controls\/restore$/,
+    description: { action: "restaurou", item: "uma competência contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/contabil\/controls\/[^/]+\/items$/,
+    description: { action: "atualizou", item: "os itens de um controle contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/monthly\/[^/]+\/item$/,
+    description: { action: "atualizou", item: "uma pendência documental contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/monthly\/[^/]+\/items$/,
+    description: { action: "atualizou", item: "as pendências documentais contábeis" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "consultou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "atualizou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "arquivou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/editability$/,
+    description: { action: "consultou", item: "a permissão de edição da triagem" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/ti\/stock\/items\/[^/]+\/movements\/list$/,
     description: { action: "consultou", item: "a lista de movimentações de um item de estoque" },
   },
@@ -752,6 +912,12 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 ];
 
 const RESOURCE_RULES: ResourceRule[] = [
+  {
+    pattern: /^\/pessoal\/groups(?:\/|$)/,
+    singular: "um grupo de pessoal",
+    newSingular: "um novo grupo de pessoal",
+    plural: "grupos de pessoal",
+  },
   {
     pattern: /^\/commercial\/proposal-configs(?:\/|$)/,
     singular: "uma configuração de proposta comercial",
@@ -919,6 +1085,18 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um vínculo contábil",
     newSingular: "um novo vínculo contábil",
     plural: "vínculos contábeis",
+  },
+  {
+    pattern: /^\/triagem\/monthly(?:\/|$)/,
+    singular: "uma pendência documental contábil",
+    newSingular: "uma nova pendência documental contábil",
+    plural: "pendências documentais contábeis",
+  },
+  {
+    pattern: /^\/triagem\/statements(?:\/|$)/,
+    singular: "um marcador de extrato bancário",
+    newSingular: "um novo marcador de extrato bancário",
+    plural: "marcadores de extratos bancários",
   },
   {
     pattern: /^\/rh\/point-config(?:\/|$)/,

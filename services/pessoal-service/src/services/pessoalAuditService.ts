@@ -121,9 +121,7 @@ function createPessoalAuditRecorder(options: {
         signal: controller.signal,
       });
 
-      if (response.ok) {
-        return;
-      }
+      if (response.ok) return;
 
       options.logger.warn({
         event: "audit.ingest.failed",
@@ -135,6 +133,7 @@ function createPessoalAuditRecorder(options: {
           statusCode: response.status,
         },
       });
+      throw new Error(`Audit ingest returned ${response.status}.`);
     } catch (err) {
       options.logger.error({
         event: "audit.ingest.failed",
@@ -144,6 +143,7 @@ function createPessoalAuditRecorder(options: {
         },
         err,
       });
+      throw err;
     } finally {
       clearTimeout(timeout);
     }
@@ -171,7 +171,7 @@ export class PessoalAuditService {
       });
   }
 
-  async recordChange(input: PessoalAuditChangeInput): Promise<void> {
+  async recordChange(input: PessoalAuditChangeInput): Promise<boolean> {
     const timestamp = this.now().toISOString();
     const requestId = input.requestId?.trim() || this.requestIdFactory();
     const payload: CreateAuditRequestPayload = {
@@ -198,6 +198,7 @@ export class PessoalAuditService {
 
     try {
       await this.recordAudit(payload);
+      return true;
     } catch (err) {
       this.logger.error({
         event: "pessoal.audit.record.failed",
@@ -207,6 +208,7 @@ export class PessoalAuditService {
         },
         err,
       });
+      return false;
     }
   }
 }

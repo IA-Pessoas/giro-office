@@ -4,6 +4,8 @@ import { mkdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const baseUrl = process.env.REPORTS_BROWSER_BASE_URL || "http://127.0.0.1:3115";
 const evidenceDir = process.env.REPORTS_EVIDENCE_DIR;
@@ -15,7 +17,7 @@ const user = {
   permission: 1,
   organization_id: "reports-fixture-org",
   department_id: "reports-fixture-department",
-  modules: { integracao: 1, fiscal: 1 },
+  modules: { integracao: 1, fiscal: 1, pessoal: 1 },
 };
 const field = (key, label) => ({
   key,
@@ -26,6 +28,37 @@ const field = (key, label) => ({
   groupable: true,
   sortable: true,
 });
+const pessoalFieldLabels = {
+  client_name: "Cliente",
+  responsible_name: "Responsável",
+  union_name: "Sindicato",
+  group_name: "Grupo",
+  group_state: "Estado do grupo",
+  competence: "Competência",
+  group_snapshot_name: "Grupo no snapshot",
+  group_snapshot_policy: "Política do grupo no snapshot",
+  group_snapshot_state: "Estado do grupo no snapshot",
+  advance: "Adiantamento",
+  advance_type: "Tipo de adiantamento",
+  advance_amount: "Valor do adiantamento",
+  onvio: "Envio via Onvio",
+  vt: "Vale-transporte",
+  vt_value: "Valor do vale-transporte",
+  vt_type: "Tipo do vale-transporte",
+  va: "Vale-alimentação",
+  assistance_fee: "Taxa assistencial",
+  bem_mais: "Bem Mais",
+  bsf: "BSF",
+  reinf: "Reinf",
+  employees: "Quantidade de empregados",
+  status: "Status",
+  title: "Título",
+  registration_date: "Data de registro",
+  completion_date: "Data de conclusão",
+  payroll: "Folha",
+  charges: "Encargos",
+};
+const pessoalField = (key) => field(key, pessoalFieldLabels[key] ?? key);
 const items = [
   {
     key: "integracao.projects",
@@ -50,6 +83,61 @@ const items = [
     department_label: "Fiscal",
     description: "Consulte tributos e suas competências.",
     fields: [field("period", "Competência")],
+  },
+  {
+    key: "pessoal.payroll",
+    label: "Configuração de folha de Departamento Pessoal",
+    module: "pessoal",
+    department_label: "Departamento Pessoal",
+    fields: [
+      "client_name",
+      "responsible_name",
+      "union_name",
+      "group_name",
+      "group_state",
+      "advance",
+      "advance_type",
+      "advance_amount",
+      "onvio",
+      "vt",
+      "vt_value",
+      "vt_type",
+      "va",
+      "assistance_fee",
+      "bem_mais",
+      "bsf",
+      "reinf",
+      "employees",
+    ].map(pessoalField),
+  },
+  {
+    key: "pessoal.situations",
+    label: "Situações de Departamento Pessoal",
+    module: "pessoal",
+    department_label: "Departamento Pessoal",
+    fields: ["status", "title", "registration_date", "completion_date"].map(pessoalField),
+  },
+  {
+    key: "pessoal.obligations",
+    label: "Obrigações de Departamento Pessoal",
+    module: "pessoal",
+    department_label: "Departamento Pessoal",
+    fields: [
+      "competence",
+      "client_name",
+      "responsible_name",
+      "group_snapshot_name",
+      "group_snapshot_policy",
+      "group_snapshot_state",
+      "advance",
+      "payroll",
+      "charges",
+      "assistance_fee",
+      "bem_mais",
+      "bsf",
+      "va",
+      "vt",
+    ].map(pessoalField),
   },
 ];
 
@@ -270,6 +358,16 @@ async function run() {
   try {
     await page.goto("/relatorios", { waitUntil: "domcontentloaded" });
     const panel = page.getByRole("tabpanel");
+    await expect(panel.getByRole("button", { name: "Ficha completa", exact: true })).toBeVisible();
+    await panel.getByRole("button", { name: "Ficha completa", exact: true }).click();
+    await expect(
+      panel.getByRole("group", {
+        name: "Campos de Configuração de folha de Departamento Pessoal",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await screenshot("00-pessoal-ficha-completa");
+    await page.reload({ waitUntil: "domcontentloaded" });
     await expect(panel.getByRole("checkbox", { name: "Projetos", exact: true })).toBeVisible();
     await panel.getByRole("checkbox", { name: "Projetos", exact: true }).check();
     await panel.getByRole("checkbox", { name: "Clientes", exact: true }).check();
@@ -516,7 +614,7 @@ if (process.env.REPORTS_BROWSER_BASE_URL) {
     ["node_modules/next/dist/bin/next", "start", "--port", "3115", "--hostname", "127.0.0.1"],
     {
       cwd: appRoot,
-      env: process.env,
+      env: browserSmokeEnv(),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     },

@@ -166,6 +166,8 @@ describe("projectPlan routes", () => {
     expect(received).toEqual({
       user_id: USER_ID,
       organization_id: ORG_ID,
+      integracaoLevel: 0,
+      isOwner: false,
       name: "Plano",
       color: "#123456",
     });
@@ -183,7 +185,7 @@ describe("projectPlan routes", () => {
     const deps = createRouteDeps();
     deps.hirePlan = async (data) => {
       received = data as unknown as Record<string, unknown>;
-      return { created: [] };
+      return { created: [], idempotent: false };
     };
     const app = createTestApp(deps);
 
@@ -198,11 +200,14 @@ describe("projectPlan routes", () => {
       success: true,
       data: {
         created: [],
+        idempotent: false,
       },
     });
     expect(received).toEqual({
       user_id: USER_ID,
       organization_id: ORG_ID,
+      integracaoLevel: 0,
+      isOwner: false,
       project_id: PROJECT_ID,
       plan_id: PLAN_ID,
     });
@@ -227,6 +232,8 @@ describe("projectPlan routes", () => {
     expect(received).toEqual({
       user_id: USER_ID,
       organization_id: ORG_ID,
+      integracaoLevel: 0,
+      isOwner: false,
       id: PLAN_ID,
       name: "Plano atualizado",
       color: "#654321",
@@ -259,6 +266,8 @@ describe("projectPlan routes", () => {
       direction: "up",
       user_id: USER_ID,
       organization_id: ORG_ID,
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 
@@ -293,6 +302,8 @@ describe("projectPlan routes", () => {
       plan_task_id: "33333333-3333-3333-3333-333333333333",
       user_id: USER_ID,
       organization_id: ORG_ID,
+      integracaoLevel: 0,
+      isOwner: false,
     });
   });
 

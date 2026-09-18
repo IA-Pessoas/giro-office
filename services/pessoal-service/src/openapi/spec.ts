@@ -206,6 +206,16 @@ const updateUnionRequestSchema = strictObjectSchema({
   base_date: nullableDateSchema,
 });
 
+const groupPolicySchema = { type: "string", enum: ["NORMAL", "NO_OBLIGATIONS"] } as const;
+const createGroupRequestSchema = strictObjectSchema(
+  { name: textSchema, policy: groupPolicySchema },
+  ["name"],
+);
+const updateGroupRequestSchema = strictObjectSchema({
+  name: textSchema,
+  policy: groupPolicySchema,
+});
+
 const createPayrollRequestSchema = strictObjectSchema(
   {
     client_id: uuidSchema,
@@ -216,7 +226,7 @@ const createPayrollRequestSchema = strictObjectSchema(
     info: textSchema,
     previous: { type: "boolean" },
     onvio: { type: "boolean" },
-    group: textSchema,
+    group_id: uuidSchema,
     vt: { type: "boolean" },
     vt_value: nullableNonNegativeNumberSchema,
     vt_type: nullableTextSchema,
@@ -235,7 +245,7 @@ const createPayrollRequestSchema = strictObjectSchema(
     "info",
     "previous",
     "onvio",
-    "group",
+    "group_id",
     "vt",
     "va",
     "assistance_fee",
@@ -246,27 +256,46 @@ const createPayrollRequestSchema = strictObjectSchema(
   ],
 );
 
-const updatePayrollRequestSchema = strictObjectSchema({
-  responsible_id: { ...uuidSchema, nullable: true },
-  advance: { type: "boolean" },
-  advance_type: nullableTextSchema,
-  advance_amount: nullableNonNegativeNumberSchema,
-  info: textSchema,
-  previous: { type: "boolean" },
-  onvio: { type: "boolean" },
-  group: textSchema,
-  vt: { type: "boolean" },
-  vt_value: nullableNonNegativeNumberSchema,
-  vt_type: nullableTextSchema,
-  va: { type: "boolean" },
-  assistance_fee: { type: "boolean" },
-  union_id: { ...uuidSchema, nullable: true },
-  bem_mais: { type: "boolean" },
-  bsf: { type: "boolean" },
-  reinf: { type: "boolean" },
-  employees: { type: "integer", minimum: 0 },
-  contact: nullableTextSchema,
-});
+const updatePayrollRequestSchema = strictObjectSchema(
+  {
+    responsible_id: { ...uuidSchema, nullable: true },
+    advance: { type: "boolean" },
+    advance_type: nullableTextSchema,
+    advance_amount: nullableNonNegativeNumberSchema,
+    info: textSchema,
+    previous: { type: "boolean" },
+    onvio: { type: "boolean" },
+    group_id: uuidSchema,
+    vt: { type: "boolean" },
+    vt_value: nullableNonNegativeNumberSchema,
+    vt_type: nullableTextSchema,
+    va: { type: "boolean" },
+    assistance_fee: { type: "boolean" },
+    union_id: { ...uuidSchema, nullable: true },
+    bem_mais: { type: "boolean" },
+    bsf: { type: "boolean" },
+    reinf: { type: "boolean" },
+    employees: { type: "integer", minimum: 0 },
+    contact: nullableTextSchema,
+  },
+  ["group_id"],
+);
+
+const groupAssignmentPreviewRequestSchema = strictObjectSchema(
+  {
+    group_id: uuidSchema,
+    client_ids: { type: "array", minItems: 1, maxItems: 500, items: uuidSchema },
+  },
+  ["group_id", "client_ids"],
+);
+
+const groupAssignmentApplyRequestSchema = strictObjectSchema(
+  {
+    preview_id: uuidSchema,
+    fingerprint: { type: "string", pattern: "^[a-f0-9]{64}$" },
+  },
+  ["preview_id", "fingerprint"],
+);
 
 const createObligationRequestSchema = strictObjectSchema(
   {
@@ -426,6 +455,11 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
       { name: "Pessoal LDD", description: "Controle de LDD" },
       { name: "Pessoal Situations", description: "Situacoes de clientes" },
       { name: "Pessoal Unions", description: "Sindicatos" },
+      { name: "Pessoal Groups", description: "Catalogo de grupos da folha" },
+      {
+        name: "Pessoal Group Assignments",
+        description: "Selecao, previa persistida e aplicacao atomica de grupos",
+      },
       { name: "Pessoal Payroll", description: "Configuracao de folha" },
       { name: "Pessoal Obligations", description: "Obrigacoes mensais" },
       {
@@ -499,6 +533,9 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
             "existing",
             "created",
             "skippedExisting",
+            "skippedArchivedGroup",
+            "skippedNoObligations",
+            "skippedNoGroup",
             "skippedNoPayroll",
           ],
           properties: {
@@ -507,6 +544,9 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
             existing: { type: "integer", minimum: 0 },
             created: { type: "integer", minimum: 0 },
             skippedExisting: { type: "integer", minimum: 0 },
+            skippedArchivedGroup: { type: "integer", minimum: 0 },
+            skippedNoObligations: { type: "integer", minimum: 0 },
+            skippedNoGroup: { type: "integer", minimum: 0 },
             skippedNoPayroll: { type: "integer", minimum: 0 },
           },
         },
@@ -683,6 +723,126 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
           responses: mutationResponses,
         },
       },
+      "/pessoal/groups": {
+        get: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Listar grupos de pessoal",
+          operationId: "listPessoalGroups",
+          responses: readResponses,
+        },
+        post: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Criar grupo de pessoal",
+          operationId: "createPessoalGroup",
+          requestBody: jsonRequestBody(createGroupRequestSchema),
+          responses: mutationResponses,
+        },
+      },
+      "/pessoal/groups/{id}": {
+        get: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Detalhar grupo de pessoal",
+          operationId: "getPessoalGroup",
+          parameters: [idParam("id")],
+          responses: readResponses,
+        },
+        patch: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Editar grupo de pessoal",
+          operationId: "updatePessoalGroup",
+          parameters: [idParam("id")],
+          requestBody: jsonRequestBody(updateGroupRequestSchema),
+          responses: mutationResponses,
+        },
+        delete: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Arquivar grupo de pessoal",
+          operationId: "archivePessoalGroup",
+          parameters: [idParam("id")],
+          responses: mutationResponses,
+        },
+      },
+      "/pessoal/groups/{id}/reactivate": {
+        post: {
+          tags: ["Pessoal Groups"],
+          security: bearerSecurity,
+          summary: "Reativar grupo de pessoal",
+          operationId: "reactivatePessoalGroup",
+          parameters: [idParam("id")],
+          responses: mutationResponses,
+        },
+      },
+      "/pessoal/group-assignments/eligible": {
+        get: {
+          tags: ["Pessoal Group Assignments"],
+          security: bearerSecurity,
+          summary: "Listar folhas elegiveis para atribuicao em lote",
+          operationId: "listPessoalGroupAssignmentEligible",
+          parameters: [
+            queryParam("search", undefined, false),
+            { name: "page", in: "query", required: false, schema: { type: "integer", minimum: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: readResponses,
+        },
+      },
+      "/pessoal/group-assignments/previews": {
+        post: {
+          tags: ["Pessoal Group Assignments"],
+          security: bearerSecurity,
+          summary: "Persistir previa de atribuicao de grupo",
+          operationId: "createPessoalGroupAssignmentPreview",
+          requestBody: jsonRequestBody(groupAssignmentPreviewRequestSchema),
+          responses: mutationResponses,
+        },
+      },
+      "/pessoal/group-assignments/previews/{preview_id}": {
+        get: {
+          tags: ["Pessoal Group Assignments"],
+          security: bearerSecurity,
+          summary: "Detalhar previa persistida com paginação",
+          operationId: "getPessoalGroupAssignmentPreview",
+          parameters: [
+            idParam("preview_id"),
+            { name: "page", in: "query", required: false, schema: { type: "integer", minimum: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: readResponses,
+        },
+      },
+      "/pessoal/group-assignments/apply": {
+        post: {
+          tags: ["Pessoal Group Assignments"],
+          security: bearerSecurity,
+          summary: "Aplicar uma previa valida de forma idempotente",
+          operationId: "applyPessoalGroupAssignmentPreview",
+          parameters: [
+            {
+              name: "Idempotency-Key",
+              in: "header",
+              required: true,
+              schema: { type: "string", minLength: 1, maxLength: 255 },
+            },
+          ],
+          requestBody: jsonRequestBody(groupAssignmentApplyRequestSchema),
+          responses: mutationResponses,
+        },
+      },
       "/pessoal/payroll": {
         post: {
           tags: ["Pessoal Payroll"],
@@ -825,6 +985,30 @@ export function buildPessoalServiceOpenApiSpec(env: PessoalServiceEnv): OpenApiD
                   unionsMatched: { type: "integer", minimum: 0 },
                   notificationsCreated: { type: "integer", minimum: 0 },
                   duplicatesSkipped: { type: "integer", minimum: 0 },
+                },
+              }),
+            },
+            "401": { description: "Unauthorized", ...errorJson },
+            "403": { description: "Forbidden", ...errorJson },
+            "500": { description: "Internal error", ...errorJson },
+          },
+        },
+      },
+      "/internal/pessoal/group-assignments/audit-outbox/reconcile": {
+        post: {
+          tags: ["Pessoal Internal"],
+          security: internalSecurity,
+          summary: "Reconciliar eventos pendentes da outbox de atribuicao de grupos",
+          operationId: "reconcilePessoalGroupAssignmentAuditOutbox",
+          responses: {
+            "200": {
+              description: "OK",
+              ...successJsonWithData({
+                type: "object",
+                required: ["processed", "pending"],
+                properties: {
+                  processed: { type: "integer", minimum: 0 },
+                  pending: { type: "integer", minimum: 0 },
                 },
               }),
             },

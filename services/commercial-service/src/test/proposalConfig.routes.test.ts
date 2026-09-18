@@ -22,6 +22,7 @@ const CONFIG_ID = "d0000000-0000-4000-8000-000000000001";
 function createServiceMock(): CommercialProposalConfigRouteDeps {
   return {
     create: vi.fn(async () => ({ id: CONFIG_ID, name: "Padrão", contract_value: 1800 })),
+    delete: vi.fn(async () => ({ id: CONFIG_ID, deleted: true as const })),
     detail: vi.fn(async () => ({ id: CONFIG_ID, name: "Padrão", contract_value: 1800 })),
     list: vi.fn(async () => []),
     update: vi.fn(async () => ({ id: CONFIG_ID, name: "Atualizada", contract_value: 2000 })),
@@ -141,6 +142,44 @@ describe("commercial proposal-config routes", () => {
       name: undefined,
       contract_value: 2000,
     });
+  });
+
+  it("exclui item com identidade da organização e retorna confirmação", async () => {
+    const response = await request(createTestApp(service))
+      .delete(`/commercial/proposal-configs/${CONFIG_ID}`)
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: { id: CONFIG_ID, deleted: true },
+    });
+    expect(service.delete).toHaveBeenCalledWith({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      config_id: CONFIG_ID,
+    });
+  });
+
+  it("exige autenticação para excluir item", async () => {
+    const response = await request(createTestApp(service)).delete(
+      `/commercial/proposal-configs/${CONFIG_ID}`,
+    );
+
+    expect(response.status).toBe(401);
+    expect(service.delete).not.toHaveBeenCalled();
+  });
+
+  it("propaga conflito de referências da exclusão", async () => {
+    service.delete = vi.fn(async () => {
+      throw new ServiceError(409, "Configuração possui referências.");
+    });
+
+    const response = await request(createTestApp(service))
+      .delete(`/commercial/proposal-configs/${CONFIG_ID}`)
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(409);
   });
 
   it("propaga 404 do service sem vazar dados de outra organização", async () => {

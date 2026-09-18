@@ -45,6 +45,9 @@ describe("pessoal-service OpenAPI", () => {
     expect(paths["/internal/pessoal/union-notifications/run"]?.post?.security).toEqual([
       { internalServiceToken: [] },
     ]);
+    expect(
+      paths["/internal/pessoal/group-assignments/audit-outbox/reconcile"]?.post?.security,
+    ).toEqual([{ internalServiceToken: [] }]);
   });
 
   it("documenta o contrato interno de reporting pessoal", () => {
@@ -101,6 +104,8 @@ describe("pessoal-service OpenAPI", () => {
       paths["/pessoal/situations/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
       paths["/pessoal/unions"]?.post?.requestBody?.content?.["application/json"]?.schema,
       paths["/pessoal/unions/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/groups"]?.post?.requestBody?.content?.["application/json"]?.schema,
+      paths["/pessoal/groups/{id}"]?.patch?.requestBody?.content?.["application/json"]?.schema,
       paths["/pessoal/payroll"]?.post?.requestBody?.content?.["application/json"]?.schema,
       paths["/pessoal/payroll/{client_id}"]?.patch?.requestBody?.content?.["application/json"]
         ?.schema,
@@ -118,6 +123,67 @@ describe("pessoal-service OpenAPI", () => {
         properties: expect.any(Object),
       });
     }
+  });
+
+  it("documenta catalogo de grupos e reativacao", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const paths = spec.paths as Record<
+      string,
+      Record<string, { operationId?: string; responses?: Record<string, unknown> }>
+    >;
+
+    expect(paths["/pessoal/groups"]?.get?.operationId).toBe("listPessoalGroups");
+    expect(paths["/pessoal/groups/{id}"]?.delete?.operationId).toBe("archivePessoalGroup");
+    expect(paths["/pessoal/groups/{id}/reactivate"]?.post?.operationId).toBe(
+      "reactivatePessoalGroup",
+    );
+  });
+
+  it("documenta selecao, previa paginada e aplicacao idempotente de grupos", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const paths = spec.paths as Record<
+      string,
+      Record<string, { operationId?: string; parameters?: Array<{ name?: string }> }>
+    >;
+
+    expect(paths["/pessoal/group-assignments/eligible"]?.get?.operationId).toBe(
+      "listPessoalGroupAssignmentEligible",
+    );
+    expect(paths["/pessoal/group-assignments/previews"]?.post?.operationId).toBe(
+      "createPessoalGroupAssignmentPreview",
+    );
+    expect(paths["/pessoal/group-assignments/previews/{preview_id}"]?.get?.parameters).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "preview_id" })]),
+    );
+    expect(paths["/pessoal/group-assignments/apply"]?.post?.parameters).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Idempotency-Key" })]),
+    );
+    expect(
+      paths["/internal/pessoal/group-assignments/audit-outbox/reconcile"]?.post?.operationId,
+    ).toBe("reconcilePessoalGroupAssignmentAuditOutbox");
+  });
+
+  it("documenta politica explicita e contadores de geracao de obrigacoes", () => {
+    const spec = buildPessoalServiceOpenApiSpec(getPessoalServiceEnv());
+    const components = spec.components as {
+      schemas?: Record<string, { required?: string[]; properties?: Record<string, unknown> }>;
+    };
+    const paths = spec.paths as Record<
+      string,
+      {
+        post?: {
+          requestBody?: { content?: Record<string, { schema?: { properties?: unknown } }> };
+        };
+      }
+    >;
+
+    expect(
+      paths["/pessoal/groups"]?.post?.requestBody?.content?.["application/json"]?.schema
+        ?.properties,
+    ).toMatchObject({ policy: { enum: ["NORMAL", "NO_OBLIGATIONS"] } });
+    expect(components.schemas?.PessoalObligationGenerationResult?.required).toEqual(
+      expect.arrayContaining(["skippedArchivedGroup", "skippedNoObligations", "skippedNoGroup"]),
+    );
   });
 
   it("documenta busca e resposta dual de sindicatos", () => {

@@ -43,6 +43,7 @@ runTest("commercial catalog has a tenant-scoped CRUD contract and admin surface"
   const service = read("./services/commercialService.ts");
   const hooks = read("./hooks/useCommercialProposalConfigs.ts");
   const catalog = read("./components/CommercialCatalog.tsx");
+  const browserSmoke = read("./run-commercial-browser-smoke.mjs");
   const page = read("../../pages/comercial/index.tsx");
 
   assert.match(contract, /proposalConfigs:\s*["']\/commercial\/proposal-configs["']/);
@@ -50,10 +51,17 @@ runTest("commercial catalog has a tenant-scoped CRUD contract and admin surface"
   assert.match(service, /listProposalConfigs/);
   assert.match(service, /createProposalConfig/);
   assert.match(service, /updateProposalConfig/);
+  assert.match(service, /deleteProposalConfig/);
   assert.match(hooks, /useMutation/);
+  assert.match(hooks, /useDeleteCommercialProposalConfig/);
   assert.match(catalog, /useModuleAccess\("comercial"\)/);
   assert.match(catalog, /Catálogo de propostas/);
   assert.match(catalog, /Valor base do contrato/);
+  assert.match(catalog, /Excluir configuração/);
+  assert.match(catalog, /window\.confirm/);
+  assert.match(browserSmoke, /request\.method === "DELETE"/);
+  assert.match(browserSmoke, /02-commercial-config-deleted\.png/);
+  assert.match(browserSmoke, /05-commercial-prospecting-archived\.png/);
   assert.match(page, /CommercialCatalog/);
 });
 
@@ -69,10 +77,14 @@ runTest("commercial prospecting uses the dedicated legacy-status contract", () =
   assert.match(service, /listProspecting/);
   assert.match(service, /createProspecting/);
   assert.match(service, /updateProspecting/);
+  assert.match(service, /archiveProspecting/);
   assert.match(hooks, /invalidateQueries/);
+  assert.match(hooks, /useArchiveCommercialProspecting/);
   assert.match(types, /COMMERCIAL_PROSPECTING_STATUSES/);
   assert.match(catalog, /Nova prospecção/);
   assert.match(catalog, /COMMERCIAL_PROSPECTING_STATUSES/);
+  assert.match(catalog, /Arquivar prospecção/);
+  assert.match(catalog, /window\.confirm/);
   assert.doesNotMatch(catalog, /client\/[^"']+\/commercial/);
 });
 
@@ -102,4 +114,39 @@ runTest("commercial catalog uses the shared dark text ramps", () => {
   assert.match(catalog, /placeholder:text-slate-400[^"]*dark:placeholder:text-slate-500/);
 });
 
+runTest("commercial contract value uses the shared Brazilian currency mask", () => {
+  const catalog = read("./components/CommercialCatalog.tsx");
+
+  assert.match(catalog, /formatBrlInput/);
+  assert.match(catalog, /normalizeDigits\(event\.target\.value\)/);
+  assert.match(catalog, /parseBrlInput/);
+  assert.match(catalog, /Math\.round\(value \* 100\)/);
+});
+
+runTest("commercial creation actions open the shared dialogs", () => {
+  const catalog = read("./components/CommercialCatalog.tsx");
+
+  assert.match(catalog, /import \{ Dialog \} from "@shared\/components";/);
+  assert.match(catalog, /<Dialog[\s\S]*open=\{isCreating\}[\s\S]*title="Nova configuração"/);
+  assert.match(catalog, /<Dialog[\s\S]*open=\{isCreatingProspecting\}[\s\S]*title="Nova prospecção"/);
+  assert.match(catalog, /onCloseAutoFocus=/);
+  assert.match(catalog, /disabled=\{isSaving\}/);
+  assert.match(catalog, /disabled=\{isSavingProspecting\}/);
+  assert.match(catalog, /isSaving \? "Salvando\.\.\."/);
+  assert.match(catalog, /isSavingProspecting \? <Loader2/);
+  assert.match(catalog, /editingId !== null/);
+  assert.match(catalog, /prospectingEditingId !== null/);
+  assert.doesNotMatch(catalog, /\{isCreating \|\| editingId !== null \?/);
+  assert.doesNotMatch(catalog, /prospectingEditingId !== null \|\| \(!prospectingQuery\.data\?\.length/);
+});
+
+runTest("commercial browser smoke starts Next on the current platform", () => {
+  const browserSmoke = read("./run-commercial-browser-smoke.mjs");
+
+  assert.match(browserSmoke, /process\.platform === "win32"/);
+  assert.match(browserSmoke, /corepack/, "o smoke deve manter o gerenciador de pacotes fixado");
+  assert.doesNotMatch(browserSmoke, /spawn\("cmd", \["\/c", "corepack"/);
+  assert.match(browserSmoke, /async function stopProcessTree/);
+  assert.match(browserSmoke, /await stopProcessTree\(serverProcess\)/);
+});
 console.log("commercial contract tests passed");

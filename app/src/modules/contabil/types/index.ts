@@ -75,6 +75,18 @@ export interface ContabilControlFilters {
   competence: ContabilCompetence;
 }
 
+export interface ContabilControlPortfolioItem {
+  client_id: string;
+  legal_name: string;
+  control: ContabilControl | null;
+  closing: TriageClosing;
+}
+
+export interface ContabilControlPortfolio {
+  competence: ContabilCompetence;
+  items: ContabilControlPortfolioItem[];
+}
+
 export interface CreateOrGetContabilControlPayload {
   client_id: string;
   competence: ContabilCompetence;
@@ -83,6 +95,17 @@ export interface CreateOrGetContabilControlPayload {
 export interface PatchContabilControlFieldPayload {
   field: ContabilControlField;
   value: boolean | string | null;
+}
+
+export interface CreateYearContabilControlsPayload {
+  client_id: string;
+  year: number;
+  confirmed: true;
+}
+
+export interface ContabilCompetenceOperationPayload {
+  client_id: string;
+  competence: ContabilCompetence;
 }
 
 export interface CreateContabilResponsiblePayload {
@@ -123,4 +146,40 @@ export interface UpdateContabilRelationshipPayload {
 
 export interface DeleteContabilRelationshipPayload {
   id: string;
+}
+
+export type TriageDocumentStatus =
+  | "PENDING"
+  | "COMPLETED"
+  | "ATTENTION"
+  | "NOT_PRESENT"
+  | "NOT_APPLICABLE";
+
+export interface TriageDocumentsMonthly {
+  id: string;
+  client_id: string;
+  competence: ContabilCompetence;
+  checklist: Record<string, TriageDocumentStatus>;
+  summary: { applicable: number; completed: number; attention: number; pending: number; notApplicable: number; notPresent: number; percentage: number };
+}
+
+export interface TriageBankStatement {
+  id: string;
+  bank_id: string;
+  status: TriageDocumentStatus;
+}
+
+export type TriageClosingStatus =
+  | "NOT_RECEIVED"
+  | "RECEIVED"
+  | "UNDER_REVIEW"
+  | "CLOSED"
+  | "REOPENED";
+
+export interface TriageClosing {
+  id?: string;
+  client_id: string;
+  competence: ContabilCompetence;
+  status: TriageClosingStatus;
+  archived_at: string | null;
 }

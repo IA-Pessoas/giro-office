@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium, expect } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const PORT = process.env.PROJECT_WIZARD_BROWSER_PORT || "3117";
 const configuredBaseUrl = process.env.PROJECT_WIZARD_BROWSER_BASE_URL?.replace(/\/$/, "");
+const useProductionBuild = process.argv.includes("--production");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const failureArtifactDir =
@@ -81,6 +85,7 @@ async function installApiMocks(
   wizardRequests,
   extractionRequests = [],
   firstExtractionGate,
+  invalidExtractionRequests = [],
 ) {
   const existingTask = {
     id: "task-existing",
@@ -180,6 +185,16 @@ async function installApiMocks(
   await page.route("**/task/project-wizard/extract-tasks", async (route) => {
     const request = route.request();
     const contentType = request.headers()["content-type"] ?? "";
+    for (const [filename, error] of [
+      ["ata-corrompida.docx", "O arquivo DOCX está corrompido ou não pôde ser lido."],
+      ["ata-digitalizada.pdf", "O arquivo da Ata não contém texto."],
+    ]) {
+      if (request.postDataBuffer()?.includes(Buffer.from(`filename="${filename}"`))) {
+        invalidExtractionRequests.push(filename);
+        await route.fulfill({ status: 400, json: { success: false, error } });
+        return;
+      }
+    }
     extractionRequests.push({
       contentType,
       body: contentType.startsWith("multipart/form-data")
@@ -334,6 +349,20 @@ async function installApiMocks(
  * mostraria a digitação, então a evidência é um screenshot com os campos da Ata mascarados.
  * Grava em app/smoke-artifacts/ por padrão; PROJECT_WIZARD_BROWSER_ARTIFACT_DIR muda o destino.
  */
+async function captureEvidence(page, name) {
+  if (process.env.PROJECT_WIZARD_BROWSER_CAPTURE !== "1") return;
+  await mkdir(failureArtifactDir, { recursive: true });
+  await page.screenshot({
+    path: path.join(failureArtifactDir, `${name}.png`),
+    fullPage: true,
+    mask: [
+      page.getByLabel("Cole a Ata para extrair tarefas"),
+      page.getByLabel("Selecione um arquivo .txt, .md, .docx ou .pdf"),
+    ],
+    maskColor: "#94a3b8",
+  });
+}
+
 async function captureFailureArtifact(page) {
   try {
     await mkdir(failureArtifactDir, { recursive: true });
@@ -373,6 +402,7 @@ async function runBrowserProof() {
   const wizardRequests = [];
   const updateRequests = [];
   const extractionRequests = [];
+  const invalidExtractionRequests = [];
   let releaseFirstExtraction;
   const firstExtractionGate = new Promise((resolve) => {
     releaseFirstExtraction = resolve;
@@ -391,6 +421,7 @@ async function runBrowserProof() {
       wizardRequests,
       extractionRequests,
       firstExtractionGate,
+      invalidExtractionRequests,
     );
     await page.route("**/project", async (route) => {
       assert.equal(route.request().method(), "PUT");
@@ -425,10 +456,30 @@ async function runBrowserProof() {
     await page.getByRole("button", { name: "Novo projeto" }).click();
     const wizard = page.getByRole("dialog", { name: "Novo projeto" });
     await expectLockedClient(wizard);
+    await expect(wizard).toHaveAccessibleDescription("Etapa 1 de 3");
+    await expect(wizard.getByRole("button", { name: "Fechar", exact: true })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(wizard.getByLabel("Nome")).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(wizard.getByRole("button", { name: "Fechar", exact: true })).toBeFocused();
     await wizard.getByRole("button", { name: "Continuar" }).click();
-    await expect(page.getByText("Preencha o nome do projeto.", { exact: true })).toBeVisible();
+    await expect(wizard.getByLabel("Nome")).toHaveAttribute("aria-invalid", "true");
+    await expect(wizard.getByLabel("Nome")).toHaveAccessibleDescription(
+      "Preencha o nome do projeto.",
+    );
+    await expect(
+      wizard.getByRole("alert").filter({ hasText: "Preencha o nome do projeto." }),
+    ).toBeVisible();
 
+    await expect(wizard.getByLabel("Data de início")).toHaveAccessibleDescription(
+      "Preencha a data de início.",
+    );
+    await expect(wizard.getByLabel("Objetivo")).toHaveAccessibleDescription(
+      "Preencha o objetivo do projeto.",
+    );
+    await captureEvidence(page, "01-erros-campos-desktop");
     await wizard.getByLabel("Nome").fill("Projeto pelo wizard");
+    await expect(wizard.getByLabel("Nome")).toHaveAttribute("aria-invalid", "false");
     await wizard.getByLabel("Data de início").fill("2026-09-10");
     await wizard.getByLabel("Data final prevista").fill("2026-09-09");
     await wizard.getByLabel("Objetivo").fill("Criar sem tarefas.");
@@ -463,7 +514,7 @@ async function runBrowserProof() {
     await wizard.getByRole("button", { name: "Continuar" }).click();
     await wizard.getByRole("button", { name: "Pular e revisar" }).click();
     await wizard.getByRole("button", { name: "Criar projeto" }).click();
-    await expect(page.getByText("Tente novamente.", { exact: true })).toBeVisible();
+    await expect(wizard.getByRole("alert")).toHaveText("Tente novamente.");
     await wizard.getByRole("button", { name: "Criar projeto" }).click();
     await expect.poll(() => wizardRequests.length).toBe(2);
     assert.equal(
@@ -638,8 +689,12 @@ async function runBrowserProof() {
     });
     await expect(firstTask.getByLabel(/^Nome/)).toBeDisabled();
     await expect(firstTask.getByLabel(/^Modelo/)).toBeDisabled();
-    await expect(firstTask.getByRole("button", { name: "Remover tarefa", exact: true })).toBeDisabled();
-    await expect(wizard.getByRole("button", { name: "Adicionar tarefa", exact: true })).toBeDisabled();
+    await expect(
+      firstTask.getByRole("button", { name: "Remover tarefa", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      wizard.getByRole("button", { name: "Adicionar tarefa", exact: true }),
+    ).toBeDisabled();
     await expect.poll(() => previewRequests.length).toBe(5);
     assert.equal(previewRequests.length, 5, "Uma prévia pendente não pode aceitar nova revisão.");
     await expect(review.getByRole("cell", { name: "Apuração final", exact: true })).toBeVisible();
@@ -714,7 +769,7 @@ async function runBrowserProof() {
       buffer: Buffer.from("não enviar"),
     });
     await extractButton.click();
-    await expect(page.getByText("Tipo de arquivo não permitido.", { exact: true })).toBeVisible();
+    await expect(wizard.getByRole("alert")).toHaveText("Tipo de arquivo não permitido.");
     assert.equal(
       extractionRequests.length,
       0,
@@ -723,6 +778,71 @@ async function runBrowserProof() {
     await expect(
       wizard.getByText("Tentativas de extração: 0 de 3.", { exact: true }),
     ).toBeVisible();
+    await wizard.getByRole("button", { name: "Remover arquivo" }).click();
+
+    for (const { name, buffer, message } of [
+      {
+        name: "ata-vazia.txt",
+        buffer: Buffer.alloc(0),
+        message: "O arquivo da Ata é obrigatório e não pode estar vazio.",
+      },
+      {
+        name: "ata-grande.txt",
+        buffer: Buffer.alloc(10 * 1024 * 1024 + 1, "x"),
+        message: "Arquivo excede o limite de 10 MB.",
+      },
+    ]) {
+      await minutesFile.setInputFiles({ name, mimeType: "text/plain", buffer });
+      await extractButton.click();
+      await expect(wizard.getByRole("alert")).toHaveText(message);
+      await expect(minutesFile).toHaveAccessibleDescription(
+        new RegExp(message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      );
+      await expect(
+        wizard.getByText("Tentativas de extração: 0 de 3.", { exact: true }),
+      ).toBeVisible();
+      assert.equal(extractionRequests.length + invalidExtractionRequests.length, 0);
+      await wizard.getByRole("button", { name: "Remover arquivo" }).click();
+    }
+
+    await minutesFile.setInputFiles({
+      name: "ata-corrompida.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: await readFile(
+        path.join(
+          appRoot,
+          "../services/task-service/src/test/fixtures/meeting-minutes-corrupted.docx",
+        ),
+      ),
+    });
+    await extractButton.click();
+    await expect(wizard.getByRole("alert")).toHaveText(
+      "O arquivo DOCX está corrompido ou não pôde ser lido.",
+    );
+    await expect(
+      wizard.getByText("Tentativas de extração: 0 de 3.", { exact: true }),
+    ).toBeVisible();
+    assert.equal(invalidExtractionRequests.length, 1);
+    assert.equal(extractionRequests.length, 0);
+    await wizard.getByRole("button", { name: "Remover arquivo" }).click();
+    await minutesFile.setInputFiles({
+      name: "ata-digitalizada.pdf",
+      mimeType: "application/pdf",
+      buffer: await readFile(
+        path.join(
+          appRoot,
+          "../services/task-service/src/test/fixtures/meeting-minutes-scanned.pdf",
+        ),
+      ),
+    });
+    await extractButton.click();
+    await expect(wizard.getByRole("alert")).toHaveText("O arquivo da Ata não contém texto.");
+    await expect(
+      wizard.getByText("Tentativas de extração: 0 de 3.", { exact: true }),
+    ).toBeVisible();
+    await captureEvidence(page, "02-pdf-sem-texto-zero-tentativas");
+    assert.equal(invalidExtractionRequests.length, 2);
+    assert.equal(extractionRequests.length, 0);
     await wizard.getByRole("button", { name: "Remover arquivo" }).click();
 
     await minutesField.fill("- Apurar impostos do trimestre\n- Reunir documentos do cliente");
@@ -737,6 +857,7 @@ async function runBrowserProof() {
     await expect(
       wizard.getByText("Tentativas de extração: 1 de 3.", { exact: true }),
     ).toBeVisible();
+    await expect(wizard.getByRole("status")).toHaveText("Extraindo tarefas da Ata...");
     const wizardOverlay = page.locator('[data-state="open"].fixed.inset-0');
     await expect(wizardOverlay).toBeVisible();
     await wizardOverlay.click({ position: { x: 5, y: 5 }, force: true });
@@ -748,9 +869,7 @@ async function runBrowserProof() {
     const firstProposedTask = wizard.getByRole("group", {
       name: "Tarefa 1 (proposta pela IA)",
     });
-    await expect(firstProposedTask.getByLabel(/^Nome/)).toHaveValue(
-      "Apurar impostos do trimestre",
-    );
+    await expect(firstProposedTask.getByLabel(/^Nome/)).toHaveValue("Apurar impostos do trimestre");
     await expect(firstProposedTask.getByLabel("Prazo", { exact: true })).toHaveValue("2026-09-15");
     await expect(firstProposedTask.getByLabel(/^Departamento/)).toHaveValue("department-one");
     await expect(firstProposedTask.getByLabel(/^Modelo/)).toHaveValue("model-default");
@@ -776,12 +895,13 @@ async function runBrowserProof() {
 
     await extractButton.click();
     await expect(
-      page.getByText("Nenhuma tarefa foi identificada na Ata.", { exact: true }),
+      wizard.getByRole("alert").filter({ hasText: "Nenhuma tarefa foi identificada na Ata." }),
     ).toBeVisible();
     await expect(
       wizard.getByText("Tentativas de extração: 3 de 3.", { exact: true }),
     ).toBeVisible();
     await expect(extractButton).toBeDisabled();
+    await captureEvidence(page, "03-limite-reextracao-preservada");
     await expect(
       wizard.getByText(
         "Limite de 3 tentativas atingido. Continue adicionando tarefas manualmente.",
@@ -844,6 +964,18 @@ async function runBrowserProof() {
     await wizard.getByRole("button", { name: "Remover arquivo" }).click();
     await expect(minutesFile).toBeEnabled();
     await minutesField.fill("Nova fonte em texto");
+    await manualTask.getByLabel(/^Departamento/).selectOption("department-empty");
+    await manualTask.getByLabel(/^Modelo/).selectOption("model-empty");
+    await wizard.getByRole("button", { name: "Revisar tarefas" }).click();
+    await expect(
+      wizard.getByRole("cell", { name: "Tarefa manual preservada", exact: true }),
+    ).toBeVisible();
+    await expect(wizard.getByRole("button", { name: "Criar projeto" })).toBeEnabled();
+    await captureEvidence(page, "06-revisao-manual-apos-limite");
+    await wizard.getByRole("button", { name: "Voltar para tarefas" }).click();
+    await expect(
+      wizard.getByText("Tentativas de extração: 3 de 3.", { exact: true }),
+    ).toBeVisible();
 
     await wizard.getByRole("button", { name: "Cancelar" }).click();
     const draftDiscardConfirmation = page.getByRole("dialog", {
@@ -853,26 +985,20 @@ async function runBrowserProof() {
     await expect(draftDiscardConfirmation).toContainText(
       "Fechar agora vai descartar o rascunho deste projeto. Deseja continuar?",
     );
-    await draftDiscardConfirmation
-      .getByRole("button", { name: "Continuar editando" })
-      .click();
+    await draftDiscardConfirmation.getByRole("button", { name: "Continuar editando" }).click();
     await expect(draftDiscardConfirmation).not.toBeVisible();
     await expect(wizard).toBeVisible();
     await expect(minutesField).toHaveValue("Nova fonte em texto");
 
     await wizard.getByRole("button", { name: "Fechar" }).click();
     await expect(draftDiscardConfirmation).toBeVisible();
-    await draftDiscardConfirmation
-      .getByRole("button", { name: "Continuar editando" })
-      .click();
+    await draftDiscardConfirmation.getByRole("button", { name: "Continuar editando" }).click();
     await expect(draftDiscardConfirmation).not.toBeVisible();
     await expect(wizard).toBeVisible();
 
     await page.mouse.click(5, 5);
     await expect(draftDiscardConfirmation).toBeVisible();
-    await draftDiscardConfirmation
-      .getByRole("button", { name: "Continuar editando" })
-      .click();
+    await draftDiscardConfirmation.getByRole("button", { name: "Continuar editando" }).click();
     await expect(draftDiscardConfirmation).not.toBeVisible();
     await expect(wizard).toBeVisible();
 
@@ -934,10 +1060,83 @@ async function runBrowserProof() {
     );
     await expect(page).toHaveURL(`/tasks?clientId=${clientId}`);
 
-    smokeUser.modules.integracao = 1;
     await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Novo projeto" }).click();
+    await wizard.getByLabel("Nome").fill("Rascunho descartado pela recarga");
+    await wizard.getByLabel("Data de início").fill("2026-09-10");
+    await wizard.getByLabel("Objetivo").fill("Comprovar descarte completo pela recarga.");
+    await wizard.getByRole("button", { name: "Continuar" }).click();
+    await minutesField.fill("Ata sintética descartada na recarga");
+    await extractButton.click();
+    await expect(wizard.getByRole("group", { name: "Tarefa 1 (proposta pela IA)" })).toBeVisible();
+    await expect(
+      wizard.getByText("Tentativas de extração: 1 de 3.", { exact: true }),
+    ).toBeVisible();
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("button", { name: "Novo projeto" })).toHaveCount(0);
+    await expect(wizard).not.toBeVisible();
+    await page.getByRole("button", { name: "Novo projeto" }).click();
+    await expect(wizard.getByLabel("Nome")).toHaveValue("");
+    await expect(wizard.getByLabel("Objetivo")).toHaveValue("");
+    await expect(wizard.getByLabel("Data de início")).toHaveValue("");
+    await wizard.getByLabel("Nome").fill("Novo rascunho após recarga");
+    await wizard.getByLabel("Data de início").fill("2026-09-10");
+    await wizard.getByLabel("Objetivo").fill("Verificar estado inicial da etapa 2.");
+    await wizard.getByRole("button", { name: "Continuar" }).click();
+    await expect(minutesField).toHaveValue("");
+    await expect(wizard.getByRole("group", { name: /^Tarefa \d/ })).toHaveCount(0);
+    await expect(
+      wizard.getByText("Tentativas de extração: 0 de 3.", { exact: true }),
+    ).toBeVisible();
+    await wizard.getByRole("button", { name: "Cancelar" }).click();
+    await page
+      .getByRole("dialog", { name: "Descartar rascunho?" })
+      .getByRole("button", { name: "Descartar rascunho" })
+      .click();
+
+    for (const level of [0, 1]) {
+      smokeUser.type = "user";
+      smokeUser.modules.integracao = level;
+      await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
+      if (level === 1)
+        await expect(page.getByRole("heading", { name: "Projetos", level: 1 })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Novo projeto" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Criar projeto" })).toHaveCount(0);
+      assert.equal(wizardRequests.length, 4);
+    }
+    for (const [type, level] of [
+      ["user", 2],
+      ["user", 3],
+      ["owner", 0],
+    ]) {
+      smokeUser.type = type;
+      smokeUser.modules.integracao = level;
+      await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
+      await page.getByRole("button", { name: "Novo projeto" }).click();
+      await wizard.getByLabel("Nome").fill(`Projeto ${type} nível ${level}`);
+      await wizard.getByLabel("Data de início").fill("2026-09-10");
+      await wizard.getByLabel("Objetivo").fill("Validar autorização para criar projeto.");
+      await wizard.getByRole("button", { name: "Continuar" }).click();
+      await expect(wizard).toHaveAccessibleDescription("Etapa 2 de 3");
+      await wizard.getByRole("button", { name: "Pular e revisar" }).click();
+      await expect(wizard).toHaveAccessibleDescription("Etapa 3 de 3");
+      if (type === "user" && level === 2) {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await expect(wizard.getByRole("button", { name: "Criar projeto" })).toBeInViewport();
+        assert.equal(
+          await wizard.evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth),
+          true,
+        );
+        await captureEvidence(page, "04-revisao-mobile");
+        await page.evaluate(() => document.documentElement.classList.add("dark"));
+        await captureEvidence(page, "05-revisao-mobile-dark");
+        await page.evaluate(() => document.documentElement.classList.remove("dark"));
+        await page.setViewportSize({ width: 1440, height: 900 });
+      }
+      const before = wizardRequests.length;
+      await wizard.getByRole("button", { name: "Criar projeto" }).click();
+      await expect.poll(() => wizardRequests.length).toBe(before + 1);
+      await expect(page).toHaveURL(`/tasks?clientId=${clientId}`);
+    }
   } catch (error) {
     await captureFailureArtifact(page);
     throw error;
@@ -949,14 +1148,13 @@ async function runBrowserProof() {
 
 async function withNextServer(run) {
   if (configuredBaseUrl) return run();
-  const command = process.platform === "win32" ? "cmd" : "corepack";
-  const args =
-    process.platform === "win32"
-      ? ["/c", "pnpm", "exec", "next", "dev", "--webpack", "--port", PORT]
-      : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PORT];
-  const server = spawn(command, args, {
+  const nextCli = createRequire(import.meta.url).resolve("next/dist/bin/next");
+  const nextArgs = useProductionBuild
+    ? ["start", "--port", PORT]
+    : ["dev", "--webpack", "--port", PORT];
+  const server = spawn(process.execPath, [nextCli, ...nextArgs], {
     cwd: appRoot,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
@@ -968,13 +1166,32 @@ async function withNextServer(run) {
   });
   try {
     const startedAt = Date.now();
+    let ready = false;
     while (Date.now() - startedAt < 45_000) {
-      if (server.exitCode !== null) throw new Error(`Next dev encerrou antes do smoke.\n${output}`);
+      if (server.exitCode !== null) throw new Error(`Next encerrou antes do smoke.\n${output}`);
+      if (useProductionBuild && !output.includes("Ready in")) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        continue;
+      }
       try {
         const response = await fetch(baseUrl);
-        if (response.ok || response.status < 500) break;
+        if (response.ok || response.status < 500) {
+          ready = true;
+          break;
+        }
       } catch {}
       await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!ready) throw new Error(`Tempo esgotado aguardando Next em ${baseUrl}.\n${output}`);
+    // Compile both browser routes before checking UI timings in development mode.
+    if (!useProductionBuild) {
+      for (const route of ["/projects", "/tasks"]) {
+        const response = await fetch(`${baseUrl}${route}`, {
+          headers: { Cookie: "cw.session=opaque-test-session" },
+          signal: AbortSignal.timeout(120_000),
+        });
+        assert.equal(response.status, 200, `Next must serve ${route} before the smoke.`);
+      }
     }
     await run();
   } finally {
@@ -988,6 +1205,11 @@ async function withNextServer(run) {
   }
 }
 
+execFileSync(
+  process.execPath,
+  ["--experimental-vm-modules", "--test", path.join(appRoot, "scripts/wizard-evidence.test.mjs")],
+  { stdio: "inherit" },
+);
 await withNextServer(runBrowserProof);
 console.log("PASS wizard revisa tarefas manuais, aceita lista vazia e preserva edição direta");
 console.log("PASS wizard limita extração, preserva estado transitório e confirma descartes");

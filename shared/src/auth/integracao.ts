@@ -11,7 +11,13 @@ export const INTEGRACAO_PERMISSION_LEVEL = {
   ADMIN: 3,
 } as const satisfies Record<string, IntegracaoPermissionLevel>;
 
-export type IntegracaoResource = "client" | "project" | "task" | "taskModel";
+export type IntegracaoResource =
+  | "client"
+  | "project"
+  | "projectPlan"
+  | "task"
+  | "taskAttachment"
+  | "taskModel";
 export type IntegracaoAction =
   | "read"
   | "create"
@@ -21,6 +27,8 @@ export type IntegracaoAction =
   | "delete"
   | "requestCompletion"
   | "approveCompletion"
+  | "cancelCompletion"
+  | "reopen"
   | "manage"
   | "manageDependencies";
 export type IntegracaoScope = "organization" | "responsible";
@@ -91,6 +99,7 @@ const CLIENT_CREATE_FIELDS = [
   "service_unique",
   "status",
   "prospecting_status",
+  "regime",
 ] as const;
 
 const CLIENT_UPDATE_FIELDS = [
@@ -143,7 +152,6 @@ const TASK_UPDATE_FIELDS = [
   "department_id",
   "billing",
   "responsible_id",
-  "prevision_date",
 ] as const;
 const TASK_OWN_FIELDS = ["status", "observations"] as const;
 const TASK_MODEL_FIELDS = [
@@ -324,6 +332,32 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     [readRule([INTEGRACAO_PERMISSION_LEVEL.BASIC], "responsible"), readRule(readOrganization)],
     { test: "task.detail" },
   ),
+  routePolicy("GET", "/task/financeiro/queue", "task", "read", [readRule(readOrganization)], {
+    test: "task.financeiro.queue",
+  }),
+  routePolicy("GET", "/task/financeiro/collectors", "task", "manage", [readRule(admin)], {
+    test: "task.financeiro.collectors.list",
+  }),
+  routePolicy("PUT", "/task/financeiro/collectors", "task", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "task.financeiro.collectors",
+  }),
+  routePolicy(
+    "POST",
+    "/task/financeiro/settle",
+    "task",
+    "update",
+    [writeRule(readOrganization, [])],
+    { audit: "required", test: "task.financeiro.settle" },
+  ),
+  routePolicy(
+    "POST",
+    "/task/financeiro/express",
+    "task",
+    "update",
+    [writeRule(readOrganization, [])],
+    { audit: "required", test: "task.financeiro.express" },
+  ),
   routePolicy("POST", "/task", "task", "create", [writeRule(writeUser, TASK_CREATE_FIELDS)], {
     audit: "required",
     test: "task.create",
@@ -348,6 +382,60 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     [writeRule(writeUser, [])],
     { test: "task.projectWizard.preview" },
   ),
+  routePolicy("GET", "/task/project-plan", "projectPlan", "read", [readRule(readOrganization)], {
+    test: "projectPlan.detail",
+  }),
+  routePolicy(
+    "GET",
+    "/task/project-plan/list",
+    "projectPlan",
+    "read",
+    [readRule(readOrganization)],
+    {
+      test: "projectPlan.list",
+    },
+  ),
+  routePolicy(
+    "GET",
+    "/task/project-plan/task/list",
+    "projectPlan",
+    "read",
+    [readRule(readOrganization)],
+    { test: "projectPlan.task.list" },
+  ),
+  routePolicy("POST", "/task/project-plan", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.create",
+  }),
+  routePolicy("PUT", "/task/project-plan", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.update",
+  }),
+  routePolicy("DELETE", "/task/project-plan", "projectPlan", "delete", [writeRule(admin, [])], {
+    audit: "required",
+    dependency: 409,
+    test: "projectPlan.delete",
+  }),
+  routePolicy("POST", "/task/project-plan/task", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.task.create",
+  }),
+  routePolicy("PUT", "/task/project-plan/task", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.task.reorder",
+  }),
+  routePolicy(
+    "DELETE",
+    "/task/project-plan/task",
+    "projectPlan",
+    "delete",
+    [writeRule(admin, [])],
+    { audit: "required", test: "projectPlan.task.delete" },
+  ),
+  routePolicy("POST", "/task/project-plan/hire", "projectPlan", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "projectPlan.hire",
+  }),
   routePolicy(
     "PUT",
     "/task",
@@ -366,6 +454,51 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
       ),
     ],
     { audit: "required", test: "task.update" },
+  ),
+  routePolicy(
+    "POST",
+    "/task/postponement",
+    "task",
+    "update",
+    [
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        [],
+        "responsible",
+      ),
+      writeRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN], []),
+    ],
+    { audit: "required", test: "task.postponement.create" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/postponement/list",
+    "task",
+    "read",
+    [
+      readRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        "responsible",
+      ),
+      readRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
+    { test: "task.postponement.list" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/notifications",
+    "task",
+    "read",
+    [readRule([INTEGRACAO_PERMISSION_LEVEL.BASIC, ...readOrganization])],
+    { test: "task.notifications.list" },
+  ),
+  routePolicy(
+    "PUT",
+    "/task/notifications/read",
+    "task",
+    "update",
+    [writeRule([INTEGRACAO_PERMISSION_LEVEL.BASIC, ...readOrganization], [])],
+    { test: "task.notifications.read" },
   ),
   routePolicy("DELETE", "/task", "task", "delete", [writeRule(admin, [])], {
     audit: "required",
@@ -387,6 +520,25 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     { audit: "required", test: "task.requestCompletion" },
   ),
   routePolicy(
+    "POST",
+    "/task/complete-request",
+    "task",
+    "requestCompletion",
+    [
+      writeRule(
+        [
+          INTEGRACAO_PERMISSION_LEVEL.BASIC,
+          INTEGRACAO_PERMISSION_LEVEL.VIEWER,
+          INTEGRACAO_PERMISSION_LEVEL.USER,
+          INTEGRACAO_PERMISSION_LEVEL.ADMIN,
+        ],
+        [],
+        "responsible",
+      ),
+    ],
+    { audit: "required", test: "task.requestCompletion.create" },
+  ),
+  routePolicy(
     "PUT",
     "/task/complete-request",
     "task",
@@ -397,6 +549,89 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     ],
     { audit: "required", test: "task.approveCompletion" },
   ),
+  routePolicy(
+    "DELETE",
+    "/task/complete-request",
+    "task",
+    "cancelCompletion",
+    [
+      writeRule(
+        [
+          INTEGRACAO_PERMISSION_LEVEL.BASIC,
+          INTEGRACAO_PERMISSION_LEVEL.VIEWER,
+          INTEGRACAO_PERMISSION_LEVEL.USER,
+          INTEGRACAO_PERMISSION_LEVEL.ADMIN,
+        ],
+        [],
+      ),
+    ],
+    { audit: "required", test: "task.requestCompletion.cancel" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/complete-request/list",
+    "task",
+    "read",
+    [
+      readRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        "responsible",
+      ),
+      readRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
+    { test: "task.requestCompletion.list" },
+  ),
+  routePolicy(
+    "POST",
+    "/task/attachment",
+    "taskAttachment",
+    "create",
+    [
+      writeRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        [],
+        "responsible",
+      ),
+      writeRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN], []),
+    ],
+    { audit: "required", test: "task.attachment.create" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/attachment/list",
+    "taskAttachment",
+    "read",
+    [
+      readRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        "responsible",
+      ),
+      readRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
+    { test: "task.attachment.list" },
+  ),
+  routePolicy(
+    "GET",
+    "/task/attachment/access",
+    "taskAttachment",
+    "read",
+    [
+      readRule(
+        [INTEGRACAO_PERMISSION_LEVEL.BASIC, INTEGRACAO_PERMISSION_LEVEL.VIEWER],
+        "responsible",
+      ),
+      readRule([INTEGRACAO_PERMISSION_LEVEL.USER, INTEGRACAO_PERMISSION_LEVEL.ADMIN]),
+    ],
+    { test: "task.attachment.access" },
+  ),
+  routePolicy("DELETE", "/task/attachment", "taskAttachment", "delete", [writeRule(admin, [])], {
+    audit: "required",
+    test: "task.attachment.delete",
+  }),
+  routePolicy("PUT", "/task/reopen", "task", "reopen", [writeRule(admin, [])], {
+    audit: "required",
+    test: "task.reopen",
+  }),
   routePolicy("GET", "/task/model/list", "taskModel", "read", [readRule(taskModelRead)], {
     test: "taskModel.list",
   }),
@@ -421,6 +656,17 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     audit: "required",
     dependency: 409,
     test: "taskModel.delete",
+  }),
+  routePolicy("POST", "/task/integration", "taskModel", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "taskIntegration.create",
+  }),
+  routePolicy("DELETE", "/task/integration", "taskModel", "manage", [writeRule(admin, [])], {
+    audit: "required",
+    test: "taskIntegration.delete",
+  }),
+  routePolicy("GET", "/task/integration", "taskModel", "read", [readRule(taskModelRead)], {
+    test: "taskIntegration.list",
   }),
   routePolicy(
     "GET",

@@ -24,7 +24,8 @@ test("workflow do gate usa somente leitura e relatório sanitizado", async () =>
 test("test runner raiz inclui o scanner compartilhado", async () => {
   const packageJson = JSON.parse(await read("package.json"));
 
-  assert.match(packageJson.scripts.test, /supply-chain-integrity\.test\.mjs/u);
+  assert.match(packageJson.scripts.test, /^pnpm test:scripts && /u);
+  assert.match(packageJson.scripts["test:scripts"], /supply-chain-integrity\.test\.mjs/u);
   assert.equal(
     packageJson.scripts["security:supply-chain"],
     "node scripts/supply-chain-integrity.mjs",

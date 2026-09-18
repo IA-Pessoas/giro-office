@@ -149,6 +149,7 @@ model Organization {
   ipis                          Ipi[]
   ncms                          Ncm[]
   projectPlans                  ProjectPlan[]
+  projectPlanHirings            ProjectPlanHiring[]
   projectPlanTasks              ProjectPlanTasks[]
   projects                      Project[]
   projectWizardConfirmations    ProjectWizardConfirmation[]
@@ -156,6 +157,9 @@ model Organization {
   taskDependents                TaskDependent[]
   tasksIntegrationRegularize    TasksIntegrationRegularize[]
   taskModels                    TaskModel[]
+  completionRequests            TaskCompletionRequest[]
+  taskAttachments               TaskAttachment[]
+  taskPostponements             TaskPostponement[]
   logs                          Logs[]
   passwordsMkt                  PasswordMkt[]
   notes                         Note[]
@@ -165,6 +169,7 @@ model Organization {
   rhNotifications               RhNotification[]
   rhRequestReads                RhRequestRead[]
   rhMessageReads                RhMessageRead[]
+  taskOperationalNotifications  TaskOperationalNotification[]
   organizationInvites           OrganizationInvite[]
   usersWithOrg                  User[]              @relation("UserOrganization")
   installments                  Installment[]
@@ -176,6 +181,11 @@ model Organization {
   lddPessoal                    LddPessoal[]
   obrigationsPessoal            ObrigationsPessoal[]
   passwordsPessoal              PasswordPessoal[]
+  pessoalGroups                 PessoalGroup[]
+  pessoalGroupMigrationMappings PessoalGroupMigrationMapping[]
+  pessoalGroupAssignmentPreviews PessoalGroupAssignmentPreview[]
+  pessoalGroupAssignmentConfirmations PessoalGroupAssignmentConfirmation[]
+  pessoalAuditOutboxEvents      PessoalAuditOutboxEvent[]
   payrolls                      Payroll[]
   situationsPessoal             SituationsPessoal[]
   unionsPessoal                 UnionPessoal[]
@@ -221,6 +231,8 @@ model Organization {
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
   triageResponsibles            TriageResponsible[]
+  triageBankStatements          TriageBankStatement[]
+  triageClosings                TriageClosing[]
 
   @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
@@ -258,6 +270,7 @@ model Department {
   categorysStock            CategoryStock[]
   locationsStock            LocationStock[]
   users                     User[]
+  financeiroCollectors      DepartmentCollector[]
 
   @@index([organization_id, name], map: "idx_departments_org_name")
   @@unique([organization_id, name], map: "uq_departments_org_name")
@@ -324,6 +337,7 @@ model User {
   permissionsSpecifics        PermissionSpecific?
   obrigationsPessoal          ObrigationsPessoal[]
   passPessoal                 PasswordPessoal[]
+  pessoalGroupMigrationMappings PessoalGroupMigrationMapping[] @relation("PessoalGroupMigrationMappedBy")
   payroll                     Payroll[]
   completedSituationsPessoal  SituationsPessoal[]    @relation("completed_by")
   registeredSituationsPessoal SituationsPessoal[]    @relation("registered_by")
@@ -361,6 +375,8 @@ model User {
   authSessions                AuthSession[]
   triageMonthlys              TriageMonthly[]
   responsiblesTriage          TriageResponsible[]
+  financeiroCollectorAssignments DepartmentCollector[]
+  taskOperationalNotifications TaskOperationalNotification[]
   department                  Department             @relation(fields: [department_id], references: [id])
 
   @@unique([login], map: "users_login_key")
@@ -557,6 +573,27 @@ model RegularizeNotification {
   @@map("notification.regularize")
 }
 
+model TaskOperationalNotification {
+  id              String       @id @default(uuid())
+  organization_id String
+  recipient_id    String
+  task_id         String
+  event_key       String       @db.VarChar(191)
+  type            String
+  title           String
+  message         String
+  read_at         DateTime?
+  archived_at     DateTime?
+  created_at      DateTime     @default(now())
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  recipient       User         @relation(fields: [recipient_id], references: [id])
+
+  @@unique([organization_id, recipient_id, task_id, event_key], map: "uq_task_operational_notification_event")
+  @@index([organization_id, recipient_id, archived_at, read_at, created_at], map: "idx_task_operational_notification_inbox")
+  @@index([archived_at, created_at], map: "idx_task_operational_notification_retention")
+  @@map("notification.task_operational")
+}
+
 model Chat {
   id              String            @id @default(uuid())
   type            ChatType
@@ -691,6 +728,8 @@ model Client {
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
   responsiblesTriage            TriageResponsible[]
+  triageBankStatements          TriageBankStatement[]
+  triageClosings                TriageClosing[]
   commercialProspectings        CommercialProspecting[]
 
   @@map("clients")
@@ -892,6 +931,7 @@ model ProjectPlan {
   color           String
   organization_id String
   organization    Organization       @relation(fields: [organization_id], references: [id])
+  hirings         ProjectPlanHiring[]
   tasks           ProjectPlanTasks[]
 
   @@map("integracao.projectPlan")
@@ -907,7 +947,25 @@ model ProjectPlanTasks {
   plans           ProjectPlan  @relation(fields: [plan_id], references: [id])
   tasks           TaskModel    @relation(fields: [task_id], references: [id])
 
+  @@unique([organization_id, plan_id, task_id], map: "uq_project_plan_task_model")
   @@map("integracao.projectPlanTasks")
+}
+
+model ProjectPlanHiring {
+  id                String      @id @default(uuid())
+  plan_id           String
+  project_id        String
+  organization_id   String
+  response_snapshot Json
+  created_at        DateTime    @default(now())
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  plan              ProjectPlan @relation(fields: [plan_id], references: [id])
+  project           Project     @relation(fields: [project_id], references: [id])
+
+  @@unique([organization_id, plan_id, project_id], map: "uq_project_plan_hiring_org_plan_project")
+  @@index([plan_id], map: "idx_project_plan_hiring_plan")
+  @@index([project_id], map: "idx_project_plan_hiring_project")
+  @@map("integracao.project_plan_hirings")
 }
 
 model Project {
@@ -926,6 +984,7 @@ model Project {
   sponsor         User?        @relation("sponsor", fields: [sponsor_id], references: [id])
   tasks           Task[]
   wizardConfirmations ProjectWizardConfirmation[]
+  planHirings         ProjectPlanHiring[]
 
   @@map("integracao.projects")
 }
@@ -988,8 +1047,95 @@ model Task {
   license             License[]
   process             Process[]
   commercialTaskBilling CommercialTaskBilling?
+  completionRequests    TaskCompletionRequest[]
+  attachments           TaskAttachment[]
+  postponements         TaskPostponement[]
 
   @@map("integracao.tasks")
+}
+
+model TaskFinanceiroCommand {
+  id                String   @id @default(uuid())
+  organization_id   String
+  requested_by_user_id String
+  idempotency_key   String   @db.VarChar(255)
+  command_hash      String   @db.Char(64)
+  response_snapshot Json
+  created_at        DateTime @default(now())
+  audited_at        DateTime?
+
+  @@unique([organization_id, idempotency_key], map: "uq_task_financeiro_command_org_key")
+  @@index([organization_id], map: "idx_task_financeiro_command_org")
+  @@map("integracao.task_financeiro_commands")
+}
+
+model DepartmentCollector {
+  id              String     @id @default(uuid())
+  organization_id String
+  department_id   String
+  user_id         String
+  created_at      DateTime   @default(now())
+  department      Department @relation(fields: [department_id], references: [id])
+  user            User       @relation(fields: [user_id], references: [id])
+
+  @@unique([organization_id, department_id, user_id], map: "uq_department_collector")
+  @@index([organization_id, user_id], map: "idx_department_collector_user")
+  @@map("integracao.department_collectors")
+}
+
+model TaskCompletionRequest {
+  id              String   @id @default(uuid())
+  task_id         String
+  organization_id String
+  requester_id    String
+  status          String   @default("pending")
+  reason          String?
+  decision_reason String?
+  decided_by      String?
+  created_at      DateTime @default(now())
+  resolved_at     DateTime?
+  task            Task     @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, created_at], map: "idx_task_completion_requests_org_task_created")
+  @@index([organization_id, requester_id, created_at], map: "idx_task_completion_requests_org_requester_created")
+  @@map("integracao.task_completion_requests")
+}
+
+model TaskAttachment {
+  id              String       @id @default(uuid())
+  task_id         String
+  organization_id String
+  uploaded_by     String
+  original_name   String
+  mime_type       String
+  size_bytes      Int
+  object_path     String       @unique
+  created_at      DateTime     @default(now())
+  deleted_at      DateTime?
+  deleted_by      String?
+  task            Task         @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, deleted_at, created_at], map: "idx_task_attachments_org_task_visible")
+  @@map("integracao.task_attachments")
+}
+
+model TaskPostponement {
+  id                      String       @id @default(uuid())
+  task_id                 String
+  organization_id         String
+  previous_prevision_date DateTime
+  new_prevision_date      DateTime
+  justification           String
+  author_id               String
+  created_at              DateTime     @default(now())
+  task                    Task         @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization            Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, created_at], map: "idx_task_postponements_org_task_created")
+  @@index([organization_id, author_id, created_at], map: "idx_task_postponements_org_author_created")
+  @@map("integracao.task_postponements")
 }
 
 model ProposalConfig {
@@ -1010,6 +1156,7 @@ model CommercialProspecting {
   status          String
   status_date     DateTime?
   description     String?
+  archived_at     DateTime?
   registered_at   DateTime     @default(now())
   updated_at      DateTime     @updatedAt
   client          Client       @relation(fields: [client_id], references: [id])
@@ -1017,6 +1164,7 @@ model CommercialProspecting {
 
   @@unique([organization_id, client_id], map: "uq_commercial_prospecting_org_client")
   @@index([organization_id, status], map: "idx_commercial_prospecting_org_status")
+  @@index([organization_id, archived_at, updated_at], map: "idx_commercial_prospecting_org_archived_updated")
   @@map("commercial.prospecting")
 }
 
@@ -1395,11 +1543,13 @@ model ControlContabil {
   reconcile_icms_pis_cofins        Boolean
   depreciation                     Boolean
   notes                            String
+  archived_at                      DateTime?
   organization_id                  String
   client                           Client       @relation(fields: [client_id], references: [id])
   organization                     Organization @relation(fields: [organization_id], references: [id])
 
-  @@index([client_id, competence, organization_id], map: "idx_contabil_control_client_competence_org")
+  @@unique([organization_id, client_id, competence], map: "uq_contabil_control_org_client_competence")
+  @@index([client_id, competence, organization_id, archived_at], map: "idx_contabil_control_client_competence_org_archived")
   @@map("contabil.control")
 }
 
@@ -1635,7 +1785,7 @@ model Payroll {
   info            String
   previous        Boolean
   onvio           Boolean
-  group           String
+  group_id        String
   vt              Boolean
   vt_value        Float?
   vt_type         String?
@@ -1649,29 +1799,142 @@ model Payroll {
   contact         String?
   organization_id String
   organization    Organization  @relation(fields: [organization_id], references: [id])
+  group           PessoalGroup  @relation(fields: [group_id], references: [id], onDelete: Restrict)
   responsible     User?         @relation(fields: [responsible_id], references: [id])
   union           UnionPessoal? @relation(fields: [union_id], references: [id], onDelete: Restrict)
+  groupAssignmentPreviewDetails PessoalGroupAssignmentPreviewDetail[]
 
   @@map("pessoal.payroll")
 }
 
-model ObrigationsPessoal {
-  id              String       @id @default(uuid())
-  client_id       String
-  competence      String
-  responsavel_id  String?
-  advance         Boolean?
-  payroll         Boolean?
-  charges         Boolean?
-  assistance_fee  Boolean?
-  bem_mais        Boolean?
-  bsf             Boolean?
-  va              Boolean?
-  vt              Boolean?
+model PessoalGroup {
+  id              String        @id @default(uuid())
+  name            String
+  normalized_name String
+  policy          String        @default("NORMAL")
+  system_key      String?
+  archived_at     DateTime?
   organization_id String
-  client          Client       @relation(fields: [client_id], references: [id])
-  organization    Organization @relation(fields: [organization_id], references: [id])
-  responsible     User?        @relation(fields: [responsavel_id], references: [id])
+  organization    Organization  @relation(fields: [organization_id], references: [id])
+  migrationMappings PessoalGroupMigrationMapping[]
+  payrolls        Payroll[]
+  assignmentPreviews PessoalGroupAssignmentPreview[]
+
+  @@unique([organization_id, normalized_name], map: "uq_pessoal_group_org_normalized_name")
+  @@unique([organization_id, system_key], map: "uq_pessoal_group_org_system_key")
+  @@index([organization_id, archived_at, name], map: "idx_pessoal_group_org_archived_name")
+  @@map("pessoal.group")
+}
+
+model PessoalGroupAssignmentPreview {
+  id              String       @id @default(uuid())
+  organization_id String
+  target_group_id String
+  fingerprint     String       @db.Char(64)
+  version         Int          @default(1)
+  totals          Json
+  expires_at      DateTime
+  applied_at      DateTime?
+  created_by_id   String
+  created_at      DateTime     @default(now())
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  targetGroup     PessoalGroup @relation(fields: [target_group_id], references: [id], onDelete: Restrict)
+  details         PessoalGroupAssignmentPreviewDetail[]
+  confirmations   PessoalGroupAssignmentConfirmation[]
+  auditOutboxEvents PessoalAuditOutboxEvent[]
+
+  @@index([organization_id, expires_at], map: "idx_pessoal_group_assignment_preview_org_expiry")
+  @@map("pessoal.group_assignment_previews")
+}
+
+model PessoalGroupAssignmentPreviewDetail {
+  id                    String                         @id @default(uuid())
+  preview_id            String
+  client_id             String
+  client_name           String?
+  payroll_id            String?
+  previous_group_id     String?
+  previous_group_name   String?
+  outcome               String
+  skip_reason           String?
+  preview               PessoalGroupAssignmentPreview @relation(fields: [preview_id], references: [id], onDelete: Cascade)
+  payroll               Payroll?                       @relation(fields: [payroll_id], references: [id], onDelete: SetNull)
+
+  @@unique([preview_id, client_id], map: "uq_pessoal_group_assignment_preview_client")
+  @@index([preview_id, outcome, id], map: "idx_pessoal_group_assignment_detail_preview_outcome")
+  @@map("pessoal.group_assignment_preview_details")
+}
+
+model PessoalGroupAssignmentConfirmation {
+  id                String                         @id @default(uuid())
+  organization_id   String
+  preview_id        String
+  idempotency_key   String                         @db.VarChar(255)
+  command_hash      String                         @db.Char(64)
+  response_snapshot Json
+  created_at        DateTime                       @default(now())
+  organization      Organization                   @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  preview           PessoalGroupAssignmentPreview @relation(fields: [preview_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, idempotency_key], map: "uq_pessoal_group_assignment_confirmation_org_idempotency_key")
+  @@index([preview_id], map: "idx_pessoal_group_assignment_confirmation_preview")
+  @@map("pessoal.group_assignment_confirmations")
+}
+
+model PessoalAuditOutboxEvent {
+  id              String                         @id @default(uuid())
+  organization_id String
+  preview_id      String
+  payload         Json
+  status          String                         @default("pending")
+  created_at      DateTime                       @default(now())
+  processed_at    DateTime?
+  organization    Organization                   @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  preview         PessoalGroupAssignmentPreview @relation(fields: [preview_id], references: [id], onDelete: Cascade)
+
+  @@index([status, created_at], map: "idx_pessoal_audit_outbox_dispatch")
+  @@index([organization_id, preview_id], map: "idx_pessoal_audit_outbox_preview")
+  @@map("pessoal.audit_outbox_events")
+}
+
+model PessoalGroupMigrationMapping {
+  id               String        @id @default(uuid())
+  legacy_value     String
+  normalized_value String
+  group_id         String
+  mapped_by_id     String
+  mapped_at        DateTime      @default(now())
+  resolution_kind  String
+  organization_id  String
+  group            PessoalGroup  @relation(fields: [group_id], references: [id], onDelete: Restrict)
+  mappedBy         User          @relation("PessoalGroupMigrationMappedBy", fields: [mapped_by_id], references: [id], onDelete: Restrict)
+  organization     Organization  @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, normalized_value], map: "uq_pessoal_group_migration_mapping_org_normalized")
+  @@index([organization_id, group_id], map: "idx_pessoal_group_migration_mapping_org_group")
+  @@map("pessoal.group_migration_mapping")
+}
+
+model ObrigationsPessoal {
+  id                    String       @id @default(uuid())
+  client_id             String
+  competence            String
+  responsavel_id        String?
+  advance               Boolean?
+  payroll               Boolean?
+  charges               Boolean?
+  assistance_fee        Boolean?
+  bem_mais              Boolean?
+  bsf                   Boolean?
+  va                    Boolean?
+  vt                    Boolean?
+  group_snapshot_id     String?
+  group_snapshot_name   String?
+  group_snapshot_policy String?
+  organization_id       String
+  client                Client       @relation(fields: [client_id], references: [id])
+  organization          Organization @relation(fields: [organization_id], references: [id])
+  responsible           User?        @relation(fields: [responsavel_id], references: [id])
 
   @@unique([organization_id, client_id, competence], map: "uq_pessoal_obligations_org_client_competence")
   @@index([organization_id, competence], map: "idx_pessoal_obligations_org_competence")
@@ -1868,6 +2131,7 @@ model TasksIntegrationRegularize {
   organization    Organization @relation(fields: [organization_id], references: [id])
   task_model      TaskModel    @relation(fields: [task_model_id], references: [id])
 
+  @@unique([organization_id, task_model_id, referring_type, referring], map: "uq_task_regularize_link")
   @@map("integracao.tasksIntegrationRegularize")
 }
 
@@ -2347,7 +2611,8 @@ model TriageConfig {
   client          Client       @relation(fields: [client_id], references: [id])
   organization    Organization @relation(fields: [organization_id], references: [id])
 
-  @@unique([client_id, type])
+  @@unique([organization_id, client_id, type])
+  @@index([organization_id, client_id])
   @@map("triagem.configs")
 }
 
@@ -2366,13 +2631,50 @@ model TriageMonthly {
   justification   String?
   created_at      DateTime     @default(now())
   updated_at      DateTime     @updatedAt
+  archived_at     DateTime?
   organization_id String
   client          Client       @relation(fields: [client_id], references: [id])
   organization    Organization @relation(fields: [organization_id], references: [id])
   responsible     User?        @relation(fields: [responsible_id], references: [id])
 
-  @@unique([client_id, competence, type])
+  @@unique([organization_id, client_id, competence, type])
+  @@index([organization_id, client_id, competence, archived_at])
   @@map("triagem.monthly")
+}
+
+model TriageBankStatement {
+  id              String       @id @default(uuid())
+  client_id       String
+  competence      String
+  bank_id         String
+  status          String       @default("PENDING")
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  archived_at     DateTime?
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, client_id, competence, bank_id])
+  @@index([organization_id, client_id, competence, archived_at])
+  @@map("triagem.bank_statements")
+}
+
+model TriageClosing {
+  id              String       @id @default(uuid())
+  client_id       String
+  competence      String
+  status          String
+  archived_at     DateTime?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, client_id, competence])
+  @@index([organization_id, client_id, competence, archived_at])
+  @@map("triagem.closings")
 }
 
 model ClientClouds {
@@ -2401,7 +2703,8 @@ model TriageResponsible {
   organization    Organization @relation(fields: [organization_id], references: [id])
   user            User         @relation(fields: [user_id], references: [id])
 
-  @@unique([client_id, type])
+  @@unique([organization_id, client_id, type])
+  @@index([organization_id, client_id])
   @@map("triagem.responsibles")
 }
 

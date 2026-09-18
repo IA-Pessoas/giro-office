@@ -450,6 +450,33 @@ await (async () => {
     );
   });
 
+  await runTest("commercial access follows the modular matrix for every user type", () => {
+    const expectedByType = {
+      user: ["none", "view", "edit", "admin"],
+      admin: ["none", "view", "edit", "admin"],
+      owner: ["admin", "admin", "admin", "admin"],
+    };
+
+    for (const [type, expectedLevels] of Object.entries(expectedByType)) {
+      for (const [commercialLevel, expectedLevel] of expectedLevels.entries()) {
+        const subject = {
+          type,
+          modules: { comercial: commercialLevel },
+        };
+        const persistedLevel = getModulePermissionLevel(subject, "comercial");
+        const access = resolveModuleAccess({
+          module: "comercial",
+          additionalModulePermissions: { comercial: persistedLevel ?? 0 },
+          isGlobalAdmin: subject.type === "owner",
+        });
+
+        assert.equal(access.level, expectedLevel, `${type} comercial=${commercialLevel}`);
+        assert.equal(access.canView, expectedLevel !== "none");
+        assert.equal(access.canEdit, expectedLevel === "edit" || expectedLevel === "admin");
+      }
+    }
+  });
+
   await runTest("resolveModuleAccess maps zero and invalid levels to no access", () => {
     assert.deepEqual(
       resolveModuleAccess({
@@ -525,7 +552,7 @@ await (async () => {
   );
 
   await runTest("disabled modules are blocked even for global admins", () => {
-    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing", "triagem"]);
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing"]);
 
     for (const moduleKey of DISABLED_MODULE_KEYS) {
       assert.equal(isModuleDisabled(moduleKey), true);
@@ -590,7 +617,7 @@ await (async () => {
   );
 
   await runTest("retired modules are not registered in navigation or quick actions", () => {
-    for (const blockedPath of ["/marketing", "/triagem"]) {
+    for (const blockedPath of ["/marketing"]) {
       assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
       assert.equal(quickActionsSource.includes(`href: "${blockedPath}"`), false);
     }
@@ -600,7 +627,7 @@ await (async () => {
   await runTest(
     "disabled module pages return not found without importing module implementations",
     () => {
-      for (const source of [marketingPageSource, triagemPageSource]) {
+    for (const source of [marketingPageSource]) {
         assert.match(source, /notFound:\s*true/);
       }
 
@@ -610,7 +637,7 @@ await (async () => {
       assert.equal(clientCommercialPageSource.includes("ClientCommercialForm"), false);
       assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
       assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);
-      assert.equal(triagemPageSource.includes("newLayout/Triagem"), false);
+      assert.equal(triagemPageSource.includes("TriageDocumentsSection"), true);
       assert.match(parcelamentoPageSource, /ParcelamentoShell/);
     },
   );

@@ -5,6 +5,7 @@ import { PayrollService } from "../services/payrollService.js";
 import {
   clientId,
   createAuditMock,
+  groupId,
   organizationId,
   responsibleId,
   unionId,
@@ -16,6 +17,9 @@ function createPrismaMock() {
     client: { findFirst: vi.fn(async () => ({ id: clientId })) },
     user: { findFirst: vi.fn(async () => ({ id: responsibleId })) },
     unionPessoal: { findFirst: vi.fn(async () => ({ id: unionId })) },
+    pessoalGroup: {
+      findFirst: vi.fn(async (): Promise<{ id: string } | null> => ({ id: groupId })),
+    },
     payroll: {
       findFirst: vi.fn(
         async ({
@@ -36,7 +40,7 @@ const payrollBody = {
   info: "Enviar ate dia 5",
   previous: false,
   onvio: true,
-  group: "A",
+  group_id: groupId,
   vt: true,
   va: true,
   assistance_fee: true,
@@ -55,7 +59,7 @@ describe("PayrollService", () => {
     const viewerContext = { organizationId, userId, permission: 1 };
     const operations = [
       () => service.create(viewerContext, payrollBody),
-      () => service.update(viewerContext, clientId, { info: "Novo prazo" }),
+      () => service.update(viewerContext, clientId, { info: "Novo prazo", group_id: groupId }),
     ];
 
     for (const operation of operations) {
@@ -95,6 +99,24 @@ describe("PayrollService", () => {
       where: { id: unionId, organization_id: organizationId },
       select: { id: true },
     });
+    expect(prisma.pessoalGroup.findFirst).toHaveBeenCalledWith({
+      where: { id: groupId, organization_id: organizationId, archived_at: null },
+      select: { id: true },
+    });
+  });
+
+  it("impede nova atribuicao a grupo arquivado", async () => {
+    const prisma = createPrismaMock();
+    prisma.pessoalGroup.findFirst.mockResolvedValueOnce(null);
+    const service = new PayrollService(prisma as never, createAuditMock());
+
+    await expect(
+      service.create({ organizationId, userId, permission: 2 }, payrollBody),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+    });
+
+    expect(prisma.payroll.create).not.toHaveBeenCalled();
   });
 
   it("rejeita folha duplicada por cliente", async () => {
@@ -128,13 +150,17 @@ describe("PayrollService", () => {
 
     await service.update({ organizationId, userId, permission: 2 }, clientId, {
       info: "Novo prazo",
+      group_id: groupId,
     });
 
     expect(prisma.payroll.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { client_id: clientId, organization_id: organizationId } }),
     );
     expect(prisma.payroll.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { client_id: clientId }, data: { info: "Novo prazo" } }),
+      expect.objectContaining({
+        where: { client_id: clientId },
+        data: { info: "Novo prazo", group_id: groupId },
+      }),
     );
   });
 });

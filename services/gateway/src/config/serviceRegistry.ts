@@ -20,6 +20,7 @@ const REGULARIZE_SERVICE_PREFIXES = ["/regularize"] as const;
 const FISCAL_SERVICE_PREFIXES = ["/fiscal"] as const;
 
 const CONTABIL_SERVICE_PREFIXES = ["/contabil"] as const;
+const TRIAGEM_SERVICE_PREFIXES = ["/triagem"] as const;
 
 const TI_SERVICE_PREFIXES = ["/ti"] as const;
 
@@ -145,6 +146,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.projectServiceUrl,
       auditTarget: "project-service",
       routePrefixes: [...PROJECT_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
     },
     {
       key: "client-service",
@@ -158,6 +160,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.regularizeServiceUrl,
       auditTarget: "regularize-service",
       routePrefixes: [...REGULARIZE_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
     },
     {
       key: "fiscal-service",
@@ -174,6 +177,13 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       routePrefixes: [...CONTABIL_SERVICE_PREFIXES],
       internalServiceToken: env.auditServiceToken,
       permissionModule: "contabil",
+    },
+    {
+      key: "triagem-service",
+      targetUrl: env.contabilServiceUrl,
+      auditTarget: "contabil-service",
+      routePrefixes: [...TRIAGEM_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
     },
     {
       key: "ti-service",

@@ -20,6 +20,29 @@ describe("activityCatalog", () => {
     ],
     ["GET", "/commercial/prospecting", "consultou", "a lista de prospecções comerciais"],
     ["POST", "/commercial/prospecting", "cadastrou", "uma nova prospecção comercial"],
+    ["GET", "/pessoal/groups", "consultou", "a lista de grupos de pessoal"],
+    ["POST", "/pessoal/groups", "cadastrou", "um novo grupo de pessoal"],
+    [
+      "DELETE",
+      "/pessoal/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "arquivou",
+      "um grupo de pessoal",
+    ],
+    [
+      "POST",
+      "/pessoal/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/reactivate",
+      "reativou",
+      "um grupo de pessoal",
+    ],
+    [
+      "GET",
+      "/pessoal/group-assignments/eligible",
+      "consultou",
+      "os clientes elegíveis para atribuição de grupo",
+    ],
+    ["POST", "/pessoal/group-assignments/previews", "gerou", "uma prévia de atribuição de grupo"],
+    ["POST", "/pessoal/group-assignments/apply", "aplicou", "uma atribuição de grupo"],
+    ["GET", "/triagem/editability", "consultou", "a permissão de edição da triagem"],
     ["POST", "/reports/definitions/validate", "revisou", "a configuração de um relatório"],
     ["POST", "/reports/preview", "gerou", "uma prévia de relatório"],
     ["GET", "/reports/jobs/list", "consultou", "o histórico de relatórios"],
@@ -318,6 +341,10 @@ describe("activityCatalog", () => {
   it("não inventa descrição para rota desconhecida", () => {
     expect(classifyActivity("POST", "/unknown/action")).toEqual({ kind: "unknown" });
     expect(classifyActivity("POST", "/task/nova-acao")).toEqual({ kind: "unknown" });
+    expect(classifyActivity("POST", "/pessoal/groups/42/unknown")).toEqual({ kind: "unknown" });
+    expect(classifyActivity("GET", "/pessoal/group-assignments/unknown")).toEqual({
+      kind: "unknown",
+    });
     expect(describeActivity("POST", "/unknown/action")).toBeNull();
   });
 

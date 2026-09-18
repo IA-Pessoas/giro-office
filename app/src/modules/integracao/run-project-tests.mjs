@@ -22,20 +22,117 @@ runTest("task creation preserves explicit null responsible and omits secondary a
   assert.equal(Object.hasOwn(buildCreateIntegracaoTaskPayload(base), "responsible_id"), false);
 });
 
+runTest("task completion contract preserves request, decision, reopen and history payloads", () => {
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.completionRequest, "/task/complete-request");
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.completionRequestList, "/task/complete-request/list");
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.reopen, "/task/reopen");
+  assert.deepEqual(buildTaskCompletionRequestPayload("task-1", "Pronta para validação."), {
+    task_id: "task-1",
+    reason: "Pronta para validação.",
+  });
+  assert.deepEqual(buildTaskCompletionDecisionPayload("task-1", "request-1", "refused", "Falta anexo."), {
+    task_id: "task-1",
+    request_id: "request-1",
+    decision: "refused",
+    reason: "Falta anexo.",
+  });
+  assert.deepEqual(buildTaskReopenPayload("task-1", "Documento pendente."), {
+    task_id: "task-1",
+    reason: "Documento pendente.",
+  });
+  assert.deepEqual(
+    unwrapTaskCompletionRequestHistory({ success: true, data: [{ id: "request-1", status: "pending" }] }),
+    [{ id: "request-1", status: "pending" }],
+  );
+});
+
+runTest("task completion panel exposes request, decision, cancel, history and reopen actions", () => {
+  const source = readFileSync(
+    new URL("./components/TaskCompletionPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  for (const hook of [
+    "useRequestTaskCompletionMutation",
+    "useDecideTaskCompletionMutation",
+    "useCancelTaskCompletionMutation",
+    "useReopenTaskMutation",
+    "useIntegracaoTaskCompletionRequests",
+  ]) {
+    assert.match(source, new RegExp(hook));
+  }
+  assert.match(source, /Solicitar conclusão/);
+  assert.match(source, /Recusar/);
+  assert.match(source, /Cancelar solicitação/);
+  assert.match(source, /Reabrir tarefa/);
+});
+
+runTest("task attachment contract keeps private paths out of the UI", () => {
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.attachment, "/task/attachment");
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.attachmentAccess, "/task/attachment/access");
+  assert.deepEqual(
+    unwrapTaskAttachmentList({ success: true, data: [{ id: "attachment-1" }] }),
+    [{ id: "attachment-1" }],
+  );
+  assert.equal(
+    unwrapTaskAttachmentAccessUrl({ success: true, data: { url: "https://signed.example/file" } }),
+    "https://signed.example/file",
+  );
+  const source = readFileSync(new URL("./components/TaskAttachmentPanel.tsx", import.meta.url), "utf8");
+  assert.match(source, /useUploadTaskAttachmentMutation/);
+  assert.match(source, /useIntegracaoTaskAttachments/);
+  assert.match(source, /window\.open\(url, "_blank", "noopener,noreferrer"\)/);
+  assert.match(source, /key=\{fileInputKey\}/);
+  assert.doesNotMatch(source, /object_path/);
+});
+
+runTest("task postponement contract and panel retain justification and chronological history", () => {
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponement, "/task/postponement");
+  assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponementList, "/task/postponement/list");
+  assert.deepEqual(
+    buildTaskPostponementPayload("task-1", "2026-09-20", "Aguardando documento."),
+    {
+      task_id: "task-1",
+      new_prevision_date: "2026-09-20",
+      justification: "Aguardando documento.",
+    },
+  );
+  assert.deepEqual(
+    unwrapTaskPostponementHistory({ success: true, data: [{ id: "postponement-1" }] }),
+    [{ id: "postponement-1" }],
+  );
+  const panel = readFileSync(
+    new URL("./components/TaskPostponementPanel.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /usePostponeTaskMutation/);
+  assert.match(panel, /useIntegracaoTaskPostponements/);
+  assert.match(panel, /Justificativa da prorrogação/);
+  assert.match(panel, /Histórico de prorrogações/);
+});
+
 import {
   buildCreateIntegracaoTaskPayload,
   buildDeleteIntegracaoTaskPayload,
   buildIntegracaoTaskListParams,
+  buildTaskCompletionDecisionPayload,
+  buildTaskCompletionRequestPayload,
+  buildTaskPostponementPayload,
+  buildTaskReopenPayload,
   buildUpdateIntegracaoTaskPayload,
   INTEGRACAO_TASKS_ENDPOINTS,
   unwrapCreatedIntegracaoTask,
   unwrapIntegracaoTaskDetail,
   unwrapIntegracaoTaskList,
+  unwrapTaskAttachmentAccessUrl,
+  unwrapTaskAttachmentList,
+  unwrapTaskCompletionRequestHistory,
+  unwrapTaskPostponementHistory,
   unwrapUpdatedIntegracaoTask,
 } from "./services/integracaoTasksService.contract.ts";
 import {
   buildCreateTaskModelPayload,
   buildDeleteTaskModelPayload,
+  buildTaskIntegrationPayload,
   buildTaskModelOptionsParams,
   buildTaskModelListParams,
   buildUpdateTaskModelPayload,
@@ -46,6 +143,7 @@ import {
   unwrapTaskModelList,
   unwrapTaskModelOptions,
   unwrapTaskModelPage,
+  unwrapTaskIntegrationList,
 } from "./services/taskModelService.contract.ts";
 import {
   buildCreateProjectPayload,
@@ -65,6 +163,11 @@ import {
   unwrapUpdatedProject,
   unwrapProjectTaskProposals,
 } from "./services/projectService.contract.ts";
+import {
+  buildHireProjectPlanPayload,
+  PROJECT_PLAN_ENDPOINTS,
+  unwrapProjectPlanHire,
+} from "./services/projectPlanService.contract.ts";
 import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
   applyWizardTaskChange,
@@ -296,6 +399,30 @@ runTest("project endpoints use only the v1 project contract", () => {
   assert.equal(PROJECT_ENDPOINTS.progress, "/project/progress");
   assert.equal(PROJECT_ENDPOINTS.metrics, "/project/metrics");
   assert.equal(PROJECT_ENDPOINTS.wizardPreview, "/task/project-wizard/preview");
+});
+
+runTest("project plan contratação preserva o contrato idempotente", () => {
+  assert.equal(PROJECT_PLAN_ENDPOINTS.hire, "/task/project-plan/hire");
+  assert.deepEqual(buildHireProjectPlanPayload({ plan_id: "plan-1", project_id: "project-1" }), {
+    plan_id: "plan-1",
+    project_id: "project-1",
+  });
+  assert.deepEqual(
+    unwrapProjectPlanHire({ success: true, data: { created: [], idempotent: true } }),
+    { created: [], idempotent: true },
+  );
+});
+
+runTest("contratação de plano só é exposta para administrador da Integração", () => {
+  const projectDetail = readFileSync(
+    new URL("./components/ProjectDetailView.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    projectDetail,
+    /integracaoAccess\.isAdmin \? \(\s*<button[\s\S]*?Contratar plano/,
+  );
 });
 
 runTest("project wizard preview keeps the server revision and hierarchy", () => {
@@ -608,6 +735,28 @@ runTest("task model endpoints match task-service contract", () => {
   assert.equal(TASK_MODEL_ENDPOINTS.list, "/task/model/list");
   assert.equal(TASK_MODEL_ENDPOINTS.dependent, "/task/model/dependent");
   assert.equal(TASK_MODEL_ENDPOINTS.options, "/task/deps/options");
+  assert.equal(TASK_MODEL_ENDPOINTS.integration, "/task/integration");
+  assert.deepEqual(buildTaskIntegrationPayload("model-1", "process-1", "process"), {
+    task_model_id: "model-1",
+    referring: "process-1",
+    referring_type: "process",
+  });
+  assert.deepEqual(
+    unwrapTaskIntegrationList({
+      success: true,
+      data: [{ id: "link-1", referring_type: "process", available: false }],
+    }),
+    [{ id: "link-1", referring_type: "process", available: false }],
+  );
+});
+
+runTest("task model modal loads Regularize destinations from their own contracts", () => {
+  const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /regularizeService\.listProcesses\(\{ status: "Todos" \}\)/);
+  assert.match(source, /regularizeService\.listLicenses\(\{ status: "Todos" \}\)/);
+  assert.match(source, /taskModelService\.listRegularizeLinks/);
+  assert.match(source, /\(indisponível\)/);
 });
 
 runTest("task model options scope eligible responsibles by department", () => {

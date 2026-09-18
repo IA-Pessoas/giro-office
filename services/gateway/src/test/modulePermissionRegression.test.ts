@@ -55,16 +55,100 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ modules: { rh: 0 } }), listPolicy)).toBe(false);
   });
 
-  it("protege Comercial: Viewer lê e Editor altera, sem bypass global", () => {
+  it("classifica todos os fluxos Contábil do milestone com leitura e escrita corretas", () => {
+    const viewer = authContext({ modules: { contabil: 1 } });
+    const editor = authContext({ modules: { contabil: 2 } });
+    const readRoutes = [
+      ["GET", "/contabil/controls"],
+      ["GET", "/contabil/controls/list"],
+      ["GET", "/triagem/monthly"],
+      ["GET", "/triagem/statements"],
+      ["GET", "/triagem/closing"],
+    ] as const;
+    const contabilWriteRoutes = [
+      ["POST", "/contabil/controls"],
+      ["POST", "/contabil/controls/year"],
+      ["PATCH", "/contabil/controls/control-1/items"],
+      ["DELETE", "/contabil/controls"],
+      ["POST", "/contabil/controls/restore"],
+    ] as const;
+    const triagemWriteRoutes = [
+      ["POST", "/triagem/monthly"],
+      ["PUT", "/triagem/statements"],
+      ["PUT", "/triagem/closing"],
+    ] as const;
+
+    for (const [method, path] of readRoutes) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(true);
+    }
+    for (const [method, path] of contabilWriteRoutes) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(false);
+      expect(canAccessRoute(editor, requiredRoutePolicy(method, path))).toBe(true);
+    }
+    for (const [method, path] of triagemWriteRoutes) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(true);
+      expect(canAccessRoute(editor, requiredRoutePolicy(method, path))).toBe(true);
+    }
+  });
+
+  it("permite consulta de triagem para Contábil ou Triagem e não permite quem não tem ambos", () => {
+    const policy = requiredRoutePolicy("GET", "/triagem/monthly");
+
+    expect(canAccessRoute(authContext({ modules: { contabil: 1, triagem: 0 } }), policy)).toBe(
+      true,
+    );
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 1 } }), policy)).toBe(
+      true,
+    );
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 0 } }), policy)).toBe(
+      false,
+    );
+  });
+
+  it("deixa a atribuição de Triagem decidir a escrita no serviço", () => {
+    const policy = requiredRoutePolicy("PATCH", "/triagem/monthly/monthly-1/item");
+
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 1 } }), policy)).toBe(
+      true,
+    );
+    expect(canAccessRoute(authContext({ modules: { contabil: 0, triagem: 0 } }), policy)).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    ["user", 0, false, false],
+    ["user", 1, true, false],
+    ["user", 2, true, true],
+    ["user", 3, true, true],
+    ["admin", 0, false, false],
+    ["admin", 1, true, false],
+    ["admin", 2, true, true],
+    ["admin", 3, true, true],
+    ["owner", 0, true, true],
+    ["owner", 1, true, true],
+    ["owner", 2, true, true],
+    ["owner", 3, true, true],
+  ])("aplica a matriz Comercial para %s com comercial=%i", (type, commercialLevel, canRead, canWrite) => {
     const readPolicy = requiredRoutePolicy("GET", "/commercial/prospecting");
     const editPolicy = requiredRoutePolicy("PATCH", "/commercial/prospecting/prospecting-1");
+    const archivePolicy = requiredRoutePolicy("DELETE", "/commercial/prospecting/prospecting-1");
+    const context = authContext({
+      permission: type === "admin" ? 2 : 0,
+      type: type as "user" | "admin" | "owner",
+      modules: { comercial: commercialLevel },
+    });
 
-    expect(canAccessRoute(authContext({ modules: { comercial: 1 } }), readPolicy)).toBe(true);
-    expect(canAccessRoute(authContext({ modules: { comercial: 0 } }), readPolicy)).toBe(false);
-    expect(canAccessRoute(authContext({ modules: { comercial: 1 } }), editPolicy)).toBe(false);
-    expect(canAccessRoute(authContext({ modules: { comercial: 2 } }), editPolicy)).toBe(true);
+    expect(canAccessRoute(context, readPolicy)).toBe(canRead);
+    expect(canAccessRoute(context, editPolicy)).toBe(canWrite);
+    expect(canAccessRoute(context, archivePolicy)).toBe(canWrite);
+  });
+
+  it("não usa permission global como bypass do Comercial", () => {
+    const policy = requiredRoutePolicy("GET", "/commercial/prospecting");
+
     expect(
-      canAccessRoute(authContext({ permission: 999, modules: { comercial: 0 } }), readPolicy),
+      canAccessRoute(authContext({ permission: 999, modules: { comercial: 0 } }), policy),
     ).toBe(false);
   });
 
@@ -268,6 +352,34 @@ describe("matriz de regressão das políticas modulares", () => {
         policy,
       ),
     ).toBe(false);
+  });
+
+  it("libera as rotas de responsável da Integração para os níveis 0 e 1", () => {
+    for (const [method, path] of [
+      ["POST", "/task/complete-request"],
+      ["DELETE", "/task/complete-request"],
+      ["GET", "/task/complete-request/list"],
+      ["POST", "/task/postponement"],
+      ["GET", "/task/postponement/list"],
+      ["POST", "/task/attachment"],
+      ["GET", "/task/attachment/list"],
+      ["GET", "/task/attachment/access"],
+      ["PUT", "/task/conclusion"],
+      ["GET", "/task"],
+      ["GET", "/task/list"],
+    ] as const) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(
+        canAccessRoute(authContext({ modules: { integracao: 0 } }), policy),
+        `${method} ${path}`,
+      ).toBe(true);
+    }
+  });
+
+  it("mantém as demais mutações de tarefa restritas ao nível 2", () => {
+    const policy = requiredRoutePolicy("PUT", "/task");
+    expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), policy)).toBe(false);
+    expect(canAccessRoute(authContext({ modules: { integracao: 2 } }), policy)).toBe(true);
   });
 
   it("protege os endpoints de projeto pelo módulo Integração", () => {

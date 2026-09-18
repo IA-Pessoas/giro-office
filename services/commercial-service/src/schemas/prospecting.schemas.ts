@@ -15,16 +15,20 @@ export type ProspectingStatus = z.infer<typeof prospectingStatusSchema>;
 const descriptionSchema = z.string().trim().max(5000).nullable().optional();
 const statusDateSchema = z.coerce.date().nullable().optional();
 
-export const prospectingIdParamSchema = z.object({
-  id: z.string().uuid("Id da prospecção inválido."),
-}).strict();
+export const prospectingIdParamSchema = z
+  .object({
+    id: z.string().uuid("Id da prospecção inválido."),
+  })
+  .strict();
 
-export const createProspectingBodySchema = z.object({
-  client_id: z.string().uuid("Cliente inválido."),
-  status: prospectingStatusSchema,
-  status_date: statusDateSchema,
-  description: descriptionSchema,
-}).strict();
+export const createProspectingBodySchema = z
+  .object({
+    client_id: z.string().uuid("Cliente inválido."),
+    status: prospectingStatusSchema,
+    status_date: statusDateSchema,
+    description: descriptionSchema,
+  })
+  .strict();
 
 export const updateProspectingBodySchema = z
   .object({

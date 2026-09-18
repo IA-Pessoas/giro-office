@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { browserSmokeEnv } from "./testing/browserSmokeEnv.mjs";
+
 const PLAYWRIGHT_PORT = process.env.FIELD_HELP_SMOKE_PORT || "3114";
 const configuredBaseUrl = process.env.FIELD_HELP_SMOKE_BASE_URL?.replace(/\/$/, "");
 let baseUrl = configuredBaseUrl || `http://localhost:${PLAYWRIGHT_PORT}`;
@@ -78,7 +80,21 @@ async function installApiMocks(page) {
     });
   });
 
-  for (const endpoint of ["**/pessoal/unions*", "**/rh/operational-users*"]) {
+  await page.route("**/pessoal/overview", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: {
+          unions: { total: 0, withBaseDate: 0, withoutBaseDate: 0, withCnpj: 0 },
+          ldd: { total: 0, open: 0, overdue: 0, paid: 0 },
+        },
+      }),
+    });
+  });
+
+  for (const endpoint of ["**/pessoal/groups*", "**/pessoal/unions*", "**/rh/operational-users*"]) {
     await page.route(endpoint, async (route) => {
       await route.fulfill({
         status: 200,
@@ -93,7 +109,7 @@ async function installApiMocks(page) {
   });
 }
 
-async function assertFieldHelp({ viewport, theme, screenshotPath }) {
+async function assertFieldHelp({ viewport, theme, screenshotPath, groupScreenshotPath }) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ baseURL: baseUrl, viewport });
 
@@ -122,6 +138,8 @@ async function assertFieldHelp({ viewport, theme, screenshotPath }) {
     const helpButton = page.getByRole("button", { name: "Ajuda: Tipo de adiantamento" });
     assert.equal(await helpButton.getAttribute("aria-label"), "Ajuda: Tipo de adiantamento");
 
+    // O tooltip fecha quando um ancestral rola; posicione o campo antes de focar.
+    await helpButton.scrollIntoViewIfNeeded();
     await helpButton.focus();
     assert.equal(
       await helpButton.evaluate((element) => document.activeElement === element),
@@ -150,6 +168,18 @@ async function assertFieldHelp({ viewport, theme, screenshotPath }) {
     assert.ok(box.x >= 0 && box.x + box.width <= viewport.width + 1);
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
+
+    await page.getByRole("tab", { name: "Grupos" }).click();
+    assert.equal(
+      await page.getByRole("tab", { name: "Grupos" }).getAttribute("aria-selected"),
+      "true",
+    );
+    await page.getByRole("button", { name: "Novo grupo" }).click();
+    const policy = page.getByLabel("Política de obrigações");
+    assert.equal(await policy.inputValue(), "NORMAL");
+    await policy.selectOption("NO_OBLIGATIONS");
+    assert.equal(await policy.inputValue(), "NO_OBLIGATIONS");
+    await page.screenshot({ path: groupScreenshotPath, fullPage: true });
   } finally {
     await context.close();
     await browser.close();
@@ -161,6 +191,7 @@ await withNextServer(async () => {
     viewport: { width: 1440, height: 900 },
     theme: "light",
     screenshotPath: "output/playwright/issue-487-contextual-help-real-desktop.png",
+    groupScreenshotPath: "output/playwright/issue-1081/02-group-policy-desktop.png",
   });
   console.log("PASS FieldHelp desktop light theme and keyboard/mouse interaction");
 
@@ -168,6 +199,7 @@ await withNextServer(async () => {
     viewport: { width: 390, height: 844 },
     theme: "dark",
     screenshotPath: "output/playwright/issue-487-contextual-help-real-mobile-dark.png",
+    groupScreenshotPath: "output/playwright/issue-1081/03-group-policy-mobile-dark.png",
   });
   console.log("PASS FieldHelp mobile dark theme and responsive positioning");
 });
@@ -192,7 +224,7 @@ async function withNextServer(run) {
       : ["exec", "next", "dev", "--webpack", "--port", PLAYWRIGHT_PORT];
   const server = spawn(command, args, {
     cwd: appRoot,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";

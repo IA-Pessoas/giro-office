@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeDollarSign,
   Bot,
@@ -23,6 +24,7 @@ import {
   Shield,
   ShieldCheck,
   SquareCheck,
+  ListChecks,
   ContactRound,
   FolderKanban,
   UserRoundCog,
@@ -48,7 +50,8 @@ import {
   useMarkRhNotificationReadMutation,
   useRhNotifications,
 } from "@modules/rh/hooks/useRhRequests";
-import { useMe } from "@shared/hooks";
+import { useFetch, useMe } from "@shared/hooks";
+import { taskOperationalNotificationService } from "@shared/services/taskOperationalNotificationService";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -141,6 +144,7 @@ const moduleCategories: NavigationCategory[] = [
       },
       { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },
       { path: "/contabil", name: "Contábil", icon: Calculator },
+      { path: "/triagem", name: "Triagem", icon: ListChecks, moduleKey: "triagem" as ModuleKey },
       { path: "/parcelamento", name: "Parcelamento", icon: BadgeDollarSign, moduleKey: "parcelamento" as ModuleKey },
       { path: "/rh", name: "RH", icon: Users, moduleKey: "rh" as ModuleKey },
       {
@@ -311,11 +315,14 @@ type ChatMessage = {
 
 type AppShellNotification = {
   id: string;
-  requestId: string;
+  notificationId: string;
+  source: "rh" | "task";
+  requestId?: string;
   title: string;
   description: string;
   time: string;
   unread: boolean;
+  createdAt: string;
 };
 
 export function AppShell({
@@ -330,6 +337,16 @@ export function AppShell({
   const isPlatformSuperAdmin =
     user?.auth_kind === "platform" && user.platform_role === "super_admin";
   const meQuery = useMe({ enabled: !isPlatformSuperAdmin });
+  const notificationQuery = useFetch(
+    ["task", "notifications"],
+    () => taskOperationalNotificationService.list(),
+    { enabled: !isPlatformSuperAdmin && Boolean(user) },
+  );
+  const queryClient = useQueryClient();
+  const markNotificationRead = useMutation({
+    mutationFn: taskOperationalNotificationService.markRead,
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["task", "notifications"] }),
+  });
   const {
     accessMap: moduleAccessMap,
     isLoading: isModuleAccessLoading,
@@ -350,14 +367,32 @@ export function AppShell({
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
-  const notifications: AppShellNotification[] = (rhNotificationsQuery.data ?? []).map((item) => ({
-    id: item.id,
+  const rhNotifications: AppShellNotification[] = (rhNotificationsQuery.data ?? []).map((item) => ({
+    id: `rh:${item.id}`,
+    notificationId: item.id,
+    source: "rh" as const,
     requestId: item.request_id,
     title: item.title,
     description: item.message,
     time: formatAppShellNotificationTime(item.created_at),
     unread: !item.read,
+    createdAt: item.created_at,
   }));
+  const taskNotifications: AppShellNotification[] = (notificationQuery.data?.items ?? []).map(
+    (item) => ({
+      id: `task:${item.id}`,
+      notificationId: item.id,
+      source: "task" as const,
+      title: item.title,
+      description: item.message,
+      time: formatAppShellNotificationTime(item.created_at),
+      unread: item.read_at === null,
+      createdAt: item.created_at,
+    }),
+  );
+  const notifications = [...rhNotifications, ...taskNotifications].sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
   const hasUnreadNotifications = notifications.some((item) => item.unread);
   const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
   const sidebarToggleLabel = isSidebarOpen
@@ -845,13 +880,19 @@ export function AppShell({
                             type="button"
                             onClick={() => {
                               if (item.unread) {
-                                markRhNotificationReadMutation.mutate({ id: item.id });
+                                if (item.source === "rh") {
+                                  markRhNotificationReadMutation.mutate({ id: item.notificationId });
+                                } else {
+                                  markNotificationRead.mutate(item.notificationId);
+                                }
                               }
                               setShowNotifications(false);
-                              void router.push({
-                                pathname: "/rh",
-                                query: { requestId: item.requestId },
-                              });
+                              if (item.source === "rh" && item.requestId) {
+                                void router.push({
+                                  pathname: "/rh",
+                                  query: { requestId: item.requestId },
+                                });
+                              }
                             }}
                             className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
                           >

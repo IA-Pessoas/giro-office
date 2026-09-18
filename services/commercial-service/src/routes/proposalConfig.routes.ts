@@ -1,5 +1,6 @@
 import {
   createSuccessResponse,
+  error as logError,
   parseWithZod,
   requireAuthenticatedRequestContext,
 } from "@workspace/shared";
@@ -16,7 +17,7 @@ import type { CommercialProposalConfigService } from "../services/proposalConfig
 
 export type CommercialProposalConfigRouteDeps = Pick<
   CommercialProposalConfigService,
-  "create" | "detail" | "list" | "update"
+  "create" | "delete" | "detail" | "list" | "update"
 >;
 
 function authContext(req: Request): { user_id: string; organization_id: string } {
@@ -70,6 +71,22 @@ export function createProposalConfigRoutes(
       const result = await service.update({ user_id, organization_id, config_id: id, ...body });
       res.json(createSuccessResponse(result));
     } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete("/:id", isAuthenticated, async (req, res, next) => {
+    try {
+      const { user_id, organization_id } = authContext(req);
+      const { id } = parseWithZod(proposalConfigIdParamSchema, req.params);
+      const result = await service.delete({
+        user_id,
+        organization_id,
+        config_id: id,
+      });
+      res.json(createSuccessResponse(result));
+    } catch (error) {
+      logError("Erro na rota de exclusão de configuração comercial", { err: error });
       next(error);
     }
   });

@@ -7,15 +7,15 @@
  *
  * Modo padrão: os dois cenários usam a Ata sintética de `docs/qa/fixtures/`, e as capturas podem ser
  * versionadas. Com WIZARD_QA_SENSITIVE_ATA o cenário de arquivo passa a usar uma Ata real: aí o
- * runner entra em modo sensível, grava fora de `docs/` e não registra vídeo nem nomes extraídos,
- * porque as Tarefas propostas carregam nomes e assuntos do cliente.
+ * runner entra em modo sensível e registra somente contagens, sem capturas ou nomes extraídos.
+ * Vídeo e trace ficam desativados em ambos os modos para não registrar a Ata.
  *
  * Uso:
  *   node app/scripts/wizard-evidence.mjs
  *   WIZARD_QA_SENSITIVE_ATA=/fora/do/repo/ata.md node app/scripts/wizard-evidence.mjs
  */
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
@@ -42,7 +42,7 @@ const publicAtaPath = path.resolve(
 /**
  * Uma Ata real vaza pelo que a IA devolve, não só pelo campo onde ela é colada: as Tarefas propostas
  * repetem nomes e assuntos do cliente, e nenhuma máscara alcança isso. Por isso o modo sensível
- * troca o destino das capturas, desliga o vídeo e cala o dump das propostas.
+ * não grava capturas. Os dois modos omitem o conteúdo das propostas dos logs.
  */
 const sensitiveAtaPath = process.env.WIZARD_QA_SENSITIVE_ATA;
 const isSensitiveRun = Boolean(sensitiveAtaPath);
@@ -56,6 +56,7 @@ let captureIndex = 0;
 
 /** Mascara os campos onde a Ata aparece literalmente; o modo sensível cuida do resto. */
 async function capture(page, name) {
+  if (isSensitiveRun) return;
   captureIndex += 1;
   const file = path.join(outputDir, `${String(captureIndex).padStart(2, "0")}-${name}.png`);
   await page.screenshot({
@@ -142,12 +143,7 @@ async function extractProposals(page, wizard, { label, text, file }) {
   }
 
   const mapped = extracted.filter(({ model }) => model).length;
-  console.log(`  🤖 ${proposalCount} proposta(s), ${mapped} já com Modelo:`);
-  if (isSensitiveRun) {
-    console.log("     (nomes omitidos: rodada com Ata real)");
-  } else {
-    for (const item of extracted) console.log(`     ${JSON.stringify(item)}`);
-  }
+  console.log(`  🤖 ${proposalCount} proposta(s), ${mapped} já com Modelo.`);
 
   return extracted;
 }
@@ -247,7 +243,10 @@ async function createProject(page, wizard, { client, source }, expected) {
   await page.getByLabel("Atribuição").selectOption("all");
 
   // Limpar o cliente derruba o parâmetro e devolve a listagem permitida.
-  await page.getByRole("button", { name: new RegExp(client.name, "i") }).first().click();
+  await page
+    .getByRole("button", { name: new RegExp(client.name, "i") })
+    .first()
+    .click();
   await page.getByRole("option", { name: "Sem cliente selecionado" }).click();
   await page.waitForURL(`${baseUrl}/tasks`, { timeout: 30_000 });
   await capture(page, `${source.label}-etapa-5-cliente-limpo`);
@@ -274,26 +273,20 @@ async function runScenario(page, scenario) {
     mappedByAi: extracted.filter(({ model }) => model).length,
     completedByHand: completedByHand.length,
     success,
-    ...(isSensitiveRun ? {} : { extracted }),
   };
 }
 
 async function main() {
-  await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
   console.log(
     isSensitiveRun
-      ? `⚠️  Ata real em uso: evidência vai para ${path.relative(repoRoot, outputDir)} e não deve ser versionada.`
+      ? "Ata real em uso: somente contagens, sem capturas."
       : `Evidência pública em ${path.relative(repoRoot, outputDir)}.`,
   );
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
-    // Vídeo não tem máscara: só grava quando a Ata é a sintética.
-    ...(isSensitiveRun
-      ? {}
-      : { recordVideo: { dir: path.join(outputDir, "video"), size: { width: 1440, height: 900 } } }),
   });
   const page = await context.newPage();
   const results = [];
@@ -340,21 +333,17 @@ async function main() {
     );
 
     console.log(`\n${JSON.stringify(results, null, 2)}`);
-  } catch (error) {
-    await capture(page, "falha");
-    throw error;
+  } catch {
+    await capture(page, "falha").catch(() => {
+      // A falha da captura também não pode expor DOM ou conteúdo da Ata.
+    });
+    // Erros do Playwright podem incluir DOM, valores de campos e respostas.
+    throw new Error(
+      "Smoke real do wizard falhou; confira o estado da stack e a captura mascarada, se disponível.",
+    );
   } finally {
     await context.close();
     await browser.close();
-    if (!isSensitiveRun) {
-      const [video] = await readdir(path.join(outputDir, "video"));
-      if (video) {
-        await rename(
-          path.join(outputDir, "video", video),
-          path.join(outputDir, "video", "wizard-projetos-e2e.webm"),
-        );
-      }
-    }
   }
 }
 

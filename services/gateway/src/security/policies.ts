@@ -27,6 +27,18 @@ const fiscalModulePolicy = createModulePolicy("fiscal", moduleAccessPermission);
 const fiscalEditPolicy = createModulePolicy("fiscal", moduleEditPermission);
 const contabilModulePolicy = createModulePolicy("contabil", moduleAccessPermission);
 const contabilEditPolicy = createModulePolicy("contabil", moduleEditPermission);
+const triagemModulePolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["contabil", "triagem"],
+    minPermission: moduleAccessPermission,
+  },
+};
+const triagemEditPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["contabil", "triagem"],
+    minPermission: moduleAccessPermission,
+  },
+};
 const certificateModulePolicy = createModulePolicy("certificado", moduleAccessPermission);
 const certificateEditPolicy = createModulePolicy("certificado", moduleEditPermission);
 const commercialModulePolicy = createModulePolicy("comercial", moduleAccessPermission);
@@ -98,6 +110,12 @@ const integracaoProjectPolicy: AuthPolicy = {
     minPermission: moduleAccessPermission,
   },
 };
+const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao", 0);
+/**
+ * Rotas cuja matriz do task-service admite o responsável em nível 0/1; o escopo de
+ * responsável continua sendo validado no serviço.
+ */
+const integracaoResponsibleTaskPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 
 const integracaoClientPolicy: AuthPolicy = {
   modulePermission: {
@@ -230,6 +248,22 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  {
+    method: "POST",
+    path: /^\/task\/financeiro\/(?:settle|express)$/,
+    policy: integracaoProjectPolicy,
+  },
+  {
+    method: "ANY",
+    path: /^\/task\/notifications(?:\/read)?$/,
+    policy: integracaoNotificationPolicy,
+  },
+  {
+    method: "ANY",
+    path: /^\/task\/(?:complete-request(?:\/list)?|postponement(?:\/list)?|attachment(?:\/list|\/access)?|conclusion)$/,
+    policy: integracaoResponsibleTaskPolicy,
+  },
+  { method: "GET", path: /^\/task(?:\/list)?$/, policy: integracaoResponsibleTaskPolicy },
   { method: "GET", path: /^\/task(?:\/|$)/, policy: integracaoProjectPolicy },
   { method: "ANY", path: /^\/task(?:\/|$)/, policy: integracaoEditPolicy },
   { method: "GET", path: /^\/department(?:\/|$)/, policy: tiModulePolicy },
@@ -240,6 +274,8 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/fiscal(?:\/|$)/, policy: fiscalEditPolicy },
   { method: "GET", path: /^\/contabil(?:\/|$)/, policy: contabilModulePolicy },
   { method: "ANY", path: /^\/contabil(?:\/|$)/, policy: contabilEditPolicy },
+  { method: "GET", path: /^\/triagem(?:\/|$)/, policy: triagemModulePolicy },
+  { method: "ANY", path: /^\/triagem(?:\/|$)/, policy: triagemEditPolicy },
   { method: "GET", path: /^\/ti(?:\/|$)/, policy: tiModulePolicy },
   { method: "ANY", path: /^\/ti(?:\/|$)/, policy: tiEditPolicy },
   { method: "GET", path: /^\/certificate(?:\/|$)/, policy: certificateModulePolicy },

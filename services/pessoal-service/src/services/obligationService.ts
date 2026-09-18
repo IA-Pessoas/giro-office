@@ -7,6 +7,7 @@ import type {
   UpdateObligationFieldBody,
 } from "../schemas/obligation.schemas.js";
 import type { PessoalAuditService } from "./pessoalAuditService.js";
+import { NO_OBLIGATIONS_GROUP_POLICY, NORMAL_GROUP_POLICY } from "./pessoalGroupPolicy.js";
 import { ensurePessoalResponsible } from "./pessoalResponsibleService.js";
 import {
   PESSOAL_WRITE_PERMISSION,
@@ -30,6 +31,9 @@ const obligationSelect = {
   bsf: true,
   va: true,
   vt: true,
+  group_snapshot_id: true,
+  group_snapshot_name: true,
+  group_snapshot_policy: true,
   organization_id: true,
 } as const;
 
@@ -42,6 +46,15 @@ const payrollDefaultsSelect = {
   bsf: true,
   va: true,
   vt: true,
+  group: {
+    select: {
+      id: true,
+      name: true,
+      policy: true,
+      archived_at: true,
+      organization_id: true,
+    },
+  },
 } as const;
 
 type PayrollDefaults = {
@@ -53,6 +66,13 @@ type PayrollDefaults = {
   bsf: boolean;
   va: boolean;
   vt: boolean;
+  group: {
+    id: string;
+    name: string;
+    policy: string;
+    archived_at: Date | null;
+    organization_id: string;
+  } | null;
 };
 
 type ObligationCreateData = {
@@ -67,16 +87,26 @@ type ObligationCreateData = {
   bsf: boolean | null;
   va: boolean | null;
   vt: boolean | null;
+  group_snapshot_id: string;
+  group_snapshot_name: string;
+  group_snapshot_policy: string;
   organization_id: string;
 };
 
-export type ObligationRecord = ObligationCreateData & {
+export type ObligationRecord = Omit<
+  ObligationCreateData,
+  "group_snapshot_id" | "group_snapshot_name" | "group_snapshot_policy"
+> & {
   id: string;
+  group_snapshot_id: string | null;
+  group_snapshot_name: string | null;
+  group_snapshot_policy: string | null;
 };
 
 export interface CreateObligationResult {
   created: boolean;
-  obligation: ObligationRecord;
+  obligation: ObligationRecord | null;
+  skippedNoObligations: boolean;
 }
 
 export interface GenerateObligationResult {
@@ -85,6 +115,9 @@ export interface GenerateObligationResult {
   existing: number;
   created: number;
   skippedExisting: number;
+  skippedArchivedGroup: number;
+  skippedNoObligations: number;
+  skippedNoGroup: number;
   skippedNoPayroll: number;
 }
 
@@ -113,7 +146,7 @@ export class ObligationService {
       });
 
       if (existing) {
-        return { created: false, obligation: existing };
+        return { created: false, obligation: existing, skippedNoObligations: false };
       }
 
       const payroll = await this.prisma.payroll.findFirst({
@@ -123,12 +156,28 @@ export class ObligationService {
       if (!payroll) {
         throw new ServiceError(404, "Folha de pessoal nao encontrada para o cliente.");
       }
+      const group = payroll.group;
+      if (!group) {
+        throw new ServiceError(409, "Folha de pessoal sem grupo canonico para gerar obrigacao.");
+      }
+      if (group.organization_id !== context.organizationId) {
+        throw new ServiceError(409, "Grupo de pessoal invalido para a organizacao.");
+      }
+      if (group.archived_at) {
+        throw new ServiceError(409, "Grupo de pessoal arquivado nao gera novas obrigacoes.");
+      }
+      if (group.policy === NO_OBLIGATIONS_GROUP_POLICY) {
+        return { created: false, obligation: null, skippedNoObligations: true };
+      }
+      if (group.policy !== NORMAL_GROUP_POLICY) {
+        throw new ServiceError(409, "Politica de grupo de pessoal invalida.");
+      }
 
       let createdByInsert = true;
       let obligation: ObligationRecord;
       try {
         obligation = await this.prisma.obrigationsPessoal.create({
-          data: buildObligationData(context.organizationId, body.competence, payroll),
+          data: buildObligationData(context.organizationId, body.competence, { ...payroll, group }),
           select: obligationSelect,
         });
       } catch (err: unknown) {
@@ -153,7 +202,7 @@ export class ObligationService {
       }
 
       if (!createdByInsert) {
-        return { created: false, obligation };
+        return { created: false, obligation, skippedNoObligations: false };
       }
 
       await this.auditService.recordChange({
@@ -168,7 +217,7 @@ export class ObligationService {
         path: `/pessoal/obrigations/${obligation.id}`,
       });
 
-      return { created: true, obligation };
+      return { created: true, obligation, skippedNoObligations: false };
     } catch (err: unknown) {
       logError("Erro ao criar obrigacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
@@ -262,6 +311,9 @@ export class ObligationService {
           existing: 0,
           created: 0,
           skippedExisting: 0,
+          skippedArchivedGroup: 0,
+          skippedNoObligations: 0,
+          skippedNoGroup: 0,
           skippedNoPayroll: 0,
         };
       }
@@ -290,6 +342,9 @@ export class ObligationService {
       );
       const createData: ObligationCreateData[] = [];
       let skippedNoPayroll = 0;
+      let skippedArchivedGroup = 0;
+      let skippedNoObligations = 0;
+      let skippedNoGroup = 0;
 
       for (const clientId of clientIds) {
         if (existingClientIds.has(clientId)) {
@@ -301,8 +356,30 @@ export class ObligationService {
           skippedNoPayroll += 1;
           continue;
         }
+        const group = payroll.group;
+        if (!group) {
+          skippedNoGroup += 1;
+          continue;
+        }
+        if (group.organization_id !== context.organizationId) {
+          skippedNoGroup += 1;
+          continue;
+        }
+        if (group.archived_at) {
+          skippedArchivedGroup += 1;
+          continue;
+        }
+        if (group.policy === NO_OBLIGATIONS_GROUP_POLICY) {
+          skippedNoObligations += 1;
+          continue;
+        }
+        if (group.policy !== NORMAL_GROUP_POLICY) {
+          throw new ServiceError(409, "Politica de grupo de pessoal invalida.");
+        }
 
-        createData.push(buildObligationData(context.organizationId, competence, payroll));
+        createData.push(
+          buildObligationData(context.organizationId, competence, { ...payroll, group }),
+        );
       }
 
       let created = 0;
@@ -337,6 +414,9 @@ export class ObligationService {
         existing: existingObligations.length,
         created,
         skippedExisting: existingObligations.length + (attemptedCreates - created),
+        skippedArchivedGroup,
+        skippedNoObligations,
+        skippedNoGroup,
         skippedNoPayroll,
       };
     } catch (err: unknown) {
@@ -373,7 +453,7 @@ function defaultFlag(enabled: boolean): boolean | null {
 function buildObligationData(
   organizationId: string,
   competence: string,
-  payroll: PayrollDefaults,
+  payroll: PayrollDefaults & { group: NonNullable<PayrollDefaults["group"]> },
 ): ObligationCreateData {
   return {
     client_id: payroll.client_id,
@@ -387,6 +467,9 @@ function buildObligationData(
     bsf: defaultFlag(payroll.bsf),
     va: defaultFlag(payroll.va),
     vt: defaultFlag(payroll.vt),
+    group_snapshot_id: payroll.group.id,
+    group_snapshot_name: payroll.group.name,
+    group_snapshot_policy: payroll.group.policy,
     organization_id: organizationId,
   };
 }
