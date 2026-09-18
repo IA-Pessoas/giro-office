@@ -523,6 +523,7 @@ export class TriageDocumentsService {
     if (!isTriageDocumentStatus(request.status) || request.bank_id.trim().length === 0) {
       throw new ServiceError(400, "Marcador de extrato bancário inválido.");
     }
+    await this.assertClientInOrganization(request.client_id, auth.organizationId);
     await this.assertCanEdit(request.client_id, auth, "CONTABIL");
     const identity = {
       organization_id: auth.organizationId,
@@ -566,6 +567,7 @@ export class TriageDocumentsService {
     if (request.bank_id.trim().length === 0) {
       throw new ServiceError(400, "Marcador de extrato bancário inválido.");
     }
+    await this.assertClientInOrganization(request.client_id, auth.organizationId);
     await this.assertCanEdit(request.client_id, auth, "CONTABIL");
     const identity = {
       organization_id: auth.organizationId,
@@ -648,6 +650,19 @@ export class TriageDocumentsService {
     });
     if (!assignment) {
       throw new ServiceError(403, "Permissão insuficiente para alterar pendências documentais.");
+    }
+  }
+
+  private async assertClientInOrganization(
+    clientId: string,
+    organizationId: string,
+  ): Promise<void> {
+    const client = await this.prisma.client.findFirst({
+      where: { id: clientId, organization_id: organizationId },
+      select: { id: true },
+    });
+    if (!client) {
+      throw new ServiceError(404, "Cliente não encontrado.");
     }
   }
 
