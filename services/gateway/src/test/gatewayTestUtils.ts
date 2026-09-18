@@ -7,7 +7,10 @@ import { MemoryLogStream } from "@workspace/shared/testUtils";
 import type { GatewayEnv } from "../config/env.js";
 
 export async function startServer(server: Server): Promise<string> {
-  server.listen(0, "127.0.0.1");
+  // Sem host: bind em `::` (dual-stack), igual ao supertest. Com "127.0.0.1" o SO aceita
+  // este listener e o do supertest na MESMA porta efemera (familias diferentes) e entrega a
+  // requisicao ao bind mais especifico - o teste recebe 404 de um servidor alheio.
+  server.listen(0);
   await once(server, "listening");
 
   const address = server.address();

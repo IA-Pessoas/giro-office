@@ -123,11 +123,30 @@ describe("buildHookPlan", () => {
     assert.deepEqual(buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files }), [
       [
         "pnpm",
-        ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
+        [
+          "exec",
+          "biome",
+          "check",
+          "--files-ignore-unknown=true",
+          "--no-errors-on-unmatched",
+          "infra/prisma/schema.prisma",
+        ],
       ],
       ["pnpm", ["typecheck"]],
       ["pnpm", ["test:scripts"]],
     ]);
+  });
+
+  // Um push que so mexe em workflow passa ao biome uma lista que ele inteira
+  // ignora. Sem --no-errors-on-unmatched ele sai 1 em "No files were processed"
+  // e derruba o push, embora nada esteja errado com a mudanca.
+  it("nao deixa o biome falhar quando todo arquivo empurrado e do tipo que ele ignora", () => {
+    const files = [".github/workflows/quality.yml"];
+    const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
+    const biome = commands.find(([, args]) => args.includes("biome"));
+
+    assert.ok(biome, "esperava um comando do biome no plano");
+    assert.ok(biome[1].includes("--no-errors-on-unmatched"));
   });
 
   it("audits dependency changes even inside an affected package", () => {
@@ -241,6 +260,28 @@ describe("parsePrePushInput", () => {
         },
       ],
     );
+  });
+
+  // O git sempre escreve os quatro campos, inclusive ao apagar uma branch
+  // ("(delete) 000... refs/heads/x <oid>"). Uma linha com menos campos e
+  // entrada corrompida: descarta-la faria o gate concluir que nada esta sendo
+  // empurrado e liberar justamente o push que ele existe para barrar.
+  it("recusa uma linha incompleta em vez de descartar", () => {
+    assert.throws(
+      () => parsePrePushInput("refs/heads/feature  refs/heads/feature def456\n"),
+      /entrada do pre-push malformada/,
+    );
+  });
+
+  it("aceita a linha de quatro campos que apaga uma branch", () => {
+    assert.deepEqual(parsePrePushInput(`(delete) ${"0".repeat(40)} refs/heads/feature def456\n`), [
+      {
+        localRef: "(delete)",
+        localOid: "0".repeat(40),
+        remoteRef: "refs/heads/feature",
+        remoteOid: "def456",
+      },
+    ]);
   });
 });
 

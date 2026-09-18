@@ -1215,7 +1215,7 @@ function classifyRequiredReference(value, field, reasonCode) {
   return isValidLegacyReference(value) ? prepared() : quarantine(field, reasonCode);
 }
 
-function classifyRequiredValue(value, field, reasonCode) {
+function classifyRequiredValue(_value, _field, _reasonCode) {
   return prepared();
 }
 

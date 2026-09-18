@@ -4469,6 +4469,13 @@ const handlers = {
     });
   },
 
+  async triageEditabilityGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
   async triageMonthlyCreate(op) {
     const competence = "2026-09";
     state.triageMonthlyCompetence = competence;
