@@ -8,6 +8,7 @@ import {
   useTriageCompetences,
 } from "../hooks";
 import { TriageExternalLinksSection } from "./TriageExternalLinksSection";
+import { TriageUrgentRequestsSection } from "./TriageUrgentRequestsSection";
 
 function currentCompetence(): string {
   const now = new Date();
@@ -102,6 +103,11 @@ export function TriageCompetenceSection({
               ) : null}
             </div>
             <TriageExternalLinksSection
+              clientId={clientId}
+              competence={item.competence}
+              canEdit={canEdit}
+            />
+            <TriageUrgentRequestsSection
               clientId={clientId}
               competence={item.competence}
               canEdit={canEdit}

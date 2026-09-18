@@ -75,6 +75,46 @@ export const operations = [
     target: "gateway",
     auth: "bearer",
   },
+  {
+    service: "triagem-service",
+    method: "GET",
+    path: "/triagem/urgent-requests",
+    action: "triagemUrgentRequestList",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "triagem-service",
+    method: "POST",
+    path: "/triagem/urgent-requests",
+    action: "triagemUrgentRequestCreate",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "triagem-service",
+    method: "PUT",
+    path: "/triagem/urgent-requests/{id}",
+    action: "triagemUrgentRequestUpdate",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "triagem-service",
+    method: "PATCH",
+    path: "/triagem/urgent-requests/{id}/close",
+    action: "triagemUrgentRequestClose",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "triagem-service",
+    method: "PATCH",
+    path: "/triagem/urgent-requests/{id}/reopen",
+    action: "triagemUrgentRequestReopen",
+    target: "gateway",
+    auth: "bearer",
+  },
 ];
 
 export const routePlaceholders = [];

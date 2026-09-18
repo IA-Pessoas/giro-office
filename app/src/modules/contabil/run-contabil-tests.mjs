@@ -181,6 +181,19 @@ await (async () => {
     assert.match(source, /window\.confirm/);
   });
 
+  await runTest("triagem apresenta solicitações urgentes por competência", () => {
+    const source = readWorkspaceSource("../triagem/components/TriageUrgentRequestsSection.tsx");
+    const competenceSource = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
+
+    assert.match(competenceSource, /TriageUrgentRequestsSection/);
+    assert.match(source, /Solicitações urgentes/);
+    assert.match(source, /urgency_code/);
+    assert.match(source, /responsible_id/);
+    assert.match(source, /resolution_note/);
+    assert.match(source, /Reabrir/);
+    assert.match(source, /Fechar/);
+  });
+
   await runTest("triagem apresenta dez documentos com nota, justificativa e banco sem dados de conta", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
 
@@ -238,6 +251,11 @@ await (async () => {
   await runTest("triagem de links externos integra o smoke de navegador à suíte do app", () => {
     const packageJson = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
     assert.match(packageJson.scripts.test, /test:triagem-external-links-browser/);
+  });
+
+  await runTest("triagem de solicitações urgentes integra o smoke de navegador à suíte do app", () => {
+    const packageJson = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
+    assert.match(packageJson.scripts.test, /test:triagem-urgent-requests-browser/);
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {

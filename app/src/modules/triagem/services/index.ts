@@ -6,3 +6,10 @@ export type {
   TriageExternalLinkInput,
   TriageExternalLinkType,
 } from "./triagemExternalLinkService";
+export { triagemUrgentRequestService } from "./triagemUrgentRequestService";
+export type {
+  TriageUrgentRequest,
+  TriageUrgentRequestInput,
+  TriageUrgentRequestStatus,
+  TriageUrgencyCode,
+} from "./triagemUrgentRequestService";

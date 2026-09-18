@@ -237,6 +237,8 @@ const state = {
   contabilControlCompetence: "",
   triagemExternalLinkId: "",
   triagemExternalLinkCompetence: "",
+  triagemUrgentRequestId: "",
+  triagemUrgentRequestCompetence: "",
   contabilResponsibleId: "",
   contabilRelationshipId: "",
   pessoalLddId: "",
@@ -4395,6 +4397,62 @@ const handlers = {
     await httpRequest(op, {
       expectedStatus: [200],
       path: `/triagem/external-links/${requireState("triagemExternalLinkId")}/archive`,
+    });
+  },
+
+  async triagemUrgentRequestList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: state.triagemUrgentRequestCompetence ?? "2026-09",
+      },
+    });
+  },
+
+  async triagemUrgentRequestCreate(op) {
+    const competence = "2026-09";
+    state.triagemUrgentRequestCompetence = competence;
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence,
+        urgency_code: "HIGH",
+        description: "Solicitação urgente criada pelo smoke",
+        responsible_id: requireState("session").id,
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemUrgentRequestId = id;
+  },
+
+  async triagemUrgentRequestUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/urgent-requests/${requireState("triagemUrgentRequestId")}`,
+      json: {
+        urgency_code: "CRITICAL",
+        description: "Solicitação urgente atualizada pelo smoke",
+        responsible_id: requireState("session").id,
+      },
+    });
+  },
+
+  async triagemUrgentRequestClose(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/urgent-requests/${requireState("triagemUrgentRequestId")}/close`,
+      json: { resolution_note: "Solicitação resolvida pelo smoke" },
+    });
+  },
+
+  async triagemUrgentRequestReopen(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/urgent-requests/${requireState("triagemUrgentRequestId")}/reopen`,
     });
   },
 

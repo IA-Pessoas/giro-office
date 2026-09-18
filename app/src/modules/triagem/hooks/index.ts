@@ -8,3 +8,8 @@ export {
   useTriageExternalLinkMutations,
   useTriageExternalLinks,
 } from "./useTriageExternalLinks";
+export {
+  triagemUrgentRequestsQueryKey,
+  useTriageUrgentRequestMutations,
+  useTriageUrgentRequests,
+} from "./useTriageUrgentRequests";

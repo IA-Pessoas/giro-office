@@ -687,6 +687,31 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "arquivou", item: "um link externo da Triagem" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/triagem\/urgent-requests\/?$/,
+    description: { action: "consultou", item: "as solicitações urgentes da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/urgent-requests\/?$/,
+    description: { action: "cadastrou", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/urgent-requests\/[^/]+\/?$/,
+    description: { action: "atualizou", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/urgent-requests\/[^/]+\/close\/?$/,
+    description: { action: "fechou", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/urgent-requests\/[^/]+\/reopen\/?$/,
+    description: { action: "reabriu", item: "uma solicitação urgente da Triagem" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/contabil\/controls\/year$/,
     description: { action: "criou", item: "os controles contábeis anuais" },
@@ -948,6 +973,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um link externo da Triagem",
     newSingular: "um novo link externo da Triagem",
     plural: "links externos da Triagem",
+  },
+  {
+    pattern: /^\/triagem\/urgent-requests(?:\/|$)/,
+    singular: "uma solicitação urgente da Triagem",
+    newSingular: "uma nova solicitação urgente da Triagem",
+    plural: "solicitações urgentes da Triagem",
   },
   {
     pattern: /^\/rh\/point-config(?:\/|$)/,
