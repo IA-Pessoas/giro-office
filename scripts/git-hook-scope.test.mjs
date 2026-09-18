@@ -66,7 +66,8 @@ describe("classifyChangedFiles", () => {
 describe("buildHookPlan", () => {
   it("filters by the affected graph from the pushed base", () => {
     assert.deepEqual(buildHookPlan(classifyChangedFiles(["app/src/x.tsx"]), ["abc123"]), [
-      ["pnpm", ["exec", "turbo", "run", "check", "typecheck", "test", "--filter=...[abc123]"]],
+      ["pnpm", ["exec", "turbo", "run", "check", "typecheck", "--filter=...[abc123]"]],
+      ["pnpm", ["test:policies"]],
     ]);
   });
 
@@ -82,11 +83,11 @@ describe("buildHookPlan", () => {
             "run",
             "check",
             "typecheck",
-            "test",
             "--filter=...[abc123]",
             "--filter=...[def456]",
           ],
         ],
+        ["pnpm", ["test:policies"]],
       ],
     );
   });
@@ -96,7 +97,7 @@ describe("buildHookPlan", () => {
       ["pnpm", ["audit:ci"]],
       ["pnpm", ["check"]],
       ["pnpm", ["typecheck"]],
-      ["pnpm", ["test"]],
+      ["pnpm", ["test:policies"]],
     ]);
   });
 
@@ -114,7 +115,7 @@ describe("buildHookPlan", () => {
           ["exec", "biome", "check", "--files-ignore-unknown=true", "infra/prisma/schema.prisma"],
         ],
         ["pnpm", ["typecheck"]],
-        ["pnpm", ["test"]],
+        ["pnpm", ["test:policies"]],
       ],
     );
   });

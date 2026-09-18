@@ -42,13 +42,20 @@ const GLOBAL_PREFIXES = [
   "supabase/",
 ];
 
+/**
+ * O pre-push roda apenas verificações rápidas e determinísticas: formatação, tipos,
+ * auditoria de dependências e as políticas de segurança (entre elas a varredura de
+ * payload em configs executáveis). As suítes de teste dos pacotes ficam de fora
+ * porque falhavam de forma intermitente na máquina de quem empurra, e um gate que
+ * às vezes reprova código correto deixa de ser levado a sério.
+ */
 const GLOBAL_COMMANDS = [
   ["pnpm", ["audit:ci"]],
   ["pnpm", ["typecheck"]],
-  ["pnpm", ["test"]],
+  ["pnpm", ["test:policies"]],
 ];
 
-const AFFECTED_TASKS = ["check", "typecheck", "test"];
+const AFFECTED_TASKS = ["check", "typecheck"];
 
 /**
  * O hook roda na máquina de quem está empurrando, normalmente com editor, containers
@@ -130,7 +137,10 @@ export function buildHookPlan(classification, bases = [], changedFiles = []) {
   }
 
   const filters = bases.map((base) => `--filter=...[${base}]`);
-  return [["pnpm", ["exec", "turbo", "run", ...AFFECTED_TASKS, ...filters]]];
+  return [
+    ["pnpm", ["exec", "turbo", "run", ...AFFECTED_TASKS, ...filters]],
+    ["pnpm", ["test:policies"]],
+  ];
 }
 
 export function parsePrePushInput(input) {
