@@ -258,16 +258,43 @@ const keepRawBody: NonNullable<Parameters<typeof express.json>[0]>["verify"] = (
   (request as Request).rawBody = buffer;
 };
 
+/**
+ * Teto de tamanho da extração do wizard, aplicado sem materializar o corpo.
+ * Um corpo sem content-length é recusado: sem parser e sem esse cabeçalho não
+ * há como saber o tamanho antes de já ter recebido tudo.
+ */
+export function assertWizardExtractionSize(request: Request): ServiceError | undefined {
+  const declaredLength = Number(request.headers["content-length"]);
+
+  if (!Number.isFinite(declaredLength)) {
+    return new ServiceError(411, "Informe o tamanho do conteúdo enviado.");
+  }
+  if (declaredLength > PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES) {
+    return new ServiceError(413, "Conteúdo enviado excede o limite permitido.");
+  }
+  return undefined;
+}
+
 function mountCorsAndParsing(app: express.Express, env: GatewayEnv): void {
   const corsOptions = createServiceCorsOptions(env.allowedOrigins, "gateway");
 
   app.use(cors(corsOptions));
   app.options("*", cors(corsOptions));
-  app.post(
-    PROJECT_WIZARD_EXTRACTION_PATH,
-    express.json({ limit: PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES, verify: keepRawBody }),
-  );
-  app.use(express.json({ limit: env.jsonBodyLimit ?? "1mb", verify: keepRawBody }));
+  // A extração do wizard fica fora do express.json: o corpo chega a 61MB e
+  // bufferizá-lo custava esse tanto de heap por request concorrente, num
+  // container de 256MB. Sem parser, o proxy encaminha o stream direto ao
+  // upstream. Nada no gateway lê o body dessa rota — a auditoria dela usa só
+  // método e caminho (audit/activityCatalog.ts:61). O teto de tamanho que o
+  // express.json aplicava passa a ser verificado pelo content-length, antes de
+  // qualquer byte entrar.
+  const parseJsonBody = express.json({ limit: env.jsonBodyLimit ?? "1mb", verify: keepRawBody });
+  app.use((request, response, next) => {
+    if (request.path !== PROJECT_WIZARD_EXTRACTION_PATH) {
+      parseJsonBody(request, response, next);
+      return;
+    }
+    next(assertWizardExtractionSize(request));
+  });
   app.use(normalizeJsonBodyError);
 }
 
