@@ -40,6 +40,12 @@ export interface RhRequestRequester {
   status: string | null;
 }
 
+export interface RhRequestAssignee {
+  id: string;
+  name: string;
+  status: string | null;
+}
+
 export interface RhRequest {
   id: string;
   title: string;
@@ -48,6 +54,7 @@ export interface RhRequest {
   requester?: RhRequestRequester | null;
   category_id: string;
   assigned_to_user_id: string;
+  assigned_to?: RhRequestAssignee | null;
   urgency: RhRequestUrgency;
   status: RhRequestStatus;
   created_at: string;
@@ -134,6 +141,7 @@ export interface RhMessage {
   is_read: boolean;
   created_at: string;
   organization_id: string;
+  sender?: RhRequestRequester | null;
 }
 
 export interface RhMessageListFilters {
@@ -145,6 +153,23 @@ export interface CreateRhMessagePayload {
   message: string;
   type: RhMessageType;
   attachment?: string;
+}
+
+export interface RhNotification {
+  id: string;
+  user_id: string;
+  request_id: string;
+  event_key: string;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+  organization_id: string;
+}
+
+export interface CreateRhMessageInput {
+  payload: CreateRhMessagePayload;
+  file?: File;
 }
 
 export interface RhPointConfig {
@@ -233,7 +258,8 @@ export interface RhPointMonthlySummary {
 }
 
 export interface CreateRhPointAdjustmentPayload {
-  point_id: string;
+  point_id?: string;
+  date?: string;
   clock_in: string;
   lunch_out: string;
   lunch_in: string;
@@ -249,6 +275,27 @@ export interface ApproveRhPointAdjustmentPayload {
 
 export type RejectRhPointAdjustmentPayload = ApproveRhPointAdjustmentPayload;
 
+export interface ApproveRhPointAdjustmentsBulkPayload {
+  request_ids: string[];
+  obs_approver?: string | null;
+}
+
+export interface CreateRhRetroactivePointPayload {
+  target_user_id: string;
+  date: string;
+  clock_in: string;
+  lunch_out: string;
+  lunch_in: string;
+  clock_out: string;
+  justification: string;
+}
+
+export interface RecalculateRhPointsPayload {
+  target_user_id: string;
+  date_from: string;
+  date_to: string;
+}
+
 export type RhPointAdjustmentStatus = "Pendente" | "Aprovado" | "Rejeitado";
 
 export interface RhPointAdjustmentListFilters {
@@ -259,7 +306,7 @@ export interface RhPointAdjustmentListFilters {
 export interface RhPointAdjustmentRequest {
   id: string;
   user_id: string;
-  point_id: string;
+  point_id: string | null;
   clock_in: string;
   lunch_out: string;
   lunch_in: string;
@@ -365,6 +412,7 @@ export interface RhTimeSheetTotals {
   expected_minutes: number;
   balance_minutes: number;
   absence_count: number;
+  bank_balance_minutes: number;
 }
 
 export interface RhTimeSheetListItem extends Omit<RhTimeSheetRecord, "organization_id"> {
@@ -384,13 +432,22 @@ export interface RhTimeSheetListFilters {
 
 export interface CreateRhTimeSheetPayload {
   user_id: string;
-  start_time: string;
-  end_time: string;
+  start_time?: string;
+  end_time?: string;
 }
 
 export interface SignRhTimeSheetPayload {
   id: string;
-  signature: string;
+  signature?: string;
+}
+
+export interface ReopenRhTimeSheetPayload {
+  id: string;
+  reason: string;
+}
+
+export interface RebuildRhTimeSheetPayload {
+  id: string;
 }
 
 export interface RhScoreQuestion {
@@ -517,4 +574,92 @@ export interface SubmitRhScoreEvaluationPayload {
 
 export interface RhMutationMessage {
   message: string;
+}
+
+export interface RhDepartmentSummary {
+  id: string;
+  name: string;
+}
+
+export interface RhAllergy {
+  name: string;
+  fonts: string;
+  action: string;
+}
+
+export interface RhEmergencyContact {
+  id: string;
+  name: string;
+  phone: string;
+  reference?: string;
+}
+
+export interface RhDossierListItem {
+  id: string;
+  full_name: string;
+  job_title: string | null;
+  department: RhDepartmentSummary | null;
+  photo_url: string | null;
+  status: string;
+}
+
+export interface RhDossier {
+  id: string;
+  full_name: string;
+  department_id: string;
+  gender: string | null;
+  birth_date: string | null;
+  cpf: string | null;
+  rg: string | null;
+  address: string | null;
+  job_title: string | null;
+  department: RhDepartmentSummary | null;
+  email: string | null;
+  phone: string | null;
+  hire_date: string | null;
+  dominio_hire_date: string | null;
+  termination_date: string | null;
+  photo_url: string | null;
+  status: string;
+  allergies: RhAllergy[];
+  emergency_contacts: RhEmergencyContact[];
+}
+
+export interface UpdateRhDossierPayload {
+  target_user_id?: string;
+  full_name?: string | null;
+  gender?: string | null;
+  birth_date?: string | null;
+  cpf?: string | null;
+  rg?: string | null;
+  address?: string | null;
+  job_title?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  hire_date?: string | null;
+  dominio_hire_date?: string | null;
+  termination_date?: string | null;
+  photo_url?: string | null;
+  status?: string;
+  department_id?: string;
+}
+
+export interface CreateRhEmergencyContactPayload {
+  target_user_id?: string;
+  name: string;
+  phone: string;
+  reference?: string;
+}
+
+export interface UpdateRhEmergencyContactPayload {
+  target_user_id?: string;
+  id: string;
+  name?: string;
+  phone?: string;
+  reference?: string | null;
+}
+
+export interface DeleteRhEmergencyContactPayload {
+  target_user_id?: string;
+  id: string;
 }

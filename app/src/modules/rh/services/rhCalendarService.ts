@@ -15,6 +15,8 @@ import type {
   RhTimeSheetDetail,
   RhTimeSheetListItem,
   RhTimeSheetListFilters,
+  RebuildRhTimeSheetPayload,
+  ReopenRhTimeSheetPayload,
   SignRhTimeSheetPayload,
   UpdateRhHolidayPayload,
 } from "../types";
@@ -127,10 +129,35 @@ export const rhCalendarService = {
     return unwrapRhEnvelope<RhTimeSheetDetail>(response.data);
   },
 
+  async rebuildTimeSheet(payload: RebuildRhTimeSheetPayload): Promise<RhTimeSheetDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(RH_ENDPOINTS.rebuildTimeSheet, payload);
+
+    return unwrapRhEnvelope<RhTimeSheetDetail>(response.data);
+  },
+
   async signTimeSheet(payload: SignRhTimeSheetPayload): Promise<RhTimeSheetDetail> {
     const api = setupAPIClient();
     const response = await api.put(RH_ENDPOINTS.signTimeSheet, payload);
 
     return unwrapRhEnvelope<RhTimeSheetDetail>(response.data);
+  },
+
+  async reopenTimeSheet(payload: ReopenRhTimeSheetPayload): Promise<RhTimeSheetDetail> {
+    const api = setupAPIClient();
+    const response = await api.put(RH_ENDPOINTS.reopenTimeSheet, payload);
+
+    return unwrapRhEnvelope<RhTimeSheetDetail>(response.data);
+  },
+
+  async downloadTimeSheetPdf(id: string): Promise<{ blob: Blob; filename: string }> {
+    const api = setupAPIClient();
+    const response = await api.get(RH_ENDPOINTS.timeSheetPdf(id), { responseType: "blob" });
+    const contentDisposition = String(response.headers["content-disposition"] ?? "");
+    const match = /filename="?([^";]+)"?/iu.exec(contentDisposition);
+    return {
+      blob: response.data as Blob,
+      filename: match?.[1] ?? `folha-ponto-${id}.pdf`,
+    };
   },
 };

@@ -2,8 +2,10 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   ApproveRhPointAdjustmentPayload,
+  ApproveRhPointAdjustmentsBulkPayload,
   RhPointAdjustmentListFilters,
   CreateRhPointAdjustmentPayload,
+  CreateRhRetroactivePointPayload,
   RhPointAdjustmentRequest,
   RhPointCalculationResult,
   RhPointConfig,
@@ -12,6 +14,7 @@ import type {
   RhPointMonthlySummary,
   RhRegisterPointResult,
   RhTodayPoint,
+  RecalculateRhPointsPayload,
   UpsertRhPointConfigPayload,
   RejectRhPointAdjustmentPayload,
 } from "../types";
@@ -97,6 +100,13 @@ export const rhPointService = {
     return unwrapRhEnvelope<RhPointCalculationResult>(response.data);
   },
 
+  async recalculatePoints(payload: RecalculateRhPointsPayload): Promise<RhPointCalculationResult[]> {
+    const api = setupAPIClient();
+    const response = await api.post(RH_ENDPOINTS.recalculatePoints, payload);
+
+    return unwrapRhEnvelope<RhPointCalculationResult[]>(response.data);
+  },
+
   async requestAdjustment(
     payload: CreateRhPointAdjustmentPayload,
   ): Promise<RhPointAdjustmentRequest> {
@@ -120,6 +130,36 @@ export const rhPointService = {
   ): Promise<RhPointAdjustmentRequest> {
     const api = setupAPIClient();
     const response = await api.put(RH_ENDPOINTS.rejectPointAdjustment, payload);
+
+    return unwrapRhEnvelope<RhPointAdjustmentRequest>(response.data);
+  },
+
+  async approveAdjustmentsBulk(
+    payload: ApproveRhPointAdjustmentsBulkPayload,
+  ): Promise<RhPointAdjustmentRequest[]> {
+    const api = setupAPIClient();
+    const response = await api.put(RH_ENDPOINTS.approvePointAdjustmentsBulk, payload);
+
+    return unwrapRhEnvelope<RhPointAdjustmentRequest[]>(response.data);
+  },
+
+  async createRetroactiveAdjustment(
+    payload: CreateRhRetroactivePointPayload,
+  ): Promise<RhPointAdjustmentRequest> {
+    const api = setupAPIClient();
+    const response = await api.post(RH_ENDPOINTS.retroactivePointAdjustment, payload);
+
+    return unwrapRhEnvelope<RhPointAdjustmentRequest>(response.data);
+  },
+
+  async uploadAdjustmentAttachment(
+    requestId: string,
+    file: File,
+  ): Promise<RhPointAdjustmentRequest> {
+    const api = setupAPIClient();
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(RH_ENDPOINTS.pointAdjustmentAttachment(requestId), formData);
 
     return unwrapRhEnvelope<RhPointAdjustmentRequest>(response.data);
   },

@@ -46,6 +46,10 @@ import {
   type ModuleKey,
   type ModulePermissionSubject,
 } from "@modules/auth";
+import {
+  useMarkRhNotificationReadMutation,
+  useRhNotifications,
+} from "@modules/rh/hooks/useRhRequests";
 import { useFetch, useMe } from "@shared/hooks";
 import { taskOperationalNotificationService } from "@shared/services/taskOperationalNotificationService";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
@@ -172,6 +176,15 @@ const MODULE_NAV_LOADING_MESSAGE = "Carregando módulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
 const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";
+
+function formatAppShellNotificationTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
 
 function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
   const normalizedPath = normalizeRoutePath(routePath);
@@ -302,17 +315,15 @@ type ChatMessage = {
 
 type AppShellNotification = {
   id: string;
+  notificationId: string;
+  source: "rh" | "task";
+  requestId?: string;
   title: string;
   description: string;
   time: string;
   unread: boolean;
+  createdAt: string;
 };
-
-function formatNotificationTime(value: string): string {
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(
-    new Date(value),
-  );
-}
 
 export function AppShell({
   children,
@@ -341,6 +352,10 @@ export function AppShell({
     isLoading: isModuleAccessLoading,
     user: moduleAccessUser,
   } = useModuleAccessMap(MODULE_KEYS);
+  const rhNotificationsQuery = useRhNotifications({
+    enabled: !isPlatformSuperAdmin && moduleAccessMap.rh?.canView === true,
+  });
+  const markRhNotificationReadMutation = useMarkRhNotificationReadMutation();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -352,14 +367,33 @@ export function AppShell({
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
-  const notifications: AppShellNotification[] = (notificationQuery.data?.items ?? []).map((item) => ({
-    id: item.id,
+  const rhNotifications: AppShellNotification[] = (rhNotificationsQuery.data ?? []).map((item) => ({
+    id: `rh:${item.id}`,
+    notificationId: item.id,
+    source: "rh" as const,
+    requestId: item.request_id,
     title: item.title,
     description: item.message,
-    time: formatNotificationTime(item.created_at),
-    unread: item.read_at === null,
+    time: formatAppShellNotificationTime(item.created_at),
+    unread: !item.read,
+    createdAt: item.created_at,
   }));
-  const hasUnreadNotifications = (notificationQuery.data?.unread_count ?? 0) > 0;
+  const taskNotifications: AppShellNotification[] = (notificationQuery.data?.items ?? []).map(
+    (item) => ({
+      id: `task:${item.id}`,
+      notificationId: item.id,
+      source: "task" as const,
+      title: item.title,
+      description: item.message,
+      time: formatAppShellNotificationTime(item.created_at),
+      unread: item.read_at === null,
+      createdAt: item.created_at,
+    }),
+  );
+  const notifications = [...rhNotifications, ...taskNotifications].sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
+  const hasUnreadNotifications = notifications.some((item) => item.unread);
   const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
   const sidebarToggleLabel = isSidebarOpen
     ? "Recolher sidebar"
@@ -845,7 +879,20 @@ export function AppShell({
                             key={item.id}
                             type="button"
                             onClick={() => {
-                              if (item.unread) markNotificationRead.mutate(item.id);
+                              if (item.unread) {
+                                if (item.source === "rh") {
+                                  markRhNotificationReadMutation.mutate({ id: item.notificationId });
+                                } else {
+                                  markNotificationRead.mutate(item.notificationId);
+                                }
+                              }
+                              setShowNotifications(false);
+                              if (item.source === "rh" && item.requestId) {
+                                void router.push({
+                                  pathname: "/rh",
+                                  query: { requestId: item.requestId },
+                                });
+                              }
                             }}
                             className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
                           >

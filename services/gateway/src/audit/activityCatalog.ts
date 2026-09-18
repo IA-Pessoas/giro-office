@@ -442,9 +442,59 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "registrou", item: "um ponto" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/colaborator$/,
+    description: { action: "consultou", item: "o dossiê de um colaborador" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/colaborator\/list$/,
+    description: { action: "consultou", item: "a lista de dossiês de colaboradores" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/profile\/colaborator$/,
+    description: { action: "atualizou", item: "o dossiê de um colaborador" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "consultou", item: "os contatos de emergência" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "cadastrou", item: "um contato de emergência" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "atualizou", item: "um contato de emergência" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "removeu", item: "um contato de emergência" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/allergy$/,
+    description: { action: "consultou", item: "as alergias de um colaborador" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/profile\/allergy$/,
+    description: { action: "atualizou", item: "as alergias de um colaborador" },
+  },
+  {
     methods: ["POST", "PATCH"],
     pattern: /^\/rh\/point\/[^/]+\/calculate$/,
     description: { action: "recalculou", item: "um ponto" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/point\/recalculate$/,
+    description: { action: "recalculou", item: "os pontos de um colaborador" },
   },
   {
     methods: ["POST"],
@@ -452,9 +502,24 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "solicitou", item: "um ajuste de ponto" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/rh\/point\/adjustment\/retroactive$/,
+    description: { action: "registrou", item: "uma entrada retroativa de ponto" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/point\/adjustment\/[^/]+\/attachment$/,
+    description: { action: "anexou", item: "um comprovante de ajuste de ponto" },
+  },
+  {
     methods: ["POST", "PATCH"],
     pattern: /^\/rh\/point\/adjustment\/approve$/,
     description: { action: "aprovou", item: "um ajuste de ponto" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/point\/adjustment\/approve-bulk$/,
+    description: { action: "aprovou", item: "um lote de ajustes de ponto" },
   },
   {
     methods: ["POST"],
@@ -697,6 +762,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "a lista de solicitações de ajuste de ponto" },
   },
   {
+    methods: ["PUT"],
+    pattern: /^\/rh\/timesheets\/reopen$/,
+    description: { action: "reabriu", item: "uma folha de ponto assinada" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/timesheets\/rebuild$/,
+    description: { action: "reconstruiu", item: "uma folha de ponto aberta" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/timesheets\/[^/]+\/pdf$/,
+    description: { action: "baixou", item: "o PDF de uma folha de ponto" },
+  },
+  {
     methods: ["PATCH"],
     pattern: /^\/rh\/score\/quarters\/nitro$/,
     description: { action: "atualizou", item: "a pontuação Nitro de um ciclo de avaliação" },
@@ -730,6 +810,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["PUT"],
     pattern: /^\/rh\/timesheets\/sign$/,
     description: { action: "assinou", item: "uma folha de ponto" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/messages$/,
+    description: { action: "enviou", item: "uma mensagem em uma solicitação de RH" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/notifications$/,
+    description: { action: "consultou", item: "as notificações de solicitações de RH" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/notifications\/read$/,
+    description: { action: "marcou", item: "notificações de solicitações de RH como lidas" },
   },
   {
     methods: ["GET"],

@@ -224,6 +224,7 @@ const state = {
   rhPointId: "",
   rhAdjustmentId: "",
   rhCategoryId: "",
+  rhDossierContactId: "",
   rhRequestId: "",
   rhScoreQuestionId: "",
   rhScoreId: "",
@@ -232,7 +233,15 @@ const state = {
   rhTimeBankReleaseId: "",
   rhTimeSheetId: "",
   rhTargetUserId: "",
+  rhTargetUserLogin: "",
   rhTargetUserSessionCookies: null,
+  rhManagerUserId: "",
+  rhManagerLogin: "",
+  rhManagerSessionCookies: null,
+  rhOutsideDepartmentId: "",
+  rhOutsideUserId: "",
+  rhOutsideUserLogin: "",
+  rhOutsideUserSessionCookies: null,
   rhPointDayAlreadyComplete: false,
   auditRequestId: "",
   contabilControlId: "",
@@ -268,11 +277,16 @@ const cleanupTasks = [];
 const executed = [];
 const skipped = [];
 const actionExecutionRank = {
-  // rhPointCalculate needs to run AFTER rhPointAdjustmentApprove because:
+  // Adjustment lifecycle actions need a deterministic order because:
   // - completeRhPointLifecycle fails the min-interval check (runs too fast)
   // - Adjustment approval sets clock_out and runs calculateDailyHours automatically
   // - After approval, the point is complete so calculate succeeds
-  rhPointCalculate: 500,
+  rhPointAdjustmentAttachment: 2920,
+  rhPointAdjustmentApprove: 2922,
+  rhPointCalculate: 2923,
+  rhPointAdjustmentApproveBulk: 2924,
+  rhPointAdjustmentRetroactive: 2925,
+  rhPointRecalculate: 2926,
   projectDelete: 8000,
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
@@ -572,10 +586,18 @@ async function runCleanupTasks() {
   }
 }
 
-async function writeArtifact(opId, responseText) {
+async function writeArtifact(opId, responseText, redact = false) {
   const filePath = path.join(env.tmpDir, `${sanitizeFileName(opId)}.response.txt`);
-  await fs.promises.writeFile(filePath, responseText, "utf8");
+  await fs.promises.writeFile(
+    filePath,
+    redact ? "<redacted sensitive response>\n" : responseText,
+    "utf8",
+  );
   return filePath;
+}
+
+function isSensitiveRhProfilePath(pathname) {
+  return /^\/rh\/profile(?:\/|$)/u.test(pathname);
 }
 
 function isBadExpectation(op) {
@@ -738,7 +760,8 @@ async function httpRequest(op, options) {
   captureSessionCookies(response.headers);
 
   text = await response.text();
-  const artifactPath = await writeArtifact(label, text);
+  const redactResponse = isSensitiveRhProfilePath(url.pathname);
+  const artifactPath = await writeArtifact(label, text, redactResponse);
 
   if (cli.verbose) {
     log("INFO", `${color.dim}<- ${response.status} (${text.length} bytes)${color.reset}`);
@@ -751,7 +774,7 @@ async function httpRequest(op, options) {
     body = undefined;
   }
 
-  const summary = summarizeResponse(body, text);
+  const summary = redactResponse ? "<redacted sensitive response>" : summarizeResponse(body, text);
   if (shouldLogEndpointResult(label)) {
     log(
       "INFO",
@@ -760,7 +783,8 @@ async function httpRequest(op, options) {
   }
 
   if (!expectedStatus.includes(response.status)) {
-    let errorMsg = `${label} returned ${response.status}, expected ${expectedStatus.join(", ")}. Body: ${text}`;
+    const errorBody = redactResponse ? "<redacted sensitive response>" : text;
+    let errorMsg = `${label} returned ${response.status}, expected ${expectedStatus.join(", ")}. Body: ${errorBody}`;
     if (response.status === 502 && target === "gateway") {
       const diagnostic = await diagnoseUpstream(service);
       errorMsg += `\n${diagnostic}`;
@@ -1283,6 +1307,7 @@ async function ensureSecondaryTaskModel() {
 
 async function ensureRhTargetUser() {
   if (state.rhTargetUserId) return state.rhTargetUserId;
+  state.rhTargetUserLogin = uniqueEmail("smoke-rh-target");
   const response = await helperCall("rh-target-user-create", {
     method: "POST",
     path: "/user",
@@ -1291,7 +1316,7 @@ async function ensureRhTargetUser() {
     auth: "admin-bearer",
     json: {
       name: uniqueText("Smoke RH Target"),
-      login: uniqueEmail("smoke-rh-target"),
+      login: state.rhTargetUserLogin,
       password: env.password,
       department_id: await ensureDepartmentId(),
       permission: 1,
@@ -1340,30 +1365,161 @@ async function ensureRhTargetUser() {
 async function ensureRhTargetUserSessionCookies() {
   if (state.rhTargetUserSessionCookies) return state.rhTargetUserSessionCookies;
   await ensureRhTargetUser();
+  state.rhTargetUserSessionCookies = await loginWithCookies(
+    "rh-target-user-login",
+    requireState("rhTargetUserLogin"),
+    env.password,
+  );
+  return state.rhTargetUserSessionCookies;
+}
+
+async function loginWithCookies(label, login, password) {
   const adminSessionCookies = { ...state.sessionCookies };
   state.sessionCookies = { "cw.csrf": "", "cw.session": "" };
 
   try {
-    await helperCall("rh-target-user-login", {
+    await helperCall(label, {
       method: "POST",
       path: "/user/session",
       target: "gateway",
       service: "user-service",
       auth: "public",
       json: {
-        login: uniqueEmail("smoke-rh-target"),
-        password: env.password,
+        login,
+        password,
       },
       expectedStatus: [200],
       expectEnvelope: false,
     });
     getSessionHeaders("GET");
-    state.rhTargetUserSessionCookies = { ...state.sessionCookies };
+    const loginCookies = { ...state.sessionCookies };
+    return loginCookies;
   } finally {
     state.sessionCookies = adminSessionCookies;
   }
+}
 
-  return state.rhTargetUserSessionCookies;
+async function ensureRhManagerSessionCookies() {
+  if (state.rhManagerSessionCookies) return state.rhManagerSessionCookies;
+
+  const departmentId = await ensureDepartmentId();
+  state.rhManagerLogin = uniqueEmail("smoke-rh-manager");
+  const response = await helperCall("rh-manager-user-create", {
+    method: "POST",
+    path: "/user",
+    target: "gateway",
+    service: "user-service",
+    auth: "admin-bearer",
+    json: {
+      name: uniqueText("Smoke RH Department Manager"),
+      login: state.rhManagerLogin,
+      password: env.password,
+      department_id: departmentId,
+      permission: 1,
+      organization_id: requireState("session").organization_id,
+      type: "user",
+      modules: { integracao: 1, rh: 2 },
+    },
+    expectedStatus: [201],
+  });
+  state.rhManagerUserId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  state.rhManagerSessionCookies = await loginWithCookies(
+    "rh-manager-user-login",
+    state.rhManagerLogin,
+    env.password,
+  );
+
+  registerCleanup("rh-manager-user", async () => {
+    if (!state.rhManagerUserId) return;
+    await helperCall("rh-manager-user-cleanup", {
+      method: "DELETE",
+      path: `/user/${state.rhManagerUserId}`,
+      target: "gateway",
+      service: "user-service",
+      auth: "admin-bearer",
+      expectedStatus: [200, 404],
+      expectEnvelope: false,
+    });
+  });
+
+  return state.rhManagerSessionCookies;
+}
+
+async function ensureRhOutsideUserSessionCookies() {
+  if (state.rhOutsideUserSessionCookies) return state.rhOutsideUserSessionCookies;
+
+  const departmentResponse = await helperCall("rh-outside-department-create", {
+    method: "POST",
+    path: "/department",
+    target: "gateway",
+    service: "department-service",
+    auth: "admin-bearer",
+    json: {
+      name: uniqueText("Smoke RH Outside Department"),
+      color: "#B91C1C",
+      solution: true,
+    },
+    expectedStatus: [201],
+  });
+  state.rhOutsideDepartmentId =
+    pickFirst(departmentResponse.body, "data.dep.id") ?? findFirstId(departmentResponse.body?.data);
+
+  state.rhOutsideUserLogin = uniqueEmail("smoke-rh-outside");
+  const response = await helperCall("rh-outside-user-create", {
+    method: "POST",
+    path: "/user",
+    target: "gateway",
+    service: "user-service",
+    auth: "admin-bearer",
+    json: {
+      name: uniqueText("Smoke RH Outside Department User"),
+      login: state.rhOutsideUserLogin,
+      password: env.password,
+      department_id: state.rhOutsideDepartmentId,
+      permission: 1,
+      organization_id: requireState("session").organization_id,
+      type: "user",
+      modules: { integracao: 1, rh: 1 },
+    },
+    expectedStatus: [201],
+  });
+  state.rhOutsideUserId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  state.rhOutsideUserSessionCookies = await loginWithCookies(
+    "rh-outside-user-login",
+    state.rhOutsideUserLogin,
+    env.password,
+  );
+
+  registerCleanup("rh-outside-user", async () => {
+    if (!state.rhOutsideUserId) return;
+    await helperCall("rh-outside-user-cleanup", {
+      method: "DELETE",
+      path: `/user/${state.rhOutsideUserId}`,
+      target: "gateway",
+      service: "user-service",
+      auth: "admin-bearer",
+      expectedStatus: [200, 404],
+      expectEnvelope: false,
+    });
+  });
+  registerCleanup("rh-outside-department", async () => {
+    if (!state.rhOutsideDepartmentId) return;
+    await helperCall("rh-outside-department-cleanup", {
+      method: "PUT",
+      path: "/department",
+      target: "gateway",
+      service: "department-service",
+      auth: "admin-bearer",
+      json: {
+        dep_id: state.rhOutsideDepartmentId,
+        status: "Inativo",
+      },
+      expectedStatus: [200, 404],
+      expectEnvelope: false,
+    });
+  });
+
+  return state.rhOutsideUserSessionCookies;
 }
 
 async function withPlatformSession(fn) {
@@ -1376,6 +1532,17 @@ async function withPlatformSession(fn) {
     return result;
   } finally {
     state.sessionCookies = organizationSessionCookies;
+  }
+}
+
+async function withSessionCookies(sessionCookies, fn) {
+  const currentSessionCookies = state.sessionCookies;
+  state.sessionCookies = { ...sessionCookies };
+
+  try {
+    return await fn();
+  } finally {
+    state.sessionCookies = currentSessionCookies;
   }
 }
 
@@ -5421,6 +5588,139 @@ const handlers = {
     });
   },
 
+  async rhDossierGet(op) {
+    await httpRequest(op, {
+      path: "/rh/profile/colaborator",
+      query: { user_id: await ensureRhTargetUser() },
+    });
+  },
+
+  async rhDossierSelfGet(op) {
+    const sessionCookies = await ensureRhTargetUserSessionCookies();
+    await withSessionCookies(sessionCookies, () =>
+      httpRequest(op, {
+        auth: "session",
+        path: "/rh/profile/colaborator",
+      }),
+    );
+  },
+
+  async rhDossierManagerList(op) {
+    const sessionCookies = await ensureRhManagerSessionCookies();
+    await withSessionCookies(sessionCookies, () =>
+      httpRequest(op, {
+        auth: "session",
+        path: "/rh/profile/colaborator/list",
+      }),
+    );
+  },
+
+  async rhDossierManagerProjectionGet(op) {
+    const targetUserId = await ensureRhTargetUser();
+    const sessionCookies = await ensureRhManagerSessionCookies();
+    await withSessionCookies(sessionCookies, () =>
+      httpRequest(op, {
+        auth: "session",
+        path: "/rh/profile/colaborator",
+        query: { user_id: targetUserId },
+      }),
+    );
+  },
+
+  async rhDossierManagerOutsideForbidden(op) {
+    await ensureRhOutsideUserSessionCookies();
+    const managerSessionCookies = await ensureRhManagerSessionCookies();
+    await withSessionCookies(managerSessionCookies, () =>
+      httpRequest(op, {
+        auth: "session",
+        path: "/rh/profile/colaborator",
+        query: { user_id: requireState("rhOutsideUserId") },
+        expectedStatus: [404],
+        expectEnvelope: false,
+      }),
+    );
+  },
+
+  async rhDossierList(op) {
+    await httpRequest(op, {
+      path: "/rh/profile/colaborator/list",
+    });
+  },
+
+  async rhDossierPut(op) {
+    await httpRequest(op, {
+      path: "/rh/profile/colaborator",
+      json: {
+        target_user_id: await ensureRhTargetUser(),
+        phone: "5511888800000",
+      },
+    });
+  },
+
+  async rhDossierContactList(op) {
+    await httpRequest(op, {
+      path: "/rh/profile/contact",
+      query: { user_id: await ensureRhTargetUser() },
+    });
+  },
+
+  async rhDossierContactCreate(op) {
+    const response = await httpRequest(op, {
+      path: "/rh/profile/contact",
+      json: {
+        target_user_id: await ensureRhTargetUser(),
+        name: uniqueText("Smoke RH Emergency Contact"),
+        phone: "5511888800001",
+        reference: "Smoke",
+      },
+    });
+    if (isBadExpectation(op)) return;
+    state.rhDossierContactId =
+      pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async rhDossierContactPut(op) {
+    await httpRequest(op, {
+      path: "/rh/profile/contact",
+      json: {
+        target_user_id: await ensureRhTargetUser(),
+        id: isBadExpectation(op)
+          ? "00000000-0000-4000-8000-000000000004"
+          : requireState("rhDossierContactId"),
+        phone: "5511888800002",
+      },
+    });
+  },
+
+  async rhDossierContactDelete(op) {
+    await httpRequest(op, {
+      path: "/rh/profile/contact",
+      json: {
+        target_user_id: await ensureRhTargetUser(),
+        id: isBadExpectation(op)
+          ? "00000000-0000-4000-8000-000000000005"
+          : requireState("rhDossierContactId"),
+      },
+    });
+  },
+
+  async rhDossierAllergyList(op) {
+    await httpRequest(op, {
+      path: "/rh/profile/allergy",
+      query: { user_id: await ensureRhTargetUser() },
+    });
+  },
+
+  async rhDossierAllergyPut(op) {
+    await httpRequest(op, {
+      path: "/rh/profile/allergy",
+      json: {
+        target_user_id: await ensureRhTargetUser(),
+        allergies: [{ name: "Smoke", fonts: "Smoke", action: "Smoke" }],
+      },
+    });
+  },
+
   async rhPointConfigGet(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -5508,7 +5808,7 @@ const handlers = {
   },
 
   async rhPointCalculate(op) {
-    // Runs after rhPointAdjustmentApprove (via actionExecutionRank:500).
+    // Runs after rhPointAdjustmentApprove (via actionExecutionRank:2923).
     // Approval sets clock_in/lunch_out/lunch_in/clock_out on the point, so calculate succeeds.
     const targetToken = await ensureRhTargetUserSessionCookies();
     if (!state.rhPointId) {
@@ -5536,7 +5836,7 @@ const handlers = {
 
     const targetToken = await ensureRhTargetUserSessionCookies();
     const response = await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [201],
       path: "/rh/point/adjustment/request",
       auth: "public",
       headers: getSessionHeaders("POST", targetToken),
@@ -5553,6 +5853,21 @@ const handlers = {
       return;
     }
     state.rhAdjustmentId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  },
+
+  async rhPointAdjustmentAttachment(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/rh/point/adjustment/${requireState("rhAdjustmentId")}/attachment`,
+      form: {
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "smoke-point-adjustment.png",
+          contentType: "image/png",
+        },
+      },
+    });
   },
 
   async rhPointAdjustmentList(op) {
@@ -5587,6 +5902,80 @@ const handlers = {
     });
   },
 
+  async rhPointAdjustmentApproveBulk(op) {
+    const targetToken = await ensureRhTargetUserSessionCookies();
+    const requestIds = [];
+    for (const daysAgo of [2, 3]) {
+      const base = new Date();
+      base.setUTCDate(base.getUTCDate() - daysAgo);
+      const at = (hour) => {
+        const value = new Date(base);
+        value.setUTCHours(hour, 0, 0, 0);
+        return value.toISOString();
+      };
+      const response = await httpRequest(op, {
+        expectedStatus: [201],
+        path: "/rh/point/adjustment/request",
+        auth: "public",
+        headers: getSessionHeaders("POST", targetToken),
+        json: {
+          date: at(12),
+          clock_in: at(8),
+          lunch_out: at(12),
+          lunch_in: at(13),
+          clock_out: at(17),
+          justification: `Smoke bulk adjustment ${daysAgo}`,
+        },
+      });
+      const requestId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+      if (!requestId) throw new Error("Bulk adjustment smoke did not return a request id.");
+      requestIds.push(requestId);
+    }
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point/adjustment/approve-bulk",
+      json: { request_ids: requestIds, obs_approver: "Bulk smoke approval" },
+    });
+  },
+
+  async rhPointAdjustmentRetroactive(op) {
+    const base = new Date();
+    base.setUTCDate(base.getUTCDate() - 5);
+    const at = (hour) => {
+      const value = new Date(base);
+      value.setUTCHours(hour, 0, 0, 0);
+      return value.toISOString();
+    };
+    await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/rh/point/adjustment/retroactive",
+      json: {
+        target_user_id: await ensureRhTargetUser(),
+        date: at(12),
+        clock_in: at(8),
+        lunch_out: at(12),
+        lunch_in: at(13),
+        clock_out: at(17),
+        justification: "Smoke retroactive adjustment",
+      },
+    });
+  },
+
+  async rhPointRecalculate(op) {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/point/recalculate",
+      json: {
+        target_user_id: await ensureRhTargetUser(),
+        date_from: start.toISOString(),
+        date_to: end.toISOString(),
+      },
+    });
+  },
+
   async rhPointAdjustmentReject(op) {
     if (isBadExpectation(op)) {
       await httpRequest(op, {
@@ -5610,7 +5999,7 @@ const handlers = {
     clockOut.setUTCHours(17, 0, 0, 0);
     const targetToken = await ensureRhTargetUserSessionCookies();
     const createResponse = await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [201],
       path: "/rh/point/adjustment/request",
       auth: "public",
       headers: getSessionHeaders("POST", targetToken),
@@ -5989,6 +6378,21 @@ const handlers = {
     });
   },
 
+  async rhNotificationList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/notifications",
+    });
+  },
+
+  async rhNotificationMarkRead(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/notifications/read",
+      json: { all: true },
+    });
+  },
+
   async rhTimeSheetCreate(op) {
     const start = new Date(Date.now() - 8 * 60 * 60 * 1000);
     const end = new Date();
@@ -6031,6 +6435,17 @@ const handlers = {
       auth: "public",
       headers: getSessionHeaders("POST", targetToken),
       json: { id: requireState("rhTimeSheetId"), signature: "smoke-signature" },
+    });
+  },
+
+  async rhTimeSheetReopen(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: "/rh/timesheets/reopen",
+      json: {
+        id: requireState("rhTimeSheetId"),
+        reason: "Smoke authorized reopen",
+      },
     });
   },
 

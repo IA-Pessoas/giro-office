@@ -11,6 +11,7 @@ import { rhRequestsService } from "../services/rhRequestsService";
 import type {
   CreateRhCategoryPayload,
   CreateRhMessagePayload,
+  CreateRhMessageInput,
   CreateRhRequestPayload,
   DeleteRhCategoryPayload,
   DeleteRhRequestPayload,
@@ -22,6 +23,7 @@ import type {
   RhRequest,
   RhRequestListFilters,
   RhRequestListPage,
+  RhNotification,
   UpdateRhCategoryPayload,
   UpdateRhRequestPayload,
 } from "../types";
@@ -56,6 +58,8 @@ export function rhRequestDetailQueryKey(id: string) {
 export function rhMessagesQueryKey(filters: RhMessageListFilters) {
   return [...RH_QUERY_KEY, "messages", filters.requestId] as const;
 }
+
+export const rhNotificationsQueryKey = [...RH_QUERY_KEY, "notifications"] as const;
 
 export function useRhCategories(
   filters: RhCategoryListFilters = {},
@@ -95,6 +99,13 @@ export function useRhMessages(
       enabled: Boolean(filters?.requestId),
     },
   );
+}
+
+export function useRhNotifications(options?: { enabled?: boolean }): UseQueryResult<RhNotification[], Error> {
+  return useFetch(rhNotificationsQueryKey, () => rhRequestsService.listNotifications(), {
+    enabled: options?.enabled ?? true,
+    refetchInterval: 60_000,
+  });
 }
 
 export function useCreateRhCategoryMutation(): UseMutationResult<
@@ -190,14 +201,28 @@ export function useDeleteRhRequestMutation(): UseMutationResult<
 export function useCreateRhMessageMutation(): UseMutationResult<
   RhMessage,
   Error,
-  CreateRhMessagePayload
+  CreateRhMessageInput
 > {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload) => rhRequestsService.createMessage(payload),
+    mutationFn: (input) => rhRequestsService.createMessageWithAttachment(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+    },
+  });
+}
+
+export function useMarkRhNotificationReadMutation(): UseMutationResult<
+  { count: number },
+  Error,
+  { id?: string; request_id?: string; all?: boolean }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => rhRequestsService.markNotificationRead(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: rhNotificationsQueryKey });
     },
   });
 }
