@@ -835,6 +835,14 @@ function ProcessDetailContent({
               />
             }
           />
+          <FieldLine
+            label="Status financeiro"
+            value={formatText(processDetailQuery.data.financial_status)}
+          />
+          <FieldLine
+            label="Aviso ao cliente"
+            value={formatDate(processDetailQuery.data.client_notice_date)}
+          />
           <FieldLine label="Entrada" value={formatDate(processDetailQuery.data.entry_date)} />
           <FieldLine label="Previsto" value={formatDate(processDetailQuery.data.expected_date)} />
           <FieldLine
@@ -1958,7 +1966,9 @@ export function RegularizePage() {
             >
               {(processRows) => (
                 <div>
-                  <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
+                  <DataTable
+                    headers={["Processo", "Cliente", "Documento", "Status", "Financeiro", ""]}
+                  >
                     {processRows.map((item) => (
                     <tr
                       key={item.id}
@@ -1974,6 +1984,7 @@ export function RegularizePage() {
                       <td className="px-4 py-3">
                         <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
                       </td>
+                      <td className="px-4 py-3 text-sm">{formatText(item.financial_status)}</td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <TableActionButton

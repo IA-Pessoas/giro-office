@@ -27,6 +27,13 @@ export const regularizeProcessStatusOptions = [
   "Paralisado",
 ] as const;
 
+export const regularizeFinancialStatusOptions = [
+  "Pendente",
+  "Regular",
+  "Bônus",
+  "Não Contratado",
+] as const;
+
 export const regularizeProcessStatusFilterOptions = [
   "Todos",
   ...regularizeProcessStatusOptions,

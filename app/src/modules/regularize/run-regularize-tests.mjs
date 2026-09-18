@@ -687,6 +687,12 @@ await runTest("regularize process contract keeps canonical states and explicit F
     controlsSource,
     /regularizeProcessStatusOptions = \[\s*"Pendente",\s*"Andamento",\s*"Protocolado",\s*"Finalizado",\s*"Paralisado",\s*\]/,
   );
+  assert.match(
+    controlsSource,
+    /regularizeFinancialStatusOptions = \[\s*"Pendente",\s*"Regular",\s*"Bônus",\s*"Não Contratado",\s*\]/,
+  );
+  assert.match(formSource, /financial_status/);
+  assert.match(formSource, /client_notice_date/);
   assert.match(formSource, /useAssignableUsers/);
   assert.match(formSource, /responsible1_id/);
   assert.match(formSource, /responsible2_id/);
@@ -699,6 +705,8 @@ await runTest("regularize process contract keeps canonical states and explicit F
   assert.match(hooksSource, /useReturnRegularizeProcessFromFiscalMutation/);
   assert.match(pageSource, /Enviar ao Fiscal/);
   assert.match(pageSource, /Registrar retorno do Fiscal/);
+  assert.match(pageSource, /Status financeiro/);
+  assert.match(pageSource, /Aviso ao cliente/);
 });
 
 await runTest("regularize municipal tax contract carries filters and unwraps a page", async () => {

@@ -9,6 +9,7 @@ import {
   guidanceWriteStatusSchema,
   licenseUpdateStatusSchema,
   licenseWriteStatusSchema,
+  processFinancialStatusSchema,
   processReadStatusSchema,
   processWriteStatusSchema,
 } from "../schemas/status.schemas.js";
@@ -18,6 +19,14 @@ describe("regularize status contracts", () => {
     expect(processWriteStatusSchema.safeParse("Andamento").success).toBe(true);
     expect(processWriteStatusSchema.safeParse("Aberto").success).toBe(false);
     expect(processWriteStatusSchema.safeParse("Em andamento").success).toBe(false);
+  });
+
+  it("normalizes the supported legacy financial codes", () => {
+    expect(processFinancialStatusSchema.parse(0)).toBe("Pendente");
+    expect(processFinancialStatusSchema.parse("1")).toBe("Regular");
+    expect(processFinancialStatusSchema.parse(3)).toBe("Bônus");
+    expect(processFinancialStatusSchema.parse("4")).toBe("Não Contratado");
+    expect(processFinancialStatusSchema.safeParse(2).success).toBe(false);
   });
 
   it("keeps legacy process aliases readable and maps them to the same filter", () => {
@@ -82,6 +91,7 @@ describe("regularize status contracts", () => {
       get: { parameters: Array<{ name: string; schema: { enum: string[] } }> };
     };
     const processWritePath = spec.paths["/regularize/process"] as {
+      get: { responses: Record<string, unknown> };
       post: {
         requestBody: {
           content: {
@@ -91,6 +101,8 @@ describe("regularize status contracts", () => {
                 additionalProperties: boolean;
                 properties: {
                   status: { enum: string[] };
+                  financial_status: { oneOf: Array<Record<string, unknown>> };
+                  client_notice_date: { type: string; format: string; nullable: boolean };
                   client_pj_id: { type: string; format: string };
                 };
               };
@@ -98,6 +110,7 @@ describe("regularize status contracts", () => {
           };
         };
       };
+      put: { responses: Record<string, unknown> };
     };
     const guidanceWritePath = spec.paths["/regularize/guidance"] as {
       post: {
@@ -141,6 +154,29 @@ describe("regularize status contracts", () => {
       processWritePath.post.requestBody.content["application/json"].schema.properties.status.enum,
     ).toEqual(
       expect.arrayContaining(["Pendente", "Andamento", "Protocolado", "Finalizado", "Paralisado"]),
+    );
+    expect(
+      processWritePath.post.requestBody.content["application/json"].schema.properties
+        .financial_status,
+    ).toEqual({
+      oneOf: [
+        { type: "string", enum: ["Pendente", "Regular", "Bônus", "Não Contratado"] },
+        { type: "integer", enum: [0, 1, 3, 4] },
+        { type: "string", enum: ["0", "1", "3", "4"] },
+      ],
+    });
+    expect(
+      processWritePath.post.requestBody.content["application/json"].schema.properties
+        .client_notice_date,
+    ).toEqual({ type: "string", format: "date", nullable: true });
+    expect(Object.keys(processWritePath.get.responses)).toEqual(
+      expect.arrayContaining(["200", "401", "403", "404"]),
+    );
+    expect(Object.keys(processWritePath.post.responses)).toEqual(
+      expect.arrayContaining(["201", "400", "401", "403", "404", "409"]),
+    );
+    expect(Object.keys(processWritePath.put.responses)).toEqual(
+      expect.arrayContaining(["200", "400", "401", "403", "404", "409"]),
     );
     expect(
       processWritePath.post.requestBody.content["application/json"].schema.additionalProperties,

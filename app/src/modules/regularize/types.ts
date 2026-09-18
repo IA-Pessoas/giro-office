@@ -10,6 +10,8 @@ export type RegularizeId = string;
 
 export type RegularizeStatus = string | boolean;
 
+export type RegularizeFinancialStatus = "Pendente" | "Regular" | "Bônus" | "Não Contratado";
+
 export type RegularizePartnerType = "pf" | "pj";
 
 export type RegularizeMunicipalTaxType = "TFF" | "TLP" | "TLL";
@@ -305,6 +307,8 @@ export type RegularizeProcessListItem = {
   cpf_cnpj?: string | null;
   process_type: string;
   status: string;
+  financial_status?: RegularizeFinancialStatus | null;
+  client_notice_date?: string | null;
   clientPF?: RegularizeProcessClientSummary | null;
   clientPJ?: RegularizeProcessClientSummary | null;
 };
@@ -352,7 +356,9 @@ export type CreateRegularizeProcessPayload = {
   entry_date?: RegularizeOptionalDate;
   completion_date?: RegularizeOptionalDate;
   expected_date?: RegularizeOptionalDate;
+  client_notice_date?: RegularizeOptionalDate | null;
   status: string;
+  financial_status?: RegularizeFinancialStatus;
   observation?: string | null;
   responsible1_id?: RegularizeId;
   responsible2_id?: RegularizeId;
