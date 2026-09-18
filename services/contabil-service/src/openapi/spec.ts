@@ -1062,7 +1062,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               name: "competence",
               in: "query",
               required: true,
-              schema: { type: "string" },
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
             },
           ],
           responses: {
@@ -1090,7 +1090,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    competence: { type: "string" },
+                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
                     bank_id: {
                       type: "string",
                       description:
@@ -1122,6 +1122,43 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               },
             },
             "403": { description: "Sem permissão" },
+          },
+        },
+        delete: {
+          tags: ["Triage Documents"],
+          summary: "Arquivar marcador de extrato",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "bank_id"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+                    bank_id: {
+                      type: "string",
+                      description: "Identificador operacional do banco.",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Marcador arquivado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Marcador não encontrado" },
           },
         },
       },

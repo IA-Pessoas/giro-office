@@ -136,6 +136,14 @@ export function useTriageMutations(
         });
       },
     }),
+    archiveStatement: useMutation({
+      mutationFn: triageDocumentsService.archiveStatement,
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: triageStatementsQueryKey(clientId, competence),
+        });
+      },
+    }),
     closing: useMutation({
       mutationFn: ({ status }: { status: TriageClosingStatus }) =>
         triageDocumentsService.updateClosing({ clientId, competence, status }),

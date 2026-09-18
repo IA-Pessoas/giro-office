@@ -51,6 +51,7 @@ describe("matriz de regressão das políticas modulares", () => {
     const triagemWriteRoutes = [
       ["POST", "/triagem/monthly"],
       ["PUT", "/triagem/statements"],
+      ["DELETE", "/triagem/statements"],
       ["PUT", "/triagem/closing"],
     ] as const;
 
