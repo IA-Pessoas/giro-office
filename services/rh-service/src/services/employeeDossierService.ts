@@ -269,8 +269,8 @@ class EmployeeDossierService {
         ? toListItem(target)
         : toDossier(target);
     } catch (err) {
-      if (err instanceof ServiceError) throw err;
       logError("Erro ao buscar dossiê do colaborador", { err });
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro interno ao buscar dossiê.", err);
     }
   }
@@ -299,8 +299,8 @@ class EmployeeDossierService {
       });
       return users.map(toListItem);
     } catch (err) {
-      if (err instanceof ServiceError) throw err;
       logError("Erro ao listar dossiês de colaboradores", { err });
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro interno ao listar colaboradores.", err);
     }
   }
@@ -356,8 +356,8 @@ class EmployeeDossierService {
       const updated = await this.findUser(target.id, context.organizationId);
       return toDossier(updated);
     } catch (err) {
-      if (err instanceof ServiceError) throw err;
       logError("Erro ao atualizar dossiê do colaborador", { err });
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro interno ao atualizar dossiê.", err);
     }
   }
