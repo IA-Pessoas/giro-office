@@ -22,6 +22,7 @@ Endpoints públicos principais via gateway:
 - `GET|POST /triagem/catalogs`
 - `PATCH /triagem/catalogs/<id>` e `PATCH /triagem/catalogs/<id>/archive`
 - `GET|POST /triagem/external-links`
+- `GET /triagem/overview` com filtros de cliente, competência e status, paginação e indicadores
 
 Os catálogos aceitam `JUSTIFICATION`, `LINK_TYPE`, `DELIVERY_METHOD` e `STATE_SITE`, sempre
 escopados à organização. Competências preservam os valores catalogados em snapshots imutáveis;
