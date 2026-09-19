@@ -24,6 +24,8 @@ import type {
   RegularizeLicenseDetail,
   RegularizeLicenseListFilters,
   RegularizeLicenseListItem,
+  RegularizeLicenseProtocolAccess,
+  RegularizeLicenseProtocolMetadata,
   RegularizeMunicipalTaxesDetail,
   RegularizeMunicipalTaxesListFilters,
   RegularizeMunicipalTaxesPage,
@@ -502,5 +504,24 @@ export const regularizeService = {
     const response = await api.put(REGULARIZE_ENDPOINTS.license, payload);
 
     return unwrapRegularizeEnvelope<RegularizeLicenseDetail>(response.data);
+  },
+
+  async uploadLicenseProtocol(
+    id: RegularizeId,
+    file: File,
+  ): Promise<RegularizeLicenseProtocolMetadata> {
+    const api = setupAPIClient();
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(REGULARIZE_ENDPOINTS.licenseProtocol(id), formData);
+
+    return unwrapRegularizeEnvelope<RegularizeLicenseProtocolMetadata>(response.data);
+  },
+
+  async getLicenseProtocolAccess(id: RegularizeId): Promise<RegularizeLicenseProtocolAccess> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.licenseProtocol(id));
+
+    return unwrapRegularizeEnvelope<RegularizeLicenseProtocolAccess>(response.data);
   },
 };

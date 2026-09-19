@@ -17,6 +17,8 @@ Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 - `JWT_SECRET` - validacao do Bearer nas rotas autenticadas
 - `PORT` - porta HTTP (default `3039`)
 - `MTK_ENCRYPTION_KEY` - chave usada para criptografar credenciais do legado
+- `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` - acesso servidor ao storage privado de protocolos
+- `REGULARIZE_LICENSE_PROTOCOL_BUCKET` - bucket privado dos protocolos (default `regularize-license-protocols`)
 - `AUDIT_SERVICE_TOKEN` - token usado na integracao de auditoria
 - `REGULARIZE_SERVICE_INTERNAL_TOKEN` - token exclusivo compartilhado apenas pelo gateway e pelo regularize-service para o contexto encaminhado e as rotas internas; em desenvolvimento, se ausente, mantem fallback de compatibilidade para `INTERNAL_SERVICE_TOKEN` e `AUDIT_SERVICE_TOKEN`
 - `INTERNAL_SERVICE_TOKEN` - nome legado aceito para as rotas `POST /internal/reconciliation/*` pelo header `x-internal-service-token`
@@ -49,6 +51,7 @@ Exemplos de paths publicos:
 - `/regularize/processes`
 - `/regularize/guidance`
 - `/regularize/license`
+- `/regularize/license/:id/protocol` - substitui o arquivo vigente ou gera acesso assinado temporario
 - `/regularize/licenses`
 
 Infraestrutura direto no servico: `GET /health` e, quando habilitado, `GET /docs`.

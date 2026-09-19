@@ -1106,6 +1106,56 @@ export function buildRegularizeServiceOpenApiSpec(
           },
         },
       },
+      "/regularize/license/{id}/protocol": {
+        post: {
+          tags: ["Licenses"],
+          summary: "Cadastrar ou substituir o protocolo privado vigente",
+          description:
+            "Aceita um único PDF, JPG, PNG ou WebP de até 10 MB. O storage deve ser privado e o caminho interno nunca é retornado.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["file"],
+                  properties: {
+                    file: {
+                      type: "string",
+                      format: "binary",
+                      description: "PDF, JPG, PNG ou WebP com no máximo 10 MB.",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Protocolo vigente substituído", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+            "404": { description: "Licença não encontrada" },
+          },
+        },
+        get: {
+          tags: ["Licenses"],
+          summary: "Gerar acesso temporário ao protocolo vigente",
+          description: "Retorna URL assinada válida por 300 segundos, sem expor o caminho interno.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "URL assinada temporária", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+            "404": { description: "Licença ou protocolo não encontrado" },
+          },
+        },
+      },
       "/regularize/licenses": {
         get: {
           tags: ["Licenses"],

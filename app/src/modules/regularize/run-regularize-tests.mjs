@@ -375,6 +375,27 @@ await runTest("regularize license responsible field uses the contextual selector
   assert.doesNotMatch(source, /Respons.vel ID/);
 });
 
+await runTest("regularize license protocol uses private upload and on-demand signed access", async () => {
+  const formSource = await readModuleSource("components/RegularizeLicenseForm.tsx");
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const serviceSource = await readModuleSource("services/regularizeService.ts");
+  const contractSource = await readModuleSource("services/regularizeService.contract.ts");
+
+  assert.match(
+    formSource,
+    /accept="\.pdf,\.jpg,\.jpeg,\.png,\.webp,application\/pdf,image\/jpeg,image\/png,image\/webp"/,
+  );
+  assert.match(formSource, /LICENSE_PROTOCOL_MAX_SIZE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(formSource, /Um novo envio substitui o protocolo vigente/);
+  assert.match(formSource, /onOpenProtocol/);
+  assert.match(contractSource, /licenseProtocol: \(id: RegularizeId\)/);
+  assert.match(serviceSource, /formData\.append\("file", file\)/);
+  assert.match(serviceSource, /api\.get\(REGULARIZE_ENDPOINTS\.licenseProtocol\(id\)\)/);
+  assert.match(pageSource, /useUploadRegularizeLicenseProtocolMutation/);
+  assert.match(pageSource, /useRegularizeLicenseProtocolAccessMutation/);
+  assert.match(pageSource, /protocolWindow\.location\.replace\(access\.url\)/);
+});
+
 await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
   assert.deepEqual(
     buildRegularizeClientPfListParams({

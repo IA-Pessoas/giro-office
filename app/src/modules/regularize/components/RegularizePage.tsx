@@ -81,6 +81,7 @@ import {
   useCreateRegularizeProcessMutation,
   useRegularizeGuidance,
   useRegularizeLicenseDetail,
+  useRegularizeLicenseProtocolAccessMutation,
   usePaginatedRegularizeLicenses,
   useRegularizeMunicipalTaxDetail,
   useRegularizeMunicipalTaxes,
@@ -95,6 +96,7 @@ import {
   useUpdateRegularizeLicenseMutation,
   useUpdateRegularizeMunicipalTaxMutation,
   useUpdateRegularizeProcessMutation,
+  useUploadRegularizeLicenseProtocolMutation,
 } from "../hooks/useRegularizeOperations";
 import type {
   AddRegularizeGuidanceActivityPayload,
@@ -1179,6 +1181,8 @@ export function RegularizePage() {
   const removeGuidancePartnerMutation = useRemoveRegularizeGuidancePartnerMutation();
   const createLicenseMutation = useCreateRegularizeLicenseMutation();
   const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
+  const uploadLicenseProtocolMutation = useUploadRegularizeLicenseProtocolMutation();
+  const licenseProtocolAccessMutation = useRegularizeLicenseProtocolAccessMutation();
 
   const visiblePfRows = isPfSearchPending ? [] : pfPageQuery.data?.data ?? [];
   const pfNameById = new Map(
@@ -1674,24 +1678,58 @@ export function RegularizePage() {
 
   async function handleSubmitLicense(
     payload: CreateRegularizeLicensePayload | UpdateRegularizeLicensePayload,
+    protocolFile?: File,
   ) {
+    let savedLicenseId: RegularizeId | undefined;
     try {
       if ("id" in payload) {
-        await updateLicenseMutation.mutateAsync(payload);
+        const updated = await updateLicenseMutation.mutateAsync(payload);
+        savedLicenseId = updated.id;
         toast.success("Licença atualizada com sucesso.");
       } else {
-        await createLicenseMutation.mutateAsync(payload);
+        const created = await createLicenseMutation.mutateAsync(payload);
+        savedLicenseId = created.id;
         toast.success("Licença criada com sucesso.");
+      }
+
+      if (protocolFile) {
+        await uploadLicenseProtocolMutation.mutateAsync({ id: savedLicenseId, file: protocolFile });
+        toast.success("Protocolo armazenado com segurança.");
       }
 
       closeCoreForm();
     } catch (error) {
       const message = getRegularizeMutationErrorMessage(
         error,
-        "Não foi possível salvar a licença.",
+        savedLicenseId
+          ? "A licença foi salva, mas não foi possível armazenar o protocolo."
+          : "Não foi possível salvar a licença.",
       );
       toast.error(message);
       throw new Error(message);
+    }
+  }
+
+  async function handleOpenLicenseProtocol() {
+    if (!activeLicenseId) {
+      return;
+    }
+
+    const protocolWindow = window.open("about:blank", "_blank");
+    if (!protocolWindow) {
+      toast.error("Permita pop-ups para abrir o protocolo.");
+      return;
+    }
+    protocolWindow.opener = null;
+
+    try {
+      const access = await licenseProtocolAccessMutation.mutateAsync(activeLicenseId);
+      protocolWindow.location.replace(access.url);
+    } catch (error) {
+      protocolWindow.close();
+      toast.error(
+        getRegularizeMutationErrorMessage(error, "Não foi possível abrir o protocolo."),
+      );
     }
   }
 
@@ -2912,8 +2950,14 @@ export function RegularizePage() {
           activeForm.mode === "edit" &&
           licenseDetailQuery.isLoading
         }
-        isSubmitting={createLicenseMutation.isPending || updateLicenseMutation.isPending}
+        isSubmitting={
+          createLicenseMutation.isPending ||
+          updateLicenseMutation.isPending ||
+          uploadLicenseProtocolMutation.isPending
+        }
+        isOpeningProtocol={licenseProtocolAccessMutation.isPending}
         onClose={closeCoreForm}
+        onOpenProtocol={handleOpenLicenseProtocol}
         onSubmit={handleSubmitLicense}
       />
     </div>

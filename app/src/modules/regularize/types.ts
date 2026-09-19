@@ -570,6 +570,19 @@ export type RegularizeLicenseListItem = {
   type?: string | null;
   due_date?: string | null;
   task_id?: RegularizeId | null;
+  protocol_file?: RegularizeLicenseProtocolMetadata | null;
+};
+
+export type RegularizeLicenseProtocolMetadata = {
+  original_name: string;
+  mime_type: "application/pdf" | "image/jpeg" | "image/png" | "image/webp";
+  size_bytes: number;
+  uploaded_at: string;
+};
+
+export type RegularizeLicenseProtocolAccess = {
+  url: string;
+  expires_in_seconds: number;
 };
 
 export type RegularizeLicenseDetail = RegularizeLicenseListItem & {

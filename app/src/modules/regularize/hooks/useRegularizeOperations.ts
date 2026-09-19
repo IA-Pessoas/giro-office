@@ -24,6 +24,8 @@ import type {
   RegularizeLicenseDetail,
   RegularizeLicenseListFilters,
   RegularizeLicenseListItem,
+  RegularizeLicenseProtocolAccess,
+  RegularizeLicenseProtocolMetadata,
   RegularizeMunicipalTaxesDetail,
   RegularizeMunicipalTaxesListFilters,
   RegularizeMunicipalTaxesPage,
@@ -405,4 +407,27 @@ export function useRegularizeLicenseDetail(
       enabled: Boolean(id) && (options?.enabled ?? true),
     },
   );
+}
+
+export function useUploadRegularizeLicenseProtocolMutation(): UseMutationResult<
+  RegularizeLicenseProtocolMetadata,
+  Error,
+  { id: RegularizeId; file: File }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, file }) => regularizeService.uploadLicenseProtocol(id, file),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useRegularizeLicenseProtocolAccessMutation(): UseMutationResult<
+  RegularizeLicenseProtocolAccess,
+  Error,
+  RegularizeId
+> {
+  return useMutation({
+    mutationFn: (id) => regularizeService.getLicenseProtocolAccess(id),
+  });
 }

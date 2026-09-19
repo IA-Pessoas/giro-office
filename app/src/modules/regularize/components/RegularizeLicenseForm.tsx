@@ -46,6 +46,14 @@ type RegularizeLicenseFormState = {
   task_id: string;
 };
 
+const LICENSE_PROTOCOL_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+const LICENSE_PROTOCOL_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
 function buildLicenseFormState(
   license: RegularizeLicenseDetail | null,
   defaultClientId: string,
@@ -112,21 +120,26 @@ function buildLicensePayload(formState: RegularizeLicenseFormState): CreateRegul
 export function RegularizeLicenseForm({
   defaultClientId,
   isLoadingInitialValue = false,
+  isOpeningProtocol,
   isSubmitting,
   license,
   mode,
   onClose,
+  onOpenProtocol,
   onSubmit,
   open,
 }: {
   defaultClientId: string;
   isLoadingInitialValue?: boolean;
+  isOpeningProtocol: boolean;
   isSubmitting: boolean;
   license: RegularizeLicenseDetail | null;
   mode: "create" | "edit";
   onClose: () => void;
+  onOpenProtocol: () => Promise<void>;
   onSubmit: (
     payload: CreateRegularizeLicensePayload | UpdateRegularizeLicensePayload,
+    protocolFile?: File,
   ) => Promise<void>;
   open: boolean;
 }) {
@@ -134,6 +147,7 @@ export function RegularizeLicenseForm({
     buildLicenseFormState(license, defaultClientId),
   );
   const [formError, setFormError] = useState<string | null>(null);
+  const [protocolFile, setProtocolFile] = useState<File | null>(null);
   const isEditing = mode === "edit";
   const responsibleUsersQuery = useAssignableUsers({ enabled: open, module: "regularize" });
   const responsibleUsers = responsibleUsersQuery.data ?? [];
@@ -145,6 +159,7 @@ export function RegularizeLicenseForm({
     if (open) {
       setFormState(buildLicenseFormState(license, defaultClientId));
       setFormError(null);
+      setProtocolFile(null);
     }
   }, [defaultClientId, license, open]);
 
@@ -156,6 +171,26 @@ export function RegularizeLicenseForm({
       ...current,
       [key]: value,
     }));
+  }
+
+  function handleProtocolFileSelect(file: File | undefined) {
+    if (!file) {
+      setProtocolFile(null);
+      return;
+    }
+    if (file.size > LICENSE_PROTOCOL_MAX_SIZE_BYTES) {
+      setFormError("O protocolo deve ter no máximo 10 MB.");
+      setProtocolFile(null);
+      return;
+    }
+    if (!LICENSE_PROTOCOL_MIME_TYPES.has(file.type)) {
+      setFormError("Selecione um protocolo em PDF, JPG, PNG ou WebP.");
+      setProtocolFile(null);
+      return;
+    }
+
+    setFormError(null);
+    setProtocolFile(file);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -189,12 +224,15 @@ export function RegularizeLicenseForm({
       const payload = buildLicensePayload(formState);
 
       if (isEditing && license) {
-        await onSubmit({
-          ...payload,
-          id: license.id,
-        });
+        await onSubmit(
+          {
+            ...payload,
+            id: license.id,
+          },
+          protocolFile ?? undefined,
+        );
       } else {
-        await onSubmit(payload);
+        await onSubmit(payload, protocolFile ?? undefined);
       }
     } catch (error) {
       setFormError(getRegularizeMutationErrorMessage(error, "Não foi possível salvar a licença."));
@@ -374,6 +412,36 @@ export function RegularizeLicenseForm({
                 onChange={(event) => handleChange("observation", event.target.value)}
                 className={regularizeTextareaClassName}
               />
+            </RegularizeFormField>
+
+            <RegularizeFormField label="Arquivo do protocolo" className="md:col-span-3">
+              <div className="space-y-2">
+                {license?.protocol_file ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900/30">
+                    <span className="min-w-0 truncate text-gray-700 dark:text-slate-200">
+                      {license.protocol_file.original_name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void onOpenProtocol()}
+                      disabled={isOpeningProtocol}
+                      className="font-medium text-blue-600 hover:text-blue-700 disabled:opacity-60 dark:text-blue-400"
+                    >
+                      {isOpeningProtocol ? "Gerando acesso..." : "Abrir protocolo"}
+                    </button>
+                  </div>
+                ) : null}
+                <input
+                  key={`${license?.id ?? "new"}-${open ? "open" : "closed"}`}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                  onChange={(event) => handleProtocolFileSelect(event.target.files?.[0])}
+                  className={regularizeTextFieldClassName}
+                />
+                <p className="text-xs text-gray-500 dark:text-slate-400">
+                  PDF, JPG, PNG ou WebP, até 10 MB. Um novo envio substitui o protocolo vigente.
+                </p>
+              </div>
             </RegularizeFormField>
           </div>
 
