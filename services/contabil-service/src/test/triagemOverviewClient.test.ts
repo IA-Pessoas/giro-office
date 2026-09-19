@@ -60,6 +60,8 @@ describe("TriagemOverviewClient", () => {
     const result = await createClient(fetchImpl).getSummary({
       organizationId: ORGANIZATION_ID,
       userId: USER_ID,
+      permission: 2,
+      modules: { contabil: 2, triagem: 0 },
       clientId: CLIENT_ID,
       competence: COMPETENCE,
       requestId: "request-1156",
@@ -86,8 +88,8 @@ describe("TriagemOverviewClient", () => {
       [INTERNAL_SERVICE_TOKEN_HEADER]: "triagem-internal-token",
       [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
       [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORGANIZATION_ID,
-      [FORWARDED_AUTH_PERMISSION_HEADER]: "1",
-      [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ triagem: 1 }),
+      [FORWARDED_AUTH_PERMISSION_HEADER]: "2",
+      [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify({ contabil: 2, triagem: 0 }),
       [REQUEST_ID_HEADER]: "request-1156",
     });
   });

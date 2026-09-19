@@ -80,6 +80,33 @@ describe("triage document routes", () => {
     expect(deps.getOrCreateMonthly).not.toHaveBeenCalled();
   });
 
+  it("GET /triagem/monthly preserva o mensal e expõe o resumo opcional", async () => {
+    const deps = createMockDeps();
+    vi.mocked(deps.getMonthly).mockResolvedValue({
+      id: MONTHLY_ID,
+      triagem_summary: null,
+    });
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/triagem/monthly")
+      .query({ client_id: CLIENT_ID, competence: "2026-09" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      success: true,
+      data: { id: MONTHLY_ID, triagem_summary: null },
+    });
+    expect(deps.getMonthly).toHaveBeenCalledWith(
+      { client_id: CLIENT_ID, competence: "2026-09" },
+      expect.objectContaining({
+        organizationId: ORG_ID,
+        modules: expect.objectContaining({ contabil: 2, triagem: 0 }),
+      }),
+    );
+  });
+
   it("POST /triagem/monthly cria com o contexto autenticado", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });

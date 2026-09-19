@@ -486,6 +486,8 @@ describe("TriageDocumentsService", () => {
     expect(getSummary).toHaveBeenCalledWith({
       organizationId: ORG_ID,
       userId: USER_ID,
+      permission: undefined,
+      modules: { contabil: 2, triagem: 0 },
       clientId: CLIENT_ID,
       competence: COMPETENCE,
     });
@@ -748,6 +750,55 @@ describe("TriageDocumentsService", () => {
         card_statements: "NOT_APPLICABLE",
       }),
     ).toEqual(expect.objectContaining({ applicable: 3, completed: 1, percentage: 33 }));
+  });
+
+  it("enriquece o mensal com o resumo da Triagem sem perder o contexto", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const overviewClient = {
+      getSummary: vi.fn().mockResolvedValue({
+        version: 1,
+        organization_id: ORG_ID,
+        client_id: CLIENT_ID,
+        legal_name: "Cliente de teste",
+        competence: COMPETENCE,
+        status: "ROUTINE_PENDING",
+      }),
+    };
+
+    const result = await new TriageDocumentsService(
+      prisma,
+      { logUpdateIfChanged: vi.fn() },
+      overviewClient,
+    ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
+
+    expect(result.triagem_summary).toEqual(
+      expect.objectContaining({ client_id: CLIENT_ID, competence: COMPETENCE }),
+    );
+    expect(overviewClient.getSummary).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      permission: undefined,
+      modules: { contabil: 2, triagem: 0 },
+      clientId: CLIENT_ID,
+      competence: COMPETENCE,
+    });
+  });
+
+  it("mantém o mensal local quando a consulta do resumo da Triagem falha", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const overviewClient = {
+      getSummary: vi.fn().mockRejectedValue(new Error("triagem indisponível")),
+    };
+
+    const result = await new TriageDocumentsService(
+      prisma,
+      { logUpdateIfChanged: vi.fn() },
+      overviewClient,
+    ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
+
+    expect(result).toEqual(expect.objectContaining({ id: MONTHLY_ID, triagem_summary: null }));
   });
 
   it("altera um item permitido e audita os valores antes e depois", async () => {

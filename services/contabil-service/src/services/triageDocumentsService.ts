@@ -1,4 +1,4 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { error as logError, warn as logWarn, ServiceError } from "@workspace/shared";
 import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 
 import { type LogUpdateParams, logUpdateIfChanged } from "../integrations/audit.js";
@@ -374,10 +374,24 @@ export class TriageDocumentsService {
       const summaryRequest: TriagemOverviewSummaryRequest = {
         organizationId: auth.organizationId,
         userId: auth.userId,
+        permission: auth.permission,
+        modules: auth.modules,
         clientId: request.client_id,
         competence: request.competence,
       };
-      return { ...result, triagem_summary: await this.overviewClient.getSummary(summaryRequest) };
+      try {
+        return {
+          ...result,
+          triagem_summary: await this.overviewClient.getSummary(summaryRequest),
+        };
+      } catch (error: unknown) {
+        logWarn("Resumo da Triagem indisponível; mantendo resposta mensal local", {
+          err: error,
+          clientId: request.client_id,
+          competence: request.competence,
+        });
+        return { ...result, triagem_summary: null };
+      }
     }
     return result;
   }
