@@ -105,6 +105,128 @@ test("cadastros do smoke usam CNPJs válidos e distintos no mesmo namespace", as
   }
 });
 
+test("smoke do protocolo Regularize executa upload multipart antes do acesso assinado", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "regularize-protocol-smoke-test-"));
+  const licenseId = "b0000000-0000-4000-8000-000000000001";
+  const protocolRequests = [];
+  const server = createServer(async (request, response) => {
+    let rawBody = Buffer.alloc(0);
+    for await (const chunk of request) rawBody = Buffer.concat([rawBody, chunk]);
+    response.setHeader("content-type", "application/json");
+
+    if (request.url === "/user/session") {
+      response.setHeader("set-cookie", ["cw.session=synthetic-session", "cw.csrf=synthetic-csrf"]);
+      response.end(
+        JSON.stringify({
+          success: true,
+          data: { id: "user-test", organization_id: "org-test", permission: 2 },
+        }),
+      );
+      return;
+    }
+
+    if (request.method === "POST" && request.url === "/regularize/license") {
+      assert.match(request.headers.cookie ?? "", /cw\.session=synthetic-session/u);
+      assert.equal(request.headers["x-csrf-token"], "synthetic-csrf");
+      response.statusCode = 201;
+      response.end(JSON.stringify({ success: true, data: { id: licenseId } }));
+      return;
+    }
+
+    if (request.url === `/regularize/license/${licenseId}/protocol`) {
+      const authenticated = /cw\.session=synthetic-session/u.test(request.headers.cookie ?? "");
+      protocolRequests.push({
+        method: request.method,
+        authenticated,
+        contentType: request.headers["content-type"] ?? "",
+        body: rawBody.toString("latin1"),
+      });
+      if (!authenticated) {
+        response.statusCode = 401;
+        response.end(JSON.stringify({ success: false, error: "Não autenticado" }));
+        return;
+      }
+      if (request.method === "POST") {
+        assert.equal(request.headers["x-csrf-token"], "synthetic-csrf");
+        response.statusCode = 201;
+        response.end(
+          JSON.stringify({
+            success: true,
+            data: { original_name: "smoke-license-protocol.png", mime_type: "image/png" },
+          }),
+        );
+        return;
+      }
+      response.end(
+        JSON.stringify({
+          success: true,
+          data: { url: "https://storage.example/signed", expires_in_seconds: 300 },
+        }),
+      );
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end(JSON.stringify({ success: false }));
+  });
+
+  try {
+    for (const name of ["all-services-smoke.mjs", "service-registry.mjs"]) {
+      await copyFile(path.join(repoRoot, "scripts", name), path.join(tempDir, name));
+    }
+    const fixturePath = path.join(tempDir, "smoke-upload.png");
+    await copyFile(path.join(repoRoot, "scripts", "fixtures", "smoke-upload.png"), fixturePath);
+    const operations = manifest.filter((operation) =>
+      operation.action.startsWith("regularizeLicenseProtocol"),
+    );
+    assert.equal(operations.length, 4);
+    await writeFile(
+      path.join(tempDir, "all-services-smoke.manifest.mjs"),
+      `export const manifest = ${JSON.stringify(operations)};`,
+    );
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address();
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      [path.join(tempDir, "all-services-smoke.mjs"), "--fail-fast"],
+      {
+        timeout: 15_000,
+        env: {
+          PATH: process.env.PATH,
+          SYSTEMROOT: process.env.SYSTEMROOT,
+          GATEWAY_URL: `http://127.0.0.1:${port}`,
+          JWT_SECRET: "synthetic-test-secret",
+          LOGIN: "synthetic-user",
+          PASSWORD: "synthetic-password",
+          REGULARIZE_SMOKE_ENABLED: "true",
+          SMOKE_NAMESPACE: "regularize-protocol-regression",
+          SMOKE_TMP_DIR: tempDir,
+          SMOKE_UPLOAD_FIXTURE: fixturePath,
+        },
+      },
+    );
+
+    assert.match(stdout, /Executed\s+: 4/u);
+    assert.deepEqual(
+      protocolRequests.map((entry) => [entry.method, entry.authenticated]),
+      [
+        ["GET", false],
+        ["POST", false],
+        ["POST", true],
+        ["GET", true],
+      ],
+    );
+    for (const request of protocolRequests.filter((entry) => entry.method === "POST")) {
+      assert.match(request.contentType, /^multipart\/form-data; boundary=/u);
+      assert.match(request.body, /name="file"; filename="smoke-license-protocol\.png"/u);
+    }
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("reports smoke atravessa o gateway sem cabeçalhos de identidade forjados", async () => {
   const smoke = await readFile(path.join(repoRoot, "scripts", "all-services-smoke.mjs"), "utf8");
   const handler = smoke.match(/async reportsCatalog\(op\) \{([\s\S]*?)\n {2}\},/);

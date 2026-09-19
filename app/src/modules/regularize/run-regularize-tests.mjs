@@ -396,6 +396,23 @@ await runTest("regularize license protocol uses private upload and on-demand sig
   assert.match(pageSource, /protocolWindow\.location\.replace\(access\.url\)/);
 });
 
+await runTest("regularize license upload failure retries from the persisted license", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const submitStart = pageSource.indexOf("async function handleSubmitLicense");
+  const submitEnd = pageSource.indexOf("async function handleOpenLicenseProtocol", submitStart);
+  const submitSource = pageSource.slice(submitStart, submitEnd);
+
+  assert.match(submitSource, /const isCreateSubmission = !\("id" in payload\)/);
+  assert.match(
+    submitSource,
+    /isCreateSubmission && persistedLicenseId[\s\S]*setActiveForm\(\(currentForm\)[\s\S]*mode: "edit", id: persistedLicenseId/,
+  );
+  assert.ok(
+    submitSource.indexOf("setActiveForm((currentForm)") < submitSource.indexOf("throw new Error(message)"),
+    "o formulário deve mudar para edição antes de devolver o erro do upload",
+  );
+});
+
 await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
   assert.deepEqual(
     buildRegularizeClientPfListParams({

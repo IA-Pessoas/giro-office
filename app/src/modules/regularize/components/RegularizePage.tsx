@@ -1680,6 +1680,7 @@ export function RegularizePage() {
     payload: CreateRegularizeLicensePayload | UpdateRegularizeLicensePayload,
     protocolFile?: File,
   ) {
+    const isCreateSubmission = !("id" in payload);
     let savedLicenseId: RegularizeId | undefined;
     try {
       if ("id" in payload) {
@@ -1699,6 +1700,14 @@ export function RegularizePage() {
 
       closeCoreForm();
     } catch (error) {
+      const persistedLicenseId = savedLicenseId;
+      if (isCreateSubmission && persistedLicenseId) {
+        setActiveForm((currentForm) =>
+          currentForm?.type === "license" && currentForm.mode === "create"
+            ? { type: "license", mode: "edit", id: persistedLicenseId }
+            : currentForm,
+        );
+      }
       const message = getRegularizeMutationErrorMessage(
         error,
         savedLicenseId

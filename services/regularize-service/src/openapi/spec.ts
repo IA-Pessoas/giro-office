@@ -1139,6 +1139,7 @@ export function buildRegularizeServiceOpenApiSpec(
             "201": { description: "Protocolo vigente substituído", ...successEnvelopeContent() },
             ...protectedErrorResponses(),
             "404": { description: "Licença não encontrada" },
+            "413": { description: "Arquivo do protocolo excede 10 MB" },
           },
         },
         get: {

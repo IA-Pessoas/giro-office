@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { GuidanceService } from "../services/guidanceService.js";
+import { LICENSE_PROTOCOL_MAX_SIZE_BYTES } from "../services/licenseProtocolStorage.js";
 import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 import { createTestApp, gatewayHeaders } from "./regularizeTestUtils.js";
 
@@ -430,6 +431,27 @@ describe("regularize remaining routes", () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error).toContain("Formato do protocolo");
+    expect(protocolStorage.upload).not.toHaveBeenCalled();
+  });
+
+  it("POST /regularize/license/:id/protocol retorna 413 acima de 10 MB", async () => {
+    const protocolStorage = {
+      upload: vi.fn(),
+      deleteObject: vi.fn(),
+      createSignedAccessUrl: vi.fn(),
+    };
+    const app = createTestApp({} as PrismaClient, undefined, undefined, protocolStorage as never);
+
+    const response = await request(app)
+      .post("/regularize/license/b0000000-0000-4000-8000-000000000001/protocol")
+      .set(gatewayHeaders())
+      .attach("file", Buffer.alloc(LICENSE_PROTOCOL_MAX_SIZE_BYTES + 1), {
+        filename: "protocolo.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(response.status).toBe(413);
+    expect(response.body.error).toContain("excede o limite de 10 MB");
     expect(protocolStorage.upload).not.toHaveBeenCalled();
   });
 

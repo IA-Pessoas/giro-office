@@ -257,6 +257,7 @@ const state = {
   tiRobotId: "",
   certificatePjId: "",
   certificatePfId: "",
+  regularizeLicenseId: "",
   reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
   reportsJobId: "",
   commercialProposalConfigId: "",
@@ -271,6 +272,8 @@ const actionExecutionRank = {
   // - Adjustment approval sets clock_out and runs calculateDailyHours automatically
   // - After approval, the point is complete so calculate succeeds
   rhPointCalculate: 500,
+  regularizeLicenseProtocolReplace: 7000,
+  regularizeLicenseProtocolAccess: 7001,
   projectDelete: 8000,
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
@@ -849,6 +852,52 @@ async function bootstrapAndLogin() {
   throw new Error(
     `Unable to log in through /user/session. Last failure: ${secondAttempt?.error?.text ?? "unknown"}`,
   );
+}
+
+async function ensureUserSession() {
+  if (state.session) {
+    return state.session;
+  }
+
+  const session = await bootstrapAndLogin();
+  state.session = session;
+  state.bearerToken = createAdminToken(session.permission);
+  state.adminBearerToken =
+    session.permission === WorkspacePermissionLevel.Admin ? state.bearerToken : createAdminToken();
+  state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
+  log("PASS", `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`);
+  return session;
+}
+
+async function ensureRegularizeLicenseId() {
+  if (state.regularizeLicenseId) {
+    return state.regularizeLicenseId;
+  }
+
+  await ensureUserSession();
+  const response = await helperCall("regularize-license-create", {
+    method: "POST",
+    path: "/regularize/license",
+    target: "gateway",
+    service: "regularize-service",
+    auth: "bearer",
+    json: {
+      has: true,
+      type_license: "Alvara",
+      entry_date: new Date().toISOString(),
+      protocol: uniqueText("SMOKE-PROTOCOL"),
+      status: "Em Andamento",
+      current_situation: "Em validação smoke",
+      contact: "Smoke",
+      urgency: "Media",
+      type: "Anual",
+    },
+    expectedStatus: [201],
+  });
+
+  state.regularizeLicenseId =
+    pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+  return requireState("regularizeLicenseId");
 }
 
 function requireState(key) {
@@ -2550,18 +2599,7 @@ const handlers = {
   },
 
   async userSession(_op) {
-    const session = await bootstrapAndLogin();
-    state.session = session;
-    state.bearerToken = createAdminToken(session.permission);
-    state.adminBearerToken =
-      session.permission === WorkspacePermissionLevel.Admin
-        ? state.bearerToken
-        : createAdminToken();
-    state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
-    log(
-      "PASS",
-      `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`,
-    );
+    await ensureUserSession();
   },
 
   async platformSession(op) {
@@ -3222,6 +3260,30 @@ const handlers = {
             fields: body.fields,
             body,
           }),
+    });
+  },
+
+  async regularizeLicenseProtocolReplace(op) {
+    await ensureUserSession();
+    await httpRequest(op, {
+      path: `/regularize/license/${await ensureRegularizeLicenseId()}/protocol`,
+      expectedStatus: [201],
+      form: {
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "smoke-license-protocol.png",
+          contentType: "image/png",
+        },
+      },
+    });
+  },
+
+  async regularizeLicenseProtocolAccess(op) {
+    await ensureUserSession();
+    await httpRequest(op, {
+      path: `/regularize/license/${await ensureRegularizeLicenseId()}/protocol`,
+      expectedStatus: [200],
     });
   },
 

@@ -10,6 +10,7 @@ describe("regularize license protocol OpenAPI", () => {
       post: {
         security: unknown;
         description: string;
+        responses: Record<string, unknown>;
         requestBody: {
           content: {
             "multipart/form-data": {
@@ -24,6 +25,7 @@ describe("regularize license protocol OpenAPI", () => {
     expect(path.get.description).toContain("300 segundos");
     expect(path.post.security).toEqual([{ bearerAuth: [] }]);
     expect(path.post.description).toContain("10 MB");
+    expect(path.post.responses).toHaveProperty("413");
     expect(
       path.post.requestBody.content["multipart/form-data"].schema.properties.file,
     ).toMatchObject({ format: "binary", description: expect.stringContaining("PDF") });
