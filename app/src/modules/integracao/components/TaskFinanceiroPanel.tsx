@@ -11,9 +11,10 @@ interface TaskFinanceiroPanelProps {
   canManage: boolean;
   canView: boolean;
   clientId?: string;
+  onSettled?: () => void | Promise<void>;
 }
 
-export function TaskFinanceiroPanel({ canManage, canView, clientId }: TaskFinanceiroPanelProps) {
+export function TaskFinanceiroPanel({ canManage, canView, clientId, onSettled }: TaskFinanceiroPanelProps) {
   const [departmentId, setDepartmentId] = useState("");
   const [collectorIds, setCollectorIds] = useState<string[]>([]);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
@@ -36,7 +37,7 @@ export function TaskFinanceiroPanel({ canManage, canView, clientId }: TaskFinanc
   );
   const usersQuery = useAssignableUsers({
     enabled: canManage && Boolean(departmentId),
-    module: "integracao",
+    module: "financeiro",
     departmentId: departmentId || undefined,
   });
 
@@ -77,8 +78,24 @@ export function TaskFinanceiroPanel({ canManage, canView, clientId }: TaskFinanc
       toast.success(`${result.settled} tarefa(s) baixada(s).`);
       setSelectedTaskIds([]);
       await queueQuery.refetch();
+      await onSettled?.();
     } catch {
       toast.error("Não foi possível executar a baixa financeira.");
+    } finally {
+      setIsSettling(false);
+    }
+  }
+
+  async function settleOne(taskId: string) {
+    setIsSettling(true);
+    try {
+      const result = await integracaoTasksService.updateFinanceiro(taskId, crypto.randomUUID());
+      toast.success(`${result.settled} tarefa(s) baixada(s).`);
+      setSelectedTaskIds((current) => current.filter((id) => id !== taskId));
+      await queueQuery.refetch();
+      await onSettled?.();
+    } catch {
+      toast.error("Não foi possível atualizar a cobrança financeira.");
     } finally {
       setIsSettling(false);
     }
@@ -151,7 +168,7 @@ export function TaskFinanceiroPanel({ canManage, canView, clientId }: TaskFinanc
           <p className="text-sm text-slate-500">Nenhuma tarefa financeira pendente.</p>
         ) : null}
         {queue.map((task) => (
-          <label key={task.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+          <div key={task.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
             <input
               type="checkbox"
               checked={selectedTaskIds.includes(task.id)}
@@ -159,7 +176,15 @@ export function TaskFinanceiroPanel({ canManage, canView, clientId }: TaskFinanc
             />
             <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{task.name}</span>
             <span className="text-xs text-slate-500">{task.status}</span>
-          </label>
+            <button
+              type="button"
+              onClick={() => void settleOne(task.id)}
+              disabled={isSettling}
+              className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium disabled:opacity-50 dark:border-slate-700"
+            >
+              Baixar
+            </button>
+          </div>
         ))}
       </div>
 

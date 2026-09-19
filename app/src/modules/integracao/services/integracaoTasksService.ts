@@ -52,6 +52,16 @@ export const integracaoTasksService = {
     return unwrapServiceEnvelope(response.data) as string[];
   },
 
+  async updateFinanceiro(taskId: string, idempotencyKey: string): Promise<IntegracaoFinanceiroSettlementResult> {
+    const api = setupAPIClient();
+    const response = await api.put(
+      INTEGRACAO_TASKS_ENDPOINTS.financeiroUpdate,
+      { task_id: taskId },
+      { headers: { "Idempotency-Key": idempotencyKey } },
+    );
+    return unwrapServiceEnvelope(response.data) as IntegracaoFinanceiroSettlementResult;
+  },
+
   async setFinanceiroCollectors(departmentId: string, collectorIds: string[]): Promise<void> {
     const api = setupAPIClient();
     await api.put(INTEGRACAO_TASKS_ENDPOINTS.financeiroCollectors, {

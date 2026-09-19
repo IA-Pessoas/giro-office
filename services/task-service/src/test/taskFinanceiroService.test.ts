@@ -452,4 +452,26 @@ describe("TaskFinanceiroService", () => {
 
     expect(prismaMock.task.updateMany).not.toHaveBeenCalled();
   });
+
+  it("aceita baixa de cobrador com permissão exclusiva do módulo Financeiro", async () => {
+    prismaMock.$transaction.mockImplementation(async (operation) => operation(prismaMock));
+    prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue(null);
+    prismaMock.task.findMany.mockResolvedValue([
+      { id: "task-1", department_id: "department-1", charge_financeiro: true },
+    ]);
+    prismaMock.departmentCollector.findFirst.mockResolvedValue({ id: "assignment-1" });
+    prismaMock.task.updateMany.mockResolvedValue({ count: 1 });
+    const service = new TaskFinanceiroService();
+
+    await expect(
+      service.settle({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_ids: ["task-1"],
+        idempotency_key: "financeiro-only-key",
+        integracao_level: 0,
+        financeiro_level: 1,
+      }),
+    ).resolves.toEqual({ task_ids: ["task-1"], settled: 1 });
+  });
 });
