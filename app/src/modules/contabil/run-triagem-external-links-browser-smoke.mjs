@@ -23,6 +23,13 @@ const user = {
   type: "admin",
   modules: { triagem: 2, contabil: 2 },
 };
+const triageOverviewFixture = {
+  items: [],
+  total: 0,
+  page: 1,
+  page_size: 20,
+  indicators: { urgent_open: 0, routine_pending: 0, bank_pending: 0, complete: 0 },
+};
 
 function json(route, data, status = 200) {
   return route.fulfill({
@@ -72,6 +79,9 @@ async function runBrowserProof() {
     const body = request.postDataJSON?.();
     requests.push({ method: request.method(), path: apiPath, body });
     if (request.method() === "GET" && apiPath === "/user/me") return json(route, user);
+    if (request.method() === "GET" && apiPath === "/triagem/overview") {
+      return json(route, triageOverviewFixture);
+    }
     if (request.method() === "GET" && apiPath === "/client/list") {
       return json(route, {
         items: [{ id: clientId, name: "Cliente Demonstração", company_name: "Cliente Demonstração" }],
