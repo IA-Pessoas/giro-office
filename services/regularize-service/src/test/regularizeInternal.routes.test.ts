@@ -63,7 +63,7 @@ describe("regularize internal routes", () => {
 
     const response = await request(app)
       .post("/internal/reconciliation/run")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, "internal-token")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, regularizeTestEnv.internalServiceToken)
       .send({});
 
     expect(response.status).toBe(200);
@@ -86,7 +86,7 @@ describe("regularize internal routes", () => {
 
     const response = await request(app)
       .post("/internal/reconciliation/license-notifications/run")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, "internal-token")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, regularizeTestEnv.internalServiceToken)
       .send({});
 
     expect(response.status).toBe(200);
@@ -109,7 +109,7 @@ describe("regularize internal routes", () => {
 
     const response = await request(app)
       .post("/internal/reconciliation/client-pf-status/run")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, "internal-token")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, regularizeTestEnv.internalServiceToken)
       .send({});
 
     expect(response.status).toBe(200);
@@ -132,7 +132,7 @@ describe("regularize internal routes", () => {
 
     const response = await request(app)
       .post("/internal/reconciliation/client-pf-documents/run")
-      .set(INTERNAL_SERVICE_TOKEN_HEADER, "internal-token")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, regularizeTestEnv.internalServiceToken)
       .send({});
 
     expect(response.status).toBe(200);

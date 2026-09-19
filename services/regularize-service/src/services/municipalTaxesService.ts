@@ -124,6 +124,8 @@ export class MunicipalTaxesService {
       throw new ServiceError(404, "Tributo municipal nao encontrado.");
     }
 
+    await this.ensureClientExists(input.organizationId, input.body.client_id);
+
     const updated = await this.prisma.municipalTaxes.update({
       where: { id: input.body.id },
       data: {

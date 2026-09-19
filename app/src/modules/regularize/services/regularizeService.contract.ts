@@ -26,15 +26,20 @@ export const REGULARIZE_ENDPOINTS = {
   municipalTaxesDetail: "/regularize/municipal-taxes-detail",
   processes: "/regularize/processes",
   process: "/regularize/process",
+  sendToFiscal: "/regularize/process/send-to-fiscal",
+  returnFromFiscal: "/regularize/process/return-from-fiscal",
   guidanceList: "/regularize/guidance/list",
   guidanceDetail: "/regularize/guidance/detail",
   guidance: "/regularize/guidance",
   guidanceActivityAdd: "/regularize/guidance/activity/add",
   guidanceActivityRemove: "/regularize/guidance/activity/remove",
+  guidanceActivity: "/regularize/guidance/activity",
   guidancePartnerAdd: "/regularize/guidance/partner/add",
   guidancePartnerRemove: "/regularize/guidance/partner/remove",
+  guidancePartner: "/regularize/guidance/partner",
   licenses: "/regularize/licenses",
   license: "/regularize/license",
+  licenseProtocol: (id: RegularizeId) => `/regularize/license/${id}/protocol`,
 } as const;
 
 export function buildRegularizeDashboardParams(year: number) {
@@ -108,7 +113,8 @@ export function buildRegularizeProcessListParams(filters: RegularizeProcessListF
 
 export function buildRegularizeGuidanceListParams(filters: RegularizeGuidanceListFilters) {
   return {
-    process_id: filters.process_id,
+    ...(filters.process_id ? { process_id: filters.process_id } : {}),
+    ...(filters.target_type ? { target_type: filters.target_type } : {}),
   };
 }
 

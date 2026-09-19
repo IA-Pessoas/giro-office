@@ -37,6 +37,24 @@ describe("commercial-service gateway registry", () => {
   });
 });
 
+describe("regularize-service gateway registry", () => {
+  it("encaminha contexto confiável e a permissão específica do módulo", () => {
+    const env = {
+      regularizeServiceUrl: "http://regularize-service:3039",
+      auditServiceToken: "gateway-audit-token",
+      regularizeServiceInternalToken: "gateway-regularize-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/regularize/processes", "GET")).toMatchObject({
+      key: "regularize-service",
+      targetUrl: "http://regularize-service:3039",
+      internalServiceToken: "gateway-regularize-token",
+      permissionModule: "regularize",
+      routePrefixes: ["/regularize"],
+    });
+  });
+});
+
 describe("triagem gateway registry", () => {
   it("encaminha triagem ao serviço novo sem reduzir a autorização ao módulo Contábil", () => {
     const env = {

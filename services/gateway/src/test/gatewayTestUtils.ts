@@ -71,6 +71,7 @@ export function createTestEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     contabilServiceUrl: "http://127.0.0.1:3038",
     triagemServiceUrl: "http://127.0.0.1:3046",
     regularizeServiceUrl: "http://127.0.0.1:3039",
+    regularizeServiceInternalToken: "regularize-service-internal-token",
     tiServiceUrl: "http://127.0.0.1:3040",
     tiServiceInternalToken: "ti-service-token",
     certificateServiceUrl: "http://127.0.0.1:3041",

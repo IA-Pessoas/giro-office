@@ -1,4 +1,11 @@
+import { error as logError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import {
+  getLicenseDueDateBounds,
+  getLicenseNotificationDateRange,
+} from "../schemas/status.schemas.js";
+
+const UNDATED_NOTIFICATION_REFERENCE_DATE = new Date("1970-01-01T00:00:00.000Z");
 
 export class RegularizeReconciliationService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -108,6 +115,7 @@ export class RegularizeReconciliationService {
             regardingId: client.id,
             title,
             message,
+            referenceDate: UNDATED_NOTIFICATION_REFERENCE_DATE,
           });
           created += inserted ? 1 : 0;
         }
@@ -122,6 +130,7 @@ export class RegularizeReconciliationService {
             regardingId: client.id,
             title,
             message,
+            referenceDate: UNDATED_NOTIFICATION_REFERENCE_DATE,
           });
           created += inserted ? 1 : 0;
         }
@@ -205,13 +214,16 @@ export class RegularizeReconciliationService {
     regardingId: string;
     title: string;
     message: string;
+    referenceDate: Date;
   }): Promise<boolean> {
     const exists = await this.prisma.regularizeNotification.findFirst({
       where: {
         organization_id: input.organizationId,
         user_id: input.userId,
+        regarding: input.regarding,
         regarding_id: input.regardingId,
         title: input.title,
+        reference_date: input.referenceDate,
       },
       select: { id: true },
     });
@@ -220,16 +232,25 @@ export class RegularizeReconciliationService {
       return false;
     }
 
-    await this.prisma.regularizeNotification.create({
-      data: {
-        organization_id: input.organizationId,
-        user_id: input.userId,
-        regarding: input.regarding,
-        regarding_id: input.regardingId,
-        title: input.title,
-        message: input.message,
-      },
-    });
+    try {
+      await this.prisma.regularizeNotification.create({
+        data: {
+          organization_id: input.organizationId,
+          user_id: input.userId,
+          regarding: input.regarding,
+          regarding_id: input.regardingId,
+          title: input.title,
+          message: input.message,
+          reference_date: input.referenceDate,
+        },
+      });
+    } catch (error) {
+      logError("Falha ao criar notificacao do Regularize", { error });
+      if (isUniqueConstraintError(error)) {
+        return false;
+      }
+      throw error;
+    }
 
     return true;
   }
@@ -241,20 +262,14 @@ export class RegularizeReconciliationService {
     },
     managerCache?: Map<string, string[]>,
   ): Promise<{ created: number }> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const thirtyDaysFromNow = new Date(today);
-    thirtyDaysFromNow.setDate(today.getDate() + 30);
+    const today = getLicenseDueDateBounds().today;
+    const notificationDateRange = getLicenseNotificationDateRange(today);
 
     const licenses = await this.prisma.license.findMany({
       where: {
         ...(params?.organizationId ? { organization_id: params.organizationId } : {}),
         ...(params?.licenseId ? { id: params.licenseId } : {}),
-        due_date: {
-          not: null,
-          lte: thirtyDaysFromNow,
-        },
+        due_date: notificationDateRange,
         client: {
           status: "Ativo",
         },
@@ -263,6 +278,7 @@ export class RegularizeReconciliationService {
         client: {
           select: {
             name: true,
+            organization_id: true,
           },
         },
       },
@@ -271,20 +287,22 @@ export class RegularizeReconciliationService {
     let created = 0;
 
     for (const license of licenses) {
+      if (
+        !license.due_date ||
+        !license.client ||
+        license.client.organization_id !== license.organization_id
+      ) {
+        continue;
+      }
+
       const managers = await this.getRegularizeManagerUserIds(
         license.organization_id,
         managerCache,
       );
-      if (!license.due_date || !license.client) {
-        continue;
-      }
 
-      const isExpired = license.due_date < today;
-      const title = `${isExpired ? "ALVARA VENCIDO" : "ALVARA A VENCER"}: ${license.type_license}`;
-      const dateStr = license.due_date.toLocaleDateString("pt-BR");
-      const message = isExpired
-        ? `O alvara do cliente ${license.client.name} venceu em ${dateStr}.`
-        : `O alvara do cliente ${license.client.name} vence em ${Math.ceil((license.due_date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))} dias (${dateStr}).`;
+      const title = `ALVARA A VENCER: ${license.type_license}`;
+      const dateStr = license.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+      const message = `O alvara do cliente ${license.client.name} vence em ${dateStr}.`;
 
       for (const userId of managers) {
         const inserted = await this.createNotificationIfMissing({
@@ -294,6 +312,7 @@ export class RegularizeReconciliationService {
           regardingId: license.id,
           title,
           message,
+          referenceDate: today,
         });
         created += inserted ? 1 : 0;
       }
@@ -301,4 +320,8 @@ export class RegularizeReconciliationService {
 
     return { created };
   }
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return error !== null && typeof error === "object" && "code" in error && error.code === "P2002";
 }

@@ -86,6 +86,22 @@ describe("regularize password routes", () => {
     expect(response.body.data.password).toBe("password");
   });
 
+  it("GET /regularize/password rejects users without reveal permission", async () => {
+    const findFirst = vi.fn();
+    const prisma = {
+      passwordRegularize: { findFirst },
+    } as unknown as PrismaClient;
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .get("/regularize/password")
+      .set(gatewayHeaders({ permission: 1 }))
+      .query({ id: "f0000000-0000-4000-8000-000000000001" });
+
+    expect(response.status).toBe(403);
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
   it("GET /regularize/password returns 422 for legacy invalid encrypted payload", async () => {
     const prisma = {
       passwordRegularize: {

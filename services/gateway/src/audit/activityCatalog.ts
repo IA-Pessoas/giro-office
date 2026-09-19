@@ -604,6 +604,34 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "adicionou", item: "uma atividade à orientação de regularização" },
   },
   {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/guidance\/activity$/,
+    description: { action: "atualizou", item: "uma atividade da orientação de regularização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/process\/send-to-fiscal$/,
+    description: { action: "enviou", item: "um processo de regularização ao Fiscal" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/process\/return-from-fiscal$/,
+    description: {
+      action: "registrou",
+      item: "o retorno de um processo de regularização do Fiscal",
+    },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/license\/[^/]+\/protocol$/,
+    description: { action: "baixou", item: "o protocolo de uma licença" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/license\/[^/]+\/protocol$/,
+    description: { action: "enviou", item: "o protocolo de uma licença" },
+  },
+  {
     methods: ["POST", "DELETE"],
     pattern: /^\/regularize\/guidance\/activity\/remove$/,
     description: { action: "removeu", item: "uma atividade da orientação de regularização" },
@@ -612,6 +640,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/regularize\/guidance\/partner\/add$/,
     description: { action: "adicionou", item: "um sócio à orientação de regularização" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/guidance\/partner$/,
+    description: { action: "atualizou", item: "um sócio da orientação de regularização" },
   },
   {
     methods: ["POST", "DELETE"],

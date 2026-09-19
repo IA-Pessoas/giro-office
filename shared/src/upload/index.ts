@@ -4,4 +4,7 @@ export {
   validateUploadFileSignature,
 } from "./file-signature.js";
 export type { PhotoUploadOptions } from "./multer-photo.js";
-export { createPhotoUploadMiddleware } from "./multer-photo.js";
+export {
+  createMemoryUploadMiddleware,
+  createPhotoUploadMiddleware,
+} from "./multer-photo.js";

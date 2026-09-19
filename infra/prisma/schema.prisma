@@ -576,11 +576,13 @@ model RegularizeNotification {
   regarding_id    String
   title           String
   message         String
+  reference_date  DateTime     @default(now())
   read            Boolean      @default(false)
   create_at       DateTime     @default(now())
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
 
+  @@unique([organization_id, user_id, regarding, regarding_id, title, reference_date], map: "uq_regularize_notification_identity")
   @@map("notification.regularize")
 }
 
@@ -736,6 +738,7 @@ model Client {
   partners                      Partners[]
   passRegularize                PasswordRegularize[]
   process                       Process[]
+  proceduralGuidances           ProceduralGuidance[]       @relation("proceduralGuidanceClientPJ")
   triageConfigs                 TriageConfig[]
   triageMonthlys                TriageMonthly[]
   responsiblesTriage            TriageResponsible[]
@@ -895,6 +898,7 @@ model ClientPF {
   organization         Organization @relation(fields: [organization_id], references: [id])
   partners             Partners[]
   process              Process[]
+  proceduralGuidances  ProceduralGuidance[] @relation("proceduralGuidanceClientPF")
 
   @@map("clients.pf")
 }
@@ -2005,28 +2009,36 @@ model PasswordRegularize {
 }
 
 model License {
-  id                     String       @id @default(uuid())
-  client_id              String?
-  has                    Boolean
-  type_license           String
-  entry_date             DateTime
-  protocol               String
-  responsible_id         String?
-  status                 String
-  date_last_consultation DateTime?
-  current_situation      String
-  contact                String
-  observation            String?
-  urgency                String
-  type                   String
-  due_date               DateTime?
-  task_id                String?
-  organization_id        String
-  client                 Client?      @relation(fields: [client_id], references: [id])
-  organization           Organization @relation(fields: [organization_id], references: [id])
-  responsible            User?        @relation(fields: [responsible_id], references: [id])
-  task                   Task?        @relation(fields: [task_id], references: [id])
+  id                                String       @id @default(uuid())
+  client_id                         String?
+  has                               Boolean
+  type_license                      String
+  entry_date                        DateTime
+  protocol                          String
+  responsible_id                    String?
+  status                            String
+  date_last_consultation            DateTime?
+  current_situation                 String
+  contact                           String
+  observation                       String?
+  urgency                           String
+  type                              String
+  due_date                          DateTime?
+  task_id                           String?
+  organization_id                   String
+  protocol_file_path                String?
+  protocol_file_original_name       String?
+  protocol_file_mime_type           String?
+  protocol_file_size_bytes          Int?
+  protocol_file_uploaded_at         DateTime?
+  protocol_file_uploaded_by_user_id String?
+  client                            Client?      @relation(fields: [client_id], references: [id])
+  organization                      Organization @relation(fields: [organization_id], references: [id])
+  responsible                       User?        @relation(fields: [responsible_id], references: [id])
+  task                              Task?        @relation(fields: [task_id], references: [id])
 
+  @@index([organization_id, due_date], map: "idx_regularize_license_org_due_date")
+  @@index([organization_id, status], map: "idx_regularize_license_org_status")
   @@map("regularize.license")
 }
 
@@ -2040,7 +2052,9 @@ model Process {
   entry_date      DateTime?
   completion_date DateTime?
   expected_date   DateTime?
+  client_notice_date DateTime?
   status          String
+  financial_status String            @default("Pendente")
   observation     String?
   responsible1_id String?
   responsible2_id String?
@@ -2063,7 +2077,7 @@ model Process {
 
 model ProceduralGuidance {
   id                   String       @id @default(uuid())
-  process_id           String
+  process_id           String?
   type                 String?
   request              String?
   framework_obs        String?
@@ -2081,11 +2095,34 @@ model ProceduralGuidance {
   status               String
   economic_activities  Json?
   partners             Json?
+  target_type          String
+  client_pj_id         String?
+  client_pf_id         String?
+  target_snapshot      Json
+  branch_data          Json?
   organization_id      String
+  checklist_items      ProceduralGuidanceChecklistItem[]
+  clientPJ             Client?      @relation("proceduralGuidanceClientPJ", fields: [client_pj_id], references: [id])
+  clientPF             ClientPF?    @relation("proceduralGuidanceClientPF", fields: [client_pf_id], references: [id])
   organization         Organization @relation(fields: [organization_id], references: [id])
-  process              Process      @relation(fields: [process_id], references: [id])
+  process              Process?     @relation(fields: [process_id], references: [id])
 
   @@map("regularize.proceduralGuidances")
+}
+
+model ProceduralGuidanceChecklistItem {
+  id          String             @id @default(uuid())
+  guidance_id String
+  code        String
+  label       String
+  status      String
+  observation String?
+  created_at  DateTime           @default(now())
+  updated_at  DateTime           @updatedAt
+  guidance    ProceduralGuidance @relation(fields: [guidance_id], references: [id], onDelete: Cascade)
+
+  @@unique([guidance_id, code])
+  @@map("regularize.proceduralGuidanceChecklistItems")
 }
 
 model Partners {

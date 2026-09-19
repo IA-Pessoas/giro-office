@@ -1,11 +1,32 @@
 import "./envBootstrap.js";
 
+import { REGULARIZE_GUIDANCE_CHECKLIST_ITEMS, ServiceError } from "@workspace/shared";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { GuidanceService } from "../services/guidanceService.js";
+import { LICENSE_PROTOCOL_MAX_SIZE_BYTES } from "../services/licenseProtocolStorage.js";
 import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 import { createTestApp, gatewayHeaders } from "./regularizeTestUtils.js";
+
+const guidancePayload = {
+  target_type: "SEM_CLIENTE" as const,
+  target_snapshot: { version: 1 as const, source: "manual" as const, name: "Interessado" },
+  checklist: REGULARIZE_GUIDANCE_CHECKLIST_ITEMS.map(({ code }) => ({
+    code,
+    status: "Pendente" as const,
+  })),
+  status: "Em andamento" as const,
+};
+
+const completeGuidance = {
+  id: "d0000000-0000-4000-8000-000000000001",
+  process_id: null,
+  ...guidancePayload,
+  checklist_items: guidancePayload.checklist,
+  branch_data: null,
+};
 
 describe("regularize remaining routes", () => {
   afterEach(() => {
@@ -36,6 +57,8 @@ describe("regularize remaining routes", () => {
     ["GET", "/regularize/process"],
     ["POST", "/regularize/process"],
     ["PUT", "/regularize/process"],
+    ["POST", "/regularize/process/send-to-fiscal"],
+    ["POST", "/regularize/process/return-from-fiscal"],
     ["GET", "/regularize/processes"],
     ["POST", "/regularize/guidance"],
     ["PUT", "/regularize/guidance"],
@@ -43,12 +66,16 @@ describe("regularize remaining routes", () => {
     ["GET", "/regularize/guidance/list"],
     ["POST", "/regularize/guidance/activity/add"],
     ["POST", "/regularize/guidance/activity/remove"],
+    ["PUT", "/regularize/guidance/activity"],
     ["POST", "/regularize/guidance/partner/add"],
     ["POST", "/regularize/guidance/partner/remove"],
+    ["PUT", "/regularize/guidance/partner"],
     ["GET", "/regularize/license"],
     ["POST", "/regularize/license"],
     ["PUT", "/regularize/license"],
     ["GET", "/regularize/licenses"],
+    ["GET", "/regularize/license/b0000000-0000-4000-8000-000000000001/protocol"],
+    ["POST", "/regularize/license/b0000000-0000-4000-8000-000000000001/protocol"],
   ])("%s %s without auth returns 401", async (method, path) => {
     const app = createTestApp();
 
@@ -103,6 +130,54 @@ describe("regularize remaining routes", () => {
     expect(response.body.success).toBe(true);
   });
 
+  it("PUT guidance item routes validate and delegate activity and partner updates", async () => {
+    const updated = { ...completeGuidance, economic_activities: [], partners: [] };
+    const activitySpy = vi
+      .spyOn(GuidanceService.prototype, "updateEconomicActivity")
+      .mockResolvedValue(updated);
+    const partnerSpy = vi
+      .spyOn(GuidanceService.prototype, "updatePartner")
+      .mockResolvedValue(updated);
+    const app = createTestApp();
+    const guidanceId = "d0000000-0000-4000-8000-000000000001";
+    const itemId = "d0000000-0000-4000-8000-000000000002";
+
+    const activityResponse = await request(app)
+      .put("/regularize/guidance/activity")
+      .set(gatewayHeaders())
+      .send({
+        guidance_id: guidanceId,
+        activity: { id: itemId, code: "6201", description: "Serviço", type: "Principal" },
+      });
+    const partnerResponse = await request(app)
+      .put("/regularize/guidance/partner")
+      .set(gatewayHeaders())
+      .send({
+        guidance_id: guidanceId,
+        partner: {
+          id: itemId,
+          name: "Sócio",
+          cpf: "12345678901",
+          percentage: 50,
+          profession: "Diretor",
+          marital_status: "Casado",
+          rg: "12",
+          cnh: "34",
+          address: "Rua A",
+          role: "Administrador",
+        },
+      });
+
+    expect(activityResponse.status).toBe(200);
+    expect(partnerResponse.status).toBe(200);
+    expect(activitySpy).toHaveBeenCalledWith(
+      expect.objectContaining({ guidanceId, organizationId: expect.any(String) }),
+    );
+    expect(partnerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ guidanceId, organizationId: expect.any(String) }),
+    );
+  });
+
   it("POST /regularize/process creates a process", async () => {
     const prisma = {
       process: {
@@ -114,11 +189,11 @@ describe("regularize remaining routes", () => {
           cpf_cnpj: "12345678901",
           process_type: "Abertura",
           description: "Descricao",
-          status: "Aberto",
+          status: "Andamento",
         })),
       },
       client: {
-        findFirst: vi.fn(async () => ({ id: "client-1" })),
+        findFirst: vi.fn(async () => ({ id: "client-1", cpf_cnpj: "12345678901" })),
       },
       clientPF: {
         findFirst: vi.fn(async () => null),
@@ -128,6 +203,8 @@ describe("regularize remaining routes", () => {
       },
     } as unknown as PrismaClient;
 
+    prisma.$transaction = vi.fn(async (callback) => callback(prisma));
+
     const app = createTestApp(prisma);
 
     const response = await request(app).post("/regularize/process").set(gatewayHeaders()).send({
@@ -135,39 +212,161 @@ describe("regularize remaining routes", () => {
       cpf_cnpj: "12345678901",
       process_type: "Abertura",
       description: "Descricao",
-      status: "Aberto",
+      status: "Andamento",
     });
 
     expect(response.status).toBe(201);
     expect(response.body.success).toBe(true);
   });
 
-  it("POST /regularize/guidance creates a procedural guidance", async () => {
-    const prisma = {
-      process: {
-        findFirst: vi.fn(async () => ({ id: "process-1" })),
-      },
-      proceduralGuidance: {
-        create: vi.fn(async () => ({
-          id: "guidance-1",
-          process_id: "d0000000-0000-4000-8000-000000000001",
-          status: "Em andamento",
-        })),
-      },
-      logs: {
-        create: vi.fn(async () => ({})),
-      },
-    } as unknown as PrismaClient;
+  it("POST /regularize/guidance cria orientação independente e retorna os 17 itens", async () => {
+    vi.spyOn(GuidanceService.prototype, "create").mockResolvedValue(completeGuidance);
+    const app = createTestApp();
 
-    const app = createTestApp(prisma);
-
-    const response = await request(app).post("/regularize/guidance").set(gatewayHeaders()).send({
-      process_id: "d0000000-0000-4000-8000-000000000001",
-      status: "Em andamento",
-    });
+    const response = await request(app)
+      .post("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send(guidancePayload);
 
     expect(response.status).toBe(201);
-    expect(response.body.success).toBe(true);
+    expect(response.body).toMatchObject({ success: true, data: completeGuidance });
+    expect(response.body.data.checklist_items).toHaveLength(17);
+  });
+
+  it("PUT /regularize/guidance mantém 200 e retorna orientação completa", async () => {
+    vi.spyOn(GuidanceService.prototype, "update").mockResolvedValue(completeGuidance);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .put("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send({ id: completeGuidance.id, ...guidancePayload });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, data: completeGuidance });
+    expect(response.body.data.checklist_items).toHaveLength(17);
+  });
+
+  it("GET /regularize/guidance/list encaminha undefined quando process_id está ausente", async () => {
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app).get("/regularize/guidance/list").set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([completeGuidance]);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      undefined,
+      undefined,
+    );
+  });
+
+  it("GET /regularize/guidance/list preserva o filtro process_id", async () => {
+    const processId = "d0000000-0000-4000-8000-000000000002";
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/regularize/guidance/list")
+      .query({ process_id: processId })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      processId,
+      undefined,
+    );
+  });
+
+  it("GET /regularize/guidance/list trata process_id nulo como ausência de filtro", async () => {
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/regularize/guidance/list")
+      .query({ process_id: null })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      undefined,
+      undefined,
+    );
+  });
+
+  it("GET /regularize/guidance/list encaminha target_type sem perder o isolamento", async () => {
+    const listByProcess = vi
+      .spyOn(GuidanceService.prototype, "listByProcess")
+      .mockResolvedValue([completeGuidance]);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .get("/regularize/guidance/list")
+      .query({ target_type: "PF" })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(listByProcess).toHaveBeenCalledWith(
+      "a0000000-0000-4000-8000-000000000001",
+      undefined,
+      "PF",
+    );
+  });
+
+  it("POST /regularize/guidance rejeita chaves extras no snapshot", async () => {
+    vi.spyOn(GuidanceService.prototype, "create").mockResolvedValue(completeGuidance);
+    const app = createTestApp();
+
+    const response = await request(app)
+      .post("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send({
+        ...guidancePayload,
+        target_snapshot: { ...guidancePayload.target_snapshot, custom_note: "fora do contrato" },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("custom_note");
+    expect(GuidanceService.prototype.create).not.toHaveBeenCalled();
+  });
+
+  it("POST /regularize/guidance rejeita dados de filial sem checklist concluído", async () => {
+    const app = createTestApp();
+
+    const response = await request(app)
+      .post("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send({
+        ...guidancePayload,
+        branch_data: { name: "Filial", address: "Rua A", city: "Salvador", state: "BA" },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("branch_data");
+  });
+
+  it("POST /regularize/guidance preserva o conflito de domínio", async () => {
+    vi.spyOn(GuidanceService.prototype, "create").mockRejectedValue(
+      new ServiceError(409, "Ja existe orientacao em andamento para este processo."),
+    );
+    const app = createTestApp();
+
+    const response = await request(app)
+      .post("/regularize/guidance")
+      .set(gatewayHeaders())
+      .send(guidancePayload);
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toBe("Ja existe orientacao em andamento para este processo.");
   });
 
   it("POST /regularize/license creates a license", async () => {
@@ -188,7 +387,7 @@ describe("regularize remaining routes", () => {
           type_license: "Alvara",
           entry_date: new Date("2025-01-01"),
           protocol: "PROTO-1",
-          status: "Ativo",
+          status: "Em Andamento",
           current_situation: "Regular",
           contact: "Contato",
           urgency: "Media",
@@ -209,7 +408,7 @@ describe("regularize remaining routes", () => {
       type_license: "Alvara",
       entry_date: "2025-01-01",
       protocol: "PROTO-1",
-      status: "Ativo",
+      status: "Em Andamento",
       current_situation: "Regular",
       contact: "Contato",
       urgency: "Media",
@@ -223,5 +422,114 @@ describe("regularize remaining routes", () => {
       "a0000000-0000-4000-8000-000000000001",
       "license-1",
     );
+  });
+
+  it("POST /regularize/license/:id/protocol substitui o protocolo sem expor a chave", async () => {
+    const licenseId = "b0000000-0000-4000-8000-000000000001";
+    const objectPath = `regularize/organizations/a0000000-0000-4000-8000-000000000001/licenses/${licenseId}/protocols/10000000-0000-4000-8000-000000000001.pdf`;
+    const transaction = {
+      license: { updateMany: vi.fn(async () => ({ count: 1 })) },
+      logs: { create: vi.fn(async () => ({})) },
+    };
+    const prisma = {
+      license: {
+        findFirst: vi.fn(async () => ({ id: licenseId, protocol_file_path: null })),
+      },
+      $transaction: vi.fn(async (operation: (tx: typeof transaction) => Promise<void>) =>
+        operation(transaction),
+      ),
+    } as unknown as PrismaClient;
+    const protocolStorage = {
+      upload: vi.fn(async () => objectPath),
+      deleteObject: vi.fn(async () => undefined),
+      createSignedAccessUrl: vi.fn(),
+    };
+    const app = createTestApp(prisma, undefined, undefined, protocolStorage as never);
+
+    const response = await request(app)
+      .post(`/regularize/license/${licenseId}/protocol`)
+      .set(gatewayHeaders())
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "protocolo.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toMatchObject({
+      original_name: "protocolo.pdf",
+      mime_type: "application/pdf",
+    });
+    expect(response.body.data).not.toHaveProperty("path");
+    expect(response.body.data).not.toHaveProperty("url");
+  });
+
+  it("POST /regularize/license/:id/protocol rejeita formato não permitido", async () => {
+    const protocolStorage = {
+      upload: vi.fn(),
+      deleteObject: vi.fn(),
+      createSignedAccessUrl: vi.fn(),
+    };
+    const app = createTestApp({} as PrismaClient, undefined, undefined, protocolStorage as never);
+
+    const response = await request(app)
+      .post("/regularize/license/b0000000-0000-4000-8000-000000000001/protocol")
+      .set(gatewayHeaders())
+      .attach("file", Buffer.from("executable"), {
+        filename: "protocolo.exe",
+        contentType: "application/octet-stream",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("Formato do protocolo");
+    expect(protocolStorage.upload).not.toHaveBeenCalled();
+  });
+
+  it("POST /regularize/license/:id/protocol retorna 413 acima de 10 MB", async () => {
+    const protocolStorage = {
+      upload: vi.fn(),
+      deleteObject: vi.fn(),
+      createSignedAccessUrl: vi.fn(),
+    };
+    const app = createTestApp({} as PrismaClient, undefined, undefined, protocolStorage as never);
+
+    const response = await request(app)
+      .post("/regularize/license/b0000000-0000-4000-8000-000000000001/protocol")
+      .set(gatewayHeaders())
+      .attach("file", Buffer.alloc(LICENSE_PROTOCOL_MAX_SIZE_BYTES + 1), {
+        filename: "protocolo.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(response.status).toBe(413);
+    expect(response.body.error).toContain("excede o limite de 10 MB");
+    expect(protocolStorage.upload).not.toHaveBeenCalled();
+  });
+
+  it("GET /regularize/license/:id/protocol retorna somente URL assinada curta", async () => {
+    const licenseId = "b0000000-0000-4000-8000-000000000001";
+    const objectPath = `regularize/organizations/a0000000-0000-4000-8000-000000000001/licenses/${licenseId}/protocols/10000000-0000-4000-8000-000000000001.pdf`;
+    const prisma = {
+      license: {
+        findFirst: vi.fn(async () => ({ protocol_file_path: objectPath })),
+      },
+    } as unknown as PrismaClient;
+    const protocolStorage = {
+      upload: vi.fn(),
+      deleteObject: vi.fn(),
+      createSignedAccessUrl: vi.fn(async () => "https://storage.example/signed?token=short"),
+    };
+    const app = createTestApp(prisma, undefined, undefined, protocolStorage as never);
+
+    const response = await request(app)
+      .get(`/regularize/license/${licenseId}/protocol`)
+      .set(gatewayHeaders({ permission: 1 }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body.data).toEqual({
+      url: "https://storage.example/signed?token=short",
+      expires_in_seconds: 300,
+    });
+    expect(JSON.stringify(response.body)).not.toContain(objectPath);
   });
 });

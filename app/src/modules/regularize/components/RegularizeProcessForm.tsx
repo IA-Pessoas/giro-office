@@ -4,6 +4,7 @@ import { Dialog } from "@shared/components";
 import { formatCpfCnpjInput, normalizeDigits } from "@shared/utils/inputFormatting";
 import { ClientSelectionField } from "@modules/clients";
 import { useIntegracaoTasksList } from "@modules/integracao";
+import { useAssignableUsers } from "@modules/rh";
 
 import type {
   CreateRegularizeProcessPayload,
@@ -23,6 +24,7 @@ import {
   RegularizeFormError,
   RegularizeFormField,
   getRegularizePresetOptions,
+  regularizeFinancialStatusOptions,
   regularizeProcessStatusOptions,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
@@ -43,7 +45,12 @@ type RegularizeProcessFormState = {
   completion_date: string;
   expected_date: string;
   status: string;
+  financial_status: string;
+  client_notice_date: string;
   observation: string;
+  responsible1_id: string;
+  responsible2_id: string;
+  responsible3_id: string;
   locking_type: string;
   urgency: string;
   task_id: string;
@@ -63,8 +70,13 @@ function buildProcessFormState(
       entry_date: "",
       completion_date: "",
       expected_date: "",
-      status: "Aberto",
+      status: "Pendente",
+      financial_status: "Pendente",
+      client_notice_date: "",
       observation: "",
+      responsible1_id: "",
+      responsible2_id: "",
+      responsible3_id: "",
       locking_type: "",
       urgency: "",
       task_id: "",
@@ -82,8 +94,13 @@ function buildProcessFormState(
     entry_date: toRegularizeInputDate(process.entry_date),
     completion_date: toRegularizeInputDate(process.completion_date),
     expected_date: toRegularizeInputDate(process.expected_date),
-    status: process.status ?? "Aberto",
+    status: process.status ?? "Pendente",
+    financial_status: process.financial_status ?? "Pendente",
+    client_notice_date: toRegularizeInputDate(process.client_notice_date),
     observation: process.observation ?? "",
+    responsible1_id: process.responsible1_id ?? "",
+    responsible2_id: process.responsible2_id ?? "",
+    responsible3_id: process.responsible3_id ?? "",
     locking_type: process.locking_type ?? "",
     urgency: process.urgency ?? "",
     task_id: process.task_id ?? "",
@@ -102,13 +119,27 @@ function buildProcessPayload(formState: RegularizeProcessFormState): CreateRegul
     entry_date: formState.entry_date || undefined,
     completion_date: formState.completion_date || undefined,
     expected_date: formState.expected_date || undefined,
+    client_notice_date: formState.client_notice_date || null,
     status: trimRegularizeText(formState.status),
+    financial_status: formState.financial_status as Exclude<
+      CreateRegularizeProcessPayload["financial_status"],
+      undefined
+    >,
     observation: trimRegularizeNullableText(formState.observation),
+    responsible1_id: trimRegularizeOptionalUuid(formState.responsible1_id),
+    responsible2_id: trimRegularizeOptionalUuid(formState.responsible2_id),
+    responsible3_id: trimRegularizeOptionalUuid(formState.responsible3_id),
     locking_type: trimRegularizeNullableText(formState.locking_type),
     urgency: trimRegularizeNullableText(formState.urgency),
     task_id: trimRegularizeOptionalUuid(formState.task_id),
   };
 }
+
+const responsibleFields = [
+  { key: "responsible1_id", label: "Responsável 1" },
+  { key: "responsible2_id", label: "Responsável 2" },
+  { key: "responsible3_id", label: "Responsável 3" },
+] as const;
 
 export function RegularizeProcessForm({
   defaultClientId,
@@ -136,6 +167,8 @@ export function RegularizeProcessForm({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [taskSearch, setTaskSearch] = useState("");
+  const responsibleUsersQuery = useAssignableUsers({ enabled: open, module: "regularize" });
+  const responsibleUsers = responsibleUsersQuery.data ?? [];
   const isEditing = mode === "edit";
   const tasksQuery = useIntegracaoTasksList(
     { status: "Todos", limit: 100, search: taskSearch },
@@ -211,6 +244,15 @@ export function RegularizeProcessForm({
       !formState.status.trim()
     ) {
       setFormError("Preencha os campos obrigatórios.");
+      return;
+    }
+
+    if (
+      !regularizeFinancialStatusOptions.includes(
+        formState.financial_status as (typeof regularizeFinancialStatusOptions)[number],
+      )
+    ) {
+      setFormError("Escolha um status financeiro reconhecido antes de salvar.");
       return;
     }
 
@@ -312,6 +354,36 @@ export function RegularizeProcessForm({
               </RegularizeNativeSelect>
             </RegularizeFormField>
 
+            <RegularizeFormField label="Status financeiro" required>
+              <RegularizeNativeSelect
+                value={formState.financial_status}
+                onChange={(event) =>
+                  handleChange(
+                    "financial_status",
+                    event.target.value as RegularizeProcessFormState["financial_status"],
+                  )
+                }
+              >
+                {getRegularizePresetOptions(
+                  regularizeFinancialStatusOptions,
+                  formState.financial_status,
+                ).map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </RegularizeFormField>
+
+            <RegularizeFormField label="Aviso ao cliente">
+              <input
+                type="date"
+                value={formState.client_notice_date}
+                onChange={(event) => handleChange("client_notice_date", event.target.value)}
+                className={regularizeTextFieldClassName}
+              />
+            </RegularizeFormField>
+
             <RegularizeFormField label="Entrada">
               <input
                 type="date"
@@ -354,6 +426,43 @@ export function RegularizeProcessForm({
                 )}
               </RegularizeNativeSelect>
             </RegularizeFormField>
+
+            {responsibleFields.map((field) => {
+              const selectedResponsibleId = formState[field.key];
+              const hasSelectedResponsible = responsibleUsers.some(
+                (user) => user.id === selectedResponsibleId,
+              );
+
+              return (
+                <RegularizeFormField key={field.key} label={field.label}>
+                  <RegularizeNativeSelect
+                    value={selectedResponsibleId}
+                    onChange={(event) => handleChange(field.key, event.target.value)}
+                    disabled={
+                      isSubmitting ||
+                      responsibleUsersQuery.isLoading ||
+                      Boolean(responsibleUsersQuery.error)
+                    }
+                  >
+                    <option value="">
+                      {responsibleUsersQuery.isLoading
+                        ? "Carregando responsáveis"
+                        : responsibleUsersQuery.error
+                          ? "Responsáveis indisponíveis"
+                          : "Sem responsável"}
+                    </option>
+                    {selectedResponsibleId && !hasSelectedResponsible ? (
+                      <option value={selectedResponsibleId}>Responsável atual</option>
+                    ) : null}
+                    {responsibleUsers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name}
+                      </option>
+                    ))}
+                  </RegularizeNativeSelect>
+                </RegularizeFormField>
+              );
+            })}
 
             <RegularizeFormField label="Tipo de bloqueio">
               <input
