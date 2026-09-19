@@ -18,6 +18,11 @@ const clientId = "11111111-1111-4111-8111-111111111111";
 const secondClientId = "22222222-2222-4222-8222-222222222222";
 const externalClientId = "33333333-3333-4333-8333-333333333333";
 const missingClientId = "44444444-4444-4444-8444-444444444444";
+const financeScreenshotPath =
+  process.env.TASKS_FINANCEIRO_SCREENSHOT_PATH ?? "output/playwright/issue-301-finance-task.png";
+const financeMobileScreenshotPath =
+  process.env.TASKS_FINANCEIRO_MOBILE_SCREENSHOT_PATH ??
+  "output/playwright/issue-301-finance-task-mobile.png";
 
 const smokeUser = {
   id: "user-task-smoke",
@@ -88,8 +93,18 @@ async function installApiMocks(
   updateTaskRequests,
   responsibleOptionsRequests,
   regularizeLinkRequests,
+  financeSettlementRequests,
 ) {
   let currentLegacyTaskDetail = { ...legacyTaskDetail };
+  let financeQueue = [
+    {
+      id: "task-finance-pending",
+      name: "Tarefa financeira pendente",
+      client_id: clientId,
+      department_id: "department-one",
+      status: "Em andamento",
+    },
+  ];
   await page.route("**/user/me", (route) =>
     route.fulfill({
       status: 200,
@@ -192,6 +207,43 @@ async function installApiMocks(
       },
     }),
   );
+  await page.route("**/rh/operational-users*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: {
+        success: true,
+        data: [{ id: smokeUser.id, name: smokeUser.name, status: "Ativo" }],
+      },
+    }),
+  );
+  await page.route(/\/task\/financeiro\/queue(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: financeQueue },
+    }),
+  );
+  await page.route(/\/task\/financeiro\/collectors(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: [] },
+    }),
+  );
+  await page.route(/\/task\/financeiro\/settle$/, (route) => {
+    const request = route.request();
+    if (request.method() !== "POST") return route.continue();
+    const body = request.postDataJSON();
+    financeSettlementRequests.push({ method: request.method(), body });
+    const taskIds = body.task_ids;
+    financeQueue = financeQueue.filter((item) => !taskIds.includes(item.id));
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: { task_ids: taskIds, settled: taskIds.length } },
+    });
+  });
   await page.route("**/task/model/list*", (route) =>
     route.fulfill({
       status: 200,
@@ -448,6 +500,7 @@ async function runBrowserProof() {
   const updateTaskRequests = [];
   const responsibleOptionsRequests = [];
   const regularizeLinkRequests = [];
+  const financeSettlementRequests = [];
   await installApiMocks(
     page,
     taskListRequests,
@@ -456,12 +509,27 @@ async function runBrowserProof() {
     updateTaskRequests,
     responsibleOptionsRequests,
     regularizeLinkRequests,
+    financeSettlementRequests,
   );
 
   try {
     await page.goto(`/tasks?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Tarefas", level: 1 })).toBeVisible();
     await expect(page.getByText("Tarefa sem responsável", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Fila financeira", level: 2 })).toBeVisible();
+    await expect(page.getByText("Tarefa financeira pendente", { exact: true })).toBeVisible();
+    await page.screenshot({ path: financeScreenshotPath, fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: financeMobileScreenshotPath, fullPage: true });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const financeRow = page.getByText("Tarefa financeira pendente", { exact: true }).locator("..");
+    await financeRow.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Baixar selecionadas (1)" }).click();
+    await expect(page.getByText("1 tarefa(s) baixada(s).", { exact: true })).toBeVisible();
+    await expect(page.getByText("Nenhuma tarefa financeira pendente.", { exact: true })).toBeVisible();
+    assert.deepEqual(financeSettlementRequests, [
+      { method: "POST", body: { task_ids: ["task-finance-pending"] } },
+    ]);
     await expect(page.getByRole("cell", { name: "Sem responsável", exact: true })).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Cliente Filtro.*00\.000\.000\/0001-00/ }),
