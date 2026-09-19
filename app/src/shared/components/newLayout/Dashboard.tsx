@@ -66,10 +66,6 @@ const ACTIVITY_TONE_CLASSES: Record<DashboardStats["activities"][number]["tone"]
 };
 
 function formatCurrency(value: number): string {
-  if (value >= 1000) {
-    return `R$ ${Math.round(value / 1000)}k`;
-  }
-
   return value.toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -94,20 +90,88 @@ function buildProjectsData(projects: DashboardProjectStats) {
   ];
 }
 
-function getEmptyRevenueData(): DashboardStats["revenue"]["monthly"] {
-  return ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul"].map((month) => ({
-    month,
-    revenue: 0,
-    expenses: 0,
-  }));
-}
-
 function getEmptyPerformanceData(): DashboardStats["performance"] {
   return ["Sem 1", "Sem 2", "Sem 3", "Sem 4"].map((week) => ({
     week,
     tasks: 0,
     completed: 0,
   }));
+}
+
+function getEmptyFinancialSummary(): DashboardStats["financial"] {
+  return {
+    paidCertificateReceipts: 0,
+    unpaidCertificates: 0,
+    monthlyPaidCertificateReceipts: [],
+  };
+}
+
+function hasDashboardData(stats: DashboardStats): boolean {
+  return Boolean(
+    stats.totalClients > 0 ||
+      stats.tasks.today > 0 ||
+      stats.tasks.completedToday > 0 ||
+      stats.tasks.pending > 0 ||
+      stats.tasks.urgent > 0 ||
+      stats.projects.active > 0 ||
+      stats.projects.completed > 0 ||
+      stats.projects.inProgress > 0 ||
+      stats.projects.delayed > 0 ||
+      stats.projects.waiting > 0 ||
+      (stats.financial?.paidCertificateReceipts ?? 0) > 0 ||
+      (stats.financial?.unpaidCertificates ?? 0) > 0 ||
+      (stats.financial?.monthlyPaidCertificateReceipts ?? []).some((item) => item.amount > 0) ||
+      (stats.commercial?.activeProspects ?? 0) > 0 ||
+      (stats.commercial?.closedThisMonth ?? 0) > 0 ||
+      (stats.commercial?.byStatus ?? []).some((item) => item.count > 0) ||
+      (stats.commercial?.billing.pending ?? 0) > 0 ||
+      (stats.commercial?.billing.contracted ?? 0) > 0 ||
+      (stats.commercial?.billing.notContracted ?? 0) > 0 ||
+      (stats.departments ?? []).some(
+        (department) =>
+          department.openTasks > 0 || department.completedTasks > 0 || department.urgentTasks > 0,
+      ) ||
+      stats.notifications.total > 0 ||
+      stats.notifications.urgent > 0 ||
+      stats.notifications.pending > 0 ||
+      stats.performance.some((item) => item.tasks > 0 || item.completed > 0) ||
+      stats.pendingTasks.length > 0 ||
+      stats.recentClients.length > 0 ||
+      stats.activities.length > 0,
+  );
+}
+
+function DashboardStatePanel({
+  title,
+  description,
+  action,
+  role,
+}: {
+  title: string;
+  description: string;
+  action?: { label: string; onClick: () => void };
+  role?: "alert" | "status";
+}) {
+  return (
+    <section
+      role={role}
+      className="mx-auto flex min-h-[24rem] max-w-2xl items-center justify-center rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800"
+    >
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{description}</p>
+        {action ? (
+          <button
+            type="button"
+            onClick={action.onClick}
+            className="mt-5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            {action.label}
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
 }
 
 function formatLastUpdated(updatedAt: string | null | undefined): string {
@@ -129,20 +193,63 @@ function formatLastUpdated(updatedAt: string | null | undefined): string {
 }
 
 export function Dashboard() {
-  const { stats, isLoading, error, refetch } = useDashboard();
+  const { stats, isLoading, isFetching, error, refetch } = useDashboard();
   const activityNow = useActivityClock();
   const lastUpdated = formatLastUpdated(stats?.updatedAt);
+
+  if (isLoading && !stats) {
+    return (
+      <DashboardStatePanel
+        role="status"
+        title="Carregando dashboard"
+        description="Buscando os indicadores reais da organização."
+      />
+    );
+  }
+
+  if (error && !stats) {
+    return (
+      <DashboardStatePanel
+        role="alert"
+        title="Não foi possível carregar o dashboard"
+        description="Tente novamente para consultar os indicadores atuais."
+        action={{ label: "Tentar novamente", onClick: () => void refetch() }}
+      />
+    );
+  }
+
+  if (!stats) {
+    return (
+      <DashboardStatePanel
+        title="Nenhum dado disponível"
+        description="Ainda não existem indicadores para esta organização."
+      />
+    );
+  }
+
+  if (!hasDashboardData(stats)) {
+    return (
+      <DashboardStatePanel
+        title="Nenhum indicador disponível"
+        description="Os módulos ainda não possuem dados suficientes para compor a visão gerencial."
+      />
+    );
+  }
+
   const tasksSummary = stats?.tasks ?? {
     today: 0,
     completedToday: 0,
     pending: 0,
     urgent: 0,
   };
-  const revenueSummary = stats?.revenue ?? {
-    currentMonth: 0,
-    target: 0,
-    monthly: getEmptyRevenueData(),
+  const financialSummary = stats.financial ?? getEmptyFinancialSummary();
+  const commercialSummary = stats.commercial ?? {
+    activeProspects: 0,
+    closedThisMonth: 0,
+    byStatus: [],
+    billing: { pending: 0, contracted: 0, notContracted: 0 },
   };
+  const departmentSummary = stats.departments ?? [];
   const notificationSummary = stats?.notifications ?? {
     total: 0,
     urgent: 0,
@@ -156,10 +263,12 @@ export function Dashboard() {
     waiting: 0,
   };
   const taskCompletionPercent = getPercent(tasksSummary.completedToday, tasksSummary.today);
-  const revenuePercent = getPercent(revenueSummary.currentMonth, revenueSummary.target);
   const projectCompletionRate = getPercent(projectSummary.completed, projectSummary.completed + projectSummary.active);
   const tasks = stats?.pendingTasks ?? [];
-  const revenueData = revenueSummary.monthly;
+  const receiptsData = financialSummary.monthlyPaidCertificateReceipts.map(({ month, amount }) => ({
+    month,
+    amount,
+  }));
   const projectsData = buildProjectsData(projectSummary);
   const performanceData = stats?.performance ?? getEmptyPerformanceData();
   const activities: DashboardActivity[] = (stats?.activities ?? []).map((activity) => ({
@@ -180,6 +289,7 @@ export function Dashboard() {
           <p className="text-sm font-semibold text-gray-900 dark:text-white">
             {lastUpdated}
           </p>
+          {isFetching ? <p className="text-xs text-blue-600 dark:text-blue-400">Atualizando...</p> : null}
         </div>
       </div>
 
@@ -223,19 +333,15 @@ export function Dashboard() {
             </div>
             <div className="min-w-0">
               <p className="text-2xl font-bold leading-tight whitespace-nowrap text-gray-900 dark:text-white">
-                {formatCurrency(revenueSummary.currentMonth)}
+                {formatCurrency(financialSummary.paidCertificateReceipts)}
               </p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Receita Mês</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Recebimentos no mês</p>
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-gray-600 dark:text-gray-400">Meta: {formatCurrency(revenueSummary.target)}</p>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full"
-                style={{ width: `${revenuePercent}%` }}
-              />
-            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Certificados sem pagamento: {financialSummary.unpaidCertificates}
+            </p>
           </div>
         </div>
 
@@ -293,13 +399,15 @@ export function Dashboard() {
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                Receitas vs Despesas
+                Recebimentos de certificados
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Últimos 7 meses</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Valores pagos nos últimos 7 meses
+              </p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={revenueData}>
+            <AreaChart data={receiptsData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
               <XAxis dataKey="month" stroke="#9ca3af" style={{ fontSize: "12px" }} />
               <YAxis stroke="#9ca3af" style={{ fontSize: "12px" }} />
@@ -313,18 +421,11 @@ export function Dashboard() {
               />
               <Area
                 type="monotone"
-                dataKey="revenue"
+                dataKey="amount"
                 stackId="1"
+                name="Recebimentos pagos"
                 stroke="#10b981"
                 fill="#10b981"
-                fillOpacity={0.6}
-              />
-              <Area
-                type="monotone"
-                dataKey="expenses"
-                stackId="2"
-                stroke="#ef4444"
-                fill="#ef4444"
                 fillOpacity={0.6}
               />
             </AreaChart>
@@ -373,6 +474,80 @@ export function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800" aria-labelledby="dashboard-commercial-title">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <h2 id="dashboard-commercial-title" className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+                <Target className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                Pipeline comercial
+              </h2>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Prospecções e cobranças registradas no Comercial.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg bg-purple-50 p-3 dark:bg-purple-900/20">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{commercialSummary.activeProspects}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Prospecções ativas</p>
+            </div>
+            <div className="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{commercialSummary.closedThisMonth}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Fechadas no mês</p>
+            </div>
+            <div className="rounded-lg bg-orange-50 p-3 dark:bg-orange-900/20">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{commercialSummary.billing.pending}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Cobranças a realizar</p>
+            </div>
+          </div>
+          <div className="mt-5 space-y-2">
+            {commercialSummary.byStatus.filter((item) => item.count > 0).length > 0 ? (
+              commercialSummary.byStatus.filter((item) => item.count > 0).map((item) => (
+                <div key={item.status} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700 dark:text-gray-300">{item.status}</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{item.count}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma prospecção classificada.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800" aria-labelledby="dashboard-departments-title">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <h2 id="dashboard-departments-title" className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                Indicadores por departamento
+              </h2>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Tarefas abertas, concluídas e urgentes por departamento.
+              </p>
+            </div>
+          </div>
+          {departmentSummary.length > 0 ? (
+            <div className="space-y-3">
+              {departmentSummary.map((department) => (
+                <div key={department.id} className="rounded-lg border border-gray-100 p-3 dark:border-gray-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">{department.name}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{department.openTasks} abertas</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    <span>Concluídas: {department.completedTasks}</span>
+                    <span>Urgentes: {department.urgentTasks}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Nenhum departamento com dados de tarefas.</p>
+          )}
+        </section>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

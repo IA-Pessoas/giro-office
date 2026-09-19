@@ -68,9 +68,22 @@ runTest("dashboard hook keeps cached data isolated and refreshes it in the backg
 });
 
 runTest("dashboard distinguishes loading, retry and an empty activity feed", () => {
+  assert.match(dashboardComponent, /Carregando dashboard/);
+  assert.match(dashboardComponent, /Não foi possível carregar o dashboard/);
+  assert.match(dashboardComponent, /Nenhum indicador disponível/);
   assert.match(dashboardComponent, /Carregando atividades/);
   assert.match(dashboardComponent, /Tentar novamente/);
   assert.match(dashboardComponent, /Nenhuma atividade recente/);
+});
+
+runTest("dashboard documents real financial, commercial and department indicators", () => {
+  assert.match(dashboardTypes, /paidCertificateReceipts/);
+  assert.match(dashboardTypes, /activeProspects/);
+  assert.match(dashboardTypes, /DashboardDepartmentSummary/);
+  assert.match(dashboardComponent, /Recebimentos de certificados/);
+  assert.match(dashboardComponent, /Pipeline comercial/);
+  assert.match(dashboardComponent, /Indicadores por departamento/);
+  assert.doesNotMatch(dashboardComponent, /Receitas vs Despesas/);
 });
 
 runTest("dashboard derives activity time from createdAt and a local clock", () => {
