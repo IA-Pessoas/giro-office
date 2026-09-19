@@ -1207,6 +1207,18 @@ it("returns real dashboard stats for the authenticated organization", async () =
         { status: "Atrasada", count: 0 },
       ],
     },
+    financial: {
+      paidCertificateReceipts: 0,
+      unpaidCertificates: 0,
+      monthlyPaidCertificateReceipts: [],
+    },
+    commercial: {
+      activeProspects: 0,
+      closedThisMonth: 0,
+      byStatus: [],
+      billing: { pending: 0, contracted: 0, notContracted: 0 },
+    },
+    departments: [],
     recentClients: [],
     insights: [],
     tasks: {
@@ -1226,11 +1238,6 @@ it("returns real dashboard stats for the authenticated organization", async () =
       inProgress: 283,
       delayed: 283,
       waiting: 47,
-    },
-    revenue: {
-      currentMonth: 0,
-      target: 0,
-      monthly: [{ month: "Jul", revenue: 0, expenses: 0 }],
     },
     performance: [{ week: "Sem 1", tasks: 10, completed: 5 }],
     pendingTasks: [],
@@ -1255,13 +1262,13 @@ it("returns real dashboard stats for the authenticated organization", async () =
     });
     const body = (await response.json()) as {
       success?: boolean;
-      data?: { totalClients?: number; revenue?: { currentMonth?: number } };
+      data?: { totalClients?: number; financial?: { paidCertificateReceipts?: number } };
     };
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.data?.totalClients).toBe(1146);
-    expect(body.data?.revenue?.currentMonth).toBe(0);
+    expect(body.data?.financial?.paidCertificateReceipts).toBe(0);
     expect(getStats).toHaveBeenCalledWith("org-dashboard");
   } finally {
     await stopServer(server);
