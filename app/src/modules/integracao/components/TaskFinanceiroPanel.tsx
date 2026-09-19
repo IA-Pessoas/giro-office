@@ -171,6 +171,7 @@ export function TaskFinanceiroPanel({ canManage, canView, clientId, onSettled }:
           <div key={task.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
             <input
               type="checkbox"
+              aria-label={`Selecionar ${task.name}`}
               checked={selectedTaskIds.includes(task.id)}
               onChange={() => toggleTask(task.id)}
             />
