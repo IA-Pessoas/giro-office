@@ -5,6 +5,7 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
+import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
@@ -13,7 +14,6 @@ import "express-async-errors";
 
 import type { OrganizationEnv } from "./config/env.js";
 import { createOrganizationAudit } from "./integrations/audit.js";
-import { requestContext } from "./middlewares/requestContext.js";
 import { buildOrganizationServiceOpenApiSpec } from "./openapi/spec.js";
 import organizationRoutes from "./routes/organization.routes.js";
 import { createPlatformOrganizationRoutes } from "./routes/platformOrganization.routes.js";

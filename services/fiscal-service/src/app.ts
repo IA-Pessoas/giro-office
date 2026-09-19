@@ -4,6 +4,7 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
+import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
@@ -12,7 +13,6 @@ import "express-async-errors";
 
 import type { FiscalServiceEnv } from "./config/env.js";
 import prismaClient from "./integrations/prisma.js";
-import { requestContext } from "./middlewares/requestContext.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
 import {

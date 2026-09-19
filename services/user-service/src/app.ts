@@ -5,6 +5,7 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
+import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
@@ -14,7 +15,6 @@ import "express-async-errors";
 import type { UserServiceEnv } from "./config/env.js";
 import type { UserAuditRecorder } from "./integrations/audit.js";
 import { isAuthenticated } from "./middlewares/isAuthenticated.js";
-import { requestContext } from "./middlewares/requestContext.js";
 import { buildUserServiceOpenApiSpec } from "./openapi/spec.js";
 import { createAuthRoutes } from "./routes/auth.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
