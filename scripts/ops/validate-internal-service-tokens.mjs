@@ -28,7 +28,9 @@ const contabil = readEnv(path.join(envRoot, ".env.vps.contabil-service"));
 const triagem = readEnv(path.join(envRoot, ".env.vps.triagem-service"));
 const gatewayToken = gateway.AUDIT_SERVICE_TOKEN;
 const contabilToken =
-  contabil.TRIAGEM_INTERNAL_TOKEN || contabil.INTERNAL_SERVICE_TOKEN || contabil.AUDIT_SERVICE_TOKEN;
+  contabil.TRIAGEM_INTERNAL_TOKEN ||
+  contabil.INTERNAL_SERVICE_TOKEN ||
+  contabil.AUDIT_SERVICE_TOKEN;
 const triagemToken = triagem.INTERNAL_SERVICE_TOKEN || triagem.AUDIT_SERVICE_TOKEN;
 
 if (!gatewayToken) {
