@@ -4,6 +4,7 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLicenseBody } from "../schemas/license.schemas.js";
 import { listLicensesQuerySchema } from "../schemas/license.schemas.js";
 import { getLicenseDueDateBounds } from "../schemas/status.schemas.js";
+import type { LicenseProtocolStorage } from "../services/licenseProtocolStorage.js";
 import { LicenseService } from "../services/licenseService.js";
 
 describe("LicenseService", () => {
@@ -34,10 +35,12 @@ describe("LicenseService", () => {
     expect(findMany).toHaveBeenNthCalledWith(1, {
       where: { organization_id: "org-1" },
       orderBy: { entry_date: "desc" },
+      select: expect.any(Object),
     });
     expect(findMany).toHaveBeenNthCalledWith(2, {
       where: { organization_id: "org-1", status: "Ativo" },
       orderBy: { entry_date: "desc" },
+      select: expect.any(Object),
     });
 
     expect(listLicensesQuerySchema.safeParse({ status: "Desconhecido" }).success).toBe(false);
@@ -64,6 +67,7 @@ describe("LicenseService", () => {
       orderBy: { entry_date: "desc" },
       skip: 10,
       take: 10,
+      select: expect.any(Object),
     });
     expect(count).toHaveBeenCalledWith({
       where: { organization_id: "org-1", status: "Ativo" },
@@ -106,6 +110,7 @@ describe("LicenseService", () => {
         orderBy: { entry_date: "desc" },
         skip: 0,
         take: 20,
+        select: expect.any(Object),
       });
       expect(count).toHaveBeenCalledWith({ where: expectedWhere });
     } finally {
@@ -153,5 +158,145 @@ describe("LicenseService", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("ativa o novo protocolo no banco antes de remover o anterior e audita só metadados", async () => {
+    const events: string[] = [];
+    const oldPath =
+      "regularize/organizations/org-1/licenses/license-1/protocols/10000000-0000-4000-8000-000000000001.pdf";
+    const newPath =
+      "regularize/organizations/org-1/licenses/license-1/protocols/20000000-0000-4000-8000-000000000002.pdf";
+    const logsCreate = vi.fn(async () => {
+      events.push("audit");
+      return {};
+    });
+    const transaction = {
+      license: {
+        updateMany: vi.fn(async () => {
+          events.push("db");
+          return { count: 1 };
+        }),
+      },
+      logs: { create: logsCreate },
+    };
+    const prisma = {
+      license: {
+        findFirst: vi.fn(async () => ({ id: "license-1", protocol_file_path: oldPath })),
+      },
+      $transaction: vi.fn(async (operation: (tx: typeof transaction) => Promise<void>) =>
+        operation(transaction),
+      ),
+    } as unknown as PrismaClient;
+    const storage = {
+      upload: vi.fn(async () => {
+        events.push("upload");
+        return newPath;
+      }),
+      deleteObject: vi.fn(async (objectPath: string) => {
+        events.push(`delete:${objectPath}`);
+      }),
+      createSignedAccessUrl: vi.fn(),
+    } as unknown as LicenseProtocolStorage;
+    const service = new LicenseService(prisma, {} as never, storage);
+
+    const result = await service.replaceProtocol({
+      organizationId: "org-1",
+      userId: "user-1",
+      licenseId: "license-1",
+      file: {
+        buffer: Buffer.from("%PDF-1.7"),
+        mimetype: "application/pdf",
+        originalname: "protocolo.pdf",
+        size: 8,
+      },
+    });
+
+    expect(events).toEqual(["upload", "db", "audit", `delete:${oldPath}`]);
+    expect(result).toMatchObject({
+      original_name: "protocolo.pdf",
+      mime_type: "application/pdf",
+      size_bytes: 8,
+    });
+    expect(result).not.toHaveProperty("path");
+    expect(logsCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "Substituição de protocolo",
+        changes: {
+          had_previous_protocol: true,
+          mime_type: "application/pdf",
+          size_bytes: 8,
+        },
+      }),
+    });
+  });
+
+  it("limpa o arquivo novo e preserva o anterior quando a transação falha", async () => {
+    const oldPath =
+      "regularize/organizations/org-1/licenses/license-1/protocols/10000000-0000-4000-8000-000000000001.pdf";
+    const newPath =
+      "regularize/organizations/org-1/licenses/license-1/protocols/20000000-0000-4000-8000-000000000002.pdf";
+    const prisma = {
+      license: {
+        findFirst: vi.fn(async () => ({ id: "license-1", protocol_file_path: oldPath })),
+      },
+      $transaction: vi.fn(async () => {
+        throw new Error("database unavailable");
+      }),
+    } as unknown as PrismaClient;
+    const storage = {
+      upload: vi.fn(async () => newPath),
+      deleteObject: vi.fn(async () => undefined),
+      createSignedAccessUrl: vi.fn(),
+    } as unknown as LicenseProtocolStorage;
+    const service = new LicenseService(prisma, {} as never, storage);
+
+    await expect(
+      service.replaceProtocol({
+        organizationId: "org-1",
+        userId: "user-1",
+        licenseId: "license-1",
+        file: {
+          buffer: Buffer.from("%PDF-1.7"),
+          mimetype: "application/pdf",
+          originalname: "protocolo.pdf",
+          size: 8,
+        },
+      }),
+    ).rejects.toThrow("database unavailable");
+
+    expect(storage.deleteObject).toHaveBeenCalledTimes(1);
+    expect(storage.deleteObject).toHaveBeenCalledWith(newPath);
+    expect(storage.deleteObject).not.toHaveBeenCalledWith(oldPath);
+  });
+
+  it("gera acesso assinado apenas para a licença da organização", async () => {
+    const objectPath =
+      "regularize/organizations/org-1/licenses/license-1/protocols/10000000-0000-4000-8000-000000000001.pdf";
+    const findFirst = vi
+      .fn()
+      .mockResolvedValueOnce({ protocol_file_path: objectPath })
+      .mockResolvedValueOnce(null);
+    const prisma = { license: { findFirst } } as unknown as PrismaClient;
+    const storage = {
+      upload: vi.fn(),
+      deleteObject: vi.fn(),
+      createSignedAccessUrl: vi.fn(async () => "https://storage.example/signed"),
+    } as unknown as LicenseProtocolStorage;
+    const service = new LicenseService(prisma, {} as never, storage);
+
+    await expect(
+      service.createProtocolAccess({ organizationId: "org-1", licenseId: "license-1" }),
+    ).resolves.toEqual({
+      url: "https://storage.example/signed",
+      expires_in_seconds: 300,
+    });
+    await expect(
+      service.createProtocolAccess({ organizationId: "org-2", licenseId: "license-1" }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(findFirst).toHaveBeenLastCalledWith({
+      where: { id: "license-1", organization_id: "org-2" },
+      select: { protocol_file_path: true },
+    });
+    expect(storage.createSignedAccessUrl).toHaveBeenCalledTimes(1);
   });
 });

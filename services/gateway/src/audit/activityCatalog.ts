@@ -617,6 +617,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/regularize\/license\/[^/]+\/protocol$/,
+    description: { action: "baixou", item: "o protocolo de uma licença" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/license\/[^/]+\/protocol$/,
+    description: { action: "enviou", item: "o protocolo de uma licença" },
+  },
+  {
     methods: ["POST", "DELETE"],
     pattern: /^\/regularize\/guidance\/activity\/remove$/,
     description: { action: "removeu", item: "uma atividade da orientação de regularização" },

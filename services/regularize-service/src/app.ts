@@ -7,6 +7,7 @@ import {
 import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import { mountOpenApiDocs } from "@workspace/shared/openapi";
+import { createSupabaseServiceClient } from "@workspace/shared/storage";
 import cors from "cors";
 import express, { type Request } from "express";
 import "express-async-errors";
@@ -21,6 +22,10 @@ import {
 import { createRegularizeRoutes } from "./routes/index.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createRegularizeInternalRoutes } from "./routes/regularizeInternal.routes.js";
+import {
+  type LicenseProtocolStorage,
+  SupabaseLicenseProtocolStorage,
+} from "./services/licenseProtocolStorage.js";
 import type { RegularizeReconciliationService } from "./services/regularizeReconciliationService.js";
 
 export function regularizeServiceErrorLogContext(request: Request): Record<string, unknown> {
@@ -59,6 +64,7 @@ export interface CreateAppOptions {
   runClientPfDocumentsReconciliation: () => Promise<Record<string, unknown>>;
   internalReportingService?: RegularizeLicenseReportingService;
   municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService;
+  protocolStorage?: LicenseProtocolStorage;
 }
 
 export function createApp({
@@ -72,8 +78,15 @@ export function createApp({
   runClientPfDocumentsReconciliation,
   internalReportingService: injectedInternalReportingService,
   municipalTaxesReportingService: injectedMunicipalTaxesReportingService,
+  protocolStorage,
 }: CreateAppOptions): express.Express {
   const app = express();
+  const licenseProtocolStorage =
+    protocolStorage ??
+    new SupabaseLicenseProtocolStorage(
+      createSupabaseServiceClient(env.supabaseUrl, env.supabaseServiceRoleKey),
+      env.licenseProtocolBucket,
+    );
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "regularize-service")));
@@ -119,7 +132,15 @@ export function createApp({
     }),
   );
 
-  app.use("/regularize", createRegularizeRoutes({ prisma, env, reconciliationService }));
+  app.use(
+    "/regularize",
+    createRegularizeRoutes({
+      prisma,
+      env,
+      reconciliationService,
+      protocolStorage: licenseProtocolStorage,
+    }),
+  );
 
   app.use(
     createExpressErrorHandler({

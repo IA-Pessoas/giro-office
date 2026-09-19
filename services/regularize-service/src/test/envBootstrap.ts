@@ -6,5 +6,8 @@ process.env.AUDIT_SERVICE_TOKEN = "audit-service-token";
 process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN = "regularize-service-internal-token";
 process.env.INTERNAL_SERVICE_TOKEN = "regularize-service-internal-token";
 process.env.MTK_ENCRYPTION_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+process.env.SUPABASE_URL = "https://example.supabase.co";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+process.env.REGULARIZE_LICENSE_PROTOCOL_BUCKET = "regularize-license-protocols";
 process.env.SERVICE_ALLOWED_ORIGINS = "*";
 process.env.ENABLE_API_DOCS = "false";

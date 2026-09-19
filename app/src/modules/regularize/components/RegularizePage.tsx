@@ -81,6 +81,7 @@ import {
   useCreateRegularizeProcessMutation,
   useRegularizeGuidance,
   useRegularizeLicenseDetail,
+  useRegularizeLicenseProtocolAccessMutation,
   usePaginatedRegularizeLicenses,
   useRegularizeMunicipalTaxDetail,
   useRegularizeMunicipalTaxes,
@@ -95,7 +96,9 @@ import {
   useUpdateRegularizeLicenseMutation,
   useUpdateRegularizeMunicipalTaxMutation,
   useUpdateRegularizeProcessMutation,
+  useUploadRegularizeLicenseProtocolMutation,
 } from "../hooks/useRegularizeOperations";
+import { submitRegularizeLicense } from "../services/regularizeLicenseSubmission";
 import type {
   AddRegularizeGuidanceActivityPayload,
   AddRegularizeGuidancePartnerPayload,
@@ -1070,6 +1073,7 @@ export function RegularizePage() {
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
   const [isSiteCredentialDialogOpen, setIsSiteCredentialDialogOpen] = useState(false);
   const [activeForm, setActiveForm] = useState<RegularizeFormState | null>(null);
+  const [licenseFormSessionKey, setLicenseFormSessionKey] = useState(0);
   const [processSearch, setProcessSearch] = useState("");
   const [processStatus, setProcessStatus] = useState("Todos");
   const [processPage, setProcessPage] = useState(1);
@@ -1187,6 +1191,8 @@ export function RegularizePage() {
   const removeGuidancePartnerMutation = useRemoveRegularizeGuidancePartnerMutation();
   const createLicenseMutation = useCreateRegularizeLicenseMutation();
   const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
+  const uploadLicenseProtocolMutation = useUploadRegularizeLicenseProtocolMutation();
+  const licenseProtocolAccessMutation = useRegularizeLicenseProtocolAccessMutation();
 
   const visiblePfRows = isPfSearchPending ? [] : pfPageQuery.data?.data ?? [];
   const pfNameById = new Map(
@@ -1682,24 +1688,70 @@ export function RegularizePage() {
 
   async function handleSubmitLicense(
     payload: CreateRegularizeLicensePayload | UpdateRegularizeLicensePayload,
+    protocolFile?: File,
   ) {
+    const isCreateSubmission = !("id" in payload);
+    let savedLicenseId: RegularizeId | undefined;
     try {
-      if ("id" in payload) {
-        await updateLicenseMutation.mutateAsync(payload);
-        toast.success("Licença atualizada com sucesso.");
-      } else {
-        await createLicenseMutation.mutateAsync(payload);
-        toast.success("Licença criada com sucesso.");
+      await submitRegularizeLicense(payload, protocolFile, {
+        createLicense: createLicenseMutation.mutateAsync,
+        updateLicense: updateLicenseMutation.mutateAsync,
+        uploadProtocol: uploadLicenseProtocolMutation.mutateAsync,
+        onLicenseSaved: ({ id, operation }) => {
+          savedLicenseId = id;
+          toast.success(
+            operation === "create"
+              ? "Licença criada com sucesso."
+              : "Licença atualizada com sucesso.",
+          );
+        },
+      });
+
+      if (protocolFile) {
+        toast.success("Protocolo armazenado com segurança.");
       }
 
       closeCoreForm();
     } catch (error) {
+      const persistedLicenseId = savedLicenseId;
+      if (isCreateSubmission && persistedLicenseId) {
+        setActiveForm((currentForm) =>
+          currentForm?.type === "license" && currentForm.mode === "create"
+            ? { type: "license", mode: "edit", id: persistedLicenseId }
+            : currentForm,
+        );
+      }
       const message = getRegularizeMutationErrorMessage(
         error,
-        "Não foi possível salvar a licença.",
+        savedLicenseId
+          ? "A licença foi salva, mas não foi possível armazenar o protocolo."
+          : "Não foi possível salvar a licença.",
       );
       toast.error(message);
       throw new Error(message);
+    }
+  }
+
+  async function handleOpenLicenseProtocol() {
+    if (!activeLicenseId) {
+      return;
+    }
+
+    const protocolWindow = window.open("about:blank", "_blank");
+    if (!protocolWindow) {
+      toast.error("Permita pop-ups para abrir o protocolo.");
+      return;
+    }
+    protocolWindow.opener = null;
+
+    try {
+      const access = await licenseProtocolAccessMutation.mutateAsync(activeLicenseId);
+      protocolWindow.location.replace(access.url);
+    } catch (error) {
+      protocolWindow.close();
+      toast.error(
+        getRegularizeMutationErrorMessage(error, "Não foi possível abrir o protocolo."),
+      );
     }
   }
 
@@ -1709,6 +1761,16 @@ export function RegularizePage() {
       return;
     }
 
+    if (form.type === "license") {
+      openLicenseForm(form);
+      return;
+    }
+
+    setActiveForm(form);
+  }
+
+  function openLicenseForm(form: Extract<RegularizeFormState, { type: "license" }>) {
+    setLicenseFormSessionKey((currentKey) => currentKey + 1);
     setActiveForm(form);
   }
 
@@ -2148,7 +2210,7 @@ export function RegularizePage() {
                               icon={Pencil}
                               title="Editar licença"
                               onClick={() =>
-                                setActiveForm({ type: "license", mode: "edit", id: item.id })
+                                openLicenseForm({ type: "license", mode: "edit", id: item.id })
                               }
                             />
                           ) : null}
@@ -2914,6 +2976,7 @@ export function RegularizePage() {
       />
 
       <RegularizeLicenseForm
+        key={licenseFormSessionKey}
         open={activeForm?.type === "license"}
         mode={activeForm?.type === "license" ? activeForm.mode : "create"}
         license={activeLicenseForForm}
@@ -2923,8 +2986,14 @@ export function RegularizePage() {
           activeForm.mode === "edit" &&
           licenseDetailQuery.isLoading
         }
-        isSubmitting={createLicenseMutation.isPending || updateLicenseMutation.isPending}
+        isSubmitting={
+          createLicenseMutation.isPending ||
+          updateLicenseMutation.isPending ||
+          uploadLicenseProtocolMutation.isPending
+        }
+        isOpeningProtocol={licenseProtocolAccessMutation.isPending}
         onClose={closeCoreForm}
+        onOpenProtocol={handleOpenLicenseProtocol}
         onSubmit={handleSubmitLicense}
       />
     </div>

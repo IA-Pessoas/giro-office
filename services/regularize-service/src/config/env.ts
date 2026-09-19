@@ -41,6 +41,14 @@ const regularizeServiceEnvSchema = z
     regularizeReportingToken: z.string().optional().default("regularize-reporting-token"),
     regularizeReportingGrantSecret: z.string().optional().default(""),
     encryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY não definida."),
+    supabaseUrl: z.string().url("SUPABASE_URL inválida para o regularize-service."),
+    supabaseServiceRoleKey: z
+      .string()
+      .min(1, "SUPABASE_SERVICE_ROLE_KEY não definida para o regularize-service."),
+    licenseProtocolBucket: z
+      .string()
+      .min(1, "REGULARIZE_LICENSE_PROTOCOL_BUCKET não definido.")
+      .default("regularize-license-protocols"),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
       .string()
@@ -132,6 +140,9 @@ export function getRegularizeServiceEnv(): RegularizeServiceEnv {
     regularizeReportingToken: process.env.REGULARIZE_REPORTING_TOKEN,
     regularizeReportingGrantSecret: process.env.REGULARIZE_REPORTING_GRANT_SECRET,
     encryptionKey: process.env.MTK_ENCRYPTION_KEY,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    licenseProtocolBucket: process.env.REGULARIZE_LICENSE_PROTOCOL_BUCKET,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,

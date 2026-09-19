@@ -35,6 +35,7 @@ export const updateLicenseBodySchema = createLicenseBodySchema
   .strict();
 
 export const licenseDetailQuerySchema = idQuerySchema;
+export const licenseProtocolParamsSchema = idQuerySchema;
 
 export const licenseListStatusValues = [...licenseReadStatusSchema.options] as const;
 

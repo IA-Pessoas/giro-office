@@ -2009,27 +2009,33 @@ model PasswordRegularize {
 }
 
 model License {
-  id                     String       @id @default(uuid())
-  client_id              String?
-  has                    Boolean
-  type_license           String
-  entry_date             DateTime
-  protocol               String
-  responsible_id         String?
-  status                 String
-  date_last_consultation DateTime?
-  current_situation      String
-  contact                String
-  observation            String?
-  urgency                String
-  type                   String
-  due_date               DateTime?
-  task_id                String?
-  organization_id        String
-  client                 Client?      @relation(fields: [client_id], references: [id])
-  organization           Organization @relation(fields: [organization_id], references: [id])
-  responsible            User?        @relation(fields: [responsible_id], references: [id])
-  task                   Task?        @relation(fields: [task_id], references: [id])
+  id                                String       @id @default(uuid())
+  client_id                         String?
+  has                               Boolean
+  type_license                      String
+  entry_date                        DateTime
+  protocol                          String
+  responsible_id                    String?
+  status                            String
+  date_last_consultation            DateTime?
+  current_situation                 String
+  contact                           String
+  observation                       String?
+  urgency                           String
+  type                              String
+  due_date                          DateTime?
+  task_id                           String?
+  organization_id                   String
+  protocol_file_path                String?
+  protocol_file_original_name       String?
+  protocol_file_mime_type           String?
+  protocol_file_size_bytes          Int?
+  protocol_file_uploaded_at         DateTime?
+  protocol_file_uploaded_by_user_id String?
+  client                            Client?      @relation(fields: [client_id], references: [id])
+  organization                      Organization @relation(fields: [organization_id], references: [id])
+  responsible                       User?        @relation(fields: [responsible_id], references: [id])
+  task                              Task?        @relation(fields: [task_id], references: [id])
 
   @@index([organization_id, due_date], map: "idx_regularize_license_org_due_date")
   @@index([organization_id, status], map: "idx_regularize_license_org_status")

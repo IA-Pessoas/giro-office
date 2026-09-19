@@ -152,6 +152,7 @@ const env = {
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   tmpDir: process.env.SMOKE_TMP_DIR?.trim() || fs.mkdtempSync(path.join(process.cwd(), "smoke-")),
   smokeDepartmentId: process.env.SMOKE_DEPARTMENT_ID?.trim() || "",
+  regularizeLicenseId: process.env.SMOKE_REGULARIZE_LICENSE_ID?.trim() || "",
   fixturePath:
     process.env.SMOKE_UPLOAD_FIXTURE?.trim() ||
     path.join(rootDir, "scripts", "fixtures", "smoke-upload.png"),
@@ -274,6 +275,7 @@ const state = {
   tiRobotId: "",
   certificatePjId: "",
   certificatePfId: "",
+  regularizeLicenseId: env.regularizeLicenseId,
   reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
   reportsJobId: "",
   commercialProposalConfigId: "",
@@ -304,6 +306,8 @@ const actionExecutionRank = {
   triagemExternalLinkUpdate: 4487,
   triagemExternalLinkArchive: 4488,
   triagemCatalogArchive: 4489,
+  regularizeLicenseProtocolReplace: 7000,
+  regularizeLicenseProtocolAccess: 7001,
   projectDelete: 8000,
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
@@ -892,6 +896,21 @@ async function bootstrapAndLogin() {
   throw new Error(
     `Unable to log in through /user/session. Last failure: ${secondAttempt?.error?.text ?? "unknown"}`,
   );
+}
+
+async function ensureUserSession() {
+  if (state.session) {
+    return state.session;
+  }
+
+  const session = await bootstrapAndLogin();
+  state.session = session;
+  state.bearerToken = createAdminToken(session.permission);
+  state.adminBearerToken =
+    session.permission === WorkspacePermissionLevel.Admin ? state.bearerToken : createAdminToken();
+  state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
+  log("PASS", `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`);
+  return session;
 }
 
 function requireState(key) {
@@ -2736,18 +2755,7 @@ const handlers = {
   },
 
   async userSession(_op) {
-    const session = await bootstrapAndLogin();
-    state.session = session;
-    state.bearerToken = createAdminToken(session.permission);
-    state.adminBearerToken =
-      session.permission === WorkspacePermissionLevel.Admin
-        ? state.bearerToken
-        : createAdminToken();
-    state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
-    log(
-      "PASS",
-      `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`,
-    );
+    await ensureUserSession();
   },
 
   async platformSession(op) {
@@ -3408,6 +3416,30 @@ const handlers = {
             fields: body.fields,
             body,
           }),
+    });
+  },
+
+  async regularizeLicenseProtocolReplace(op) {
+    await ensureUserSession();
+    await httpRequest(op, {
+      path: `/regularize/license/${requireState("regularizeLicenseId")}/protocol`,
+      expectedStatus: [201],
+      form: {
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "smoke-license-protocol.png",
+          contentType: "image/png",
+        },
+      },
+    });
+  },
+
+  async regularizeLicenseProtocolAccess(op) {
+    await ensureUserSession();
+    await httpRequest(op, {
+      path: `/regularize/license/${requireState("regularizeLicenseId")}/protocol`,
+      expectedStatus: [200],
     });
   },
 

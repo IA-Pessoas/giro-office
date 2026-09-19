@@ -13,6 +13,9 @@ function setBaseEnv() {
     JWT_SECRET: "secret",
     AUDIT_SERVICE_TOKEN: "audit-token",
     MTK_ENCRYPTION_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+    REGULARIZE_LICENSE_PROTOCOL_BUCKET: "regularize-license-protocols",
     SERVICE_ALLOWED_ORIGINS: "*",
     ENABLE_API_DOCS: "false",
   };

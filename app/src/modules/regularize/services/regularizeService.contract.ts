@@ -37,6 +37,7 @@ export const REGULARIZE_ENDPOINTS = {
   guidancePartnerRemove: "/regularize/guidance/partner/remove",
   licenses: "/regularize/licenses",
   license: "/regularize/license",
+  licenseProtocol: (id: RegularizeId) => `/regularize/license/${id}/protocol`,
 } as const;
 
 export function buildRegularizeDashboardParams(year: number) {

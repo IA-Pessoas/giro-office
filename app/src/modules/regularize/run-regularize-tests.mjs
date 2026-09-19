@@ -375,6 +375,110 @@ await runTest("regularize license responsible field uses the contextual selector
   assert.doesNotMatch(source, /Respons.vel ID/);
 });
 
+await runTest("regularize license protocol uses private upload and on-demand signed access", async () => {
+  const formSource = await readModuleSource("components/RegularizeLicenseForm.tsx");
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const serviceSource = await readModuleSource("services/regularizeService.ts");
+  const contractSource = await readModuleSource("services/regularizeService.contract.ts");
+
+  assert.match(
+    formSource,
+    /accept="\.pdf,\.jpg,\.jpeg,\.png,\.webp,application\/pdf,image\/jpeg,image\/png,image\/webp"/,
+  );
+  assert.match(formSource, /LICENSE_PROTOCOL_MAX_SIZE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(formSource, /Um novo envio substitui o protocolo vigente/);
+  assert.match(formSource, /onOpenProtocol/);
+  assert.match(contractSource, /licenseProtocol: \(id: RegularizeId\)/);
+  assert.match(serviceSource, /formData\.append\("file", file\)/);
+  assert.match(serviceSource, /api\.get\(REGULARIZE_ENDPOINTS\.licenseProtocol\(id\)\)/);
+  assert.match(pageSource, /useUploadRegularizeLicenseProtocolMutation/);
+  assert.match(pageSource, /useRegularizeLicenseProtocolAccessMutation/);
+  assert.match(pageSource, /protocolWindow\.location\.replace\(access\.url\)/);
+});
+
+await runTest("regularize license upload failure retries from the persisted license", async () => {
+  const { submitRegularizeLicense } = await import(
+    "./services/regularizeLicenseSubmission.ts"
+  );
+  const formSource = await readModuleSource("components/RegularizeLicenseForm.tsx");
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const createPayload = {
+    client_id: "client-1",
+    has: true,
+    type_license: "Alvará",
+    entry_date: "2026-09-19",
+    protocol: "PROTO-1",
+    status: "Em Andamento",
+    current_situation: "Em análise",
+    contact: "Contato",
+    urgency: "Média",
+    type: "Anual",
+  };
+  const protocolFile = {
+    name: "protocolo.pdf",
+    size: 128,
+    type: "application/pdf",
+  };
+  const persistedLicenseId = "license-1";
+  const calls = [];
+  let uploadAttempt = 0;
+  let retryLicenseId;
+
+  const dependencies = {
+    createLicense: async (payload) => {
+      calls.push(["POST", payload]);
+      return { id: persistedLicenseId };
+    },
+    updateLicense: async (payload) => {
+      calls.push(["PUT", payload]);
+      return { id: payload.id };
+    },
+    uploadProtocol: async ({ id, file }) => {
+      calls.push(["UPLOAD", id, file]);
+      uploadAttempt += 1;
+      if (uploadAttempt === 1) {
+        throw new Error("synthetic upload failure");
+      }
+    },
+    onLicenseSaved: ({ id, operation }) => {
+      calls.push(["SAVED", operation, id]);
+      retryLicenseId = id;
+    },
+  };
+
+  await assert.rejects(
+    submitRegularizeLicense(createPayload, protocolFile, dependencies),
+    /synthetic upload failure/,
+  );
+  assert.equal(retryLicenseId, persistedLicenseId);
+
+  await submitRegularizeLicense(
+    { ...createPayload, id: retryLicenseId },
+    protocolFile,
+    dependencies,
+  );
+
+  assert.deepEqual(
+    calls.map(([operation]) => operation),
+    ["POST", "SAVED", "UPLOAD", "PUT", "SAVED", "UPLOAD"],
+  );
+  assert.equal(calls.filter(([operation]) => operation === "POST").length, 1);
+  assert.equal(calls.filter(([operation]) => operation === "PUT").length, 1);
+  assert.equal(calls.filter(([operation]) => operation === "UPLOAD").length, 2);
+  assert.equal(calls[2][2], protocolFile);
+  assert.equal(calls[5][2], protocolFile);
+  assert.match(pageSource, /submitRegularizeLicense\(/);
+  assert.match(
+    pageSource,
+    /isCreateSubmission && persistedLicenseId[\s\S]*mode: "edit", id: persistedLicenseId/,
+  );
+  assert.match(pageSource, /key=\{licenseFormSessionKey\}/);
+  assert.doesNotMatch(
+    formSource,
+    /useEffect\(\(\) => \{[\s\S]*?setFormState\(buildLicenseFormState[\s\S]*?setProtocolFile\(null\)[\s\S]*?\}, \[defaultClientId, license, open\]\)/,
+  );
+});
+
 await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
   assert.deepEqual(
     buildRegularizeClientPfListParams({

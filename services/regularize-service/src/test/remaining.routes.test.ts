@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { GuidanceService } from "../services/guidanceService.js";
+import { LICENSE_PROTOCOL_MAX_SIZE_BYTES } from "../services/licenseProtocolStorage.js";
 import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 import { createTestApp, gatewayHeaders } from "./regularizeTestUtils.js";
 
@@ -71,6 +72,8 @@ describe("regularize remaining routes", () => {
     ["POST", "/regularize/license"],
     ["PUT", "/regularize/license"],
     ["GET", "/regularize/licenses"],
+    ["GET", "/regularize/license/b0000000-0000-4000-8000-000000000001/protocol"],
+    ["POST", "/regularize/license/b0000000-0000-4000-8000-000000000001/protocol"],
   ])("%s %s without auth returns 401", async (method, path) => {
     const app = createTestApp();
 
@@ -369,5 +372,114 @@ describe("regularize remaining routes", () => {
       "a0000000-0000-4000-8000-000000000001",
       "license-1",
     );
+  });
+
+  it("POST /regularize/license/:id/protocol substitui o protocolo sem expor a chave", async () => {
+    const licenseId = "b0000000-0000-4000-8000-000000000001";
+    const objectPath = `regularize/organizations/a0000000-0000-4000-8000-000000000001/licenses/${licenseId}/protocols/10000000-0000-4000-8000-000000000001.pdf`;
+    const transaction = {
+      license: { updateMany: vi.fn(async () => ({ count: 1 })) },
+      logs: { create: vi.fn(async () => ({})) },
+    };
+    const prisma = {
+      license: {
+        findFirst: vi.fn(async () => ({ id: licenseId, protocol_file_path: null })),
+      },
+      $transaction: vi.fn(async (operation: (tx: typeof transaction) => Promise<void>) =>
+        operation(transaction),
+      ),
+    } as unknown as PrismaClient;
+    const protocolStorage = {
+      upload: vi.fn(async () => objectPath),
+      deleteObject: vi.fn(async () => undefined),
+      createSignedAccessUrl: vi.fn(),
+    };
+    const app = createTestApp(prisma, undefined, undefined, protocolStorage as never);
+
+    const response = await request(app)
+      .post(`/regularize/license/${licenseId}/protocol`)
+      .set(gatewayHeaders())
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "protocolo.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toMatchObject({
+      original_name: "protocolo.pdf",
+      mime_type: "application/pdf",
+    });
+    expect(response.body.data).not.toHaveProperty("path");
+    expect(response.body.data).not.toHaveProperty("url");
+  });
+
+  it("POST /regularize/license/:id/protocol rejeita formato não permitido", async () => {
+    const protocolStorage = {
+      upload: vi.fn(),
+      deleteObject: vi.fn(),
+      createSignedAccessUrl: vi.fn(),
+    };
+    const app = createTestApp({} as PrismaClient, undefined, undefined, protocolStorage as never);
+
+    const response = await request(app)
+      .post("/regularize/license/b0000000-0000-4000-8000-000000000001/protocol")
+      .set(gatewayHeaders())
+      .attach("file", Buffer.from("executable"), {
+        filename: "protocolo.exe",
+        contentType: "application/octet-stream",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("Formato do protocolo");
+    expect(protocolStorage.upload).not.toHaveBeenCalled();
+  });
+
+  it("POST /regularize/license/:id/protocol retorna 413 acima de 10 MB", async () => {
+    const protocolStorage = {
+      upload: vi.fn(),
+      deleteObject: vi.fn(),
+      createSignedAccessUrl: vi.fn(),
+    };
+    const app = createTestApp({} as PrismaClient, undefined, undefined, protocolStorage as never);
+
+    const response = await request(app)
+      .post("/regularize/license/b0000000-0000-4000-8000-000000000001/protocol")
+      .set(gatewayHeaders())
+      .attach("file", Buffer.alloc(LICENSE_PROTOCOL_MAX_SIZE_BYTES + 1), {
+        filename: "protocolo.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(response.status).toBe(413);
+    expect(response.body.error).toContain("excede o limite de 10 MB");
+    expect(protocolStorage.upload).not.toHaveBeenCalled();
+  });
+
+  it("GET /regularize/license/:id/protocol retorna somente URL assinada curta", async () => {
+    const licenseId = "b0000000-0000-4000-8000-000000000001";
+    const objectPath = `regularize/organizations/a0000000-0000-4000-8000-000000000001/licenses/${licenseId}/protocols/10000000-0000-4000-8000-000000000001.pdf`;
+    const prisma = {
+      license: {
+        findFirst: vi.fn(async () => ({ protocol_file_path: objectPath })),
+      },
+    } as unknown as PrismaClient;
+    const protocolStorage = {
+      upload: vi.fn(),
+      deleteObject: vi.fn(),
+      createSignedAccessUrl: vi.fn(async () => "https://storage.example/signed?token=short"),
+    };
+    const app = createTestApp(prisma, undefined, undefined, protocolStorage as never);
+
+    const response = await request(app)
+      .get(`/regularize/license/${licenseId}/protocol`)
+      .set(gatewayHeaders({ permission: 1 }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body.data).toEqual({
+      url: "https://storage.example/signed?token=short",
+      expires_in_seconds: 300,
+    });
+    expect(JSON.stringify(response.body)).not.toContain(objectPath);
   });
 });
