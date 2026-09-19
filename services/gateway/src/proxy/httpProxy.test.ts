@@ -71,6 +71,24 @@ describe("buildForwardHeaders", () => {
     }
   });
 
+  it("preserva a autorização legada quando o JWT não declara módulos", () => {
+    const headers = buildForwardHeaders({
+      ...authenticatedRequest,
+      auth: {
+        ...authenticatedRequest.auth,
+        claims: {
+          ...authenticatedRequest.auth?.claims,
+          permission: 2,
+          modules: { contabil: 2, triagem: 0 },
+          modulePermissionsPresent: false,
+        },
+      },
+    } as Request);
+
+    expect(headers.get(FORWARDED_AUTH_PERMISSION_HEADER)).toBe("2");
+    expect(headers.get(FORWARDED_AUTH_MODULES_HEADER)).toBeNull();
+  });
+
   it("mantém o vínculo secreto da sessão fora de upstreams comuns", () => {
     const headers = buildForwardHeaders(authenticatedRequest, {
       internalServiceToken: "shared-token",
