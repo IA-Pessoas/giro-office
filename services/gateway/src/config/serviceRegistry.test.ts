@@ -41,7 +41,7 @@ describe("regularize-service gateway registry", () => {
   it("encaminha contexto confiável e a permissão específica do módulo", () => {
     const env = {
       regularizeServiceUrl: "http://regularize-service:3039",
-      auditServiceToken: "gateway-regularize-token",
+      auditServiceToken: "gateway-audit-token",
       regularizeServiceInternalToken: "gateway-regularize-token",
     } as GatewayEnv;
 
