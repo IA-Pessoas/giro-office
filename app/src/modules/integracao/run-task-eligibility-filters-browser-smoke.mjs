@@ -104,6 +104,13 @@ async function installApiMocks(
       department_id: "department-one",
       status: "Em andamento",
     },
+    {
+      id: "task-finance-single",
+      name: "Tarefa financeira individual",
+      client_id: clientId,
+      department_id: "department-one",
+      status: "Pendente",
+    },
   ];
   await page.route("**/user/me", (route) =>
     route.fulfill({
@@ -217,25 +224,62 @@ async function installApiMocks(
       },
     }),
   );
-  await page.route(/\/task\/financeiro\/queue(?:\?.*)?$/, (route) =>
-    route.fulfill({
+  await page.route(/\/task\/financeiro\/queue(?:\?.*)?$/, (route) => {
+    const requestUrl = new URL(route.request().url());
+    const departmentId = requestUrl.searchParams.get("department_id");
+    if (requestUrl.searchParams.get("client_id") !== clientId || (departmentId && departmentId !== "department-one")) {
+      return route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        json: { success: false, error: "Parâmetros financeiros inválidos" },
+      });
+    }
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
       json: { success: true, data: financeQueue },
-    }),
-  );
-  await page.route(/\/task\/financeiro\/collectors(?:\?.*)?$/, (route) =>
-    route.fulfill({
+    });
+  });
+  await page.route(/\/task\/financeiro\/collectors(?:\?.*)?$/, (route) => {
+    const requestUrl = new URL(route.request().url());
+    if (requestUrl.searchParams.get("department_id") !== "department-one") {
+      return route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        json: { success: false, error: "Departamento financeiro inválido" },
+      });
+    }
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
       json: { success: true, data: [] },
-    }),
-  );
+    });
+  });
+  await page.route(/\/task\/financeiro$/, (route) => {
+    const request = route.request();
+    if (request.method() !== "PUT") return route.continue();
+    const body = request.postDataJSON();
+    financeSettlementRequests.push({
+      method: request.method(),
+      body,
+      idempotencyKey: request.headers()["idempotency-key"],
+    });
+    financeQueue = financeQueue.filter((item) => item.id !== body.task_id);
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: { task_ids: [body.task_id], settled: 1 } },
+    });
+  });
   await page.route(/\/task\/financeiro\/settle$/, (route) => {
     const request = route.request();
     if (request.method() !== "POST") return route.continue();
     const body = request.postDataJSON();
-    financeSettlementRequests.push({ method: request.method(), body });
+    financeSettlementRequests.push({
+      method: request.method(),
+      body,
+      idempotencyKey: request.headers()["idempotency-key"],
+    });
     const taskIds = body.task_ids;
     financeQueue = financeQueue.filter((item) => !taskIds.includes(item.id));
     return route.fulfill({
@@ -518,18 +562,34 @@ async function runBrowserProof() {
     await expect(page.getByText("Tarefa sem responsável", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Fila financeira", level: 2 })).toBeVisible();
     await expect(page.getByText("Tarefa financeira pendente", { exact: true })).toBeVisible();
+    await expect(page.getByText("Tarefa financeira individual", { exact: true })).toBeVisible();
     await page.screenshot({ path: financeScreenshotPath, fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole("heading", { name: "Fila financeira", level: 2 })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Baixa Express do cliente" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Nova tarefa" })).toBeVisible();
     await page.screenshot({ path: financeMobileScreenshotPath, fullPage: true });
     await page.setViewportSize({ width: 1440, height: 900 });
-    const financeRow = page.getByText("Tarefa financeira pendente", { exact: true }).locator("..");
-    await financeRow.getByRole("checkbox").check();
+    await page.getByRole("checkbox", { name: "Selecionar Tarefa financeira pendente" }).check();
     await page.getByRole("button", { name: "Baixar selecionadas (1)" }).click();
     await expect(page.getByText("1 tarefa(s) baixada(s).", { exact: true })).toBeVisible();
+    await expect(page.getByText("Tarefa financeira individual", { exact: true })).toBeVisible();
+    const individualFinanceRow = page
+      .getByText("Tarefa financeira individual", { exact: true })
+      .locator("..");
+    await individualFinanceRow.getByRole("button", { name: "Baixar", exact: true }).click();
+    await expect(page.getByText("1 tarefa(s) baixada(s).", { exact: true })).toBeVisible();
     await expect(page.getByText("Nenhuma tarefa financeira pendente.", { exact: true })).toBeVisible();
-    assert.deepEqual(financeSettlementRequests, [
-      { method: "POST", body: { task_ids: ["task-finance-pending"] } },
-    ]);
+    assert.deepEqual(
+      financeSettlementRequests.map(({ method, body }) => ({ method, body })),
+      [
+        { method: "POST", body: { task_ids: ["task-finance-pending"] } },
+        { method: "PUT", body: { task_id: "task-finance-single" } },
+      ],
+    );
+    for (const request of financeSettlementRequests) {
+      assert.match(request.idempotencyKey, /^[0-9a-f-]{36}$/);
+    }
     await expect(page.getByRole("cell", { name: "Sem responsável", exact: true })).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Cliente Filtro.*00\.000\.000\/0001-00/ }),
