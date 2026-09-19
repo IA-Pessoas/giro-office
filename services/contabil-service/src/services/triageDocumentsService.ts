@@ -385,6 +385,9 @@ export class TriageDocumentsService {
           triagem_summary: await this.overviewClient.getSummary(summaryRequest),
         };
       } catch (error: unknown) {
+        if (!(error instanceof ServiceError) || ![403, 503, 504].includes(error.statusCode)) {
+          throw error;
+        }
         logWarn("Resumo da Triagem indisponível; mantendo resposta mensal local", {
           err: error,
           clientId: request.client_id,

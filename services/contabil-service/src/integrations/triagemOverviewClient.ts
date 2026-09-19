@@ -87,7 +87,9 @@ export class TriagemOverviewClient {
           [FORWARDED_AUTH_USER_ID_HEADER]: input.userId,
           [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: input.organizationId,
           [FORWARDED_AUTH_PERMISSION_HEADER]: String(input.permission ?? 0),
-          [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify(input.modules ?? {}),
+          ...(input.modules
+            ? { [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify(input.modules) }
+            : {}),
           ...(input.requestId ? { [REQUEST_ID_HEADER]: input.requestId } : {}),
         },
         signal: controller.signal,

@@ -1,5 +1,6 @@
 import "./envBootstrap.js";
 
+import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -789,7 +790,7 @@ describe("TriageDocumentsService", () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
     const overviewClient = {
-      getSummary: vi.fn().mockRejectedValue(new Error("triagem indisponível")),
+      getSummary: vi.fn().mockRejectedValue(new ServiceError(503, "Triagem indisponível.")),
     };
 
     const result = await new TriageDocumentsService(
@@ -799,6 +800,22 @@ describe("TriageDocumentsService", () => {
     ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
 
     expect(result).toEqual(expect.objectContaining({ id: MONTHLY_ID, triagem_summary: null }));
+  });
+
+  it("não mascara incompatibilidade do contrato do resumo da Triagem", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const overviewClient = {
+      getSummary: vi.fn().mockRejectedValue(new ServiceError(502, "Resposta incompatível.")),
+    };
+
+    await expect(
+      new TriageDocumentsService(
+        prisma,
+        { logUpdateIfChanged: vi.fn() },
+        overviewClient,
+      ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor()),
+    ).rejects.toMatchObject({ statusCode: 502 });
   });
 
   it("altera um item permitido e audita os valores antes e depois", async () => {

@@ -109,6 +109,21 @@ describe("TriagemOverviewClient", () => {
     ).resolves.toMatchObject({ version: TRIAGE_ACCOUNTING_SUMMARY_VERSION, status });
   });
 
+  it("preserva o fallback de permissão quando não há módulos encaminhados", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(overviewResponse("COMPLETE"));
+
+    await createClient(fetchImpl).getSummary({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      permission: 1,
+      clientId: CLIENT_ID,
+      competence: COMPETENCE,
+    });
+
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(init.headers).not.toHaveProperty(FORWARDED_AUTH_MODULES_HEADER);
+  });
+
   it("rejeita resposta de outra organização lógica ou competência", async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
