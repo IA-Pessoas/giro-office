@@ -67,6 +67,9 @@ services:
   contabil-service:
     <<: *small_service
 
+  triagem-service:
+    <<: *small_service
+
   regularize-service:
     <<: *medium_service
 
@@ -84,6 +87,15 @@ services:
 
   parcelamento-service:
     <<: *small_service
+
+  commercial-service:
+    <<: *small_service
+
+  reports-service:
+    <<: *medium_service
+
+  reports-worker:
+    <<: *medium_service
 
   audit-service:
     <<: *medium_service

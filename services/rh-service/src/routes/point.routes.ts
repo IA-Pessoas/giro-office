@@ -19,6 +19,7 @@ import {
   listPointsQuerySchema,
   pointIdParamsSchema,
   pointSummaryQuerySchema,
+  recalculatePointsBodySchema,
 } from "../schemas/point.schemas.js";
 import { PointService } from "../services/pointService.js";
 
@@ -125,6 +126,28 @@ router.post(
       res.status(200).json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro ao registrar ponto", { err });
+      next(err);
+    }
+  },
+);
+
+router.post(
+  "/recalculate",
+  isAuthenticated,
+  requireRhPermission(RH_MANAGEMENT_PERMISSION),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { organization_id } = requireAuthenticatedRequestContext(req, { statusCode: 400 });
+      const body = parseWithZod(recalculatePointsBodySchema, req.body);
+      const result = await pointService.recalculateRange({
+        organization_id,
+        user_id: body.target_user_id,
+        date_from: body.date_from,
+        date_to: body.date_to,
+      });
+      res.status(200).json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao recalcular registros de ponto", { err });
       next(err);
     }
   },

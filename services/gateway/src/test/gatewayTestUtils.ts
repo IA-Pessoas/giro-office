@@ -7,7 +7,10 @@ import { MemoryLogStream } from "@workspace/shared/testUtils";
 import type { GatewayEnv } from "../config/env.js";
 
 export async function startServer(server: Server): Promise<string> {
-  server.listen(0, "127.0.0.1");
+  // Sem host: bind em `::` (dual-stack), igual ao supertest. Com "127.0.0.1" o SO aceita
+  // este listener e o do supertest na MESMA porta efemera (familias diferentes) e entrega a
+  // requisicao ao bind mais especifico - o teste recebe 404 de um servidor alheio.
+  server.listen(0);
   await once(server, "listening");
 
   const address = server.address();
@@ -28,6 +31,11 @@ export async function stopServer(server: Server): Promise<void> {
 
       resolve();
     });
+
+    // close() apenas para de aceitar conexoes novas: as keep-alive seguem vivas e
+    // seguram o callback. A porta efemera e reciclada enquanto isso, e o teste
+    // seguinte fala com o servidor anterior - a resposta chega de outro servico.
+    server.closeAllConnections();
   });
 }
 
@@ -61,6 +69,7 @@ export function createTestEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
     clientServiceInternalToken: "client-service-token",
     fiscalServiceUrl: "http://127.0.0.1:3037",
     contabilServiceUrl: "http://127.0.0.1:3038",
+    triagemServiceUrl: "http://127.0.0.1:3046",
     regularizeServiceUrl: "http://127.0.0.1:3039",
     regularizeServiceInternalToken: "regularize-service-internal-token",
     tiServiceUrl: "http://127.0.0.1:3040",

@@ -208,11 +208,28 @@ export class ControlService {
           client_id: data.clientId,
           competence: data.competence,
           organization_id: data.organizationId,
-          archived_at: null,
         },
       });
 
       if (existing) {
+        if (existing.archived_at !== null) {
+          await this.restoreCompetence(data);
+          const restored = await this.prisma.controlContabil.findFirst({
+            where: {
+              client_id: data.clientId,
+              competence: data.competence,
+              organization_id: data.organizationId,
+              archived_at: null,
+            },
+          });
+          if (!restored) {
+            throw new ServiceError(
+              409,
+              "Não foi possível restaurar o controle contábil arquivado.",
+            );
+          }
+          return { control: restored, created: false };
+        }
         return { control: existing, created: false };
       }
 

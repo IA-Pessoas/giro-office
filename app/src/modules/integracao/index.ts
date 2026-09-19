@@ -26,6 +26,9 @@ export {
   useIntegracaoTaskDetail,
   useIntegracaoTasksList,
   useProjectDetail,
+  useProjectPlans,
+  useProjectPlanTasks,
+  useHireProjectPlanMutation,
   useProjectForm,
   useProjectMetrics,
   useProjectsList,
@@ -40,6 +43,7 @@ export {
   TASK_MODEL_ENDPOINTS,
   integracaoTasksService,
   projectService,
+  projectPlanService,
   taskModelService,
 } from "./services";
 export {

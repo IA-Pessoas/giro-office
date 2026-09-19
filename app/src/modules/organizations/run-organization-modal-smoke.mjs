@@ -3,6 +3,8 @@ import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const PLAYWRIGHT_PORT = process.env.PLAYWRIGHT_PORT || "3101";
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 let baseUrl = configuredBaseUrl || `http://localhost:${PLAYWRIGHT_PORT}`;
@@ -141,7 +143,7 @@ async function assertOrganizationModal(viewport) {
   });
   await installApiMocks(page);
 
-  await page.goto("/configuracoes", { waitUntil: "networkidle" });
+  await page.goto("/configuracoes", { waitUntil: "domcontentloaded", timeout: 120_000 });
 
   await assertVisible(page.getByRole("heading", { name: "Configurações" }), page, "heading Configurações");
   await page.getByRole("button", { name: "Editar organização" }).click();
@@ -179,7 +181,7 @@ async function assertOrganizationAccessRequest() {
   await installApiMocks(page, (payload) => {
     createPayload = payload;
   });
-  await page.goto("/solicitar-acesso", { waitUntil: "networkidle" });
+  await page.goto("/solicitar-acesso", { waitUntil: "domcontentloaded", timeout: 120_000 });
 
   await page.getByLabel("Nome da organização").fill("Castelo Mask Smoke");
   await page.getByLabel("E-mail do responsável").fill("admin@castelo.test");
@@ -248,7 +250,7 @@ async function withNextServer(fn) {
       : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PLAYWRIGHT_PORT];
   const serverProcess = spawn(command, args, {
     cwd: APP_ROOT,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";

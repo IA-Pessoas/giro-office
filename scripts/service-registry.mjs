@@ -173,6 +173,16 @@ export const serviceRegistry = [
     prismaOutputPath: "services/task-service/src/generated/prisma",
   },
   {
+    name: "triagem-service",
+    packagePath: "services/triagem-service",
+    defaultUrl: "http://localhost:3046",
+    urlEnvKey: "TRIAGEM_SERVICE_URL",
+    openapiSpecPath: "services/triagem-service/src/openapi/spec.ts",
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "AUDIT_SERVICE_TOKEN",
+    prismaOutputPath: "services/triagem-service/src/generated/prisma",
+  },
+  {
     name: "ti-service",
     packagePath: "services/ti-service",
     defaultUrl: "http://localhost:3040",

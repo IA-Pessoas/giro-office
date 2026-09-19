@@ -2,6 +2,7 @@ import type {
   CreateTaskDependentData,
   CreateTaskModelData,
   TaskDependent,
+  TaskIntegrationRegularize,
   TaskModelDetail,
   TaskModelListItem,
   TaskModelListParams,
@@ -16,6 +17,7 @@ export const TASK_MODEL_ENDPOINTS = {
   list: "/task/model/list",
   dependent: "/task/model/dependent",
   options: "/task/deps/options",
+  integration: "/task/integration",
 } as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,6 +92,18 @@ export function buildListDependentsParams(taskModelId: string) {
 
 export function buildDeleteDependentPayload(id: string) {
   return { id };
+}
+
+export function buildTaskIntegrationPayload(
+  taskModelId: string,
+  referring: string,
+  referringType: "process" | "license",
+) {
+  return { task_model_id: taskModelId, referring, referring_type: referringType };
+}
+
+export function unwrapTaskIntegrationList(body: unknown): TaskIntegrationRegularize[] {
+  return unwrapServiceEnvelope(body) as TaskIntegrationRegularize[];
 }
 
 export function unwrapTaskModelList(body: unknown): TaskModelListItem[] {

@@ -28,6 +28,7 @@ Ver [`src/config/env.ts`](src/config/env.ts):
 - `CLIENT_SERVICE_URL`, `CLIENT_SERVICE_INTERNAL_TOKEN` (token compartilhado no contexto gateway -> client-service; em desenvolvimento, usa `AUDIT_SERVICE_TOKEN` quando omitido)
 - `FISCAL_SERVICE_URL`
 - `CONTABIL_SERVICE_URL`
+- `TRIAGEM_SERVICE_URL`
 - `REGULARIZE_SERVICE_URL`
 - `TI_SERVICE_URL`, `TI_SERVICE_INTERNAL_TOKEN`
 - `CERTIFICATE_SERVICE_URL`, `CERTIFICATE_SERVICE_INTERNAL_TOKEN`
@@ -49,6 +50,8 @@ O gateway encaminha estes prefixos para os servicos configurados no env:
 - `/client` -> `CLIENT_SERVICE_URL`
 - `/fiscal` -> `FISCAL_SERVICE_URL`
 - `/contabil` -> `CONTABIL_SERVICE_URL`
+- `/triagem/overview`, `/triagem/competencies`, `/triagem/catalogs`, `/triagem/external-links` e
+  `/triagem/urgent-requests` -> `TRIAGEM_SERVICE_URL`
 - `/regularize` -> `REGULARIZE_SERVICE_URL`
 - `/ti` -> `TI_SERVICE_URL`
 - `/certificate` -> `CERTIFICATE_SERVICE_URL`

@@ -2,6 +2,7 @@ import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspa
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ContabilServiceEnv } from "../config/env.js";
+import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "../constants/triageDocuments.js";
 
 export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
@@ -86,6 +87,48 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           type: "object",
           description: "Resposta de sucesso padrão do workspace",
           additionalProperties: true,
+        },
+        TriageAccountingSummary: {
+          type: "object",
+          required: [
+            "version",
+            "organization_id",
+            "client_id",
+            "legal_name",
+            "competence",
+            "status",
+          ],
+          properties: {
+            version: { type: "integer", enum: [1] },
+            organization_id: { type: "string", format: "uuid" },
+            client_id: { type: "string", format: "uuid" },
+            legal_name: { type: "string" },
+            competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            status: {
+              type: "string",
+              enum: ["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE"],
+            },
+          },
+        },
+        TriageMonthlySuccessEnvelope: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean", enum: [true] },
+            data: {
+              type: "object",
+              additionalProperties: true,
+              properties: {
+                triagem_summary: {
+                  oneOf: [
+                    { $ref: "#/components/schemas/TriageAccountingSummary" },
+                    { type: "null" },
+                  ],
+                  description: "Resumo da Triagem; null quando o serviço estiver indisponível.",
+                },
+              },
+            },
+          },
         },
         ReportingGrantV1: {
           type: "object",
@@ -794,6 +837,37 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           },
         },
       },
+      "/triagem/editability": {
+        get: {
+          tags: ["Triage Documents"],
+          summary: "Verificar edição de Triagem por cliente",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "type",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["CONTABIL", "FISCAL"], default: "CONTABIL" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Permissão contextual do usuário autenticado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+          },
+        },
+      },
       "/triagem/monthly": {
         get: {
           tags: ["Triage Documents"],
@@ -812,13 +886,19 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               required: true,
               schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
             },
+            {
+              name: "type",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["CONTABIL", "FISCAL"], default: "CONTABIL" },
+            },
           ],
           responses: {
             "200": {
               description: "Pendência",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  schema: { $ref: "#/components/schemas/TriageMonthlySuccessEnvelope" },
                 },
               },
             },
@@ -842,6 +922,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                       type: "string",
                       pattern: "^\\d{4}-(0[1-9]|1[0-2])$",
                     },
+                    type: { type: "string", enum: ["CONTABIL", "FISCAL"] },
                   },
                 },
               },
@@ -879,13 +960,14 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               "application/json": {
                 schema: {
                   type: "object",
-                  required: ["field", "status"],
+                  required: ["field"],
                   additionalProperties: false,
                   properties: {
                     field: {
                       type: "string",
                       enum: [
                         "financial_transactions",
+                        "triaged_transactions",
                         "inventory_control",
                         "accounts_payable_report",
                         "accounts_receivable_report",
@@ -894,11 +976,55 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                         "bank_reconciliation",
                         "bank_investments",
                         "card_sales_report",
+                        "inbound_report",
+                        "outbound_report",
+                        "nfse_provided",
+                        "nfse_received",
+                        "cte_documents",
+                        "mei_documents",
+                        "nfce_documents",
+                        "sped_fiscal",
+                        "sped_contributions",
+                        "model_21_invoice",
+                        "cte_as_issuer",
+                        "services_provided_as_mei",
+                        "billing_amount",
                       ],
                     },
+                    type: { type: "string", enum: ["CONTABIL", "FISCAL"] },
                     status: {
                       type: "string",
-                      enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                      enum: [
+                        "PENDING",
+                        "COMPLETED",
+                        "ATTENTION",
+                        "UNDER_REVIEW",
+                        "NOT_PRESENT",
+                        "NOT_APPLICABLE",
+                      ],
+                    },
+                    note: {
+                      type: "string",
+                      nullable: true,
+                      maxLength: 2000,
+                    },
+                    justification: {
+                      type: "string",
+                      nullable: true,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                    },
+                    value: { type: "string", nullable: true, maxLength: 2000 },
+                    delivery_method: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                      nullable: true,
+                    },
+                    state_site: {
+                      type: "string",
+                      minLength: 1,
+                      maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH,
+                      nullable: true,
                     },
                   },
                 },
@@ -942,8 +1068,16 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   properties: {
                     status: {
                       type: "string",
-                      enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                      enum: [
+                        "PENDING",
+                        "COMPLETED",
+                        "ATTENTION",
+                        "UNDER_REVIEW",
+                        "NOT_PRESENT",
+                        "NOT_APPLICABLE",
+                      ],
                     },
+                    type: { type: "string", enum: ["CONTABIL", "FISCAL"] },
                   },
                 },
               },
@@ -978,7 +1112,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               name: "competence",
               in: "query",
               required: true,
-              schema: { type: "string" },
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
             },
           ],
           responses: {
@@ -1006,7 +1140,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    competence: { type: "string" },
+                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
                     bank_id: {
                       type: "string",
                       description:
@@ -1014,7 +1148,14 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                     },
                     status: {
                       type: "string",
-                      enum: ["PENDING", "COMPLETED", "ATTENTION", "NOT_PRESENT", "NOT_APPLICABLE"],
+                      enum: [
+                        "PENDING",
+                        "COMPLETED",
+                        "ATTENTION",
+                        "UNDER_REVIEW",
+                        "NOT_PRESENT",
+                        "NOT_APPLICABLE",
+                      ],
                     },
                   },
                 },
@@ -1031,6 +1172,43 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               },
             },
             "403": { description: "Sem permissão" },
+          },
+        },
+        delete: {
+          tags: ["Triage Documents"],
+          summary: "Arquivar marcador de extrato",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "bank_id"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+                    bank_id: {
+                      type: "string",
+                      description: "Identificador operacional do banco.",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Marcador arquivado",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Marcador não encontrado" },
           },
         },
       },

@@ -98,6 +98,35 @@ pnpm test
 pnpm build
 ```
 
+### Pre-push
+
+O hook seleciona os pacotes alterados e seus dependentes pelo grafo do Turbo.
+Documentação dispensa verificações de código; mudanças globais validam todo o workspace.
+O fluxo mantém lint, typecheck e testes. Mudanças em manifestos, lockfiles ou configuração
+do gerenciador também executam a auditoria de dependências. No escopo global, os testes
+dos scripts da raiz e o QA de integração continuam obrigatórios.
+
+Os testes dos serviços executam os fontes e dispensam o build de produção do próprio
+serviço. As dependências `^build` permanecem para preparar as bibliotecas e invalidar os
+caches. O app mantém seu build porque os testes de navegador usam `next start`. Instale
+o navegador local com `pnpm --filter @workspace/app exec playwright install chromium`.
+
+A configuração do hook é derivada de `turbo.json` em `.turbo/git-hooks/turbo.pre-push.json`,
+um artefato local ignorado pelo Git. `pnpm test` mantém a validação completa com builds.
+O hook mostra o tempo de cada comando e suprime a repetição de logs de tarefas em cache.
+
+```bash
+# Inspecionar o plano sem executar as verificações
+node scripts/git-hook-scope.mjs pre-push --dry-run
+# Executar audit:ci, check, typecheck e test, inclusive sem alterações
+node scripts/git-hook-scope.mjs pre-push --full
+# Validar a seleção e o grafo de tarefas do hook
+pnpm hooks:test
+```
+
+Sem uma base de comparação confiável, o hook conserva a sequência completa como fallback.
+Falhas continuam bloqueando o push; os pré-requisitos locais devem estar instalados.
+
 ## Deploy
 
 O procedimento do ambiente VPS está documentado em [docs/vps-deploy.md](docs/vps-deploy.md).

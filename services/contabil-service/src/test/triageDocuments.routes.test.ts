@@ -29,7 +29,9 @@ const logger = createLogger({
   pretty: env.logPretty,
 });
 
-function gatewayHeaders(modules = { contabil: 2, triagem: 0 }): Record<string, string> {
+function gatewayHeaders(
+  modules: Record<string, number> = { contabil: 2, triagem: 0 },
+): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: INTERNAL_TOKEN,
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
@@ -47,6 +49,7 @@ function createMockDeps(): TriageDocumentsRouteDeps {
     updateAll: vi.fn(async () => ({ id: MONTHLY_ID })),
     listStatements: vi.fn(async () => []),
     upsertStatement: vi.fn(async () => ({ id: "statement" })),
+    archiveStatement: vi.fn(async () => ({ id: "statement", archived_at: "2026-09-17" })),
   } as unknown as TriageDocumentsRouteDeps;
 }
 
@@ -60,6 +63,7 @@ describe("triage document routes", () => {
     expect(spec.paths).toHaveProperty("/triagem/monthly/{id}/items.patch");
     expect(spec.paths).toHaveProperty("/triagem/statements.get");
     expect(spec.paths).toHaveProperty("/triagem/statements.put");
+    expect(spec.paths).toHaveProperty("/triagem/statements.delete");
   });
 
   it("POST /triagem/monthly usa a organização autenticada e os módulos encaminhados", async () => {
@@ -74,6 +78,33 @@ describe("triage document routes", () => {
 
     expect(res.status).toBe(400);
     expect(deps.getOrCreateMonthly).not.toHaveBeenCalled();
+  });
+
+  it("GET /triagem/monthly preserva o mensal e expõe o resumo opcional", async () => {
+    const deps = createMockDeps();
+    vi.mocked(deps.getMonthly).mockResolvedValue({
+      id: MONTHLY_ID,
+      triagem_summary: null,
+    });
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .get("/triagem/monthly")
+      .query({ client_id: CLIENT_ID, competence: "2026-09" })
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      success: true,
+      data: { id: MONTHLY_ID, triagem_summary: null },
+    });
+    expect(deps.getMonthly).toHaveBeenCalledWith(
+      { client_id: CLIENT_ID, competence: "2026-09" },
+      expect.objectContaining({
+        organizationId: ORG_ID,
+        modules: expect.objectContaining({ contabil: 2, triagem: 0 }),
+      }),
+    );
   });
 
   it("POST /triagem/monthly cria com o contexto autenticado", async () => {
@@ -98,6 +129,23 @@ describe("triage document routes", () => {
     );
   });
 
+  it("POST /triagem/monthly aceita a rotina fiscal explicitamente", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/triagem/monthly")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders({ fiscal: 2, triagem: 1 }))
+      .send({ client_id: CLIENT_ID, competence: "2026-09", type: "FISCAL" });
+
+    expect(res.status).toBe(200);
+    expect(deps.getOrCreateMonthly).toHaveBeenCalledWith(
+      { client_id: CLIENT_ID, competence: "2026-09", type: "FISCAL" },
+      expect.objectContaining({ modules: expect.objectContaining({ fiscal: 2 }) }),
+    );
+  });
+
   it("PATCH /triagem/monthly/:id/item rejeita status inválido", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
@@ -107,6 +155,98 @@ describe("triage document routes", () => {
       .set("Content-Type", "application/json")
       .set(gatewayHeaders())
       .send({ field: "card_statements", status: "INVALID" });
+
+    expect(res.status).toBe(400);
+    expect(deps.updateItem).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /triagem/monthly/:id/item encaminha nota e justificativa", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({
+        field: "triaged_transactions",
+        status: "ATTENTION",
+        note: "Parcial",
+        justification: "Aguardando arquivo complementar",
+      });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateItem).toHaveBeenCalledWith(
+      MONTHLY_ID,
+      {
+        field: "triaged_transactions",
+        status: "ATTENTION",
+        note: "Parcial",
+        justification: "Aguardando arquivo complementar",
+      },
+      expect.objectContaining({ organizationId: ORG_ID }),
+    );
+  });
+
+  it("PATCH /triagem/monthly/:id/item encaminha entrega fiscal controlada", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders({ fiscal: 2, triagem: 1 }))
+      .send({
+        type: "FISCAL",
+        field: "nfce_documents",
+        status: "ATTENTION",
+        delivery_method: "EMAIL",
+      });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateItem).toHaveBeenCalledWith(
+      MONTHLY_ID,
+      expect.objectContaining({
+        type: "FISCAL",
+        field: "nfce_documents",
+        delivery_method: "EMAIL",
+      }),
+      expect.objectContaining({ modules: expect.objectContaining({ fiscal: 2 }) }),
+    );
+  });
+
+  it("PATCH /triagem/monthly/:id/item aceita faturamento fiscal sem status", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders({ fiscal: 2, triagem: 1 }))
+      .send({ type: "FISCAL", field: "billing_amount", value: "12500,00" });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateItem).toHaveBeenCalledWith(
+      MONTHLY_ID,
+      { type: "FISCAL", field: "billing_amount", value: "12500,00" },
+      expect.objectContaining({ modules: expect.objectContaining({ fiscal: 2 }) }),
+    );
+  });
+
+  it("PATCH /triagem/monthly/:id/item rejeita método de entrega vazio", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders({ fiscal: 2, triagem: 1 }))
+      .send({
+        type: "FISCAL",
+        field: "nfce_documents",
+        status: "ATTENTION",
+        delivery_method: "",
+      });
 
     expect(res.status).toBe(400);
     expect(deps.updateItem).not.toHaveBeenCalled();
@@ -127,6 +267,37 @@ describe("triage document routes", () => {
       { client_id: CLIENT_ID, competence: "2026-09", bank_id: "341", status: "PENDING" },
       expect.objectContaining({ organizationId: ORG_ID }),
     );
+  });
+
+  it("DELETE /triagem/statements arquiva o marcador da competência", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .delete("/triagem/statements")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, competence: "2026-09", bank_id: "341" });
+
+    expect(res.status).toBe(200);
+    expect(deps.archiveStatement).toHaveBeenCalledWith(
+      { client_id: CLIENT_ID, competence: "2026-09", bank_id: "341" },
+      expect.objectContaining({ organizationId: ORG_ID }),
+    );
+  });
+
+  it("DELETE /triagem/statements rejeita corpo sem banco", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .delete("/triagem/statements")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ client_id: CLIENT_ID, competence: "2026-09" });
+
+    expect(res.status).toBe(400);
+    expect(deps.archiveStatement).not.toHaveBeenCalled();
   });
 
   it("GET /triagem/monthly exige autenticação", async () => {

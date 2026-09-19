@@ -2,7 +2,8 @@
 .cursor
 .vscode
 .codex
-.agents
+.agent
+.claude
 .worktrees
 .turbo
 .pnpm-store
@@ -18,3 +19,7 @@ node_modules
 coverage
 docs
 docker/nginx/certs/*
+*.zip
+evidence
+output
+smoke-*

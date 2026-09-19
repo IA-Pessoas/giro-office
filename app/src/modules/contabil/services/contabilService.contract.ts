@@ -16,6 +16,7 @@ export const CONTABIL_ENDPOINTS = {
   relationshipById: (relationshipId: string) => `/contabil/relationships/${relationshipId}`,
   relationshipByClient: (clientId: string) => `/contabil/relationships/client/${clientId}`,
   triageMonthly: "/triagem/monthly",
+  triageEditability: "/triagem/editability",
   triageMonthlyItem: (monthlyId: string) => `/triagem/monthly/${monthlyId}/item`,
   triageMonthlyItems: (monthlyId: string) => `/triagem/monthly/${monthlyId}/items`,
   triageStatements: "/triagem/statements",

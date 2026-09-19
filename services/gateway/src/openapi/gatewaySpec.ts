@@ -16,6 +16,7 @@ import { buildReportsServiceOpenApiSpec } from "../../../reports-service/src/ope
 import { buildRhServiceOpenApiSpec } from "../../../rh-service/src/openapi/spec.js";
 import { buildTaskServiceOpenApiSpec } from "../../../task-service/src/openapi/spec.js";
 import { buildTiServiceOpenApiSpec } from "../../../ti-service/src/openapi/spec.js";
+import { buildTriagemServiceOpenApiSpec } from "../../../triagem-service/src/openapi/spec.js";
 import { buildUserServiceOpenApiSpec } from "../../../user-service/src/openapi/spec.js";
 import { isGatewayOpenApiPathDisabled } from "../config/disabledRoutes.js";
 import type { GatewayEnv } from "../config/env.js";
@@ -150,6 +151,14 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       buildSpec: () =>
         buildContabilServiceOpenApiSpec({ port: getPortFromUrl(env.contabilServiceUrl) } as never),
       includePath: (path) => path !== "/health" && !path.startsWith("/internal/"),
+    },
+    {
+      key: "triagem-service",
+      label: "Triagem Service",
+      buildSpec: () =>
+        buildTriagemServiceOpenApiSpec({ port: getPortFromUrl(env.triagemServiceUrl) } as never),
+      includePath: (path) =>
+        path !== "/health" && path !== "/ready" && !path.startsWith("/internal/"),
     },
     {
       key: "ti-service",
@@ -591,7 +600,7 @@ export function buildGatewayOpenApiSpec(env: GatewayEnv): OpenApiDocument {
       title: "office-gateway",
       version: "1.0.0",
       description:
-        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service, fiscal-service, contabil-service, ti-service, certificate-service, pessoal-service, parcelamento-service, reports-service, commercial-service and audit-service. Browser authentication uses the cw.session HttpOnly cookie plus x-csrf-token on mutations. Bearer remains a temporary, disabled-by-default rollout compatibility path. Paths marked with x-internal are intended for internal service-to-service usage.",
+        "Gateway OpenAPI document aggregating user-service, task-service, project-service, client-service, regularize-service, organization-service, rh-service, fiscal-service, contabil-service, triagem-service, ti-service, certificate-service, pessoal-service, parcelamento-service, reports-service, commercial-service and audit-service. Browser authentication uses the cw.session HttpOnly cookie plus x-csrf-token on mutations. Bearer remains a temporary, disabled-by-default rollout compatibility path. Paths marked with x-internal are intended for internal service-to-service usage.",
     },
     servers: [{ url: "http://localhost" }],
     tags: [

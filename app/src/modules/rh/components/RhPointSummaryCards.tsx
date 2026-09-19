@@ -1,6 +1,7 @@
 import { isAxiosError } from "axios";
 
 import type { RhPointMonthlySummary } from "../types";
+import { formatRhDuration } from "../utils/rhDuration";
 
 interface RhPointSummaryCardsProps {
   summary: RhPointMonthlySummary | null;
@@ -9,28 +10,21 @@ interface RhPointSummaryCardsProps {
   error: Error | null;
 }
 
-function formatMinutesLabel(totalMinutes: number) {
-  const signal = totalMinutes < 0 ? "-" : "";
-  const absoluteMinutes = Math.abs(totalMinutes);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const minutes = absoluteMinutes % 60;
-
-  return `${signal}${hours}h${String(minutes).padStart(2, "0")}`;
-}
-
 const CARD_CONFIG = [
   {
     title: "Horas trabalhadas",
     getValue: (summary: RhPointMonthlySummary) =>
-      formatMinutesLabel(summary.total_worked_minutes),
+      formatRhDuration(summary.total_worked_minutes),
   },
   {
     title: "Saldo do mês",
-    getValue: (summary: RhPointMonthlySummary) => formatMinutesLabel(summary.balance_minutes),
+    getValue: (summary: RhPointMonthlySummary) =>
+      formatRhDuration(summary.balance_minutes, { showPositiveSign: true }),
   },
   {
     title: "Horas extras",
-    getValue: (summary: RhPointMonthlySummary) => formatMinutesLabel(summary.overtime_minutes),
+    getValue: (summary: RhPointMonthlySummary) =>
+      formatRhDuration(summary.overtime_minutes, { showPositiveSign: true }),
   },
   {
     title: "Ajustes pendentes",

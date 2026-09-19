@@ -1,7 +1,10 @@
+import { randomUUID } from "node:crypto";
+
 import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
+import { rhNotificationService } from "./rhNotificationService.js";
 
 const REQUEST_SELECT = {
   id: true,
@@ -17,6 +20,13 @@ const REQUEST_SELECT = {
   },
   category_id: true,
   assigned_to_user_id: true,
+  assigned_to: {
+    select: {
+      id: true,
+      name: true,
+      status: true,
+    },
+  },
   urgency: true,
   status: true,
   created_at: true,
@@ -43,6 +53,7 @@ export interface RequestCreateInput {
 export interface RequestUpdateInput {
   id: string;
   organization_id: string;
+  actor_user_id?: string;
   title?: string;
   description?: string;
   category_id?: string;
@@ -63,6 +74,7 @@ export interface RequestListOptions {
   category_id?: string;
   requester_user_id?: string;
   assigned_to_user_id?: string;
+  participant_user_id?: string;
 }
 
 export interface RhRequestListPage {
@@ -86,11 +98,14 @@ class RequestService {
   private async findEligibleRhAssignee(
     organizationId: string,
     requesterUserId: string,
+    candidateUserId?: string,
   ): Promise<string> {
     const assignee = await prismaClient.user.findFirst({
       where: {
         status: "active",
-        id: { not: requesterUserId },
+        id: candidateUserId
+          ? { equals: candidateUserId, not: requesterUserId }
+          : { not: requesterUserId },
         OR: [
           { organization_id: organizationId },
           { organization_id: null, department: { organization_id: organizationId } },
@@ -108,8 +123,10 @@ class RequestService {
 
     if (!assignee) {
       throw new ServiceError(
-        404,
-        "Nenhum responsavel de RH elegivel encontrado para atribuir a solicitacao.",
+        candidateUserId ? 400 : 404,
+        candidateUserId
+          ? "O responsável informado não está ativo, no escopo da organização ou autorizado no módulo RH."
+          : "Nenhum responsavel de RH elegivel encontrado para atribuir a solicitacao.",
       );
     }
 
@@ -118,7 +135,7 @@ class RequestService {
 
   private async requireCategoryInOrg(organizationId: string, categoryId: string): Promise<void> {
     const category = await prismaClient.rhCategory.findFirst({
-      where: { id: categoryId, organization_id: organizationId },
+      where: { id: categoryId, organization_id: organizationId, active: true },
       select: { id: true },
     });
     if (!category) {
@@ -133,13 +150,17 @@ class RequestService {
       const title = assertNonEmptyString(input.title, "title");
       const description = assertNonEmptyString(input.description, "description");
       const categoryId = assertNonEmptyString(input.category_id, "category_id");
-      let assignedToUserId =
+      const requestedAssigneeId =
         input.assigned_to_user_id !== undefined
           ? assertNonEmptyString(input.assigned_to_user_id, "assigned_to_user_id")
           : undefined;
 
       await this.requireCategoryInOrg(organizationId, categoryId);
-      assignedToUserId ??= await this.findEligibleRhAssignee(organizationId, requesterUserId);
+      const assignedToUserId = await this.findEligibleRhAssignee(
+        organizationId,
+        requesterUserId,
+        requestedAssigneeId,
+      );
       this.ensureAssigneeIsNotRequester(requesterUserId, assignedToUserId);
 
       const created = await prismaClient.rhRequest.create({
@@ -154,6 +175,15 @@ class RequestService {
           organization_id: organizationId,
         },
         select: REQUEST_SELECT,
+      });
+
+      await rhNotificationService.notify({
+        organization_id: organizationId,
+        user_id: assignedToUserId,
+        request_id: created.id,
+        event_key: "request-created",
+        title: "Nova solicitação de RH",
+        message: `A solicitação “${created.title}” foi atribuída a você.`,
       });
 
       return created;
@@ -212,15 +242,30 @@ class RequestService {
         data.category_id = categoryId;
       }
       if (input.assigned_to_user_id !== undefined) {
-        data.assigned_to_user_id = assertNonEmptyString(
+        const candidateUserId = assertNonEmptyString(
           input.assigned_to_user_id,
           "assigned_to_user_id",
+        );
+        data.assigned_to_user_id = await this.findEligibleRhAssignee(
+          organizationId,
+          existing.requester_user_id,
+          candidateUserId,
         );
       }
       if (input.urgency !== undefined) {
         data.urgency = input.urgency;
       }
       if (input.status !== undefined) {
+        if (input.status !== existing.status) {
+          const allowedNextStatus: Record<string, string> = {
+            New: "In_Progress",
+            In_Progress: "Resolved",
+            Resolved: "Closed",
+          };
+          if (allowedNextStatus[existing.status] !== input.status) {
+            throw new ServiceError(409, "Transição de status inválida para esta solicitação.");
+          }
+        }
         data.status = input.status;
       }
 
@@ -235,6 +280,21 @@ class RequestService {
         data,
         select: REQUEST_SELECT,
       });
+
+      const recipients = [updated.requester_user_id, updated.assigned_to_user_id].filter(
+        (recipientId, index, all) =>
+          recipientId !== input.actor_user_id && all.indexOf(recipientId) === index,
+      );
+      for (const recipientId of recipients) {
+        await rhNotificationService.notify({
+          organization_id: organizationId,
+          user_id: recipientId,
+          request_id: updated.id,
+          event_key: `request-updated:${randomUUID()}`,
+          title: "Solicitação de RH atualizada",
+          message: `A solicitação “${updated.title}” foi atualizada.`,
+        });
+      }
 
       return updated;
     } catch (err: unknown) {
@@ -252,16 +312,22 @@ class RequestService {
       const where: Prisma.RhRequestWhereInput = {
         organization_id: orgId,
       };
+      if (options.participant_user_id !== undefined) {
+        where.OR = [
+          { requester_user_id: options.participant_user_id },
+          { assigned_to_user_id: options.participant_user_id },
+        ];
+      }
       if (options.status !== undefined) {
         where.status = options.status;
       }
       if (options.category_id !== undefined) {
         where.category_id = options.category_id;
       }
-      if (options.requester_user_id !== undefined) {
+      if (options.requester_user_id !== undefined && options.participant_user_id === undefined) {
         where.requester_user_id = options.requester_user_id;
       }
-      if (options.assigned_to_user_id !== undefined) {
+      if (options.assigned_to_user_id !== undefined && options.participant_user_id === undefined) {
         where.assigned_to_user_id = options.assigned_to_user_id;
       }
 
@@ -312,6 +378,39 @@ class RequestService {
       const msg = err instanceof Error ? err.message : String(err);
       throw new ServiceError(500, `Erro interno ao buscar solicitação. ${msg}`, err);
     }
+  }
+
+  async markOpened(input: {
+    organization_id: string;
+    request_id: string;
+    user_id: string;
+  }): Promise<void> {
+    const requestId = assertNonEmptyString(input.request_id, "request_id");
+    const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
+    const userId = assertNonEmptyString(input.user_id, "user_id");
+    if (prismaClient.rhRequestRead) {
+      await prismaClient.rhRequestRead.upsert({
+        where: {
+          organization_id_request_id_user_id: {
+            organization_id: organizationId,
+            request_id: requestId,
+            user_id: userId,
+          },
+        },
+        create: {
+          organization_id: organizationId,
+          request_id: requestId,
+          user_id: userId,
+        },
+        update: { read_at: new Date() },
+      });
+    }
+
+    await rhNotificationService.markRead({
+      organization_id: organizationId,
+      user_id: userId,
+      request_id: requestId,
+    });
   }
 
   async delete(input: RequestDeleteInput): Promise<{ message: string }> {

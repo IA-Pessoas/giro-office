@@ -28,6 +28,7 @@ export interface CreateLogParams {
   referring: string;
   referringId: string;
   changes: Record<string, unknown> | string;
+  required?: boolean;
 }
 
 export interface LogUpdateParams {
@@ -39,6 +40,7 @@ export interface LogUpdateParams {
   referringId: string;
   oldData: Record<string, unknown> | null;
   updatedData: Record<string, unknown>;
+  required?: boolean;
 }
 
 export async function createLog(params: CreateLogParams): Promise<void> {
@@ -59,6 +61,11 @@ export async function createLog(params: CreateLogParams): Promise<void> {
     referringId: params.referringId,
     changes: typeof params.changes === "string" ? params.changes : params.changes,
   };
+
+  if (params.required) {
+    await recordAudit.recordRequired(payload);
+    return;
+  }
 
   await recordAudit(payload);
 }
@@ -93,6 +100,11 @@ export async function logUpdateIfChanged(params: LogUpdateParams): Promise<void>
     referringId: params.referringId,
     changes: Object.keys(changes).length > 0 ? changes : {},
   };
+
+  if (params.required) {
+    await recordAudit.recordRequired(payload);
+    return;
+  }
 
   await recordAudit(payload);
 }

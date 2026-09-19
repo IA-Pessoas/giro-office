@@ -11,20 +11,27 @@ import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
   triageDocumentItemBodySchema,
   triageDocumentsBulkBodySchema,
+  triageEditabilityRequestSchema,
   triageMonthlyIdParamsSchema,
   triageMonthlyRequestSchema,
+  triageStatementArchiveBodySchema,
   triageStatementBodySchema,
 } from "../schemas/triageDocuments.schemas.js";
-import type { TriageDocumentsService } from "../services/triageDocumentsService.js";
+import type {
+  TriageDocumentItemUpdate,
+  TriageDocumentsService,
+} from "../services/triageDocumentsService.js";
 
 export type TriageDocumentsRouteDeps = Pick<
   TriageDocumentsService,
   | "getMonthly"
+  | "getEditability"
   | "getOrCreateMonthly"
   | "updateItem"
   | "updateAll"
   | "listStatements"
   | "upsertStatement"
+  | "archiveStatement"
 >;
 
 function authenticatedContext(request: Request) {
@@ -43,13 +50,31 @@ export function createTriageDocumentsRoutes(
   const router: ReturnType<typeof Router> = Router();
 
   router.get(
+    "/editability",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(triageEditabilityRequestSchema, req.query);
+        res.json(
+          createSuccessResponse(
+            await service.getEditability(query.client_id, authenticatedContext(req), query.type),
+          ),
+        );
+      } catch (err) {
+        logError("Erro ao verificar permissão de edição da Triagem", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
     "/monthly",
     isAuthenticated,
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const query = parseWithZod(triageMonthlyRequestSchema, req.query);
         const auth = authenticatedContext(req);
-        res.json(createSuccessResponse(await service.getMonthly(query, auth.organizationId)));
+        res.json(createSuccessResponse(await service.getMonthly(query, auth)));
       } catch (err) {
         logError("Erro ao buscar pendência documental mensal", { err });
         next(err);
@@ -81,7 +106,11 @@ export function createTriageDocumentsRoutes(
         const body = parseWithZod(triageDocumentItemBodySchema, req.body);
         res.json(
           createSuccessResponse(
-            await service.updateItem(params.id, body, authenticatedContext(req)),
+            await service.updateItem(
+              params.id,
+              body as TriageDocumentItemUpdate,
+              authenticatedContext(req),
+            ),
           ),
         );
       } catch (err) {
@@ -136,6 +165,22 @@ export function createTriageDocumentsRoutes(
         );
       } catch (err) {
         logError("Erro ao atualizar extrato bancário", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    "/statements",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(triageStatementArchiveBodySchema, req.body);
+        res.json(
+          createSuccessResponse(await service.archiveStatement(body, authenticatedContext(req))),
+        );
+      } catch (err) {
+        logError("Erro ao arquivar marcador de extrato bancário", { err });
         next(err);
       }
     },

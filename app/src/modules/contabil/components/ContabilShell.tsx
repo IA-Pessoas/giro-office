@@ -177,7 +177,7 @@ function ContabilActiveTabPanel({
   }
 
   if (activeTab === "documents") {
-    return <div role="tabpanel" id="contabil-panel-documents" aria-labelledby="contabil-tab-documents"><TriageDocumentsSection clientId={clientId} canEdit={canEdit} /></div>;
+    return <div role="tabpanel" id="contabil-panel-documents" aria-labelledby="contabil-tab-documents"><TriageDocumentsSection clientId={clientId} canEdit={canEdit} canEditClosing={canEdit} /></div>;
   }
 
   return (

@@ -51,6 +51,9 @@ const envSchema = z
     internalServiceTokenEnv: z.string().optional(),
     reportsInternalToken: z.string().optional().default("reports-service-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
+    triagemServiceUrl: z.string().url().default("http://localhost:3046"),
+    triagemInternalTokenEnv: z.string().optional(),
+    triagemRequestTimeoutMs: z.coerce.number().int().min(50).max(10_000).default(2_000),
     enableApiDocsEnv: z.string().optional(),
     allowedOrigins: z
       .string()
@@ -59,7 +62,7 @@ const envSchema = z
       .transform((value) => parseAllowedOrigins(value)),
   })
   .transform((env) => {
-    const { enableApiDocsEnv, internalServiceTokenEnv, ...rest } = env;
+    const { enableApiDocsEnv, internalServiceTokenEnv, triagemInternalTokenEnv, ...rest } = env;
     const enableApiDocs =
       enableApiDocsEnv !== undefined && enableApiDocsEnv !== ""
         ? parseBoolean(enableApiDocsEnv)
@@ -68,6 +71,10 @@ const envSchema = z
       internalServiceTokenEnv !== undefined && internalServiceTokenEnv !== ""
         ? internalServiceTokenEnv
         : rest.auditServiceToken;
+    const triagemInternalToken =
+      triagemInternalTokenEnv !== undefined && triagemInternalTokenEnv !== ""
+        ? triagemInternalTokenEnv
+        : internalServiceToken;
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
       serviceName: "contabil-service",
@@ -79,6 +86,12 @@ const envSchema = z
       serviceName: "contabil-service",
       envName: "INTERNAL_SERVICE_TOKEN",
       token: internalServiceToken,
+    });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "contabil-service",
+      envName: "TRIAGEM_INTERNAL_TOKEN",
+      token: triagemInternalToken,
     });
     validateProductionInternalServiceToken({
       nodeEnv: rest.nodeEnv,
@@ -100,6 +113,7 @@ const envSchema = z
     });
     return {
       ...rest,
+      triagemInternalToken,
       internalServiceToken,
       logPretty: rest.nodeEnv !== "production" && rest.logPretty,
       enableApiDocs,
@@ -122,6 +136,9 @@ export function getContabilServiceEnv(): ContabilServiceEnv {
     internalServiceTokenEnv: process.env.INTERNAL_SERVICE_TOKEN,
     reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
     reportsGrantSecret: process.env.REPORTS_GRANT_SECRET,
+    triagemServiceUrl: process.env.TRIAGEM_SERVICE_URL,
+    triagemInternalTokenEnv: process.env.TRIAGEM_INTERNAL_TOKEN,
+    triagemRequestTimeoutMs: process.env.TRIAGEM_REQUEST_TIMEOUT_MS,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });
