@@ -17,6 +17,7 @@ interface RhRequestDetailModalProps {
   getCategoryLabel: (categoryId: string) => string;
   getAssignedUserLabel: (userId: string) => string;
   getRequesterLabel: (request: RhRequest) => string;
+  currentUserId?: string;
   canManageRequest: boolean;
   canUseRhWorkflowMessages: boolean;
   isDeleting: boolean;
@@ -31,6 +32,7 @@ export function RhRequestDetailModal({
   getCategoryLabel,
   getAssignedUserLabel,
   getRequesterLabel,
+  currentUserId,
   canManageRequest,
   canUseRhWorkflowMessages,
   isDeleting,
@@ -166,7 +168,7 @@ export function RhRequestDetailModal({
                   Responsável
                 </p>
                 <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                  {getAssignedUserLabel(request.assigned_to_user_id)}
+                  {request.assigned_to?.name ?? getAssignedUserLabel(request.assigned_to_user_id)}
                 </p>
               </div>
 
@@ -193,6 +195,9 @@ export function RhRequestDetailModal({
           <RhRequestMessagesTimeline
             requestId={request.id}
             canUseRhWorkflowMessages={canUseRhWorkflowMessages}
+            canRespondToRhSolution={
+              request.status === "Resolved" && request.requester_user_id === currentUserId
+            }
           />
         </>
       ) : null}

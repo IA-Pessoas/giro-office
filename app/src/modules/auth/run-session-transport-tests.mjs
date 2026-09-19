@@ -25,6 +25,8 @@ const [
   platformGuardSource,
   platformLoginSource,
   packageSource,
+  authSessionSmokeSource,
+  browserSmokeEnvSource,
 ] =
   await Promise.all([
     source("../../shared/services/api.ts"),
@@ -36,6 +38,8 @@ const [
     source("./utils/canSSRPlatformAdmin.ts"),
     source("../../pages/super-admin/login.tsx"),
     source("../../../package.json"),
+    source("./run-auth-session-browser-smoke.mjs"),
+    source("../../shared/testing/browserSmokeEnv.mjs"),
   ]);
 const appPackage = JSON.parse(packageSource);
 
@@ -86,5 +90,10 @@ await runTest("session security tests belong to the aggregate and build before b
   assert.match(appPackage.scripts.test, /test:session-security/);
   assert.match(appPackage.scripts.test, /test:platform-session/);
   assert.match(appPackage.scripts.test, /test:auth-session/);
-  assert.match(appPackage.scripts["test:auth-session"], /^pnpm run build && /);
+  // O build passou a acontecer dentro do smoke, com NEXT_PUBLIC_API_URL fixo em /api,
+  // para o gate nao depender do .env.local de cada ambiente.
+  assert.match(appPackage.scripts["test:auth-session"], /run-auth-session-browser-smoke\.mjs/);
+  assert.match(authSessionSmokeSource, /buildApp\(\);/);
+  assert.match(authSessionSmokeSource, /browserSmokeEnv\(\)/);
+  assert.match(browserSmokeEnvSource, /NEXT_PUBLIC_API_URL: "\/api"/);
 });

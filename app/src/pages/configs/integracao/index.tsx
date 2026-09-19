@@ -1,6 +1,6 @@
 import React from "react";
 import Head from "next/head";
-import { FaTasks } from "react-icons/fa";
+import { FaListOl, FaTasks } from "react-icons/fa";
 import Link from "next/link";
 import { canSSRAuth } from "@modules/auth";
 import styles from "./IntegracaoConfigPage.module.css";
@@ -22,7 +22,13 @@ export default function IntegracaoConfig() {
               <p className={styles.cardText}>Gerencie os modelos padrão de tarefas recorrentes.</p>
             </div>
           </Link>
-          {/* Adicione mais cards de configuração aqui no futuro */}
+          <Link href="/configs/integracao/plans">
+            <div className={styles.card}>
+              <FaListOl className={styles.icon} />
+              <h2 className={styles.cardTitle}>Planos de Trabalho</h2>
+              <p className={styles.cardText}>Monte a sequência de modelos a contratar em cada projeto.</p>
+            </div>
+          </Link>
         </div>
       </div>
     </>

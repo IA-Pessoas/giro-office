@@ -43,6 +43,7 @@ export {
 } from "./useContabilPermissions";
 export {
   useTriageClosing,
+  useTriageEditability,
   useTriageMonthly,
   useTriageMutations,
   useTriageStatements,

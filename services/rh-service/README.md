@@ -9,7 +9,7 @@ Por defeito: **3034** (`PORT`).
 
 ## Variaveis de ambiente
 
-Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (inteiro positivo, default 1), `JWT_SECRET`, `REPORTS_INTERNAL_TOKEN` e `REPORTS_GRANT_SECRET`.
+Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (inteiro positivo, default 1), `JWT_SECRET`, `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` e `RH_REQUEST_MESSAGE_BUCKET` (default `rh-request-messages`).
 
 ## Gateway
 
@@ -19,6 +19,8 @@ Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX
   `GET /rh/score/quarters/{id}`.
 - `POST /rh/requests` aceita criacao sem `assigned_to_user_id`; nesse caso o backend atribui automaticamente um responsavel RH elegivel antes de persistir.
 - `GET /rh/operational-users` lista colaboradores ativos da organizacao com payload minimo para seletores operacionais de RH.
+- `POST /rh/messages` aceita JSON ou multipart com um PDF, PNG ou JPEG privado de até 10 MB; `GET /rh/messages` só devolve URL assinada aos participantes autorizados.
+- `GET /rh/notifications` e `PUT /rh/notifications/read` fornecem a campainha global por usuário, organização e solicitação.
 
 ## Reporting interno
 

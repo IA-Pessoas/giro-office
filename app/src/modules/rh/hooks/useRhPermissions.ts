@@ -17,6 +17,7 @@ interface UseRhPermissionsResult {
   isGlobalAdmin: boolean;
   canManageRh: boolean;
   canManageRhRequests: boolean;
+  canManageRhPointAdjustments: boolean;
   canManageRhScore: boolean;
   canManageRhTimeBank: boolean;
   canManageRhTimesheets: boolean;
@@ -46,6 +47,7 @@ export function useRhPermissions(scope: string): UseRhPermissionsResult {
     isGlobalAdmin,
     canManageRh: capabilities.canManageRh,
     canManageRhRequests: capabilities.canManageRhRequests,
+    canManageRhPointAdjustments: capabilities.canManageRhPointAdjustments,
     canManageRhScore: capabilities.canManageRhScore,
     canManageRhTimeBank: capabilities.canManageRhTimeBank,
     canManageRhTimesheets: capabilities.canManageRhTimesheets,

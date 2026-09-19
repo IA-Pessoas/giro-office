@@ -70,6 +70,44 @@ export interface IntegracaoTaskDetail {
   end_date: string | null;
   date_created: string;
   date_updated: string;
+  pending_approval?: boolean | null;
+}
+
+export type IntegracaoTaskCompletionDecision = "approved" | "refused";
+export type IntegracaoTaskCompletionRequestStatus =
+  | "pending"
+  | "approved"
+  | "refused"
+  | "canceled";
+
+export interface IntegracaoTaskCompletionRequest {
+  id: string;
+  requester_id: string;
+  status: IntegracaoTaskCompletionRequestStatus;
+  reason: string | null;
+  decision_reason: string | null;
+  decided_by: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface IntegracaoTaskAttachment {
+  id: string;
+  original_name: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_by: string;
+  created_at: string;
+}
+
+export interface IntegracaoTaskPostponement {
+  id: string;
+  previous_prevision_date: string;
+  new_prevision_date: string;
+  justification: string;
+  author_id: string;
+  author_name: string | null;
+  created_at: string;
 }
 
 export interface IntegracaoTaskListParams {
@@ -108,5 +146,4 @@ export interface UpdateIntegracaoTaskBody {
   billing?: TaskBilling;
   urgency?: string;
   responsible_id?: string | null;
-  prevision_date?: string | null;
 }

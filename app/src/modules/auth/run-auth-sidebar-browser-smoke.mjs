@@ -6,8 +6,11 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const PORT = process.env.PLAYWRIGHT_PORT || "3115";
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
+const useProductionBuild = process.argv.includes("--production");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const APP_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const evidenceDir = process.env.CONTABIL_SMOKE_EVIDENCE_DIR;
@@ -117,11 +120,23 @@ async function installApiMocks(page, currentUser) {
               client_id: "contabil-smoke-client-initialized",
               legal_name: "Alfa Contábil Ltda.",
               control: { depreciation: true },
+              closing: {
+                client_id: "contabil-smoke-client-initialized",
+                competence,
+                status: "NOT_RECEIVED",
+                archived_at: null,
+              },
             },
             {
               client_id: "contabil-smoke-client-missing",
               legal_name: "Beta Contábil Ltda.",
               control: null,
+              closing: {
+                client_id: "contabil-smoke-client-missing",
+                competence,
+                status: "NOT_RECEIVED",
+                archived_at: null,
+              },
             },
           ],
         },
@@ -387,13 +402,16 @@ async function withNextServer(test) {
   }
 
   const command = process.platform === "win32" ? "cmd" : "corepack";
+  const nextArgs = useProductionBuild
+    ? ["start", "--port", PORT]
+    : ["dev", "--webpack", "--port", PORT];
   const args =
     process.platform === "win32"
-      ? ["/c", "corepack", "pnpm", "exec", "next", "dev", "--webpack", "--port", PORT]
-      : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PORT];
+      ? ["/c", "corepack", "pnpm", "exec", "next", ...nextArgs]
+      : ["pnpm", "exec", "next", ...nextArgs];
   const serverProcess = spawn(command, args, {
     cwd: APP_ROOT,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
@@ -420,11 +438,16 @@ async function waitForServer(serverProcess, getOutput) {
     const output = getOutput();
 
     if (serverProcess.exitCode !== null) {
-      throw new Error(`Next dev server exited before smoke test.\n${output}`);
+      throw new Error(`Next server exited before smoke test.\n${output}`);
     }
 
     if (output.includes("Module not found: Can't resolve")) {
-      throw new Error(`Next dev server failed to compile the app before smoke test.\n${output}`);
+      throw new Error(`Next server failed to compile the app before smoke test.\n${output}`);
+    }
+
+    if (useProductionBuild && !output.includes("Ready in")) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
     }
 
     try {
@@ -433,13 +456,13 @@ async function waitForServer(serverProcess, getOutput) {
         return;
       }
     } catch {
-      // Retry until the dev server binds the port.
+      // Retry until the server binds the port.
     }
 
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  throw new Error(`Timed out waiting for Next dev server at ${baseUrl}.\n${getOutput()}`);
+  throw new Error(`Timed out waiting for Next server at ${baseUrl}.\n${getOutput()}`);
 }
 
 function stopServer(serverProcess) {

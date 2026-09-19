@@ -113,8 +113,19 @@ runTest("AppShell header notifications do not embed mock notification rows", () 
   assert.equal(appShellSource.includes("Novo chamado crítico aberto"), false);
   assert.equal(appShellSource.includes("Prazo de tarefa próximo do vencimento"), false);
   assert.equal(appShellSource.includes("Backup diário finalizado"), false);
-  assert.match(appShellSource, /const notifications: AppShellNotification\[] = \[];/);
-  assert.match(appShellSource, /const hasUnreadNotifications = notifications\.some/);
+  // O sino junta duas origens desde o merge das notificacoes de RH com as de tarefa.
+  assert.match(
+    appShellSource,
+    /const taskNotifications: AppShellNotification\[] = \(notificationQuery\.data\?\.items \?\? \[]\)/,
+  );
+  assert.match(
+    appShellSource,
+    /const rhNotifications: AppShellNotification\[] = \(rhNotificationsQuery\.data \?\? \[]\)/,
+  );
+  assert.match(
+    appShellSource,
+    /const hasUnreadNotifications = notifications\.some\(\(item\) => item\.unread\);/,
+  );
   assert.match(appShellSource, /hasUnreadNotifications \?/);
   assert.match(appShellSource, /Nenhuma notificação encontrada\./);
 });

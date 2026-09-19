@@ -1,18 +1,21 @@
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Edit3, FolderSync, ListTodo, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit3, FolderSync, ListTodo, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
 import { ConfirmationDialog } from "@shared/components";
+import { Dialog } from "@shared/components/ui/Dialog";
 
 import {
   useDeleteProjectMutation,
   useProjectDetail,
   useRecalculateProjectProgressMutation,
 } from "../hooks/useProjects";
+import { useHireProjectPlanMutation, useProjectPlans } from "../hooks/useProjectPlans";
 import { getProjectDeleteErrorMessage } from "../services/projectService.contract";
+import { getProjectPlanHireErrorMessage } from "../services/projectPlanService.contract";
 import type { ProjectDetail } from "../types";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectProgressBar } from "./ProjectProgressBar";
@@ -33,9 +36,13 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
   const projectQuery = useProjectDetail(projectId);
   const deleteProjectMutation = useDeleteProjectMutation();
   const recalculateProgressMutation = useRecalculateProjectProgressMutation();
+  const hirePlanMutation = useHireProjectPlanMutation();
+  const plansQuery = useProjectPlans();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [pendingProjectDeletion, setPendingProjectDeletion] = useState<ProjectDetail | null>(null);
   const [projectDeletionError, setProjectDeletionError] = useState<string | null>(null);
+  const [isHirePlanDialogOpen, setIsHirePlanDialogOpen] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
   const backClientId = typeof router.query.clientId === "string" ? router.query.clientId : null;
   const project = projectQuery.data;
 
@@ -87,6 +94,25 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     }
   }
 
+  async function handleHirePlan() {
+    if (!selectedPlanId || !project) {
+      return;
+    }
+
+    try {
+      const result = await hirePlanMutation.mutateAsync({
+        plan_id: selectedPlanId,
+        project_id: project.id,
+      });
+      toast.success(result.idempotent ? "Este plano já foi contratado neste projeto." : "Plano contratado com sucesso.");
+      setIsHirePlanDialogOpen(false);
+      setSelectedPlanId("");
+      await projectQuery.refetch();
+    } catch (error) {
+      toast.error(getProjectPlanHireErrorMessage(error));
+    }
+  }
+
   if (projectQuery.isLoading) {
     return (
       <section
@@ -126,6 +152,33 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         cancelLabel="Cancelar"
         variant="destructive"
       />
+
+      <Dialog
+        open={isHirePlanDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && !hirePlanMutation.isPending) {
+            setIsHirePlanDialogOpen(false);
+            setSelectedPlanId("");
+          }
+        }}
+        title="Contratar plano de trabalho"
+        description="As tarefas serão criadas na ordem configurada no plano."
+        contentClassName="w-[min(92vw,460px)]"
+        footer={
+          <>
+            <button type="button" onClick={() => setIsHirePlanDialogOpen(false)} className={PROJECT_COMPACT_BUTTON_CLASSNAME} disabled={hirePlanMutation.isPending}>Cancelar</button>
+            <button type="button" onClick={() => void handleHirePlan()} className={PROJECT_COMPACT_PRIMARY_BUTTON_CLASSNAME} disabled={!selectedPlanId || hirePlanMutation.isPending}>{hirePlanMutation.isPending ? "Contratando..." : "Contratar"}</button>
+          </>
+        }
+      >
+        <label className="block space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+          Plano
+          <select value={selectedPlanId} onChange={(event) => setSelectedPlanId(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white" disabled={hirePlanMutation.isPending || plansQuery.isLoading}>
+            <option value="">Selecione um plano</option>
+            {plansQuery.data?.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+          </select>
+        </label>
+      </Dialog>
 
       {canEdit ? (
         <ProjectFormModal
@@ -257,6 +310,18 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                     <FolderSync className="h-3.5 w-3.5" />
                     {recalculateProgressMutation.isPending ? "Recalculando..." : "Recalcular"}
                   </button>
+
+                  {integracaoAccess.isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsHirePlanDialogOpen(true)}
+                      className={PROJECT_COMPACT_PRIMARY_BUTTON_CLASSNAME}
+                      disabled={plansQuery.isLoading || !plansQuery.data?.length}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Contratar plano
+                    </button>
+                  ) : null}
 
                   <button
                     type="button"

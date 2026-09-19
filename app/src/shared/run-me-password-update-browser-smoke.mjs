@@ -4,8 +4,11 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { browserSmokeEnv } from "./testing/browserSmokeEnv.mjs";
+
 const PLAYWRIGHT_PORT = process.env.ME_PASSWORD_SMOKE_PORT || "3102";
 const configuredBaseUrl = process.env.ME_PASSWORD_SMOKE_BASE_URL?.replace(/\/$/, "");
+const useProductionBuild = process.argv.includes("--production");
 let baseUrl = configuredBaseUrl || `http://localhost:${PLAYWRIGHT_PORT}`;
 const appRoot = fileURLToPath(new URL("../..", import.meta.url));
 const pageDiagnostics = new WeakMap();
@@ -193,7 +196,7 @@ async function withNextServer(run) {
     return;
   }
 
-  const reusableBaseUrl = await findReusableLocalServer();
+  const reusableBaseUrl = useProductionBuild ? null : await findReusableLocalServer();
   if (reusableBaseUrl) {
     baseUrl = reusableBaseUrl;
     await run();
@@ -201,13 +204,16 @@ async function withNextServer(run) {
   }
 
   const command = process.platform === "win32" ? "cmd" : "corepack";
+  const nextArgs = useProductionBuild
+    ? ["start", "--port", PLAYWRIGHT_PORT]
+    : ["dev", "--webpack", "--port", PLAYWRIGHT_PORT];
   const args =
     process.platform === "win32"
-      ? ["/c", "pnpm", "exec", "next", "dev", "--webpack", "--port", PLAYWRIGHT_PORT]
-      : ["pnpm", "exec", "next", "dev", "--webpack", "--port", PLAYWRIGHT_PORT];
+      ? ["/c", "pnpm", "exec", "next", ...nextArgs]
+      : ["pnpm", "exec", "next", ...nextArgs];
   const server = spawn(command, args, {
     cwd: appRoot,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
@@ -251,7 +257,12 @@ async function waitForServer(server, getOutput) {
 
   while (Date.now() - startedAt < 45_000) {
     if (server.exitCode !== null) {
-      throw new Error(`Next dev encerrou antes do smoke.\n${getOutput()}`);
+      throw new Error(`Next encerrou antes do smoke.\n${getOutput()}`);
+    }
+
+    if (useProductionBuild && !getOutput().includes("Ready in")) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
     }
 
     try {

@@ -7,7 +7,8 @@ fallback em API, frontend ou relatórios.
 
 ## Ordem obrigatória
 
-1. Aplique as migrations de catálogo, mapeamento e snapshots de obrigações.
+1. Aplique as migrations de catálogo, mapeamento, snapshots de obrigações e bootstrap de
+   `Sem Movimento`.
 2. Execute o dry-run de `scripts/migrate-pessoal-groups.mjs` para cada
    organização alvo.
 3. Resolva toda a quarentena por decisão explícita e repita o dry-run até que

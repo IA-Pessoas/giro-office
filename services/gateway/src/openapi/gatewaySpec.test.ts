@@ -24,6 +24,7 @@ it("agrega o catálogo público do reports-service", () => {
     departmentServiceUrl: "http://127.0.0.1:3336",
     fiscalServiceUrl: "http://127.0.0.1:3037",
     contabilServiceUrl: "http://127.0.0.1:3038",
+    triagemServiceUrl: "http://127.0.0.1:3046",
     regularizeServiceUrl: "http://127.0.0.1:3039",
     tiServiceUrl: "http://127.0.0.1:3040",
     tiServiceInternalToken: "ti-service-token",
@@ -52,6 +53,9 @@ it("agrega o catálogo público do reports-service", () => {
   expect(spec.paths["/commercial/prospecting"]?.post?.["x-origin-service"]).toBe(
     "commercial-service",
   );
+  expect(spec.paths["/triagem/catalogs"]?.get?.["x-origin-service"]).toBe("triagem-service");
+  expect(spec.paths["/triagem/external-links"]?.post?.["x-origin-service"]).toBe("triagem-service");
+  expect(spec.paths["/triagem/overview"]?.get?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/internal/reporting/access-context"]).toBeUndefined();
   expect(
     spec.paths["/platform/organizations/{organizationId}/users/{userId}/permissions"]?.get

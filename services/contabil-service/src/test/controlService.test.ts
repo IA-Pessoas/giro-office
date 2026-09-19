@@ -50,6 +50,10 @@ function createMockPrisma(): ControlServicePrisma {
       createMany: vi.fn(),
       updateMany: vi.fn(),
     },
+    triageMonthly: { updateMany: vi.fn() },
+    triageBankStatement: { updateMany: vi.fn() },
+    triageClosing: { updateMany: vi.fn() },
+    $transaction: vi.fn(),
   } as unknown as ControlServicePrisma;
 }
 
@@ -210,6 +214,38 @@ describe("ControlService", () => {
     expect(result.control).toEqual(baseRow);
     expect(prisma.controlContabil.create).not.toHaveBeenCalled();
     expect(audit.createLog).not.toHaveBeenCalled();
+  });
+
+  it("create restaura a competência arquivada em vez de tentar inseri-la novamente", async () => {
+    const prisma = createMockPrisma();
+    const audit = { createLog: vi.fn(), logUpdateIfChanged: vi.fn() };
+    vi.mocked(prisma.controlContabil.findFirst)
+      .mockResolvedValueOnce({ ...baseRow, archived_at: new Date("2024-02-01") } as never)
+      .mockResolvedValueOnce(baseRow as never);
+    vi.mocked(prisma.controlContabil.updateMany).mockResolvedValue({ count: 1 } as never);
+    vi.mocked(prisma.triageMonthly.updateMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.triageBankStatement.updateMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.triageClosing.updateMany).mockResolvedValue({ count: 0 } as never);
+    const transaction = prisma.$transaction as unknown as {
+      mockImplementation: (fn: (operations: Promise<unknown>[]) => Promise<unknown[]>) => void;
+    };
+    transaction.mockImplementation(async (operations) => Promise.all(operations));
+    const service = new ControlService(prisma, audit);
+
+    await expect(
+      service.create({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        permission: 2,
+        clientId: CLIENT_ID,
+        competence: "2024-01",
+      }),
+    ).resolves.toEqual({ control: baseRow, created: false });
+
+    expect(prisma.controlContabil.create).not.toHaveBeenCalled();
+    expect(prisma.controlContabil.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { archived_at: null } }),
+    );
   });
 
   it("create persiste, audita e marca created=true", async () => {

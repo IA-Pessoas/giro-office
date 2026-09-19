@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,6 +42,7 @@ const GLOBAL_PREFIXES = [
   "supabase/",
 ];
 
+/** Modo explicito (--full): o desenvolvedor pede todos os gates, suites incluidas. */
 const GLOBAL_COMMANDS = [
   ["pnpm", ["audit:ci"]],
   ["pnpm", ["check"]],
@@ -49,7 +50,24 @@ const GLOBAL_COMMANDS = [
   ["pnpm", ["test"]],
 ];
 
-const AFFECTED_TASKS = ["check", "typecheck", "test"];
+/** Sem base para comparar: roda o gate rapido inteiro, sem as suites dos pacotes. */
+const BASELESS_COMMANDS = [
+  ["pnpm", ["audit:ci"]],
+  ["pnpm", ["check"]],
+  ["pnpm", ["typecheck"]],
+  ["pnpm", ["test:scripts"]],
+];
+
+const DEPENDENCY_FILES = new Set([
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "yarn.lock",
+  ".npmrc",
+  ".pnpmfile.cjs",
+]);
 
 function normalizeGitPath(filePath) {
   return filePath
@@ -74,6 +92,31 @@ function isGlobalImpactPath(filePath) {
 
 function cloneCommands(commands) {
   return commands.map(([command, args]) => [command, [...args]]);
+}
+
+function buildBiomeCheckCommand(changedFiles) {
+  const existingFiles = changedFiles.filter((filePath) => existsSync(filePath));
+
+  if (existingFiles.length === 0) {
+    return ["pnpm", ["check"]];
+  }
+
+  // `--files-ignore-unknown` silencia o diagnostico por arquivo, mas se a lista
+  // inteira for de tipos que o biome ignora (um push so de workflow, por
+  // exemplo) ele ainda sai 1 em "No files were processed" e derruba o push.
+  // `--no-errors-on-unmatched` cobre esse caso sem esconder erro de arquivo que
+  // ele de fato entende.
+  return [
+    "pnpm",
+    [
+      "exec",
+      "biome",
+      "check",
+      "--files-ignore-unknown=true",
+      "--no-errors-on-unmatched",
+      ...existingFiles,
+    ],
+  ];
 }
 
 export function classifyChangedFiles(changedFiles) {
@@ -102,17 +145,112 @@ export function classifyChangedFiles(changedFiles) {
   return { mode: "affected", reason: "workspace-packages" };
 }
 
-export function buildHookPlan(classification, bases = []) {
+export function buildHookPlan(
+  classification,
+  bases = [],
+  { changedFiles = [], full = false } = {},
+) {
+  if (full) {
+    return cloneCommands(GLOBAL_COMMANDS);
+  }
+
   if (classification.mode === "skip") {
     return [];
   }
 
-  if (classification.mode === "global" || bases.length === 0) {
-    return cloneCommands(GLOBAL_COMMANDS);
+  if (bases.length === 0) {
+    return cloneCommands(BASELESS_COMMANDS);
   }
 
-  const filters = bases.map((base) => `--filter=...[${base}]`);
-  return [["pnpm", ["exec", "turbo", "run", ...AFFECTED_TASKS, ...filters]]];
+  const global = classification.mode === "global";
+  const filters = global ? [] : bases.map((base) => `--filter=...[${base}]`);
+  const commands = [];
+
+  if (
+    changedFiles.some((file) => DEPENDENCY_FILES.has(path.posix.basename(normalizeGitPath(file))))
+  ) {
+    commands.push(["pnpm", ["audit:ci"]]);
+  }
+
+  if (global) {
+    commands.push(buildBiomeCheckCommand(changedFiles), ["pnpm", ["typecheck"]]);
+  } else {
+    commands.push([
+      "pnpm",
+      ["exec", "turbo", "run", "check", "typecheck", ...filters, "--output-logs=new-only"],
+    ]);
+  }
+
+  // As politicas de seguranca sao rapidas e deterministicas; entre elas esta a
+  // varredura de payload em configs executaveis, que detectou o comprometimento
+  // de 2026-09-17. As suites dos pacotes ficam de fora: falhavam de forma
+  // intermitente na maquina de quem empurra e um gate que as vezes mente vira
+  // motivo para --no-verify. Elas seguem em pnpm test e devem voltar ao CI.
+  commands.push(["pnpm", ["test:scripts"]]);
+
+  return commands;
+}
+
+/**
+ * Branches onde reescrever historico nunca e aceitavel, nem com a valvula de escape.
+ */
+const PROTECTED_BRANCHES = new Set(["main", "develop", "staging"]);
+
+/** Valvula de escape consciente, para rebase de branch propria. */
+const FORCE_ESCAPE_ENV = "ALLOW_FORCE_PUSH";
+
+/**
+ * Um push que reescreve historico aparece no pre-push como um remoto que nao e
+ * ancestral do local: os commits ja publicados deixariam de existir. Recusamos por
+ * padrao — foi assim que o repositorio foi comprometido em 2026-09-17, com as branches
+ * reescritas por push forcado — e so liberamos fora das branches protegidas quando
+ * quem empurra declara a intencao em ALLOW_FORCE_PUSH.
+ */
+export function findHistoryRewrites(records, git = createGitRunner()) {
+  const rewrites = [];
+
+  for (const record of records) {
+    if (ZERO_OID.test(record.localOid) || ZERO_OID.test(record.remoteOid)) {
+      continue;
+    }
+
+    if (git.isAncestor(record.remoteOid, record.localOid) === false) {
+      rewrites.push({
+        ref: record.remoteRef,
+        branch: record.remoteRef.replace(/^refs\/heads\//, ""),
+        remoteOid: record.remoteOid,
+        localOid: record.localOid,
+      });
+    }
+  }
+
+  return rewrites;
+}
+
+export function describeForcePushBlock(rewrites, env = process.env) {
+  if (rewrites.length === 0) {
+    return null;
+  }
+
+  const protectedRewrites = rewrites.filter(({ branch }) => PROTECTED_BRANCHES.has(branch));
+
+  if (env[FORCE_ESCAPE_ENV] === "1" && protectedRewrites.length === 0) {
+    return null;
+  }
+
+  const alvos = rewrites.map(
+    ({ branch, remoteOid }) => `  ${branch} (remoto ${remoteOid.slice(0, 8)} deixaria de existir)`,
+  );
+  const motivo =
+    protectedRewrites.length > 0
+      ? `Reescrever historico de ${protectedRewrites.map(({ branch }) => branch).join(", ")} nao e permitido.`
+      : `Para reescrever historico de uma branch propria, declare a intencao definindo ${FORCE_ESCAPE_ENV}=1 no push.`;
+
+  return [
+    "git-hook-scope: push recusado — reescrita de historico detectada.",
+    ...alvos,
+    motivo,
+  ].join("\n");
 }
 
 export function parsePrePushInput(input) {
@@ -122,9 +260,16 @@ export function parsePrePushInput(input) {
     .filter(Boolean)
     .map((line) => {
       const [localRef, localOid, remoteRef, remoteOid] = line.split(/\s+/);
+
+      // O git sempre escreve os quatro campos. Descartar a linha incompleta
+      // deixaria `records` vazio, e o hook concluiria que nao ha nada sendo
+      // empurrado — liberando o push em vez de barra-lo.
+      if (!localRef || !localOid || !remoteRef || !remoteOid) {
+        throw new Error(`entrada do pre-push malformada: ${JSON.stringify(line)}`);
+      }
+
       return { localRef, localOid, remoteRef, remoteOid };
-    })
-    .filter((record) => record.localRef && record.localOid && record.remoteRef && record.remoteOid);
+    });
 }
 
 function splitGitOutput(output) {
@@ -262,6 +407,17 @@ export function resolvePrePushChangedFiles(input, git = createGitRunner()) {
 
 function createGitRunner() {
   return {
+    isAncestor(ancestorOid, descendantOid) {
+      const result = spawnSync("git", ["merge-base", "--is-ancestor", ancestorOid, descendantOid], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      if (result.status === 0) return true;
+      if (result.status === 1) return false;
+      // Objeto ausente ou erro do git: nao da para afirmar que houve reescrita.
+      return null;
+    },
     run(args) {
       const result = spawnSync("git", args, {
         encoding: "utf8",
@@ -284,7 +440,9 @@ function readHookInput() {
 
   try {
     return readFileSync(0, "utf8");
-  } catch {
+  } catch (error) {
+    // Sem stdin legivel nao da para saber o que esta sendo empurrado: avise, nao engula.
+    console.error(`git-hook-scope: nao foi possivel ler a entrada do hook: ${error.message}`);
     return "";
   }
 }
@@ -335,23 +493,31 @@ function shouldFallbackToCorepack(command, result) {
   return command === "pnpm" && result.error?.code === "ENOENT";
 }
 
+/** Ver comentario em runCommands: evita que a carga da maquina reprove codigo correto. */
+const HOOK_TURBO_CONCURRENCY = "50%";
+
 export function runCommands(
   commands,
   spawn = spawnSync,
   env = process.env,
   platform = process.platform,
 ) {
+  // O hook roda na maquina de quem empurra, com editor e containers no ar; sem teto,
+  // o turbo abre uma tarefa por nucleo e a disputa por CPU vira falha intermitente.
+  const hookEnv = { TURBO_CONCURRENCY: HOOK_TURBO_CONCURRENCY, ...env };
+
   for (const [command, args] of commands) {
     console.log(`$ ${formatCommand([command, args])}`);
+    const startedAt = performance.now();
 
     let result = spawn(command, args, {
       stdio: "inherit",
-      env,
+      env: hookEnv,
     });
 
     if (shouldFallbackToCorepack(command, result)) {
       const [fallbackCommand, fallbackArgs] = buildPnpmFallback(args, platform);
-      const fallbackEnv = createPnpmShimEnv(env, platform);
+      const fallbackEnv = createPnpmShimEnv(hookEnv, platform);
 
       try {
         result = spawn(fallbackCommand, fallbackArgs, {
@@ -363,6 +529,10 @@ export function runCommands(
       }
     }
 
+    console.log(
+      `git-hook-scope: command finished in ${((performance.now() - startedAt) / 1000).toFixed(1)}s`,
+    );
+
     if (result.status !== 0) {
       return result.status ?? 1;
     }
@@ -373,24 +543,38 @@ export function runCommands(
 
 function parseCliArgs(argv) {
   const dryRun = argv.includes("--dry-run");
+  const full = argv.includes("--full");
   const hook = argv.find((arg) => !arg.startsWith("-")) ?? "pre-push";
 
-  return { dryRun, hook };
+  return { dryRun, full, hook };
 }
 
 function main() {
-  const { dryRun, hook } = parseCliArgs(process.argv.slice(2));
+  const { dryRun, full, hook } = parseCliArgs(process.argv.slice(2));
 
   if (hook !== "pre-push") {
     console.error(`Unsupported hook: ${hook}`);
     process.exit(2);
   }
 
-  const resolution = resolvePrePushChangedFiles(readHookInput());
-  const classification = resolution.forceGlobal
-    ? { mode: "global", reason: resolution.reason }
-    : classifyChangedFiles(resolution.files);
-  const commands = buildHookPlan(classification, resolution.bases ?? []);
+  const hookInput = readHookInput();
+  const bloqueio = describeForcePushBlock(findHistoryRewrites(parsePrePushInput(hookInput)));
+
+  if (bloqueio) {
+    console.error(bloqueio);
+    process.exit(1);
+  }
+
+  const resolution = resolvePrePushChangedFiles(hookInput);
+  const classification = full
+    ? { mode: "global", reason: "explicit-full" }
+    : resolution.forceGlobal
+      ? { mode: "global", reason: resolution.reason }
+      : classifyChangedFiles(resolution.files);
+  const commands = buildHookPlan(classification, resolution.bases ?? [], {
+    changedFiles: resolution.files,
+    full,
+  });
 
   console.log(
     `git-hook-scope: ${classification.mode} (${classification.reason}); files=${resolution.files.length}`,
@@ -416,5 +600,12 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const entrypointPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
 
 if (entrypointPath === currentFilePath) {
-  main();
+  try {
+    main();
+  } catch (error) {
+    // Um gate que nao sabe o que esta sendo empurrado precisa recusar o push,
+    // nao deixar passar com um stack trace.
+    console.error(`git-hook-scope: push recusado — ${error.message}`);
+    process.exit(1);
+  }
 }

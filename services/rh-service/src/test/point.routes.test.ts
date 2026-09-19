@@ -99,4 +99,21 @@ describe("point routes", () => {
     expect(res.status).toBe(403);
     expect(pointServiceMock.calculateDailyHours).not.toHaveBeenCalled();
   });
+
+  it("POST /rh/point/recalculate recalcula intervalo para administracao", async () => {
+    const app = createTestApp();
+    const res = await request(app).post("/rh/point/recalculate").send({
+      target_user_id: "00000000-0000-4000-8000-000000000099",
+      date_from: "2026-05-01T00:00:00.000Z",
+      date_to: "2026-05-31T23:59:59.999Z",
+    });
+
+    expect(res.status).toBe(200);
+    expect(pointServiceMock.recalculateRange).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      user_id: "00000000-0000-4000-8000-000000000099",
+      date_from: expect.any(Date),
+      date_to: expect.any(Date),
+    });
+  });
 });

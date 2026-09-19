@@ -50,11 +50,12 @@ describe("ClientIntegrationReportingService", () => {
       name: `Cliente ${String(index).padStart(3, "0")}`,
     }));
     const service = new ClientIntegrationReportingService({
-      $transaction: async function (read) {
+      $transaction: async function (read: (transaction: unknown) => Promise<unknown>) {
         return read(this);
       },
       client: {
-        findMany: async ({ take, skip = 0 }) => records.slice(skip, skip + take),
+        findMany: async ({ take, skip = 0 }: { take: number; skip?: number }) =>
+          records.slice(skip, skip + take),
       },
     } as never);
 

@@ -1,3 +1,4 @@
+import { zIsoDate } from "@workspace/shared";
 import { z } from "zod";
 
 function optionalIsoDateQuery(field: string) {
@@ -35,3 +36,15 @@ export const pointSummaryQuerySchema = z
     user_id: z.string().uuid({ message: "user_id inválido." }).optional(),
   })
   .strict();
+
+export const recalculatePointsBodySchema = z
+  .object({
+    target_user_id: z.string().uuid({ message: "target_user_id invalido." }),
+    date_from: zIsoDate("date_from"),
+    date_to: zIsoDate("date_to"),
+  })
+  .strict()
+  .refine((data) => data.date_from.getTime() <= data.date_to.getTime(), {
+    message: "date_to deve ser igual ou posterior a date_from.",
+    path: ["date_to"],
+  });

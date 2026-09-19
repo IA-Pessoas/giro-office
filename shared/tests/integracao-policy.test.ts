@@ -26,14 +26,41 @@ const expectedRoutes = [
   "DELETE /project",
   "GET /task/list",
   "GET /task",
+  "GET /task/financeiro/queue",
+  "GET /task/financeiro/collectors",
+  "PUT /task/financeiro/collectors",
+  "POST /task/financeiro/settle",
+  "POST /task/financeiro/express",
   "POST /task",
   "POST /task/project-wizard",
   "POST /task/project-wizard/extract-tasks",
   "POST /task/project-wizard/preview",
+  "GET /task/project-plan",
+  "GET /task/project-plan/list",
+  "GET /task/project-plan/task/list",
+  "POST /task/project-plan",
+  "PUT /task/project-plan",
+  "DELETE /task/project-plan",
+  "POST /task/project-plan/task",
+  "PUT /task/project-plan/task",
+  "DELETE /task/project-plan/task",
+  "POST /task/project-plan/hire",
   "PUT /task",
+  "POST /task/postponement",
+  "GET /task/postponement/list",
+  "GET /task/notifications",
+  "PUT /task/notifications/read",
   "DELETE /task",
   "PUT /task/conclusion",
+  "POST /task/complete-request",
   "PUT /task/complete-request",
+  "DELETE /task/complete-request",
+  "GET /task/complete-request/list",
+  "POST /task/attachment",
+  "GET /task/attachment/list",
+  "GET /task/attachment/access",
+  "DELETE /task/attachment",
+  "PUT /task/reopen",
   "GET /task/model/list",
   "GET /task/deps/list",
   "GET /task/deps/options",
@@ -41,6 +68,9 @@ const expectedRoutes = [
   "POST /task/model",
   "PUT /task/model",
   "DELETE /task/model",
+  "POST /task/integration",
+  "DELETE /task/integration",
+  "GET /task/integration",
   "GET /task/model/dependent",
   "POST /task/model/dependent",
   "DELETE /task/model/dependent",
@@ -223,14 +253,24 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
       allowedLevels: [0, 1, 2, 3],
       requestedFields: ["status", "observations"],
     },
+    { method: "POST", path: "/task/postponement", allowedLevels: [0, 1, 2, 3] },
+    { method: "GET", path: "/task/postponement/list", allowedLevels: [0, 1, 2, 3] },
     { method: "DELETE", path: "/task", allowedLevels: [3] },
     { method: "PUT", path: "/task/conclusion", allowedLevels: [0, 1] },
+    { method: "POST", path: "/task/complete-request", allowedLevels: [0, 1, 2, 3] },
     {
       method: "PUT",
       path: "/task/complete-request",
       allowedLevels: [2, 3],
       hasTaskCompletionPermission: true,
     },
+    { method: "DELETE", path: "/task/complete-request", allowedLevels: [0, 1, 2, 3] },
+    { method: "GET", path: "/task/complete-request/list", allowedLevels: [0, 1, 2, 3] },
+    { method: "POST", path: "/task/attachment", allowedLevels: [0, 1, 2, 3] },
+    { method: "GET", path: "/task/attachment/list", allowedLevels: [0, 1, 2, 3] },
+    { method: "GET", path: "/task/attachment/access", allowedLevels: [0, 1, 2, 3] },
+    { method: "DELETE", path: "/task/attachment", allowedLevels: [3] },
+    { method: "PUT", path: "/task/reopen", allowedLevels: [3] },
     { method: "GET", path: "/task/model/list", allowedLevels: [1, 2, 3] },
     { method: "GET", path: "/task/deps/list", allowedLevels: [1, 2, 3] },
     { method: "GET", path: "/task/deps/options", allowedLevels: [1, 2, 3] },
@@ -277,6 +317,27 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
       `${routeCase.method} ${routeCase.path} owner`,
     );
   }
+});
+
+test("prorrogação conserva escopo de responsável para os níveis básicos", () => {
+  const policy = requirePolicy("POST", "/task/postponement");
+  const input = {
+    userId: "user-1",
+    level: 0 as const,
+    organizationId: "org-1",
+    resourceOrganizationId: "org-1",
+    isOwner: false,
+  };
+
+  assert.equal(evaluateIntegracaoAction(policy, { ...input, responsibleId: "user-1" }), "allow");
+  assert.equal(
+    evaluateIntegracaoAction(policy, { ...input, responsibleId: "user-2" }),
+    "not_found",
+  );
+  assert.equal(
+    evaluateIntegracaoAction(policy, { ...input, level: 2, responsibleId: "user-2" }),
+    "allow",
+  );
 });
 
 test("nível 2 exige task_completion para aprovar conclusão", () => {
@@ -351,7 +412,7 @@ test("helper traduz a decisão de política em 403 ou 404", () => {
   );
 });
 
-test("owner possui bypass global e exclusões preservam conflito de dependência", () => {
+test("owner possui bypass global e exclusões preservam o contrato de dependência", () => {
   const deletePolicy = requirePolicy("DELETE", "/project");
 
   assert.equal(
@@ -365,9 +426,18 @@ test("owner possui bypass global e exclusões preservam conflito de dependência
     "allow",
   );
   assert.equal(deletePolicy?.responses.dependency, 409);
+  const deletesWithoutDependency = INTEGRACAO_ROUTE_POLICIES.filter(
+    (policy) => policy.action === "delete" && policy.responses.dependency === null,
+  );
+  assert.deepEqual(
+    deletesWithoutDependency.map((policy) => `${policy.method} ${policy.path}`),
+    ["DELETE /task/project-plan/task", "DELETE /task/attachment"],
+  );
   assert.ok(
-    INTEGRACAO_ROUTE_POLICIES.filter((policy) => policy.action === "delete").every(
-      (policy) => policy.responses.dependency === 409,
+    INTEGRACAO_ROUTE_POLICIES.filter((policy) => policy.action === "delete").every((policy) =>
+      deletesWithoutDependency.includes(policy)
+        ? policy.responses.dependency === null
+        : policy.responses.dependency === 409,
     ),
   );
 });

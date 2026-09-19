@@ -79,6 +79,12 @@
       "development": "./src/storage/index.ts",
       "default": "./dist/storage/index.js"
     },
+    "./triagem": {
+      "types": "./dist/triagem/index.d.ts",
+      "development": "./src/triagem/index.ts",
+      "import": "./dist/triagem/index.js",
+      "default": "./dist/triagem/index.js"
+    },
     "./upload": {
       "types": "./dist/upload/index.d.ts",
       "development": "./src/upload/index.ts",
@@ -95,6 +101,12 @@
       "import": "./dist/testUtils/index.js",
       "development": "./src/testUtils/index.ts",
       "default": "./dist/testUtils/index.js"
+    },
+    "./openapi": {
+      "types": "./dist/http/swaggerUi.d.ts",
+      "development": "./src/http/swaggerUi.ts",
+      "import": "./dist/http/swaggerUi.js",
+      "default": "./dist/http/swaggerUi.js"
     },
     "./package.json": "./package.json"
   },

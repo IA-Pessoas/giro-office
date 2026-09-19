@@ -14,8 +14,14 @@ const ignoredDirectories = new Set([
   "node_modules",
 ]);
 const executableConfigPattern =
-  /^(?:postcss|tailwind|eslint|next|babel|vite)\.config\.(?:js|cjs|mjs|ts)$/;
-const additionalConfigNames = new Set(["lint-staged.config.mjs", "tasks.json"]);
+  /^(?:postcss|tailwind|eslint|next|babel|vite|jest|vitest|playwright|commitlint|prettier|turbo|drizzle|prisma)\.config\.(?:js|cjs|mjs|ts)$/;
+const additionalConfigNames = new Set([
+  "lint-staged.config.mjs",
+  "tasks.json",
+  ".lintstagedrc.js",
+  ".lintstagedrc.cjs",
+  ".lintstagedrc.mjs",
+]);
 const maliciousMarkers = [
   /For only test/,
   /global\.[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*['"][A-Za-z0-9-]+['"]/,
@@ -24,6 +30,18 @@ const maliciousMarkers = [
   /Cot%3t=shtP/,
   /LAST_COMMIT_DATE/,
   /temp_auto_push\.bat/,
+  // Identificadores embaralhados do payload de 2026-09-17 (_$_827c, _$jsoToArr).
+  /_\$_[0-9a-f]{4}\s*=\s*\(function/,
+  /_\$[A-Za-z]{3,}ToArr/,
+  // Sequestro do carregador de modulos a partir de um arquivo de configuracao.
+  /global\[_\$/,
+  /global\[['"](?:require|module|__dirname|__filename)['"]\]\s*=/,
+  // Remontagem de codigo em tempo de execucao.
+  /\bnew Function\s*\(/,
+  /\beval\s*\(/,
+  /String\.fromCharCode\s*\(/,
+  /\batob\s*\(/,
+  /Buffer\.from\([^)]*['"]base64['"]/,
 ];
 
 async function findExecutableConfigs(directory) {

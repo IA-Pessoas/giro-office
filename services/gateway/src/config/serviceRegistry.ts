@@ -146,6 +146,7 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       targetUrl: env.projectServiceUrl,
       auditTarget: "project-service",
       routePrefixes: [...PROJECT_SERVICE_PREFIXES],
+      internalServiceToken: env.auditServiceToken,
     },
     {
       key: "client-service",
@@ -180,6 +181,66 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
     },
     {
       key: "triagem-service",
+      targetUrl: env.triagemServiceUrl,
+      auditTarget: "triagem-service",
+      routePrefixes: [
+        "/triagem/overview",
+        "/triagem/competencies",
+        "/triagem/catalogs",
+        "/triagem/external-links",
+        "/triagem/urgent-requests",
+      ],
+      internalServiceToken: env.auditServiceToken,
+      permissionModule: "triagem",
+      routeMatchers: [
+        {
+          methods: ["GET"],
+          path: /^\/triagem\/overview\/?$/,
+        },
+        {
+          methods: ["GET", "POST"],
+          path: /^\/triagem\/competencies\/?$/,
+        },
+        {
+          methods: ["PATCH"],
+          path: /^\/triagem\/competencies\/[^/]+\/archive\/?$/,
+        },
+        {
+          methods: ["GET", "POST"],
+          path: /^\/triagem\/catalogs\/?$/,
+        },
+        {
+          methods: ["PATCH"],
+          path: /^\/triagem\/catalogs\/[^/]+(?:\/archive)?\/?$/,
+        },
+        {
+          methods: ["GET", "POST"],
+          path: /^\/triagem\/external-links\/?$/,
+        },
+        {
+          methods: ["PUT"],
+          path: /^\/triagem\/external-links\/[^/]+\/?$/,
+        },
+        {
+          methods: ["PATCH"],
+          path: /^\/triagem\/external-links\/[^/]+\/archive\/?$/,
+        },
+        {
+          methods: ["GET", "POST"],
+          path: /^\/triagem\/urgent-requests\/?$/,
+        },
+        {
+          methods: ["PUT"],
+          path: /^\/triagem\/urgent-requests\/[^/]+\/?$/,
+        },
+        {
+          methods: ["PATCH"],
+          path: /^\/triagem\/urgent-requests\/[^/]+\/(?:close|reopen)\/?$/,
+        },
+      ],
+    },
+    {
+      key: "triagem-legacy-service",
       targetUrl: env.contabilServiceUrl,
       auditTarget: "contabil-service",
       routePrefixes: [...TRIAGEM_SERVICE_PREFIXES],
