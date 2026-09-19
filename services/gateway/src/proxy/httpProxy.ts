@@ -1,4 +1,5 @@
 import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 import {
   AUTH_SESSION_COOKIE_NAME,
@@ -31,12 +32,22 @@ function hasRequestBody(method: string): boolean {
   return upperMethod !== "GET" && upperMethod !== "HEAD";
 }
 
-function getRequestBody(request: Request): string | ReadableStream | undefined {
+function getRequestBody(request: Request): string | Buffer | ReadableStream | undefined {
   if (!hasRequestBody(request.method)) {
     return undefined;
   }
   if (request.headers["content-type"]?.includes("application/json")) {
-    return JSON.stringify(request.body ?? {});
+    // Bytes originais quando express.json os preservou: sem re-serializar e sem
+    // alterar o payload.
+    if (request.rawBody) {
+      return request.rawBody;
+    }
+    // Corpo remontado por outra rota, ou objeto injetado em teste.
+    if (request.body !== undefined) {
+      return JSON.stringify(request.body);
+    }
+    // Nenhum parser rodou nesta rota (é o caso da extração do wizard): segue
+    // adiante e encaminha o stream, sem materializar o corpo em memória.
   }
   if (request.headers["content-type"]?.includes("application/x-www-form-urlencoded")) {
     // If it was parsed by express.urlencoded
@@ -518,7 +529,7 @@ function createHttpProxy(
         ),
       };
 
-      if (body !== undefined && typeof body !== "string") {
+      if (body !== undefined && typeof body !== "string" && !Buffer.isBuffer(body)) {
         (fetchOptions as RequestInit & { duplex: "half" }).duplex = "half";
       }
 
@@ -544,9 +555,23 @@ function createHttpProxy(
         return;
       }
 
-      const data = Buffer.from(await upstreamResponse.arrayBuffer());
-      captureOwnershipTransferAuditResult(response, normalizedPath, upstreamResponse.status, data);
-      response.send(data);
+      // A transferência de titularidade é a única rota cujo corpo a auditoria
+      // precisa ler, então só ela é bufferizada. O resto vai em stream: o
+      // cliente recebe o primeiro byte assim que o upstream o produz, e um
+      // download grande deixa de caber inteiro no heap do gateway.
+      if (PLATFORM_OWNERSHIP_TRANSFER_PATH.test(normalizedPath)) {
+        const data = Buffer.from(await upstreamResponse.arrayBuffer());
+        captureOwnershipTransferAuditResult(
+          response,
+          normalizedPath,
+          upstreamResponse.status,
+          data,
+        );
+        response.send(data);
+        return;
+      }
+
+      await pipeline(Readable.fromWeb(upstreamResponse.body as ReadableStream), response);
     } catch (error) {
       next(new ServiceError(502, "Erro ao comunicar com o serviço upstream.", error));
     }

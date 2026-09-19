@@ -6,13 +6,13 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   type Logger,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
+import { requestContext } from "@workspace/shared/http";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { AuditServiceEnv } from "./config/env.js";
 import type { AuditRequestRepository } from "./integrations/prisma/auditRequestRepository.js";
-import { requestContext } from "./middlewares/requestContext.js";
 import { buildAuditServiceOpenApiSpec } from "./openapi/spec.js";
 import { createAuditInternalRouter, createAuditPublicRouter } from "./routes/audit.routes.js";
 

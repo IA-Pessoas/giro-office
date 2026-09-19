@@ -29,7 +29,8 @@
       "outputs": []
     },
     "prisma:generate": {
-      "cache": false
+      "cache": false,
+      "env": ["DATABASE_URL", "DIRECT_URL"]
     },
     "prisma:migrate": {
       "cache": false
@@ -42,7 +43,12 @@
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build", "build"],
+      "dependsOn": ["^build", "prisma:generate"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.md"],
+      "outputs": []
+    },
+    "@workspace/shared#test": {
+      "dependsOn": ["build"],
       "inputs": ["$TURBO_DEFAULT$", "!**/*.md"],
       "outputs": []
     }

@@ -22,15 +22,15 @@ import {
   uploadAdjustmentAttachmentParamsSchema,
 } from "../schemas/timeClockRequest.schemas.js";
 import {
+  RH_POINT_ADJUSTMENT_MIME_TYPES,
+  type RhPointAdjustmentAttachmentStorage,
+} from "../services/rhPointAdjustmentStorage.js";
+import {
   RH_MANAGEMENT_PERMISSION,
   RH_MANAGER_PERMISSION,
   RH_SELF_SERVICE_PERMISSION,
   TimeClockRequestService,
 } from "../services/timeClockRequestService.js";
-import {
-  RH_POINT_ADJUSTMENT_MIME_TYPES,
-  type RhPointAdjustmentAttachmentStorage,
-} from "../services/rhPointAdjustmentStorage.js";
 
 const upload = createPhotoUploadMiddleware({
   allowedMimeTypes: [...RH_POINT_ADJUSTMENT_MIME_TYPES],

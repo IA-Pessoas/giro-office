@@ -5,15 +5,15 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
+import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
 import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { ClientServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
-import { requestContext } from "./middlewares/requestContext.js";
 import { requireInternalToken } from "./middlewares/requireInternalToken.js";
 import { buildClientServiceOpenApiSpec } from "./openapi/spec.js";
 import { createClientRouter } from "./routes/client.routes.js";
