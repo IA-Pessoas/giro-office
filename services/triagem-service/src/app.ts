@@ -12,8 +12,14 @@ import "express-async-errors";
 
 import type { TriagemServiceEnv } from "./config/env.js";
 import { createTriagemPrismaClient, type TriagemPrismaClient } from "./integrations/prisma.js";
+import { createTriageAuditDispatcher } from "./integrations/triageAuditDispatcher.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTriagemServiceOpenApiSpec } from "./openapi/spec.js";
+import {
+  createTriageAuditInternalRoutes,
+  createTriageAuditRoutes,
+  type TriageAuditRouteDeps,
+} from "./routes/triageAudit.routes.js";
 import {
   createTriageCatalogRoutes,
   type TriageCatalogRouteDeps,
@@ -34,6 +40,7 @@ import {
   createTriageUrgentRequestRoutes,
   type TriageUrgentRequestRouteDeps,
 } from "./routes/triageUrgentRequest.routes.js";
+import { TriageAuditService } from "./services/triageAuditService.js";
 import { TriageCatalogService } from "./services/triageCatalogService.js";
 import { TriageCompetenceService } from "./services/triageCompetenceService.js";
 import { TriageExternalLinkService } from "./services/triageExternalLinkService.js";
@@ -62,6 +69,7 @@ export interface CreateTriagemAppOptions {
   triageCatalogRouteDeps?: TriageCatalogRouteDeps;
   triageUrgentRequestRouteDeps?: TriageUrgentRequestRouteDeps;
   triageOverviewRouteDeps?: TriageOverviewRouteDeps;
+  triageAuditRouteDeps?: TriageAuditRouteDeps;
 }
 
 export function createTriagemApp({
@@ -73,6 +81,7 @@ export function createTriagemApp({
   triageCatalogRouteDeps,
   triageUrgentRequestRouteDeps,
   triageOverviewRouteDeps,
+  triageAuditRouteDeps,
 }: CreateTriagemAppOptions): express.Express {
   const app = express();
   const catalogService = new TriageCatalogService(prisma);
@@ -85,6 +94,7 @@ export function createTriagemApp({
   const externalLinkService = new TriageExternalLinkService(prisma);
   const urgentRequestService = new TriageUrgentRequestService(prisma);
   const overviewService = new TriageOverviewService(prisma);
+  const auditService = new TriageAuditService(prisma, createTriageAuditDispatcher(env, logger));
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -123,6 +133,11 @@ export function createTriagemApp({
     createTriageUrgentRequestRoutes(triageUrgentRequestRouteDeps ?? urgentRequestService),
   );
   app.use("/triagem", createTriageOverviewRoutes(triageOverviewRouteDeps ?? overviewService));
+  app.use("/triagem", createTriageAuditRoutes(triageAuditRouteDeps ?? auditService));
+  app.use(
+    "/internal/triagem",
+    createTriageAuditInternalRoutes(triageAuditRouteDeps ?? auditService, env),
+  );
   app.use(
     createExpressErrorHandler({
       logger,

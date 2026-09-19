@@ -186,6 +186,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
       { name: "ExternalLinks", description: "Links externos por competência" },
       { name: "UrgentRequests", description: "Solicitações urgentes por competência" },
       { name: "Overview", description: "Painel operacional consolidado" },
+      { name: "Audit", description: "Histórico append-only da Triagem" },
     ],
     paths: {
       "/health": {
@@ -333,6 +334,126 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
             "401": { description: "Não autenticado" },
             "403": { description: "Sem permissão" },
             "404": { description: "Competência não encontrada" },
+          },
+        },
+      },
+      "/triagem/competencies/{id}/history": {
+        get: {
+          tags: ["Audit"],
+          summary: "Consultar histórico da competência",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "page_size",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Timeline append-only",
+              ...successEnvelope({
+                type: "object",
+                required: ["items", "total", "page", "page_size"],
+                properties: {
+                  items: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      required: ["id", "action", "actor", "competence", "occurred_at", "context"],
+                      properties: {
+                        id: { type: "string", format: "uuid" },
+                        action: { type: "string" },
+                        actor: {
+                          type: "object",
+                          required: ["id", "name", "full_name"],
+                          properties: {
+                            id: { type: "string", format: "uuid" },
+                            name: { type: "string" },
+                            full_name: { type: ["string", "null"] },
+                          },
+                        },
+                        competence: { type: "string" },
+                        occurred_at: { type: "string", format: "date-time" },
+                        context: {
+                          type: "object",
+                          required: ["before", "after"],
+                          properties: {
+                            before: { type: ["object", "null"], additionalProperties: true },
+                            after: { type: "object", additionalProperties: true },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  total: { type: "integer", minimum: 0 },
+                  page: { type: "integer", minimum: 1 },
+                  page_size: { type: "integer", minimum: 1, maximum: 100 },
+                },
+              }),
+            },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Competência não encontrada" },
+          },
+        },
+      },
+      "/internal/triagem/audit/reconcile": {
+        post: {
+          tags: ["Audit"],
+          summary: "Reconciliar o outbox de auditoria da Triagem",
+          security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              name: "x-auth-user-id",
+              in: "header",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "x-auth-organization-id",
+              in: "header",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "x-auth-permission",
+              in: "header",
+              required: false,
+              schema: { type: "integer", minimum: 0 },
+            },
+            {
+              name: "x-auth-modules",
+              in: "header",
+              required: false,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Eventos reconciliados",
+              ...successEnvelope({
+                type: "object",
+                required: ["reconciled", "dispatched", "pending"],
+                properties: {
+                  reconciled: { type: "integer", minimum: 0 },
+                  dispatched: { type: "integer", minimum: 0 },
+                  pending: { type: "integer", minimum: 0 },
+                },
+              }),
+            },
+            "401": { description: "Token interno ausente" },
+            "403": { description: "Sem permissão" },
+            "500": { description: "Falha de reconciliação" },
           },
         },
       },
@@ -779,6 +900,7 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
     components: {
       securitySchemes: {
         bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+        internalServiceToken: { type: "apiKey", in: "header", name: "x-internal-service-token" },
       },
       schemas: {
         TriageCompetence: competence,
