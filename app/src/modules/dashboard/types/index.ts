@@ -1,12 +1,5 @@
 import type { IconType } from 'react-icons';
 
-export type FiscalObligationStatus = 'Pendente' | 'Emitida' | 'Atrasada';
-
-export interface FiscalObligationSummary {
-  status: FiscalObligationStatus;
-  count: number;
-}
-
 export interface DashboardFinancialSummary {
   paidCertificateReceipts: number;
   unpaidCertificates: number;
@@ -110,9 +103,6 @@ export interface DashboardStats {
     month: string;
     newClients: number;
   }>;
-  fiscal: {
-    obligations: FiscalObligationSummary[];
-  };
   financial: DashboardFinancialSummary;
   commercial: DashboardCommercialSummary;
   departments: DashboardDepartmentSummary[];
