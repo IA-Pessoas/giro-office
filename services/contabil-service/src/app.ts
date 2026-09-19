@@ -12,6 +12,7 @@ import "express-async-errors";
 
 import type { ContabilServiceEnv } from "./config/env.js";
 import prismaClient from "./integrations/prisma.js";
+import { TriagemOverviewClient } from "./integrations/triagemOverviewClient.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildContabilServiceOpenApiSpec } from "./openapi/spec.js";
 import { type ControlRouteDeps, createControlRoutes } from "./routes/control.routes.js";
@@ -70,7 +71,14 @@ export function createContabilApp(options: {
   const controlRouteDeps = options.controlRouteDeps ?? new ControlService();
   const responsibleRouteDeps = options.responsibleRouteDeps ?? new ResponsibleService();
   const relationshipRouteDeps = options.relationshipRouteDeps ?? new RelationshipService();
-  const triageDocumentsRouteDeps = options.triageDocumentsRouteDeps ?? new TriageDocumentsService();
+  const triagemOverviewClient = new TriagemOverviewClient({
+    baseUrl: env.triagemServiceUrl,
+    serviceToken: env.triagemInternalToken,
+    timeoutMs: env.triagemRequestTimeoutMs,
+  });
+  const triageDocumentsRouteDeps =
+    options.triageDocumentsRouteDeps ??
+    new TriageDocumentsService(prismaClient, undefined, triagemOverviewClient);
   const triageClosingRouteDeps = options.triageClosingRouteDeps ?? new TriageClosingService();
   const internalReportingService =
     options.internalReportingService ?? new InternalReportingService(prismaClient);

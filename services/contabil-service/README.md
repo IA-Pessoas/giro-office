@@ -17,6 +17,7 @@ Definição e defaults em [`src/config/env.ts`](src/config/env.ts):
 - `AUDIT_ENABLED`, `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN` — auditoria via `integrations/audit.ts`
 - `INTERNAL_SERVICE_TOKEN` — token esperado no header interno quando o gateway encaminha usuário/organização (opcional; se omitido, usa o mesmo valor que `AUDIT_SERVICE_TOKEN`)
 - `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` — autenticação e grants HMAC curtos do Reports para `/internal/reporting`
+- `TRIAGEM_SERVICE_URL`, `TRIAGEM_INTERNAL_TOKEN`, `TRIAGEM_REQUEST_TIMEOUT_MS` — cliente interno somente leitura do resumo da Triagem
 - `ENABLE_API_DOCS` — documentação OpenAPI em `/docs` (em produção o default é desligado)
 
 ## Gateway

@@ -1,5 +1,6 @@
 import "./envBootstrap.js";
 
+import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -461,6 +462,38 @@ describe("TriageDocumentsService", () => {
     );
   });
 
+  it("anexa o resumo versionado da Triagem somente quando o cliente interno está configurado", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const getSummary = vi.fn().mockResolvedValue({
+      version: 1,
+      organization_id: ORG_ID,
+      client_id: CLIENT_ID,
+      legal_name: "Cliente Teste",
+      competence: COMPETENCE,
+      status: "ROUTINE_PENDING",
+    });
+    const service = new TriageDocumentsService(
+      prisma,
+      { logUpdateIfChanged: vi.fn() },
+      { getSummary },
+    );
+
+    await expect(
+      service.getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor()),
+    ).resolves.toEqual(
+      expect.objectContaining({ triagem_summary: expect.objectContaining({ version: 1 }) }),
+    );
+    expect(getSummary).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      permission: undefined,
+      modules: { contabil: 2, triagem: 0 },
+      clientId: CLIENT_ID,
+      competence: COMPETENCE,
+    });
+  });
+
   it("atualiza estado, nota e justificativa do mesmo item", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
@@ -718,6 +751,71 @@ describe("TriageDocumentsService", () => {
         card_statements: "NOT_APPLICABLE",
       }),
     ).toEqual(expect.objectContaining({ applicable: 3, completed: 1, percentage: 33 }));
+  });
+
+  it("enriquece o mensal com o resumo da Triagem sem perder o contexto", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const overviewClient = {
+      getSummary: vi.fn().mockResolvedValue({
+        version: 1,
+        organization_id: ORG_ID,
+        client_id: CLIENT_ID,
+        legal_name: "Cliente de teste",
+        competence: COMPETENCE,
+        status: "ROUTINE_PENDING",
+      }),
+    };
+
+    const result = await new TriageDocumentsService(
+      prisma,
+      { logUpdateIfChanged: vi.fn() },
+      overviewClient,
+    ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
+
+    expect(result.triagem_summary).toEqual(
+      expect.objectContaining({ client_id: CLIENT_ID, competence: COMPETENCE }),
+    );
+    expect(overviewClient.getSummary).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      permission: undefined,
+      modules: { contabil: 2, triagem: 0 },
+      clientId: CLIENT_ID,
+      competence: COMPETENCE,
+    });
+  });
+
+  it("mantém o mensal local quando a consulta do resumo da Triagem falha", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const overviewClient = {
+      getSummary: vi.fn().mockRejectedValue(new ServiceError(503, "Triagem indisponível.")),
+    };
+
+    const result = await new TriageDocumentsService(
+      prisma,
+      { logUpdateIfChanged: vi.fn() },
+      overviewClient,
+    ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
+
+    expect(result).toEqual(expect.objectContaining({ id: MONTHLY_ID, triagem_summary: null }));
+  });
+
+  it("não mascara incompatibilidade do contrato do resumo da Triagem", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const overviewClient = {
+      getSummary: vi.fn().mockRejectedValue(new ServiceError(502, "Resposta incompatível.")),
+    };
+
+    await expect(
+      new TriageDocumentsService(
+        prisma,
+        { logUpdateIfChanged: vi.fn() },
+        overviewClient,
+      ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor()),
+    ).rejects.toMatchObject({ statusCode: 502 });
   });
 
   it("altera um item permitido e audita os valores antes e depois", async () => {

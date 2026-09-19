@@ -7,3 +7,5 @@ process.env.AUDIT_SERVICE_TOKEN ??= "audit-service-token";
 process.env.INTERNAL_SERVICE_TOKEN ??= "audit-service-token";
 process.env.REPORTS_INTERNAL_TOKEN ??= "test-reports-internal-token";
 process.env.REPORTS_GRANT_SECRET ??= "test-reports-grant-secret";
+process.env.TRIAGEM_SERVICE_URL ??= "http://127.0.0.1:3046";
+process.env.TRIAGEM_INTERNAL_TOKEN ??= "test-triagem-internal-token";

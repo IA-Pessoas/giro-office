@@ -88,6 +88,48 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           description: "Resposta de sucesso padrão do workspace",
           additionalProperties: true,
         },
+        TriageAccountingSummary: {
+          type: "object",
+          required: [
+            "version",
+            "organization_id",
+            "client_id",
+            "legal_name",
+            "competence",
+            "status",
+          ],
+          properties: {
+            version: { type: "integer", enum: [1] },
+            organization_id: { type: "string", format: "uuid" },
+            client_id: { type: "string", format: "uuid" },
+            legal_name: { type: "string" },
+            competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            status: {
+              type: "string",
+              enum: ["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE"],
+            },
+          },
+        },
+        TriageMonthlySuccessEnvelope: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean", enum: [true] },
+            data: {
+              type: "object",
+              additionalProperties: true,
+              properties: {
+                triagem_summary: {
+                  oneOf: [
+                    { $ref: "#/components/schemas/TriageAccountingSummary" },
+                    { type: "null" },
+                  ],
+                  description: "Resumo da Triagem; null quando o serviço estiver indisponível.",
+                },
+              },
+            },
+          },
+        },
         ReportingGrantV1: {
           type: "object",
           required: [
@@ -856,7 +898,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               description: "Pendência",
               content: {
                 "application/json": {
-                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                  schema: { $ref: "#/components/schemas/TriageMonthlySuccessEnvelope" },
                 },
               },
             },

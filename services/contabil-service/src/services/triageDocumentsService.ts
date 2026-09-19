@@ -1,8 +1,12 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { error as logError, warn as logWarn, ServiceError } from "@workspace/shared";
 import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 
 import { type LogUpdateParams, logUpdateIfChanged } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import type {
+  TriagemOverviewClient,
+  TriagemOverviewSummaryRequest,
+} from "../integrations/triagemOverviewClient.js";
 
 export const TRIAGE_DOCUMENT_FIELDS = [
   "financial_transactions",
@@ -56,6 +60,7 @@ export type TriageDeliveryMethod = string;
 export type TriageItemPriority = (typeof TRIAGE_ITEM_PRIORITIES)[number];
 export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
 export type TriageDocumentsServicePrisma = typeof prismaClient;
+type TriageOverviewSummaryClient = Pick<TriagemOverviewClient, "getSummary">;
 type TriageCatalogLookupClient = Pick<
   PrismaClient,
   "$executeRaw" | "triageCatalogItem" | "triageCompetence" | "triageCompetenceCatalogSnapshot"
@@ -314,6 +319,7 @@ export class TriageDocumentsService {
   constructor(
     private readonly prisma: TriageDocumentsServicePrisma = prismaClient,
     private readonly audit: TriageDocumentsAudit = { logUpdateIfChanged },
+    private readonly overviewClient?: TriageOverviewSummaryClient,
   ) {}
 
   getSummary(
@@ -341,8 +347,13 @@ export class TriageDocumentsService {
 
   async getMonthly(
     request: TriageMonthlyRequest,
-    organizationId: string,
+    organizationIdOrAuth: string | TriageDocumentsAuthContext,
   ): Promise<Record<string, unknown>> {
+    const auth = typeof organizationIdOrAuth === "string" ? undefined : organizationIdOrAuth;
+    const organizationId =
+      typeof organizationIdOrAuth === "string"
+        ? organizationIdOrAuth
+        : organizationIdOrAuth.organizationId;
     const type = routineType(request.type);
     const monthly = await this.prisma.triageMonthly.findFirst({
       where: {
@@ -358,7 +369,34 @@ export class TriageDocumentsService {
       throw new ServiceError(404, "Pendência documental mensal não encontrada.");
     }
 
-    return this.toMonthlyResponse(monthly, type);
+    const result = this.toMonthlyResponse(monthly, type);
+    if (auth && this.overviewClient) {
+      const summaryRequest: TriagemOverviewSummaryRequest = {
+        organizationId: auth.organizationId,
+        userId: auth.userId,
+        permission: auth.permission,
+        modules: auth.modules,
+        clientId: request.client_id,
+        competence: request.competence,
+      };
+      try {
+        return {
+          ...result,
+          triagem_summary: await this.overviewClient.getSummary(summaryRequest),
+        };
+      } catch (error: unknown) {
+        if (!(error instanceof ServiceError) || ![403, 503, 504].includes(error.statusCode)) {
+          throw error;
+        }
+        logWarn("Resumo da Triagem indisponível; mantendo resposta mensal local", {
+          err: error,
+          clientId: request.client_id,
+          competence: request.competence,
+        });
+        return { ...result, triagem_summary: null };
+      }
+    }
+    return result;
   }
 
   async getEditability(
