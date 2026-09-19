@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { chromium, expect } from "@playwright/test";
+import { chromium, expect as baseExpect } from "@playwright/test";
+
+// Os 5s padrao do Playwright bastam nesta maquina, mas nao no runner do CI:
+// fechar o dialogo depende de "Salvar alteracoes" completar a requisicao.
+const expect = baseExpect.configure({ timeout: 15_000 });
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 

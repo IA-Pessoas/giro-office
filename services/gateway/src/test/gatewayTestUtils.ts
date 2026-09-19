@@ -31,6 +31,11 @@ export async function stopServer(server: Server): Promise<void> {
 
       resolve();
     });
+
+    // close() apenas para de aceitar conexoes novas: as keep-alive seguem vivas e
+    // seguram o callback. A porta efemera e reciclada enquanto isso, e o teste
+    // seguinte fala com o servidor anterior - a resposta chega de outro servico.
+    server.closeAllConnections();
   });
 }
 
