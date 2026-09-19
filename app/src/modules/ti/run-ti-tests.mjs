@@ -1206,7 +1206,9 @@ await runTest("ti user selects reuse the operational users source where still in
   assert.match(hookSource, /api\.get\(RH_ENDPOINTS\.operationalUsers(?:,|\))/);
   assert.match(hookSource, /unwrapRhEnvelope<RhOperationalUser\[\]>/);
   assert.doesNotMatch(hookSource, /cpf: user\.cpf \?\? null/);
-  assert.doesNotMatch(rhTypesSource, /cpf\?: string \| null/);
+  // Escopado ao AssignableUser: o invariante e manter CPF fora da lista de
+  // usuarios atribuiveis, nao fora do arquivo — onde o dossie de RH tem CPF por direito.
+  assert.doesNotMatch(rhTypesSource, /interface AssignableUser \{[^}]*cpf/);
   assert.doesNotMatch(userTypesSource, /cpf\?: string \| null/);
   assert.doesNotMatch(hookSource, /const page = await userService\.listPage\(\{\s*skip:\s*0,/);
 
