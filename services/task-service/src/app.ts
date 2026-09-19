@@ -6,6 +6,7 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
+import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
@@ -14,7 +15,6 @@ import "express-async-errors";
 
 import type { TaskServiceEnv } from "./config/env.js";
 import { createAiTaskExtractionProvider } from "./integrations/aiTaskExtraction.js";
-import { requestContext } from "./middlewares/requestContext.js";
 import { requireCommercialServiceToken } from "./middlewares/requireCommercialServiceToken.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
 import prismaClient from "./prisma/index.js";
