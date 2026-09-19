@@ -253,7 +253,7 @@ test("triagem-service is wired into VPS build, runtime, wait, and secret materia
   assert.match(triagemBlock, /SERVICE_DIR: services\/triagem-service/);
   assert.match(triagemBlock, /\.env\.vps\.triagem-service/);
   assert.match(triagemBlock, /expose:[\s\S]*- "3046"/);
-  assert.match(triagemBlock, /fetch\('http:\/\/127\.0\.0\.1:3046\/health'\)/);
+  assert.match(triagemBlock, /fetch\('http:\/\/127\.0\.0\.1:3046\/ready'\)/);
   assert.match(contabilBlock, /TRIAGEM_SERVICE_URL: http:\/\/triagem-service:3046/);
   assert.match(gatewayBlock, /TRIAGEM_SERVICE_URL: http:\/\/triagem-service:3046/);
   assert.match(
@@ -268,7 +268,7 @@ test("triagem-service is wired into VPS build, runtime, wait, and secret materia
   const waitScript = await readFile(vpsWaitEndpointsScript, "utf8");
   assert.match(
     waitScript,
-    /triagem-service\)\s+printf "%s\\n" "http:\/\/triagem-service:3046\/health"/,
+    /triagem-service\)\s+printf "%s\\n" "http:\/\/triagem-service:3046\/ready"/,
   );
   assert.match(waitScript, /ALL_BACKEND_SERVICES=\([\s\S]*triagem-service[\s\S]*\)/);
   assert.match(
@@ -278,7 +278,7 @@ test("triagem-service is wired into VPS build, runtime, wait, and secret materia
   assert.match(await readFile(productionDeployScript, "utf8"), /triagem-service/);
   assert.match(
     await readFile(productionWaitScript, "utf8"),
-    /http:\/\/triagem-service:3046\/health/,
+    /http:\/\/triagem-service:3046\/ready/,
   );
 });
 

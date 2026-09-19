@@ -74,7 +74,7 @@ backend_check_url() {
       printf "%s\n" "http://contabil-service:3038/health"
       ;;
     triagem-service)
-      printf "%s\n" "http://triagem-service:3046/health"
+      printf "%s\n" "http://triagem-service:3046/ready"
       ;;
     regularize-service)
       printf "%s\n" "http://regularize-service:3039/health"

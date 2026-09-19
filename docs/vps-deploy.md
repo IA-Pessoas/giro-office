@@ -22,6 +22,7 @@ Para o ambiente single-slot publicado em `useoffice.com.br`, consulte
 - `.env.vps.department-service`
 - `.env.vps.fiscal-service`
 - `.env.vps.contabil-service`
+- `.env.vps.triagem-service`
 - `.env.vps.regularize-service`
 - `.env.vps.ti-service`
 - `.env.vps.certificate-service`
@@ -51,7 +52,7 @@ introduzir um hostname de develop no código.
 Quando `NGINX_TLS_ENABLED=true`, o TLS fica disponível no bind loopback
 `127.0.0.1:${REVERSE_PROXY_TLS_PORT}`; configure o proxy externo para usar HTTPS nesse upstream.
 
-6. `certificate-service`, `pessoal-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041` and `PESSOAL_SERVICE_URL=http://pessoal-service:3042` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
+6. `certificate-service`, `pessoal-service`, `triagem-service` and `audit-service` are part of the default stack. Configure `CERTIFICATE_SERVICE_URL=http://certificate-service:3041`, `PESSOAL_SERVICE_URL=http://pessoal-service:3042` and `TRIAGEM_SERVICE_URL=http://triagem-service:3046` in `.env.vps.gateway`; control whether actions are audited with `AUDIT_ENABLED` in the gateway and service `.env.vps.*` files.
 7. Configure `PROJECT_SERVICE_URL=http://project-service:3033` and
    `TASK_SERVICE_URL=http://task-service:3032` for `reports-service`. Keep
    `REPORTS_INTERNAL_TOKEN` and `REPORTS_GRANT_SECRET` equal in `.env.vps.project-service`,
@@ -62,9 +63,9 @@ Quando `NGINX_TLS_ENABLED=true`, o TLS fica disponível no bind loopback
 
 Todos os processos que abrem pool PostgreSQL devem declarar `DATABASE_POOL_MAX`. O default do
 codigo e `1`; valores vazios, fracionarios, zero ou negativos interrompem o bootstrap. Em producao,
-os 16 servicos Prisma, o segundo processo do `reports-worker` e o pool do gateway representam 18
-processos. Com `DATABASE_POOL_MAX=1`, o teto teorico e 18 clientes para um pooler session mode com
-20 slots.
+o preflight atual contabiliza 20 processos com pool, incluindo o segundo processo do
+`reports-worker` e o pool do gateway. Com `DATABASE_POOL_MAX=1`, o teto teorico e 20 clientes
+para um pooler session mode com 20 slots.
 
 Cada pool tambem usa `DATABASE_POOL_CONNECTION_TIMEOUT_MS=5000` por padrao. Quando todos os slots
 estiverem ocupados, a requisicao falha de forma observavel depois desse prazo, em vez de permanecer
@@ -78,7 +79,7 @@ indefinidamente na fila do cliente.
 - Antes de migrar para transaction mode, validar leituras concorrentes de tres modulos, transacao
   interativa e escrita de auditoria. Prepared statements nomeados e estado de sessao nao podem ser
   presumidos compativeis.
-- O deploy de producao atual pode sobrepor containers e dobrar o teto para 36 conexoes. Antes do
+- O deploy de producao atual pode sobrepor containers e dobrar o teto para 40 conexoes. Antes do
   rollout, ajuste o Pool Size do Supabase para `40` e execute o deploy com
   `DATABASE_POOLER_SIZE=40`. O preflight le todos os `.env.vps.*` reais e interrompe o deploy se a
   soma dos tetos, multiplicada por dois, exceder essa capacidade declarada.
@@ -137,6 +138,7 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps rh-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps department-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps fiscal-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps contabil-service
+docker compose -f docker-compose.vps.yml up -d --build --no-deps triagem-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps regularize-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps ti-service
 docker compose -f docker-compose.vps.yml up -d --build --no-deps certificate-service
@@ -178,11 +180,31 @@ docker compose -f docker-compose.vps.yml up -d --build --no-deps user-service
 - Department service: `GET /health`
 - Fiscal service: `GET /health`
 - Contabil service: `GET /health`
+- Triagem service: `GET /ready`
 - Regularize service: `GET /health`
 - TI service: `GET /ready`
 - Certificate service: `GET /health`
 - Pessoal service: `GET /health`
 - **Web (Next.js):** `GET /` (container escuta na porta **3000**; no host, ver portas por slot abaixo)
+
+### Checklist de ativacao do Triagem
+
+Antes de ativar ou promover o upstream em um slot, execute o smoke completo contra o gateway do
+slot com credenciais descartáveis protegidas no ambiente do operador:
+
+```bash
+export GATEWAY_URL="http://127.0.0.1:<porta-do-gateway>"
+export JWT_SECRET="<segredo JWT do slot>"
+export LOGIN="<usuario de smoke>"
+export PASSWORD="<senha de smoke>"
+pnpm smoke -- --fail-fast
+```
+
+O smoke inclui as operações geradas do `triagem-service`, casos sem autenticação, autenticação por
+organização e rotas protegidas. `pnpm smoke:coverage` valida previamente que cada operação OpenAPI
+tem expectativa positiva e negativa. Não execute esse smoke mutável contra produção sem uma janela
+operacional e dados descartáveis; em falha, mantenha o upstream desativado no slot ou faça rollback
+das imagens pelo procedimento existente.
 
 ## Deploy nos slots da VPS (manual)
 
@@ -220,7 +242,7 @@ As portas são distintas entre os quatro slots, portanto podem coexistir no mesm
 | `ENV_VPS_TASK_SERVICE` | Corpo de `.env.vps.task-service`; inclua `AUDIT_SERVICE_TOKEN` com o mesmo valor configurado no gateway/audit-service para autenticar o proxy público. Para anexos, inclua `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `TASK_ATTACHMENT_STORAGE_BUCKET`; o bucket precisa existir e ser privado. Para a extração em produção, inclua também `AI_EXTRACTION_MODE=openai`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`, `AI_EXTRACTION_TIMEOUT_MS`, `AI_EXTRACTION_RATE_LIMIT_MAX` e `AI_EXTRACTION_RATE_LIMIT_WINDOW_MS`. Os defaults e limites de fonte/processamento estão no [README do task-service](../services/task-service/README.md); nunca versione a chave nem o ficheiro real. |
 | `ENV_VPS_CERTIFICATE_SERVICE` | Corpo de `.env.vps.certificate-service`; alem das variaveis base do service, inclua `CERTIFICATE_STORAGE_MODE=supabase`, `CERTIFICATE_STORAGE_BUCKET`, `CERTIFICATE_FILE_MAX_SIZE_BYTES`, `CERTIFICATE_FILE_ENCRYPTION_KEY`, `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `UPLOAD_RATE_LIMIT_MAX` e `UPLOAD_RATE_LIMIT_WINDOW_MS` para upload/download criptografado de arquivos. |
 | `ENV_VPS_PESSOAL_SERVICE` | Corpo de `.env.vps.pessoal-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `INTERNAL_SERVICE_TOKEN`, `PESSOAL_PASSWORD_ENCRYPTION_KEY`, `PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION` e `PESSOAL_DOMAIN_AUDIT_ENABLED`. |
-| `ENV_VPS_CONTABIL_SERVICE` | Corpo de `.env.vps.contabil-service`; inclua `TRIAGEM_SERVICE_URL=http://triagem-service:3046`, `TRIAGEM_INTERNAL_TOKEN` igual ao `INTERNAL_SERVICE_TOKEN` do triagem-service e os segredos existentes de relatórios. |
+| `ENV_VPS_CONTABIL_SERVICE` | Corpo de `.env.vps.contabil-service`; inclua `TRIAGEM_INTERNAL_TOKEN` igual ao `INTERNAL_SERVICE_TOKEN` do triagem-service e os segredos existentes de relatórios. O Compose injeta `TRIAGEM_SERVICE_URL=http://triagem-service:3046`. |
 | `ENV_VPS_TRIAGEM_SERVICE` | Corpo de `.env.vps.triagem-service`; inclua `DATABASE_URL`, `JWT_SECRET`, `AUDIT_SERVICE_URL=http://audit-service:3020`, `AUDIT_SERVICE_TOKEN`, `INTERNAL_SERVICE_TOKEN` e `SERVICE_ALLOWED_ORIGINS`. O `INTERNAL_SERVICE_TOKEN` deve coincidir com `AUDIT_SERVICE_TOKEN` do gateway e `TRIAGEM_INTERNAL_TOKEN` do contabil-service. |
 | `DOCKER_REGISTRY_URL`, `DOCKER_REGISTRY_USERNAME`, `DOCKER_REGISTRY_PASSWORD` | URL **com namespace** (ex.: `ghcr.io/meu-org`, `docker.io/meuuser` — não use só `ghcr.io`). Push/pull normalizam em minúsculas. |
 | `ENV_VPS_*` | Igual ao manifest `scripts/ci/vps-secrets.manifest` — `.env.vps.*` copiados para a VPS em cada deploy |
