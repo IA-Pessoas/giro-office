@@ -1,7 +1,15 @@
 import { z } from "zod";
 
 import { idQuerySchema } from "./common.schemas.js";
-import { processReadStatusSchema, processWriteStatusSchema } from "./status.schemas.js";
+import {
+  processFinancialStatusSchema,
+  processReadStatusSchema,
+  processWriteStatusSchema,
+} from "./status.schemas.js";
+
+const processDateSchema = z
+  .union([z.string().date(), z.string().datetime({ offset: true })])
+  .transform((value) => new Date(value));
 
 const processFieldsSchema = z
   .object({
@@ -13,7 +21,9 @@ const processFieldsSchema = z
     entry_date: z.coerce.date().optional(),
     completion_date: z.coerce.date().optional(),
     expected_date: z.coerce.date().optional(),
+    client_notice_date: processDateSchema.nullable().optional(),
     status: processWriteStatusSchema,
+    financial_status: processFinancialStatusSchema.optional(),
     observation: z.string().nullable().optional(),
     responsible1_id: z.string().uuid().optional(),
     responsible2_id: z.string().uuid().optional(),
@@ -40,7 +50,9 @@ function requireExactlyOneClient(
   }
 }
 
-export const createProcessBodySchema = processFieldsSchema.superRefine(requireExactlyOneClient);
+export const createProcessBodySchema = processFieldsSchema
+  .extend({ financial_status: processFinancialStatusSchema.default("Pendente") })
+  .superRefine(requireExactlyOneClient);
 
 export const updateProcessBodySchema = processFieldsSchema
   .extend({ id: z.string().uuid("id invalido.") })

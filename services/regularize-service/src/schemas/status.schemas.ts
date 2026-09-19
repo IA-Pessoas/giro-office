@@ -27,9 +27,38 @@ export const CANONICAL_LICENSE_STATUSES = [
 
 export const LEGACY_LICENSE_STATUS_ALIASES = ["Ativo", "Pendente", "Inativo", "Cancelado"] as const;
 
+export const FINANCIAL_STATUS_VALUES = ["Pendente", "Regular", "Bônus", "Não Contratado"] as const;
+
+export const FINANCIAL_STATUS_BY_LEGACY_CODE: Record<number, FinancialStatus> = {
+  0: "Pendente",
+  1: "Regular",
+  3: "Bônus",
+  4: "Não Contratado",
+};
+
+export type FinancialStatus = (typeof FINANCIAL_STATUS_VALUES)[number];
+
 export type LicenseDateRange = { gte: Date; lt: Date };
 
 export const processWriteStatusSchema = z.enum(CANONICAL_PROCESS_STATUSES);
+const financialStatusCodeSchema = z
+  .union([z.number().int(), z.string().regex(/^\d+$/).transform(Number)])
+  .transform((code, context): FinancialStatus => {
+    const status = FINANCIAL_STATUS_BY_LEGACY_CODE[code];
+    if (!status) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Status financeiro legado invalido.",
+      });
+      return z.NEVER;
+    }
+    return status;
+  });
+
+export const processFinancialStatusSchema = z.union([
+  z.enum(FINANCIAL_STATUS_VALUES),
+  financialStatusCodeSchema,
+]);
 export const guidanceWriteStatusSchema = z.enum(CANONICAL_GUIDANCE_STATUSES);
 export const licenseWriteStatusSchema = z.enum(CANONICAL_LICENSE_STATUSES);
 export const licenseUpdateStatusSchema = z.enum([

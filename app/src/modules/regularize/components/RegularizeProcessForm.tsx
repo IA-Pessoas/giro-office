@@ -24,6 +24,7 @@ import {
   RegularizeFormError,
   RegularizeFormField,
   getRegularizePresetOptions,
+  regularizeFinancialStatusOptions,
   regularizeProcessStatusOptions,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
@@ -44,6 +45,8 @@ type RegularizeProcessFormState = {
   completion_date: string;
   expected_date: string;
   status: string;
+  financial_status: string;
+  client_notice_date: string;
   observation: string;
   responsible1_id: string;
   responsible2_id: string;
@@ -68,6 +71,8 @@ function buildProcessFormState(
       completion_date: "",
       expected_date: "",
       status: "Pendente",
+      financial_status: "Pendente",
+      client_notice_date: "",
       observation: "",
       responsible1_id: "",
       responsible2_id: "",
@@ -90,6 +95,8 @@ function buildProcessFormState(
     completion_date: toRegularizeInputDate(process.completion_date),
     expected_date: toRegularizeInputDate(process.expected_date),
     status: process.status ?? "Pendente",
+    financial_status: process.financial_status ?? "Pendente",
+    client_notice_date: toRegularizeInputDate(process.client_notice_date),
     observation: process.observation ?? "",
     responsible1_id: process.responsible1_id ?? "",
     responsible2_id: process.responsible2_id ?? "",
@@ -112,7 +119,12 @@ function buildProcessPayload(formState: RegularizeProcessFormState): CreateRegul
     entry_date: formState.entry_date || undefined,
     completion_date: formState.completion_date || undefined,
     expected_date: formState.expected_date || undefined,
+    client_notice_date: formState.client_notice_date || null,
     status: trimRegularizeText(formState.status),
+    financial_status: formState.financial_status as Exclude<
+      CreateRegularizeProcessPayload["financial_status"],
+      undefined
+    >,
     observation: trimRegularizeNullableText(formState.observation),
     responsible1_id: trimRegularizeOptionalUuid(formState.responsible1_id),
     responsible2_id: trimRegularizeOptionalUuid(formState.responsible2_id),
@@ -235,6 +247,15 @@ export function RegularizeProcessForm({
       return;
     }
 
+    if (
+      !regularizeFinancialStatusOptions.includes(
+        formState.financial_status as (typeof regularizeFinancialStatusOptions)[number],
+      )
+    ) {
+      setFormError("Escolha um status financeiro reconhecido antes de salvar.");
+      return;
+    }
+
     try {
       const payload = buildProcessPayload(formState);
 
@@ -331,6 +352,36 @@ export function RegularizeProcessForm({
                   ),
                 )}
               </RegularizeNativeSelect>
+            </RegularizeFormField>
+
+            <RegularizeFormField label="Status financeiro" required>
+              <RegularizeNativeSelect
+                value={formState.financial_status}
+                onChange={(event) =>
+                  handleChange(
+                    "financial_status",
+                    event.target.value as RegularizeProcessFormState["financial_status"],
+                  )
+                }
+              >
+                {getRegularizePresetOptions(
+                  regularizeFinancialStatusOptions,
+                  formState.financial_status,
+                ).map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </RegularizeFormField>
+
+            <RegularizeFormField label="Aviso ao cliente">
+              <input
+                type="date"
+                value={formState.client_notice_date}
+                onChange={(event) => handleChange("client_notice_date", event.target.value)}
+                className={regularizeTextFieldClassName}
+              />
             </RegularizeFormField>
 
             <RegularizeFormField label="Entrada">
