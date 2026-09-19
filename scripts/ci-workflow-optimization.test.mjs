@@ -114,6 +114,13 @@ test("detect-changed-vps-services emits reports-service for reports changes", as
   );
 });
 
+test("detect-changed-vps-services emits triagem-service for triagem changes", async () => {
+  assert.equal(
+    await detectChangedServices("services/triagem-service/src/routes/triagem.routes.ts"),
+    "triagem-service",
+  );
+});
+
 test("detect-changed-vps-services emits web for app changes", async () => {
   assert.equal(await detectChangedServices("app/src/app/page.tsx"), "web");
 });
@@ -215,6 +222,64 @@ test("compose-vps-buildx-push plans cached service build for parcelamento-servic
     /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-parcelamento-service:buildcache/,
   );
   assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/parcelamento-service:abc1234/);
+});
+
+test("compose-vps-buildx-push plans cached service build for triagem-service", async () => {
+  const output = await dryRunBuildxPush("triagem-service");
+  assert.match(output, /docker buildx build/);
+  assert.match(output, /--file docker\/service\.Dockerfile/);
+  assert.match(output, /--build-arg WORKSPACE_PACKAGE=@workspace\/triagem-service/);
+  assert.match(output, /--build-arg SERVICE_DIR=services\/triagem-service/);
+  assert.match(
+    output,
+    /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-triagem-service:buildcache/,
+  );
+  assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/triagem-service:abc1234/);
+});
+
+test("triagem-service is wired into VPS build, runtime, wait, and secret materialization", async () => {
+  assert.match(
+    await dryRunBuildxPush("triagem-service"),
+    /WORKSPACE_PACKAGE=@workspace\/triagem-service/,
+  );
+  assert.equal(await runDeployScopeFunction("vps_validate_service_token", "triagem-service"), "");
+
+  const composeContents = await readFile(composeVpsFile, "utf8");
+  const triagemBlock = extractComposeServiceBlock(composeContents, "triagem-service");
+  const contabilBlock = extractComposeServiceBlock(composeContents, "contabil-service");
+  const gatewayBlock = extractComposeServiceBlock(composeContents, "gateway");
+  assert.match(triagemBlock, /image: workspace-triagem-service:/);
+  assert.match(triagemBlock, /WORKSPACE_PACKAGE: "@workspace\/triagem-service"/);
+  assert.match(triagemBlock, /SERVICE_DIR: services\/triagem-service/);
+  assert.match(triagemBlock, /\.env\.vps\.triagem-service/);
+  assert.match(triagemBlock, /expose:[\s\S]*- "3046"/);
+  assert.match(triagemBlock, /fetch\('http:\/\/127\.0\.0\.1:3046\/health'\)/);
+  assert.match(contabilBlock, /TRIAGEM_SERVICE_URL: http:\/\/triagem-service:3046/);
+  assert.match(gatewayBlock, /TRIAGEM_SERVICE_URL: http:\/\/triagem-service:3046/);
+  assert.match(
+    gatewayBlock,
+    /depends_on:[\s\S]*triagem-service:[\s\S]*condition: service_healthy/,
+  );
+
+  const manifest = await readFile(vpsSecretsManifest, "utf8");
+  assert.match(manifest, /^ENV_VPS_TRIAGEM_SERVICE\|\.env\.vps\.triagem-service$/m);
+  assert.match(manifest, /TRIAGEM_INTERNAL_TOKEN/);
+
+  const waitScript = await readFile(vpsWaitEndpointsScript, "utf8");
+  assert.match(
+    waitScript,
+    /triagem-service\)\s+printf "%s\\n" "http:\/\/triagem-service:3046\/health"/,
+  );
+  assert.match(waitScript, /ALL_BACKEND_SERVICES=\([\s\S]*triagem-service[\s\S]*\)/);
+  assert.match(
+    await readFile(composeVpsRuntimeOverrideFile, "utf8"),
+    /triagem-service:\s+healthcheck:\s+disable: true/,
+  );
+  assert.match(await readFile(productionDeployScript, "utf8"), /triagem-service/);
+  assert.match(
+    await readFile(productionWaitScript, "utf8"),
+    /http:\/\/triagem-service:3046\/health/,
+  );
 });
 
 test("reports-service is wired into VPS build, runtime, wait, and secret materialization", async () => {

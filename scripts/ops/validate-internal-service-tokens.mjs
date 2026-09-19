@@ -25,8 +25,11 @@ function readEnv(file) {
 const envRoot = path.resolve(process.argv[2] ?? process.cwd());
 const gateway = readEnv(path.join(envRoot, ".env.vps.gateway"));
 const contabil = readEnv(path.join(envRoot, ".env.vps.contabil-service"));
+const triagem = readEnv(path.join(envRoot, ".env.vps.triagem-service"));
 const gatewayToken = gateway.AUDIT_SERVICE_TOKEN;
-const contabilToken = contabil.INTERNAL_SERVICE_TOKEN || contabil.AUDIT_SERVICE_TOKEN;
+const contabilToken =
+  contabil.TRIAGEM_INTERNAL_TOKEN || contabil.INTERNAL_SERVICE_TOKEN || contabil.AUDIT_SERVICE_TOKEN;
+const triagemToken = triagem.INTERNAL_SERVICE_TOKEN || triagem.AUDIT_SERVICE_TOKEN;
 
 if (!gatewayToken) {
   console.error("gateway: AUDIT_SERVICE_TOKEN ausente");
@@ -38,9 +41,19 @@ if (!contabilToken) {
   process.exit(1);
 }
 
+if (!triagemToken) {
+  console.error("triagem-service: token interno ausente");
+  process.exit(1);
+}
+
 if (contabilToken !== gatewayToken) {
   console.error("contabil-service: token interno diverge do gateway");
   process.exit(1);
 }
 
-console.log("Tokens internos: gateway e contabil-service alinhados.");
+if (triagemToken !== gatewayToken) {
+  console.error("triagem-service: token interno diverge do gateway");
+  process.exit(1);
+}
+
+console.log("Tokens internos: gateway, contabil-service e triagem-service alinhados.");

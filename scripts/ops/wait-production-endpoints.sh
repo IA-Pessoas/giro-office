@@ -29,6 +29,7 @@ checks=(
   "backend|http://client-service:3035/ready"
   "backend|http://fiscal-service:3037/health"
   "backend|http://contabil-service:3038/health"
+  "backend|http://triagem-service:3046/health"
   "backend|http://regularize-service:3039/health"
   "backend|http://rh-service:3034/health"
   "backend|http://ti-service:3040/ready"

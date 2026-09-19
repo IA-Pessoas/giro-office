@@ -73,6 +73,9 @@ backend_check_url() {
     contabil-service)
       printf "%s\n" "http://contabil-service:3038/health"
       ;;
+    triagem-service)
+      printf "%s\n" "http://triagem-service:3046/health"
+      ;;
     regularize-service)
       printf "%s\n" "http://regularize-service:3039/health"
       ;;
@@ -115,6 +118,7 @@ ALL_BACKEND_SERVICES=(
   client-service
   fiscal-service
   contabil-service
+  triagem-service
   regularize-service
   rh-service
   ti-service
