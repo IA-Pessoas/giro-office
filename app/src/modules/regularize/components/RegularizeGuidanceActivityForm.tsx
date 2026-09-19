@@ -2,7 +2,12 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
 
-import type { AddRegularizeGuidanceActivityPayload, RegularizeId } from "../types";
+import type {
+  AddRegularizeGuidanceActivityPayload,
+  RegularizeGuidanceEconomicActivity,
+  RegularizeId,
+  UpdateRegularizeGuidanceActivityPayload,
+} from "../types";
 import { getRegularizeMutationErrorMessage, trimRegularizeText } from "../utils/regularizeForm";
 import {
   RegularizeFormActions,
@@ -27,17 +32,23 @@ const DEFAULT_ACTIVITY_FORM_STATE: RegularizeGuidanceActivityFormState = {
 
 export function RegularizeGuidanceActivityForm({
   guidanceId,
+  activity,
   isSubmitting,
+  mode,
   onClose,
   onSubmit,
   open,
   processId,
 }: {
+  activity?: RegularizeGuidanceEconomicActivity | null;
   guidanceId?: RegularizeId;
   isSubmitting: boolean;
   onClose: () => void;
-  onSubmit: (payload: AddRegularizeGuidanceActivityPayload) => Promise<void>;
+  onSubmit: (
+    payload: AddRegularizeGuidanceActivityPayload | UpdateRegularizeGuidanceActivityPayload,
+  ) => Promise<void>;
   open: boolean;
+  mode: "create" | "edit";
   processId?: RegularizeId;
 }) {
   const [formState, setFormState] =
@@ -46,10 +57,18 @@ export function RegularizeGuidanceActivityForm({
 
   useEffect(() => {
     if (open) {
-      setFormState(DEFAULT_ACTIVITY_FORM_STATE);
+      setFormState(
+        activity
+          ? {
+              code: activity.code ?? "",
+              description: activity.description ?? "",
+              type: activity.type === "Principal" ? "Principal" : "Secundária",
+            }
+          : DEFAULT_ACTIVITY_FORM_STATE,
+      );
       setFormError(null);
     }
-  }, [open]);
+  }, [activity, open]);
 
   function handleChange<K extends keyof RegularizeGuidanceActivityFormState>(
     key: K,
@@ -71,18 +90,24 @@ export function RegularizeGuidanceActivityForm({
     }
 
     try {
-      await onSubmit({
+      const payload = {
         guidance_id: guidanceId,
         process_id: processId,
         activity: {
+          ...(activity?.id ? { id: activity.id } : {}),
           code: trimRegularizeText(formState.code),
           description: trimRegularizeText(formState.description),
           type: formState.type,
         },
-      });
+      };
+      await onSubmit(
+        mode === "edit" && activity?.id
+          ? (payload as UpdateRegularizeGuidanceActivityPayload)
+          : payload,
+      );
     } catch (error) {
       setFormError(
-        getRegularizeMutationErrorMessage(error, "Não foi possível adicionar a atividade."),
+        getRegularizeMutationErrorMessage(error, "Não foi possível salvar a atividade."),
       );
     }
   }
@@ -95,8 +120,8 @@ export function RegularizeGuidanceActivityForm({
           onClose();
         }
       }}
-      title="Adicionar atividade"
-      description="Adicionar atividade econômica na orientação procedural."
+      title={mode === "edit" ? "Editar atividade" : "Adicionar atividade"}
+      description="Atividade econômica da orientação procedural."
       contentClassName="w-[min(92vw,680px)]"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -133,8 +158,8 @@ export function RegularizeGuidanceActivityForm({
         <RegularizeFormActions
           isSubmitting={isSubmitting}
           onCancel={onClose}
-          submitLabel="Adicionar atividade"
-          submittingLabel="Adicionando..."
+          submitLabel={mode === "edit" ? "Salvar atividade" : "Adicionar atividade"}
+          submittingLabel={mode === "edit" ? "Salvando..." : "Adicionando..."}
         />
       </form>
     </Dialog>

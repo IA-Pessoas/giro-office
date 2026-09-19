@@ -35,6 +35,8 @@ import type {
   RegularizeProcessListFilters,
   RegularizeProcessListItem,
   UpdateRegularizeGuidancePayload,
+  UpdateRegularizeGuidanceActivityPayload,
+  UpdateRegularizeGuidancePartnerPayload,
   UpdateRegularizeLicensePayload,
   UpdateRegularizeMunicipalTaxPayload,
   UpdateRegularizeProcessPayload,
@@ -312,6 +314,19 @@ export function useRemoveRegularizeGuidanceActivityMutation(): UseMutationResult
   });
 }
 
+export function useUpdateRegularizeGuidanceActivityMutation(): UseMutationResult<
+  RegularizeGuidance,
+  Error,
+  UpdateRegularizeGuidanceActivityPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.updateGuidanceActivity(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
 export function useAddRegularizeGuidancePartnerMutation(): UseMutationResult<
   RegularizeGuidance,
   Error,
@@ -334,6 +349,19 @@ export function useRemoveRegularizeGuidancePartnerMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => regularizeService.removeGuidancePartner(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useUpdateRegularizeGuidancePartnerMutation(): UseMutationResult<
+  RegularizeGuidance,
+  Error,
+  UpdateRegularizeGuidancePartnerPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.updateGuidancePartner(payload),
     onSuccess: () => invalidateRegularizeOperations(queryClient),
   });
 }

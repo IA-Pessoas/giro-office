@@ -997,8 +997,10 @@ await runTest("regularize operations service exposes create and update endpoints
   for (const endpoint of [
     "guidanceActivityAdd",
     "guidanceActivityRemove",
+    "guidanceActivity",
     "guidancePartnerAdd",
     "guidancePartnerRemove",
+    "guidancePartner",
   ]) {
     assert.match(
       serviceSource,
@@ -1032,8 +1034,10 @@ await runTest("regularize operations mutations stay in hooks and invalidate cach
     "useUpdateRegularizeGuidanceMutation",
     "useAddRegularizeGuidanceActivityMutation",
     "useRemoveRegularizeGuidanceActivityMutation",
+    "useUpdateRegularizeGuidanceActivityMutation",
     "useAddRegularizeGuidancePartnerMutation",
     "useRemoveRegularizeGuidancePartnerMutation",
+    "useUpdateRegularizeGuidancePartnerMutation",
     "useCreateRegularizeLicenseMutation",
     "useUpdateRegularizeLicenseMutation",
   ]) {
