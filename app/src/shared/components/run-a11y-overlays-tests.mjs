@@ -150,6 +150,30 @@ runTest("AppShell header notifications expose loading, retryable error, and empt
   );
 });
 
+runTest("AppShell assistant discloses its local session-only behavior", () => {
+  assert.match(
+    appShellSource,
+    /Assistente local da sessão: as mensagens ficam apenas nesta sessão, não são\s+enviadas ao servidor/,
+  );
+  assert.match(
+    appShellSource,
+    /Este assistente ainda não está conectado a uma IA\. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor\./,
+  );
+  assert.doesNotMatch(appShellSource, /Recebi sua mensagem\. Em breve vou responder por aqui\./);
+});
+
+runTest("AppShell task notifications preserve task deep-links and report read failures", () => {
+  assert.match(appShellSource, /taskId\?: string;/);
+  assert.match(appShellSource, /taskId: item\.task_id,/);
+  assert.match(
+    appShellSource,
+    /router\.push\(\{[\s\S]*?pathname: "\/tasks",[\s\S]*?query: \{ taskId: item\.taskId \},[\s\S]*?\}\)/,
+  );
+  assert.match(appShellSource, /import \{ toast \} from "react-toastify";/);
+  assert.match(appShellSource, /Não foi possível marcar a notificação de RH como lida\./);
+  assert.match(appShellSource, /Não foi possível marcar a notificação de tarefa como lida\./);
+});
+
 runTest("AppShell AI chat uses Radix Dialog primitives", () => {
   assert.match(appShellSource, /import \* as DialogPrimitive from "@radix-ui\/react-dialog";/);
   assert.match(appShellSource, /<DialogPrimitive\.Root[\s\S]*open=\{showAiChat\}/);
