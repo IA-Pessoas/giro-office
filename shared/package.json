@@ -96,6 +96,12 @@
       "development": "./src/testUtils/index.ts",
       "default": "./dist/testUtils/index.js"
     },
+    "./openapi": {
+      "types": "./dist/http/swaggerUi.d.ts",
+      "development": "./src/http/swaggerUi.ts",
+      "import": "./dist/http/swaggerUi.js",
+      "default": "./dist/http/swaggerUi.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

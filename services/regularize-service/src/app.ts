@@ -4,15 +4,15 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
+import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
 import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { RegularizeServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
-import { requestContext } from "./middlewares/requestContext.js";
 import { buildRegularizeServiceOpenApiSpec } from "./openapi/spec.js";
 import {
   RegularizeLicenseReportingService,

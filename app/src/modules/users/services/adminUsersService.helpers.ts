@@ -4,14 +4,14 @@ import {
   getAdminUserStatusLabel,
   normalizeAdminUserStatus,
   type AdminUserStatus,
-} from "./adminUserStatusCatalog";
+} from "./adminUserStatusCatalog.ts";
 
 export {
   ADMIN_USER_STATUS_LABELS,
   getAdminUserStatusLabel,
   normalizeAdminUserStatus,
   type AdminUserStatus,
-} from "./adminUserStatusCatalog";
+} from "./adminUserStatusCatalog.ts";
 
 export const ADMIN_USERS_PAGE_SIZE = 100;
 

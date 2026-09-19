@@ -429,3 +429,73 @@ describe("buildHttpProxyMiddleware", () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 502 }));
   });
 });
+
+describe("encaminhamento do corpo JSON", () => {
+  function stubFetchCapturingBody(): { getBody: () => unknown } {
+    let capturedBody: unknown;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        capturedBody = init?.body;
+        return new globalThis.Response(null, { status: 204 });
+      }),
+    );
+    return { getBody: () => capturedBody };
+  }
+
+  function buildResponse(): Response {
+    return {
+      locals: {},
+      end: vi.fn(),
+      send: vi.fn(),
+      setHeader: vi.fn(),
+      status: vi.fn().mockReturnThis(),
+    } as unknown as Response;
+  }
+
+  it("reenvia os bytes originais quando express.json preservou rawBody", async () => {
+    const captured = stubFetchCapturingBody();
+    const proxy = buildHttpProxyMiddleware("http://upstream.test");
+    // Espaçamento e ordem de chaves que um JSON.stringify do body parseado perderia.
+    const rawBody = Buffer.from('{"z":1,  "a":"acentuação"}', "utf8");
+
+    await proxy(
+      {
+        body: { z: 1, a: "acentuação" },
+        rawBody,
+        get: () => undefined,
+        headers: { "content-type": "application/json" },
+        ip: "127.0.0.1",
+        method: "POST",
+        originalUrl: "/user/me",
+        protocol: "http",
+      } as unknown as Request,
+      buildResponse(),
+      vi.fn(),
+    );
+
+    expect(captured.getBody()).toBeInstanceOf(Buffer);
+    expect((captured.getBody() as Buffer).equals(rawBody)).toBe(true);
+  });
+
+  it("serializa o body quando não há rawBody", async () => {
+    const captured = stubFetchCapturingBody();
+    const proxy = buildHttpProxyMiddleware("http://upstream.test");
+
+    await proxy(
+      {
+        body: { a: 1 },
+        get: () => undefined,
+        headers: { "content-type": "application/json" },
+        ip: "127.0.0.1",
+        method: "POST",
+        originalUrl: "/user/me",
+        protocol: "http",
+      } as unknown as Request,
+      buildResponse(),
+      vi.fn(),
+    );
+
+    expect(captured.getBody()).toBe('{"a":1}');
+  });
+});
