@@ -4,7 +4,11 @@ import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 
 export type TriageAuditPrisma = Pick<
   PrismaClient,
-  "$executeRaw" | "$transaction" | "triageCompetence" | "triageCompetenceHistory"
+  | "$executeRaw"
+  | "$transaction"
+  | "triageCompetence"
+  | "triageCompetenceHistory"
+  | "triageOutboxEvent"
 >;
 
 export interface TriageAuditAuthContext {
@@ -45,7 +49,22 @@ export interface TriageAuditTimeline {
 
 export interface TriageAuditReconcileResult {
   reconciled: number;
+  dispatched: number;
+  pending: number;
 }
+
+export interface TriageAuditEvent {
+  id: string;
+  event_key: string;
+  aggregate_type: string;
+  aggregate_id: string;
+  organization_id: string;
+  event_type: string;
+  payload: unknown;
+  occurred_at: Date;
+}
+
+export type TriageAuditEventDispatcher = (event: TriageAuditEvent) => Promise<void>;
 
 const historySelect = {
   id: true,
@@ -84,7 +103,10 @@ function toJsonValue(value: Prisma.JsonValue | null): unknown {
 }
 
 export class TriageAuditService {
-  constructor(private readonly prisma: TriageAuditPrisma) {}
+  constructor(
+    private readonly prisma: TriageAuditPrisma,
+    private readonly dispatchEvent?: TriageAuditEventDispatcher,
+  ) {}
 
   async listTimeline(
     input: ListTriageAuditInput,
@@ -145,7 +167,7 @@ export class TriageAuditService {
     requireWritePermission(auth);
 
     try {
-      return await this.withOrganization(auth, async (transaction) => {
+      const reconciliation = await this.withOrganization(auth, async (transaction) => {
         const reconciled = await transaction.$executeRaw`
           INSERT INTO "triagem.outbox_events" (
             id,
@@ -182,11 +204,73 @@ export class TriageAuditService {
 
         return { reconciled: Number(reconciled) };
       });
+      const dispatch = await this.dispatchPending(auth);
+      return { reconciled: reconciliation.reconciled, ...dispatch };
     } catch (error: unknown) {
       logError("Erro ao reconciliar a outbox de auditoria da Triagem", { err: error });
       if (error instanceof ServiceError) throw error;
       throw new ServiceError(500, "Erro ao reconciliar a auditoria da Triagem.", error);
     }
+  }
+
+  private async dispatchPending(
+    auth: TriageAuditAuthContext,
+  ): Promise<Pick<TriageAuditReconcileResult, "dispatched" | "pending">> {
+    if (!this.dispatchEvent) {
+      return { dispatched: 0, pending: 0 };
+    }
+
+    const events = await this.withOrganization(auth, (transaction) =>
+      transaction.triageOutboxEvent.findMany({
+        where: { organization_id: auth.organizationId, dispatched_at: null },
+        orderBy: [{ occurred_at: "asc" }, { id: "asc" }],
+        take: 100,
+        select: {
+          id: true,
+          event_key: true,
+          aggregate_type: true,
+          aggregate_id: true,
+          organization_id: true,
+          event_type: true,
+          payload: true,
+          occurred_at: true,
+        },
+      }),
+    );
+
+    let dispatched = 0;
+    for (const event of events) {
+      const claimed = await this.withOrganization(auth, (transaction) =>
+        transaction.triageOutboxEvent.updateMany({
+          where: { id: event.id, organization_id: auth.organizationId, dispatched_at: null },
+          data: { attempts: { increment: 1 } },
+        }),
+      );
+      if (claimed.count === 0) continue;
+
+      try {
+        await this.dispatchEvent(event);
+        const completed = await this.withOrganization(auth, (transaction) =>
+          transaction.triageOutboxEvent.updateMany({
+            where: { id: event.id, organization_id: auth.organizationId, dispatched_at: null },
+            data: { dispatched_at: new Date() },
+          }),
+        );
+        dispatched += completed.count;
+      } catch (error: unknown) {
+        logError("Erro ao despachar evento da outbox de auditoria da Triagem", {
+          err: error,
+          eventKey: event.event_key,
+        });
+      }
+    }
+
+    const pending = await this.withOrganization(auth, (transaction) =>
+      transaction.triageOutboxEvent.count({
+        where: { organization_id: auth.organizationId, dispatched_at: null },
+      }),
+    );
+    return { dispatched, pending };
   }
 
   private async withOrganization<T>(

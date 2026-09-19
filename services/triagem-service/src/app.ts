@@ -12,6 +12,7 @@ import "express-async-errors";
 
 import type { TriagemServiceEnv } from "./config/env.js";
 import { createTriagemPrismaClient, type TriagemPrismaClient } from "./integrations/prisma.js";
+import { createTriageAuditDispatcher } from "./integrations/triageAuditDispatcher.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildTriagemServiceOpenApiSpec } from "./openapi/spec.js";
 import {
@@ -93,7 +94,7 @@ export function createTriagemApp({
   const externalLinkService = new TriageExternalLinkService(prisma);
   const urgentRequestService = new TriageUrgentRequestService(prisma);
   const overviewService = new TriageOverviewService(prisma);
-  const auditService = new TriageAuditService(prisma);
+  const auditService = new TriageAuditService(prisma, createTriageAuditDispatcher(env, logger));
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));

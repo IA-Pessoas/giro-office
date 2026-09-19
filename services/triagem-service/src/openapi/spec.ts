@@ -366,10 +366,25 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                       properties: {
                         id: { type: "string", format: "uuid" },
                         action: { type: "string" },
-                        actor: { type: "object", additionalProperties: true },
+                        actor: {
+                          type: "object",
+                          required: ["id", "name", "full_name"],
+                          properties: {
+                            id: { type: "string", format: "uuid" },
+                            name: { type: "string" },
+                            full_name: { type: ["string", "null"] },
+                          },
+                        },
                         competence: { type: "string" },
                         occurred_at: { type: "string", format: "date-time" },
-                        context: { type: "object", additionalProperties: true },
+                        context: {
+                          type: "object",
+                          required: ["before", "after"],
+                          properties: {
+                            before: { type: ["object", "null"], additionalProperties: true },
+                            after: { type: "object", additionalProperties: true },
+                          },
+                        },
                       },
                     },
                   },
@@ -391,13 +406,49 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
           tags: ["Audit"],
           summary: "Reconciliar o outbox de auditoria da Triagem",
           security: [{ internalServiceToken: [] }],
+          parameters: [
+            {
+              name: "x-internal-service-token",
+              in: "header",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              name: "x-auth-user-id",
+              in: "header",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "x-auth-organization-id",
+              in: "header",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "x-auth-permission",
+              in: "header",
+              required: false,
+              schema: { type: "integer", minimum: 0 },
+            },
+            {
+              name: "x-auth-modules",
+              in: "header",
+              required: false,
+              schema: { type: "string" },
+            },
+          ],
           responses: {
             "200": {
               description: "Eventos reconciliados",
               ...successEnvelope({
                 type: "object",
-                required: ["reconciled"],
-                properties: { reconciled: { type: "integer", minimum: 0 } },
+                required: ["reconciled", "dispatched", "pending"],
+                properties: {
+                  reconciled: { type: "integer", minimum: 0 },
+                  dispatched: { type: "integer", minimum: 0 },
+                  pending: { type: "integer", minimum: 0 },
+                },
               }),
             },
             "401": { description: "Token interno ausente" },

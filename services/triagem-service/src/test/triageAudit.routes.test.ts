@@ -43,7 +43,7 @@ function authHeaders(): Record<string, string> {
 function createMockDeps(): TriageAuditRouteDeps {
   return {
     listTimeline: vi.fn(async () => ({ items: [], total: 0, page: 1, page_size: 20 })),
-    reconcile: vi.fn(async () => ({ reconciled: 1 })),
+    reconcile: vi.fn(async () => ({ reconciled: 1, dispatched: 1, pending: 0 })),
   };
 }
 

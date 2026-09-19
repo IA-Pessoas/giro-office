@@ -26,6 +26,9 @@ const triagemServiceEnvSchema = z
     databaseUrl: z.string().url("DATABASE_URL não definida para o triagem-service."),
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o triagem-service."),
     nodeEnv: z.string().optional().default("development"),
+    auditEnabled: z.string().optional().default("true").transform(parseBoolean),
+    auditServiceUrl: z.string().url().default("http://localhost:3020"),
+    auditServiceToken: z.string().default("audit-service-token"),
     internalServiceToken: z.string().optional().default("audit-service-token"),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z.string().optional().default("false").transform(parseBoolean),
@@ -49,6 +52,12 @@ const triagemServiceEnvSchema = z
       envName: "INTERNAL_SERVICE_TOKEN",
       token: rest.internalServiceToken,
     });
+    validateProductionInternalServiceToken({
+      nodeEnv: rest.nodeEnv,
+      serviceName: "triagem-service",
+      envName: "AUDIT_SERVICE_TOKEN",
+      token: rest.auditServiceToken,
+    });
     validateProductionCorsOrigins({
       nodeEnv: rest.nodeEnv,
       serviceName: "triagem-service",
@@ -67,6 +76,9 @@ export function getTriagemServiceEnv(): TriagemServiceEnv {
     databaseUrl: process.env.DATABASE_URL,
     jwtSecret: process.env.JWT_SECRET,
     nodeEnv: process.env.NODE_ENV,
+    auditEnabled: process.env.AUDIT_ENABLED,
+    auditServiceUrl: process.env.AUDIT_SERVICE_URL,
+    auditServiceToken: process.env.AUDIT_SERVICE_TOKEN,
     internalServiceToken: process.env.INTERNAL_SERVICE_TOKEN ?? process.env.AUDIT_SERVICE_TOKEN,
     logLevel: process.env.LOG_LEVEL,
     logPretty: process.env.LOG_PRETTY,

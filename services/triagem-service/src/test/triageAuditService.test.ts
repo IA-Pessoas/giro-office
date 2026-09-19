@@ -27,6 +27,11 @@ function createMockPrisma(): TriageAuditPrisma {
       count: vi.fn(),
       findMany: vi.fn(),
     },
+    triageOutboxEvent: {
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+      count: vi.fn(),
+    },
   };
 
   return prisma as unknown as TriageAuditPrisma;
@@ -106,13 +111,71 @@ describe("TriageAuditService", () => {
       .mockResolvedValueOnce(0);
     const service = new TriageAuditService(prisma);
 
-    await expect(service.reconcile(editor())).resolves.toEqual({ reconciled: 2 });
-    await expect(service.reconcile(editor())).resolves.toEqual({ reconciled: 0 });
+    await expect(service.reconcile(editor())).resolves.toEqual({
+      reconciled: 2,
+      dispatched: 0,
+      pending: 0,
+    });
+    await expect(service.reconcile(editor())).resolves.toEqual({
+      reconciled: 0,
+      dispatched: 0,
+      pending: 0,
+    });
 
     expect(prisma.$executeRaw).toHaveBeenCalledTimes(6);
     const insertCall = vi.mocked(prisma.$executeRaw).mock.calls[2]?.[0];
     expect(String(insertCall)).toContain("ON CONFLICT");
     expect(String(insertCall)).toContain("competence_history");
+  });
+
+  it("despacha eventos pendentes e marca a confirmação sem apagar o fato", async () => {
+    const prisma = createMockPrisma();
+    const event = {
+      id: "event-1",
+      event_key: "competence:event-1:created",
+      aggregate_type: "triage_competence",
+      aggregate_id: COMPETENCE_ID,
+      organization_id: ORGANIZATION_ID,
+      event_type: "triage.competence.created",
+      payload: { actor_user_id: USER_ID, before: null, after: { id: COMPETENCE_ID } },
+      occurred_at: new Date("2026-09-18T12:00:00.000Z"),
+    };
+    vi.mocked(prisma.triageOutboxEvent.findMany).mockResolvedValue([event] as never);
+    vi.mocked(prisma.triageOutboxEvent.updateMany).mockResolvedValue({ count: 1 });
+    vi.mocked(prisma.triageOutboxEvent.count).mockResolvedValue(0);
+    const dispatchEvent = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      new TriageAuditService(prisma, dispatchEvent).reconcile(editor()),
+    ).resolves.toEqual({ reconciled: 0, dispatched: 1, pending: 0 });
+    expect(dispatchEvent).toHaveBeenCalledWith(event);
+    expect(prisma.triageOutboxEvent.updateMany).toHaveBeenCalledTimes(2);
+    expect(prisma.triageOutboxEvent.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { dispatched_at: expect.any(Date) } }),
+    );
+  });
+
+  it("mantém o evento pendente e registra a falha do despacho para nova tentativa", async () => {
+    const prisma = createMockPrisma();
+    const event = {
+      id: "event-2",
+      event_key: "competence:event-2:created",
+      aggregate_type: "triage_competence",
+      aggregate_id: COMPETENCE_ID,
+      organization_id: ORGANIZATION_ID,
+      event_type: "triage.competence.created",
+      payload: { actor_user_id: USER_ID },
+      occurred_at: new Date("2026-09-18T12:00:00.000Z"),
+    };
+    vi.mocked(prisma.triageOutboxEvent.findMany).mockResolvedValue([event] as never);
+    vi.mocked(prisma.triageOutboxEvent.updateMany).mockResolvedValue({ count: 1 });
+    vi.mocked(prisma.triageOutboxEvent.count).mockResolvedValue(1);
+    const dispatchEvent = vi.fn().mockRejectedValue(new Error("audit indisponível"));
+
+    await expect(
+      new TriageAuditService(prisma, dispatchEvent).reconcile(editor()),
+    ).resolves.toEqual({ reconciled: 0, dispatched: 0, pending: 1 });
+    expect(prisma.triageOutboxEvent.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it("propaga falha de reconciliação para manter a transação abortada", async () => {

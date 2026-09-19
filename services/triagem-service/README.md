@@ -9,6 +9,7 @@ Serviço oficial das competências mensais e operações do módulo Triagem.
 ## Variáveis de ambiente
 
 Consulte `src/config/env.ts`. O serviço exige `DATABASE_URL` e `JWT_SECRET` e usa `AUDIT_SERVICE_TOKEN` para chamadas internas.
+O despacho da outbox usa `AUDIT_SERVICE_URL`, `AUDIT_SERVICE_TOKEN` e `AUDIT_ENABLED`; eventos só recebem `dispatched_at` após confirmação do audit-service.
 O principal de `DATABASE_URL` deve ser membro de `giro_user_runtime`; cada transação aplica essa role e o contexto `app.organization_id` antes de acessar dados tenant-scoped. A migration concede essa membership ao principal que a aplica, e o bootstrap recusa iniciar quando a credencial do serviço não atende essa condição. Portanto, execute a migration com o mesmo principal não-superuser usado pelo serviço; a provisionamento de credenciais separado pertence ao fluxo de deploy.
 
 ## Gateway
@@ -24,7 +25,7 @@ Endpoints públicos principais via gateway:
 - `GET|POST /triagem/external-links`
 - `GET /triagem/overview` com filtros de cliente, competência e status, paginação e indicadores
 - `GET /triagem/competencies/<id>/history` para timeline append-only da competência
-- `POST /internal/triagem/audit/reconcile` para reconciliação idempotente do outbox interno
+- `POST /internal/triagem/audit/reconcile` para reconciliação e despacho idempotentes do outbox interno
 
 Os catálogos aceitam `JUSTIFICATION`, `LINK_TYPE`, `DELIVERY_METHOD` e `STATE_SITE`, sempre
 escopados à organização. Competências preservam os valores catalogados em snapshots imutáveis;

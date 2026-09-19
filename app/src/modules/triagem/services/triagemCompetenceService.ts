@@ -24,7 +24,7 @@ function unwrap<T>(body: unknown): T {
 export const triagemCompetenceService = {
   async list(clientId: string): Promise<TriageCompetence[]> {
     const response = await setupAPIClient().get(TRIAGEM_COMPETENCE_ENDPOINT, {
-      params: { client_id: clientId },
+      params: { client_id: clientId, include_archived: true },
     });
     return unwrap<TriageCompetence[]>(response.data);
   },
