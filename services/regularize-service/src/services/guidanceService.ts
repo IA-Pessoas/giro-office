@@ -30,6 +30,105 @@ const checklistLabels = Object.fromEntries(
 const [pending, completed] = REGULARIZE_GUIDANCE_CHECKLIST_STATUSES;
 type ExpandedGuidance = Prisma.ProceduralGuidanceGetPayload<{ include: typeof include }>;
 type LegacyInput = { organizationId: string; userId: string; guidanceId: string };
+type GuidanceJsonRow = Prisma.JsonObject & { id?: string };
+
+function cleanText(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function comparisonKey(value: string): string {
+  return cleanText(value)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
+function normalizeCpf(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  return digits || comparisonKey(value).replace(/\s/g, "");
+}
+
+function normalizeActivity(item: GuidanceEconomicActivity | GuidanceJsonRow): GuidanceJsonRow {
+  const raw = item as Record<string, unknown>;
+  return {
+    ...raw,
+    id: typeof raw.id === "string" ? raw.id : randomUUID(),
+    code: cleanText(raw.code),
+    description: cleanText(raw.description),
+    type: raw.type === "Principal" ? "Principal" : "Secundária",
+  } as GuidanceJsonRow;
+}
+
+function normalizePartner(item: GuidancePartner | GuidanceJsonRow): GuidanceJsonRow {
+  const raw = item as Record<string, unknown>;
+  const percentage = raw.percentage ?? raw.share;
+  return {
+    ...raw,
+    id: typeof raw.id === "string" ? raw.id : randomUUID(),
+    name: cleanText(raw.name),
+    cpf: normalizeCpf(cleanText(raw.cpf)),
+    ...(percentage === undefined ? {} : { percentage, share: percentage }),
+    ...(raw.role === undefined ? {} : { role: cleanText(raw.role) }),
+    ...(raw.profession === undefined ? {} : { profession: cleanText(raw.profession) }),
+    ...(raw.marital_status === undefined ? {} : { marital_status: cleanText(raw.marital_status) }),
+    ...(raw.rg === undefined ? {} : { rg: cleanText(raw.rg) }),
+    ...(raw.cnh === undefined ? {} : { cnh: cleanText(raw.cnh) }),
+    ...(raw.address === undefined ? {} : { address: cleanText(raw.address) }),
+  } as GuidanceJsonRow;
+}
+
+function normalizeActivities(
+  items: Array<GuidanceEconomicActivity | GuidanceJsonRow>,
+  principalId?: string,
+): GuidanceJsonRow[] {
+  const normalized = items.map(normalizeActivity);
+  const codes = new Set<string>();
+  const descriptions = new Set<string>();
+
+  for (const item of normalized) {
+    const code = comparisonKey(String(item.code));
+    const description = comparisonKey(String(item.description));
+    if (codes.has(code) || descriptions.has(description)) {
+      throw new ServiceError(409, "Atividade duplicada na orientacao.");
+    }
+    codes.add(code);
+    descriptions.add(description);
+  }
+
+  const principalCount = normalized.filter((item) => item.type === "Principal").length;
+  if (principalCount > 1 && principalId === undefined) {
+    throw new ServiceError(409, "A orientacao aceita no maximo uma atividade principal.");
+  }
+
+  return normalized.map((item) => ({
+    ...item,
+    type:
+      principalId === undefined ? item.type : item.id === principalId ? "Principal" : "Secundária",
+  }));
+}
+
+function normalizePartners(items: Array<GuidancePartner | GuidanceJsonRow>): GuidanceJsonRow[] {
+  const normalized = items.map(normalizePartner);
+  const cpfs = new Set<string>();
+  for (const item of normalized) {
+    const cpf = String(item.cpf);
+    if (cpfs.has(cpf)) {
+      throw new ServiceError(409, "O CPF ja existe nesta orientacao.");
+    }
+    cpfs.add(cpf);
+  }
+  return normalized;
+}
+
+function guidanceItems(
+  guidance: ExpandedGuidance,
+  field: "economic_activities" | "partners",
+): GuidanceJsonRow[] {
+  return Array.isArray(guidance[field]) ? (guidance[field] as GuidanceJsonRow[]) : [];
+}
 
 function expanded(guidance: ExpandedGuidance): Record<string, unknown> {
   const items = new Map(guidance.checklist_items.map((item) => [item.code, item]));
@@ -92,6 +191,10 @@ export class GuidanceService {
       const target = await this.targetData(tx, input.organizationId, fields);
       const rows = checklistRows(checklist);
       const branch = resolveBranchData(checklist, branch_data);
+      const activities = normalizeActivities(
+        (economic_activities ?? []) as GuidanceEconomicActivity[],
+      );
+      const partnerRows = normalizePartners((partners ?? []) as GuidancePartner[]);
       const created = await tx.proceduralGuidance.create({
         data: {
           ...fields,
@@ -99,11 +202,8 @@ export class GuidanceService {
           organization_id: input.organizationId,
           process_id: fields.process_id ?? null,
           branch_data: branch === null ? Prisma.DbNull : (branch as Prisma.InputJsonObject),
-          economic_activities: (economic_activities ?? []).map((item) => ({
-            ...item,
-            id: item.id ?? randomUUID(),
-          })),
-          partners: (partners ?? []).map((item) => ({ ...item, id: item.id ?? randomUUID() })),
+          economic_activities: activities,
+          partners: partnerRows,
           checklist_items: { create: rows },
         },
         include,
@@ -220,14 +320,24 @@ export class GuidanceService {
       activity: GuidanceEconomicActivity;
     },
   ): Promise<Record<string, unknown>> {
-    const item = { ...input.activity, id: input.activity.id ?? randomUUID() };
-    return this.changeLegacyItems(
-      input,
-      "economic_activities",
-      "Adicionar Atividade",
-      item,
-      (current) => [...current, item],
+    const item = normalizeActivity(input.activity);
+    return this.changeItems(input, "economic_activities", "Adicionar Atividade", (current) =>
+      normalizeActivities([...current, item], item.type === "Principal" ? item.id : undefined),
     );
+  }
+
+  async updateEconomicActivity(
+    input: LegacyInput & {
+      activity: GuidanceEconomicActivity;
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.changeItems(input, "economic_activities", "Atualizar Atividade", (current) => {
+      const existing = current.find((item) => item.id === input.activity.id);
+      if (!existing) throw new ServiceError(404, "Atividade nao encontrada na orientacao.");
+      const item = normalizeActivity(input.activity);
+      const next = current.map((candidate) => (candidate.id === item.id ? item : candidate));
+      return normalizeActivities(next, item.type === "Principal" ? item.id : undefined);
+    });
   }
 
   async removeEconomicActivity(
@@ -235,13 +345,12 @@ export class GuidanceService {
       itemId: string;
     },
   ): Promise<Record<string, unknown>> {
-    return this.changeLegacyItems(
-      input,
-      "economic_activities",
-      "Remover Atividade",
-      { removed_id: input.itemId },
-      (current) => current.filter((item) => item.id !== input.itemId),
-    );
+    return this.changeItems(input, "economic_activities", "Remover Atividade", (current) => {
+      if (!current.some((item) => item.id === input.itemId)) {
+        throw new ServiceError(404, "Atividade nao encontrada na orientacao.");
+      }
+      return normalizeActivities(current.filter((item) => item.id !== input.itemId));
+    });
   }
 
   async addPartner(
@@ -249,11 +358,26 @@ export class GuidanceService {
       partner: GuidancePartner;
     },
   ): Promise<Record<string, unknown>> {
-    const item = { ...input.partner, id: input.partner.id ?? randomUUID() };
-    return this.changeLegacyItems(input, "partners", "Adicionar Socio", item, (current) => [
-      ...current,
-      item,
-    ]);
+    const item = normalizePartner(input.partner);
+    return this.changeItems(input, "partners", "Adicionar Socio", (current) =>
+      normalizePartners([...current, item]),
+    );
+  }
+
+  async updatePartner(
+    input: LegacyInput & {
+      partner: GuidancePartner;
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.changeItems(input, "partners", "Atualizar Socio", (current) => {
+      const item = normalizePartner(input.partner);
+      if (!current.some((candidate) => candidate.id === item.id)) {
+        throw new ServiceError(404, "Socio nao encontrado na orientacao.");
+      }
+      return normalizePartners(
+        current.map((candidate) => (candidate.id === item.id ? item : candidate)),
+      );
+    });
   }
 
   async removePartner(
@@ -261,25 +385,24 @@ export class GuidanceService {
       itemId: string;
     },
   ): Promise<Record<string, unknown>> {
-    return this.changeLegacyItems(
-      input,
-      "partners",
-      "Remover Socio",
-      { removed_id: input.itemId },
-      (current) => current.filter((item) => item.id !== input.itemId),
-    );
+    return this.changeItems(input, "partners", "Remover Socio", (current) => {
+      if (!current.some((item) => item.id === input.itemId)) {
+        throw new ServiceError(404, "Socio nao encontrado na orientacao.");
+      }
+      return normalizePartners(current.filter((item) => item.id !== input.itemId));
+    });
   }
 
-  private async changeLegacyItems(
+  private async changeItems(
     input: LegacyInput,
     field: "economic_activities" | "partners",
     action: string,
-    changes: unknown,
-    change: (current: Prisma.JsonObject[]) => Prisma.JsonObject[],
+    change: (current: GuidanceJsonRow[]) => GuidanceJsonRow[],
   ): Promise<Record<string, unknown>> {
     return this.transaction(async (tx) => {
       const existing = await this.getGuidance(tx, input.organizationId, input.guidanceId);
-      const items = change((existing[field] as Prisma.JsonObject[] | null) ?? []);
+      const before = guidanceItems(existing, field);
+      const items = change(before);
       const projection = {
         code: field,
         label: checklistLabels[field],
@@ -307,7 +430,7 @@ export class GuidanceService {
         action,
         referring: "regularize.guidance",
         referringId: input.guidanceId,
-        changes,
+        changes: { before, after: items },
       });
       return expanded(updated);
     });

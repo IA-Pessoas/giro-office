@@ -21,7 +21,13 @@ export const guidancePartnerSchema = z
     id: z.string().uuid().optional(),
     name: z.string().min(1, "name obrigatorio."),
     cpf: z.string().min(1, "cpf obrigatorio."),
+    percentage: z.coerce.number().min(0).max(100).optional(),
     role: z.string().optional(),
+    profession: z.string().optional(),
+    marital_status: z.string().optional(),
+    rg: z.string().optional(),
+    cnh: z.string().optional(),
+    address: z.string().optional(),
     share: z.coerce.number().optional(),
   })
   .strict();
@@ -236,6 +242,13 @@ export const addGuidanceActivityBodySchema = z
   })
   .strict();
 
+export const updateGuidanceActivityBodySchema = z
+  .object({
+    guidance_id: z.string().uuid("guidance_id invalido."),
+    activity: guidanceEconomicActivitySchema,
+  })
+  .strict();
+
 export const removeGuidanceActivityBodySchema = z
   .object({
     guidance_id: z.string().uuid("guidance_id invalido."),
@@ -247,6 +260,13 @@ export const addGuidancePartnerBodySchema = z
   .object({
     guidance_id: z.string().uuid("guidance_id invalido."),
     partner: guidancePartnerSchema.omit({ id: true }),
+  })
+  .strict();
+
+export const updateGuidancePartnerBodySchema = z
+  .object({
+    guidance_id: z.string().uuid("guidance_id invalido."),
+    partner: guidancePartnerSchema,
   })
   .strict();
 

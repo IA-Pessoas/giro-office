@@ -198,7 +198,13 @@ const guidancePartnerInputOpenApiSchema = {
     id: { type: "string", format: "uuid" },
     name: { type: "string", minLength: 1 },
     cpf: { type: "string", minLength: 1 },
+    percentage: { type: "number", minimum: 0, maximum: 100 },
     role: { type: "string" },
+    profession: { type: "string" },
+    marital_status: { type: "string" },
+    rg: { type: "string" },
+    cnh: { type: "string" },
+    address: { type: "string" },
     share: { type: "number" },
   },
 };
@@ -1116,6 +1122,33 @@ export function buildRegularizeServiceOpenApiSpec(
           responses: { "200": { description: "Atividade removida", ...successEnvelopeContent() } },
         },
       },
+      "/regularize/guidance/activity": {
+        put: {
+          tags: ["Guidance"],
+          summary: "Atualizar atividade econômica da orientação",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["guidance_id", "activity"],
+                  properties: {
+                    guidance_id: { type: "string", format: "uuid" },
+                    activity: guidanceEconomicActivityResponseOpenApiSchema,
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Atividade atualizada", ...successEnvelopeContent() },
+            ...guidanceErrorResponses(),
+          },
+        },
+      },
       "/regularize/guidance/partner/add": {
         post: {
           tags: ["Guidance"],
@@ -1130,6 +1163,33 @@ export function buildRegularizeServiceOpenApiSpec(
           summary: "Remover sócio da orientação (compatibilidade legada)",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Socio removido", ...successEnvelopeContent() } },
+        },
+      },
+      "/regularize/guidance/partner": {
+        put: {
+          tags: ["Guidance"],
+          summary: "Atualizar sócio da orientação",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["guidance_id", "partner"],
+                  properties: {
+                    guidance_id: { type: "string", format: "uuid" },
+                    partner: guidancePartnerResponseOpenApiSchema,
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Socio atualizado", ...successEnvelopeContent() },
+            ...guidanceErrorResponses(),
+          },
         },
       },
       "/regularize/license": {

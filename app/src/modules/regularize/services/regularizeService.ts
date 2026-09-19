@@ -13,6 +13,8 @@ import type {
   CreateRegularizeSitePasswordPayload,
   RemoveRegularizeGuidanceActivityPayload,
   RemoveRegularizeGuidancePartnerPayload,
+  UpdateRegularizeGuidanceActivityPayload,
+  UpdateRegularizeGuidancePartnerPayload,
   LegacyGuidanceDraft,
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
@@ -439,6 +441,16 @@ export const regularizeService = {
     return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
   },
 
+  async updateGuidanceActivity(
+    payload: UpdateRegularizeGuidanceActivityPayload,
+  ): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const { process_id: _processId, ...body } = payload;
+    const response = await api.put(REGULARIZE_ENDPOINTS.guidanceActivity, body);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
+  },
+
   async addGuidancePartner(
     payload: AddRegularizeGuidancePartnerPayload,
   ): Promise<RegularizeGuidance> {
@@ -455,6 +467,16 @@ export const regularizeService = {
     const api = setupAPIClient();
     const { process_id: _processId, ...body } = payload;
     const response = await api.post(REGULARIZE_ENDPOINTS.guidancePartnerRemove, body);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
+  },
+
+  async updateGuidancePartner(
+    payload: UpdateRegularizeGuidancePartnerPayload,
+  ): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const { process_id: _processId, ...body } = payload;
+    const response = await api.put(REGULARIZE_ENDPOINTS.guidancePartner, body);
 
     return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
   },

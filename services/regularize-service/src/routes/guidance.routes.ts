@@ -9,7 +9,9 @@ import {
   listGuidanceByProcessQuerySchema,
   removeGuidanceActivityBodySchema,
   removeGuidancePartnerBodySchema,
+  updateGuidanceActivityBodySchema,
   updateGuidanceBodySchema,
+  updateGuidancePartnerBodySchema,
 } from "../schemas/guidance.schemas.js";
 import { GuidanceService } from "../services/guidanceService.js";
 import type { RegularizeRouteDeps } from "./regularizeRouteDeps.js";
@@ -118,6 +120,25 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
     },
   );
 
+  router.put(
+    "/guidance/activity",
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(updateGuidanceActivityBodySchema, request.body);
+        const updated = await guidanceService.updateEconomicActivity({
+          organizationId: request.organization_id,
+          userId: request.user_id,
+          guidanceId: body.guidance_id,
+          activity: body.activity,
+        });
+        response.json(createSuccessResponse(updated));
+      } catch (err) {
+        logError("Erro ao atualizar atividade em orientacao do regularize", { err });
+        next(err);
+      }
+    },
+  );
+
   router.post(
     "/guidance/partner/add",
     async (request: Request, response: Response, next: NextFunction) => {
@@ -151,6 +172,25 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
         response.json(createSuccessResponse(updated));
       } catch (err) {
         logError("Erro ao remover socio de orientacao do regularize", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.put(
+    "/guidance/partner",
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(updateGuidancePartnerBodySchema, request.body);
+        const updated = await guidanceService.updatePartner({
+          organizationId: request.organization_id,
+          userId: request.user_id,
+          guidanceId: body.guidance_id,
+          partner: body.partner,
+        });
+        response.json(createSuccessResponse(updated));
+      } catch (err) {
+        logError("Erro ao atualizar socio em orientacao do regularize", { err });
         next(err);
       }
     },

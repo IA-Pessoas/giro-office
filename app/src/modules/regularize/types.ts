@@ -394,7 +394,13 @@ export type RegularizeGuidancePartner = {
   name?: string | null;
   cpf?: string | null;
   document?: string | null;
+  percentage?: number | string | null;
   role?: string | null;
+  profession?: string | null;
+  marital_status?: string | null;
+  rg?: string | null;
+  cnh?: string | null;
+  address?: string | null;
   share?: number | string | null;
   [key: string]: unknown;
 };
@@ -447,15 +453,23 @@ export type RegularizeGuidance = {
 };
 
 export type RegularizeGuidanceEconomicActivityPayload = {
+  id?: RegularizeId;
   code: string;
   description: string;
   type: string;
 };
 
 export type RegularizeGuidancePartnerPayload = {
+  id?: RegularizeId;
   name: string;
   cpf: string;
+  percentage?: number;
   role?: string;
+  profession?: string;
+  marital_status?: string;
+  rg?: string;
+  cnh?: string;
+  address?: string;
   share?: number;
 };
 
@@ -545,6 +559,12 @@ export type AddRegularizeGuidanceActivityPayload = {
   activity: RegularizeGuidanceEconomicActivityPayload;
 };
 
+export type UpdateRegularizeGuidanceActivityPayload = {
+  guidance_id: RegularizeId;
+  process_id?: RegularizeId;
+  activity: RegularizeGuidanceEconomicActivityPayload & { id: RegularizeId };
+};
+
 export type RemoveRegularizeGuidanceActivityPayload = {
   guidance_id: RegularizeId;
   process_id?: RegularizeId;
@@ -555,6 +575,12 @@ export type AddRegularizeGuidancePartnerPayload = {
   guidance_id: RegularizeId;
   process_id?: RegularizeId;
   partner: RegularizeGuidancePartnerPayload;
+};
+
+export type UpdateRegularizeGuidancePartnerPayload = {
+  guidance_id: RegularizeId;
+  process_id?: RegularizeId;
+  partner: RegularizeGuidancePartnerPayload & { id: RegularizeId };
 };
 
 export type RemoveRegularizeGuidancePartnerPayload = RemoveRegularizeGuidanceActivityPayload;
