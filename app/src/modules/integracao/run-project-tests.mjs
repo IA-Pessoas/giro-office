@@ -260,6 +260,22 @@ runTest("task and dependency confirmations retain contextual errors on failure",
   assert.match(taskModel, /setDependentDeletionError\(message\);\s*throw error;/);
 });
 
+runTest("task notification deep-links open the editor and preserve clientId on close", () => {
+  const source = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /const routeTaskId = routeQuery\.get\("taskId"\) \?\? undefined;/);
+  assert.match(source, /setEditingTaskId\(routeTaskId\);/);
+  assert.match(source, /function handleEditingTaskModalChange\(open: boolean\)/);
+  assert.match(source, /const query = \{ \.\.\.router\.query \};/);
+  assert.match(source, /delete query\.taskId;/);
+  assert.match(
+    source,
+    /router\.replace\(\{ pathname: "\/tasks", query \}, undefined, \{ shallow: true \}\)/,
+  );
+  assert.match(source, /onOpenChange=\{handleEditingTaskModalChange\}/);
+  assert.match(source, /routeQuery\.getAll\(\s*"clientId",\s*\)/);
+});
+
 runTest("integration destructive actions use the shared confirmation dialog", () => {
   const sources = {
     tasks: readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8"),

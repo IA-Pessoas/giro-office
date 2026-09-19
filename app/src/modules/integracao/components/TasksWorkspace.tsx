@@ -93,10 +93,12 @@ export function TasksWorkspace() {
   const [taskDeletionError, setTaskDeletionError] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(searchTerm.trim(), 300);
   const isSearchPending = searchTerm.trim() !== debouncedSearch;
-  const routeClientIds = new URLSearchParams(router.asPath.split("?", 2)[1]?.split("#", 1)[0]).getAll(
+  const routeQuery = new URLSearchParams(router.asPath.split("?", 2)[1]?.split("#", 1)[0]);
+  const routeClientIds = routeQuery.getAll(
     "clientId",
   );
   const routeClientId = routeClientIds.length > 0 ? routeClientIds.join(",") : undefined;
+  const routeTaskId = routeQuery.get("taskId") ?? undefined;
   const clientQuery = useClient(routeClientId);
   const client = clientQuery.data;
   const selectedClient =
@@ -133,6 +135,14 @@ export function TasksWorkspace() {
   useEffect(() => {
     setPage(1);
   }, [assignmentFilter, refFilter, routeClientId, searchTerm, statusFilter]);
+
+  useEffect(() => {
+    if (!router.isReady || !routeTaskId) {
+      return;
+    }
+
+    setEditingTaskId(routeTaskId);
+  }, [router.isReady, routeTaskId]);
 
   const stats = useMemo(
     () => [
@@ -219,6 +229,17 @@ export function TasksWorkspace() {
     );
   }
 
+  function handleEditingTaskModalChange(open: boolean) {
+    if (open) {
+      return;
+    }
+
+    setEditingTaskId(null);
+    const query = { ...router.query };
+    delete query.taskId;
+    void router.replace({ pathname: "/tasks", query }, undefined, { shallow: true });
+  }
+
   const isInitialLoading = tasksQuery.isLoading && tasks.length === 0;
   const hasMore = Boolean(tasksQuery.data?.hasMore) && page < totalPages;
 
@@ -254,11 +275,7 @@ export function TasksWorkspace() {
 
       <TaskFormModal
         open={Boolean(editingTaskId)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingTaskId(null);
-          }
-        }}
+        onOpenChange={handleEditingTaskModalChange}
         taskId={editingTaskId}
         onSuccess={handleTaskSaved}
         selectedClient={selectedClient}
