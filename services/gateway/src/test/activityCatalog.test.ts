@@ -43,6 +43,14 @@ describe("activityCatalog", () => {
     ["POST", "/pessoal/group-assignments/previews", "gerou", "uma prévia de atribuição de grupo"],
     ["POST", "/pessoal/group-assignments/apply", "aplicou", "uma atribuição de grupo"],
     ["GET", "/triagem/editability", "consultou", "a permissão de edição da triagem"],
+    ["GET", "/triagem/competencies", "consultou", "a lista de competências mensais da Triagem"],
+    ["POST", "/triagem/competencies", "cadastrou", "uma nova competência mensal da Triagem"],
+    [
+      "PATCH",
+      "/triagem/competencies/competence-1/archive",
+      "arquivou",
+      "uma competência mensal da Triagem",
+    ],
     ["GET", "/triagem/catalogs", "consultou", "os catálogos operacionais da Triagem"],
     ["POST", "/triagem/catalogs", "cadastrou", "um item de catálogo da Triagem"],
     ["PATCH", "/triagem/catalogs/catalog-1", "atualizou", "um item de catálogo da Triagem"],
@@ -361,6 +369,8 @@ describe("activityCatalog", () => {
     ["POST", "/platform/session/refresh"],
     ["GET", "/platform/me"],
     ["GET", "/platform/audit/requests"],
+    ["GET", "/triagem/overview"],
+    ["GET", "/triagem/competencies/competence-1/history"],
   ])("classifica %s %s como técnico", (method, path) => {
     expect(classifyActivity(method, path)).toEqual({ kind: "technical" });
     expect(describeActivity(method, path)).toBeNull();

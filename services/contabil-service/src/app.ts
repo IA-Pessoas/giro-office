@@ -13,6 +13,7 @@ import "express-async-errors";
 
 import type { ContabilServiceEnv } from "./config/env.js";
 import prismaClient from "./integrations/prisma.js";
+import { TriagemOverviewClient } from "./integrations/triagemOverviewClient.js";
 import { buildContabilServiceOpenApiSpec } from "./openapi/spec.js";
 import { type ControlRouteDeps, createControlRoutes } from "./routes/control.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
