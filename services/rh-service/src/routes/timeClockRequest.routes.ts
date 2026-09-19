@@ -244,6 +244,6 @@ export function createTimeClockRequestRoutes(
   return router;
 }
 
-const router = createTimeClockRequestRoutes();
+const router: ReturnType<typeof Router> = createTimeClockRequestRoutes();
 
 export default router;
