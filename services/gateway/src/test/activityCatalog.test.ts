@@ -282,6 +282,13 @@ describe("activityCatalog", () => {
       "uma atividade à orientação de regularização",
     ],
     [
+      "PUT",
+      "/regularize/guidance/activity",
+      "atualizou",
+      "uma atividade da orientação de regularização",
+    ],
+    ["PUT", "/regularize/guidance/partner", "atualizou", "um sócio da orientação de regularização"],
+    [
       "POST",
       "/pessoal/obrigations/competences/2026-07/generate",
       "gerou",

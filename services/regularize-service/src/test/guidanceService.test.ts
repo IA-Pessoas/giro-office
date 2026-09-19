@@ -576,13 +576,23 @@ describe("GuidanceService", () => {
     const f = setup();
     const { id } = await f.create();
     const input = { organizationId, userId, guidanceId: id as string };
-    const add = () =>
-      kind === "activity"
+    let sequence = 0;
+    const add = () => {
+      const current = sequence++;
+      return kind === "activity"
         ? f.service.addEconomicActivity({
             ...input,
-            activity: { code: "123", description: "Serviço", type: "Principal" },
+            activity: {
+              code: `123-${current}`,
+              description: `Serviço ${current}`,
+              type: "Principal",
+            },
           })
-        : f.service.addPartner({ ...input, partner: { name: "Sócio", cpf: "456" } });
+        : f.service.addPartner({
+            ...input,
+            partner: { name: `Sócio ${current}`, cpf: `456${current}` },
+          });
+    };
     const remove = (itemId: string) =>
       kind === "activity"
         ? f.service.removeEconomicActivity({ ...input, itemId })
@@ -619,6 +629,154 @@ describe("GuidanceService", () => {
     f.failLog = true;
     await expect(add()).rejects.toThrow("Falha no log");
     expect((await f.service.detail(organizationId, id as string))[field]).toEqual([]);
+  });
+
+  it("normaliza atividades, garante uma principal e audita edição e remoção", async () => {
+    const f = setup();
+    const created = await f.create({
+      economic_activities: [
+        { code: " 4711 ", description: " Comércio  varejista ", type: "Secundaria" },
+      ],
+    });
+    const activity = (created.economic_activities as Row[])[0];
+
+    await expect(
+      f.service.addEconomicActivity({
+        organizationId,
+        userId,
+        guidanceId: created.id as string,
+        activity: { code: "4711", description: "Outro", type: "Secundária" },
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    const firstPrincipal = await f.service.addEconomicActivity({
+      organizationId,
+      userId,
+      guidanceId: created.id as string,
+      activity: { code: "6201", description: "Desenvolvimento", type: "Principal" },
+    });
+    const firstPrincipalId = (firstPrincipal.economic_activities as Row[])[1].id;
+    const secondPrincipal = await f.service.addEconomicActivity({
+      organizationId,
+      userId,
+      guidanceId: created.id as string,
+      activity: { code: "6202", description: "Consultoria", type: "Principal" },
+    });
+    expect(secondPrincipal.economic_activities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: firstPrincipalId, type: "Secundária" }),
+        expect.objectContaining({ code: "6202", type: "Principal" }),
+      ]),
+    );
+
+    const edited = await f.service.updateEconomicActivity({
+      organizationId,
+      userId,
+      guidanceId: created.id as string,
+      activity: {
+        id: activity.id,
+        code: "4712",
+        description: "Comercio atualizado",
+        type: "Secundária",
+      },
+    });
+    expect(edited.economic_activities).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: activity.id, code: "4712" })]),
+    );
+    expect(f.state.logs.at(-1)?.changes).toEqual(
+      expect.objectContaining({ before: expect.any(Array), after: expect.any(Array) }),
+    );
+
+    await f.service.removeEconomicActivity({
+      organizationId,
+      userId,
+      guidanceId: created.id as string,
+      itemId: activity.id as string,
+    });
+    expect(f.state.logs.at(-1)?.changes).toEqual(
+      expect.objectContaining({ before: expect.any(Array), after: expect.any(Array) }),
+    );
+  });
+
+  it("preserva snapshot completo de socio, rejeita CPF duplicado e respeita organização", async () => {
+    const f = setup();
+    const created = await f.create({
+      partners: [
+        {
+          name: "Sócio original",
+          cpf: "123.456.789-01",
+          percentage: 40,
+          profession: "Administrador",
+          marital_status: "Casado",
+          rg: "12.345",
+          cnh: "9988",
+          address: "Rua A",
+          role: "Administrador",
+        },
+      ],
+    });
+    const partner = (created.partners as Row[])[0];
+    expect(partner).toMatchObject({
+      cpf: "12345678901",
+      percentage: 40,
+      share: 40,
+      profession: "Administrador",
+      marital_status: "Casado",
+      rg: "12.345",
+      cnh: "9988",
+      address: "Rua A",
+      role: "Administrador",
+    });
+
+    await expect(
+      f.service.addPartner({
+        organizationId,
+        userId,
+        guidanceId: created.id as string,
+        partner: { name: "Duplicado", cpf: "12345678901" },
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    const edited = await f.service.updatePartner({
+      organizationId,
+      userId,
+      guidanceId: created.id as string,
+      partner: {
+        id: partner.id,
+        name: "Sócio atualizado",
+        cpf: "12345678901",
+        percentage: 55,
+        profession: "Diretor",
+        marital_status: "Solteiro",
+        rg: "99",
+        cnh: "77",
+        address: "Rua B",
+        role: "Diretor",
+      },
+    });
+    expect(edited.partners).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: partner.id, name: "Sócio atualizado", percentage: 55 }),
+      ]),
+    );
+
+    await expect(
+      f.service.removePartner({
+        organizationId: "org-b",
+        userId,
+        guidanceId: created.id as string,
+        itemId: partner.id as string,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    await f.service.removePartner({
+      organizationId,
+      userId,
+      guidanceId: created.id as string,
+      itemId: partner.id as string,
+    });
+    expect(f.state.logs.at(-1)?.changes).toEqual(
+      expect.objectContaining({ before: expect.any(Array), after: [] }),
+    );
   });
 
   it("isola os quatro métodos legados por organização", async () => {

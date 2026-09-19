@@ -66,8 +66,10 @@ describe("regularize remaining routes", () => {
     ["GET", "/regularize/guidance/list"],
     ["POST", "/regularize/guidance/activity/add"],
     ["POST", "/regularize/guidance/activity/remove"],
+    ["PUT", "/regularize/guidance/activity"],
     ["POST", "/regularize/guidance/partner/add"],
     ["POST", "/regularize/guidance/partner/remove"],
+    ["PUT", "/regularize/guidance/partner"],
     ["GET", "/regularize/license"],
     ["POST", "/regularize/license"],
     ["PUT", "/regularize/license"],
@@ -126,6 +128,54 @@ describe("regularize remaining routes", () => {
 
     expect(response.status).toBe(201);
     expect(response.body.success).toBe(true);
+  });
+
+  it("PUT guidance item routes validate and delegate activity and partner updates", async () => {
+    const updated = { ...completeGuidance, economic_activities: [], partners: [] };
+    const activitySpy = vi
+      .spyOn(GuidanceService.prototype, "updateEconomicActivity")
+      .mockResolvedValue(updated);
+    const partnerSpy = vi
+      .spyOn(GuidanceService.prototype, "updatePartner")
+      .mockResolvedValue(updated);
+    const app = createTestApp();
+    const guidanceId = "d0000000-0000-4000-8000-000000000001";
+    const itemId = "d0000000-0000-4000-8000-000000000002";
+
+    const activityResponse = await request(app)
+      .put("/regularize/guidance/activity")
+      .set(gatewayHeaders())
+      .send({
+        guidance_id: guidanceId,
+        activity: { id: itemId, code: "6201", description: "Serviço", type: "Principal" },
+      });
+    const partnerResponse = await request(app)
+      .put("/regularize/guidance/partner")
+      .set(gatewayHeaders())
+      .send({
+        guidance_id: guidanceId,
+        partner: {
+          id: itemId,
+          name: "Sócio",
+          cpf: "12345678901",
+          percentage: 50,
+          profession: "Diretor",
+          marital_status: "Casado",
+          rg: "12",
+          cnh: "34",
+          address: "Rua A",
+          role: "Administrador",
+        },
+      });
+
+    expect(activityResponse.status).toBe(200);
+    expect(partnerResponse.status).toBe(200);
+    expect(activitySpy).toHaveBeenCalledWith(
+      expect.objectContaining({ guidanceId, organizationId: expect.any(String) }),
+    );
+    expect(partnerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ guidanceId, organizationId: expect.any(String) }),
+    );
   });
 
   it("POST /regularize/process creates a process", async () => {

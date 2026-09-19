@@ -90,6 +90,8 @@ import {
   usePaginatedRegularizeProcesses,
   useRemoveRegularizeGuidanceActivityMutation,
   useRemoveRegularizeGuidancePartnerMutation,
+  useUpdateRegularizeGuidanceActivityMutation,
+  useUpdateRegularizeGuidancePartnerMutation,
   useReturnRegularizeProcessFromFiscalMutation,
   useSendRegularizeProcessToFiscalMutation,
   useUpdateRegularizeGuidanceMutation,
@@ -125,6 +127,8 @@ import type {
   RegularizeStatus,
   UpdateRegularizeClientPfPayload,
   UpdateRegularizeGuidancePayload,
+  UpdateRegularizeGuidanceActivityPayload,
+  UpdateRegularizeGuidancePartnerPayload,
   UpdateRegularizeLicensePayload,
   UpdateRegularizeMunicipalTaxPayload,
   UpdateRegularizePartnerPayload,
@@ -172,8 +176,32 @@ type RegularizeFormState =
   | { type: "process"; mode: "edit"; id: RegularizeId }
   | { type: "guidance"; mode: "create"; processId?: RegularizeId }
   | { type: "guidance"; mode: "edit"; guidance: RegularizeGuidance }
-  | { type: "guidance-activity"; guidanceId: RegularizeId; processId: RegularizeId }
-  | { type: "guidance-partner"; guidanceId: RegularizeId; processId: RegularizeId }
+  | {
+      type: "guidance-activity";
+      mode: "create";
+      guidanceId: RegularizeId;
+      processId?: RegularizeId;
+    }
+  | {
+      type: "guidance-activity";
+      mode: "edit";
+      guidanceId: RegularizeId;
+      processId?: RegularizeId;
+      activity: RegularizeGuidanceEconomicActivity;
+    }
+  | {
+      type: "guidance-partner";
+      mode: "create";
+      guidanceId: RegularizeId;
+      processId?: RegularizeId;
+    }
+  | {
+      type: "guidance-partner";
+      mode: "edit";
+      guidanceId: RegularizeId;
+      processId?: RegularizeId;
+      partner: RegularizeGuidancePartner;
+    }
   | { type: "license"; mode: "create" }
   | { type: "license"; mode: "edit"; id: RegularizeId };
 
@@ -963,6 +991,7 @@ function ProcessDetailContent({
                         onClick={() =>
                           onSetActiveForm({
                             type: "guidance-activity",
+                            mode: "create",
                             guidanceId: item.id,
                             processId: item.process_id,
                           })
@@ -974,6 +1003,7 @@ function ProcessDetailContent({
                         onClick={() =>
                           onSetActiveForm({
                             type: "guidance-partner",
+                            mode: "create",
                             guidanceId: item.id,
                             processId: item.process_id,
                           })
@@ -997,18 +1027,36 @@ function ProcessDetailContent({
                               {formatText(activity.code)} - {formatText(activity.description)}
                             </span>
                             {canManageRegularizeCore ? (
-                              <TableActionButton
-                                disabled={!activity.id}
-                                icon={Trash2}
-                                title="Remover atividade"
-                                onClick={() => {
-                                  void onRemoveGuidanceActivity(
-                                    item.id,
-                                    item.process_id,
-                                    activity.id,
-                                  );
-                                }}
-                              />
+                              <span className="flex shrink-0 gap-1">
+                                <TableActionButton
+                                  disabled={!activity.id}
+                                  icon={Pencil}
+                                  title="Editar atividade"
+                                  onClick={() =>
+                                    activity.id
+                                      ? onSetActiveForm({
+                                          type: "guidance-activity",
+                                          mode: "edit",
+                                          guidanceId: item.id,
+                                          processId: item.process_id,
+                                          activity,
+                                        })
+                                      : undefined
+                                  }
+                                />
+                                <TableActionButton
+                                  disabled={!activity.id}
+                                  icon={Trash2}
+                                  title="Remover atividade"
+                                  onClick={() => {
+                                    void onRemoveGuidanceActivity(
+                                      item.id,
+                                      item.process_id,
+                                      activity.id,
+                                    );
+                                  }}
+                                />
+                              </span>
                             ) : null}
                           </div>
                         ),
@@ -1028,20 +1076,42 @@ function ProcessDetailContent({
                         >
                           <span className="min-w-0 text-gray-700 dark:text-slate-200">
                             {formatText(partner.name)} - {formatDocument(partner.cpf ?? partner.document)}
+                            {partner.profession ? `, ${formatText(partner.profession)}` : ""}
+                            {partner.percentage ?? partner.share
+                              ? ` (${formatText(partner.percentage ?? partner.share)}%)`
+                              : ""}
                           </span>
                           {canManageRegularizeCore ? (
-                            <TableActionButton
-                              disabled={!partner.id}
-                              icon={Trash2}
-                              title="Remover sócio"
-                              onClick={() => {
-                                void onRemoveGuidancePartner(
-                                  item.id,
-                                  item.process_id,
-                                  partner.id,
-                                );
-                              }}
-                            />
+                            <span className="flex shrink-0 gap-1">
+                              <TableActionButton
+                                disabled={!partner.id}
+                                icon={Pencil}
+                                title="Editar sócio"
+                                onClick={() =>
+                                  partner.id
+                                    ? onSetActiveForm({
+                                        type: "guidance-partner",
+                                        mode: "edit",
+                                        guidanceId: item.id,
+                                        processId: item.process_id,
+                                        partner,
+                                      })
+                                    : undefined
+                                }
+                              />
+                              <TableActionButton
+                                disabled={!partner.id}
+                                icon={Trash2}
+                                title="Remover sócio"
+                                onClick={() => {
+                                  void onRemoveGuidancePartner(
+                                    item.id,
+                                    item.process_id,
+                                    partner.id,
+                                  );
+                                }}
+                              />
+                            </span>
                           ) : null}
                         </div>
                       ))}
@@ -1187,8 +1257,10 @@ export function RegularizePage() {
   const updateGuidanceMutation = useUpdateRegularizeGuidanceMutation();
   const addGuidanceActivityMutation = useAddRegularizeGuidanceActivityMutation();
   const removeGuidanceActivityMutation = useRemoveRegularizeGuidanceActivityMutation();
+  const updateGuidanceActivityMutation = useUpdateRegularizeGuidanceActivityMutation();
   const addGuidancePartnerMutation = useAddRegularizeGuidancePartnerMutation();
   const removeGuidancePartnerMutation = useRemoveRegularizeGuidancePartnerMutation();
+  const updateGuidancePartnerMutation = useUpdateRegularizeGuidancePartnerMutation();
   const createLicenseMutation = useCreateRegularizeLicenseMutation();
   const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
   const uploadLicenseProtocolMutation = useUploadRegularizeLicenseProtocolMutation();
@@ -1357,6 +1429,14 @@ export function RegularizePage() {
   const activeGuidanceAction =
     activeForm?.type === "guidance-activity" || activeForm?.type === "guidance-partner"
       ? activeForm
+      : null;
+  const activeGuidanceActivity =
+    activeGuidanceAction?.type === "guidance-activity" && activeGuidanceAction.mode === "edit"
+      ? activeGuidanceAction.activity
+      : null;
+  const activeGuidancePartner =
+    activeGuidanceAction?.type === "guidance-partner" && activeGuidanceAction.mode === "edit"
+      ? activeGuidanceAction.partner
       : null;
   const activeLicenseForForm =
     activeForm?.type === "license" && activeForm.mode === "edit"
@@ -1610,15 +1690,24 @@ export function RegularizePage() {
     }
   }
 
-  async function handleSubmitGuidanceActivity(payload: AddRegularizeGuidanceActivityPayload) {
+  async function handleSubmitGuidanceActivity(
+    payload: AddRegularizeGuidanceActivityPayload | UpdateRegularizeGuidanceActivityPayload,
+  ) {
     try {
-      await addGuidanceActivityMutation.mutateAsync(payload);
-      toast.success("Atividade adicionada com sucesso.");
+      if (payload.activity.id) {
+        await updateGuidanceActivityMutation.mutateAsync(
+          payload as UpdateRegularizeGuidanceActivityPayload,
+        );
+        toast.success("Atividade atualizada com sucesso.");
+      } else {
+        await addGuidanceActivityMutation.mutateAsync(payload);
+        toast.success("Atividade adicionada com sucesso.");
+      }
       closeCoreForm();
     } catch (error) {
       const message = getRegularizeMutationErrorMessage(
         error,
-        "Não foi possível adicionar a atividade.",
+        "Não foi possível salvar a atividade.",
       );
       toast.error(message);
       throw new Error(message);
@@ -1649,15 +1738,24 @@ export function RegularizePage() {
     }
   }
 
-  async function handleSubmitGuidancePartner(payload: AddRegularizeGuidancePartnerPayload) {
+  async function handleSubmitGuidancePartner(
+    payload: AddRegularizeGuidancePartnerPayload | UpdateRegularizeGuidancePartnerPayload,
+  ) {
     try {
-      await addGuidancePartnerMutation.mutateAsync(payload);
-      toast.success("Sócio adicionado com sucesso.");
+      if (payload.partner.id) {
+        await updateGuidancePartnerMutation.mutateAsync(
+          payload as UpdateRegularizeGuidancePartnerPayload,
+        );
+        toast.success("Sócio atualizado com sucesso.");
+      } else {
+        await addGuidancePartnerMutation.mutateAsync(payload);
+        toast.success("Sócio adicionado com sucesso.");
+      }
       closeCoreForm();
     } catch (error) {
       const message = getRegularizeMutationErrorMessage(
         error,
-        "Não foi possível adicionar o sócio.",
+        "Não foi possível salvar o sócio.",
       );
       toast.error(message);
       throw new Error(message);
@@ -2959,18 +3057,24 @@ export function RegularizePage() {
 
       <RegularizeGuidanceActivityForm
         open={activeForm?.type === "guidance-activity"}
+        mode={activeGuidanceAction?.type === "guidance-activity" ? activeGuidanceAction.mode : "create"}
+        activity={activeGuidanceActivity}
         guidanceId={activeGuidanceAction?.guidanceId}
         processId={activeGuidanceAction?.processId}
-        isSubmitting={addGuidanceActivityMutation.isPending}
+        isSubmitting={
+          addGuidanceActivityMutation.isPending || updateGuidanceActivityMutation.isPending
+        }
         onClose={closeCoreForm}
         onSubmit={handleSubmitGuidanceActivity}
       />
 
       <RegularizeGuidancePartnerForm
         open={activeForm?.type === "guidance-partner"}
+        mode={activeGuidanceAction?.type === "guidance-partner" ? activeGuidanceAction.mode : "create"}
+        partner={activeGuidancePartner}
         guidanceId={activeGuidanceAction?.guidanceId}
         processId={activeGuidanceAction?.processId}
-        isSubmitting={addGuidancePartnerMutation.isPending}
+        isSubmitting={addGuidancePartnerMutation.isPending || updateGuidancePartnerMutation.isPending}
         onClose={closeCoreForm}
         onSubmit={handleSubmitGuidancePartner}
       />
