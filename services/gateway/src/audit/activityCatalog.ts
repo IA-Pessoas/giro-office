@@ -48,6 +48,8 @@ const TECHNICAL_RULES = [
   /^\/project\/metrics$/,
   /^\/ti\/dashboard\/?$/,
   /^\/pessoal\/overview\/?$/,
+  /^\/triagem\/overview\/?$/,
+  /^\/triagem\/competencies\/[^/]+\/history$/,
 ] as const;
 
 const EXPLICIT_RULES: ExplicitRule[] = [
@@ -952,6 +954,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "a permissão de edição da triagem" },
   },
   {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/competencies\/[^/]+\/archive$/,
+    description: { action: "arquivou", item: "uma competência mensal da Triagem" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/ti\/stock\/items\/[^/]+\/movements\/list$/,
     description: { action: "consultou", item: "a lista de movimentações de um item de estoque" },
@@ -1162,6 +1169,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um marcador de extrato bancário",
     newSingular: "um novo marcador de extrato bancário",
     plural: "marcadores de extratos bancários",
+  },
+  {
+    pattern: /^\/triagem\/competencies(?:\/|$)/,
+    singular: "uma competência mensal da Triagem",
+    newSingular: "uma nova competência mensal da Triagem",
+    plural: "competências mensais da Triagem",
   },
   {
     pattern: /^\/triagem\/external-links(?:\/|$)/,

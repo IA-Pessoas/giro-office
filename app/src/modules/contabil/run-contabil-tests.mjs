@@ -163,7 +163,7 @@ await (async () => {
     assert.match(source, /type="month"/);
     assert.match(source, /Criar competência/);
     assert.match(source, /Arquivar/);
-    assert.match(source, /Nenhuma competência ativa/);
+    assert.match(source, /Nenhuma competência para este cliente/);
     assert.match(source, /role="alert"/);
     assert.match(source, /window\.confirm/);
   });

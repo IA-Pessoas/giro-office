@@ -1,4 +1,5 @@
 import { error as logError, warn as logWarn, ServiceError } from "@workspace/shared";
+import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "../constants/triageDocuments.js";
 import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 
 import { type LogUpdateParams, logUpdateIfChanged } from "../integrations/audit.js";
@@ -50,7 +51,7 @@ export const TRIAGE_DOCUMENT_STATUSES = [
   "NOT_APPLICABLE",
 ] as const;
 export const TRIAGE_DOCUMENT_NOTE_MAX_LENGTH = 2_000;
-export const TRIAGE_CATALOG_CODE_MAX_LENGTH = 100;
+export { TRIAGE_CATALOG_CODE_MAX_LENGTH };
 
 export type TriageDocumentField = (typeof TRIAGE_DOCUMENT_FIELDS)[number];
 export type TriageFiscalChecklistField = (typeof TRIAGE_FISCAL_CHECKLIST_FIELDS)[number];
