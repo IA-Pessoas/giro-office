@@ -9,6 +9,7 @@ import {
   CANONICAL_GUIDANCE_STATUSES,
   CANONICAL_LICENSE_STATUSES,
   CANONICAL_PROCESS_STATUSES,
+  FINANCIAL_STATUS_VALUES,
   LEGACY_LICENSE_STATUS_ALIASES,
   LEGACY_PROCESS_STATUS_ALIASES,
 } from "../schemas/status.schemas.js";
@@ -28,6 +29,50 @@ function successEnvelopeContent() {
     content: {
       "application/json": {
         schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+      },
+    },
+  };
+}
+
+const processRecordOpenApiSchema = {
+  type: "object",
+  additionalProperties: true,
+  properties: {
+    id: { type: "string", format: "uuid" },
+    status: { type: "string", enum: [...CANONICAL_PROCESS_STATUSES] },
+    financial_status: { type: "string", enum: [...FINANCIAL_STATUS_VALUES] },
+    client_notice_date: { type: "string", format: "date", nullable: true },
+    locking_type: { type: "string", nullable: true },
+    elapsed_days: { type: "integer", minimum: 0, nullable: true },
+  },
+};
+
+function processRecordSuccessEnvelopeContent() {
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              oneOf: [
+                processRecordOpenApiSchema,
+                {
+                  type: "object",
+                  required: ["create"],
+                  properties: { create: processRecordOpenApiSchema },
+                },
+                {
+                  type: "object",
+                  required: ["detail"],
+                  properties: { detail: processRecordOpenApiSchema },
+                },
+              ],
+            },
+          },
+        },
       },
     },
   };
@@ -417,7 +462,15 @@ function processRequestBody(required: string[]) {
               entry_date: { type: "string", format: "date-time" },
               completion_date: { type: "string", format: "date-time" },
               expected_date: { type: "string", format: "date-time" },
+              client_notice_date: { type: "string", format: "date", nullable: true },
               status: { type: "string", enum: [...CANONICAL_PROCESS_STATUSES] },
+              financial_status: {
+                oneOf: [
+                  { type: "string", enum: [...FINANCIAL_STATUS_VALUES] },
+                  { type: "integer", enum: [0, 1, 3, 4] },
+                  { type: "string", enum: ["0", "1", "3", "4"] },
+                ],
+              },
               observation: { type: "string", nullable: true },
               responsible1_id: { type: "string", format: "uuid" },
               responsible2_id: { type: "string", format: "uuid" },
@@ -866,7 +919,11 @@ export function buildRegularizeServiceOpenApiSpec(
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
-          responses: { "200": { description: "Detalhe do processo", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Detalhe do processo", ...processRecordSuccessEnvelopeContent() },
+            "404": { description: "Processo nao encontrado" },
+            ...protectedErrorResponses(),
+          },
         },
         post: {
           tags: ["Processes"],
@@ -874,7 +931,9 @@ export function buildRegularizeServiceOpenApiSpec(
           security: [{ bearerAuth: [] }],
           ...processRequestBody(["cpf_cnpj", "process_type", "description", "status"]),
           responses: {
-            "201": { description: "Processo criado", ...successEnvelopeContent() },
+            "201": { description: "Processo criado", ...processRecordSuccessEnvelopeContent() },
+            "404": { description: "Cliente, responsavel ou tarefa nao encontrado" },
+            "409": { description: "Processo duplicado" },
             ...protectedErrorResponses(),
           },
         },
@@ -884,7 +943,9 @@ export function buildRegularizeServiceOpenApiSpec(
           security: [{ bearerAuth: [] }],
           ...processRequestBody(["id", "cpf_cnpj", "process_type", "description", "status"]),
           responses: {
-            "200": { description: "Processo atualizado", ...successEnvelopeContent() },
+            "200": { description: "Processo atualizado", ...processRecordSuccessEnvelopeContent() },
+            "404": { description: "Processo, cliente, responsavel ou tarefa nao encontrado" },
+            "409": { description: "Processo duplicado ou alterado" },
             ...protectedErrorResponses(),
           },
         },

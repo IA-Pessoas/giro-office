@@ -8,7 +8,7 @@ import { createTestApp, gatewayHeaders } from "./regularizeTestUtils.js";
 
 const processId = "e0000000-0000-4000-8000-000000000001";
 
-function createPrisma() {
+function createPrisma(overrides: Record<string, unknown> = {}) {
   const prisma = {
     process: {
       findFirst: vi.fn(async () => ({
@@ -21,7 +21,9 @@ function createPrisma() {
         entry_date: new Date("2026-01-01T00:00:00.000Z"),
         completion_date: null,
         expected_date: null,
+        client_notice_date: null,
         status: "Andamento",
+        financial_status: "Regular",
         observation: null,
         responsible1_id: null,
         responsible2_id: null,
@@ -30,11 +32,28 @@ function createPrisma() {
         urgency: null,
         task_id: null,
       })),
+      create: vi.fn(async () => ({
+        id: processId,
+        status: "Paralisado",
+        financial_status: "Não Contratado",
+        locking_type: "Financeiro",
+        client_notice_date: new Date("2026-04-10T00:00:00.000Z"),
+      })),
     },
+    client: {
+      findFirst: vi.fn(async () => ({
+        id: "c0000000-0000-4000-8000-000000000001",
+        cpf_cnpj: "12345678000199",
+      })),
+    },
+    clientPF: { findFirst: vi.fn(async () => null) },
+    user: { findMany: vi.fn(async () => []) },
+    task: { findFirst: vi.fn(async () => null) },
     logs: {
       create: vi.fn(async () => ({})),
       findMany: vi.fn(async () => []),
     },
+    ...overrides,
   } as unknown as PrismaClient;
 
   prisma.$transaction = vi.fn(async (callback) => callback(prisma));
@@ -42,6 +61,81 @@ function createPrisma() {
 }
 
 describe("regularize process routes", () => {
+  it("accepts legacy financial codes and persists the client notice date", async () => {
+    const prisma = createPrisma({
+      process: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => ({
+          id: processId,
+          status: "Paralisado",
+          financial_status: "Não Contratado",
+          locking_type: "Financeiro",
+          client_notice_date: new Date("2026-04-10T00:00:00.000Z"),
+        })),
+      },
+    });
+    const app = createTestApp(prisma);
+
+    const response = await request(app).post("/regularize/process").set(gatewayHeaders()).send({
+      client_pj_id: "c0000000-0000-4000-8000-000000000001",
+      cpf_cnpj: "12345678000199",
+      process_type: "Abertura",
+      description: "Descrição",
+      status: "Andamento",
+      financial_status: 4,
+      client_notice_date: "2026-04-10",
+    });
+
+    expect(response.status).toBe(201);
+    expect(prisma.process.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          financial_status: "Não Contratado",
+          status: "Paralisado",
+          locking_type: "Financeiro",
+          client_notice_date: new Date("2026-04-10T00:00:00.000Z"),
+        }),
+      }),
+    );
+  });
+
+  it("rejects an unsupported legacy financial code at the HTTP boundary", async () => {
+    const prisma = createPrisma();
+    const app = createTestApp(prisma);
+
+    const response = await request(app).post("/regularize/process").set(gatewayHeaders()).send({
+      client_pj_id: "c0000000-0000-4000-8000-000000000001",
+      cpf_cnpj: "12345678000199",
+      process_type: "Abertura",
+      description: "Descrição",
+      status: "Andamento",
+      financial_status: 2,
+    });
+
+    expect(response.status).toBe(400);
+    expect(prisma.process.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("does not allow a viewer to mutate financial process data", async () => {
+    const prisma = createPrisma();
+    const app = createTestApp(prisma);
+
+    const response = await request(app)
+      .post("/regularize/process")
+      .set(gatewayHeaders({ permission: 1 }))
+      .send({
+        client_pj_id: "c0000000-0000-4000-8000-000000000001",
+        cpf_cnpj: "12345678000199",
+        process_type: "Abertura",
+        description: "Descrição",
+        status: "Andamento",
+        financial_status: "Regular",
+      });
+
+    expect(response.status).toBe(403);
+    expect(prisma.process.findFirst).not.toHaveBeenCalled();
+  });
+
   it("rejects a process creation without a selected client", async () => {
     const app = createTestApp(createPrisma());
 

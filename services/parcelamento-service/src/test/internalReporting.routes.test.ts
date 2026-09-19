@@ -118,10 +118,7 @@ describe("internal reporting routes", () => {
     const signed = grant("extract", body.source, body.fields, body);
     const app = createApp();
 
-    const missing = await request(app)
-      .post("/internal/reporting/extract")
-      .send(body)
-      .expect(403);
+    const missing = await request(app).post("/internal/reporting/extract").send(body).expect(403);
     const valid = await request(app)
       .post("/internal/reporting/extract")
       .set(INTERNAL_SERVICE_TOKEN_HEADER, "test-reports-internal-token")

@@ -77,9 +77,7 @@ function createGrant(input: {
   return { signature: createHmac("sha256", input.secret).update(grant).digest("hex"), grant };
 }
 
-function isExtractResponse(
-  value: unknown,
-): value is {
+function isExtractResponse(value: unknown): value is {
   success: true;
   data: { rows: readonly Record<string, unknown>[]; reachedLimit?: boolean };
 } {
