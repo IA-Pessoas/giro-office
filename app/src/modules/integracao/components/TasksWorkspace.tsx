@@ -79,6 +79,7 @@ function getBillingTone(value: string) {
 export function TasksWorkspace() {
   const router = useRouter();
   const { access: integracaoAccess } = useModuleAccess("integracao");
+  const { access: financeiroAccess } = useModuleAccess("financeiro");
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [refFilter, setRefFilter] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState<"all" | "assigned" | "unassigned">(
@@ -338,9 +339,12 @@ export function TasksWorkspace() {
       </div>
 
       <TaskFinanceiroPanel
-        canManage={integracaoAccess.isAdmin}
-        canView={integracaoAccess.canView}
+        canManage={integracaoAccess.isAdmin || financeiroAccess.isAdmin}
+        canView={integracaoAccess.canView || financeiroAccess.canView}
         clientId={routeClientId}
+        onSettled={() => {
+          void tasksQuery.refetch();
+        }}
       />
 
       <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-4`}>

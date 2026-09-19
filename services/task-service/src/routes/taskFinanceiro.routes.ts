@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   createSuccessResponse,
   error as logError,
@@ -16,6 +17,7 @@ import {
   financeiroExpressBodySchema,
   financeiroQueueQuerySchema,
   financeiroSettlementBodySchema,
+  financeiroTaskUpdateBodySchema,
 } from "../schemas/financeiroTaskUpdateBody.schema.js";
 import { TaskFinanceiroService } from "../services/taskFinanceiroService.js";
 
@@ -28,13 +30,34 @@ function requestContext(req: Request) {
     user_id,
     organization_id,
     integracao_level: normalizeModulePermission(req.modules?.integracao),
+    financeiro_level: normalizeModulePermission(req.modules?.financeiro),
     is_owner: req.user_type === "owner",
   };
 }
 
 function idempotencyKey(req: Request): string {
-  return parseWithZod(zNonEmptyText("Idempotency-Key").max(255), req.get("Idempotency-Key"));
+  const value = req.get("Idempotency-Key");
+  return value ? parseWithZod(zNonEmptyText("Idempotency-Key").max(255), value) : randomUUID();
 }
+
+router.put(
+  "/financeiro",
+  isAuthenticated,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = parseWithZod(financeiroTaskUpdateBodySchema, req.body);
+      const result = await taskFinanceiroService.settle({
+        ...requestContext(req),
+        task_ids: [body.task_id],
+        idempotency_key: idempotencyKey(req),
+      });
+      res.json(createSuccessResponse(result));
+    } catch (err) {
+      logError("Erro ao atualizar cobrança financeira", { err });
+      next(err);
+    }
+  },
+);
 
 router.get(
   "/financeiro/queue",

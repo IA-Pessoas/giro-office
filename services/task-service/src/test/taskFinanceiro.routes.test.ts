@@ -8,6 +8,23 @@ describe("task financeiro routes", () => {
     resetTaskRouteMocks();
   });
 
+  it("PUT /task/financeiro delega a atualização à baixa financeira", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/task/financeiro")
+      .set("Idempotency-Key", "task-financeiro-key")
+      .send({ task_id: "task-1" });
+
+    expect(res.status).toBe(200);
+    expect(taskFinanceiroServiceMock.settle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        task_ids: ["task-1"],
+        idempotency_key: "task-financeiro-key",
+      }),
+    );
+  });
+
   it("POST /task/financeiro/settle exige chave idempotente e delega a baixa", async () => {
     const app = createTestApp();
 

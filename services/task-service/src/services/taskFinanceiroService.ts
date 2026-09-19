@@ -11,6 +11,7 @@ export interface SettleFinanceiroRequest {
   task_ids: string[];
   idempotency_key: string;
   integracao_level?: number;
+  financeiro_level?: number;
   is_owner?: boolean;
   command_hash?: string;
 }
@@ -26,6 +27,7 @@ export interface SetCollectorsRequest {
   department_id: string;
   collector_ids: string[];
   integracao_level?: number;
+  financeiro_level?: number;
   is_owner?: boolean;
 }
 
@@ -38,6 +40,7 @@ export interface ListCollectorsRequest {
   organization_id: string;
   department_id: string;
   integracao_level?: number;
+  financeiro_level?: number;
   is_owner?: boolean;
 }
 
@@ -47,6 +50,7 @@ export interface ListFinanceiroQueueRequest {
   department_id?: string;
   client_id?: string;
   integracao_level?: number;
+  financeiro_level?: number;
   is_owner?: boolean;
 }
 
@@ -56,6 +60,7 @@ export interface SettleExpressRequest {
   client_id: string;
   idempotency_key: string;
   integracao_level?: number;
+  financeiro_level?: number;
   is_owner?: boolean;
 }
 
@@ -71,10 +76,20 @@ function expressCommandHash(clientId: string): string {
     .digest("hex");
 }
 
+function effectivePermission(data: {
+  integracao_level?: number;
+  financeiro_level?: number;
+}): number {
+  return Math.max(
+    data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC,
+    data.financeiro_level ?? 0,
+  );
+}
+
 export class TaskFinanceiroService {
   async listCollectors(data: ListCollectorsRequest) {
     const isPrivileged =
-      data.is_owner === true || data.integracao_level === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
+      data.is_owner === true || effectivePermission(data) === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
     if (!isPrivileged) {
       throw new ServiceError(
         403,
@@ -93,15 +108,11 @@ export class TaskFinanceiroService {
   }
 
   async listQueue(data: ListFinanceiroQueueRequest) {
-    if (
-      data.is_owner !== true &&
-      (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) <
-        INTEGRACAO_PERMISSION_LEVEL.VIEWER
-    ) {
+    if (data.is_owner !== true && effectivePermission(data) < INTEGRACAO_PERMISSION_LEVEL.VIEWER) {
       throw new ServiceError(403, "Você não possui acesso à Integração.");
     }
     const isPrivileged =
-      data.is_owner === true || data.integracao_level === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
+      data.is_owner === true || effectivePermission(data) === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
     let departmentIds: string[] | undefined;
     if (!isPrivileged) {
       const actor = await prismaClient.user.findFirst({
@@ -155,11 +166,7 @@ export class TaskFinanceiroService {
   }
 
   async settleExpress(data: SettleExpressRequest): Promise<SettleFinanceiroResponse> {
-    if (
-      data.is_owner !== true &&
-      (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) <
-        INTEGRACAO_PERMISSION_LEVEL.VIEWER
-    ) {
+    if (data.is_owner !== true && effectivePermission(data) < INTEGRACAO_PERMISSION_LEVEL.VIEWER) {
       throw new ServiceError(403, "Você não possui acesso à Integração.");
     }
     const tasks = await prismaClient.task.findMany({
@@ -180,7 +187,7 @@ export class TaskFinanceiroService {
   async setCollectors(data: SetCollectorsRequest): Promise<SetCollectorsResponse> {
     try {
       const isPrivileged =
-        data.is_owner === true || data.integracao_level === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
+        data.is_owner === true || effectivePermission(data) === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
       if (!isPrivileged) {
         throw new ServiceError(403, "Apenas administradores podem configurar cobradores.");
       }
@@ -206,7 +213,10 @@ export class TaskFinanceiroService {
                 { organization_id: null, department: { organization_id: data.organization_id } },
               ],
               permissions: {
-                some: { organization_id: data.organization_id, integracao: { gt: 0 } },
+                some: {
+                  organization_id: data.organization_id,
+                  OR: [{ integracao: { gt: 0 } }, { financeiro: { gt: 0 } }],
+                },
               },
             },
             select: { id: true },
@@ -237,7 +247,7 @@ export class TaskFinanceiroService {
       await audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
-        permission: data.integracao_level,
+        permission: effectivePermission(data),
         action: "Configuração de Cobradores Financeiros",
         referring: "integracao.financeiro.collectors",
         referringId: data.department_id,
@@ -256,8 +266,7 @@ export class TaskFinanceiroService {
     try {
       if (
         data.is_owner !== true &&
-        (data.integracao_level ?? INTEGRACAO_PERMISSION_LEVEL.BASIC) <
-          INTEGRACAO_PERMISSION_LEVEL.VIEWER
+        effectivePermission(data) < INTEGRACAO_PERMISSION_LEVEL.VIEWER
       ) {
         throw new ServiceError(403, "Você não possui acesso à Integração.");
       }
@@ -270,7 +279,7 @@ export class TaskFinanceiroService {
         const lockKey = JSON.stringify([data.organization_id, data.idempotency_key]);
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
         const isPrivileged =
-          data.is_owner === true || data.integracao_level === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
+          data.is_owner === true || effectivePermission(data) === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
         const previous = await tx.taskFinanceiroCommand.findUnique({
           where: {
             organization_id_idempotency_key: {
@@ -430,7 +439,7 @@ export class TaskFinanceiroService {
           await audit.createLog({
             userId: data.user_id,
             organizationId: data.organization_id,
-            permission: data.integracao_level,
+            permission: effectivePermission(data),
             action: "Baixa Financeira de Tarefas",
             referring: "integracao.financeiro.settlement",
             referringId: data.idempotency_key,

@@ -205,6 +205,14 @@ const settleFinanceiroRequestBody = createObjectRequestBody({
   },
 });
 
+const updateFinanceiroRequestBody = createObjectRequestBody({
+  example: { task_id: "task-uuid" },
+  required: ["task_id"],
+  properties: {
+    task_id: { type: "string" },
+  },
+});
+
 const expressFinanceiroRequestBody = createObjectRequestBody({
   example: { client_id: "client-uuid" },
   required: ["client_id"],
@@ -923,6 +931,21 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: {
             "200": { description: "Fila pendente", ...successJson },
             "403": { description: "Fora do escopo" },
+          },
+        },
+      },
+      "/task/financeiro": {
+        put: {
+          tags: ["Financeiro"],
+          summary: "Atualizar cobrança financeira de uma tarefa",
+          security: bearer,
+          ...updateFinanceiroRequestBody,
+          parameters: [{ ...financeiroIdempotencyHeader, required: false }],
+          responses: {
+            "200": { description: "Baixa realizada", ...successJson },
+            "403": { description: "Fora do escopo" },
+            "404": { description: "Tarefa não encontrada" },
+            "409": { description: "Tarefa não está pendente" },
           },
         },
       },

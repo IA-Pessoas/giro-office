@@ -23,6 +23,7 @@ export const INTEGRACAO_TASKS_ENDPOINTS = {
   attachmentList: "/task/attachment/list",
   attachmentAccess: "/task/attachment/access",
   financeiroQueue: "/task/financeiro/queue",
+  financeiroUpdate: "/task/financeiro",
   financeiroCollectors: "/task/financeiro/collectors",
   financeiroSettle: "/task/financeiro/settle",
   financeiroExpress: "/task/financeiro/express",

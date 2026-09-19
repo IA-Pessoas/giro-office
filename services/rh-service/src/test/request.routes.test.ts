@@ -119,6 +119,7 @@ describe("request routes", () => {
   it.each([
     "ti",
     "integracao",
+    "financeiro",
     "triagem",
   ])("GET /rh/operational-users aceita modulo %s para seletores contextuais", async (moduleKey) => {
     const app = createTestApp();

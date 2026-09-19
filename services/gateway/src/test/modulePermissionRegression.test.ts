@@ -396,6 +396,33 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ modules: { integracao: 2 } }), policy)).toBe(true);
   });
 
+  it("permite o fluxo financeiro pelo módulo Financeiro ou Integração", () => {
+    const viewRoutes = [
+      ["GET", "/task/financeiro/queue"],
+      ["PUT", "/task/financeiro"],
+      ["POST", "/task/financeiro/settle"],
+    ] as const;
+    const adminRoutes = [
+      ["GET", "/task/financeiro/collectors"],
+      ["PUT", "/task/financeiro/collectors"],
+    ] as const;
+
+    for (const [method, path] of viewRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(authContext({ modules: { financeiro: 1 } }), policy)).toBe(true);
+      expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), policy)).toBe(true);
+      expect(
+        canAccessRoute(authContext({ modules: { financeiro: 0, integracao: 0 } }), policy),
+      ).toBe(false);
+    }
+
+    for (const [method, path] of adminRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(authContext({ modules: { financeiro: 2 } }), policy)).toBe(false);
+      expect(canAccessRoute(authContext({ modules: { financeiro: 3 } }), policy)).toBe(true);
+    }
+  });
+
   it("protege os endpoints de projeto pelo módulo Integração", () => {
     const policy = requiredRoutePolicy("GET", "/project/list");
     expect(canAccessRoute(authContext({ modules: { integracao: 0 } }), policy)).toBe(false);
