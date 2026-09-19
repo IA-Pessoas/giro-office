@@ -256,7 +256,10 @@ test("commercial-service is wired into VPS build, runtime, wait, and secret mate
     await dryRunBuildxPush("commercial-service"),
     /WORKSPACE_PACKAGE=@workspace\/commercial-service/,
   );
-  assert.equal(await runDeployScopeFunction("vps_validate_service_token", "commercial-service"), "");
+  assert.equal(
+    await runDeployScopeFunction("vps_validate_service_token", "commercial-service"),
+    "",
+  );
   const composeContents = await readFile(composeVpsFile, "utf8");
   const commercialBlock = extractComposeServiceBlock(composeContents, "commercial-service");
   const gatewayBlock = extractComposeServiceBlock(composeContents, "gateway");
@@ -286,7 +289,10 @@ test("commercial-service is wired into VPS build, runtime, wait, and secret mate
     /commercial-service:\s+healthcheck:\s+disable: true/,
   );
   assert.match(await readFile(productionDeployScript, "utf8"), /commercial-service/);
-  assert.match(await readFile(productionWaitScript, "utf8"), /http:\/\/commercial-service:3045\/health/);
+  assert.match(
+    await readFile(productionWaitScript, "utf8"),
+    /http:\/\/commercial-service:3045\/health/,
+  );
 });
 
 test("reports project adapter has internal URL and shared reporting secret provisioning", async () => {
