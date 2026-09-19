@@ -20,6 +20,65 @@ describe("activityCatalog", () => {
     ],
     ["GET", "/commercial/prospecting", "consultou", "a lista de prospecções comerciais"],
     ["POST", "/commercial/prospecting", "cadastrou", "uma nova prospecção comercial"],
+    ["GET", "/pessoal/groups", "consultou", "a lista de grupos de pessoal"],
+    ["POST", "/pessoal/groups", "cadastrou", "um novo grupo de pessoal"],
+    [
+      "DELETE",
+      "/pessoal/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "arquivou",
+      "um grupo de pessoal",
+    ],
+    [
+      "POST",
+      "/pessoal/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/reactivate",
+      "reativou",
+      "um grupo de pessoal",
+    ],
+    [
+      "GET",
+      "/pessoal/group-assignments/eligible",
+      "consultou",
+      "os clientes elegíveis para atribuição de grupo",
+    ],
+    ["POST", "/pessoal/group-assignments/previews", "gerou", "uma prévia de atribuição de grupo"],
+    ["POST", "/pessoal/group-assignments/apply", "aplicou", "uma atribuição de grupo"],
+    ["GET", "/triagem/editability", "consultou", "a permissão de edição da triagem"],
+    ["GET", "/triagem/competencies", "consultou", "a lista de competências mensais da Triagem"],
+    ["POST", "/triagem/competencies", "cadastrou", "uma nova competência mensal da Triagem"],
+    [
+      "PATCH",
+      "/triagem/competencies/competence-1/archive",
+      "arquivou",
+      "uma competência mensal da Triagem",
+    ],
+    ["GET", "/triagem/catalogs", "consultou", "os catálogos operacionais da Triagem"],
+    ["POST", "/triagem/catalogs", "cadastrou", "um item de catálogo da Triagem"],
+    ["PATCH", "/triagem/catalogs/catalog-1", "atualizou", "um item de catálogo da Triagem"],
+    ["PATCH", "/triagem/catalogs/catalog-1/archive", "arquivou", "um item de catálogo da Triagem"],
+    ["GET", "/triagem/external-links", "consultou", "os links externos da Triagem"],
+    ["POST", "/triagem/external-links", "cadastrou", "um link externo da Triagem"],
+    ["PUT", "/triagem/external-links/link-1", "atualizou", "um link externo da Triagem"],
+    ["PATCH", "/triagem/external-links/link-1/archive", "arquivou", "um link externo da Triagem"],
+    ["GET", "/triagem/urgent-requests", "consultou", "as solicitações urgentes da Triagem"],
+    ["POST", "/triagem/urgent-requests", "cadastrou", "uma solicitação urgente da Triagem"],
+    [
+      "PUT",
+      "/triagem/urgent-requests/request-1",
+      "atualizou",
+      "uma solicitação urgente da Triagem",
+    ],
+    [
+      "PATCH",
+      "/triagem/urgent-requests/request-1/close",
+      "fechou",
+      "uma solicitação urgente da Triagem",
+    ],
+    [
+      "PATCH",
+      "/triagem/urgent-requests/request-1/reopen",
+      "reabriu",
+      "uma solicitação urgente da Triagem",
+    ],
     ["POST", "/reports/definitions/validate", "revisou", "a configuração de um relatório"],
     ["POST", "/reports/preview", "gerou", "uma prévia de relatório"],
     ["GET", "/reports/jobs/list", "consultou", "o histórico de relatórios"],
@@ -83,6 +142,28 @@ describe("activityCatalog", () => {
     ["GET", "/client/list?page=2&search=segredo", "consultou", "a lista de clientes"],
     ["POST", "/rh/point/register", "registrou", "um ponto"],
     ["POST", "/rh/point/register/", "registrou", "um ponto"],
+    ["POST", "/rh/point/recalculate", "recalculou", "os pontos de um colaborador"],
+    ["POST", "/rh/point/adjustment/request", "solicitou", "um ajuste de ponto"],
+    ["POST", "/rh/point/adjustment/retroactive", "registrou", "uma entrada retroativa de ponto"],
+    [
+      "POST",
+      "/rh/point/adjustment/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/attachment",
+      "anexou",
+      "um comprovante de ajuste de ponto",
+    ],
+    ["PUT", "/rh/point/adjustment/approve-bulk", "aprovou", "um lote de ajustes de ponto"],
+    ["PUT", "/rh/timesheets/reopen", "reabriu", "uma folha de ponto assinada"],
+    ["PUT", "/rh/timesheets/rebuild", "reconstruiu", "uma folha de ponto aberta"],
+    ["GET", "/rh/timesheets/sheet-1/pdf", "baixou", "o PDF de uma folha de ponto"],
+    ["GET", "/rh/profile/colaborator", "consultou", "o dossiê de um colaborador"],
+    ["GET", "/rh/profile/colaborator/list", "consultou", "a lista de dossiês de colaboradores"],
+    ["PUT", "/rh/profile/colaborator", "atualizou", "o dossiê de um colaborador"],
+    ["GET", "/rh/profile/contact", "consultou", "os contatos de emergência"],
+    ["POST", "/rh/profile/contact", "cadastrou", "um contato de emergência"],
+    ["PUT", "/rh/profile/contact", "atualizou", "um contato de emergência"],
+    ["DELETE", "/rh/profile/contact", "removeu", "um contato de emergência"],
+    ["GET", "/rh/profile/allergy", "consultou", "as alergias de um colaborador"],
+    ["PUT", "/rh/profile/allergy", "atualizou", "as alergias de um colaborador"],
     ["POST", "/project/progress", "recalculou", "o progresso de um projeto"],
     [
       "POST",
@@ -288,6 +369,8 @@ describe("activityCatalog", () => {
     ["POST", "/platform/session/refresh"],
     ["GET", "/platform/me"],
     ["GET", "/platform/audit/requests"],
+    ["GET", "/triagem/overview"],
+    ["GET", "/triagem/competencies/competence-1/history"],
   ])("classifica %s %s como técnico", (method, path) => {
     expect(classifyActivity(method, path)).toEqual({ kind: "technical" });
     expect(describeActivity(method, path)).toBeNull();
@@ -296,6 +379,10 @@ describe("activityCatalog", () => {
   it("não inventa descrição para rota desconhecida", () => {
     expect(classifyActivity("POST", "/unknown/action")).toEqual({ kind: "unknown" });
     expect(classifyActivity("POST", "/task/nova-acao")).toEqual({ kind: "unknown" });
+    expect(classifyActivity("POST", "/pessoal/groups/42/unknown")).toEqual({ kind: "unknown" });
+    expect(classifyActivity("GET", "/pessoal/group-assignments/unknown")).toEqual({
+      kind: "unknown",
+    });
     expect(describeActivity("POST", "/unknown/action")).toBeNull();
   });
 

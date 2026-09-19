@@ -7,8 +7,11 @@ import { fileURLToPath } from "node:url";
 
 import { chromium, expect } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const PORT = process.env.PROJECT_WIZARD_BROWSER_PORT || "3117";
 const configuredBaseUrl = process.env.PROJECT_WIZARD_BROWSER_BASE_URL?.replace(/\/$/, "");
+const useProductionBuild = process.argv.includes("--production");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const failureArtifactDir =
@@ -1146,9 +1149,12 @@ async function runBrowserProof() {
 async function withNextServer(run) {
   if (configuredBaseUrl) return run();
   const nextCli = createRequire(import.meta.url).resolve("next/dist/bin/next");
-  const server = spawn(process.execPath, [nextCli, "dev", "--webpack", "--port", PORT], {
+  const nextArgs = useProductionBuild
+    ? ["start", "--port", PORT]
+    : ["dev", "--webpack", "--port", PORT];
+  const server = spawn(process.execPath, [nextCli, ...nextArgs], {
     cwd: appRoot,
-    env: process.env,
+    env: browserSmokeEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
@@ -1160,21 +1166,32 @@ async function withNextServer(run) {
   });
   try {
     const startedAt = Date.now();
+    let ready = false;
     while (Date.now() - startedAt < 45_000) {
-      if (server.exitCode !== null) throw new Error(`Next dev encerrou antes do smoke.\n${output}`);
+      if (server.exitCode !== null) throw new Error(`Next encerrou antes do smoke.\n${output}`);
+      if (useProductionBuild && !output.includes("Ready in")) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        continue;
+      }
       try {
         const response = await fetch(baseUrl);
-        if (response.ok || response.status < 500) break;
+        if (response.ok || response.status < 500) {
+          ready = true;
+          break;
+        }
       } catch {}
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
+    if (!ready) throw new Error(`Tempo esgotado aguardando Next em ${baseUrl}.\n${output}`);
     // Compile both browser routes before checking UI timings in development mode.
-    for (const route of ["/projects", "/tasks"]) {
-      const response = await fetch(`${baseUrl}${route}`, {
-        headers: { Cookie: "cw.session=opaque-test-session" },
-        signal: AbortSignal.timeout(120_000),
-      });
-      assert.equal(response.status, 200, `Next must serve ${route} before the smoke.`);
+    if (!useProductionBuild) {
+      for (const route of ["/projects", "/tasks"]) {
+        const response = await fetch(`${baseUrl}${route}`, {
+          headers: { Cookie: "cw.session=opaque-test-session" },
+          signal: AbortSignal.timeout(120_000),
+        });
+        assert.equal(response.status, 200, `Next must serve ${route} before the smoke.`);
+      }
     }
     await run();
   } finally {

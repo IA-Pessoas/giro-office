@@ -2,42 +2,36 @@ import { Eye, FileSignature } from "lucide-react";
 
 import type { RhTimeSheetListItem } from "../types";
 import { formatRhDateTime } from "../utils/rhDate";
+import { formatRhDuration } from "../utils/rhDuration";
 
 interface RhTimesheetsTableProps {
   timeSheets: RhTimeSheetListItem[];
   currentUserId: string;
+  canManageTimesheets: boolean;
   signingSheetId: string | null;
+  reopeningSheetId: string | null;
+  rebuildingSheetId: string | null;
   getUserLabel: (userId: string) => string;
   onSign: (sheet: RhTimeSheetListItem) => void;
+  onReopen: (sheet: RhTimeSheetListItem) => void;
+  onRebuild: (sheet: RhTimeSheetListItem) => void;
   onViewDetail: (timesheetId: string) => void;
 }
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 min-w-[96px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
 
-function formatMinutes(value: number) {
-  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
-  const absoluteMinutes = Math.abs(value);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const remainingMinutes = absoluteMinutes % 60;
-
-  if (hours === 0) {
-    return `${sign}${remainingMinutes}min`;
-  }
-
-  if (remainingMinutes === 0) {
-    return `${sign}${hours}h`;
-  }
-
-  return `${sign}${hours}h ${remainingMinutes}min`;
-}
-
 export function RhTimesheetsTable({
   timeSheets,
   currentUserId,
+  canManageTimesheets,
   signingSheetId,
+  reopeningSheetId,
+  rebuildingSheetId,
   getUserLabel,
   onSign,
+  onReopen,
+  onRebuild,
   onViewDetail,
 }: RhTimesheetsTableProps) {
   return (
@@ -71,6 +65,8 @@ export function RhTimesheetsTable({
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
           {timeSheets.map((sheet) => {
             const isSigning = signingSheetId === sheet.id;
+            const isReopening = reopeningSheetId === sheet.id;
+            const isRebuilding = rebuildingSheetId === sheet.id;
             const canSign = sheet.user_id === currentUserId && !sheet.signature;
 
             return (
@@ -96,10 +92,10 @@ export function RhTimesheetsTable({
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                  {formatMinutes(sheet.worked_minutes)}
+                  {formatRhDuration(sheet.worked_minutes)}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                  {formatMinutes(sheet.balance_minutes)}
+                  {formatRhDuration(sheet.balance_minutes, { showPositiveSign: true })}
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex flex-col items-end gap-2">
@@ -133,6 +129,28 @@ export function RhTimesheetsTable({
                         {sheet.signature ? "Concluído" : "Sem ação"}
                       </span>
                     )}
+
+                    {canManageTimesheets && sheet.signature ? (
+                      <button
+                        type="button"
+                        onClick={() => onReopen(sheet)}
+                        disabled={isReopening}
+                        className={`${ACTION_BUTTON_CLASSNAME} border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-900/20`}
+                      >
+                        {isReopening ? "Reabrindo" : "Reabrir folha"}
+                      </button>
+                    ) : null}
+
+                    {canManageTimesheets && !sheet.signature ? (
+                      <button
+                        type="button"
+                        onClick={() => onRebuild(sheet)}
+                        disabled={isRebuilding}
+                        className={`${ACTION_BUTTON_CLASSNAME} border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-900/40 dark:text-violet-300 dark:hover:bg-violet-900/20`}
+                      >
+                        {isRebuilding ? "Atualizando" : "Atualizar folha"}
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               </tr>

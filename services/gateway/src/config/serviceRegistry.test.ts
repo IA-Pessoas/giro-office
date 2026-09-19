@@ -41,7 +41,7 @@ describe("regularize-service gateway registry", () => {
   it("encaminha contexto confiável e a permissão específica do módulo", () => {
     const env = {
       regularizeServiceUrl: "http://regularize-service:3039",
-      auditServiceToken: "gateway-regularize-token",
+      auditServiceToken: "gateway-audit-token",
       regularizeServiceInternalToken: "gateway-regularize-token",
     } as GatewayEnv;
 
@@ -56,14 +56,58 @@ describe("regularize-service gateway registry", () => {
 });
 
 describe("triagem gateway registry", () => {
-  it("encaminha triagem ao contabil-service sem reduzir a autorização ao módulo Contábil", () => {
+  it("encaminha triagem ao serviço novo sem reduzir a autorização ao módulo Contábil", () => {
     const env = {
       contabilServiceUrl: "http://contabil-service:3038",
+      triagemServiceUrl: "http://triagem-service:3046",
       auditServiceToken: "gateway-triagem-token",
     } as GatewayEnv;
 
-    expect(resolveGatewayService(env, "/triagem/closing", "PUT")).toMatchObject({
+    expect(resolveGatewayService(env, "/triagem/competencies", "POST")).toMatchObject({
       key: "triagem-service",
+      targetUrl: "http://triagem-service:3046",
+      internalServiceToken: "gateway-triagem-token",
+      permissionModule: "triagem",
+      routePrefixes: [
+        "/triagem/overview",
+        "/triagem/competencies",
+        "/triagem/catalogs",
+        "/triagem/external-links",
+        "/triagem/urgent-requests",
+      ],
+    });
+    expect(resolveGatewayService(env, "/triagem/external-links", "POST")).toMatchObject({
+      key: "triagem-service",
+      targetUrl: "http://triagem-service:3046",
+      internalServiceToken: "gateway-triagem-token",
+      permissionModule: "triagem",
+      routePrefixes: [
+        "/triagem/overview",
+        "/triagem/competencies",
+        "/triagem/catalogs",
+        "/triagem/external-links",
+        "/triagem/urgent-requests",
+      ],
+    });
+    expect(resolveGatewayService(env, "/triagem/overview", "GET")).toMatchObject({
+      key: "triagem-service",
+      targetUrl: "http://triagem-service:3046",
+      permissionModule: "triagem",
+    });
+    expect(resolveGatewayService(env, "/triagem/urgent-requests", "GET")).toMatchObject({
+      key: "triagem-service",
+      targetUrl: "http://triagem-service:3046",
+      permissionModule: "triagem",
+    });
+    expect(
+      resolveGatewayService(env, "/triagem/urgent-requests/request-1/close", "PATCH"),
+    ).toMatchObject({
+      key: "triagem-service",
+      targetUrl: "http://triagem-service:3046",
+      permissionModule: "triagem",
+    });
+    expect(resolveGatewayService(env, "/triagem/closing", "PUT")).toMatchObject({
+      key: "triagem-legacy-service",
       targetUrl: "http://contabil-service:3038",
       internalServiceToken: "gateway-triagem-token",
       routePrefixes: ["/triagem"],

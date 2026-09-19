@@ -4,6 +4,8 @@ import { mkdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const baseUrl = process.env.REPORTS_BROWSER_BASE_URL || "http://127.0.0.1:3115";
 const evidenceDir = process.env.REPORTS_EVIDENCE_DIR;
@@ -612,7 +614,7 @@ if (process.env.REPORTS_BROWSER_BASE_URL) {
     ["node_modules/next/dist/bin/next", "start", "--port", "3115", "--hostname", "127.0.0.1"],
     {
       cwd: appRoot,
-      env: process.env,
+      env: browserSmokeEnv(),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     },

@@ -41,7 +41,7 @@ function createPoolEnvRoot(databasePoolMax = "1") {
   return envRoot;
 }
 
-function createInternalTokenEnvRoot(contabilInternalToken) {
+function createInternalTokenEnvRoot(contabilInternalToken, triagemInternalToken = "shared-token") {
   const envRoot = mkdtempSync(path.join(tmpdir(), "internal-service-tokens-"));
   writeFileSync(path.join(envRoot, ".env.vps.gateway"), "AUDIT_SERVICE_TOKEN=shared-token\n");
   writeFileSync(
@@ -50,6 +50,10 @@ function createInternalTokenEnvRoot(contabilInternalToken) {
       "AUDIT_SERVICE_TOKEN=shared-token",
       contabilInternalToken === undefined ? "" : `INTERNAL_SERVICE_TOKEN=${contabilInternalToken}`,
     ].join("\n"),
+  );
+  writeFileSync(
+    path.join(envRoot, ".env.vps.triagem-service"),
+    `INTERNAL_SERVICE_TOKEN=${triagemInternalToken}\n`,
   );
   return envRoot;
 }
@@ -129,7 +133,7 @@ test("production Docker builds reuse common work and exclude local artifacts", (
   assert.match(ignore, /^\*\*\/\.env\*$/mu);
   assert.match(ignore, /^\.worktrees$/mu);
   assert.match(ignore, /^\.codex$/mu);
-  assert.match(ignore, /^\.agents$/mu);
+  assert.match(ignore, /^\.agent$/mu);
 });
 
 test("production builds minimize Prisma generation and preserve the Next cache", () => {
@@ -251,7 +255,7 @@ test("production pool preflight validates actual envs against rollout capacity",
     env: { ...process.env, DATABASE_POOLER_SIZE: "40" },
   });
   assert.equal(valid.status, 0, valid.stderr);
-  assert.match(valid.stdout, /steady=19.*rollout=38.*pooler=40/u);
+  assert.match(valid.stdout, /steady=20.*rollout=40.*pooler=40/u);
 
   const oversizedEnvRoot = createPoolEnvRoot("1");
   writeFileSync(path.join(oversizedEnvRoot, ".env.vps.rh-service"), "DATABASE_POOL_MAX=5\n");
@@ -261,7 +265,7 @@ test("production pool preflight validates actual envs against rollout capacity",
     env: { ...process.env, DATABASE_POOLER_SIZE: "40" },
   });
   assert.equal(oversized.status, 1);
-  assert.match(oversized.stderr, /rollout requer 46 slots.*pooler possui 40/u);
+  assert.match(oversized.stderr, /rollout requer 48 slots.*pooler possui 40/u);
 });
 
 test("production token preflight rejects a contabil token that differs from the gateway", () => {
@@ -279,6 +283,14 @@ test("production token preflight rejects a contabil token that differs from the 
   });
   assert.equal(mismatched.status, 1);
   assert.match(mismatched.stderr, /contabil-service.*token interno diverge do gateway/u);
+
+  const triagemMismatchEnvRoot = createInternalTokenEnvRoot(undefined, "different-token");
+  const triagemMismatch = spawnSync("node", [internalTokenValidator, triagemMismatchEnvRoot], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(triagemMismatch.status, 1);
+  assert.match(triagemMismatch.stderr, /triagem-service.*token interno diverge do gateway/u);
 });
 
 test("production deploy preserves rollback image tags before overwriting production tags", () => {

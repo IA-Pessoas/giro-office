@@ -24,6 +24,9 @@ const { prismaMock, passwordHashMock, permissionServiceMock, userAuditMock } = v
     department: {
       findFirst: vi.fn(),
     },
+    permissionSpecific: {
+      findFirst: vi.fn(),
+    },
     $transaction: vi.fn(async (callback: (client: typeof prismaMock) => unknown) =>
       callback(prismaMock),
     ),
@@ -129,6 +132,7 @@ describe("UserService", () => {
       first_owner_flag: false,
       permission_id: "permission-1",
     });
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
     permissionServiceMock.getByUserId.mockResolvedValue({
       user_id: "user-1",
       organization_id: "org-1",
@@ -143,6 +147,7 @@ describe("UserService", () => {
 
     expect(result.modules).toMatchObject({ contabil: 1, rh: 1, ti: 1, fiscal: 0 });
     expect(result.modules).not.toHaveProperty("atendimento");
+    expect(result.task_completion).toBe(true);
     expect(permissionServiceMock.getByUserId).toHaveBeenCalledWith("user-1", undefined, "org-1");
   });
 

@@ -2,6 +2,7 @@ import { CheckCircle2 } from "lucide-react";
 
 import type { RhTimeBankRelease } from "../types";
 import { formatRhDate } from "../utils/rhDate";
+import { formatRhDuration } from "../utils/rhDuration";
 
 interface RhTimeBankTableProps {
   releases: RhTimeBankRelease[];
@@ -13,23 +14,6 @@ interface RhTimeBankTableProps {
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 min-w-[96px] items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
-
-function formatMinutes(minutes: number) {
-  const sign = minutes > 0 ? "+" : minutes < 0 ? "-" : "";
-  const absoluteMinutes = Math.abs(minutes);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const remainingMinutes = absoluteMinutes % 60;
-
-  if (hours === 0) {
-    return `${sign}${remainingMinutes}min`;
-  }
-
-  if (remainingMinutes === 0) {
-    return `${sign}${hours}h`;
-  }
-
-  return `${sign}${hours}h ${remainingMinutes}min`;
-}
 
 export function RhTimeBankTable({
   releases,
@@ -86,7 +70,7 @@ export function RhTimeBankTable({
                         : "text-red-700 dark:text-red-300"
                     }`}
                   >
-                    {formatMinutes(release.minutes)}
+                    {formatRhDuration(release.minutes, { showPositiveSign: true })}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm leading-6 text-gray-700 dark:text-gray-300">

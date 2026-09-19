@@ -119,6 +119,7 @@ describe("request routes", () => {
   it.each([
     "ti",
     "integracao",
+    "triagem",
   ])("GET /rh/operational-users aceita modulo %s para seletores contextuais", async (moduleKey) => {
     const app = createTestApp();
     const res = await request(app)
@@ -175,7 +176,7 @@ describe("request routes", () => {
 
     expect(res.status).toBe(200);
     expect(requestServiceMock.list).toHaveBeenCalledWith(organizationId, {
-      requester_user_id: userId,
+      participant_user_id: userId,
       page: 1,
       limit: 20,
     });
@@ -191,7 +192,7 @@ describe("request routes", () => {
 
     expect(res.status).toBe(200);
     expect(requestServiceMock.list).toHaveBeenCalledWith(organizationId, {
-      requester_user_id: userId,
+      participant_user_id: userId,
       status: "New",
       page: 1,
       limit: 20,
@@ -204,6 +205,29 @@ describe("request routes", () => {
 
     expect(res.status).toBe(200);
     expect(requestServiceMock.getById).toHaveBeenCalledWith(itemId, organizationId);
+    expect(requestServiceMock.markOpened).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      request_id: itemId,
+      user_id: userId,
+    });
+  });
+
+  it("GET /rh/requests/:id permite o responsável e marca a leitura no servidor", async () => {
+    const app = createTestApp({ rhPermission: 2 });
+    requestServiceMock.getById.mockResolvedValueOnce({
+      id: itemId,
+      requester_user_id: "00000000-0000-4000-8000-000000000099",
+      assigned_to_user_id: userId,
+    });
+
+    const res = await request(app).get(`/rh/requests/${itemId}`);
+
+    expect(res.status).toBe(200);
+    expect(requestServiceMock.markOpened).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      request_id: itemId,
+      user_id: userId,
+    });
   });
 
   it("GET /rh/requests/:id permite Usuario RH ver solicitacao propria", async () => {

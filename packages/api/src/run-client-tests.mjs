@@ -11,7 +11,7 @@ async function withServer(run) {
     response.end("{}");
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => server.listen(0, resolve));
   const address = server.address();
 
   try {
@@ -53,7 +53,7 @@ async function expectCsrfFailureCallback() {
     );
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => server.listen(0, resolve));
   const address = server.address();
 
   try {
@@ -98,7 +98,7 @@ async function expectConflictHandling({ rotateBeforeResponse, expectedUnauthoriz
     response.end("{}");
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => server.listen(0, resolve));
   const address = server.address();
 
   try {
@@ -152,7 +152,7 @@ async function expectPendingRefreshWinsConflictRace() {
     response.end("{}");
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => server.listen(0, resolve));
   const address = server.address();
 
   try {
@@ -220,7 +220,7 @@ async function expectCrossTabRefreshWinsConflictRace() {
     response.end("{}");
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => server.listen(0, resolve));
   const address = server.address();
 
   try {
@@ -283,7 +283,7 @@ async function expectHangingRefreshWaitIsBounded() {
     response.end("{}");
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => server.listen(0, resolve));
   const address = server.address();
   const abortController = new AbortController();
 

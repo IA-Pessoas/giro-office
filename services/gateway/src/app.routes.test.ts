@@ -4926,6 +4926,41 @@ it("allows Contabil module users to load RH operational users for selectors", as
   }
 });
 
+it("allows Triagem module users to load RH operational users for link selectors", async () => {
+  const token = createToken({
+    user_id: "triagem-editor",
+    organization_id: "org-1",
+    permission: 0,
+    type: "user",
+    modules: { triagem: 2, rh: 0 },
+  });
+  let upstreamHits = 0;
+
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: [] }));
+  });
+  const rhServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/operational-users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstreamHits).toBe(1);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("blocks limited users without pessoal module permission before proxying /pessoal", async () => {
   const token = createToken({
     user_id: "user-1",

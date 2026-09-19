@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PaginationControls } from "@shared/components";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -22,6 +22,7 @@ import {
 } from "../utils/rhRequestUi";
 import { formatRhDateTime } from "../utils/rhDate";
 import { RhRequestDetailModal } from "./RhRequestDetailModal";
+import { RhCategoriesManager } from "./RhCategoriesManager";
 import { RhRequestFormModal } from "./RhRequestFormModal";
 import { RhRequestsFilters } from "./RhRequestsFilters";
 import { RhRequestsTable } from "./RhRequestsTable";
@@ -30,7 +31,7 @@ const MISSING_CATEGORY_LABEL = "Categoria não encontrada";
 const MISSING_ASSIGNEE_LABEL = "Aguardando atribuição";
 const MISSING_REQUESTER_LABEL = "Solicitante não identificado";
 
-export function RhRequestsSection() {
+export function RhRequestsSection({ initialRequestId }: { initialRequestId?: string } = {}) {
   const [statusFilter, setStatusFilter] = useState<RhRequestStatus | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [requesterFilter, setRequesterFilter] = useState("");
@@ -39,6 +40,12 @@ export function RhRequestsSection() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<RhRequest | null>(null);
   const [requestIdPendingDelete, setRequestIdPendingDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialRequestId) {
+      setSelectedRequestId(initialRequestId);
+    }
+  }, [initialRequestId]);
 
   const { user, canManageRhRequests, canUseRhWorkflowMessages } = useRhPermissions("requests");
   const categoriesQuery = useRhCategories({ activeOnly: true });
@@ -83,6 +90,7 @@ export function RhRequestsSection() {
     categoryLabel: categoryNameById.get(request.category_id) ?? MISSING_CATEGORY_LABEL,
     assignedToUserId: request.assigned_to_user_id,
     assignedToUserLabel:
+      request.assigned_to?.name ??
       userNameById.get(request.assigned_to_user_id) ?? MISSING_ASSIGNEE_LABEL,
     urgency: request.urgency,
     urgencyLabel: getRhRequestUrgencyLabel(request.urgency),
@@ -107,7 +115,11 @@ export function RhRequestsSection() {
   }
 
   function getAssignedUserLabel(userId: string) {
-    return userNameById.get(userId) ?? MISSING_ASSIGNEE_LABEL;
+    return (
+      requests.find((request) => request.assigned_to_user_id === userId)?.assigned_to?.name ??
+      userNameById.get(userId) ??
+      MISSING_ASSIGNEE_LABEL
+    );
   }
 
   function getRequesterLabel(request: RhRequest) {
@@ -212,6 +224,7 @@ export function RhRequestsSection() {
 
   return (
     <div className="space-y-6">
+      {canManageRhRequests ? <RhCategoriesManager /> : null}
       <RhRequestsFilters
         categories={categories}
         requesters={canManageRhRequests ? assignableUsers : undefined}
@@ -222,7 +235,7 @@ export function RhRequestsSection() {
         description={
           canManageRhRequests
             ? "Acompanhe os chamados de RH por status e categoria."
-            : "Acompanhe apenas as solicitações abertas por você."
+            : "Acompanhe as solicitações abertas por você ou atribuídas a você."
         }
         onStatusChange={handleStatusChange}
         onCategoryChange={handleCategoryChange}
@@ -298,6 +311,7 @@ export function RhRequestsSection() {
         getCategoryLabel={getCategoryLabel}
         getAssignedUserLabel={getAssignedUserLabel}
         getRequesterLabel={getRequesterLabel}
+        currentUserId={user?.id}
         canManageRequest={canManageRhRequests}
         canUseRhWorkflowMessages={canUseRhWorkflowMessages}
         isDeleting={deleteRequestMutation.isPending}

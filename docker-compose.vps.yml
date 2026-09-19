@@ -87,6 +87,7 @@ services:
       PARCELAMENTO_SERVICE_URL: http://parcelamento-service:3043
       COMMERCIAL_SERVICE_URL: http://commercial-service:3045
       REPORTS_SERVICE_URL: http://reports-service:3044
+      TRIAGEM_SERVICE_URL: http://triagem-service:3046
     ports:
       - "127.0.0.1:3010:3010"
     depends_on:
@@ -105,6 +106,8 @@ services:
       fiscal-service:
         condition: service_healthy
       contabil-service:
+        condition: service_healthy
+      triagem-service:
         condition: service_healthy
       regularize-service:
         condition: service_healthy
@@ -364,6 +367,8 @@ services:
         SERVICE_DIR: services/contabil-service
     env_file:
       - .env.vps.contabil-service
+    environment:
+      TRIAGEM_SERVICE_URL: http://triagem-service:3046
     expose:
       - "3038"
     healthcheck:
@@ -373,6 +378,36 @@ services:
           "node",
           "-e",
           "fetch('http://127.0.0.1:3038/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - backend
+      - egress
+
+  triagem-service:
+    <<: *service_defaults
+    image: workspace-triagem-service:${WORKSPACE_VPS_IMAGE_TAG:-vps}
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        WORKSPACE_PACKAGE: "@workspace/triagem-service"
+        SERVICE_DIR: services/triagem-service
+    env_file:
+      - .env.vps.triagem-service
+    expose:
+      - "3046"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3046/ready').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 30s
       timeout: 5s

@@ -8,6 +8,7 @@ import {
   useRhPointConfig,
   useRhPoints,
   useRhPointSummary,
+  useRecalculateRhPointsMutation,
   useRegisterRhPointMutation,
   useRhTodayPoint,
 } from "../hooks/useRhPoint";
@@ -17,6 +18,7 @@ import { RhPointAdjustmentPanel } from "./RhPointAdjustmentPanel";
 import { RhPointAdjustmentRequestModal } from "./RhPointAdjustmentRequestModal";
 import { RhPointConfigCard } from "./RhPointConfigCard";
 import { RhPointFilters } from "./RhPointFilters";
+import { RhPointRetroactiveModal } from "./RhPointRetroactiveModal";
 import { RhPointSummaryCards } from "./RhPointSummaryCards";
 import { RhPointTable } from "./RhPointTable";
 import { RhPointTodayCard } from "./RhPointTodayCard";
@@ -105,7 +107,7 @@ function getLastBusinessDaysRange(month: string) {
 }
 
 export function RhPointSection() {
-  const { user, canManageRhWorkday } = useRhPermissions("point");
+  const { user, canManageRhWorkday, canManageRhPointAdjustments } = useRhPermissions("point");
   const [activePointTab, setActivePointTab] = useState<"point" | "timebank" | "timesheets">(
     "point",
   );
@@ -118,15 +120,18 @@ export function RhPointSection() {
   >("");
   const [selectedPointForAdjustment, setSelectedPointForAdjustment] =
     useState<RhPointListItem | null>(null);
+  const [isMissingPointAdjustmentOpen, setIsMissingPointAdjustmentOpen] = useState(false);
+  const [isRetroactiveOpen, setIsRetroactiveOpen] = useState(false);
   const canManagePoint = canManageRhWorkday;
+  const canDecideAdjustments = canManageRhPointAdjustments;
 
   const assignableUsersQuery = useAssignableUsers({
-    enabled: canManagePoint,
+    enabled: canDecideAdjustments,
     module: "rh",
   });
 
   const assignableUsers = assignableUsersQuery.data ?? [];
-  const auxiliaryError = canManagePoint ? assignableUsersQuery.error : null;
+  const auxiliaryError = canDecideAdjustments ? assignableUsersQuery.error : null;
   const currentUserName = user?.name?.trim() || "Você";
   const effectiveUserId = canManagePoint ? selectedUserId || (user?.id ?? "") : user?.id ?? "";
   const hasAuthenticatedUser = Boolean(user?.id);
@@ -147,7 +152,7 @@ export function RhPointSection() {
   });
   const pointsQuery = useRhPoints(
     {
-      user_id: effectiveUserId || undefined,
+      user_id: canManagePoint ? effectiveUserId || undefined : undefined,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
     },
@@ -158,7 +163,7 @@ export function RhPointSection() {
   const summaryQuery = useRhPointSummary(
     {
       month,
-      user_id: effectiveUserId || undefined,
+      user_id: canManagePoint ? effectiveUserId || undefined : undefined,
     },
     {
       enabled: hasAuthenticatedUser && isPointTabActive,
@@ -166,7 +171,7 @@ export function RhPointSection() {
   );
   const adjustmentsQuery = useRhPointAdjustmentRequests(
     {
-      user_id: effectiveUserId || undefined,
+      user_id: canDecideAdjustments ? selectedUserId || undefined : undefined,
       status: selectedAdjustmentStatus || undefined,
     },
     {
@@ -174,6 +179,7 @@ export function RhPointSection() {
     },
   );
   const registerMutation = useRegisterRhPointMutation();
+  const recalculateMutation = useRecalculateRhPointsMutation();
 
   useEffect(() => {
     const { dateFrom: nextDateFrom, dateTo: nextDateTo } = getLastBusinessDaysRange(month);
@@ -190,6 +196,8 @@ export function RhPointSection() {
     setMonth(getCurrentMonthValue());
     setSelectedAdjustmentStatus("");
     setSelectedPointForAdjustment(null);
+    setIsMissingPointAdjustmentOpen(false);
+    setIsRetroactiveOpen(false);
   }, [activePointTab]);
 
   async function handleRegisterPoint() {
@@ -210,6 +218,26 @@ export function RhPointSection() {
     }
   }
 
+  async function handleRecalculate() {
+    if (!selectedUserId || !dateFrom || !dateTo) {
+      toast.warn("Selecione o colaborador e o período do recálculo.");
+      return;
+    }
+
+    try {
+      await recalculateMutation.mutateAsync({
+        target_user_id: selectedUserId,
+        date_from: `${dateFrom}T00:00:00.000Z`,
+        date_to: `${dateTo}T23:59:59.999Z`,
+      });
+      toast.success("Registros recalculados com sucesso.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível recalcular os registros.",
+      );
+    }
+  }
+
   function getUserLabel(userId: string) {
     if (user?.id === userId) {
       return currentUserName;
@@ -221,6 +249,9 @@ export function RhPointSection() {
 
   const pointConfigTargetLabel =
     canManagePoint && selectedUserId ? getUserLabel(selectedUserId) : currentUserName;
+  const canRequestOwnAdjustment =
+    Boolean(user?.id) &&
+    (!canDecideAdjustments || !selectedUserId || selectedUserId === user?.id);
 
   const pointSections = [
     { key: "point" as const, title: "Registros de ponto" },
@@ -269,7 +300,7 @@ export function RhPointSection() {
           <div className="rounded-xl bg-gray-50/80 p-4 dark:bg-gray-900/20">
             <RhPointFilters
               assignableUsers={assignableUsers}
-              canManagePoint={canManagePoint}
+              canManagePoint={canDecideAdjustments}
               currentUserLabel={currentUserName}
               selectedUserId={selectedUserId}
               month={month}
@@ -338,6 +369,57 @@ export function RhPointSection() {
             error={summaryQuery.error ?? null}
           />
 
+          {canManagePoint ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Operações administrativas
+                </p>
+                <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                  Use o colaborador selecionado para corrigir ou recalcular o período.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRetroactiveOpen(true)}
+                  disabled={!selectedUserId}
+                  className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/20"
+                >
+                  Lançar ponto retroativo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRecalculate()}
+                  disabled={!selectedUserId || recalculateMutation.isPending}
+                  className="rounded-lg bg-gray-700 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-600 dark:hover:bg-gray-500"
+                >
+                  {recalculateMutation.isPending ? "Recalculando..." : "Recalcular período"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {canRequestOwnAdjustment ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-900/10">
+              <div>
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                  Faltou um dia no histórico?
+                </p>
+                <p className="mt-1 text-xs text-blue-800/80 dark:text-blue-300/80">
+                  Solicite a inclusão do dia com os horários e uma justificativa.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMissingPointAdjustmentOpen(true)}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                Solicitar dia sem registro
+              </button>
+            </div>
+          ) : null}
+
           <RhPointTable
             points={pointsQuery.data ?? []}
             isLoading={pointsQuery.isLoading}
@@ -350,16 +432,28 @@ export function RhPointSection() {
             adjustments={adjustmentsQuery.data ?? []}
             isLoading={adjustmentsQuery.isLoading}
             hasError={Boolean(adjustmentsQuery.error)}
-            canManagePoint={canManagePoint}
+            canManagePoint={canDecideAdjustments}
             currentUserId={user?.id ?? ""}
             getUserLabel={getUserLabel}
           />
 
           <RhPointAdjustmentRequestModal
-            open={Boolean(selectedPointForAdjustment)}
+            open={Boolean(selectedPointForAdjustment) || isMissingPointAdjustmentOpen}
             point={selectedPointForAdjustment}
-            onClose={() => setSelectedPointForAdjustment(null)}
+            onClose={() => {
+              setSelectedPointForAdjustment(null);
+              setIsMissingPointAdjustmentOpen(false);
+            }}
           />
+
+          {canManagePoint ? (
+            <RhPointRetroactiveModal
+              open={isRetroactiveOpen}
+              targetUserId={selectedUserId}
+              targetUserLabel={getUserLabel(selectedUserId)}
+              onClose={() => setIsRetroactiveOpen(false)}
+            />
+          ) : null}
         </>
       ) : null}
     </div>

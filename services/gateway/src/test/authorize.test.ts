@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { describe, expect, it, vi } from "vitest";
 
 import { authorizeRequest, buildAuthorizeMiddleware } from "../middlewares/authorize.js";
+import { getRoutePolicy } from "../security/policies.js";
 
 describe("authorizeRequest", () => {
   it("denies an authenticated route without an explicit policy", () => {
@@ -58,4 +59,10 @@ it("allows an unclassified route only in observation mode and emits bounded tele
       authorization: { method: "GET", routeNamespace: "unknown" },
     }),
   );
+});
+
+it("aplica política de módulo RH nível 1 nas mutações de perfil", () => {
+  expect(getRoutePolicy("PUT", "/rh/profile/colaborator")).toEqual({
+    modulePermission: { module: "rh", minPermission: 1 },
+  });
 });

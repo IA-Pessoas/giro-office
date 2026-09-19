@@ -37,6 +37,8 @@ services:
         condition: service_started
       contabil-service:
         condition: service_started
+      triagem-service:
+        condition: service_started
       regularize-service:
         condition: service_started
       rh-service:
@@ -87,6 +89,10 @@ services:
       disable: true
 
   contabil-service:
+    healthcheck:
+      disable: true
+
+  triagem-service:
     healthcheck:
       disable: true
 

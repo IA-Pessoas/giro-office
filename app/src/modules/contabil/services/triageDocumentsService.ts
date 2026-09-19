@@ -4,9 +4,11 @@ import type {
   ContabilCompetence,
   TriageBankStatement,
   TriageDocumentStatus,
+  TriageDocumentItemNotes,
   TriageDocumentsMonthly,
   TriageClosing,
   TriageClosingStatus,
+  TriageRoutineType,
 } from "../types";
 import {
   CONTABIL_ENDPOINTS,
@@ -14,14 +16,29 @@ import {
   unwrapContabilEnvelope,
 } from "./contabilService.contract";
 
-type MonthlyParams = { clientId: string; competence: ContabilCompetence };
+type MonthlyParams = {
+  clientId: string;
+  competence: ContabilCompetence;
+  type?: TriageRoutineType;
+};
+type Editability = { can_edit: boolean };
 
 export const triageDocumentsService = {
+  async getEditability(clientId: string, type: TriageRoutineType = "CONTABIL"): Promise<Editability> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageEditability, {
+      params: { client_id: clientId, ...(type === "FISCAL" ? { type } : {}) },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
   getMonthly(params: MonthlyParams): Promise<TriageDocumentsMonthly | null> {
     const api = setupAPIClient();
     return executeNullableContabilRequest(() =>
       api.get(CONTABIL_ENDPOINTS.triageMonthly, {
-        params: { client_id: params.clientId, competence: params.competence },
+        params: {
+          client_id: params.clientId,
+          competence: params.competence,
+          ...(params.type ? { type: params.type } : {}),
+        },
       }),
     );
   },
@@ -30,27 +47,38 @@ export const triageDocumentsService = {
     const response = await api.post(CONTABIL_ENDPOINTS.triageMonthly, {
       client_id: params.clientId,
       competence: params.competence,
+      ...(params.type ? { type: params.type } : {}),
     });
     return unwrapContabilEnvelope(response.data);
   },
   async updateItem(
     monthlyId: string,
     field: string,
-    status: TriageDocumentStatus,
+    status: TriageDocumentStatus | undefined,
+    itemNotes?: Partial<TriageDocumentItemNotes>,
+    type: TriageRoutineType = "CONTABIL",
+    value?: string | null,
   ): Promise<TriageDocumentsMonthly> {
     const response = await setupAPIClient().patch(
       CONTABIL_ENDPOINTS.triageMonthlyItem(monthlyId),
-      { field, status },
+      {
+        field,
+        ...(status ? { status } : {}),
+        ...(type === "FISCAL" ? { type } : {}),
+        ...(value !== undefined ? { value } : {}),
+        ...itemNotes,
+      },
     );
     return unwrapContabilEnvelope(response.data);
   },
   async updateAll(
     monthlyId: string,
     status: TriageDocumentStatus,
+    type: TriageRoutineType = "CONTABIL",
   ): Promise<TriageDocumentsMonthly> {
     const response = await setupAPIClient().patch(
       CONTABIL_ENDPOINTS.triageMonthlyItems(monthlyId),
-      { status },
+      { status, ...(type === "FISCAL" ? { type } : {}) },
     );
     return unwrapContabilEnvelope(response.data);
   },
@@ -73,6 +101,16 @@ export const triageDocumentsService = {
         status: params.status,
       },
     );
+    return unwrapContabilEnvelope(response.data);
+  },
+  async archiveStatement(params: MonthlyParams & { bankId: string }): Promise<TriageBankStatement> {
+    const response = await setupAPIClient().delete(CONTABIL_ENDPOINTS.triageStatements, {
+      data: {
+        client_id: params.clientId,
+        competence: params.competence,
+        bank_id: params.bankId,
+      },
+    });
     return unwrapContabilEnvelope(response.data);
   },
   async getClosing(params: MonthlyParams): Promise<TriageClosing> {

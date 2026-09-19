@@ -1,5 +1,9 @@
 import type {
   CreateIntegracaoTaskBody,
+  IntegracaoTaskCompletionDecision,
+  IntegracaoTaskCompletionRequest,
+  IntegracaoTaskAttachment,
+  IntegracaoTaskPostponement,
   IntegracaoTaskDetail,
   IntegracaoTaskListParams,
   IntegracaoTaskListResult,
@@ -10,7 +14,66 @@ import { unwrapServiceEnvelope } from "./envelope.contract.js";
 export const INTEGRACAO_TASKS_ENDPOINTS = {
   crud: "/task",
   list: "/task/list",
+  completionRequest: "/task/complete-request",
+  completionRequestList: "/task/complete-request/list",
+  postponement: "/task/postponement",
+  postponementList: "/task/postponement/list",
+  reopen: "/task/reopen",
+  attachment: "/task/attachment",
+  attachmentList: "/task/attachment/list",
+  attachmentAccess: "/task/attachment/access",
+  financeiroQueue: "/task/financeiro/queue",
+  financeiroCollectors: "/task/financeiro/collectors",
+  financeiroSettle: "/task/financeiro/settle",
+  financeiroExpress: "/task/financeiro/express",
 } as const;
+
+export interface IntegracaoFinanceiroQueueItem {
+  id: string;
+  name: string;
+  client_id: string;
+  department_id: string;
+  status: string;
+}
+
+export interface IntegracaoFinanceiroSettlementResult {
+  task_ids: string[];
+  settled: number;
+}
+
+export function buildTaskCompletionRequestPayload(taskId: string, reason: string) {
+  return { task_id: taskId, reason };
+}
+
+export function buildTaskCompletionDecisionPayload(
+  taskId: string,
+  requestId: string,
+  decision: IntegracaoTaskCompletionDecision,
+  reason?: string,
+) {
+  return {
+    task_id: taskId,
+    request_id: requestId,
+    decision,
+    ...(reason ? { reason } : {}),
+  };
+}
+
+export function buildTaskReopenPayload(taskId: string, reason: string) {
+  return { task_id: taskId, reason };
+}
+
+export function buildTaskPostponementPayload(
+  taskId: string,
+  newPrevisionDate: string,
+  justification: string,
+) {
+  return {
+    task_id: taskId,
+    new_prevision_date: newPrevisionDate,
+    justification,
+  };
+}
 
 export function buildIntegracaoTaskListParams(params: IntegracaoTaskListParams) {
   return {
@@ -52,6 +115,24 @@ export function buildDeleteIntegracaoTaskPayload(taskId: string) {
 
 export function unwrapIntegracaoTaskList(body: unknown): IntegracaoTaskListResult {
   return unwrapServiceEnvelope(body) as IntegracaoTaskListResult;
+}
+
+export function unwrapTaskCompletionRequestHistory(body: unknown): IntegracaoTaskCompletionRequest[] {
+  return unwrapServiceEnvelope(body) as IntegracaoTaskCompletionRequest[];
+}
+
+export function unwrapTaskPostponementHistory(body: unknown): IntegracaoTaskPostponement[] {
+  return unwrapServiceEnvelope(body) as IntegracaoTaskPostponement[];
+}
+
+export function unwrapTaskAttachmentList(body: unknown): IntegracaoTaskAttachment[] {
+  return unwrapServiceEnvelope(body) as IntegracaoTaskAttachment[];
+}
+
+export function unwrapTaskAttachmentAccessUrl(body: unknown): string {
+  const value = unwrapServiceEnvelope(body) as { url?: unknown };
+  if (typeof value?.url !== "string") throw new Error("Resposta de acesso ao anexo inválida.");
+  return value.url;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

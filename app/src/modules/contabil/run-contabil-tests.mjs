@@ -141,22 +141,127 @@ await (async () => {
       "/contabil/relationships/client/30",
     );
     assert.equal(CONTABIL_ENDPOINTS.triageMonthly, "/triagem/monthly");
+    assert.equal(CONTABIL_ENDPOINTS.triageEditability, "/triagem/editability");
     assert.equal(CONTABIL_ENDPOINTS.triageStatements, "/triagem/statements");
     assert.equal(CONTABIL_ENDPOINTS.triageClosing, "/triagem/closing");
   });
 
-  await runTest("triagem apresenta os nove documentos, indicador e banco sem dados de conta", () => {
+  await runTest("triagem só mostra mutações após verificar a atribuição do cliente", () => {
+    const pageSource = readFileSync(new URL("../../pages/triagem.tsx", import.meta.url), "utf8");
+
+    assert.match(pageSource, /useTriageEditability/);
+    assert.match(pageSource, /canEdit=\{editability\.data\?\.can_edit === true\}/);
+    assert.match(pageSource, /canEditClosing=\{contabilAccess\.canEdit\}/);
+    assert.doesNotMatch(pageSource, /canEdit\s*\/>/);
+  });
+
+  await runTest("triagem apresenta competências com criação, listagem e arquivamento", () => {
+    const pageSource = readFileSync(new URL("../../pages/triagem.tsx", import.meta.url), "utf8");
+    const source = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
+
+    assert.match(pageSource, /TriageCompetenceSection/);
+    assert.match(source, /type="month"/);
+    assert.match(source, /Criar competência/);
+    assert.match(source, /Arquivar/);
+    assert.match(source, /Nenhuma competência para este cliente/);
+    assert.match(source, /role="alert"/);
+    assert.match(source, /window\.confirm/);
+  });
+
+  await runTest("triagem apresenta links externos por competência", () => {
+    const source = readWorkspaceSource("../triagem/components/TriageExternalLinksSection.tsx");
+    const competenceSource = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
+
+    assert.match(competenceSource, /TriageExternalLinksSection/);
+    assert.match(source, /https:\/\//);
+    assert.match(source, /useTriageCatalogs/);
+    assert.match(source, /LINK_TYPE/);
+    assert.doesNotMatch(source, /<option value="DRIVE">/);
+    assert.doesNotMatch(source, /<option value="CLOUD">/);
+    assert.match(source, /responsible_id/);
+    assert.match(source, /Arquivar/);
+    assert.match(source, /window\.confirm/);
+  });
+
+  await runTest("triagem apresenta solicitações urgentes por competência", () => {
+    const source = readWorkspaceSource("../triagem/components/TriageUrgentRequestsSection.tsx");
+    const competenceSource = readWorkspaceSource("../triagem/components/TriageCompetenceSection.tsx");
+
+    assert.match(competenceSource, /TriageUrgentRequestsSection/);
+    assert.match(source, /Solicitações urgentes/);
+    assert.match(source, /urgency_code/);
+    assert.match(source, /responsible_id/);
+    assert.match(source, /resolution_note/);
+    assert.match(source, /Reabrir/);
+    assert.match(source, /Fechar/);
+  });
+
+  await runTest("triagem apresenta dez documentos com nota, justificativa e banco sem dados de conta", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
 
-    assert.equal((source.match(/\["[a-z_]+", "/g) ?? []).length, 9);
+    const contabilDocuments = source.slice(
+      source.indexOf("const CONTABIL_DOCUMENTS"),
+      source.indexOf("const FISCAL_DOCUMENTS"),
+    );
+    assert.equal((contabilDocuments.match(/\["[a-z0-9_]+", "/g) ?? []).length, 10);
+    assert.match(source, /triaged_transactions/);
+    assert.match(source, /Nota/);
+    assert.match(source, /Justificativa/);
+    assert.match(source, /Salvar observações de \$\{label\}/);
     assert.match(source, /não entram no\s+indicador/i);
     assert.match(source, /Marcar todos os itens abertos/);
     assert.match(source, /Identificador do banco/);
     assert.match(source, /dados de\s+conta não são solicitados/i);
     assert.match(source, /useTriageStatements/);
+    assert.match(source, /Status do banco/);
+    assert.match(source, /Arquivar marcador do banco/);
+    assert.match(source, /window\.confirm/);
+    assert.match(source, /Nenhum marcador registrado/);
+    assert.match(source, /Carregando marcadores/);
     assert.match(source, /useTriageClosing/);
     assert.match(source, /Fechamento recebido/);
     assert.match(source, /NOT_RECEIVED/);
+  });
+
+  await runTest("triagem fiscal apresenta os 14 campos e controla revisão e entrega", () => {
+    const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    const pageSource = readWorkspaceSource("../../pages/triagem.tsx");
+    const fiscalDocuments = source.slice(
+      source.indexOf("const FISCAL_DOCUMENTS"),
+      source.indexOf("const STATUSES"),
+    );
+
+    assert.equal((fiscalDocuments.match(/\["[a-z0-9_]+", "/g) ?? []).length, 13);
+    assert.match(source, /billing_amount/);
+    assert.match(pageSource, /documentType="FISCAL"/);
+    assert.match(source, /UNDER_REVIEW/);
+    assert.match(source, /Método de entrega/);
+    assert.match(source, /DELIVERY_METHOD/);
+    assert.match(source, /Site estadual/);
+    assert.match(source, /STATE_SITE/);
+    assert.doesNotMatch(source, /<option value="EMAIL">/);
+    assert.doesNotMatch(source, /<option value="PORTAL">/);
+    assert.doesNotMatch(source, /<option value="WHATSAPP">/);
+    assert.doesNotMatch(source, /<textarea\s+aria-label=\{`\$\{label\} Justificativa`\}/);
+    assert.match(source, /Obrigatório/);
+    assert.match(source, /prioridade/);
+    assert.match(source, /const mutationError/);
+    assert.match(source, /role="alert"/);
+  });
+
+  await runTest("triagem bancária integra o smoke de navegador à suíte do app", () => {
+    const packageJson = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
+    assert.match(packageJson.scripts.test, /test:triagem-bank-statements-browser/);
+  });
+
+  await runTest("triagem de links externos integra o smoke de navegador à suíte do app", () => {
+    const packageJson = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
+    assert.match(packageJson.scripts.test, /test:triagem-external-links-browser/);
+  });
+
+  await runTest("triagem de solicitações urgentes integra o smoke de navegador à suíte do app", () => {
+    const packageJson = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
+    assert.match(packageJson.scripts.test, /test:triagem-urgent-requests-browser/);
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {

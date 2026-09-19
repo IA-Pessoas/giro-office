@@ -5,6 +5,7 @@ import type {
   CreateTaskDependentData,
   CreateTaskModelData,
   TaskDependent,
+  TaskIntegrationRegularize,
   TaskModelDetail,
   TaskModelListItem,
   TaskModelListParams,
@@ -17,12 +18,14 @@ import {
   buildDeleteDependentPayload,
   buildDeleteTaskModelPayload,
   buildListDependentsParams,
+  buildTaskIntegrationPayload,
   buildTaskModelOptionsParams,
   buildTaskModelListParams,
   buildUpdateTaskModelPayload,
   TASK_MODEL_ENDPOINTS,
   unwrapCreatedTaskModel,
   unwrapTaskDependentList,
+  unwrapTaskIntegrationList,
   unwrapTaskModelDetail,
   unwrapTaskModelList,
   unwrapTaskModelOptions,
@@ -115,5 +118,30 @@ export const taskModelService = {
     await api.delete(TASK_MODEL_ENDPOINTS.dependent, {
       data: buildDeleteDependentPayload(id),
     });
+  },
+
+  async listRegularizeLinks(taskModelId: string): Promise<TaskIntegrationRegularize[]> {
+    const api = setupAPIClient();
+    const response = await api.get(TASK_MODEL_ENDPOINTS.integration, {
+      params: { task_model_id: taskModelId },
+    });
+    return unwrapTaskIntegrationList(response.data);
+  },
+
+  async addRegularizeLink(
+    taskModelId: string,
+    referring: string,
+    referringType: "process" | "license",
+  ): Promise<void> {
+    const api = setupAPIClient();
+    await api.post(
+      TASK_MODEL_ENDPOINTS.integration,
+      buildTaskIntegrationPayload(taskModelId, referring, referringType),
+    );
+  },
+
+  async deleteRegularizeLink(id: string): Promise<void> {
+    const api = setupAPIClient();
+    await api.delete(TASK_MODEL_ENDPOINTS.integration, { data: { integration_id: id } });
   },
 };

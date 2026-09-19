@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   BadgeDollarSign,
   Bot,
@@ -45,7 +46,12 @@ import {
   type ModuleKey,
   type ModulePermissionSubject,
 } from "@modules/auth";
-import { useMe } from "@shared/hooks";
+import {
+  useMarkRhNotificationReadMutation,
+  useRhNotifications,
+} from "@modules/rh/hooks/useRhRequests";
+import { useFetch, useMe } from "@shared/hooks";
+import { taskOperationalNotificationService } from "@shared/services/taskOperationalNotificationService";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -170,6 +176,15 @@ const MODULE_NAV_LOADING_MESSAGE = "Carregando módulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
 const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";
+
+function formatAppShellNotificationTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
 
 function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
   const normalizedPath = normalizeRoutePath(routePath);
@@ -300,10 +315,14 @@ type ChatMessage = {
 
 type AppShellNotification = {
   id: string;
+  notificationId: string;
+  source: "rh" | "task";
+  requestId?: string;
   title: string;
   description: string;
   time: string;
   unread: boolean;
+  createdAt: string;
 };
 
 export function AppShell({
@@ -318,11 +337,25 @@ export function AppShell({
   const isPlatformSuperAdmin =
     user?.auth_kind === "platform" && user.platform_role === "super_admin";
   const meQuery = useMe({ enabled: !isPlatformSuperAdmin });
+  const notificationQuery = useFetch(
+    ["task", "notifications"],
+    () => taskOperationalNotificationService.list(),
+    { enabled: !isPlatformSuperAdmin && Boolean(user) },
+  );
+  const queryClient = useQueryClient();
+  const markNotificationRead = useMutation({
+    mutationFn: taskOperationalNotificationService.markRead,
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["task", "notifications"] }),
+  });
   const {
     accessMap: moduleAccessMap,
     isLoading: isModuleAccessLoading,
     user: moduleAccessUser,
   } = useModuleAccessMap(MODULE_KEYS);
+  const rhNotificationsQuery = useRhNotifications({
+    enabled: !isPlatformSuperAdmin && moduleAccessMap.rh?.canView === true,
+  });
+  const markRhNotificationReadMutation = useMarkRhNotificationReadMutation();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -334,7 +367,32 @@ export function AppShell({
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
-  const notifications: AppShellNotification[] = [];
+  const rhNotifications: AppShellNotification[] = (rhNotificationsQuery.data ?? []).map((item) => ({
+    id: `rh:${item.id}`,
+    notificationId: item.id,
+    source: "rh" as const,
+    requestId: item.request_id,
+    title: item.title,
+    description: item.message,
+    time: formatAppShellNotificationTime(item.created_at),
+    unread: !item.read,
+    createdAt: item.created_at,
+  }));
+  const taskNotifications: AppShellNotification[] = (notificationQuery.data?.items ?? []).map(
+    (item) => ({
+      id: `task:${item.id}`,
+      notificationId: item.id,
+      source: "task" as const,
+      title: item.title,
+      description: item.message,
+      time: formatAppShellNotificationTime(item.created_at),
+      unread: item.read_at === null,
+      createdAt: item.created_at,
+    }),
+  );
+  const notifications = [...rhNotifications, ...taskNotifications].sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
   const hasUnreadNotifications = notifications.some((item) => item.unread);
   const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
   const sidebarToggleLabel = isSidebarOpen
@@ -820,6 +878,22 @@ export function AppShell({
                           <button
                             key={item.id}
                             type="button"
+                            onClick={() => {
+                              if (item.unread) {
+                                if (item.source === "rh") {
+                                  markRhNotificationReadMutation.mutate({ id: item.notificationId });
+                                } else {
+                                  markNotificationRead.mutate(item.notificationId);
+                                }
+                              }
+                              setShowNotifications(false);
+                              if (item.source === "rh" && item.requestId) {
+                                void router.push({
+                                  pathname: "/rh",
+                                  query: { requestId: item.requestId },
+                                });
+                              }
+                            }}
                             className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
                           >
                             <div className="flex items-start gap-3">

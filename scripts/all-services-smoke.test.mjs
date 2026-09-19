@@ -59,7 +59,7 @@ test("cadastros do smoke usam CNPJs válidos e distintos no mesmo namespace", as
       path.join(tempDir, "all-services-smoke.manifest.mjs"),
       `export const manifest = ${JSON.stringify(operations)};`,
     );
-    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    await new Promise((resolve) => server.listen(0, resolve));
     const { port } = server.address();
     const { stdout } = await promisify(execFile)(
       process.execPath,

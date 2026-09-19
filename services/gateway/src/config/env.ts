@@ -98,6 +98,7 @@ const gatewayEnvSchema = z
     clientServiceInternalToken: z.string().optional().transform(parseOptionalString),
     fiscalServiceUrl: z.string().url().default("http://localhost:3037"),
     contabilServiceUrl: z.string().url().default("http://localhost:3038"),
+    triagemServiceUrl: z.string().url().default("http://localhost:3046"),
     regularizeServiceUrl: z.string().url().default("http://localhost:3039"),
     regularizeServiceInternalToken: z.string().optional().transform(parseOptionalString),
     tiServiceUrl: z.string().url().default("http://localhost:3040"),
@@ -264,6 +265,7 @@ export interface GatewayEnv {
   clientServiceInternalToken: string;
   fiscalServiceUrl: string;
   contabilServiceUrl: string;
+  triagemServiceUrl: string;
   regularizeServiceUrl: string;
   regularizeServiceInternalToken: string;
   tiServiceUrl: string;
@@ -310,6 +312,7 @@ export function getGatewayEnv(): GatewayEnv {
     clientServiceInternalToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
     fiscalServiceUrl: process.env.FISCAL_SERVICE_URL,
     contabilServiceUrl: process.env.CONTABIL_SERVICE_URL,
+    triagemServiceUrl: process.env.TRIAGEM_SERVICE_URL,
     regularizeServiceUrl: process.env.REGULARIZE_SERVICE_URL,
     regularizeServiceInternalToken: process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN,
     tiServiceUrl: process.env.TI_SERVICE_URL,
