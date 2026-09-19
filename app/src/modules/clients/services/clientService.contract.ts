@@ -4,6 +4,7 @@ export const CLIENT_ENDPOINTS = {
   list: "/client/list",
   create: "/client",
   createIntegration: "/client/integration",
+  lookupCnpj: "/client/integration",
   detail: (id: string) => `/client/${id}`,
   updateIntegration: (id: string) => `/client/${id}/integration`,
   updateFinance: (id: string) => `/client/${id}/finance`,

@@ -9,7 +9,7 @@ import type {
   CreateIntegrationBody,
   UpdateIntegrationBody,
 } from "../schemas/clientVerticals.schemas.js";
-import { cleanDocument } from "../utils/documents.js";
+import { cleanCnpjDocument, cleanDocument } from "../utils/documents.js";
 
 type ClientAuthorization = IntegracaoServiceAuthorization & { userId: string };
 
@@ -31,7 +31,7 @@ export async function createIntegrationClient(
     requestedFields: Object.keys(input).filter((field) => field !== "organization_id"),
   });
 
-  const cleanedCpf = cleanDocument(input.cpf_cnpj);
+  const cleanedCpf = cleanCnpjDocument(input.cpf_cnpj);
   const exists = await prisma.client.findFirst({
     where: { cpf_cnpj: cleanedCpf, organization_id: input.organization_id },
     select: { id: true },
@@ -105,7 +105,8 @@ export async function updateIntegrationClient(
     requestedFields: Object.keys(input),
   });
 
-  const cleanedCpfCnpj = input.cpf_cnpj !== undefined ? cleanDocument(input.cpf_cnpj) : undefined;
+  const cleanedCpfCnpj =
+    input.cpf_cnpj !== undefined ? cleanCnpjDocument(input.cpf_cnpj) : undefined;
   const cleanedCpfResponsible =
     input.cpf_responsible !== undefined ? cleanDocument(input.cpf_responsible) : undefined;
   const cleanedCpfAgent =

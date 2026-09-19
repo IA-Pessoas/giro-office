@@ -25,6 +25,8 @@ import { createInternalReportingRouter } from "./routes/internalReporting.routes
 import { ClientCommercialProjectionService } from "./services/clientCommercialProjectionService.js";
 import { ClientIntegrationReportingService } from "./services/clientIntegrationReportingService.js";
 import type { IClientService } from "./services/clientService.js";
+import type { CnpjLookupProvider } from "./services/cnpjLookupService.js";
+import { createCnpjLookupProvider } from "./services/cnpjLookupService.js";
 import { runCompetenceOutputUpdate } from "./services/competenceOutputRoutineService.js";
 import type { HistoryFileStorage } from "./services/historyStorageService.js";
 
@@ -48,6 +50,7 @@ export interface CreateAppOptions {
   logger: Logger;
   historyStorage: HistoryFileStorage;
   commercialProjectionService?: InternalCommercialRouteDeps;
+  cnpjLookupProvider?: CnpjLookupProvider;
 }
 
 export function createApp({
@@ -57,6 +60,7 @@ export function createApp({
   logger,
   historyStorage,
   commercialProjectionService,
+  cnpjLookupProvider,
 }: CreateAppOptions): express.Express {
   const app = express();
 
@@ -126,6 +130,7 @@ export function createApp({
       clientService,
       prisma,
       historyStorage,
+      cnpjLookupProvider: cnpjLookupProvider ?? createCnpjLookupProvider(env),
       historyUploadRateLimit: createRateLimitMiddleware({
         key: "client-service:history-upload",
         max: env.uploadRateLimitMax,

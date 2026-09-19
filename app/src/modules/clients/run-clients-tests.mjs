@@ -429,6 +429,7 @@ runTest("integration phone comparison and payload use canonical digits", () => {
 
 runTest("integration edit guard blocks when normalized cpf_cnpj is missing", () => {
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "12.345.678/0001-90" }), true);
+  assert.equal(hasUsableIntegrationData({ type: "PJ", cpf_cnpj: "AB123456780001" }), true);
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "   " }), false);
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "..../-" }), false);
   assert.equal(hasUsableIntegrationData(null), false);
@@ -452,6 +453,8 @@ runTest("document input formatter masks and limits by person type", () => {
   assert.equal(formatCpfCnpjInput("123456789101112", "PJ"), "12.345.678/9101-11");
   assert.equal(formatCpfCnpjInput("abc1234", "PF"), "123.4");
   assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
+  assert.equal(formatCpfCnpjInput("AB123456780001", "PJ"), "AB.123.456/7800-01");
+  assert.equal(validateCpfCnpjDocument("AB.123.456/7800-01", "PJ"), null);
 });
 
 runTest("client input masks forward formatted document and phone values through event-compatible targets", () => {

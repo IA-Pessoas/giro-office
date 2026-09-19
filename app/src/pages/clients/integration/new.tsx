@@ -1,16 +1,20 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientIntegrationForm } from "@modules/clients/components/ClientIntegrationForm";
-import { useCreateClientIntegrationMutation } from "@modules/clients/hooks/useClients";
+import {
+  useClientCnpjLookup,
+  useCreateClientIntegrationMutation,
+} from "@modules/clients/hooks/useClients";
 import {
   buildCreateClientIntegrationPayload,
   createClientIntegrationInitialValues,
+  mergeClientCompanyLookup,
 } from "@modules/clients/utils/integrationForm";
 import { useMe } from "@shared/hooks/useMe";
 import {
@@ -27,6 +31,15 @@ export default function NewClientIntegrationPage() {
   const meQuery = useMe();
   const createIntegrationMutation = useCreateClientIntegrationMutation();
   const [formValues, setFormValues] = useState(createClientIntegrationInitialValues);
+  const cnpjLookup = useClientCnpjLookup(formValues.cpf_cnpj);
+
+  useEffect(() => {
+    if (!cnpjLookup.data || cnpjLookup.data.cnpj !== formValues.cpf_cnpj.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()) {
+      return;
+    }
+
+    setFormValues((current) => mergeClientCompanyLookup(current, cnpjLookup.data));
+  }, [cnpjLookup.data, formValues.cpf_cnpj]);
 
   const handleInputChange = (
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
@@ -136,6 +149,9 @@ export default function NewClientIntegrationPage() {
               onChange={handleInputChange}
               onSubmit={() => void handleSubmit()}
               onCancel={() => void router.push("/clients")}
+              cnpjLookupStatus={
+                cnpjLookup.isFetching ? "loading" : cnpjLookup.isError ? "unavailable" : "idle"
+              }
               submitLabel={createIntegrationMutation.isPending ? "Salvando..." : "Salvar"}
               disabled={createIntegrationMutation.isPending || meQuery.isLoading}
             />

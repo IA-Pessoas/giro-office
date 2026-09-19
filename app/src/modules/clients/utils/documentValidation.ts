@@ -1,3 +1,5 @@
+import { normalizeCnpjInput } from "../../../shared/utils/inputFormatting.ts";
+
 export type ClientPersonType = "PJ" | "PF";
 
 export function normalizeDocumentValue(value: string | null | undefined): string {
@@ -48,30 +50,41 @@ export function formatCpfCnpjInput(
   personType: ClientPersonType,
 ): string {
   const limit = personType === "PF" ? 11 : 14;
-  const digits = normalizeDocumentValue(value).slice(0, limit);
+  const document =
+    personType === "PJ"
+      ? normalizeCnpjInput(value).slice(0, limit)
+      : normalizeDocumentValue(value).slice(0, limit);
 
-  return personType === "PF" ? formatCpfInput(digits) : formatCnpjInput(digits);
+  return personType === "PF" ? formatCpfInput(document) : formatCnpjInput(document);
 }
 
 export function validateCpfCnpjDocument(
   value: string,
   personType?: ClientPersonType,
 ): string | null {
-  const digits = normalizeDocumentValue(value);
+  const document = personType === "PJ" ? normalizeCnpjInput(value) : normalizeDocumentValue(value);
 
-  if (digits.length === 0) {
+  if (document.length === 0) {
     return "CPF/CNPJ é obrigatório.";
   }
 
   if (personType === "PF") {
-    return digits.length === 11 ? null : "CPF deve ter 11 dígitos.";
+    return document.length === 11 ? null : "CPF deve ter 11 dígitos.";
   }
 
   if (personType === "PJ") {
-    return digits.length === 14 ? null : "CNPJ deve ter 14 dígitos.";
+    return document.length === 14
+      ? null
+      : /[A-Z]/.test(document)
+        ? "CNPJ deve ter 14 caracteres."
+        : "CNPJ deve ter 14 dígitos.";
   }
 
-  return digits.length === 11 || digits.length === 14 ? null : "CPF/CNPJ deve ter 11 ou 14 dígitos.";
+  return document.length === 11 || document.length === 14
+    ? null
+    : /[A-Z]/.test(document)
+      ? "CPF/CNPJ deve ter 11 ou 14 caracteres."
+      : "CPF/CNPJ deve ter 11 ou 14 dígitos.";
 }
 
 export function validateOptionalCpfDocument(label: string, value: string): string | null {

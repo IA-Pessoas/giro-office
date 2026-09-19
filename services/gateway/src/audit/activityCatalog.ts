@@ -660,6 +660,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/client\/integration$/,
+    description: { action: "consultou", item: "os dados oficiais de um CNPJ" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/client\/[^/]+\/pa$/,
     description: { action: "consultou", item: "o PA de um cliente" },
   },

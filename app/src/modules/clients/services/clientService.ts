@@ -2,6 +2,7 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   Client,
+  ClientCompanyLookup,
   ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
@@ -67,6 +68,13 @@ export const clientService = {
     const response = await api.post(CLIENT_ENDPOINTS.createIntegration, payload);
 
     return unwrapClientEnvelope<Client>(response.data);
+  },
+
+  async lookupCnpj(cnpj: string): Promise<ClientCompanyLookup> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_ENDPOINTS.lookupCnpj, { params: { cnpj } });
+
+    return unwrapClientEnvelope<ClientCompanyLookup>(response.data);
   },
 
   async updateIntegration(id: string, payload: UpdateClientIntegrationPayload): Promise<Client> {

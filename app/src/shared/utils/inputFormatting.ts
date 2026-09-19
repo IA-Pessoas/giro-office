@@ -40,33 +40,39 @@ export function formatCpfInput(value: string): string {
 }
 
 export function formatCnpjInput(value: string): string {
-  const digits = normalizeDigits(value).slice(0, 14);
+  const normalized = normalizeCnpjInput(value);
 
-  if (digits.length <= 2) {
-    return digits;
+  if (normalized.length <= 2) {
+    return normalized;
   }
 
-  let formatted = `${digits.slice(0, 2)}.${digits.slice(2, 5)}`;
+  let formatted = `${normalized.slice(0, 2)}.${normalized.slice(2, 5)}`;
 
-  if (digits.length > 5) {
-    formatted += `.${digits.slice(5, 8)}`;
+  if (normalized.length > 5) {
+    formatted += `.${normalized.slice(5, 8)}`;
   }
 
-  if (digits.length > 8) {
-    formatted += `/${digits.slice(8, 12)}`;
+  if (normalized.length > 8) {
+    formatted += `/${normalized.slice(8, 12)}`;
   }
 
-  if (digits.length > 12) {
-    formatted += `-${digits.slice(12, 14)}`;
+  if (normalized.length > 12) {
+    formatted += `-${normalized.slice(12, 14)}`;
   }
 
   return formatted;
 }
 
-export function formatCpfCnpjInput(value: string): string {
-  const digits = normalizeDigits(value);
+export function normalizeCnpjInput(value: string | null | undefined): string {
+  return (value ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 14);
+}
 
-  return digits.length <= 11 ? formatCpfInput(digits) : formatCnpjInput(digits);
+export function formatCpfCnpjInput(value: string): string {
+  const normalized = normalizeCnpjInput(value);
+
+  return /[A-Z]/.test(normalized) || normalized.length > 11
+    ? formatCnpjInput(normalized)
+    : formatCpfInput(normalized);
 }
 
 export function formatBrazilianPhoneInput(value: string): string {

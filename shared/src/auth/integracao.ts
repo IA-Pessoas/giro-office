@@ -241,6 +241,9 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
   routePolicy("GET", "/client/list", "client", "read", [readRule(readOrganization)], {
     test: "client.list",
   }),
+  routePolicy("GET", "/client/integration", "client", "read", [readRule(readOrganization)], {
+    test: "client.integration.lookup",
+  }),
   routePolicy("GET", "/client/:id", "client", "read", [readRule(readOrganization)], {
     test: "client.detail",
   }),

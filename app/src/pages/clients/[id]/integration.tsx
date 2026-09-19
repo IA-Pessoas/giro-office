@@ -7,12 +7,17 @@ import { toast } from "react-toastify";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientIntegrationForm } from "@modules/clients/components/ClientIntegrationForm";
-import { useClient, useUpdateClientIntegrationMutation } from "@modules/clients/hooks/useClients";
+import {
+  useClient,
+  useClientCnpjLookup,
+  useUpdateClientIntegrationMutation,
+} from "@modules/clients/hooks/useClients";
 import type { UpdateClientIntegrationFormValues } from "@modules/clients/types";
 import {
   buildUpdateClientIntegrationPayload,
   createUpdateClientIntegrationInitialValues,
   hasUsableIntegrationData,
+  mergeClientCompanyLookup,
 } from "@modules/clients/utils/integrationForm";
 import {
   validateCpfCnpjDocument,
@@ -30,6 +35,19 @@ export default function ClientIntegrationPage() {
   const updateIntegrationMutation = useUpdateClientIntegrationMutation(clientId ?? "");
   const client = clientQuery.data;
   const [formValues, setFormValues] = useState<UpdateClientIntegrationFormValues | null>(null);
+  const cnpjLookup = useClientCnpjLookup(formValues?.cpf_cnpj ?? "");
+
+  useEffect(() => {
+    if (
+      !formValues ||
+      !cnpjLookup.data ||
+      cnpjLookup.data.cnpj !== formValues.cpf_cnpj.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+    ) {
+      return;
+    }
+
+    setFormValues((current) => (current ? mergeClientCompanyLookup(current, cnpjLookup.data) : current));
+  }, [cnpjLookup.data, formValues?.cpf_cnpj]);
 
   useEffect(() => {
     if (!client) {
@@ -179,6 +197,9 @@ export default function ClientIntegrationPage() {
               onChange={handleInputChange}
               onSubmit={() => void handleSubmit()}
               onCancel={() => setFormValues(createUpdateClientIntegrationInitialValues(client))}
+              cnpjLookupStatus={
+                cnpjLookup.isFetching ? "loading" : cnpjLookup.isError ? "unavailable" : "idle"
+              }
               submitLabel={
                 updateIntegrationMutation.isPending ? "Salvando..." : "Salvar alterações"
               }
