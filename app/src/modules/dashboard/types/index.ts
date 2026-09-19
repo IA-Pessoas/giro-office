@@ -7,6 +7,37 @@ export interface FiscalObligationSummary {
   count: number;
 }
 
+export interface DashboardFinancialSummary {
+  paidCertificateReceipts: number;
+  unpaidCertificates: number;
+  monthlyPaidCertificateReceipts: Array<{
+    month: string;
+    amount: number;
+  }>;
+}
+
+export interface DashboardCommercialSummary {
+  activeProspects: number;
+  closedThisMonth: number;
+  byStatus: Array<{
+    status: string;
+    count: number;
+  }>;
+  billing: {
+    pending: number;
+    contracted: number;
+    notContracted: number;
+  };
+}
+
+export interface DashboardDepartmentSummary {
+  id: string;
+  name: string;
+  openTasks: number;
+  completedTasks: number;
+  urgentTasks: number;
+}
+
 export interface RecentClientRow {
   id: string;
   name: string;
@@ -40,16 +71,6 @@ export interface DashboardProjectSummary {
   inProgress: number;
   delayed: number;
   waiting: number;
-}
-
-export interface DashboardRevenueSummary {
-  currentMonth: number;
-  target: number;
-  monthly: Array<{
-    month: string;
-    revenue: number;
-    expenses: number;
-  }>;
 }
 
 export interface DashboardPerformanceEntry {
@@ -92,12 +113,14 @@ export interface DashboardStats {
   fiscal: {
     obligations: FiscalObligationSummary[];
   };
+  financial: DashboardFinancialSummary;
+  commercial: DashboardCommercialSummary;
+  departments: DashboardDepartmentSummary[];
   recentClients: RecentClientRow[];
   insights: DashboardInsight[];
   tasks: DashboardTaskSummary;
   notifications: DashboardNotificationSummary;
   projects: DashboardProjectSummary;
-  revenue: DashboardRevenueSummary;
   performance: DashboardPerformanceEntry[];
   pendingTasks: DashboardPendingTask[];
   activities: DashboardActivity[];

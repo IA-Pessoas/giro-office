@@ -12,6 +12,9 @@ export type {
   StatCardData,
   FiscalObligationStatus,
   FiscalObligationSummary,
+  DashboardFinancialSummary,
+  DashboardCommercialSummary,
+  DashboardDepartmentSummary,
   RecentClientRow,
   DashboardInsight,
 } from './types';
