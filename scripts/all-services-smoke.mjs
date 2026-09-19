@@ -114,6 +114,9 @@ const env = {
   clientReportingSmokeEnabled:
     process.env.CLIENT_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.CLIENT_REPORTING_SMOKE_ENABLED === "1",
+  cnpjLookupSmokeEnabled:
+    process.env.CNPJ_LOOKUP_SMOKE_ENABLED === "true" ||
+    process.env.CNPJ_LOOKUP_SMOKE_ENABLED === "1",
   contabilReportingSmokeEnabled:
     process.env.CONTABIL_REPORTING_SMOKE_ENABLED === "true" ||
     process.env.CONTABIL_REPORTING_SMOKE_ENABLED === "1",
@@ -3837,6 +3840,13 @@ const handlers = {
     });
   },
 
+  async clientCnpjLookup(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { cnpj: process.env.CNPJ_LOOKUP_SMOKE_CNPJ?.trim() || "AB123456780001" },
+    });
+  },
+
   async clientCommercialProspectingTransition(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -7175,6 +7185,10 @@ function disabledConditionReason(condition) {
 
   if (condition === "clientReportingSmokeEnabled" && !env.clientReportingSmokeEnabled) {
     return "CLIENT_REPORTING_SMOKE_ENABLED is false";
+  }
+
+  if (condition === "cnpjLookupSmokeEnabled" && !env.cnpjLookupSmokeEnabled) {
+    return "CNPJ_LOOKUP_SMOKE_ENABLED is false";
   }
 
   if (condition === "contabilReportingSmokeEnabled" && !env.contabilReportingSmokeEnabled) {

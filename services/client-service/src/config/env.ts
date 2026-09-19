@@ -55,6 +55,8 @@ const rawClientServiceEnvSchema = z
     internalServiceToken: z.string().optional(),
     reportsInternalToken: z.string().optional(),
     reportsGrantSecret: z.string().optional(),
+    cnpjLookupApiUrl: z.string().trim().optional().default(""),
+    cnpjLookupApiToken: z.string().trim().optional().default(""),
     enableApiDocsEnv: z.string().optional(),
     allowedOrigins: z
       .string()
@@ -162,6 +164,8 @@ export function parseClientServiceEnv(
       (source.NODE_ENV === "production" ? undefined : source.AUDIT_SERVICE_TOKEN),
     reportsInternalToken: source.REPORTS_INTERNAL_TOKEN,
     reportsGrantSecret: source.REPORTS_GRANT_SECRET,
+    cnpjLookupApiUrl: source.CNPJ_LOOKUP_API_URL,
+    cnpjLookupApiToken: source.CNPJ_LOOKUP_API_TOKEN,
     enableApiDocsEnv: source.ENABLE_API_DOCS,
     allowedOrigins: source.SERVICE_ALLOWED_ORIGINS,
     uploadRateLimitMax: source.UPLOAD_RATE_LIMIT_MAX,

@@ -4,12 +4,15 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 import { useFetch } from "@shared/hooks";
+import { normalizeCnpjInput } from "@shared/utils/inputFormatting";
 
 import { clientService } from "../services/clientService";
 import type {
   Client,
+  ClientCompanyLookup,
   ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
@@ -58,6 +61,27 @@ export function useClient(id: string | undefined): UseQueryResult<Client | null,
   return useFetch(clientDetailQueryKey(id ?? "missing"), () => clientService.getById(id ?? ""), {
     enabled: Boolean(id),
   });
+}
+
+export function useClientCnpjLookup(cnpj: string): UseQueryResult<ClientCompanyLookup, Error> {
+  const [stableCnpj, setStableCnpj] = useState("");
+
+  useEffect(() => {
+    const normalized = normalizeCnpjInput(cnpj);
+    if (normalized.length !== 14) {
+      setStableCnpj("");
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setStableCnpj(normalized), 350);
+    return () => window.clearTimeout(timeout);
+  }, [cnpj]);
+
+  return useFetch(
+    ["clients", "cnpj-lookup", stableCnpj],
+    () => clientService.lookupCnpj(stableCnpj),
+    { enabled: stableCnpj.length === 14, retry: false },
+  );
 }
 
 export function useClientPa(id: string | undefined): UseQueryResult<ClientPaResponse | null, Error> {

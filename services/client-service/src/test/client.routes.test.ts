@@ -22,6 +22,7 @@ import {
   type IClientService,
   type OrganizationPublic,
 } from "../services/clientService.js";
+import type { CnpjLookupProvider } from "../services/cnpjLookupService.js";
 import type { HistoryFileStorage } from "../services/historyStorageService.js";
 
 const TEST_JWT_SECRET = "test-jwt-secret-for-client-service";
@@ -90,6 +91,7 @@ function buildTestApp(
   overrides?: {
     prisma?: PrismaClient;
     historyStorage?: HistoryFileStorage;
+    cnpjLookupProvider?: CnpjLookupProvider;
     env?: Partial<ReturnType<typeof getClientServiceEnv>>;
     commercialProjectionService?: InternalCommercialRouteDeps;
   },
@@ -113,6 +115,7 @@ function buildTestApp(
     logger,
     prisma,
     historyStorage,
+    cnpjLookupProvider: overrides?.cnpjLookupProvider,
     commercialProjectionService: overrides?.commercialProjectionService,
   });
 }
@@ -308,6 +311,34 @@ describe("client-service", () => {
       },
       { userId: "user-test-1", level: 1, isOwner: false },
     );
+  });
+
+  it("GET /client/integration consulta CNPJ alfanumérico pelo provider injetado", async () => {
+    const provider: CnpjLookupProvider = {
+      lookup: vi.fn().mockResolvedValue({
+        cnpj: "AB123456780001",
+        name: "Empresa Oficial",
+        company_name: "Empresa Oficial LTDA",
+        fantasy_name: "Empresa Oficial",
+        opening_date: "2026-01-02",
+        address: "Rua Teste, 10",
+        cep: "01001000",
+        neighborhood: "Centro",
+        state: "SP",
+        city: "São Paulo",
+      }),
+    };
+    const app = buildTestApp({ ...mockServiceBase() }, { cnpjLookupProvider: provider });
+    const token = bearerToken(TEST_ORG_ID);
+
+    const response = await request(app)
+      .get("/client/integration")
+      .query({ cnpj: "AB.123.456/7800-01" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.company_name).toBe("Empresa Oficial LTDA");
+    expect(provider.lookup).toHaveBeenCalledWith("AB123456780001");
   });
 
   it("GET /client/commercial/overview is unavailable after the commercial cutover", async () => {

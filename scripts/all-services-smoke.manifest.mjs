@@ -1525,6 +1525,15 @@ const baseManifest = [
   }),
   op({
     service: "client-service",
+    method: "GET",
+    path: "/client/integration",
+    action: "clientCnpjLookup",
+    target: "gateway",
+    auth: "bearer",
+    condition: "cnpjLookupSmokeEnabled",
+  }),
+  op({
+    service: "client-service",
     method: "PATCH",
     path: "/client/{id}/integration",
     action: "clientIntegrationPatch",

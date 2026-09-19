@@ -100,6 +100,19 @@ export interface ClientListPage {
   hasMore: boolean;
 }
 
+export interface ClientCompanyLookup {
+  cnpj: string;
+  name: string | null;
+  company_name: string | null;
+  fantasy_name: string | null;
+  opening_date: string | null;
+  address: string | null;
+  cep: string | null;
+  neighborhood: string | null;
+  state: string | null;
+  city: string | null;
+}
+
 export interface ClientListFilters {
   search?: string;
   ref?: "integracao" | "deps";

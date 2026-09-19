@@ -24,6 +24,12 @@ export const createIntegrationBodySchema = z
   })
   .strict();
 
+export const cnpjLookupQuerySchema = z
+  .object({
+    cnpj: z.string().min(1).max(32),
+  })
+  .strict();
+
 export const updateIntegrationBodySchema = z
   .object({
     type: z.string().min(1).optional(),
