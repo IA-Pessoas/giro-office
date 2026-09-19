@@ -15,6 +15,7 @@ Ver `src/config/env.ts`:
 - `CLIENT_SERVICE_INTERNAL_TOKEN` - token compartilhado com o gateway para o contexto encaminhado e para `POST /internal/competence-output-update` (header `x-internal-service-token`); obrigatório em produção
 - `AUDIT_SERVICE_TOKEN` - fallback local do token interno apenas fora de produção, quando `CLIENT_SERVICE_INTERNAL_TOKEN` não é informado
 - `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` - token e segredo HMAC compartilhados com `reports-service` para `/internal/reporting/*`; obrigatórios e fortes em produção
+- `CNPJ_LOOKUP_API_URL`, `CNPJ_LOOKUP_API_TOKEN` - credenciais do provider oficial; sem ambos, a consulta automática responde indisponível e o cadastro continua manual
 
 ## Gateway
 
@@ -33,6 +34,7 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | `DELETE` | `/client/:id` | Desativar (soft): `status` Inativo + `deletion_date`. Requer `permission: 2`. |
 | `POST` | `/client/:id/activate` | Reativar. |
 | `POST` | `/client/integration` | Fluxo integracao (cadastro). |
+| `GET` | `/client/integration?cnpj=...` | Consulta oficial de dados da empresa para o autopreenchimento do cadastro PJ. |
 | `PATCH` | `/client/:id/integration` | Atualizacao integracao. |
 | `PATCH` | `/client/:id/termination` | Distrato. |
 | `PATCH` | `/client/:id/finance` | Contrato (`contract`). |

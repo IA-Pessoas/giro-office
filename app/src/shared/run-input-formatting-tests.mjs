@@ -17,6 +17,7 @@ assert.equal(formatCpfInput("123.456.789-01999"), "123.456.789-01");
 assert.equal(formatCnpjInput("12.345.678/0001-90"), "12.345.678/0001-90");
 assert.equal(formatCnpjInput("12345678"), "12.345.678");
 assert.equal(formatCnpjInput("12.345.678/0001-9000"), "12.345.678/0001-90");
+assert.equal(formatCnpjInput("ab123456780001"), "AB.123.456/7800-01");
 
 assert.equal(formatCpfCnpjInput("12345678901"), "123.456.789-01");
 assert.equal(formatCpfCnpjInput("12345678901234"), "12.345.678/9012-34");

@@ -352,6 +352,25 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
         },
       },
       "/client/integration": {
+        get: {
+          tags: ["Integration"],
+          summary: "Consultar dados oficiais de CNPJ",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "cnpj",
+              in: "query",
+              required: true,
+              schema: { type: "string", minLength: 14, maxLength: 32 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Dados oficiais da empresa",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
         post: {
           tags: ["Integration"],
           summary: "Criar cliente pela integracao",
