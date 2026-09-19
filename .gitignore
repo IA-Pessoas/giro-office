@@ -77,3 +77,8 @@ services_env_summary.md
 
 # Atas de clientes usadas em QA local: contêm dado sensível, nunca versionar.
 ata-sample/
+
+# Exports e dumps de banco locais, que podem conter dados e credenciais.
+*.zip
+*.dump
+*.sql.gz
