@@ -27,3 +27,5 @@ export type {
   TriageOverviewItem,
   TriageOverviewStatus,
 } from "./triagemOverviewService";
+export { triagemAuditService } from "./triagemAuditService";
+export type { TriageAuditItem, TriageAuditTimeline } from "./triagemAuditService";

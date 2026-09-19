@@ -1,0 +1,83 @@
+import { History, Loader2, RotateCcw } from "lucide-react";
+import { useState } from "react";
+
+import { getContabilErrorMessage } from "@modules/contabil";
+
+import { useTriageAudit } from "../hooks/useTriageAudit";
+
+const ACTION_LABELS: Record<string, string> = {
+  created: "Competência criada",
+  archived: "Competência arquivada",
+};
+
+function actionLabel(action: string): string {
+  return ACTION_LABELS[action] ?? action;
+}
+
+export function TriageAuditTimeline({ competenceId }: { competenceId: string }) {
+  const [open, setOpen] = useState(false);
+  const history = useTriageAudit(competenceId, open);
+
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 dark:border-slate-700">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-800"
+      >
+        <span className="inline-flex items-center gap-2">
+          <History className="h-4 w-4 text-blue-600" aria-hidden="true" />
+          Histórico de alterações
+        </span>
+        <span aria-hidden="true">{open ? "−" : "+"}</span>
+      </button>
+
+      {open ? (
+        <div className="border-t border-gray-200 px-3 py-3 dark:border-slate-700">
+          {history.isLoading ? (
+            <p className="flex items-center gap-2 text-sm text-slate-500" role="status">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              Carregando histórico...
+            </p>
+          ) : null}
+
+          {history.isError ? (
+            <div className="text-sm text-red-700 dark:text-red-300" role="alert">
+              <p>Não foi possível carregar o histórico. {getContabilErrorMessage(history.error)}</p>
+              <button
+                type="button"
+                onClick={() => void history.refetch()}
+                className="mt-2 inline-flex items-center gap-2 rounded-md border border-red-300 px-2 py-1 font-medium hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                Tentar novamente
+              </button>
+            </div>
+          ) : null}
+
+          {!history.isLoading && !history.isError && history.data?.items.length === 0 ? (
+            <p className="text-sm text-gray-600 dark:text-slate-400" role="status">
+              Nenhuma alteração registrada.
+            </p>
+          ) : null}
+
+          {!history.isLoading && !history.isError && history.data?.items.length ? (
+            <ol className="space-y-3" aria-label="Alterações da competência">
+              {history.data.items.map((item) => (
+                <li key={item.id} className="border-l-2 border-blue-200 pl-3 dark:border-blue-900">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {actionLabel(item.action)}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-slate-400">
+                    {new Date(item.occurred_at).toLocaleString("pt-BR")} · {item.actor.full_name ?? item.actor.name}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}

@@ -4541,6 +4541,26 @@ const handlers = {
     });
   },
 
+  async triagemCompetenceHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/competencies/${requireState("triagemCompetenceId")}/history`,
+      query: { page: "1", page_size: "20" },
+    });
+  },
+
+  async triagemAuditReconcile(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      headers: {
+        "x-auth-user-id": state.session?.id ?? "",
+        "x-auth-organization-id": state.session?.organization_id ?? "",
+        "x-auth-permission": "2",
+        "x-auth-modules": JSON.stringify({ triagem: 2 }),
+      },
+    });
+  },
+
   async triagemOverviewList(op) {
     await httpRequest(op, {
       expectedStatus: [200],
