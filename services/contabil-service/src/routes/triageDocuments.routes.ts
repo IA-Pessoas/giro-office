@@ -14,9 +14,13 @@ import {
   triageEditabilityRequestSchema,
   triageMonthlyIdParamsSchema,
   triageMonthlyRequestSchema,
+  triageStatementArchiveBodySchema,
   triageStatementBodySchema,
 } from "../schemas/triageDocuments.schemas.js";
-import type { TriageDocumentsService } from "../services/triageDocumentsService.js";
+import type {
+  TriageDocumentItemUpdate,
+  TriageDocumentsService,
+} from "../services/triageDocumentsService.js";
 
 export type TriageDocumentsRouteDeps = Pick<
   TriageDocumentsService,
@@ -27,6 +31,7 @@ export type TriageDocumentsRouteDeps = Pick<
   | "updateAll"
   | "listStatements"
   | "upsertStatement"
+  | "archiveStatement"
 >;
 
 function authenticatedContext(request: Request) {
@@ -52,7 +57,7 @@ export function createTriageDocumentsRoutes(
         const query = parseWithZod(triageEditabilityRequestSchema, req.query);
         res.json(
           createSuccessResponse(
-            await service.getEditability(query.client_id, authenticatedContext(req)),
+            await service.getEditability(query.client_id, authenticatedContext(req), query.type),
           ),
         );
       } catch (err) {
@@ -69,7 +74,7 @@ export function createTriageDocumentsRoutes(
       try {
         const query = parseWithZod(triageMonthlyRequestSchema, req.query);
         const auth = authenticatedContext(req);
-        res.json(createSuccessResponse(await service.getMonthly(query, auth.organizationId)));
+        res.json(createSuccessResponse(await service.getMonthly(query, auth)));
       } catch (err) {
         logError("Erro ao buscar pendência documental mensal", { err });
         next(err);
@@ -101,7 +106,11 @@ export function createTriageDocumentsRoutes(
         const body = parseWithZod(triageDocumentItemBodySchema, req.body);
         res.json(
           createSuccessResponse(
-            await service.updateItem(params.id, body, authenticatedContext(req)),
+            await service.updateItem(
+              params.id,
+              body as TriageDocumentItemUpdate,
+              authenticatedContext(req),
+            ),
           ),
         );
       } catch (err) {
@@ -156,6 +165,22 @@ export function createTriageDocumentsRoutes(
         );
       } catch (err) {
         logError("Erro ao atualizar extrato bancário", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    "/statements",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(triageStatementArchiveBodySchema, req.body);
+        res.json(
+          createSuccessResponse(await service.archiveStatement(body, authenticatedContext(req))),
+        );
+      } catch (err) {
+        logError("Erro ao arquivar marcador de extrato bancário", { err });
         next(err);
       }
     },

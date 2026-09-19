@@ -67,6 +67,9 @@ services:
   contabil-service:
     <<: *small_service
 
+  triagem-service:
+    <<: *small_service
+
   regularize-service:
     <<: *medium_service
 

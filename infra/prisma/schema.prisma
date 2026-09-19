@@ -233,6 +233,13 @@ model Organization {
   triageResponsibles            TriageResponsible[]
   triageBankStatements          TriageBankStatement[]
   triageClosings                TriageClosing[]
+  triageCompetences             TriageCompetence[]
+  triageCatalogItems            TriageCatalogItem[]
+  triageCompetenceCatalogSnapshots TriageCompetenceCatalogSnapshot[]
+  triageCompetenceHistories     TriageCompetenceHistory[]
+  triageOutboxEvents            TriageOutboxEvent[]
+  triageExternalLinks           TriageExternalLink[]
+  triageUrgentRequests           TriageUrgentRequest[]
 
   @@index([name, id], map: "idx_organizations_name_id")
   @@map("organizations")
@@ -375,6 +382,10 @@ model User {
   authSessions                AuthSession[]
   triageMonthlys              TriageMonthly[]
   responsiblesTriage          TriageResponsible[]
+  triageCompetenceHistories   TriageCompetenceHistory[]
+  triageExternalLinks         TriageExternalLink[]       @relation("TriageExternalLinkResponsible")
+  triageUrgentRequestsCreated TriageUrgentRequest[]      @relation("TriageUrgentRequestRequester")
+  triageUrgentRequestsAssigned TriageUrgentRequest[]     @relation("TriageUrgentRequestResponsible")
   financeiroCollectorAssignments DepartmentCollector[]
   taskOperationalNotifications TaskOperationalNotification[]
   department                  Department             @relation(fields: [department_id], references: [id])
@@ -730,6 +741,9 @@ model Client {
   responsiblesTriage            TriageResponsible[]
   triageBankStatements          TriageBankStatement[]
   triageClosings                TriageClosing[]
+  triageCompetences             TriageCompetence[]
+  triageExternalLinks           TriageExternalLink[]
+  triageUrgentRequests           TriageUrgentRequest[]
   commercialProspectings        CommercialProspecting[]
 
   @@map("clients")
@@ -2622,6 +2636,7 @@ model TriageMonthly {
   competence      String
   type            String
   checklist       Json
+  item_notes      Json              @default("{}")
   download_date   DateTime?
   settlement_date DateTime?
   billing_amount  String?
@@ -2706,6 +2721,153 @@ model TriageResponsible {
   @@unique([organization_id, client_id, type])
   @@index([organization_id, client_id])
   @@map("triagem.responsibles")
+}
+
+model TriageCompetence {
+  id                     String                    @id @default(uuid())
+  organization_id        String
+  client_id              String
+  competence             String
+  configuration_snapshot Json
+  responsible_snapshot   Json
+  catalog_snapshot_initialized_at DateTime?
+  archived_at            DateTime?
+  created_at             DateTime                  @default(now())
+  updated_at             DateTime                  @updatedAt
+  organization           Organization              @relation(fields: [organization_id], references: [id])
+  client                 Client                    @relation(fields: [client_id], references: [id])
+  history                TriageCompetenceHistory[]
+  catalog_snapshots      TriageCompetenceCatalogSnapshot[]
+  outbox_events          TriageOutboxEvent[]
+
+  @@unique([organization_id, client_id, competence])
+  @@unique([id, organization_id], map: "uq_triagem_competences_id_organization_id")
+  @@index([organization_id, client_id, archived_at])
+  @@index([organization_id, competence, archived_at])
+  @@map("triagem.competences")
+}
+
+model TriageCatalogItem {
+  id              String       @id @default(uuid())
+  organization_id String
+  kind            String
+  code            String
+  label           String
+  url             String?
+  archived_at     DateTime?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  snapshots       TriageCompetenceCatalogSnapshot[]
+
+  @@unique([organization_id, kind, code], map: "uq_triagem_catalog_items_org_kind_code")
+  @@unique([id, organization_id], map: "uq_triagem_catalog_items_id_organization_id")
+  @@index([organization_id, kind, archived_at, label], map: "idx_triagem_catalog_items_scope")
+  @@map("triagem.catalog_items")
+}
+
+model TriageCompetenceCatalogSnapshot {
+  id              String          @id @default(uuid())
+  organization_id String
+  competence_id   String
+  catalog_item_id String
+  kind            String
+  code            String
+  label           String
+  url             String?
+  created_at      DateTime        @default(now())
+  organization    Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  competence      TriageCompetence @relation(fields: [competence_id, organization_id], references: [id, organization_id], onDelete: Restrict)
+  catalog_item    TriageCatalogItem @relation(fields: [catalog_item_id, organization_id], references: [id, organization_id], onDelete: Restrict)
+
+  @@unique([organization_id, competence_id, catalog_item_id], map: "uq_triagem_competence_catalog_snapshot_item")
+  @@index([organization_id, competence_id, kind], map: "idx_triagem_competence_catalog_snapshots_scope")
+  @@map("triagem.competence_catalog_snapshots")
+}
+
+model TriageExternalLink {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      String
+  type            String
+  url             String
+  description     String?
+  responsible_id  String?
+  archived_at     DateTime?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  client          Client       @relation(fields: [client_id], references: [id], onDelete: Restrict)
+  responsible     User?        @relation("TriageExternalLinkResponsible", fields: [responsible_id], references: [id], onDelete: SetNull)
+
+  @@index([organization_id, client_id, competence, archived_at], map: "idx_triagem_external_links_scope")
+  @@index([organization_id, responsible_id], map: "idx_triagem_external_links_responsible")
+  @@map("triagem.external_links")
+}
+
+model TriageUrgentRequest {
+  id              String       @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      String
+  requester_id    String
+  responsible_id  String
+  urgency_code    String
+  description     String
+  status          String       @default("OPEN")
+  resolution_note String?
+  resolved_at     DateTime?
+  dedupe_key      String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  client          Client       @relation(fields: [client_id], references: [id], onDelete: Restrict)
+  requester       User         @relation("TriageUrgentRequestRequester", fields: [requester_id], references: [id], onDelete: Restrict)
+  responsible     User         @relation("TriageUrgentRequestResponsible", fields: [responsible_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, dedupe_key], map: "uq_triagem_urgent_requests_dedupe")
+  @@index([organization_id, client_id, competence, status, created_at], map: "idx_triagem_urgent_requests_scope")
+  @@index([organization_id, responsible_id, status], map: "idx_triagem_urgent_requests_responsible")
+  @@map("triagem.urgent_requests")
+}
+
+model TriageCompetenceHistory {
+  id              String          @id @default(uuid())
+  competence_id   String
+  organization_id String
+  actor_user_id   String
+  action          String
+  before_data     Json?
+  after_data      Json
+  idempotency_key String          @unique
+  created_at      DateTime        @default(now())
+  competence      TriageCompetence @relation(fields: [competence_id], references: [id], onDelete: Restrict)
+  organization    Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  actor           User            @relation(fields: [actor_user_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, competence_id, created_at])
+  @@map("triagem.competence_history")
+}
+
+model TriageOutboxEvent {
+  id              String          @id @default(uuid())
+  event_key       String          @unique
+  aggregate_type  String
+  aggregate_id    String
+  competence_id   String
+  organization_id String
+  event_type      String
+  payload         Json
+  occurred_at     DateTime        @default(now())
+  dispatched_at   DateTime?
+  attempts        Int             @default(0)
+  competence      TriageCompetence @relation(fields: [competence_id], references: [id], onDelete: Restrict)
+  organization    Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, dispatched_at, occurred_at])
+  @@index([aggregate_type, aggregate_id, occurred_at])
+  @@map("triagem.outbox_events")
 }
 
 model ReportModel {

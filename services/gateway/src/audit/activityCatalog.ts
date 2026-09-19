@@ -48,6 +48,8 @@ const TECHNICAL_RULES = [
   /^\/project\/metrics$/,
   /^\/ti\/dashboard\/?$/,
   /^\/pessoal\/overview\/?$/,
+  /^\/triagem\/overview\/?$/,
+  /^\/triagem\/competencies\/[^/]+\/history$/,
 ] as const;
 
 const EXPLICIT_RULES: ExplicitRule[] = [
@@ -842,6 +844,71 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "as pendências documentais contábeis" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/triagem\/external-links\/?$/,
+    description: { action: "consultou", item: "os links externos da Triagem" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/catalogs\/?$/,
+    description: { action: "consultou", item: "os catálogos operacionais da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/catalogs\/?$/,
+    description: { action: "cadastrou", item: "um item de catálogo da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/catalogs\/[^/]+\/archive\/?$/,
+    description: { action: "arquivou", item: "um item de catálogo da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/catalogs\/[^/]+\/?$/,
+    description: { action: "atualizou", item: "um item de catálogo da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/external-links\/?$/,
+    description: { action: "cadastrou", item: "um link externo da Triagem" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/external-links\/[^/]+\/?$/,
+    description: { action: "atualizou", item: "um link externo da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/external-links\/[^/]+\/archive\/?$/,
+    description: { action: "arquivou", item: "um link externo da Triagem" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/urgent-requests\/?$/,
+    description: { action: "consultou", item: "as solicitações urgentes da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/urgent-requests\/?$/,
+    description: { action: "cadastrou", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/urgent-requests\/[^/]+\/?$/,
+    description: { action: "atualizou", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/urgent-requests\/[^/]+\/close\/?$/,
+    description: { action: "fechou", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/urgent-requests\/[^/]+\/reopen\/?$/,
+    description: { action: "reabriu", item: "uma solicitação urgente da Triagem" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/contabil\/controls\/year$/,
     description: { action: "criou", item: "os controles contábeis anuais" },
@@ -885,6 +952,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/triagem\/editability$/,
     description: { action: "consultou", item: "a permissão de edição da triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/competencies\/[^/]+\/archive$/,
+    description: { action: "arquivou", item: "uma competência mensal da Triagem" },
   },
   {
     methods: ["GET"],
@@ -1097,6 +1169,30 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um marcador de extrato bancário",
     newSingular: "um novo marcador de extrato bancário",
     plural: "marcadores de extratos bancários",
+  },
+  {
+    pattern: /^\/triagem\/competencies(?:\/|$)/,
+    singular: "uma competência mensal da Triagem",
+    newSingular: "uma nova competência mensal da Triagem",
+    plural: "competências mensais da Triagem",
+  },
+  {
+    pattern: /^\/triagem\/external-links(?:\/|$)/,
+    singular: "um link externo da Triagem",
+    newSingular: "um novo link externo da Triagem",
+    plural: "links externos da Triagem",
+  },
+  {
+    pattern: /^\/triagem\/catalogs(?:\/|$)/,
+    singular: "um item de catálogo da Triagem",
+    newSingular: "um novo item de catálogo da Triagem",
+    plural: "itens de catálogo da Triagem",
+  },
+  {
+    pattern: /^\/triagem\/urgent-requests(?:\/|$)/,
+    singular: "uma solicitação urgente da Triagem",
+    newSingular: "uma nova solicitação urgente da Triagem",
+    plural: "solicitações urgentes da Triagem",
   },
   {
     pattern: /^\/rh\/point-config(?:\/|$)/,

@@ -246,6 +246,12 @@ const state = {
   auditRequestId: "",
   contabilControlId: "",
   contabilControlCompetence: "",
+  triagemExternalLinkId: "",
+  triagemExternalLinkCompetence: "",
+  triagemCatalogId: "",
+  triagemLinkTypeCode: "",
+  triagemUrgentRequestId: "",
+  triagemUrgentRequestCompetence: "",
   contabilResponsibleId: "",
   contabilRelationshipId: "",
   pessoalLddId: "",
@@ -287,6 +293,17 @@ const actionExecutionRank = {
   rhPointAdjustmentApproveBulk: 2924,
   rhPointAdjustmentRetroactive: 2925,
   rhPointRecalculate: 2926,
+  triagemCatalogCreate: 4470,
+  triagemCompetenceList: 4480,
+  triagemCompetenceCreate: 4481,
+  triagemOverviewList: 4482,
+  triagemCatalogList: 4483,
+  triagemCatalogUpdate: 4484,
+  triagemExternalLinkList: 4485,
+  triagemExternalLinkCreate: 4486,
+  triagemExternalLinkUpdate: 4487,
+  triagemExternalLinkArchive: 4488,
+  triagemCatalogArchive: 4489,
   projectDelete: 8000,
   rhRequestDelete: 8100,
   rhCategoryDelete: 8200,
@@ -4489,6 +4506,216 @@ const handlers = {
     if (id) state.triageMonthlyId = id;
   },
 
+  async triageEditability(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async triagemCompetenceList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async triagemCompetenceCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemCompetenceId = id;
+  },
+
+  async triagemCompetenceArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/competencies/${requireState("triagemCompetenceId")}/archive`,
+    });
+  },
+
+  async triagemCompetenceHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/competencies/${requireState("triagemCompetenceId")}/history`,
+      query: { page: "1", page_size: "20" },
+    });
+  },
+
+  async triagemAuditReconcile(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      headers: {
+        "x-auth-user-id": state.session?.id ?? "",
+        "x-auth-organization-id": state.session?.organization_id ?? "",
+        "x-auth-permission": "2",
+        "x-auth-modules": JSON.stringify({ triagem: 2 }),
+      },
+    });
+  },
+
+  async triagemOverviewList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+        page: "1",
+        page_size: "20",
+      },
+    });
+  },
+
+  async triagemCatalogList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { kind: "LINK_TYPE" },
+    });
+  },
+
+  async triagemCatalogCreate(op) {
+    const code = `SMOKE_LINK_TYPE_${crypto.randomUUID().slice(0, 8)}`;
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        kind: "LINK_TYPE",
+        code,
+        label: "Tipo de link (smoke)",
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemCatalogId = id;
+    state.triagemLinkTypeCode = code;
+  },
+
+  async triagemCatalogUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/catalogs/${requireState("triagemCatalogId")}`,
+      json: { label: "Sem movimento (smoke revisado)" },
+    });
+  },
+
+  async triagemCatalogArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/catalogs/${requireState("triagemCatalogId")}/archive`,
+    });
+  },
+
+  async triagemExternalLinkList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: state.triagemExternalLinkCompetence ?? "2026-09",
+      },
+    });
+  },
+
+  async triagemExternalLinkCreate(op) {
+    const competence = "2026-09";
+    state.triagemExternalLinkCompetence = competence;
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence,
+        type: requireState("triagemLinkTypeCode"),
+        url: "https://links.example.test/triagem-smoke",
+        description: "Link externo criado pelo smoke",
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemExternalLinkId = id;
+  },
+
+  async triagemExternalLinkUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/external-links/${requireState("triagemExternalLinkId")}`,
+      json: {
+        type: requireState("triagemLinkTypeCode"),
+        url: "https://links.example.test/triagem-smoke-revisado",
+        description: "Link externo atualizado pelo smoke",
+      },
+    });
+  },
+
+  async triagemExternalLinkArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/external-links/${requireState("triagemExternalLinkId")}/archive`,
+    });
+  },
+
+  async triagemUrgentRequestList(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: state.triagemUrgentRequestCompetence ?? "2026-09",
+      },
+    });
+  },
+
+  async triagemUrgentRequestCreate(op) {
+    const competence = "2026-09";
+    state.triagemUrgentRequestCompetence = competence;
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence,
+        urgency_code: "HIGH",
+        description: "Solicitação urgente criada pelo smoke",
+        responsible_id: requireState("session").id,
+      },
+    });
+    if (isBadExpectation(op)) return;
+
+    const id = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    if (id) state.triagemUrgentRequestId = id;
+  },
+
+  async triagemUrgentRequestUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/urgent-requests/${requireState("triagemUrgentRequestId")}`,
+      json: {
+        urgency_code: "CRITICAL",
+        description: "Solicitação urgente atualizada pelo smoke",
+        responsible_id: requireState("session").id,
+      },
+    });
+  },
+
+  async triagemUrgentRequestClose(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/urgent-requests/${requireState("triagemUrgentRequestId")}/close`,
+      json: { resolution_note: "Solicitação resolvida pelo smoke" },
+    });
+  },
+
+  async triagemUrgentRequestReopen(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/triagem/urgent-requests/${requireState("triagemUrgentRequestId")}/reopen`,
+    });
+  },
+
   async triageMonthlyGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -4533,6 +4760,17 @@ const handlers = {
       query: {
         client_id: requireState("primaryClientId"),
         competence: requireState("triageMonthlyCompetence"),
+      },
+    });
+  },
+
+  async triageStatementArchive(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("triageMonthlyCompetence"),
+        bank_id: "001",
       },
     });
   },

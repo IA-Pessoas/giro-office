@@ -73,6 +73,12 @@
       "development": "./src/storage/index.ts",
       "default": "./dist/storage/index.js"
     },
+    "./triagem": {
+      "types": "./dist/triagem/index.d.ts",
+      "development": "./src/triagem/index.ts",
+      "import": "./dist/triagem/index.js",
+      "default": "./dist/triagem/index.js"
+    },
     "./upload": {
       "types": "./dist/upload/index.d.ts",
       "development": "./src/upload/index.ts",

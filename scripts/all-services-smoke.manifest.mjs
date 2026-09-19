@@ -3926,6 +3926,14 @@ const baseManifest = [
   }),
   op({
     service: "contabil-service",
+    method: "DELETE",
+    path: "/triagem/statements",
+    action: "triageStatementArchive",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "contabil-service",
     method: "GET",
     path: "/triagem/closing",
     action: "triageClosingGet",

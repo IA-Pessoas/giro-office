@@ -64,6 +64,8 @@ describe("matriz de regressão das políticas modulares", () => {
       ["GET", "/triagem/monthly"],
       ["GET", "/triagem/statements"],
       ["GET", "/triagem/closing"],
+      ["GET", "/triagem/external-links"],
+      ["GET", "/triagem/catalogs"],
     ] as const;
     const contabilWriteRoutes = [
       ["POST", "/contabil/controls"],
@@ -75,7 +77,19 @@ describe("matriz de regressão das políticas modulares", () => {
     const triagemWriteRoutes = [
       ["POST", "/triagem/monthly"],
       ["PUT", "/triagem/statements"],
+      ["DELETE", "/triagem/statements"],
       ["PUT", "/triagem/closing"],
+      ["POST", "/triagem/external-links"],
+      ["PUT", "/triagem/external-links/link-1"],
+      ["PATCH", "/triagem/external-links/link-1/archive"],
+      ["POST", "/triagem/catalogs"],
+      ["PATCH", "/triagem/catalogs/catalog-1"],
+      ["PATCH", "/triagem/catalogs/catalog-1/archive"],
+      ["GET", "/triagem/urgent-requests"],
+      ["POST", "/triagem/urgent-requests"],
+      ["PUT", "/triagem/urgent-requests/request-1"],
+      ["PATCH", "/triagem/urgent-requests/request-1/close"],
+      ["PATCH", "/triagem/urgent-requests/request-1/reopen"],
     ] as const;
 
     for (const [method, path] of readRoutes) {

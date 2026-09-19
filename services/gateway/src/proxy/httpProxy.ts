@@ -354,7 +354,10 @@ export function buildForwardHeaders(
     } else {
       headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, request.auth.organizationId);
 
-      const modules = request.auth.claims.modules as Record<string, number> | undefined;
+      const modules =
+        request.auth.claims.modulePermissionsPresent === true
+          ? (request.auth.claims.modules as Record<string, number> | undefined)
+          : undefined;
       const forwardedPermission = resolveForwardedPermission(
         request.auth.claims.permission,
         modules,
