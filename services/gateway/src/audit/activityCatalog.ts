@@ -604,6 +604,19 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "adicionou", item: "uma atividade à orientação de regularização" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/regularize\/process\/send-to-fiscal$/,
+    description: { action: "enviou", item: "um processo de regularização ao Fiscal" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/process\/return-from-fiscal$/,
+    description: {
+      action: "registrou",
+      item: "o retorno de um processo de regularização do Fiscal",
+    },
+  },
+  {
     methods: ["POST", "DELETE"],
     pattern: /^\/regularize\/guidance\/activity\/remove$/,
     description: { action: "removeu", item: "uma atividade da orientação de regularização" },
