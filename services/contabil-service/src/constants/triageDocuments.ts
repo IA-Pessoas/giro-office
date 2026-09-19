@@ -1,0 +1,1 @@
+export const TRIAGE_CATALOG_CODE_MAX_LENGTH = 100;
