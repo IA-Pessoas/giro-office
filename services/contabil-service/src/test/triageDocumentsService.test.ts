@@ -461,6 +461,36 @@ describe("TriageDocumentsService", () => {
     );
   });
 
+  it("anexa o resumo versionado da Triagem somente quando o cliente interno está configurado", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const getSummary = vi.fn().mockResolvedValue({
+      version: 1,
+      organization_id: ORG_ID,
+      client_id: CLIENT_ID,
+      legal_name: "Cliente Teste",
+      competence: COMPETENCE,
+      status: "ROUTINE_PENDING",
+    });
+    const service = new TriageDocumentsService(
+      prisma,
+      { logUpdateIfChanged: vi.fn() },
+      { getSummary },
+    );
+
+    await expect(
+      service.getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor()),
+    ).resolves.toEqual(
+      expect.objectContaining({ triagem_summary: expect.objectContaining({ version: 1 }) }),
+    );
+    expect(getSummary).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      clientId: CLIENT_ID,
+      competence: COMPETENCE,
+    });
+  });
+
   it("atualiza estado, nota e justificativa do mesmo item", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);

@@ -74,7 +74,7 @@ export function createTriageDocumentsRoutes(
       try {
         const query = parseWithZod(triageMonthlyRequestSchema, req.query);
         const auth = authenticatedContext(req);
-        res.json(createSuccessResponse(await service.getMonthly(query, auth.organizationId)));
+        res.json(createSuccessResponse(await service.getMonthly(query, auth)));
       } catch (err) {
         logError("Erro ao buscar pendência documental mensal", { err });
         next(err);

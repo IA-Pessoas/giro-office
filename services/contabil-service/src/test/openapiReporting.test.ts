@@ -19,6 +19,9 @@ function createEnv(): ContabilServiceEnv {
     internalServiceToken: "test-internal-token",
     reportsInternalToken: "test-reports-internal-token",
     reportsGrantSecret: "test-reports-grant-secret",
+    triagemServiceUrl: "http://localhost:3046",
+    triagemInternalToken: "test-triagem-internal-token",
+    triagemRequestTimeoutMs: 2_000,
     allowedOrigins: ["*"],
     enableApiDocs: true,
   };
