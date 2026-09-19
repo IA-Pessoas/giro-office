@@ -19,6 +19,7 @@ Definicao e defaults em [`src/config/env.ts`](src/config/env.ts):
 - `MTK_ENCRYPTION_KEY` - chave usada para criptografar credenciais do legado
 - `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` - acesso servidor ao storage privado de protocolos
 - `REGULARIZE_LICENSE_PROTOCOL_BUCKET` - bucket privado dos protocolos (default `regularize-license-protocols`)
+- Protocolos aceitos: PDF, JPG, PNG ou WebP, com limite de **10 MB** por arquivo; o acesso de leitura usa URL assinada temporária e o caminho interno não é exposto.
 - `AUDIT_SERVICE_TOKEN` - token usado na integracao de auditoria
 - `REGULARIZE_SERVICE_INTERNAL_TOKEN` - token exclusivo compartilhado apenas pelo gateway e pelo regularize-service para o contexto encaminhado e as rotas internas; em desenvolvimento, se ausente, mantem fallback de compatibilidade para `INTERNAL_SERVICE_TOKEN` e `AUDIT_SERVICE_TOKEN`
 - `INTERNAL_SERVICE_TOKEN` - nome legado aceito para as rotas `POST /internal/reconciliation/*` pelo header `x-internal-service-token`
