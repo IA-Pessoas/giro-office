@@ -130,6 +130,26 @@ runTest("AppShell header notifications do not embed mock notification rows", () 
   assert.match(appShellSource, /Nenhuma notificação encontrada\./);
 });
 
+runTest("AppShell header notifications expose loading, retryable error, and empty states", () => {
+  assert.match(
+    appShellSource,
+    /const isNotificationsLoading = notificationQuery\.isLoading \|\| rhNotificationsQuery\.isLoading;/,
+  );
+  assert.match(
+    appShellSource,
+    /const hasNotificationsError = notificationQuery\.isError \|\| rhNotificationsQuery\.isError;/,
+  );
+  assert.match(appShellSource, /Carregando notificações\.\.\./);
+  assert.match(appShellSource, /Não foi possível carregar todas as notificações\./);
+  assert.match(appShellSource, /notificationQuery\.isError[\s\S]*notificationQuery\.refetch\(\)/);
+  assert.match(appShellSource, /rhNotificationsQuery\.isError[\s\S]*rhNotificationsQuery\.refetch\(\)/);
+  assert.match(appShellSource, />\s*Tentar novamente\s*<\/button>/);
+  assert.match(
+    appShellSource,
+    /!isNotificationsLoading && !hasNotificationsError[\s\S]*Nenhuma notificação encontrada\./,
+  );
+});
+
 runTest("AppShell AI chat uses Radix Dialog primitives", () => {
   assert.match(appShellSource, /import \* as DialogPrimitive from "@radix-ui\/react-dialog";/);
   assert.match(appShellSource, /<DialogPrimitive\.Root[\s\S]*open=\{showAiChat\}/);

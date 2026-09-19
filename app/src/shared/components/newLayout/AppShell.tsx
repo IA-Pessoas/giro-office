@@ -393,6 +393,8 @@ export function AppShell({
   const notifications = [...rhNotifications, ...taskNotifications].sort(
     (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
   );
+  const isNotificationsLoading = notificationQuery.isLoading || rhNotificationsQuery.isLoading;
+  const hasNotificationsError = notificationQuery.isError || rhNotificationsQuery.isError;
   const hasUnreadNotifications = notifications.some((item) => item.unread);
   const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
   const sidebarToggleLabel = isSidebarOpen
@@ -873,6 +875,33 @@ export function AppShell({
                       </h3>
                     </div>
                     <div className={`max-h-96 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>
+                      {isNotificationsLoading ? (
+                        <div
+                          role="status"
+                          className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-gray-500 dark:text-gray-400"
+                        >
+                          <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                          Carregando notificações...
+                        </div>
+                      ) : null}
+                      {hasNotificationsError ? (
+                        <div
+                          role="alert"
+                          className="border-b border-red-100 px-4 py-4 text-sm text-red-700 dark:border-red-900/60 dark:text-red-300"
+                        >
+                          <p>Não foi possível carregar todas as notificações.</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (notificationQuery.isError) void notificationQuery.refetch();
+                              if (rhNotificationsQuery.isError) void rhNotificationsQuery.refetch();
+                            }}
+                            className="mt-2 font-semibold underline underline-offset-2"
+                          >
+                            Tentar novamente
+                          </button>
+                        </div>
+                      ) : null}
                       {notifications.length > 0 ? (
                         notifications.map((item) => (
                           <button
@@ -914,11 +943,11 @@ export function AppShell({
                             </div>
                           </button>
                         ))
-                      ) : (
+                      ) : !isNotificationsLoading && !hasNotificationsError ? (
                         <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                           Nenhuma notificação encontrada.
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </>
