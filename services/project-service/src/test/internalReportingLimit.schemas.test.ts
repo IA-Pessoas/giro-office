@@ -13,8 +13,10 @@ describe("project reporting extraction limit", () => {
 
     expect(internalReportingExtractBodySchema.safeParse(body).success).toBe(true);
     expect(
-      internalReportingExtractBodySchema.safeParse({ ...body, limit: MAX_REPORTING_QUERY_LIMIT + 1 })
-        .success,
+      internalReportingExtractBodySchema.safeParse({
+        ...body,
+        limit: MAX_REPORTING_QUERY_LIMIT + 1,
+      }).success,
     ).toBe(false);
   });
 });

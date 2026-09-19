@@ -3,8 +3,8 @@ import type { OpenApiDocument } from "@workspace/shared/http";
 import { buildAuditServiceOpenApiSpec } from "../../../audit-service/src/openapi/spec.js";
 import { buildCertificateServiceOpenApiSpec } from "../../../certificate-service/src/openapi/spec.js";
 import { buildClientServiceOpenApiSpec } from "../../../client-service/src/openapi/spec.js";
-import { buildContabilServiceOpenApiSpec } from "../../../contabil-service/src/openapi/spec.js";
 import { buildCommercialServiceOpenApiSpec } from "../../../commercial-service/src/openapi/spec.js";
+import { buildContabilServiceOpenApiSpec } from "../../../contabil-service/src/openapi/spec.js";
 import { buildDepartmentServiceOpenApiSpec } from "../../../department-service/src/openapi/spec.js";
 import { buildFiscalServiceOpenApiSpec } from "../../../fiscal-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
@@ -201,7 +201,9 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       key: "commercial-service",
       label: "Commercial Service",
       buildSpec: () =>
-        buildCommercialServiceOpenApiSpec({ port: getPortFromUrl(env.commercialServiceUrl) } as never),
+        buildCommercialServiceOpenApiSpec({
+          port: getPortFromUrl(env.commercialServiceUrl),
+        } as never),
       includePath: (path) => path !== "/health",
     },
     {

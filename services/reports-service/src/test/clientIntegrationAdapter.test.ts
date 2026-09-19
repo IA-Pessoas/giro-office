@@ -7,12 +7,10 @@ describe("ClientIntegrationAdapter", () => {
   it("publica só campos seguros e chama extract interno com request id", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: vi
-        .fn()
-        .mockResolvedValue({
-          success: true,
-          data: { rows: [{ name: "Cliente seguro" }], reachedLimit: true },
-        }),
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: { rows: [{ name: "Cliente seguro" }], reachedLimit: true },
+      }),
     });
     vi.stubGlobal("fetch", fetchMock);
     const adapter = new ClientIntegrationAdapter({

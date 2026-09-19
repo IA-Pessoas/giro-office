@@ -54,7 +54,10 @@ describe("TriageDocumentsService", () => {
     vi.mocked(prisma.triageMonthly.create).mockResolvedValue(monthly as never);
     const service = new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() });
 
-    await service.getOrCreateMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
+    await service.getOrCreateMonthly(
+      { client_id: CLIENT_ID, competence: COMPETENCE },
+      contabilEditor(),
+    );
 
     expect(prisma.triageMonthly.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -166,7 +169,11 @@ describe("TriageDocumentsService", () => {
       service.updateItem(
         MONTHLY_ID,
         { field: "inventory_control", status: "ATTENTION" },
-        { userId: RESPONSIBLE_USER_ID, organizationId: ORG_ID, modules: { contabil: 0, triagem: 1 } },
+        {
+          userId: RESPONSIBLE_USER_ID,
+          organizationId: ORG_ID,
+          modules: { contabil: 0, triagem: 1 },
+        },
       ),
     ).resolves.toEqual(expect.objectContaining({ id: MONTHLY_ID }));
 
@@ -211,10 +218,7 @@ describe("TriageDocumentsService", () => {
     );
     expect(prisma.triageBankStatement.upsert).toHaveBeenCalledTimes(2);
     await expect(
-      service.getMonthly(
-        { client_id: CLIENT_ID, competence: COMPETENCE },
-        OTHER_ORG_ID,
-      ),
+      service.getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, OTHER_ORG_ID),
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 });

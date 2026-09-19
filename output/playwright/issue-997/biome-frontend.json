@@ -7,9 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": [
-      "**"
-    ]
+    "includes": ["**"]
   },
   "formatter": {
     "enabled": true,
@@ -42,9 +40,7 @@
             "useFilenamingConvention": {
               "level": "error",
               "options": {
-                "filenameCases": [
-                  "camelCase"
-                ],
+                "filenameCases": ["camelCase"],
                 "strictCase": true
               }
             }

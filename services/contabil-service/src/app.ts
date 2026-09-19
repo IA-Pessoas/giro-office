@@ -22,19 +22,19 @@ import {
 } from "./routes/relationship.routes.js";
 import { createResponsibleRoutes, type ResponsibleRouteDeps } from "./routes/responsible.routes.js";
 import {
-  createTriageDocumentsRoutes,
-  type TriageDocumentsRouteDeps,
-} from "./routes/triageDocuments.routes.js";
-import {
   createTriageClosingRoutes,
   type TriageClosingRouteDeps,
 } from "./routes/triageClosing.routes.js";
+import {
+  createTriageDocumentsRoutes,
+  type TriageDocumentsRouteDeps,
+} from "./routes/triageDocuments.routes.js";
 import { ControlService } from "./services/controlService.js";
 import { InternalReportingService } from "./services/internalReportingService.js";
 import { RelationshipService } from "./services/relationshipService.js";
 import { ResponsibleService } from "./services/responsibleService.js";
-import { TriageDocumentsService } from "./services/triageDocumentsService.js";
 import { TriageClosingService } from "./services/triageClosingService.js";
+import { TriageDocumentsService } from "./services/triageDocumentsService.js";
 
 function contabilServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;

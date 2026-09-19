@@ -40,10 +40,8 @@ export class InternalReportingService {
       );
     }
     if (input.query) {
-      return executeReportingQuery(
-        { ...input, query: input.query },
-        (fields, limit, offset) =>
-          this.extract({ ...input, query: undefined, fields, limit, offset }),
+      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+        this.extract({ ...input, query: undefined, fields, limit, offset }),
       );
     }
     const allowedFields = getInternalReportingFields(input.source);
