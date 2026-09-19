@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
@@ -14,6 +14,7 @@ const useProductionBuild = process.argv.includes("--production");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const APP_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const evidenceDir = process.env.CONTABIL_SMOKE_EVIDENCE_DIR;
+const notificationEvidencePath = process.env.APP_SHELL_NOTIFICATIONS_SCREENSHOT_PATH;
 const browserViewport =
   process.env.CONTABIL_SMOKE_MOBILE === "1" ? { width: 390, height: 844 } : { width: 1366, height: 768 };
 const isMobileSmoke = process.env.CONTABIL_SMOKE_MOBILE === "1";
@@ -139,6 +140,38 @@ async function installApiMocks(page, currentUser) {
               },
             },
           ],
+        },
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.route("**/task/notifications/read", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({ success: true, data: null }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
+
+  await page.route("**/task/notifications", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({
+        success: true,
+        data: {
+          items: [
+            {
+              id: "task-notification-smoke",
+              task_id: "task-notification-smoke-target",
+              type: "TASK_ASSIGNED",
+              title: "Tarefa operacional pendente",
+              message: "A tarefa precisa de acompanhamento.",
+              read_at: null,
+              created_at: "2026-09-19T12:00:00.000Z",
+            },
+          ],
+          unread_count: 1,
         },
       }),
       contentType: "application/json",
@@ -309,6 +342,20 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
       consoleErrors,
       "Abertura direta de /contabil",
     );
+    const notificationButton = page.getByRole("button", { name: "Abrir notificações" });
+    await notificationButton.click();
+    await page.getByRole("heading", { name: "Notificações", level: 3 }).waitFor({ state: "visible" });
+    await page.getByRole("button", { name: /Tarefa operacional pendente/ }).waitFor({ state: "visible" });
+    assert.equal(
+      await page.getByText("A tarefa precisa de acompanhamento.", { exact: true }).count(),
+      1,
+      "O painel deve exibir a notificação operacional mockada.",
+    );
+    if (notificationEvidencePath && currentUser.id === integrationRestrictedProfiles[0].id) {
+      await mkdir(dirname(notificationEvidencePath), { recursive: true });
+      await page.screenshot({ path: notificationEvidencePath, fullPage: true });
+    }
+    await page.locator('div[aria-hidden="true"].fixed.inset-0.z-40').click({ position: { x: 1, y: 1 } });
     await captureContabilEvidence(page, currentUser.id);
     if (isMobileSmoke) return;
     assert.equal(

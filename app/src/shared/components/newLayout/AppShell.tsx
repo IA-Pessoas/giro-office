@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 import {
   BadgeDollarSign,
   Bot,
@@ -318,6 +319,7 @@ type AppShellNotification = {
   notificationId: string;
   source: "rh" | "task";
   requestId?: string;
+  taskId?: string;
   title: string;
   description: string;
   time: string;
@@ -383,6 +385,7 @@ export function AppShell({
       id: `task:${item.id}`,
       notificationId: item.id,
       source: "task" as const,
+      taskId: item.task_id,
       title: item.title,
       description: item.message,
       time: formatAppShellNotificationTime(item.created_at),
@@ -393,6 +396,8 @@ export function AppShell({
   const notifications = [...rhNotifications, ...taskNotifications].sort(
     (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
   );
+  const isNotificationsLoading = notificationQuery.isLoading || rhNotificationsQuery.isLoading;
+  const hasNotificationsError = notificationQuery.isError || rhNotificationsQuery.isError;
   const hasUnreadNotifications = notifications.some((item) => item.unread);
   const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
   const sidebarToggleLabel = isSidebarOpen
@@ -575,7 +580,7 @@ export function AppShell({
     const aiMsg: ChatMessage = {
       id: `${Date.now()}-a`,
       sender: "ai",
-      text: "Recebi sua mensagem. Em breve vou responder por aqui.",
+      text: "Este assistente ainda não está conectado a uma IA. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor.",
       time: getTimeLabel(),
     };
 
@@ -592,6 +597,40 @@ export function AppShell({
     sendChatMessage(chatInput);
     setChatInput("");
   };
+
+  async function handleNotificationClick(item: AppShellNotification) {
+    setShowNotifications(false);
+
+    if (item.unread) {
+      try {
+        if (item.source === "rh") {
+          await markRhNotificationReadMutation.mutateAsync({ id: item.notificationId });
+        } else {
+          await markNotificationRead.mutateAsync(item.notificationId);
+        }
+      } catch {
+        toast.error(
+          item.source === "rh"
+            ? "Não foi possível marcar a notificação de RH como lida."
+            : "Não foi possível marcar a notificação de tarefa como lida.",
+        );
+      }
+    }
+
+    if (item.source === "rh" && item.requestId) {
+      void router.push({
+        pathname: "/rh",
+        query: { requestId: item.requestId },
+      });
+    }
+
+    if (item.source === "task" && item.taskId) {
+      void router.push({
+        pathname: "/tasks",
+        query: { taskId: item.taskId },
+      });
+    }
+  }
 
   const openSidebarPreview = () => {
     if (!isSidebarOpen) {
@@ -873,27 +912,39 @@ export function AppShell({
                       </h3>
                     </div>
                     <div className={`max-h-96 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>
+                      {isNotificationsLoading ? (
+                        <div
+                          role="status"
+                          className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-gray-500 dark:text-gray-400"
+                        >
+                          <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                          Carregando notificações...
+                        </div>
+                      ) : null}
+                      {hasNotificationsError ? (
+                        <div
+                          role="alert"
+                          className="border-b border-red-100 px-4 py-4 text-sm text-red-700 dark:border-red-900/60 dark:text-red-300"
+                        >
+                          <p>Não foi possível carregar todas as notificações.</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (notificationQuery.isError) void notificationQuery.refetch();
+                              if (rhNotificationsQuery.isError) void rhNotificationsQuery.refetch();
+                            }}
+                            className="mt-2 font-semibold underline underline-offset-2"
+                          >
+                            Tentar novamente
+                          </button>
+                        </div>
+                      ) : null}
                       {notifications.length > 0 ? (
                         notifications.map((item) => (
                           <button
                             key={item.id}
                             type="button"
-                            onClick={() => {
-                              if (item.unread) {
-                                if (item.source === "rh") {
-                                  markRhNotificationReadMutation.mutate({ id: item.notificationId });
-                                } else {
-                                  markNotificationRead.mutate(item.notificationId);
-                                }
-                              }
-                              setShowNotifications(false);
-                              if (item.source === "rh" && item.requestId) {
-                                void router.push({
-                                  pathname: "/rh",
-                                  query: { requestId: item.requestId },
-                                });
-                              }
-                            }}
+                            onClick={() => void handleNotificationClick(item)}
                             className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
                           >
                             <div className="flex items-start gap-3">
@@ -914,11 +965,11 @@ export function AppShell({
                             </div>
                           </button>
                         ))
-                      ) : (
+                      ) : !isNotificationsLoading && !hasNotificationsError ? (
                         <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                           Nenhuma notificação encontrada.
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </>
@@ -1029,7 +1080,8 @@ export function AppShell({
                   Assistente IA
                 </DialogPrimitive.Title>
                 <DialogPrimitive.Description id={AI_CHAT_DIALOG_DESCRIPTION_ID} className="sr-only">
-                  Chat do Assistente IA com histórico de mensagens e campo de texto para envio.
+                  Assistente local da sessão: as mensagens ficam apenas nesta sessão, não são
+                  enviadas ao servidor e ainda não são processadas por uma IA real.
                 </DialogPrimitive.Description>
               </div>
               <DialogPrimitive.Close asChild>
@@ -1042,6 +1094,11 @@ export function AppShell({
                 </button>
               </DialogPrimitive.Close>
             </div>
+
+            <p className="border-b border-gray-200 bg-purple-50 px-4 py-2 text-xs text-purple-900 dark:border-slate-800 dark:bg-purple-950/30 dark:text-purple-100">
+              Assistente local da sessão: as mensagens ficam apenas nesta sessão, não são enviadas
+              ao servidor e ainda não são processadas por uma IA real.
+            </p>
 
             <div
               ref={chatScrollRef}
