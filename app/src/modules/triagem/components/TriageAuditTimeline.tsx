@@ -14,6 +14,10 @@ function actionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action;
 }
 
+function formatContext(value: unknown): string {
+  return JSON.stringify(value, null, 2) ?? "null";
+}
+
 export function TriageAuditTimeline({ competenceId }: { competenceId: string }) {
   const [open, setOpen] = useState(false);
   const history = useTriageAudit(competenceId, open);
@@ -72,6 +76,25 @@ export function TriageAuditTimeline({ competenceId }: { competenceId: string }) 
                   <p className="text-xs text-gray-500 dark:text-slate-400">
                     {new Date(item.occurred_at).toLocaleString("pt-BR")} · {item.actor.full_name ?? item.actor.name}
                   </p>
+                  <details className="mt-2 text-xs text-gray-600 dark:text-slate-400">
+                    <summary className="cursor-pointer font-medium hover:text-gray-900 dark:hover:text-white">
+                      Ver contexto
+                    </summary>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <div>
+                        <p className="mb-1 font-medium">Antes</p>
+                        <pre className="max-h-48 overflow-auto rounded bg-gray-50 p-2 text-[11px] dark:bg-slate-950">
+                          {formatContext(item.context.before)}
+                        </pre>
+                      </div>
+                      <div>
+                        <p className="mb-1 font-medium">Depois</p>
+                        <pre className="max-h-48 overflow-auto rounded bg-gray-50 p-2 text-[11px] dark:bg-slate-950">
+                          {formatContext(item.context.after)}
+                        </pre>
+                      </div>
+                    </div>
+                  </details>
                 </li>
               ))}
             </ol>

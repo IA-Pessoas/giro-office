@@ -73,7 +73,7 @@ export function TriageCompetenceSection({
     if (records.length === 0) {
       return (
         <p className="mt-4 rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-600 dark:border-slate-700 dark:text-slate-400">
-          Nenhuma competência ativa para este cliente.
+          Nenhuma competência para este cliente.
         </p>
       );
     }
@@ -87,11 +87,16 @@ export function TriageCompetenceSection({
                 <p className="font-medium capitalize text-gray-900 dark:text-white">
                   {formatCompetence(item.competence)}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-slate-400">
-                  Criada em {new Date(item.created_at).toLocaleDateString("pt-BR")}
-                </p>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                  <span>Criada em {new Date(item.created_at).toLocaleDateString("pt-BR")}</span>
+                  {item.archived_at ? (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      Arquivada em {new Date(item.archived_at).toLocaleDateString("pt-BR")}
+                    </span>
+                  ) : null}
+                </div>
               </div>
-              {canEdit ? (
+              {canEdit && !item.archived_at ? (
                 <button
                   type="button"
                   onClick={() => archiveCompetence(item.id)}
