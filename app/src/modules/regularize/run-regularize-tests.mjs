@@ -397,19 +397,85 @@ await runTest("regularize license protocol uses private upload and on-demand sig
 });
 
 await runTest("regularize license upload failure retries from the persisted license", async () => {
-  const pageSource = await readModuleSource("components/RegularizePage.tsx");
-  const submitStart = pageSource.indexOf("async function handleSubmitLicense");
-  const submitEnd = pageSource.indexOf("async function handleOpenLicenseProtocol", submitStart);
-  const submitSource = pageSource.slice(submitStart, submitEnd);
-
-  assert.match(submitSource, /const isCreateSubmission = !\("id" in payload\)/);
-  assert.match(
-    submitSource,
-    /isCreateSubmission && persistedLicenseId[\s\S]*setActiveForm\(\(currentForm\)[\s\S]*mode: "edit", id: persistedLicenseId/,
+  const { submitRegularizeLicense } = await import(
+    "./services/regularizeLicenseSubmission.ts"
   );
-  assert.ok(
-    submitSource.indexOf("setActiveForm((currentForm)") < submitSource.indexOf("throw new Error(message)"),
-    "o formulário deve mudar para edição antes de devolver o erro do upload",
+  const formSource = await readModuleSource("components/RegularizeLicenseForm.tsx");
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const createPayload = {
+    client_id: "client-1",
+    has: true,
+    type_license: "Alvará",
+    entry_date: "2026-09-19",
+    protocol: "PROTO-1",
+    status: "Em Andamento",
+    current_situation: "Em análise",
+    contact: "Contato",
+    urgency: "Média",
+    type: "Anual",
+  };
+  const protocolFile = {
+    name: "protocolo.pdf",
+    size: 128,
+    type: "application/pdf",
+  };
+  const persistedLicenseId = "license-1";
+  const calls = [];
+  let uploadAttempt = 0;
+  let retryLicenseId;
+
+  const dependencies = {
+    createLicense: async (payload) => {
+      calls.push(["POST", payload]);
+      return { id: persistedLicenseId };
+    },
+    updateLicense: async (payload) => {
+      calls.push(["PUT", payload]);
+      return { id: payload.id };
+    },
+    uploadProtocol: async ({ id, file }) => {
+      calls.push(["UPLOAD", id, file]);
+      uploadAttempt += 1;
+      if (uploadAttempt === 1) {
+        throw new Error("synthetic upload failure");
+      }
+    },
+    onLicenseSaved: ({ id, operation }) => {
+      calls.push(["SAVED", operation, id]);
+      retryLicenseId = id;
+    },
+  };
+
+  await assert.rejects(
+    submitRegularizeLicense(createPayload, protocolFile, dependencies),
+    /synthetic upload failure/,
+  );
+  assert.equal(retryLicenseId, persistedLicenseId);
+
+  await submitRegularizeLicense(
+    { ...createPayload, id: retryLicenseId },
+    protocolFile,
+    dependencies,
+  );
+
+  assert.deepEqual(
+    calls.map(([operation]) => operation),
+    ["POST", "SAVED", "UPLOAD", "PUT", "SAVED", "UPLOAD"],
+  );
+  assert.equal(calls.filter(([operation]) => operation === "POST").length, 1);
+  assert.equal(calls.filter(([operation]) => operation === "PUT").length, 1);
+  assert.equal(calls.filter(([operation]) => operation === "UPLOAD").length, 2);
+  assert.equal(calls[2][2], protocolFile);
+  assert.equal(calls[5][2], protocolFile);
+  assert.match(pageSource, /submitRegularizeLicense\(/);
+  assert.match(
+    pageSource,
+    /isCreateSubmission && persistedLicenseId[\s\S]*mode: "edit", id: persistedLicenseId/,
+  );
+  assert.match(pageSource, /key=\{licenseFormSessionKey\}/);
+  assert.doesNotMatch(
+    formSource,
+    /useEffect\(\(\) => \{[\s\S]*?setFormState\(buildLicenseFormState[\s\S]*?setProtocolFile\(null\)[\s\S]*?\}, \[defaultClientId, license, open\]\)/,
   );
 });
 

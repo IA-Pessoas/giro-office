@@ -109,6 +109,7 @@ test("smoke do protocolo Regularize executa upload multipart antes do acesso ass
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "regularize-protocol-smoke-test-"));
   const licenseId = "b0000000-0000-4000-8000-000000000001";
   const protocolRequests = [];
+  let licenseCreationRequests = 0;
   const server = createServer(async (request, response) => {
     let rawBody = Buffer.alloc(0);
     for await (const chunk of request) rawBody = Buffer.concat([rawBody, chunk]);
@@ -126,10 +127,9 @@ test("smoke do protocolo Regularize executa upload multipart antes do acesso ass
     }
 
     if (request.method === "POST" && request.url === "/regularize/license") {
-      assert.match(request.headers.cookie ?? "", /cw\.session=synthetic-session/u);
-      assert.equal(request.headers["x-csrf-token"], "synthetic-csrf");
-      response.statusCode = 201;
-      response.end(JSON.stringify({ success: true, data: { id: licenseId } }));
+      licenseCreationRequests += 1;
+      response.statusCode = 500;
+      response.end(JSON.stringify({ success: false, error: "fixture creation is forbidden" }));
       return;
     }
 
@@ -199,6 +199,7 @@ test("smoke do protocolo Regularize executa upload multipart antes do acesso ass
           LOGIN: "synthetic-user",
           PASSWORD: "synthetic-password",
           REGULARIZE_SMOKE_ENABLED: "true",
+          SMOKE_REGULARIZE_LICENSE_ID: licenseId,
           SMOKE_NAMESPACE: "regularize-protocol-regression",
           SMOKE_TMP_DIR: tempDir,
           SMOKE_UPLOAD_FIXTURE: fixturePath,
@@ -207,6 +208,7 @@ test("smoke do protocolo Regularize executa upload multipart antes do acesso ass
     );
 
     assert.match(stdout, /Executed\s+: 4/u);
+    assert.equal(licenseCreationRequests, 0);
     assert.deepEqual(
       protocolRequests.map((entry) => [entry.method, entry.authenticated]),
       [

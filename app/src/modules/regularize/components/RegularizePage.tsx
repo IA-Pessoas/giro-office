@@ -98,6 +98,7 @@ import {
   useUpdateRegularizeProcessMutation,
   useUploadRegularizeLicenseProtocolMutation,
 } from "../hooks/useRegularizeOperations";
+import { submitRegularizeLicense } from "../services/regularizeLicenseSubmission";
 import type {
   AddRegularizeGuidanceActivityPayload,
   AddRegularizeGuidancePartnerPayload,
@@ -1064,6 +1065,7 @@ export function RegularizePage() {
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
   const [isSiteCredentialDialogOpen, setIsSiteCredentialDialogOpen] = useState(false);
   const [activeForm, setActiveForm] = useState<RegularizeFormState | null>(null);
+  const [licenseFormSessionKey, setLicenseFormSessionKey] = useState(0);
   const [processSearch, setProcessSearch] = useState("");
   const [processStatus, setProcessStatus] = useState("Todos");
   const [processPage, setProcessPage] = useState(1);
@@ -1683,18 +1685,21 @@ export function RegularizePage() {
     const isCreateSubmission = !("id" in payload);
     let savedLicenseId: RegularizeId | undefined;
     try {
-      if ("id" in payload) {
-        const updated = await updateLicenseMutation.mutateAsync(payload);
-        savedLicenseId = updated.id;
-        toast.success("Licença atualizada com sucesso.");
-      } else {
-        const created = await createLicenseMutation.mutateAsync(payload);
-        savedLicenseId = created.id;
-        toast.success("Licença criada com sucesso.");
-      }
+      await submitRegularizeLicense(payload, protocolFile, {
+        createLicense: createLicenseMutation.mutateAsync,
+        updateLicense: updateLicenseMutation.mutateAsync,
+        uploadProtocol: uploadLicenseProtocolMutation.mutateAsync,
+        onLicenseSaved: ({ id, operation }) => {
+          savedLicenseId = id;
+          toast.success(
+            operation === "create"
+              ? "Licença criada com sucesso."
+              : "Licença atualizada com sucesso.",
+          );
+        },
+      });
 
       if (protocolFile) {
-        await uploadLicenseProtocolMutation.mutateAsync({ id: savedLicenseId, file: protocolFile });
         toast.success("Protocolo armazenado com segurança.");
       }
 
@@ -1748,6 +1753,16 @@ export function RegularizePage() {
       return;
     }
 
+    if (form.type === "license") {
+      openLicenseForm(form);
+      return;
+    }
+
+    setActiveForm(form);
+  }
+
+  function openLicenseForm(form: Extract<RegularizeFormState, { type: "license" }>) {
+    setLicenseFormSessionKey((currentKey) => currentKey + 1);
     setActiveForm(form);
   }
 
@@ -2184,7 +2199,7 @@ export function RegularizePage() {
                               icon={Pencil}
                               title="Editar licença"
                               onClick={() =>
-                                setActiveForm({ type: "license", mode: "edit", id: item.id })
+                                openLicenseForm({ type: "license", mode: "edit", id: item.id })
                               }
                             />
                           ) : null}
@@ -2950,6 +2965,7 @@ export function RegularizePage() {
       />
 
       <RegularizeLicenseForm
+        key={licenseFormSessionKey}
         open={activeForm?.type === "license"}
         mode={activeForm?.type === "license" ? activeForm.mode : "create"}
         license={activeLicenseForForm}

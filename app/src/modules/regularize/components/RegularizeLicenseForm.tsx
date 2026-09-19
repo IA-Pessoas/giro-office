@@ -158,8 +158,6 @@ export function RegularizeLicenseForm({
   useEffect(() => {
     if (open) {
       setFormState(buildLicenseFormState(license, defaultClientId));
-      setFormError(null);
-      setProtocolFile(null);
     }
   }, [defaultClientId, license, open]);
 

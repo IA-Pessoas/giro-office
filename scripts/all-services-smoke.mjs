@@ -152,6 +152,7 @@ const env = {
     `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   tmpDir: process.env.SMOKE_TMP_DIR?.trim() || fs.mkdtempSync(path.join(process.cwd(), "smoke-")),
   smokeDepartmentId: process.env.SMOKE_DEPARTMENT_ID?.trim() || "",
+  regularizeLicenseId: process.env.SMOKE_REGULARIZE_LICENSE_ID?.trim() || "",
   fixturePath:
     process.env.SMOKE_UPLOAD_FIXTURE?.trim() ||
     path.join(rootDir, "scripts", "fixtures", "smoke-upload.png"),
@@ -257,7 +258,7 @@ const state = {
   tiRobotId: "",
   certificatePjId: "",
   certificatePfId: "",
-  regularizeLicenseId: "",
+  regularizeLicenseId: env.regularizeLicenseId,
   reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
   reportsJobId: "",
   commercialProposalConfigId: "",
@@ -867,37 +868,6 @@ async function ensureUserSession() {
   state.baselineDepartmentId = session.department_id || state.baselineDepartmentId;
   log("PASS", `Authenticated as user_id=${session.id} organization_id=${session.organization_id}`);
   return session;
-}
-
-async function ensureRegularizeLicenseId() {
-  if (state.regularizeLicenseId) {
-    return state.regularizeLicenseId;
-  }
-
-  await ensureUserSession();
-  const response = await helperCall("regularize-license-create", {
-    method: "POST",
-    path: "/regularize/license",
-    target: "gateway",
-    service: "regularize-service",
-    auth: "bearer",
-    json: {
-      has: true,
-      type_license: "Alvara",
-      entry_date: new Date().toISOString(),
-      protocol: uniqueText("SMOKE-PROTOCOL"),
-      status: "Em Andamento",
-      current_situation: "Em validação smoke",
-      contact: "Smoke",
-      urgency: "Media",
-      type: "Anual",
-    },
-    expectedStatus: [201],
-  });
-
-  state.regularizeLicenseId =
-    pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
-  return requireState("regularizeLicenseId");
 }
 
 function requireState(key) {
@@ -3266,7 +3236,7 @@ const handlers = {
   async regularizeLicenseProtocolReplace(op) {
     await ensureUserSession();
     await httpRequest(op, {
-      path: `/regularize/license/${await ensureRegularizeLicenseId()}/protocol`,
+      path: `/regularize/license/${requireState("regularizeLicenseId")}/protocol`,
       expectedStatus: [201],
       form: {
         file: {
@@ -3282,7 +3252,7 @@ const handlers = {
   async regularizeLicenseProtocolAccess(op) {
     await ensureUserSession();
     await httpRequest(op, {
-      path: `/regularize/license/${await ensureRegularizeLicenseId()}/protocol`,
+      path: `/regularize/license/${requireState("regularizeLicenseId")}/protocol`,
       expectedStatus: [200],
     });
   },
