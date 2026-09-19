@@ -135,7 +135,7 @@ export function createTriagemApp({
   app.use("/triagem", createTriageAuditRoutes(triageAuditRouteDeps ?? auditService));
   app.use(
     "/internal/triagem",
-    createTriageAuditInternalRoutes(triageAuditRouteDeps ?? auditService),
+    createTriageAuditInternalRoutes(triageAuditRouteDeps ?? auditService, env),
   );
   app.use(
     createExpressErrorHandler({

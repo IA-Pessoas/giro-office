@@ -8,6 +8,7 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
@@ -89,6 +90,33 @@ describe("rotas de auditoria da Triagem", () => {
     expect(deps.reconcile).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
     );
+  });
+
+  it("rejeita token interno inválido mesmo com bearer válido", async () => {
+    const deps = createMockDeps();
+    const app = createTriagemApp({
+      env,
+      logger,
+      prisma: createMockPrisma(),
+      triageAuditRouteDeps: deps,
+    });
+    const bearer = jwt.sign(
+      {
+        user_id: USER_ID,
+        organization_id: ORGANIZATION_ID,
+        permission: 2,
+        modules: { triagem: 2 },
+      },
+      env.jwtSecret,
+    );
+
+    const response = await request(app)
+      .post("/internal/triagem/audit/reconcile")
+      .set("Authorization", `Bearer ${bearer}`)
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, "invalid-internal-token");
+
+    expect(response.status).toBe(403);
+    expect(deps.reconcile).not.toHaveBeenCalled();
   });
 
   it("rejeita paginação inválida antes de consultar o serviço", async () => {

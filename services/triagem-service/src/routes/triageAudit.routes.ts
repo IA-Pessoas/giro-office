@@ -3,10 +3,11 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
   parseWithZod,
+  ServiceError,
 } from "@workspace/shared";
 import type { Request, Response } from "express";
 import { Router } from "express";
-
+import type { TriagemServiceEnv } from "../config/env.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import type { TriagemRequestContext } from "../middlewares/requestContext.js";
 import {
@@ -66,6 +67,7 @@ export function createTriageAuditRoutes(service: TriageAuditRouteDeps): ReturnTy
 
 export function createTriageAuditInternalRoutes(
   service: TriageAuditRouteDeps,
+  env: Pick<TriagemServiceEnv, "internalServiceToken">,
 ): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
 
@@ -74,9 +76,12 @@ export function createTriageAuditInternalRoutes(
     isAuthenticated,
     async (request: Request, response: Response, next) => {
       try {
-        if (!request.get(INTERNAL_SERVICE_TOKEN_HEADER)) {
-          response.status(401);
-          throw new Error("Token interno obrigatório.");
+        const internalToken = request.get(INTERNAL_SERVICE_TOKEN_HEADER);
+        if (!internalToken) {
+          throw new ServiceError(401, "Token interno obrigatório.");
+        }
+        if (internalToken !== env.internalServiceToken) {
+          throw new ServiceError(403, "Token interno inválido.");
         }
         response.json(createSuccessResponse(await service.reconcile(contextAuth(request))));
       } catch (error: unknown) {
