@@ -256,10 +256,7 @@ test("triagem-service is wired into VPS build, runtime, wait, and secret materia
   assert.match(triagemBlock, /fetch\('http:\/\/127\.0\.0\.1:3046\/ready'\)/);
   assert.match(contabilBlock, /TRIAGEM_SERVICE_URL: http:\/\/triagem-service:3046/);
   assert.match(gatewayBlock, /TRIAGEM_SERVICE_URL: http:\/\/triagem-service:3046/);
-  assert.match(
-    gatewayBlock,
-    /depends_on:[\s\S]*triagem-service:[\s\S]*condition: service_healthy/,
-  );
+  assert.match(gatewayBlock, /depends_on:[\s\S]*triagem-service:[\s\S]*condition: service_healthy/);
 
   const manifest = await readFile(vpsSecretsManifest, "utf8");
   assert.match(manifest, /^ENV_VPS_TRIAGEM_SERVICE\|\.env\.vps\.triagem-service$/m);
