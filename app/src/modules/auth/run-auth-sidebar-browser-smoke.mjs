@@ -15,6 +15,7 @@ const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const APP_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const evidenceDir = process.env.CONTABIL_SMOKE_EVIDENCE_DIR;
 const notificationEvidencePath = process.env.APP_SHELL_NOTIFICATIONS_SCREENSHOT_PATH;
+const assistantEvidencePath = process.env.APP_SHELL_ASSISTANT_SCREENSHOT_PATH;
 const browserViewport =
   process.env.CONTABIL_SMOKE_MOBILE === "1" ? { width: 390, height: 844 } : { width: 1366, height: 768 };
 const isMobileSmoke = process.env.CONTABIL_SMOKE_MOBILE === "1";
@@ -356,6 +357,18 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
       await page.screenshot({ path: notificationEvidencePath, fullPage: true });
     }
     await page.locator('div[aria-hidden="true"].fixed.inset-0.z-40').click({ position: { x: 1, y: 1 } });
+    await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").fill("Como está minha operação?");
+    await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").press("Enter");
+    await page.getByRole("heading", { name: "Assistente IA", level: 2 }).waitFor({ state: "visible" });
+    await page.getByText(
+      "Este assistente ainda não está conectado a uma IA. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor.",
+      { exact: true },
+    ).waitFor({ state: "visible" });
+    if (assistantEvidencePath && currentUser.id === integrationRestrictedProfiles[0].id) {
+      await mkdir(dirname(assistantEvidencePath), { recursive: true });
+      await page.screenshot({ path: assistantEvidencePath, fullPage: true });
+    }
+    await page.getByRole("button", { name: "Fechar Assistente IA" }).click();
     await captureContabilEvidence(page, currentUser.id);
     if (isMobileSmoke) return;
     assert.equal(
