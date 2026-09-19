@@ -46,7 +46,7 @@ const commercialEditPolicy = createModulePolicy("comercial", moduleEditPermissio
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
-    modules: ["rh", "contabil", "triagem"],
+    modules: ["rh", "contabil", "financeiro", "triagem"],
     minPermission: moduleAccessPermission,
   },
 };
@@ -108,6 +108,18 @@ const integracaoProjectPolicy: AuthPolicy = {
   modulePermission: {
     module: "integracao",
     minPermission: moduleAccessPermission,
+  },
+};
+const financeiroTaskViewPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["financeiro", "integracao"],
+    minPermission: moduleAccessPermission,
+  },
+};
+const financeiroTaskAdminPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["financeiro", "integracao"],
+    minPermission: 3,
   },
 };
 const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao", 0);
@@ -248,10 +260,22 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "GET", path: /^\/task\/financeiro\/queue$/, policy: financeiroTaskViewPolicy },
+  {
+    method: "GET",
+    path: /^\/task\/financeiro\/collectors$/,
+    policy: financeiroTaskAdminPolicy,
+  },
+  { method: "PUT", path: /^\/task\/financeiro$/, policy: financeiroTaskViewPolicy },
+  {
+    method: "PUT",
+    path: /^\/task\/financeiro\/collectors$/,
+    policy: financeiroTaskAdminPolicy,
+  },
   {
     method: "POST",
     path: /^\/task\/financeiro\/(?:settle|express)$/,
-    policy: integracaoProjectPolicy,
+    policy: financeiroTaskViewPolicy,
   },
   {
     method: "ANY",

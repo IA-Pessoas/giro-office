@@ -5436,6 +5436,37 @@ const handlers = {
     state.taskFinanceiroDepartmentId = pickFirst(response.body, "data.0.department_id");
   },
 
+  async taskFinanceiroPut(op) {
+    if (isBadExpectation(op)) {
+      await httpRequest(op, {
+        expectedStatus: [403],
+        json: { task_id: requireState("taskId") },
+      });
+      return;
+    }
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      method: "POST",
+      path: "/task",
+      json: {
+        model_id: requireState("taskModelPrimaryId"),
+        project_id: requireState("projectId"),
+        client_id: requireState("primaryClientId"),
+        prospecting_status: "Fechado",
+        status: "Em Andamento",
+        observations: "Smoke single financial update",
+        urgency: "Alta",
+        prevision_date: "2020-01-01",
+      },
+    });
+    const taskId = pickFirst(response.body, "data.create.id") ?? findFirstId(response.body?.data);
+    await httpRequest(op, {
+      expectedStatus: [200],
+      headers: { "Idempotency-Key": uniqueText("smoke-financeiro-put") },
+      json: { task_id: taskId },
+    });
+  },
+
   async taskFinanceiroCollectorsGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],

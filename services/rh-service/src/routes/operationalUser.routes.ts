@@ -24,6 +24,7 @@ const operationalUserService = new OperationalUserService();
 const OPERATIONAL_USER_CATALOG_MODULES = [
   "rh",
   "contabil",
+  "financeiro",
   "pessoal",
   "regularize",
   "ti",
