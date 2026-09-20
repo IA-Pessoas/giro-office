@@ -15,6 +15,7 @@ const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const APP_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const evidenceDir = process.env.CONTABIL_SMOKE_EVIDENCE_DIR;
 const notificationEvidencePath = process.env.APP_SHELL_NOTIFICATIONS_SCREENSHOT_PATH;
+const assistantEvidencePath = process.env.APP_SHELL_ASSISTANT_SCREENSHOT_PATH;
 const browserViewport =
   process.env.CONTABIL_SMOKE_MOBILE === "1" ? { width: 390, height: 844 } : { width: 1366, height: 768 };
 const isMobileSmoke = process.env.CONTABIL_SMOKE_MOBILE === "1";
@@ -81,7 +82,24 @@ const noAccessUser = createUser({
   login: "dashboard.no-access@castelo.test",
 });
 
+const organizationOwnerProfile = createUser({
+  id: "user-organization-owner-smoke",
+  name: "Organization Owner Smoke",
+  login: "organization.owner@castelo.test",
+  permission: 3,
+  type: "owner",
+  modules: { contabil: 3 },
+});
+
 async function installApiMocks(page, currentUser) {
+  const notificationState = {
+    mode: "success",
+    readCalls: 0,
+    loadingStarted: Promise.resolve(),
+    loadingStartedResolve: null,
+    releaseLoading: null,
+  };
+
   await page.route("**/user/me", async (route) => {
     await route.fulfill({
       body: JSON.stringify({ success: true, data: currentUser }),
@@ -148,6 +166,7 @@ async function installApiMocks(page, currentUser) {
   });
 
   await page.route("**/task/notifications/read", async (route) => {
+    notificationState.readCalls += 1;
     await route.fulfill({
       body: JSON.stringify({ success: true, data: null }),
       contentType: "application/json",
@@ -156,6 +175,31 @@ async function installApiMocks(page, currentUser) {
   });
 
   await page.route("**/task/notifications", async (route) => {
+    if (notificationState.mode === "loading") {
+      notificationState.loadingStartedResolve?.();
+      await new Promise((resolve) => {
+        notificationState.releaseLoading = resolve;
+      });
+    }
+
+    if (notificationState.mode === "error") {
+      await route.fulfill({
+        body: JSON.stringify({ success: false, error: "Falha simulada" }),
+        contentType: "application/json",
+        status: 500,
+      });
+      return;
+    }
+
+    if (notificationState.mode === "empty") {
+      await route.fulfill({
+        body: JSON.stringify({ success: true, data: { items: [], unread_count: 0 } }),
+        contentType: "application/json",
+        status: 200,
+      });
+      return;
+    }
+
     await route.fulfill({
       body: JSON.stringify({
         success: true,
@@ -186,6 +230,23 @@ async function installApiMocks(page, currentUser) {
       status: 200,
     });
   });
+
+  return {
+    readCalls: () => notificationState.readCalls,
+    setMode(mode) {
+      notificationState.mode = mode;
+      if (mode === "loading") {
+        notificationState.loadingStarted = new Promise((resolve) => {
+          notificationState.loadingStartedResolve = resolve;
+        });
+      }
+    },
+    waitForLoading: () => notificationState.loadingStarted,
+    releaseLoading() {
+      notificationState.releaseLoading?.();
+      notificationState.releaseLoading = null;
+    },
+  };
 }
 
 function appendDiagnostics(message, pageErrors, consoleErrors) {
@@ -295,6 +356,9 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
   });
   const pageErrors = [];
   const consoleErrors = [];
+  const appRequests = [];
+  let assistantObservationActive = false;
+  let assistantUnexpectedRequest = null;
 
   await context.addCookies([
     {
@@ -315,7 +379,13 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
       consoleErrors.push(message.text());
     }
   });
-  await installApiMocks(page, currentUser);
+  page.on("request", (request) => {
+    appRequests.push(request.url());
+    if (assistantObservationActive) {
+      assistantUnexpectedRequest = request.url();
+    }
+  });
+  const notificationState = await installApiMocks(page, currentUser);
 
   try {
     await page.goto("/contabil", { waitUntil: "networkidle" });
@@ -355,7 +425,58 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
       await mkdir(dirname(notificationEvidencePath), { recursive: true });
       await page.screenshot({ path: notificationEvidencePath, fullPage: true });
     }
-    await page.locator('div[aria-hidden="true"].fixed.inset-0.z-40').click({ position: { x: 1, y: 1 } });
+    const readResponse = page.waitForResponse("**/task/notifications/read");
+    await page.getByRole("button", { name: /Tarefa operacional pendente/ }).click();
+    await readResponse;
+    assert.equal(notificationState.readCalls(), 1, "A interação deve marcar a notificação como lida.");
+    await page.goto("/contabil", { waitUntil: "networkidle" });
+    await page.locator("aside").waitFor({ state: "visible" });
+    const requestsBeforeAssistant = appRequests.length;
+    assistantObservationActive = true;
+    await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").fill("Como está minha operação?");
+    await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").press("Enter");
+    await page.getByRole("heading", { name: "Assistente IA", level: 2 }).waitFor({ state: "visible" });
+    await page.getByText(
+      "Este assistente ainda não está conectado a uma IA. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor.",
+      { exact: true },
+    ).waitFor({ state: "visible" });
+    await page.waitForTimeout(250);
+    assistantObservationActive = false;
+    assert.equal(
+      assistantUnexpectedRequest,
+      null,
+      `O fluxo local do Assistente IA gerou uma requisição inesperada: ${assistantUnexpectedRequest ?? ""}`,
+    );
+    assert.deepEqual(
+      appRequests.slice(requestsBeforeAssistant),
+      [],
+      "O fluxo local do Assistente IA não deve gerar requisições de rede.",
+    );
+    if (assistantEvidencePath && currentUser.id === integrationRestrictedProfiles[0].id) {
+      await mkdir(dirname(assistantEvidencePath), { recursive: true });
+      await page.screenshot({ path: assistantEvidencePath, fullPage: true });
+    }
+    await page.getByRole("button", { name: "Fechar Assistente IA" }).click();
+
+    notificationState.setMode("loading");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await notificationState.waitForLoading();
+    await notificationButton.waitFor({ state: "visible" });
+    await notificationButton.click();
+    await page.getByText("Carregando notificações...", { exact: true }).waitFor({ state: "visible" });
+    notificationState.setMode("success");
+    notificationState.releaseLoading();
+    await page.getByRole("button", { name: /Tarefa operacional pendente/ }).waitFor({ state: "visible" });
+    await page.getByTestId("app-shell-notifications-backdrop").click({ position: { x: 1, y: 1 } });
+
+    notificationState.setMode("error");
+    await page.reload({ waitUntil: "networkidle" });
+    await notificationButton.click();
+    await page.getByRole("alert").getByText("Não foi possível carregar todas as notificações.", { exact: true }).waitFor({ state: "visible" });
+    notificationState.setMode("empty");
+    await page.getByRole("button", { name: "Tentar novamente" }).click();
+    await page.getByText("Nenhuma notificação encontrada.", { exact: true }).waitFor({ state: "visible" });
+    await page.getByTestId("app-shell-notifications-backdrop").click({ position: { x: 1, y: 1 } });
     await captureContabilEvidence(page, currentUser.id);
     if (isMobileSmoke) return;
     assert.equal(
@@ -430,9 +551,54 @@ async function assertDashboardIsHiddenWithoutModuleAccess() {
   }
 }
 
+async function assertConfigurationAndAdministrationNavigation() {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: browserViewport,
+  });
+
+  await context.addCookies([
+    {
+      httpOnly: true,
+      name: "cw.session",
+      sameSite: "Lax",
+      url: baseUrl,
+      value: "opaque-test-session",
+    },
+  ]);
+
+  const page = await context.newPage();
+  await installApiMocks(page, organizationOwnerProfile);
+
+  try {
+    await page.goto("/contabil", { waitUntil: "networkidle" });
+    await page.locator("aside").waitFor({ state: "visible" });
+    await page.getByRole("link", { name: "Configurações", exact: true }).waitFor({ state: "visible" });
+    await page.getByRole("link", { name: "Administração", exact: true }).waitFor({ state: "visible" });
+    assert.equal(
+      await page.getByRole("link", { name: "Configurações", exact: true }).getAttribute("href"),
+      "/configuracoes",
+    );
+    assert.equal(
+      await page.getByRole("link", { name: "Administração", exact: true }).getAttribute("href"),
+      "/administracao",
+    );
+    assert.equal(
+      await page.evaluate(() => window.innerWidth),
+      browserViewport.width,
+      "O smoke deve executar no viewport responsivo configurado.",
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
 await withNextServer(async () => {
   await assertDashboardIsHiddenWithoutModuleAccess();
   console.log("PASS dashboard is hidden from sidebar without module access");
+  await assertConfigurationAndAdministrationNavigation();
+  console.log("PASS configuration and administration navigation is visible to organization owners");
 
   for (const currentUser of integrationRestrictedProfiles) {
     await assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUser);
