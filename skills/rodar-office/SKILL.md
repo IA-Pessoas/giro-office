@@ -106,9 +106,10 @@ Codex. Compile os pacotes necessários, inicie base/dependências e depois UI e
 serviços em edição. Reaproveite os processos verificados. Mantenha logs por
 processo e registre como encerrá-los na mesma sessão.
 
-Não execute `pnpm dev` da raiz: no fluxo conhecido ele chama `dev:reset` e inicia
-muitos pacotes. Não use Compose/deploy da VPS para desenvolvimento. Os nomes
-`dev:up` e `dev:ensure` foram propostas de arquitetura, não comandos garantidos.
+`pnpm dev` da raiz usa o orquestrador seletivo e não executa reset destrutivo. Escolha
+`pnpm dev -- --profile <nome>` ou `pnpm dev:full` conforme a proposta aprovada; use
+`pnpm dev:recover -- --apply` somente para recuperação explícita. Não use
+Compose/deploy da VPS para desenvolvimento.
 
 Se um serviço da base mudar, atualize seu build ou passe a watch antes de testar.
 Se `shared` ou código gerado mudar, atualize os artefatos consumidos e reinicie
