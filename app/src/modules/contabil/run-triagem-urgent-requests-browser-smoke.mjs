@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { chromium, expect } from "@playwright/test";
+
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 const port = process.env.TRIAGE_URGENT_REQUESTS_SMOKE_PORT ?? "3128";
 const baseUrl = configuredBaseUrl ?? `http://127.0.0.1:${port}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const smokeEnv = browserSmokeEnv();
 const screenshotPath =
   process.env.TRIAGE_URGENT_REQUESTS_SCREENSHOT_PATH ??
   "output/playwright/issue-1151-triagem-urgent-requests.png";
@@ -170,10 +173,16 @@ async function withNextServer(run) {
     return;
   }
 
-  const server = spawn("pnpm", ["exec", "next", "dev", "--webpack", "--port", port], {
+  const command = process.platform === "win32" ? "cmd" : "corepack";
+  const args =
+    process.platform === "win32"
+      ? ["/c", "corepack", "pnpm", "exec", "next", "start", "--port", port]
+      : ["pnpm", "exec", "next", "start", "--port", port];
+  const server = spawn(command, args, {
     cwd: appRoot,
-    env: process.env,
+    env: smokeEnv,
     stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
   });
   let output = "";
   server.stdout.on("data", (chunk) => (output += chunk.toString()));
@@ -182,19 +191,33 @@ async function withNextServer(run) {
   try {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 60_000) {
-      if (server.exitCode !== null) throw new Error(`Next encerrou antes do smoke.\n${output}`);
+      if (server.exitCode !== null) {
+        throw new Error(`Next production server encerrou antes do smoke.\n${output}`);
+      }
       try {
-        const response = await fetch(baseUrl);
-        if (response.status < 500) break;
+        const response = await fetch(`${baseUrl}/triagem`);
+        if (response.ok || response.status < 500) return await run();
       } catch {
-        // Aguarda o bind do Next.
+        // Continua até o Next abrir a porta.
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
-    await run();
+    throw new Error(`Timeout aguardando o build de produção em ${baseUrl}.\n${output}`);
   } finally {
-    if (server.pid && server.exitCode === null) server.kill("SIGTERM");
+    stopServer(server);
   }
+}
+
+function stopServer(server) {
+  if (!server.pid || server.exitCode !== null) return;
+  if (process.platform === "win32") {
+    execFileSync("taskkill", ["/pid", String(server.pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return;
+  }
+  server.kill("SIGTERM");
 }
 
 await withNextServer(runBrowserProof);
