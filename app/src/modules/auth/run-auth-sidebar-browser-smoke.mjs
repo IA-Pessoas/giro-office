@@ -82,6 +82,15 @@ const noAccessUser = createUser({
   login: "dashboard.no-access@castelo.test",
 });
 
+const organizationOwnerProfile = createUser({
+  id: "user-organization-owner-smoke",
+  name: "Organization Owner Smoke",
+  login: "organization.owner@castelo.test",
+  permission: 3,
+  type: "owner",
+  modules: { contabil: 3 },
+});
+
 async function installApiMocks(page, currentUser) {
   const notificationState = {
     mode: "success",
@@ -529,9 +538,41 @@ async function assertDashboardIsHiddenWithoutModuleAccess() {
   }
 }
 
+async function assertConfigurationAndAdministrationNavigation() {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: browserViewport,
+  });
+
+  await context.addCookies([
+    {
+      httpOnly: true,
+      name: "cw.session",
+      sameSite: "Lax",
+      url: baseUrl,
+      value: "opaque-test-session",
+    },
+  ]);
+
+  const page = await context.newPage();
+  await installApiMocks(page, organizationOwnerProfile);
+
+  try {
+    await page.goto("/contabil", { waitUntil: "networkidle" });
+    await page.locator("aside").waitFor({ state: "visible" });
+    await page.getByRole("link", { name: "Configurações", exact: true }).waitFor({ state: "visible" });
+    await page.getByRole("link", { name: "Administração", exact: true }).waitFor({ state: "visible" });
+  } finally {
+    await browser.close();
+  }
+}
+
 await withNextServer(async () => {
   await assertDashboardIsHiddenWithoutModuleAccess();
   console.log("PASS dashboard is hidden from sidebar without module access");
+  await assertConfigurationAndAdministrationNavigation();
+  console.log("PASS configuration and administration navigation is visible to organization owners");
 
   for (const currentUser of integrationRestrictedProfiles) {
     await assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUser);
