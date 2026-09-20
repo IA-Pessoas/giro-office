@@ -521,6 +521,10 @@ async function startDevelopment({
   const children = [];
   const records = [...active];
   let shuttingDown = false;
+  let resolveShutdown;
+  const shutdownFinished = new Promise((resolve) => {
+    resolveShutdown = resolve;
+  });
   const persist = async () => {
     if (records.length === 0) {
       await removeState(statePath);
@@ -540,6 +544,7 @@ async function startDevelopment({
     );
     await persist();
     process.exitCode = exitCode;
+    resolveShutdown();
   };
 
   process.once("SIGINT", () => void shutdown(0));
@@ -566,7 +571,7 @@ async function startDevelopment({
     });
   }
 
-  if (children.length > 0) await new Promise(() => {});
+  if (children.length > 0) await shutdownFinished;
 }
 
 export async function main(args = process.argv.slice(2)) {
