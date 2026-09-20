@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 import {
   BadgeDollarSign,
   Bot,
@@ -23,6 +25,7 @@ import {
   Shield,
   ShieldCheck,
   SquareCheck,
+  ListChecks,
   ContactRound,
   FolderKanban,
   UserRoundCog,
@@ -44,7 +47,12 @@ import {
   type ModuleKey,
   type ModulePermissionSubject,
 } from "@modules/auth";
-import { useMe } from "@shared/hooks";
+import {
+  useMarkRhNotificationReadMutation,
+  useRhNotifications,
+} from "@modules/rh/hooks/useRhRequests";
+import { useFetch, useMe } from "@shared/hooks";
+import { taskOperationalNotificationService } from "@shared/services/taskOperationalNotificationService";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 import { resolvePhotoUrl } from "@shared/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -137,6 +145,7 @@ const moduleCategories: NavigationCategory[] = [
       },
       { path: "/fiscal", name: "Fiscal", icon: Receipt, moduleKey: "fiscal" as ModuleKey },
       { path: "/contabil", name: "Contábil", icon: Calculator },
+      { path: "/triagem", name: "Triagem", icon: ListChecks, moduleKey: "triagem" as ModuleKey },
       { path: "/parcelamento", name: "Parcelamento", icon: BadgeDollarSign, moduleKey: "parcelamento" as ModuleKey },
       { path: "/rh", name: "RH", icon: Users, moduleKey: "rh" as ModuleKey },
       {
@@ -146,6 +155,7 @@ const moduleCategories: NavigationCategory[] = [
         moduleKey: "pessoal" as ModuleKey,
       },
       { path: "/tecnologia", name: "Tecnologia", icon: Code, moduleKey: "ti" as ModuleKey },
+      { path: "/comercial", name: "Comercial", icon: BadgeDollarSign, moduleKey: "comercial" as ModuleKey },
     ],
   },
   {
@@ -167,6 +177,15 @@ const MODULE_NAV_LOADING_MESSAGE = "Carregando módulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
 const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";
+
+function formatAppShellNotificationTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
 
 function getModuleKeyFromRoutePath(routePath: string): ModuleKey | null {
   const normalizedPath = normalizeRoutePath(routePath);
@@ -297,10 +316,15 @@ type ChatMessage = {
 
 type AppShellNotification = {
   id: string;
+  notificationId: string;
+  source: "rh" | "task";
+  requestId?: string;
+  taskId?: string;
   title: string;
   description: string;
   time: string;
   unread: boolean;
+  createdAt: string;
 };
 
 export function AppShell({
@@ -315,11 +339,25 @@ export function AppShell({
   const isPlatformSuperAdmin =
     user?.auth_kind === "platform" && user.platform_role === "super_admin";
   const meQuery = useMe({ enabled: !isPlatformSuperAdmin });
+  const notificationQuery = useFetch(
+    ["task", "notifications"],
+    () => taskOperationalNotificationService.list(),
+    { enabled: !isPlatformSuperAdmin && Boolean(user) },
+  );
+  const queryClient = useQueryClient();
+  const markNotificationRead = useMutation({
+    mutationFn: taskOperationalNotificationService.markRead,
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["task", "notifications"] }),
+  });
   const {
     accessMap: moduleAccessMap,
     isLoading: isModuleAccessLoading,
     user: moduleAccessUser,
   } = useModuleAccessMap(MODULE_KEYS);
+  const rhNotificationsQuery = useRhNotifications({
+    enabled: !isPlatformSuperAdmin && moduleAccessMap.rh?.canView === true,
+  });
+  const markRhNotificationReadMutation = useMarkRhNotificationReadMutation();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -331,7 +369,35 @@ export function AppShell({
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [hasUserPhotoLoadError, setHasUserPhotoLoadError] = useState(false);
-  const notifications: AppShellNotification[] = [];
+  const rhNotifications: AppShellNotification[] = (rhNotificationsQuery.data ?? []).map((item) => ({
+    id: `rh:${item.id}`,
+    notificationId: item.id,
+    source: "rh" as const,
+    requestId: item.request_id,
+    title: item.title,
+    description: item.message,
+    time: formatAppShellNotificationTime(item.created_at),
+    unread: !item.read,
+    createdAt: item.created_at,
+  }));
+  const taskNotifications: AppShellNotification[] = (notificationQuery.data?.items ?? []).map(
+    (item) => ({
+      id: `task:${item.id}`,
+      notificationId: item.id,
+      source: "task" as const,
+      taskId: item.task_id,
+      title: item.title,
+      description: item.message,
+      time: formatAppShellNotificationTime(item.created_at),
+      unread: item.read_at === null,
+      createdAt: item.created_at,
+    }),
+  );
+  const notifications = [...rhNotifications, ...taskNotifications].sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
+  const isNotificationsLoading = notificationQuery.isLoading || rhNotificationsQuery.isLoading;
+  const hasNotificationsError = notificationQuery.isError || rhNotificationsQuery.isError;
   const hasUnreadNotifications = notifications.some((item) => item.unread);
   const shouldExpandSidebar = isSidebarOpen || isSidebarPreviewOpen;
   const sidebarToggleLabel = isSidebarOpen
@@ -514,7 +580,7 @@ export function AppShell({
     const aiMsg: ChatMessage = {
       id: `${Date.now()}-a`,
       sender: "ai",
-      text: "Recebi sua mensagem. Em breve vou responder por aqui.",
+      text: "Este assistente ainda não está conectado a uma IA. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor.",
       time: getTimeLabel(),
     };
 
@@ -531,6 +597,40 @@ export function AppShell({
     sendChatMessage(chatInput);
     setChatInput("");
   };
+
+  async function handleNotificationClick(item: AppShellNotification) {
+    setShowNotifications(false);
+
+    if (item.unread) {
+      try {
+        if (item.source === "rh") {
+          await markRhNotificationReadMutation.mutateAsync({ id: item.notificationId });
+        } else {
+          await markNotificationRead.mutateAsync(item.notificationId);
+        }
+      } catch {
+        toast.error(
+          item.source === "rh"
+            ? "Não foi possível marcar a notificação de RH como lida."
+            : "Não foi possível marcar a notificação de tarefa como lida.",
+        );
+      }
+    }
+
+    if (item.source === "rh" && item.requestId) {
+      void router.push({
+        pathname: "/rh",
+        query: { requestId: item.requestId },
+      });
+    }
+
+    if (item.source === "task" && item.taskId) {
+      void router.push({
+        pathname: "/tasks",
+        query: { taskId: item.taskId },
+      });
+    }
+  }
 
   const openSidebarPreview = () => {
     if (!isSidebarOpen) {
@@ -800,6 +900,7 @@ export function AppShell({
                   <div
                     aria-hidden="true"
                     className="fixed inset-0 z-40"
+                    data-testid="app-shell-notifications-backdrop"
                     onClick={() => setShowNotifications(false)}
                   />
                   <div
@@ -812,11 +913,39 @@ export function AppShell({
                       </h3>
                     </div>
                     <div className={`max-h-96 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>
+                      {isNotificationsLoading ? (
+                        <div
+                          role="status"
+                          className="flex items-center justify-center gap-2 px-4 py-6 text-sm text-gray-500 dark:text-gray-400"
+                        >
+                          <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                          Carregando notificações...
+                        </div>
+                      ) : null}
+                      {hasNotificationsError ? (
+                        <div
+                          role="alert"
+                          className="border-b border-red-100 px-4 py-4 text-sm text-red-700 dark:border-red-900/60 dark:text-red-300"
+                        >
+                          <p>Não foi possível carregar todas as notificações.</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (notificationQuery.isError) void notificationQuery.refetch();
+                              if (rhNotificationsQuery.isError) void rhNotificationsQuery.refetch();
+                            }}
+                            className="mt-2 font-semibold underline underline-offset-2"
+                          >
+                            Tentar novamente
+                          </button>
+                        </div>
+                      ) : null}
                       {notifications.length > 0 ? (
                         notifications.map((item) => (
                           <button
                             key={item.id}
                             type="button"
+                            onClick={() => void handleNotificationClick(item)}
                             className="w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
                           >
                             <div className="flex items-start gap-3">
@@ -837,11 +966,11 @@ export function AppShell({
                             </div>
                           </button>
                         ))
-                      ) : (
+                      ) : !isNotificationsLoading && !hasNotificationsError ? (
                         <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                           Nenhuma notificação encontrada.
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </>
@@ -952,7 +1081,8 @@ export function AppShell({
                   Assistente IA
                 </DialogPrimitive.Title>
                 <DialogPrimitive.Description id={AI_CHAT_DIALOG_DESCRIPTION_ID} className="sr-only">
-                  Chat do Assistente IA com histórico de mensagens e campo de texto para envio.
+                  Assistente local da sessão: as mensagens ficam apenas nesta sessão, não são
+                  enviadas ao servidor e ainda não são processadas por uma IA real.
                 </DialogPrimitive.Description>
               </div>
               <DialogPrimitive.Close asChild>
@@ -965,6 +1095,11 @@ export function AppShell({
                 </button>
               </DialogPrimitive.Close>
             </div>
+
+            <p className="border-b border-gray-200 bg-purple-50 px-4 py-2 text-xs text-purple-900 dark:border-slate-800 dark:bg-purple-950/30 dark:text-purple-100">
+              Assistente local da sessão: as mensagens ficam apenas nesta sessão, não são enviadas
+              ao servidor e ainda não são processadas por uma IA real.
+            </p>
 
             <div
               ref={chatScrollRef}

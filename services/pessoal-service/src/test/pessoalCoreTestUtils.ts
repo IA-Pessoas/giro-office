@@ -21,6 +21,7 @@ export const clientId = "20000000-0000-4000-8000-000000000001";
 export const otherClientId = "20000000-0000-4000-8000-000000000002";
 export const recordId = "30000000-0000-4000-8000-000000000001";
 export const unionId = "40000000-0000-4000-8000-000000000001";
+export const groupId = "40000000-0000-4000-8000-000000000002";
 export const responsibleId = "50000000-0000-4000-8000-000000000001";
 
 export function gatewayHeaders(permission = 2): Record<string, string> {

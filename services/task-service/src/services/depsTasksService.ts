@@ -1,5 +1,6 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 import prismaClient from "../prisma/index.js";
+import { taskResponsibleEligibilityWhere } from "./responsibleUserContext.js";
 
 export type DepsTasksPrisma = Pick<typeof prismaClient, "department" | "user">;
 
@@ -44,17 +45,22 @@ export class DepsTasksService {
     }
   }
 
-  async listTaskModelOptions(organizationId: string): Promise<TaskModelOptions> {
+  async listTaskModelOptions(
+    organizationId: string,
+    departmentId?: string,
+  ): Promise<TaskModelOptions> {
     try {
       const [users, departments] = await Promise.all([
         this.prisma.user.findMany({
-          where: {
-            status: "active",
-            OR: [
-              { organization_id: organizationId },
-              { organization_id: null, department: { organization_id: organizationId } },
-            ],
-          },
+          where: departmentId
+            ? taskResponsibleEligibilityWhere(organizationId, departmentId)
+            : {
+                status: "active",
+                OR: [
+                  { organization_id: organizationId },
+                  { organization_id: null, department: { organization_id: organizationId } },
+                ],
+              },
           select: { id: true, name: true },
           orderBy: { name: "asc" },
         }),

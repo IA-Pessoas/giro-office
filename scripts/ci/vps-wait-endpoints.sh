@@ -73,6 +73,9 @@ backend_check_url() {
     contabil-service)
       printf "%s\n" "http://contabil-service:3038/health"
       ;;
+    triagem-service)
+      printf "%s\n" "http://triagem-service:3046/ready"
+      ;;
     regularize-service)
       printf "%s\n" "http://regularize-service:3039/health"
       ;;
@@ -90,6 +93,9 @@ backend_check_url() {
       ;;
     parcelamento-service)
       printf "%s\n" "http://parcelamento-service:3043/health"
+      ;;
+    commercial-service)
+      printf "%s\n" "http://commercial-service:3045/health"
       ;;
     reports-service)
       printf "%s\n" "http://reports-service:3044/health"
@@ -112,12 +118,14 @@ ALL_BACKEND_SERVICES=(
   client-service
   fiscal-service
   contabil-service
+  triagem-service
   regularize-service
   rh-service
   ti-service
   certificate-service
   pessoal-service
   parcelamento-service
+  commercial-service
   reports-service
   audit-service
 )

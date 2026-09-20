@@ -2,7 +2,7 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   Client,
-  ClientCommercialRecord,
+  ClientCompanyLookup,
   ClientFinanceRecord,
   ClientPa,
   ClientPaResponse,
@@ -17,7 +17,6 @@ import type {
   CreateClientHistoryPendingPayload,
   ClientTerminationRecord,
   TerminateClientPayload,
-  UpdateClientCommercialPayload,
   UpdateClientFinancePayload,
   UpdateClientHistoryPayload,
   UpdateClientPaPayload,
@@ -71,21 +70,18 @@ export const clientService = {
     return unwrapClientEnvelope<Client>(response.data);
   },
 
+  async lookupCnpj(cnpj: string): Promise<ClientCompanyLookup> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_ENDPOINTS.lookupCnpj, { params: { cnpj } });
+
+    return unwrapClientEnvelope<ClientCompanyLookup>(response.data);
+  },
+
   async updateIntegration(id: string, payload: UpdateClientIntegrationPayload): Promise<Client> {
     const api = setupAPIClient();
     const response = await api.patch(CLIENT_ENDPOINTS.updateIntegration(id), payload);
 
     return unwrapClientEnvelope<Client>(response.data);
-  },
-
-  async updateCommercial(
-    id: string,
-    payload: UpdateClientCommercialPayload,
-  ): Promise<ClientCommercialRecord> {
-    const api = setupAPIClient();
-    const response = await api.patch(CLIENT_ENDPOINTS.updateCommercial(id), payload);
-
-    return unwrapClientEnvelope<ClientCommercialRecord>(response.data);
   },
 
   async updateFinance(

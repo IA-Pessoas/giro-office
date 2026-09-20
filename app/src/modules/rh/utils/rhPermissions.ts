@@ -8,6 +8,7 @@ interface RhPermissionCapabilities {
   canViewRhDashboard: boolean;
   canManageRh: boolean;
   canManageRhRequests: boolean;
+  canManageRhPointAdjustments: boolean;
   canManageRhScore: boolean;
   canManageRhTimeBank: boolean;
   canManageRhTimesheets: boolean;
@@ -31,6 +32,8 @@ export function resolveRhPermissionCapabilities(
     explicitRhPermission !== undefined &&
     explicitRhPermission >= RH_WORKFLOW_MESSAGE_PERMISSION;
   const canManageRh = isGlobalAdmin || hasRhAdminPermission;
+  const canManageRhPointAdjustments =
+    isGlobalAdmin || hasRhWorkflowMessagePermission;
   const canAccessRhPortal = isGlobalAdmin || hasSelfServicePermission;
 
   return {
@@ -39,6 +42,7 @@ export function resolveRhPermissionCapabilities(
     canViewRhDashboard: canManageRh,
     canManageRh,
     canManageRhRequests: canManageRh,
+    canManageRhPointAdjustments,
     canManageRhScore: canManageRh,
     canManageRhTimeBank: canManageRh,
     canManageRhTimesheets: canManageRh,

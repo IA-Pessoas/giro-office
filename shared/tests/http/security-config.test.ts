@@ -8,10 +8,11 @@ import {
   validateProductionInternalServiceToken,
 } from "../../src/http/security-config.js";
 
-test("credentialed CORS permits the session-bound CSRF header", () => {
+test("credentialed CORS permits session-bound and idempotency headers", () => {
   const options = createServiceCorsOptions(["https://app.example.com"], "test-service");
 
   assert.ok(options.allowedHeaders.includes("x-csrf-token"));
+  assert.ok(options.allowedHeaders.includes("Idempotency-Key"));
   assert.ok(options.exposedHeaders.includes("x-auth-session-state"));
 });
 

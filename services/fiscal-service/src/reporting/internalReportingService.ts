@@ -1,4 +1,9 @@
-import { ServiceError } from "@workspace/shared";
+import {
+  executeReportingQuery,
+  type ReportingQuery,
+  ServiceError,
+  withReportingSnapshot,
+} from "@workspace/shared";
 
 import {
   type FiscalIcmsReportingSource,
@@ -18,6 +23,8 @@ type ReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, true>;
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -28,14 +35,27 @@ export class InternalReportingService {
       ncm: ReportingDelegate;
       ipi: ReportingDelegate;
     },
+    private readonly inSnapshot = false,
   ) {}
 
   async extract(input: {
+    query?: ReportingQuery;
+    offset?: number;
     organizationId: string;
     source: FiscalIcmsReportingSource | FiscalNcmReportingSource | FiscalIpiReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    if (input.query && !this.inSnapshot) {
+      return withReportingSnapshot(this.prisma, (transaction) =>
+        new InternalReportingService(transaction, true).extract(input),
+      );
+    }
+    if (input.query) {
+      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+        this.extract({ ...input, query: undefined, fields, limit, offset }),
+      );
+    }
     const isIcms = input.source === "fiscal.icms";
     const isNcm = input.source === "fiscal.ncm";
     const allowedFields = isIcms
@@ -51,6 +71,9 @@ export class InternalReportingService {
     const rows = await delegate.findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
+      ...(input.offset !== undefined
+        ? { skip: input.offset, orderBy: { id: "asc" as const } }
+        : {}),
       take: input.limit + 1,
     });
 

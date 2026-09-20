@@ -23,6 +23,7 @@ describe("ReportJobService", () => {
         status: "queued",
         payload_json: { format: "json" },
       },
+      select: { id: true, status: true },
     });
   });
 
@@ -79,6 +80,7 @@ describe("ReportJobService", () => {
     });
     expect(transaction.reportJob.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ payload_json: { format: "json", retentionDays: 14 } }),
+      select: { id: true, status: true },
     });
   });
 

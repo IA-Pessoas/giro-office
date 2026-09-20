@@ -1,6 +1,16 @@
+import type {
+  RegularizeGuidanceBranchData,
+  RegularizeGuidanceChecklistCode,
+  RegularizeGuidanceChecklistStatus,
+  RegularizeGuidanceSnapshot,
+  RegularizeGuidanceTargetType,
+} from "@workspace/shared/regularize";
+
 export type RegularizeId = string;
 
 export type RegularizeStatus = string | boolean;
+
+export type RegularizeFinancialStatus = "Pendente" | "Regular" | "Bônus" | "Não Contratado";
 
 export type RegularizePartnerType = "pf" | "pj";
 
@@ -52,7 +62,8 @@ export type RegularizeProcessListFilters = {
 };
 
 export type RegularizeGuidanceListFilters = {
-  process_id: RegularizeId;
+  process_id?: RegularizeId;
+  target_type?: RegularizeGuidanceTargetType;
 };
 
 export type RegularizeLicenseListFilters = {
@@ -296,8 +307,25 @@ export type RegularizeProcessListItem = {
   cpf_cnpj?: string | null;
   process_type: string;
   status: string;
+  financial_status?: RegularizeFinancialStatus | null;
+  client_notice_date?: string | null;
   clientPF?: RegularizeProcessClientSummary | null;
   clientPJ?: RegularizeProcessClientSummary | null;
+};
+
+export type RegularizeProcessResponsible = {
+  id: RegularizeId;
+  name: string;
+};
+
+export type RegularizeProcessHistoryItem = {
+  id: RegularizeId;
+  action: string;
+  referring: string;
+  referring_id: RegularizeId;
+  changes: unknown;
+  date: string;
+  user?: RegularizeProcessResponsible | null;
 };
 
 export type RegularizeProcessDetail = RegularizeProcessListItem & {
@@ -312,6 +340,11 @@ export type RegularizeProcessDetail = RegularizeProcessListItem & {
   locking_type?: string | null;
   urgency?: string | null;
   task_id?: RegularizeId | null;
+  responsible1?: RegularizeProcessResponsible | null;
+  responsible2?: RegularizeProcessResponsible | null;
+  responsible3?: RegularizeProcessResponsible | null;
+  elapsed_days?: number | null;
+  history?: RegularizeProcessHistoryItem[];
 };
 
 export type CreateRegularizeProcessPayload = {
@@ -323,7 +356,9 @@ export type CreateRegularizeProcessPayload = {
   entry_date?: RegularizeOptionalDate;
   completion_date?: RegularizeOptionalDate;
   expected_date?: RegularizeOptionalDate;
+  client_notice_date?: RegularizeOptionalDate | null;
   status: string;
+  financial_status?: RegularizeFinancialStatus;
   observation?: string | null;
   responsible1_id?: RegularizeId;
   responsible2_id?: RegularizeId;
@@ -335,6 +370,15 @@ export type CreateRegularizeProcessPayload = {
 
 export type UpdateRegularizeProcessPayload = CreateRegularizeProcessPayload & {
   id: RegularizeId;
+};
+
+export type RegularizeProcessActionPayload = {
+  id: RegularizeId;
+};
+
+export type RegularizeProcessActionResult = {
+  process: RegularizeProcessDetail;
+  action: "Envio ao Fiscal" | "Retorno do Fiscal";
 };
 
 export type RegularizeGuidanceEconomicActivity = {
@@ -350,14 +394,43 @@ export type RegularizeGuidancePartner = {
   name?: string | null;
   cpf?: string | null;
   document?: string | null;
+  percentage?: number | string | null;
   role?: string | null;
+  profession?: string | null;
+  marital_status?: string | null;
+  rg?: string | null;
+  cnh?: string | null;
+  address?: string | null;
   share?: number | string | null;
   [key: string]: unknown;
 };
 
+export type RegularizeGuidanceChecklistInput = {
+  code: RegularizeGuidanceChecklistCode;
+  status: RegularizeGuidanceChecklistStatus;
+  observation?: string;
+};
+
+export type RegularizeGuidanceChecklistItem = {
+  id: RegularizeId;
+  guidance_id: RegularizeId;
+  code: RegularizeGuidanceChecklistCode;
+  label: string;
+  status: RegularizeGuidanceChecklistStatus;
+  observation: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type RegularizeGuidance = {
   id: RegularizeId;
-  process_id: RegularizeId;
+  process_id: RegularizeId | null;
+  target_type: RegularizeGuidanceTargetType;
+  client_pj_id?: RegularizeId | null;
+  client_pf_id?: RegularizeId | null;
+  target_snapshot: RegularizeGuidanceSnapshot;
+  branch_data: RegularizeGuidanceBranchData | null;
+  checklist_items: RegularizeGuidanceChecklistItem[];
   description?: string | null;
   type?: string | null;
   request?: string | null;
@@ -380,20 +453,53 @@ export type RegularizeGuidance = {
 };
 
 export type RegularizeGuidanceEconomicActivityPayload = {
+  id?: RegularizeId;
   code: string;
   description: string;
   type: string;
 };
 
 export type RegularizeGuidancePartnerPayload = {
+  id?: RegularizeId;
   name: string;
   cpf: string;
+  percentage?: number;
   role?: string;
+  profession?: string;
+  marital_status?: string;
+  rg?: string;
+  cnh?: string;
+  address?: string;
   share?: number;
 };
 
-export type CreateRegularizeGuidancePayload = {
-  process_id: RegularizeId;
+export type RegularizeGuidanceManualSnapshot = {
+  version: 1;
+  source: "manual";
+  name: string;
+  document?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  type?: string;
+  request?: string;
+  framework_obs?: string;
+  legal_nature?: string;
+  company_name?: string;
+  trade_name?: string;
+  cpf_cnpj?: string;
+  share_capital?: number | string;
+  iptu?: string;
+  comporate_purpose?: string;
+  carryng?: string;
+  regime?: string;
+  legal_representative?: string;
+  economic_activities?: RegularizeGuidanceEconomicActivityPayload[];
+  partners?: RegularizeGuidancePartnerPayload[];
+  status?: string;
+};
+
+type RegularizeGuidancePayloadFields = {
   type?: string;
   request?: string;
   framework_obs?: string;
@@ -408,22 +514,55 @@ export type CreateRegularizeGuidancePayload = {
   carryng?: string;
   regime?: string;
   legal_representative?: string;
-  status: string;
+  status?: string;
+};
+
+type RegularizeGuidanceCreatePayloadFields = RegularizeGuidancePayloadFields & {
   economic_activities?: RegularizeGuidanceEconomicActivityPayload[];
   partners?: RegularizeGuidancePartnerPayload[];
 };
 
-export type UpdateRegularizeGuidancePayload = Partial<
-  Omit<CreateRegularizeGuidancePayload, "process_id" | "economic_activities" | "partners">
-> & {
+type RegularizeGuidanceCompletePayload = RegularizeGuidanceCreatePayloadFields & {
+  process_id?: RegularizeId | null;
+  target_type: RegularizeGuidanceTargetType;
+  client_pj_id?: RegularizeId | null;
+  client_pf_id?: RegularizeId | null;
+  target_snapshot?: RegularizeGuidanceManualSnapshot;
+  branch_data?: RegularizeGuidanceBranchData;
+  checklist: RegularizeGuidanceChecklistInput[];
+  status: string;
+};
+
+export type LegacyGuidanceDraft = RegularizeGuidanceCreatePayloadFields & {
+  process_id: RegularizeId;
+  status: string;
+};
+
+export type CreateRegularizeGuidancePayload =
+  | RegularizeGuidanceCompletePayload
+  | LegacyGuidanceDraft;
+
+export type UpdateRegularizeGuidancePayload = RegularizeGuidancePayloadFields & {
   id: RegularizeId;
-  process_id?: RegularizeId;
+  process_id?: RegularizeId | null;
+  target_type?: RegularizeGuidanceTargetType;
+  client_pj_id?: RegularizeId | null;
+  client_pf_id?: RegularizeId | null;
+  target_snapshot?: RegularizeGuidanceManualSnapshot;
+  checklist?: RegularizeGuidanceChecklistInput[];
+  branch_data?: RegularizeGuidanceBranchData;
 };
 
 export type AddRegularizeGuidanceActivityPayload = {
   guidance_id: RegularizeId;
   process_id?: RegularizeId;
   activity: RegularizeGuidanceEconomicActivityPayload;
+};
+
+export type UpdateRegularizeGuidanceActivityPayload = {
+  guidance_id: RegularizeId;
+  process_id?: RegularizeId;
+  activity: RegularizeGuidanceEconomicActivityPayload & { id: RegularizeId };
 };
 
 export type RemoveRegularizeGuidanceActivityPayload = {
@@ -436,6 +575,12 @@ export type AddRegularizeGuidancePartnerPayload = {
   guidance_id: RegularizeId;
   process_id?: RegularizeId;
   partner: RegularizeGuidancePartnerPayload;
+};
+
+export type UpdateRegularizeGuidancePartnerPayload = {
+  guidance_id: RegularizeId;
+  process_id?: RegularizeId;
+  partner: RegularizeGuidancePartnerPayload & { id: RegularizeId };
 };
 
 export type RemoveRegularizeGuidancePartnerPayload = RemoveRegularizeGuidanceActivityPayload;
@@ -457,6 +602,19 @@ export type RegularizeLicenseListItem = {
   type?: string | null;
   due_date?: string | null;
   task_id?: RegularizeId | null;
+  protocol_file?: RegularizeLicenseProtocolMetadata | null;
+};
+
+export type RegularizeLicenseProtocolMetadata = {
+  original_name: string;
+  mime_type: "application/pdf" | "image/jpeg" | "image/png" | "image/webp";
+  size_bytes: number;
+  uploaded_at: string;
+};
+
+export type RegularizeLicenseProtocolAccess = {
+  url: string;
+  expires_in_seconds: number;
 };
 
 export type RegularizeLicenseDetail = RegularizeLicenseListItem & {

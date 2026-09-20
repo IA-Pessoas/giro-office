@@ -1,3 +1,19 @@
+import {
+  REGULARIZE_GUIDANCE_CHECKLIST_CODES,
+  REGULARIZE_GUIDANCE_CHECKLIST_STATUSES,
+  REGULARIZE_GUIDANCE_TARGET_TYPES,
+  reportingQueryOpenApiSchema,
+} from "@workspace/shared";
+
+import {
+  CANONICAL_GUIDANCE_STATUSES,
+  CANONICAL_LICENSE_STATUSES,
+  CANONICAL_PROCESS_STATUSES,
+  FINANCIAL_STATUS_VALUES,
+  LEGACY_LICENSE_STATUS_ALIASES,
+  LEGACY_PROCESS_STATUS_ALIASES,
+} from "../schemas/status.schemas.js";
+
 type OpenApiDocument = Record<string, unknown> & {
   openapi: string;
   info: { title: string; version: string; description?: string };
@@ -13,6 +29,50 @@ function successEnvelopeContent() {
     content: {
       "application/json": {
         schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+      },
+    },
+  };
+}
+
+const processRecordOpenApiSchema = {
+  type: "object",
+  additionalProperties: true,
+  properties: {
+    id: { type: "string", format: "uuid" },
+    status: { type: "string", enum: [...CANONICAL_PROCESS_STATUSES] },
+    financial_status: { type: "string", enum: [...FINANCIAL_STATUS_VALUES] },
+    client_notice_date: { type: "string", format: "date", nullable: true },
+    locking_type: { type: "string", nullable: true },
+    elapsed_days: { type: "integer", minimum: 0, nullable: true },
+  },
+};
+
+function processRecordSuccessEnvelopeContent() {
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              oneOf: [
+                processRecordOpenApiSchema,
+                {
+                  type: "object",
+                  required: ["create"],
+                  properties: { create: processRecordOpenApiSchema },
+                },
+                {
+                  type: "object",
+                  required: ["detail"],
+                  properties: { detail: processRecordOpenApiSchema },
+                },
+              ],
+            },
+          },
+        },
       },
     },
   };
@@ -47,6 +107,385 @@ function dualListSuccessEnvelopeContent() {
               },
             },
           ],
+        },
+      },
+    },
+  };
+}
+
+function protectedErrorResponses() {
+  return {
+    "400": { description: "Dados de entrada invalidos" },
+    "401": { description: "Autenticacao ausente ou invalida" },
+    "403": { description: "Permissao insuficiente para o modulo Regularize" },
+  };
+}
+
+const guidanceChecklistItemOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "status"],
+  properties: {
+    code: { type: "string", enum: [...REGULARIZE_GUIDANCE_CHECKLIST_CODES] },
+    status: { type: "string", enum: [...REGULARIZE_GUIDANCE_CHECKLIST_STATUSES] },
+    observation: { type: "string" },
+  },
+};
+
+const guidanceChecklistOpenApiSchema = {
+  type: "array",
+  minItems: 17,
+  maxItems: 17,
+  description: "Os 17 códigos canônicos, cada um exatamente uma vez.",
+  items: guidanceChecklistItemOpenApiSchema,
+};
+
+const guidanceChecklistResponseItemOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "guidance_id",
+    "code",
+    "label",
+    "status",
+    "observation",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    guidance_id: { type: "string", format: "uuid" },
+    code: { type: "string", enum: [...REGULARIZE_GUIDANCE_CHECKLIST_CODES] },
+    label: { type: "string" },
+    status: { type: "string", enum: [...REGULARIZE_GUIDANCE_CHECKLIST_STATUSES] },
+    observation: { type: "string", nullable: true },
+    created_at: { type: "string", format: "date-time" },
+    updated_at: { type: "string", format: "date-time" },
+  },
+};
+
+const guidanceChecklistItemsResponseOpenApiSchema = {
+  type: "array",
+  minItems: 17,
+  maxItems: 17,
+  description: "Os 17 itens canônicos persistidos, na ordem de apresentação.",
+  items: guidanceChecklistResponseItemOpenApiSchema,
+};
+
+const guidanceEconomicActivityInputOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "description", "type"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    code: { type: "string", minLength: 1 },
+    description: { type: "string", minLength: 1 },
+    type: { type: "string", enum: ["Principal", "Secundária", "Secundaria"] },
+  },
+};
+
+const guidanceEconomicActivityResponseOpenApiSchema = {
+  ...guidanceEconomicActivityInputOpenApiSchema,
+  required: ["id", "code", "description", "type"],
+};
+
+const guidancePartnerInputOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "cpf"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    name: { type: "string", minLength: 1 },
+    cpf: { type: "string", minLength: 1 },
+    percentage: { type: "number", minimum: 0, maximum: 100 },
+    role: { type: "string" },
+    profession: { type: "string" },
+    marital_status: { type: "string" },
+    rg: { type: "string" },
+    cnh: { type: "string" },
+    address: { type: "string" },
+    share: { type: "number" },
+  },
+};
+
+const guidancePartnerResponseOpenApiSchema = {
+  ...guidancePartnerInputOpenApiSchema,
+  required: ["id", "name", "cpf"],
+};
+
+const guidanceSnapshotProperties = {
+  version: { type: "integer", enum: [1] },
+  source: { type: "string", enum: ["manual", "client_pj", "client_pf"] },
+  name: { type: "string" },
+  document: { type: "string" },
+  address: { type: "string" },
+  city: { type: "string" },
+  state: { type: "string" },
+  company_name: { type: "string" },
+  trade_name: { type: "string" },
+  cpf_cnpj: { type: "string" },
+  legal_nature: { type: "string" },
+  share_capital: { oneOf: [{ type: "number" }, { type: "string" }] },
+  type: { type: "string" },
+  request: { type: "string" },
+  framework_obs: { type: "string" },
+  iptu: { type: "string" },
+  comporate_purpose: { type: "string" },
+  carryng: { type: "string" },
+  regime: { type: "string" },
+  legal_representative: { type: "string" },
+  economic_activities: {
+    type: "array",
+    items: guidanceEconomicActivityInputOpenApiSchema,
+  },
+  partners: {
+    type: "array",
+    items: guidancePartnerInputOpenApiSchema,
+  },
+  status: { type: "string", enum: [...CANONICAL_GUIDANCE_STATUSES] },
+};
+
+const guidanceTargetSnapshotOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["version", "source"],
+  properties: guidanceSnapshotProperties,
+};
+
+const guidanceInputTargetSnapshotOpenApiSchema = {
+  ...guidanceTargetSnapshotOpenApiSchema,
+  required: ["version", "source", "name"],
+  properties: {
+    ...guidanceSnapshotProperties,
+    source: { type: "string", enum: ["manual"] },
+    name: { type: "string", minLength: 1 },
+  },
+};
+
+const guidanceBranchDataOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "address", "city", "state"],
+  properties: {
+    name: { type: "string", minLength: 1 },
+    document: { type: "string", minLength: 1 },
+    address: { type: "string", minLength: 1 },
+    city: { type: "string", minLength: 1 },
+    state: { type: "string", minLength: 1 },
+  },
+};
+
+const guidanceOpenApiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "organization_id",
+    "process_id",
+    "type",
+    "request",
+    "framework_obs",
+    "legal_nature",
+    "company_name",
+    "trade_name",
+    "cpf_cnpj",
+    "share_capital",
+    "iptu",
+    "address",
+    "comporate_purpose",
+    "carryng",
+    "regime",
+    "legal_representative",
+    "status",
+    "economic_activities",
+    "partners",
+    "target_type",
+    "client_pj_id",
+    "client_pf_id",
+    "target_snapshot",
+    "checklist_items",
+    "branch_data",
+  ],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    organization_id: { type: "string", format: "uuid" },
+    process_id: { type: "string", format: "uuid", nullable: true },
+    type: { type: "string", nullable: true },
+    request: { type: "string", nullable: true },
+    framework_obs: { type: "string", nullable: true },
+    legal_nature: { type: "string", nullable: true },
+    company_name: { type: "string", nullable: true },
+    trade_name: { type: "string", nullable: true },
+    cpf_cnpj: { type: "string", nullable: true },
+    share_capital: { type: "number", nullable: true },
+    iptu: { type: "string", nullable: true },
+    address: { type: "string", nullable: true },
+    comporate_purpose: { type: "string", nullable: true },
+    carryng: { type: "string", nullable: true },
+    regime: { type: "string", nullable: true },
+    legal_representative: { type: "string", nullable: true },
+    status: { type: "string", enum: [...CANONICAL_GUIDANCE_STATUSES] },
+    economic_activities: {
+      type: "array",
+      nullable: true,
+      items: guidanceEconomicActivityResponseOpenApiSchema,
+    },
+    partners: { type: "array", nullable: true, items: guidancePartnerResponseOpenApiSchema },
+    target_type: { type: "string", enum: [...REGULARIZE_GUIDANCE_TARGET_TYPES] },
+    client_pj_id: { type: "string", format: "uuid", nullable: true },
+    client_pf_id: { type: "string", format: "uuid", nullable: true },
+    target_snapshot: guidanceTargetSnapshotOpenApiSchema,
+    checklist_items: guidanceChecklistItemsResponseOpenApiSchema,
+    branch_data: { ...guidanceBranchDataOpenApiSchema, nullable: true },
+  },
+};
+
+function guidanceRequestBody(required: string[], includeId: boolean, includeCollections: boolean) {
+  return {
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required,
+            properties: {
+              ...(includeId ? { id: { type: "string", format: "uuid" } } : {}),
+              process_id: { type: "string", format: "uuid", nullable: true },
+              target_type: { type: "string", enum: [...REGULARIZE_GUIDANCE_TARGET_TYPES] },
+              client_pj_id: { type: "string", format: "uuid", nullable: true },
+              client_pf_id: { type: "string", format: "uuid", nullable: true },
+              target_snapshot: guidanceInputTargetSnapshotOpenApiSchema,
+              checklist: guidanceChecklistOpenApiSchema,
+              branch_data: { ...guidanceBranchDataOpenApiSchema, nullable: true },
+              type: { type: "string" },
+              request: { type: "string" },
+              framework_obs: { type: "string" },
+              legal_nature: { type: "string" },
+              company_name: { type: "string" },
+              trade_name: { type: "string" },
+              cpf_cnpj: { type: "string" },
+              share_capital: { type: "number" },
+              iptu: { type: "string" },
+              address: { type: "string" },
+              comporate_purpose: { type: "string" },
+              carryng: { type: "string" },
+              regime: { type: "string" },
+              legal_representative: { type: "string" },
+              status: { type: "string", enum: [...CANONICAL_GUIDANCE_STATUSES] },
+              ...(includeCollections
+                ? {
+                    economic_activities: {
+                      type: "array",
+                      items: guidanceEconomicActivityInputOpenApiSchema,
+                    },
+                    partners: { type: "array", items: guidancePartnerInputOpenApiSchema },
+                  }
+                : {}),
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function guidanceSuccessEnvelopeContent(list = false) {
+  return {
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["success", "data"],
+          properties: {
+            success: { type: "boolean", enum: [true] },
+            data: list ? { type: "array", items: guidanceOpenApiSchema } : guidanceOpenApiSchema,
+          },
+        },
+      },
+    },
+  };
+}
+
+function guidanceErrorResponses() {
+  return {
+    ...protectedErrorResponses(),
+    "404": { description: "Orientação, processo ou cadastro não encontrado" },
+    "409": { description: "Já existe orientação em andamento para este processo" },
+    "422": { description: "Alvo, checklist ou dados de filial inconsistentes" },
+  };
+}
+
+function statusRequestBody(
+  statuses: readonly string[],
+  required: string[],
+  statusDescription = "Estado canonico; aliases legados nao sao aceitos em novas escritas.",
+) {
+  return {
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: true,
+            required,
+            properties: {
+              status: {
+                type: "string",
+                enum: [...statuses],
+                description: statusDescription,
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function processRequestBody(required: string[]) {
+  return {
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required,
+            description: "Informe exatamente um cliente PJ ou PF.",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              client_pj_id: { type: "string", format: "uuid" },
+              client_pf_id: { type: "string", format: "uuid" },
+              cpf_cnpj: { type: "string", minLength: 1 },
+              process_type: { type: "string", minLength: 1 },
+              description: { type: "string", minLength: 1 },
+              entry_date: { type: "string", format: "date-time" },
+              completion_date: { type: "string", format: "date-time" },
+              expected_date: { type: "string", format: "date-time" },
+              client_notice_date: { type: "string", format: "date", nullable: true },
+              status: { type: "string", enum: [...CANONICAL_PROCESS_STATUSES] },
+              financial_status: {
+                oneOf: [
+                  { type: "string", enum: [...FINANCIAL_STATUS_VALUES] },
+                  { type: "integer", enum: [0, 1, 3, 4] },
+                  { type: "string", enum: ["0", "1", "3", "4"] },
+                ],
+              },
+              observation: { type: "string", nullable: true },
+              responsible1_id: { type: "string", format: "uuid" },
+              responsible2_id: { type: "string", format: "uuid" },
+              responsible3_id: { type: "string", format: "uuid" },
+              locking_type: { type: "string", nullable: true },
+              urgency: { type: "string", nullable: true },
+              task_id: { type: "string", format: "uuid" },
+            },
+          },
         },
       },
     },
@@ -150,7 +589,8 @@ export function buildRegularizeServiceOpenApiSpec(
     info: {
       title: "regularize-service",
       version: "1.0.0",
-      description: "API do modulo regularize, com rotas autenticadas e endpoints internos.",
+      description:
+        "API do modulo regularize. As rotas de negocio exigem contexto autenticado, permissao Regularize 1 para leitura e 2 para mutacoes; chamadas internas usam token de servico. Status legados continuam aceitos nas leituras, enquanto novas escritas usam somente estados canonicos.",
     },
     servers: [{ url: baseUrl }],
     tags: [
@@ -250,11 +690,15 @@ export function buildRegularizeServiceOpenApiSpec(
         get: {
           tags: ["Passwords"],
           summary: "Detalhar senha",
+          description: "Revela login e senha somente para usuarios com permissao Regularize 2.",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
-          responses: { "200": { description: "Detalhe da senha", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Detalhe da senha", ...successEnvelopeContent() },
+            "403": { description: "Permissao insuficiente para revelar credencial" },
+          },
         },
       },
       "/regularize/sites-pass": {
@@ -476,24 +920,90 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/process": {
         get: {
           tags: ["Processes"],
-          summary: "Detalhar processo",
+          summary: "Detalhar processo com responsáveis, prazo e histórico",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
-          responses: { "200": { description: "Detalhe do processo", ...successEnvelopeContent() } },
+          responses: {
+            "200": { description: "Detalhe do processo", ...processRecordSuccessEnvelopeContent() },
+            "404": { description: "Processo nao encontrado" },
+            ...protectedErrorResponses(),
+          },
         },
         post: {
           tags: ["Processes"],
           summary: "Criar processo",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Processo criado", ...successEnvelopeContent() } },
+          ...processRequestBody(["cpf_cnpj", "process_type", "description", "status"]),
+          responses: {
+            "201": { description: "Processo criado", ...processRecordSuccessEnvelopeContent() },
+            "404": { description: "Cliente, responsavel ou tarefa nao encontrado" },
+            "409": { description: "Processo duplicado" },
+            ...protectedErrorResponses(),
+          },
         },
         put: {
           tags: ["Processes"],
           summary: "Atualizar processo",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Processo atualizado", ...successEnvelopeContent() } },
+          ...processRequestBody(["id", "cpf_cnpj", "process_type", "description", "status"]),
+          responses: {
+            "200": { description: "Processo atualizado", ...processRecordSuccessEnvelopeContent() },
+            "404": { description: "Processo, cliente, responsavel ou tarefa nao encontrado" },
+            "409": { description: "Processo duplicado ou alterado" },
+            ...protectedErrorResponses(),
+          },
+        },
+      },
+      "/regularize/process/send-to-fiscal": {
+        post: {
+          tags: ["Processes"],
+          summary: "Registrar envio do processo ao Fiscal",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["id"],
+                  properties: { id: { type: "string", format: "uuid" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Envio ao Fiscal registrado", ...successEnvelopeContent() },
+            "404": { description: "Processo nao encontrado" },
+            ...protectedErrorResponses(),
+          },
+        },
+      },
+      "/regularize/process/return-from-fiscal": {
+        post: {
+          tags: ["Processes"],
+          summary: "Registrar retorno do processo pelo Fiscal",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["id"],
+                  properties: { id: { type: "string", format: "uuid" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Retorno do Fiscal registrado", ...successEnvelopeContent() },
+            "404": { description: "Processo nao encontrado" },
+            ...protectedErrorResponses(),
+          },
         },
       },
       "/regularize/processes": {
@@ -502,7 +1012,15 @@ export function buildRegularizeServiceOpenApiSpec(
           summary: "Listar processos",
           security: [{ bearerAuth: [] }],
           parameters: [
-            { name: "status", in: "query", required: true, schema: { type: "string" } },
+            {
+              name: "status",
+              in: "query",
+              required: true,
+              schema: {
+                type: "string",
+                enum: ["Todos", ...CANONICAL_PROCESS_STATUSES, ...LEGACY_PROCESS_STATUS_ALIASES],
+              },
+            },
             { name: "search", in: "query", schema: { type: "string" } },
             { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
             {
@@ -522,16 +1040,28 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/guidance": {
         post: {
           tags: ["Guidance"],
-          summary: "Criar orientacao procedural",
+          summary: "Criar orientação procedural independente ou vinculada a processo",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Orientacao criada", ...successEnvelopeContent() } },
+          ...guidanceRequestBody(["target_type", "checklist", "status"], false, true),
+          responses: {
+            "201": {
+              description: "Orientação completa criada",
+              ...guidanceSuccessEnvelopeContent(),
+            },
+            ...guidanceErrorResponses(),
+          },
         },
         put: {
           tags: ["Guidance"],
-          summary: "Atualizar orientacao procedural",
+          summary: "Atualizar orientação procedural completa",
           security: [{ bearerAuth: [] }],
+          ...guidanceRequestBody(["id"], true, false),
           responses: {
-            "200": { description: "Orientacao atualizada", ...successEnvelopeContent() },
+            "200": {
+              description: "Orientação completa atualizada",
+              ...guidanceSuccessEnvelopeContent(),
+            },
+            ...guidanceErrorResponses(),
           },
         },
       },
@@ -544,32 +1074,40 @@ export function buildRegularizeServiceOpenApiSpec(
             { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
           ],
           responses: {
-            "200": { description: "Detalhe da orientacao", ...successEnvelopeContent() },
+            "200": { description: "Detalhe da orientação", ...guidanceSuccessEnvelopeContent() },
+            ...guidanceErrorResponses(),
           },
         },
       },
       "/regularize/guidance/list": {
         get: {
           tags: ["Guidance"],
-          summary: "Listar orientacoes por processo",
+          summary: "Listar orientações, opcionalmente filtradas por processo ou alvo",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
               name: "process_id",
               in: "query",
-              required: true,
-              schema: { type: "string", format: "uuid" },
+              required: false,
+              schema: { type: "string", format: "uuid", nullable: true },
+            },
+            {
+              name: "target_type",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: [...REGULARIZE_GUIDANCE_TARGET_TYPES] },
             },
           ],
           responses: {
-            "200": { description: "Lista de orientacoes", ...successEnvelopeContent() },
+            "200": { description: "Lista de orientações", ...guidanceSuccessEnvelopeContent(true) },
+            ...guidanceErrorResponses(),
           },
         },
       },
       "/regularize/guidance/activity/add": {
         post: {
           tags: ["Guidance"],
-          summary: "Adicionar atividade economica",
+          summary: "Adicionar atividade econômica (compatibilidade legada)",
           security: [{ bearerAuth: [] }],
           responses: {
             "200": { description: "Atividade adicionada", ...successEnvelopeContent() },
@@ -579,15 +1117,42 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/guidance/activity/remove": {
         post: {
           tags: ["Guidance"],
-          summary: "Remover atividade economica",
+          summary: "Remover atividade econômica (compatibilidade legada)",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Atividade removida", ...successEnvelopeContent() } },
+        },
+      },
+      "/regularize/guidance/activity": {
+        put: {
+          tags: ["Guidance"],
+          summary: "Atualizar atividade econômica da orientação",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["guidance_id", "activity"],
+                  properties: {
+                    guidance_id: { type: "string", format: "uuid" },
+                    activity: guidanceEconomicActivityResponseOpenApiSchema,
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Atividade atualizada", ...successEnvelopeContent() },
+            ...guidanceErrorResponses(),
+          },
         },
       },
       "/regularize/guidance/partner/add": {
         post: {
           tags: ["Guidance"],
-          summary: "Adicionar socio na orientacao",
+          summary: "Adicionar sócio na orientação (compatibilidade legada)",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Socio adicionado", ...successEnvelopeContent() } },
         },
@@ -595,9 +1160,36 @@ export function buildRegularizeServiceOpenApiSpec(
       "/regularize/guidance/partner/remove": {
         post: {
           tags: ["Guidance"],
-          summary: "Remover socio da orientacao",
+          summary: "Remover sócio da orientação (compatibilidade legada)",
           security: [{ bearerAuth: [] }],
           responses: { "200": { description: "Socio removido", ...successEnvelopeContent() } },
+        },
+      },
+      "/regularize/guidance/partner": {
+        put: {
+          tags: ["Guidance"],
+          summary: "Atualizar sócio da orientação",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["guidance_id", "partner"],
+                  properties: {
+                    guidance_id: { type: "string", format: "uuid" },
+                    partner: guidancePartnerResponseOpenApiSchema,
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Socio atualizado", ...successEnvelopeContent() },
+            ...guidanceErrorResponses(),
+          },
         },
       },
       "/regularize/license": {
@@ -614,13 +1206,76 @@ export function buildRegularizeServiceOpenApiSpec(
           tags: ["Licenses"],
           summary: "Criar licenca",
           security: [{ bearerAuth: [] }],
-          responses: { "201": { description: "Licenca criada", ...successEnvelopeContent() } },
+          ...statusRequestBody(CANONICAL_LICENSE_STATUSES, ["status"]),
+          responses: {
+            "201": { description: "Licenca criada", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+          },
         },
         put: {
           tags: ["Licenses"],
           summary: "Atualizar licenca",
           security: [{ bearerAuth: [] }],
-          responses: { "200": { description: "Licenca atualizada", ...successEnvelopeContent() } },
+          ...statusRequestBody(
+            [...CANONICAL_LICENSE_STATUSES, ...LEGACY_LICENSE_STATUS_ALIASES],
+            ["id", "status"],
+            "Estado canonico; aliases legados sao aceitos para preservar registros existentes.",
+          ),
+          responses: {
+            "200": { description: "Licenca atualizada", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+          },
+        },
+      },
+      "/regularize/license/{id}/protocol": {
+        post: {
+          tags: ["Licenses"],
+          summary: "Cadastrar ou substituir o protocolo privado vigente",
+          description:
+            "Aceita um único PDF, JPG, PNG ou WebP de até 10 MB. O storage deve ser privado e o caminho interno nunca é retornado.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["file"],
+                  properties: {
+                    file: {
+                      type: "string",
+                      format: "binary",
+                      description: "PDF, JPG, PNG ou WebP com no máximo 10 MB.",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Protocolo vigente substituído", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+            "404": { description: "Licença não encontrada" },
+            "413": { description: "Arquivo do protocolo excede 10 MB" },
+          },
+        },
+        get: {
+          tags: ["Licenses"],
+          summary: "Gerar acesso temporário ao protocolo vigente",
+          description: "Retorna URL assinada válida por 300 segundos, sem expor o caminho interno.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "URL assinada temporária", ...successEnvelopeContent() },
+            ...protectedErrorResponses(),
+            "404": { description: "Licença ou protocolo não encontrado" },
+          },
         },
       },
       "/regularize/licenses": {
@@ -633,10 +1288,17 @@ export function buildRegularizeServiceOpenApiSpec(
               name: "status",
               in: "query",
               required: true,
-              description: "Use Todos para listar todos os status.",
+              description:
+                "Use Todos para listar todos os status. A vencer e Vencido são derivados de due_date; aliases legados permanecem disponíveis para leitura.",
               schema: {
                 type: "string",
-                enum: ["Todos", "Ativo", "Pendente", "A vencer", "Vencido", "Inativo", "Cancelado"],
+                enum: [
+                  "Todos",
+                  ...CANONICAL_LICENSE_STATUSES,
+                  ...LEGACY_LICENSE_STATUS_ALIASES,
+                  "A vencer",
+                  "Vencido",
+                ],
               },
             },
             { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
@@ -737,12 +1399,14 @@ export function buildRegularizeServiceOpenApiSpec(
                       items: { type: "string" },
                     },
                     limit: { type: "integer", minimum: 1, maximum: 101 },
+                    query: reportingQueryOpenApiSchema,
                   },
                 },
               },
             },
           },
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": {
               description: "Linhas projetadas e limite de origem",
               ...successEnvelopeContent(),

@@ -7,3 +7,11 @@ export function cleanDocument(doc: string | null | undefined): string {
   }
   return doc.replace(/\D/g, "");
 }
+
+export function cleanCnpjDocument(doc: string | null | undefined): string {
+  if (!doc) {
+    return "";
+  }
+
+  return doc.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+}

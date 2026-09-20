@@ -11,7 +11,10 @@ import type { TaskModelGetPayload } from "../generated/prisma/models/TaskModel.j
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { parseTaskModelResponsibleSequence } from "../schemas/taskModelResponsibleSequence.schemas.js";
-import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
+import {
+  assertResponsibleUsersInDepartment,
+  taskResponsibleEligibilityWhere,
+} from "./responsibleUserContext.js";
 
 export interface CreateModelRequest {
   user_id: string;
@@ -67,20 +70,30 @@ const TASK_MODEL_SELECT = {
   type: true,
 } as const;
 
-const TASK_MODEL_LIST_SELECT = {
-  id: true,
-  name: true,
-  department_id: true,
-  department: {
-    select: {
-      id: true,
-      name: true,
+function taskModelListSelect(organizationId: string) {
+  return {
+    id: true,
+    name: true,
+    department_id: true,
+    responsible_id: true,
+    department: {
+      select: {
+        id: true,
+        name: true,
+        users: {
+          where: taskResponsibleEligibilityWhere(organizationId),
+          select: { id: true, name: true },
+          orderBy: { name: "asc" as const },
+        },
+      },
     },
-  },
-} as const;
+  } as const;
+}
 
 export type TaskModelRow = TaskModelGetPayload<{ select: typeof TASK_MODEL_SELECT }>;
-export type TaskModelListItem = TaskModelGetPayload<{ select: typeof TASK_MODEL_LIST_SELECT }>;
+export type TaskModelListItem = TaskModelGetPayload<{
+  select: ReturnType<typeof taskModelListSelect>;
+}>;
 
 export interface ListTaskModelsParams {
   organizationId: string;
@@ -298,6 +311,7 @@ export class TaskModelService {
       const where: Prisma.TaskModelWhereInput = {
         organization_id: params.organizationId,
         ...(params.type ? { type: params.type } : {}),
+        ...(params.type === "Projeto" ? { department: { status: "Ativo" } } : {}),
         ...(params.billing ? { billing: params.billing } : {}),
         ...(params.search
           ? {
@@ -314,7 +328,7 @@ export class TaskModelService {
       };
       const findManyArgs = {
         where,
-        select: TASK_MODEL_LIST_SELECT,
+        select: taskModelListSelect(params.organizationId),
         orderBy: { name: "asc" as const },
         ...(params.paginationRequested
           ? { skip: (params.page - 1) * params.limit, take: params.limit }

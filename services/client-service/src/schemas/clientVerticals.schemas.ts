@@ -24,6 +24,12 @@ export const createIntegrationBodySchema = z
   })
   .strict();
 
+export const cnpjLookupQuerySchema = z
+  .object({
+    cnpj: z.string().min(1).max(32),
+  })
+  .strict();
+
 export const updateIntegrationBodySchema = z
   .object({
     type: z.string().min(1).optional(),
@@ -49,15 +55,6 @@ export const updateIntegrationBodySchema = z
   })
   .strict()
   .refine((d) => Object.keys(d).length > 0, "Informe ao menos um campo para atualizar.");
-
-export const updateCommercialBodySchema = z
-  .object({
-    prospecting_status: z.string().min(1),
-    date_status: z.coerce.date().optional(),
-    description_prospecting: z.string().nullable().optional(),
-    register_date_prospecting: z.coerce.date().optional(),
-  })
-  .strict();
 
 export const terminationBodySchema = z
   .object({
@@ -187,7 +184,6 @@ export const pendingDeleteParamsSchema = z
 
 export type CreateIntegrationBody = z.infer<typeof createIntegrationBodySchema>;
 export type UpdateIntegrationBody = z.infer<typeof updateIntegrationBodySchema>;
-export type UpdateCommercialBody = z.infer<typeof updateCommercialBodySchema>;
 export type TerminationBody = z.infer<typeof terminationBodySchema>;
 export type UpdateFinanceBody = z.infer<typeof updateFinanceBodySchema>;
 export type UpdateRegularizeBody = z.infer<typeof updateRegularizeBodySchema>;

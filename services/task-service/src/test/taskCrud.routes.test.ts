@@ -9,6 +9,69 @@ describe("task crud routes", () => {
     resetTaskRouteMocks();
   });
 
+  it("POST /task preserva null explícito no responsável principal", async () => {
+    const res = await request(createTestApp()).post("/task").send({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      department_id: "department-1",
+      urgency: "Alta",
+      responsible_id: null,
+    });
+    expect(res.status).toBe(201);
+    expect(taskCrudServiceMock.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        responsible_id: null,
+      }),
+    );
+  });
+
+  it.each([
+    "responsible2_id",
+    "responsible3_id",
+  ])("POST /task rejeita mutação manual de %s", async (field) => {
+    const res = await request(createTestApp())
+      .post("/task")
+      .send({
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: "client-1",
+        prospecting_status: "Fechado",
+        department_id: "department-1",
+        urgency: "Alta",
+        [field]: "user-common",
+      });
+
+    expect(res.status).toBe(400);
+    expect(taskCrudServiceMock.createTask).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "responsible2_id",
+    "responsible3_id",
+  ])("PUT /task rejeita mutação manual de %s", async (field) => {
+    const res = await request(createTestApp())
+      .put("/task")
+      .send({ task_id: "task-1", [field]: "user-common" });
+
+    expect(res.status).toBe(400);
+    expect(taskCrudServiceMock.updateTask).not.toHaveBeenCalled();
+  });
+
+  it("PUT /task aceita desatribuição por null e serializa null", async () => {
+    taskCrudServiceMock.updateTask.mockResolvedValue({ responsible_id: null });
+    const res = await request(createTestApp()).put("/task").send({
+      task_id: "task-1",
+      responsible_id: null,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data.responsible_id).toBeNull();
+    expect(taskCrudServiceMock.updateTask).toHaveBeenCalledWith(
+      expect.objectContaining({ responsible_id: null }),
+    );
+  });
+
   it("POST /task encaminha os detalhes operacionais opcionais da criação", async () => {
     const app = createTestApp();
 
@@ -24,8 +87,6 @@ describe("task crud routes", () => {
       billing: "Não Realizar",
       urgency: "Alta",
       responsible_id: "user-1",
-      responsible2_id: "user-2",
-      responsible3_id: "user-3",
       prevision_date: "2026-08-15",
     });
 
@@ -44,15 +105,13 @@ describe("task crud routes", () => {
       billing: "Não Realizar",
       urgency: "Alta",
       responsible_id: "user-1",
-      responsible2_id: "user-2",
-      responsible3_id: "user-3",
       prevision_date: "2026-08-15",
       integracaoLevel: 0,
       isOwner: false,
     });
   });
 
-  it("POST /task normaliza detalhes opcionais vazios para preservar os defaults do modelo", async () => {
+  it("POST /task normaliza detalhes opcionais vazios e preserva o departamento selecionado", async () => {
     const app = createTestApp();
 
     const res = await request(app).post("/task").send({
@@ -62,13 +121,11 @@ describe("task crud routes", () => {
       prospecting_status: "Fechado",
       name: "",
       status: "",
-      department_id: "",
+      department_id: "department-1",
       billing: "",
       observations: "obs",
       urgency: "Alta",
       responsible_id: "",
-      responsible2_id: "",
-      responsible3_id: "",
       prevision_date: "",
     });
 
@@ -77,11 +134,9 @@ describe("task crud routes", () => {
       expect.objectContaining({
         name: undefined,
         status: undefined,
-        department_id: undefined,
+        department_id: "department-1",
         billing: undefined,
         responsible_id: undefined,
-        responsible2_id: undefined,
-        responsible3_id: undefined,
         prevision_date: undefined,
       }),
     );
@@ -95,9 +150,23 @@ describe("task crud routes", () => {
       project_id: "project-1",
       client_id: "client-1",
       prospecting_status: "Fechado",
+      department_id: "department-1",
       observations: "obs",
       urgency: "Alta",
       prevision_date: "2026-02-31",
+    });
+
+    expect(res.status).toBe(400);
+    expect(taskCrudServiceMock.createTask).not.toHaveBeenCalled();
+  });
+
+  it("POST /task exige o departamento selecionado", async () => {
+    const res = await request(createTestApp()).post("/task").send({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "Fechado",
+      urgency: "Alta",
     });
 
     expect(res.status).toBe(400);
@@ -158,12 +227,23 @@ describe("task crud routes", () => {
         auditServiceUrl: "http://localhost:3020",
         auditServiceToken: "audit-service-token",
         projectServiceUrl: "http://localhost:3033",
+        aiExtractionMode: "fake" as const,
+        aiExtractionTimeoutMs: 30_000,
+        aiExtractionRateLimitMax: 10,
+        aiExtractionRateLimitWindowMs: 60_000,
         enableApiDocs: false,
       }).paths["/task/list"],
     );
 
+    expect(pathSpec).toContain(
+      '"client_id","in":"query","schema":{"type":"string","format":"uuid"}',
+    );
+    expect(pathSpec).toContain(
+      '"assignment","in":"query","schema":{"type":"string","enum":["assigned","unassigned"]}',
+    );
     expect(pathSpec).toContain('"isOwn":{"type":"boolean"}');
-    expect(pathSpec).toContain('"required":["id","isOwn"]');
+    expect(pathSpec).toContain('"isUnassigned":{"type":"boolean"}');
+    expect(pathSpec).toContain('"required":["id","isOwn","isUnassigned"]');
   });
 
   it("GET /task/list encaminha busca e pagina validadas", async () => {
@@ -188,6 +268,30 @@ describe("task crud routes", () => {
     });
   });
 
+  it("GET /task/list encaminha filtros validados de cliente e atribuição", async () => {
+    const app = createTestApp();
+    const clientId = "11111111-1111-4111-8111-111111111111";
+
+    const res = await request(app)
+      .get("/task/list")
+      .query({ client_id: clientId, assignment: "unassigned" });
+
+    expect(res.status).toBe(200);
+    expect(taskCrudServiceMock.listTasks).toHaveBeenCalledWith(
+      expect.objectContaining({ client_id: clientId, assignment: "unassigned" }),
+    );
+  });
+
+  it.each([
+    { client_id: "cliente-invalido" },
+    { assignment: "anyone" },
+  ])("GET /task/list rejeita filtro inválido: %o", async (query) => {
+    const res = await request(createTestApp()).get("/task/list").query(query);
+
+    expect(res.status).toBe(400);
+    expect(taskCrudServiceMock.listTasks).not.toHaveBeenCalled();
+  });
+
   it("GET /task/list rejeita pagina invalida", async () => {
     const app = createTestApp();
 
@@ -204,6 +308,31 @@ describe("task crud routes", () => {
 
     expect(res.status).toBe(200);
     expect(taskCrudServiceMock.updateTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("PUT /task rejeita alteração direta da previsão", async () => {
+    const app = createTestApp();
+
+    const res = await request(app).put("/task").send({
+      task_id: "task-1",
+      prevision_date: "2026-09-20",
+    });
+
+    expect(res.status).toBe(400);
+    expect(taskCrudServiceMock.updateTask).not.toHaveBeenCalled();
+  });
+
+  it("PUT /task encaminha troca de modelo e departamento", async () => {
+    const res = await request(createTestApp()).put("/task").send({
+      task_id: "task-1",
+      model_id: "model-2",
+      department_id: "department-2",
+    });
+
+    expect(res.status).toBe(200);
+    expect(taskCrudServiceMock.updateTask).toHaveBeenCalledWith(
+      expect.objectContaining({ model_id: "model-2", department_id: "department-2" }),
+    );
   });
 
   it("GET /task detalha tarefa", async () => {

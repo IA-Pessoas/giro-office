@@ -1,5 +1,6 @@
 import type { RhPointListItem } from "../types";
 import { formatRhDateTime } from "../utils/rhDate";
+import { formatRhDuration } from "../utils/rhDuration";
 
 interface RhPointTableProps {
   points: RhPointListItem[];
@@ -7,29 +8,6 @@ interface RhPointTableProps {
   hasError: boolean;
   currentUserId: string;
   onRequestAdjustment: (point: RhPointListItem) => void;
-}
-
-function formatWorkloadLabel(totalMinutes: number | null) {
-  if (totalMinutes === null || totalMinutes === undefined) {
-    return "-";
-  }
-
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}h${String(minutes).padStart(2, "0")}`;
-}
-
-function formatBalanceLabel(balanceMinutes: number | null) {
-  if (balanceMinutes === null || balanceMinutes === undefined) {
-    return "-";
-  }
-
-  const signal = balanceMinutes < 0 ? "-" : "";
-  const absoluteMinutes = Math.abs(balanceMinutes);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const minutes = absoluteMinutes % 60;
-
-  return `${signal}${hours}h${String(minutes).padStart(2, "0")}`;
 }
 
 export function RhPointTable({
@@ -112,10 +90,10 @@ export function RhPointTable({
                     {formatRhDateTime(point.clock_out)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                    {formatWorkloadLabel(point.workload_hours)}
+                    {formatRhDuration(point.workload_hours)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                    {formatBalanceLabel(point.time_bank_balance)}
+                    {formatRhDuration(point.time_bank_balance, { showPositiveSign: true })}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                     {point.status}

@@ -10,11 +10,29 @@ const MARGIN = 48;
 const CONTENT_TOP = 110;
 const FOOTER_BOTTOM = 40;
 const ROW_HEIGHT = 18;
+const TITLE_HEIGHT = 24;
+const BLOCK_GAP = 18;
 const FALLBACK_COLOR = "#f2f4f7";
 const BORDER_COLOR = "#cbd5e1";
 
 export const REPORT_PDF_FORMAT = "pdf" as const;
 export const REPORT_PDF_CONTENT_TYPE = "application/pdf";
+export const UNKNOWN_REPORT_AUTHOR = "Usuário não identificado";
+
+export function normalizeReportAuthor(value: unknown): string {
+  if (typeof value !== "string") return UNKNOWN_REPORT_AUTHOR;
+  const normalized = value
+    .split("")
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) ? " " : character;
+    })
+    .join("")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, 120);
+  return normalized || UNKNOWN_REPORT_AUTHOR;
+}
 
 export interface PdfDocumentOptions {
   size: "A4";
@@ -51,6 +69,13 @@ export interface ReportPdfRenderInput {
   organizationId: string;
   departmentId?: string;
   scope: "personal" | "shared";
+  presentation_json: unknown;
+  rows: readonly Record<string, unknown>[];
+  blocks?: readonly ReportPdfBlock[];
+}
+
+export interface ReportPdfBlock {
+  title: string;
   presentation_json: unknown;
   rows: readonly Record<string, unknown>[];
 }
@@ -156,10 +181,17 @@ export class ReportPdfService implements ReportPdfRenderer {
   ) {}
 
   async render(input: ReportPdfRenderInput): Promise<Buffer> {
-    const presentation = presentationColumns(input.presentation_json);
-    if (presentation.columns.length === 0) {
-      throw new ServiceError(400, "A apresentação do relatório não possui colunas.");
-    }
+    const author = normalizeReportAuthor(input.author);
+    const blocks = input.blocks?.length
+      ? input.blocks
+      : [{ title: "", presentation_json: input.presentation_json, rows: input.rows }];
+    const preparedBlocks = blocks.map((block) => {
+      const presentation = presentationColumns(block.presentation_json);
+      if (presentation.columns.length === 0) {
+        throw new ServiceError(400, "A apresentação do relatório não possui colunas.");
+      }
+      return { ...block, presentation };
+    });
 
     const letterhead = await this.letterheads.select({
       organizationId: input.organizationId,
@@ -169,7 +201,7 @@ export class ReportPdfService implements ReportPdfRenderer {
     const document = this.createDocument({
       size: "A4",
       margin: 0,
-      info: { Author: input.author, CreationDate: input.generatedAt },
+      info: { Author: author, CreationDate: input.generatedAt },
     });
 
     const chunks: Buffer[] = [];
@@ -179,21 +211,51 @@ export class ReportPdfService implements ReportPdfRenderer {
       document.on("error", (error) => reject(error));
 
       try {
-        this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
-        let y = this.drawTableHeader(document, presentation, presentation.title);
-        for (const row of input.rows) {
-          if (y + ROW_HEIGHT > A4_HEIGHT - FOOTER_BOTTOM) {
+        this.drawPageStart(document, letterhead.bytes, author, input.generatedAt);
+        let y = CONTENT_TOP;
+        for (const [index, block] of preparedBlocks.entries()) {
+          const title = block.title || block.presentation.title;
+          const blockHeaderHeight = (title ? TITLE_HEIGHT : 0) + ROW_HEIGHT;
+          if (y + blockHeaderHeight + ROW_HEIGHT > A4_HEIGHT - FOOTER_BOTTOM) {
             this.drawFooter(document, input.generatedAt);
             document.addPage({
               size: "A4",
               margin: 0,
-              info: { Author: input.author, CreationDate: input.generatedAt },
+              info: { Author: author, CreationDate: input.generatedAt },
             });
-            this.drawPageStart(document, letterhead.bytes, input.author, input.generatedAt);
-            y = this.drawTableHeader(document, presentation);
+            this.drawPageStart(document, letterhead.bytes, author, input.generatedAt);
+            y = CONTENT_TOP;
           }
-          this.drawRow(document, presentation.columns, row, y);
-          y += ROW_HEIGHT;
+          y = this.drawTableHeader(document, block.presentation, title || undefined, y);
+          if (block.rows.length === 0) {
+            document
+              .fillColor("#4b5563")
+              .fontSize(8)
+              .text("Nenhum registro encontrado nesta área.", MARGIN, y);
+            y += ROW_HEIGHT;
+            if (index < preparedBlocks.length - 1) y += BLOCK_GAP;
+            continue;
+          }
+          for (const row of block.rows) {
+            if (y + ROW_HEIGHT > A4_HEIGHT - FOOTER_BOTTOM) {
+              this.drawFooter(document, input.generatedAt);
+              document.addPage({
+                size: "A4",
+                margin: 0,
+                info: { Author: author, CreationDate: input.generatedAt },
+              });
+              this.drawPageStart(document, letterhead.bytes, author, input.generatedAt);
+              y = this.drawTableHeader(
+                document,
+                block.presentation,
+                title || undefined,
+                CONTENT_TOP,
+              );
+            }
+            this.drawRow(document, block.presentation.columns, row, y);
+            y += ROW_HEIGHT;
+          }
+          if (index < preparedBlocks.length - 1) y += BLOCK_GAP;
         }
         this.drawFooter(document, input.generatedAt);
         document.end();
@@ -228,20 +290,21 @@ export class ReportPdfService implements ReportPdfRenderer {
     document: PdfDocumentLike,
     presentation: { columns: PresentationColumn[] },
     title?: string,
+    y = CONTENT_TOP,
   ): number {
-    let y = CONTENT_TOP;
+    let headerY = y;
     if (title) {
-      document.fillColor("#111827").fontSize(14).text(title, MARGIN, y);
-      y += 24;
+      document.fillColor("#111827").fontSize(14).text(title, MARGIN, headerY);
+      headerY += TITLE_HEIGHT;
     }
     document.fontSize(9);
     this.drawCells(
       document,
       presentation.columns.map((column) => column.label),
-      y,
+      headerY,
       true,
     );
-    return y + ROW_HEIGHT;
+    return headerY + ROW_HEIGHT;
   }
 
   private drawRow(

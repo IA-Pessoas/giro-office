@@ -92,6 +92,20 @@ export function formatAuditChanges(changes: PlatformAuditRecord["changes"]): str
       `Logo: ${formatAuditValue(changes.logo_url.from, "logo")} → ${formatAuditValue(changes.logo_url.to, "logo")}`,
     );
   }
+  if (changes.modules) {
+    const moduleKeys = new Set([
+      ...Object.keys(changes.modules.before),
+      ...Object.keys(changes.modules.after),
+    ]);
+    const permissionLabels = ["Sem acesso", "Visualizador", "Usuário", "Administrador"];
+    for (const moduleKey of [...moduleKeys].sort()) {
+      const before = changes.modules.before[moduleKey];
+      const after = changes.modules.after[moduleKey];
+      lines.push(
+        `Módulo ${moduleKey}: ${before === undefined ? "não definido" : permissionLabels[before]} → ${after === undefined ? "não definido" : permissionLabels[after]}`,
+      );
+    }
+  }
   if (changes.ownership) {
     const { before, after, previousOwnerAction, justification } = changes.ownership;
     lines.push(`Ownership: ${before.ownerId} → ${after.ownerId}`);

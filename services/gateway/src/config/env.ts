@@ -98,7 +98,9 @@ const gatewayEnvSchema = z
     clientServiceInternalToken: z.string().optional().transform(parseOptionalString),
     fiscalServiceUrl: z.string().url().default("http://localhost:3037"),
     contabilServiceUrl: z.string().url().default("http://localhost:3038"),
+    triagemServiceUrl: z.string().url().default("http://localhost:3046"),
     regularizeServiceUrl: z.string().url().default("http://localhost:3039"),
+    regularizeServiceInternalToken: z.string().optional().transform(parseOptionalString),
     tiServiceUrl: z.string().url().default("http://localhost:3040"),
     tiServiceInternalToken: z.string().optional().default("ti-service-token"),
     certificateServiceUrl: z.string().url().default("http://localhost:3041"),
@@ -106,6 +108,7 @@ const gatewayEnvSchema = z
     pessoalServiceUrl: z.string().url().default("http://localhost:3042"),
     parcelamentoServiceUrl: z.string().url().default("http://localhost:3043"),
     reportsServiceUrl: z.string().url().default("http://localhost:3044"),
+    commercialServiceUrl: z.string().url().default("http://localhost:3045"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -162,6 +165,10 @@ const gatewayEnvSchema = z
       env.nodeEnv === "production"
         ? env.userServiceInternalToken
         : (env.userServiceInternalToken ?? env.auditServiceToken);
+    const regularizeServiceInternalToken =
+      env.nodeEnv === "production"
+        ? env.regularizeServiceInternalToken
+        : (env.regularizeServiceInternalToken ?? env.auditServiceToken);
     const bearerAuthCompatibility = parseBoolean(env.bearerAuthCompatibilityEnv);
     const authCookieSecure =
       env.authCookieSecureEnv !== undefined
@@ -181,6 +188,17 @@ const gatewayEnvSchema = z
     if (env.nodeEnv === "production" && userServiceInternalToken === env.auditServiceToken) {
       throw new Error(
         "USER_SERVICE_INTERNAL_TOKEN deve ser diferente de AUDIT_SERVICE_TOKEN em produção.",
+      );
+    }
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "gateway",
+      envName: "REGULARIZE_SERVICE_INTERNAL_TOKEN",
+      token: regularizeServiceInternalToken,
+    });
+    if (env.nodeEnv === "production" && regularizeServiceInternalToken === env.auditServiceToken) {
+      throw new Error(
+        "REGULARIZE_SERVICE_INTERNAL_TOKEN deve ser diferente de AUDIT_SERVICE_TOKEN em produção.",
       );
     }
     validateProductionInternalServiceToken({
@@ -217,6 +235,7 @@ const gatewayEnvSchema = z
     return {
       ...env,
       userServiceInternalToken,
+      regularizeServiceInternalToken,
       clientServiceInternalToken,
       bearerAuthCompatibility,
       authCookieSecure,
@@ -246,7 +265,9 @@ export interface GatewayEnv {
   clientServiceInternalToken: string;
   fiscalServiceUrl: string;
   contabilServiceUrl: string;
+  triagemServiceUrl: string;
   regularizeServiceUrl: string;
+  regularizeServiceInternalToken: string;
   tiServiceUrl: string;
   tiServiceInternalToken: string;
   certificateServiceUrl: string;
@@ -254,6 +275,7 @@ export interface GatewayEnv {
   pessoalServiceUrl: string;
   parcelamentoServiceUrl: string;
   reportsServiceUrl: string;
+  commercialServiceUrl: string;
   websocketUpstreamUrl?: string;
   databaseUrl?: string;
   publicGatewayUrl?: string;
@@ -290,7 +312,9 @@ export function getGatewayEnv(): GatewayEnv {
     clientServiceInternalToken: process.env.CLIENT_SERVICE_INTERNAL_TOKEN,
     fiscalServiceUrl: process.env.FISCAL_SERVICE_URL,
     contabilServiceUrl: process.env.CONTABIL_SERVICE_URL,
+    triagemServiceUrl: process.env.TRIAGEM_SERVICE_URL,
     regularizeServiceUrl: process.env.REGULARIZE_SERVICE_URL,
+    regularizeServiceInternalToken: process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN,
     tiServiceUrl: process.env.TI_SERVICE_URL,
     tiServiceInternalToken: process.env.TI_SERVICE_INTERNAL_TOKEN,
     certificateServiceUrl: process.env.CERTIFICATE_SERVICE_URL,
@@ -298,6 +322,7 @@ export function getGatewayEnv(): GatewayEnv {
     pessoalServiceUrl: process.env.PESSOAL_SERVICE_URL,
     parcelamentoServiceUrl: process.env.PARCELAMENTO_SERVICE_URL,
     reportsServiceUrl: process.env.REPORTS_SERVICE_URL,
+    commercialServiceUrl: process.env.COMMERCIAL_SERVICE_URL,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     databaseUrl: process.env.DATABASE_URL,
     publicGatewayUrl: process.env.GATEWAY_PUBLIC_URL,

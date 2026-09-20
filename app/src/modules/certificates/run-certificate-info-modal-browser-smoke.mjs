@@ -57,7 +57,9 @@ async function assertHelpTooltipsStayInsideDialog(page, expectedHelpCount) {
       "Certificate help buttons must be reachable by keyboard focus.",
     );
 
-    const tooltip = page.getByRole("tooltip").last();
+    // `getByRole("tooltip")` também casa o nó visually-hidden que o Radix cria para leitor
+    // de tela (caixa de 1x1); o hit-test abaixo precisa do conteúdo visível.
+    const tooltip = page.locator('[data-slot="tooltip-content"]').last();
     await tooltip.waitFor({ state: "visible", timeout: 10_000 });
     await helpButton.hover();
     assert.equal(await tooltip.isVisible(), true, "Certificate help tooltips should open on mouse hover.");

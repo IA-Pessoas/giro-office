@@ -3,6 +3,7 @@ import {
   error as logError,
   normalizeModulePermission,
   parseWithZod,
+  requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
@@ -13,6 +14,7 @@ import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { clientIdParamsSchema } from "../schemas/client.schemas.js";
 import {
   type CreateIntegrationBody,
+  cnpjLookupQuerySchema,
   createIntegrationBodySchema,
   updateIntegrationBodySchema,
 } from "../schemas/clientVerticals.schemas.js";
@@ -20,6 +22,7 @@ import {
   createIntegrationClient,
   updateIntegrationClient,
 } from "../services/clientIntegrationService.js";
+import { normalizeLookupCnpj, validateLookupCnpj } from "../services/cnpjLookupService.js";
 import { resolveOrganizationId } from "../utils/organizationContext.js";
 
 function getIntegrationAuthorization(request: Request) {
@@ -31,8 +34,32 @@ function getIntegrationAuthorization(request: Request) {
 }
 
 export function createClientIntegrationRouter(deps: ClientRouterDeps): Router {
-  const { prisma } = deps;
+  const { prisma, cnpjLookupProvider } = deps;
   const router: ReturnType<typeof Router> = Router();
+
+  router.get(
+    "/integration",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(cnpjLookupQuerySchema, request.query);
+        const cnpj = validateLookupCnpj(normalizeLookupCnpj(query.cnpj));
+        requireIntegracaoRouteAccess("GET", "/client/integration", {
+          ...getIntegrationAuthorization(request),
+          organizationId: resolveOrganizationId(request, undefined),
+          resourceOrganizationId: resolveOrganizationId(request, undefined),
+        });
+        if (!cnpjLookupProvider) {
+          throw new ServiceError(503, "Consulta oficial de CNPJ indisponível.");
+        }
+        const result = await cnpjLookupProvider.lookup(cnpj);
+        response.json(createSuccessResponse(result));
+      } catch (err) {
+        logError("Erro ao consultar CNPJ", { err });
+        next(err);
+      }
+    },
+  );
 
   router.post(
     "/integration",

@@ -52,14 +52,86 @@ describe("ReportWorkerService", () => {
       {
         getAccessContext: vi.fn().mockResolvedValue({ organization: { id: "org-1" }, modules: {} }),
       } as never,
-      { execute: vi.fn().mockRejectedValue(new Error("permissão negada")) } as never,
+      {
+        execute: vi.fn().mockRejectedValue(new Error("permissão negada")),
+        assertAuthorizedDefinition: vi.fn(),
+      } as never,
       { complete: vi.fn(), transition } as never,
     );
 
     await expect(worker.processNext()).resolves.toBe(true);
     expect(transition).toHaveBeenCalledWith(
-      expect.objectContaining({ job_id: "job-1", status: "failed" }),
+      expect.objectContaining({
+        job_id: "job-1",
+        status: "failed",
+        error_message:
+          "Não foi possível gerar o relatório. Confira o acesso e os critérios e tente novamente.",
+      }),
     );
+  });
+
+  it("materializa blocos compostos em um único snapshot", async () => {
+    const complete = vi.fn().mockResolvedValue(undefined);
+    const composition = {
+      version: 2,
+      areas: [{ source: "regularize.licenses", fields: ["protocol"] }],
+    };
+    const worker = new ReportWorkerService(
+      {
+        claimNext: vi.fn().mockResolvedValue({
+          id: "job-1",
+          organization_id: "org-1",
+          requester_id: "user-1",
+          report_model_version_id: "version-1",
+          lease_token: "lease-1",
+          payload_json: {},
+        }),
+      } as never,
+      {
+        reportModelVersion: {
+          findFirst: vi.fn().mockResolvedValue({
+            report_model_id: "model-1",
+            definition_json: composition,
+          }),
+        },
+        reportModel: {
+          findFirst: vi.fn().mockResolvedValue({ created_by_user_id: "user-1", active: true }),
+        },
+        reportJob: { findFirst: vi.fn().mockResolvedValue({ id: "job-1" }) },
+      } as never,
+      {
+        getAccessContext: vi.fn().mockResolvedValue({ organization: { id: "org-1" }, modules: {} }),
+      } as never,
+      {
+        executeComposition: vi.fn().mockResolvedValue({
+          blocks: [
+            {
+              source: "regularize.licenses",
+              label: "Licenças do Regularize",
+              columns: [{ key: "protocol", label: "Protocolo" }],
+              rows: [{ protocol: "P-1" }],
+            },
+          ],
+        }),
+        assertAuthorizedDefinition: vi.fn(),
+      } as never,
+      { complete, transition: vi.fn() } as never,
+    );
+
+    await expect(worker.processNext()).resolves.toBe(true);
+
+    expect(complete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        job_id: "job-1",
+        blocks: [
+          expect.objectContaining({
+            label: "Licenças do Regularize",
+            rows: [{ protocol: "P-1" }],
+          }),
+        ],
+      }),
+    );
+    expect(complete.mock.calls[0]?.[0]).not.toHaveProperty("rows");
   });
 
   it("continua expirando os demais snapshots quando uma expiração falha", async () => {
@@ -123,7 +195,7 @@ describe("ReportWorkerService", () => {
             .fn()
             .mockResolvedValue({ organization: { id: "org-1" }, modules: {} }),
         } as never,
-        { execute: vi.fn().mockResolvedValue([]) } as never,
+        { execute: vi.fn().mockResolvedValue([]), assertAuthorizedDefinition: vi.fn() } as never,
         { complete, transition: vi.fn() } as never,
       );
 

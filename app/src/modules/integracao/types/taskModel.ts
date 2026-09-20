@@ -2,9 +2,11 @@ export interface TaskModelListItem {
   id: string;
   name: string;
   department_id: string;
+  responsible_id: string | null;
   department?: {
     id: string;
     name: string;
+    users: TaskModelOption[];
   };
 }
 
@@ -23,17 +25,12 @@ export interface TaskModelDetail {
 
 /** Item de lista enriquecido no cliente (ex.: nome do departamento). */
 export interface TaskModel extends TaskModelListItem {
-  responsible_id?: string;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
   observations?: string | null;
   billing?: string;
   prevision?: number;
   type?: string | null;
-  department?: {
-    id: string;
-    name: string;
-  };
 }
 
 export interface CreateTaskModelData {
@@ -80,6 +77,14 @@ export interface TaskDependent {
     id: string;
     name: string;
   };
+}
+
+export interface TaskIntegrationRegularize {
+  id: string;
+  task_model_id: string;
+  referring: string;
+  referring_type: "process" | "license";
+  available: boolean;
 }
 
 export interface CreateTaskDependentData {

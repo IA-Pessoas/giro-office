@@ -48,9 +48,26 @@ const TECHNICAL_RULES = [
   /^\/project\/metrics$/,
   /^\/ti\/dashboard\/?$/,
   /^\/pessoal\/overview\/?$/,
+  /^\/triagem\/overview\/?$/,
+  /^\/triagem\/competencies\/[^/]+\/history$/,
 ] as const;
 
 const EXPLICIT_RULES: ExplicitRule[] = [
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/project-wizard$/,
+    description: { action: "criou", item: "um projeto com tarefas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/project-wizard\/extract-tasks$/,
+    description: { action: "extraiu", item: "tarefas de uma Ata com IA" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/project-wizard\/preview$/,
+    description: { action: "gerou", item: "uma prévia de projeto com tarefas" },
+  },
   {
     methods: ["POST"],
     pattern: /^\/platform\/organizations\/[^/]+\/users$/,
@@ -60,6 +77,46 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "criou", item: "uma organização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/commercial\/prospecting\/clients$/,
+    description: { action: "consultou", item: "a lista de clientes para prospecção" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/commercial\/outbox\/status$/,
+    description: { action: "consultou", item: "o estado de entrega da outbox comercial" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/pessoal\/groups\/[^/]+$/,
+    description: { action: "arquivou", item: "um grupo de pessoal" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/groups\/[^/]+\/reactivate$/,
+    description: { action: "reativou", item: "um grupo de pessoal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/eligible$/,
+    description: { action: "consultou", item: "os clientes elegíveis para atribuição de grupo" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/previews$/,
+    description: { action: "gerou", item: "uma prévia de atribuição de grupo" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/pessoal\/group-assignments\/previews\/[^/]+$/,
+    description: { action: "consultou", item: "uma prévia de atribuição de grupo" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/pessoal\/group-assignments\/apply$/,
+    description: { action: "aplicou", item: "uma atribuição de grupo" },
   },
   {
     methods: ["GET"],
@@ -135,6 +192,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/reports\/catalog$/,
     description: { action: "consultou", item: "o catálogo de relatórios" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/reports\/definitions\/validate$/,
+    description: { action: "revisou", item: "a configuração de um relatório" },
   },
   {
     methods: ["POST"],
@@ -252,6 +314,86 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "concluiu", item: "uma tarefa" },
   },
   {
+    methods: ["DELETE"],
+    pattern: /^\/task\/complete-request$/,
+    description: { action: "cancelou", item: "uma solicitação de conclusão de tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/complete-request\/list$/,
+    description: { action: "consultou", item: "o histórico de conclusão de uma tarefa" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/reopen$/,
+    description: { action: "reabriu", item: "uma tarefa" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/postponement$/,
+    description: { action: "prorrogou", item: "uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/postponement\/list$/,
+    description: { action: "consultou", item: "o histórico de prorrogações de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/notifications$/,
+    description: { action: "consultou", item: "as notificações operacionais" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/notifications\/read$/,
+    description: { action: "marcou como lida", item: "uma notificação operacional" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/attachment$/,
+    description: { action: "anexou", item: "um comprovante a uma tarefa" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/task\/attachment$/,
+    description: { action: "removeu", item: "um anexo de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/attachment\/list$/,
+    description: { action: "consultou", item: "os anexos de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/attachment\/access$/,
+    description: { action: "abriu", item: "um anexo de uma tarefa" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/financeiro\/queue$/,
+    description: { action: "consultou", item: "a fila de cobrança financeira" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/task\/financeiro\/collectors$/,
+    description: { action: "consultou", item: "os cobradores de um departamento" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/task\/financeiro\/collectors$/,
+    description: { action: "configurou", item: "os cobradores de um departamento" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/financeiro\/settle$/,
+    description: { action: "deu baixa financeira em", item: "tarefas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/task\/financeiro\/express$/,
+    description: { action: "deu Baixa Express em", item: "tarefas de um cliente" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/regularize\/dashboard$/,
     description: { action: "consultou", item: "o painel de regularização" },
@@ -302,9 +444,59 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "registrou", item: "um ponto" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/colaborator$/,
+    description: { action: "consultou", item: "o dossiê de um colaborador" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/colaborator\/list$/,
+    description: { action: "consultou", item: "a lista de dossiês de colaboradores" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/profile\/colaborator$/,
+    description: { action: "atualizou", item: "o dossiê de um colaborador" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "consultou", item: "os contatos de emergência" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "cadastrou", item: "um contato de emergência" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "atualizou", item: "um contato de emergência" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/rh\/profile\/contact$/,
+    description: { action: "removeu", item: "um contato de emergência" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/profile\/allergy$/,
+    description: { action: "consultou", item: "as alergias de um colaborador" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/profile\/allergy$/,
+    description: { action: "atualizou", item: "as alergias de um colaborador" },
+  },
+  {
     methods: ["POST", "PATCH"],
     pattern: /^\/rh\/point\/[^/]+\/calculate$/,
     description: { action: "recalculou", item: "um ponto" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/point\/recalculate$/,
+    description: { action: "recalculou", item: "os pontos de um colaborador" },
   },
   {
     methods: ["POST"],
@@ -312,9 +504,24 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "solicitou", item: "um ajuste de ponto" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/rh\/point\/adjustment\/retroactive$/,
+    description: { action: "registrou", item: "uma entrada retroativa de ponto" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/rh\/point\/adjustment\/[^/]+\/attachment$/,
+    description: { action: "anexou", item: "um comprovante de ajuste de ponto" },
+  },
+  {
     methods: ["POST", "PATCH"],
     pattern: /^\/rh\/point\/adjustment\/approve$/,
     description: { action: "aprovou", item: "um ajuste de ponto" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/point\/adjustment\/approve-bulk$/,
+    description: { action: "aprovou", item: "um lote de ajustes de ponto" },
   },
   {
     methods: ["POST"],
@@ -397,6 +604,34 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "adicionou", item: "uma atividade à orientação de regularização" },
   },
   {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/guidance\/activity$/,
+    description: { action: "atualizou", item: "uma atividade da orientação de regularização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/process\/send-to-fiscal$/,
+    description: { action: "enviou", item: "um processo de regularização ao Fiscal" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/process\/return-from-fiscal$/,
+    description: {
+      action: "registrou",
+      item: "o retorno de um processo de regularização do Fiscal",
+    },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/license\/[^/]+\/protocol$/,
+    description: { action: "baixou", item: "o protocolo de uma licença" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/regularize\/license\/[^/]+\/protocol$/,
+    description: { action: "enviou", item: "o protocolo de uma licença" },
+  },
+  {
     methods: ["POST", "DELETE"],
     pattern: /^\/regularize\/guidance\/activity\/remove$/,
     description: { action: "removeu", item: "uma atividade da orientação de regularização" },
@@ -405,6 +640,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/regularize\/guidance\/partner\/add$/,
     description: { action: "adicionou", item: "um sócio à orientação de regularização" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/regularize\/guidance\/partner$/,
+    description: { action: "atualizou", item: "um sócio da orientação de regularização" },
   },
   {
     methods: ["POST", "DELETE"],
@@ -450,6 +690,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/client\/integration$/,
     description: { action: "cadastrou", item: "um novo cliente pela integração" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/integration$/,
+    description: { action: "consultou", item: "os dados oficiais de um CNPJ" },
   },
   {
     methods: ["GET"],
@@ -557,6 +802,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "a lista de solicitações de ajuste de ponto" },
   },
   {
+    methods: ["PUT"],
+    pattern: /^\/rh\/timesheets\/reopen$/,
+    description: { action: "reabriu", item: "uma folha de ponto assinada" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/timesheets\/rebuild$/,
+    description: { action: "reconstruiu", item: "uma folha de ponto aberta" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/timesheets\/[^/]+\/pdf$/,
+    description: { action: "baixou", item: "o PDF de uma folha de ponto" },
+  },
+  {
     methods: ["PATCH"],
     pattern: /^\/rh\/score\/quarters\/nitro$/,
     description: { action: "atualizou", item: "a pontuação Nitro de um ciclo de avaliação" },
@@ -592,6 +852,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "assinou", item: "uma folha de ponto" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/rh\/messages$/,
+    description: { action: "enviou", item: "uma mensagem em uma solicitação de RH" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/rh\/notifications$/,
+    description: { action: "consultou", item: "as notificações de solicitações de RH" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/rh\/notifications\/read$/,
+    description: { action: "marcou", item: "notificações de solicitações de RH como lidas" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/contabil\/responsibles\/client\/[^/]+$/,
     description: { action: "consultou", item: "o responsável contábil de um cliente" },
@@ -600,6 +875,126 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/contabil\/relationships\/client\/[^/]+$/,
     description: { action: "consultou", item: "o vínculo contábil de um cliente" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/(?:monthly|statements)\/?.*$/,
+    description: { action: "consultou", item: "as pendências documentais contábeis" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/external-links\/?$/,
+    description: { action: "consultou", item: "os links externos da Triagem" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/catalogs\/?$/,
+    description: { action: "consultou", item: "os catálogos operacionais da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/catalogs\/?$/,
+    description: { action: "cadastrou", item: "um item de catálogo da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/catalogs\/[^/]+\/archive\/?$/,
+    description: { action: "arquivou", item: "um item de catálogo da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/catalogs\/[^/]+\/?$/,
+    description: { action: "atualizou", item: "um item de catálogo da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/external-links\/?$/,
+    description: { action: "cadastrou", item: "um link externo da Triagem" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/external-links\/[^/]+\/?$/,
+    description: { action: "atualizou", item: "um link externo da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/external-links\/[^/]+\/archive\/?$/,
+    description: { action: "arquivou", item: "um link externo da Triagem" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/urgent-requests\/?$/,
+    description: { action: "consultou", item: "as solicitações urgentes da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/triagem\/urgent-requests\/?$/,
+    description: { action: "cadastrou", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/urgent-requests\/[^/]+\/?$/,
+    description: { action: "atualizou", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/urgent-requests\/[^/]+\/close\/?$/,
+    description: { action: "fechou", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/urgent-requests\/[^/]+\/reopen\/?$/,
+    description: { action: "reabriu", item: "uma solicitação urgente da Triagem" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/controls\/year$/,
+    description: { action: "criou", item: "os controles contábeis anuais" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/contabil\/controls\/restore$/,
+    description: { action: "restaurou", item: "uma competência contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/contabil\/controls\/[^/]+\/items$/,
+    description: { action: "atualizou", item: "os itens de um controle contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/monthly\/[^/]+\/item$/,
+    description: { action: "atualizou", item: "uma pendência documental contábil" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/monthly\/[^/]+\/items$/,
+    description: { action: "atualizou", item: "as pendências documentais contábeis" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "consultou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "atualizou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["DELETE"],
+    pattern: /^\/triagem\/closing$/,
+    description: { action: "arquivou", item: "o fechamento recebido" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/editability$/,
+    description: { action: "consultou", item: "a permissão de edição da triagem" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/triagem\/competencies\/[^/]+\/archive$/,
+    description: { action: "arquivou", item: "uma competência mensal da Triagem" },
   },
   {
     methods: ["GET"],
@@ -627,6 +1022,30 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 ];
 
 const RESOURCE_RULES: ResourceRule[] = [
+  {
+    pattern: /^\/pessoal\/groups(?:\/|$)/,
+    singular: "um grupo de pessoal",
+    newSingular: "um novo grupo de pessoal",
+    plural: "grupos de pessoal",
+  },
+  {
+    pattern: /^\/commercial\/proposal-configs(?:\/|$)/,
+    singular: "uma configuração de proposta comercial",
+    newSingular: "uma nova configuração de proposta comercial",
+    plural: "configurações de proposta comercial",
+  },
+  {
+    pattern: /^\/commercial\/prospecting(?:\/|$)/,
+    singular: "uma prospecção comercial",
+    newSingular: "uma nova prospecção comercial",
+    plural: "prospecções comerciais",
+  },
+  {
+    pattern: /^\/commercial\/task-billing(?:\/|$)/,
+    singular: "uma cobrança comercial de tarefa",
+    newSingular: "uma nova cobrança comercial de tarefa",
+    plural: "cobranças comerciais de tarefas",
+  },
   {
     pattern: /^\/reports\/models\/shared(?:\/|$)/,
     singular: "um modelo compartilhado de relatório",
@@ -776,6 +1195,42 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um vínculo contábil",
     newSingular: "um novo vínculo contábil",
     plural: "vínculos contábeis",
+  },
+  {
+    pattern: /^\/triagem\/monthly(?:\/|$)/,
+    singular: "uma pendência documental contábil",
+    newSingular: "uma nova pendência documental contábil",
+    plural: "pendências documentais contábeis",
+  },
+  {
+    pattern: /^\/triagem\/statements(?:\/|$)/,
+    singular: "um marcador de extrato bancário",
+    newSingular: "um novo marcador de extrato bancário",
+    plural: "marcadores de extratos bancários",
+  },
+  {
+    pattern: /^\/triagem\/competencies(?:\/|$)/,
+    singular: "uma competência mensal da Triagem",
+    newSingular: "uma nova competência mensal da Triagem",
+    plural: "competências mensais da Triagem",
+  },
+  {
+    pattern: /^\/triagem\/external-links(?:\/|$)/,
+    singular: "um link externo da Triagem",
+    newSingular: "um novo link externo da Triagem",
+    plural: "links externos da Triagem",
+  },
+  {
+    pattern: /^\/triagem\/catalogs(?:\/|$)/,
+    singular: "um item de catálogo da Triagem",
+    newSingular: "um novo item de catálogo da Triagem",
+    plural: "itens de catálogo da Triagem",
+  },
+  {
+    pattern: /^\/triagem\/urgent-requests(?:\/|$)/,
+    singular: "uma solicitação urgente da Triagem",
+    newSingular: "uma nova solicitação urgente da Triagem",
+    plural: "solicitações urgentes da Triagem",
   },
   {
     pattern: /^\/rh\/point-config(?:\/|$)/,

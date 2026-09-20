@@ -8,6 +8,43 @@ type UserLookupClient = {
   };
 };
 
+const RH_LEADERSHIP_PERMISSION = 3;
+
+export function taskResponsibleEligibilityWhere(
+  organizationId: string,
+  departmentId?: string,
+): Prisma.UserWhereInput {
+  return {
+    status: "active",
+    ...(departmentId ? { department: { id: departmentId, organization_id: organizationId } } : {}),
+    AND: [
+      { OR: [{ organization_id: organizationId }, { organization_id: null }] },
+      {
+        OR: [
+          { type: "admin" },
+          {
+            permissions: {
+              some: { organization_id: organizationId, rh: { gte: RH_LEADERSHIP_PERMISSION } },
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+export async function listEligibleTaskResponsibles(
+  client: UserLookupClient,
+  organizationId: string,
+  departmentId: string,
+): Promise<Array<{ id: string }>> {
+  return client.user.findMany({
+    where: taskResponsibleEligibilityWhere(organizationId, departmentId),
+    select: { id: true },
+    orderBy: { name: "asc" },
+  });
+}
+
 export async function assertResponsibleUsersInDepartment(
   client: UserLookupClient,
   organizationId: string,

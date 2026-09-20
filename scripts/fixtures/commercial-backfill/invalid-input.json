@@ -1,0 +1,34 @@
+{
+  "organizationId": "org-commercial",
+  "cutoffAt": "2026-09-10T12:00:00.000Z",
+  "namespace": "giro-office:migration:v2:castelo-contabilidade",
+  "legacy": {
+    "clients": [{ "id": 10 }],
+    "prospecting": [
+      {
+        "id": 20,
+        "cliente_id": 10,
+        "status_prospeccao": "Aberto",
+        "data_status": "2026-09-01T00:00:00.000Z"
+      }
+    ],
+    "tasks": [{ "id": 30, "cliente_id": 10 }],
+    "taskBillings": [
+      {
+        "id": 30,
+        "task_id": 30,
+        "hiring_status": "Decisão sem contrato"
+      }
+    ],
+    "proposalConfigs": [],
+    "unsupported": [{ "sourceTable": "tb_integracao.cobrancas_solucoes", "rows": [{ "id": 99 }] }]
+  },
+  "current": {
+    "clients": [],
+    "projects": [],
+    "prospecting": [],
+    "tasks": [],
+    "taskBillings": [],
+    "proposalConfigs": []
+  }
+}

@@ -1708,7 +1708,7 @@ function validId(value, field, reasonCode) {
   return validLegacyId(value) ? prepared() : quarantine(field, reasonCode);
 }
 
-function requiredText(value, field, reasonCode) {
+function requiredText(_value, _field, _reasonCode) {
   return prepared();
 }
 

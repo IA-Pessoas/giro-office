@@ -5,7 +5,6 @@ import { toast } from "react-toastify";
 import { ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import type { ModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
-import { useAssignableUsers } from "@modules/rh";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { useFetch } from "@shared/hooks";
 import { useAuth } from "../../../context/AuthContext";
@@ -20,6 +19,11 @@ import {
 } from "../types";
 import { taskModelService } from "../services";
 import {
+  TASK_FORM_DEPARTMENTS_QUERY_KEY,
+  TASK_FORM_TASK_MODELS_QUERY_KEY,
+  taskResponsibleOptionsQueryKey,
+} from "../hooks/queryKeys";
+import {
   useCreateIntegracaoTaskMutation,
   useIntegracaoTaskDetail,
   useProjectsList,
@@ -29,8 +33,7 @@ import {
   PROJECT_INPUT_CLASSNAME,
   PROJECT_PRIMARY_BUTTON_CLASSNAME,
   PROJECT_SECONDARY_BUTTON_CLASSNAME,
-  PROJECT_SELECT_ARROW_STYLE,
-  PROJECT_SELECT_CLASSNAME,
+  ProjectSelect,
 } from "./projectUi";
 import {
   TASK_FORM_AUXILIARY_WARNING_CLASSNAME,
@@ -44,11 +47,16 @@ import {
   TASK_URGENCY_OPTIONS,
   type TaskUrgencyOption,
   getDefaultTaskUrgency,
+  getAutomaticTaskResponsibleId,
   getProjectSelectPlaceholder,
   getTaskCreateValidationMessage,
+  getTaskEditValidationMessage,
   getTaskUrgencyOptions,
   shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
+import { TaskCompletionPanel } from "./TaskCompletionPanel";
+import { TaskAttachmentPanel } from "./TaskAttachmentPanel";
+import { TaskPostponementPanel } from "./TaskPostponementPanel";
 
 interface TaskFormModalProps {
   open: boolean;
@@ -71,12 +79,11 @@ interface CreateFormState {
   billing: TaskBilling | "";
   urgency: TaskUrgencyOption;
   responsible_id: string;
-  responsible2_id: string;
-  responsible3_id: string;
   prevision_date: string;
 }
 
 interface EditFormState {
+  model_id: string;
   name: string;
   status: IntegracaoTaskStatus | "";
   department_id: string;
@@ -84,8 +91,6 @@ interface EditFormState {
   billing: TaskBilling;
   urgency: string;
   responsible_id: string;
-  responsible2_id: string;
-  responsible3_id: string;
   prevision_date: string;
 }
 
@@ -101,12 +106,11 @@ const CREATE_INITIAL_STATE: CreateFormState = {
   billing: "",
   urgency: getDefaultTaskUrgency(),
   responsible_id: "",
-  responsible2_id: "",
-  responsible3_id: "",
   prevision_date: "",
 };
 
 const EDIT_INITIAL_STATE: EditFormState = {
+  model_id: "",
   name: "",
   status: "",
   department_id: "",
@@ -114,8 +118,6 @@ const EDIT_INITIAL_STATE: EditFormState = {
   billing: "Não Realizar",
   urgency: "",
   responsible_id: "",
-  responsible2_id: "",
-  responsible3_id: "",
   prevision_date: "",
 };
 
@@ -170,27 +172,27 @@ export function TaskFormModal({
     !isEditing && createValues.client_id ? { ref: "client", id: createValues.client_id } : null,
   );
   const taskModelsQuery = useFetch(
-    ["task-form-task-models"],
+    TASK_FORM_TASK_MODELS_QUERY_KEY,
     () => taskModelService.list({ type: "Projeto" }),
     {
-      enabled: open && !isEditing,
+      enabled: open && !isRestrictedEdit,
     },
   );
   const departmentsQuery = useFetch<DepItem[]>(
-    ["task-form-departments"],
+    TASK_FORM_DEPARTMENTS_QUERY_KEY,
     () => departmentService.list({ status: "Ativo" }),
     {
       enabled: open && !isRestrictedEdit,
     },
   );
-  const usersQuery = useAssignableUsers({
-    enabled: open && !isRestrictedEdit,
-    module: "integracao",
-    departmentId: isEditing
-      ? editValues.department_id || undefined
-      : createValues.department_id || undefined,
-  });
   const taskDetailQuery = useIntegracaoTaskDetail(open && taskId ? taskId : undefined);
+  const editResponsibleOptionsQuery = useFetch(
+    taskResponsibleOptionsQueryKey(editValues.department_id),
+    () => taskModelService.listOptions(editValues.department_id),
+    {
+      enabled: open && isEditing && !isRestrictedEdit && Boolean(editValues.department_id),
+    },
+  );
   const { user } = useAuth();
   const createMutation = useCreateIntegracaoTaskMutation();
   const updateMutation = useUpdateIntegracaoTaskMutation();
@@ -214,6 +216,7 @@ export function TaskFormModal({
 
     const detail = taskDetailQuery.data;
     setEditValues({
+      model_id: detail.model_id ?? "",
       name: detail.name ?? "",
       status: INTEGRACAO_TASK_STATUS_VALUES.includes(detail.status as IntegracaoTaskStatus)
         ? (detail.status as IntegracaoTaskStatus)
@@ -225,8 +228,6 @@ export function TaskFormModal({
         : "Não Realizar",
       urgency: detail.urgency ?? "",
       responsible_id: detail.responsible_id ?? "",
-      responsible2_id: detail.responsible2_id ?? "",
-      responsible3_id: detail.responsible3_id ?? "",
       prevision_date: toDateInputValue(detail.prevision_date),
     });
   }, [open, taskDetailQuery.data]);
@@ -237,10 +238,12 @@ export function TaskFormModal({
     shouldBlockTaskEditForm({
       isTaskLoading: taskDetailQuery.isLoading,
       isDepartmentsLoading: isRestrictedEdit ? false : departmentsQuery.isLoading,
-      isUsersLoading: isRestrictedEdit ? false : usersQuery.isLoading,
+      isUsersLoading: false,
     });
   const hasEditAuxiliaryOptionsWarning =
-    isEditing && !isRestrictedEdit && (departmentsQuery.isError || usersQuery.isError);
+    isEditing &&
+    !isRestrictedEdit &&
+    (departmentsQuery.isError || taskModelsQuery.isError || editResponsibleOptionsQuery.isError);
   const hasRestrictedTaskAccessDenied =
     isRestrictedEdit &&
     Boolean(taskDetailQuery.data) &&
@@ -250,10 +253,23 @@ export function TaskFormModal({
       taskDetailQuery.data?.responsible3_id,
     ].includes(user?.id ?? null);
   const departments = departmentsQuery.data ?? [];
-  const users = usersQuery.data ?? [];
+  const taskModels = taskModelsQuery.data ?? [];
+  const createTaskModels = taskModels.filter(
+    (model) => model.department_id === createValues.department_id,
+  );
+  const selectedCreateTaskModel = createTaskModels.find(
+    (model) => model.id === createValues.model_id,
+  );
+  const createResponsibleCandidates = selectedCreateTaskModel?.department?.users ?? [];
+  const editTaskModels = taskModels.filter(
+    (model) => model.department_id === editValues.department_id,
+  );
+  const editResponsibleCandidates = editResponsibleOptionsQuery.data?.users ?? [];
   const shouldRenderCurrentDepartmentOption =
     Boolean(editValues.department_id) &&
     !departments.some((department) => department.id === editValues.department_id);
+  const shouldRenderCurrentModelOption =
+    Boolean(editValues.model_id) && !editTaskModels.some((model) => model.id === editValues.model_id);
   const createProjectsCount = projectsQuery.data?.length ?? null;
   const hasNoProjectsForSelectedClient =
     Boolean(createValues.client_id) && !projectsQuery.isLoading && createProjectsCount === 0;
@@ -263,15 +279,12 @@ export function TaskFormModal({
     projectCount: createProjectsCount,
   });
   const editUrgencyOptions = getTaskUrgencyOptions(editValues.urgency);
-  const hasInvalidFullEditValues =
-    !editValues.name.trim() ||
-    !editValues.status ||
-    !editValues.department_id ||
-    !editValues.responsible_id ||
-    !editValues.urgency.trim();
+  const taskEditValidationMessage = getTaskEditValidationMessage(editValues);
 
-  function shouldRenderCurrentUserOption(userId: string) {
-    return Boolean(userId) && !users.some((user) => user.id === userId);
+  function shouldRenderCurrentResponsibleOption(userId: string) {
+    return (
+      Boolean(userId) && !editResponsibleCandidates.some((candidate) => candidate.id === userId)
+    );
   }
 
   function getDepartmentPlaceholder() {
@@ -286,34 +299,65 @@ export function TaskFormModal({
     return "Selecione";
   }
 
-  function getUserPlaceholder(optional: boolean) {
-    if (usersQuery.isLoading) {
-      return "Carregando usuários...";
-    }
-
-    if (usersQuery.isError) {
-      return "Usuários indisponíveis";
-    }
-
-    return optional ? "Opcional" : "Selecione";
-  }
-
   function updateCreateValue<Key extends keyof CreateFormState>(
     field: Key,
     value: CreateFormState[Key],
   ) {
-    setCreateValues((currentValues) => ({
-      ...currentValues,
-      [field]: value,
-      ...(field === "client_id" ? { project_id: "" } : {}),
-    }));
+    setCreateValues((currentValues) => {
+      if (field === "department_id") {
+        return {
+          ...currentValues,
+          department_id: value as string,
+          model_id: "",
+          responsible_id: "",
+        };
+      }
+
+      if (field === "model_id") {
+        const model = taskModels.find(({ id }) => id === value);
+        return {
+          ...currentValues,
+          model_id: value as string,
+          responsible_id: getAutomaticTaskResponsibleId(
+            model?.responsible_id,
+            model?.department?.users ?? [],
+          ),
+        };
+      }
+
+      return {
+        ...currentValues,
+        [field]: value,
+        ...(field === "client_id" ? { project_id: "" } : {}),
+      };
+    });
   }
 
   function updateEditValue<Key extends keyof EditFormState>(field: Key, value: EditFormState[Key]) {
-    setEditValues((currentValues) => ({
-      ...currentValues,
-      [field]: value,
-    }));
+    setEditValues((currentValues) => {
+      if (field === "department_id") {
+        return {
+          ...currentValues,
+          department_id: value as string,
+          model_id: "",
+          responsible_id: "",
+        };
+      }
+
+      if (field === "model_id") {
+        const model = taskModels.find(({ id }) => id === value);
+        return {
+          ...currentValues,
+          model_id: value as string,
+          responsible_id: getAutomaticTaskResponsibleId(
+            model?.responsible_id,
+            model?.department?.users ?? [],
+          ),
+        };
+      }
+
+      return { ...currentValues, [field]: value };
+    });
   }
 
   async function handleCreateSubmit() {
@@ -321,9 +365,12 @@ export function TaskFormModal({
       clientId: createValues.client_id,
       projectId: createValues.project_id,
       modelId: createValues.model_id,
+      departmentId: createValues.department_id,
       prospectingStatus: createValues.prospecting_status,
       urgency: createValues.urgency,
       observations: createValues.observations,
+      eligibleResponsibleCount: createResponsibleCandidates.length,
+      responsibleId: createValues.responsible_id,
     });
 
     if (validationMessage) {
@@ -339,13 +386,12 @@ export function TaskFormModal({
         prospecting_status: createValues.prospecting_status,
         name: createValues.name.trim() || undefined,
         status: createValues.status || undefined,
-        department_id: createValues.department_id || undefined,
+        department_id: createValues.department_id,
         observations: createValues.observations.trim(),
         billing: createValues.billing || undefined,
         urgency: createValues.urgency,
-        responsible_id: createValues.responsible_id || undefined,
-        responsible2_id: createValues.responsible2_id || undefined,
-        responsible3_id: createValues.responsible3_id || undefined,
+        responsible_id:
+          createResponsibleCandidates.length === 0 ? null : createValues.responsible_id,
         prevision_date: createValues.prevision_date || undefined,
       });
 
@@ -372,12 +418,25 @@ export function TaskFormModal({
       return;
     }
 
-    if (!isRestrictedEdit && hasInvalidFullEditValues) {
-      toast.warning("Preencha nome, status, departamento, responsável e urgência.");
+    if (!isRestrictedEdit && taskEditValidationMessage) {
+      toast.warning(taskEditValidationMessage);
+      return;
+    }
+
+    const detail = taskDetailQuery.data;
+    const relationshipChanged =
+      Boolean(detail) &&
+      (editValues.department_id !== detail.department_id || editValues.model_id !== detail.model_id);
+    if (relationshipChanged && editResponsibleCandidates.length > 1 && !editValues.responsible_id) {
+      toast.warning("Selecione um responsável elegível para a tarefa.");
       return;
     }
 
     const status = editValues.status as IntegracaoTaskStatus;
+    if (status === "Concluída" && detail?.status !== "Concluída") {
+      toast.warning("Use o painel de conclusão para enviar a solicitação.");
+      return;
+    }
 
     try {
       const updatedTask = await updateMutation.mutateAsync(
@@ -389,16 +448,18 @@ export function TaskFormModal({
             }
           : {
               task_id: taskId,
+              ...(editValues.model_id !== detail?.model_id
+                ? { model_id: editValues.model_id }
+                : {}),
               name: editValues.name.trim(),
               status,
               department_id: editValues.department_id,
               observations: editValues.observations.trim(),
               billing: editValues.billing,
               urgency: editValues.urgency.trim(),
-              responsible_id: editValues.responsible_id,
-              responsible2_id: editValues.responsible2_id || null,
-              responsible3_id: editValues.responsible3_id || null,
-              prevision_date: editValues.prevision_date || null,
+              ...(editValues.responsible_id !== (detail?.responsible_id ?? "")
+                ? { responsible_id: editValues.responsible_id }
+                : {}),
             },
       );
 
@@ -488,13 +549,11 @@ export function TaskFormModal({
             <>
               <label className={TASK_FORM_LABEL_CLASSNAME}>
                 <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
-                <select
+                <ProjectSelect
                   value={editValues.status}
                   onChange={(event) =>
                     updateEditValue("status", event.target.value as IntegracaoTaskStatus | "")
                   }
-                  className={PROJECT_SELECT_CLASSNAME}
-                  style={PROJECT_SELECT_ARROW_STYLE}
                 >
                   <option value="">Selecione</option>
                   {INTEGRACAO_TASK_STATUS_VALUES.map((status) => (
@@ -502,7 +561,7 @@ export function TaskFormModal({
                       {status}
                     </option>
                   ))}
-                </select>
+                </ProjectSelect>
               </label>
 
               <label className={TASK_FORM_LABEL_CLASSNAME}>
@@ -522,7 +581,7 @@ export function TaskFormModal({
             </>
           ) : (
             <>
-              <div className={TASK_FORM_GRID_CLASSNAME}>
+              <div className={TASK_FORM_THREE_COLUMN_GRID_CLASSNAME}>
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
                   <span className="text-sm font-medium text-slate-700 dark:text-white">Nome</span>
                   <input
@@ -534,14 +593,37 @@ export function TaskFormModal({
                 </label>
 
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
+                  <span className="text-sm font-medium text-slate-700 dark:text-white">
+                    Modelo de tarefa
+                  </span>
+                  <ProjectSelect
+                    value={editValues.model_id}
+                    onChange={(event) => updateEditValue("model_id", event.target.value)}
+                    disabled={
+                      !editValues.department_id ||
+                      taskModelsQuery.isLoading ||
+                      taskModelsQuery.isError
+                    }
+                  >
+                    <option value="">Selecione um modelo de tarefa</option>
+                    {shouldRenderCurrentModelOption ? (
+                      <option value={editValues.model_id}>Modelo atual</option>
+                    ) : null}
+                    {editTaskModels.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </ProjectSelect>
+                </label>
+
+                <label className={TASK_FORM_LABEL_CLASSNAME}>
                   <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
-                  <select
+                  <ProjectSelect
                     value={editValues.status}
                     onChange={(event) =>
                       updateEditValue("status", event.target.value as IntegracaoTaskStatus | "")
                     }
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                   >
                     <option value="">Selecione</option>
                     {INTEGRACAO_TASK_STATUS_VALUES.map((status) => (
@@ -549,7 +631,7 @@ export function TaskFormModal({
                         {status}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
               </div>
 
@@ -558,11 +640,9 @@ export function TaskFormModal({
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Departamento
                   </span>
-                  <select
+                  <ProjectSelect
                     value={editValues.department_id}
                     onChange={(event) => updateEditValue("department_id", event.target.value)}
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                     disabled={departmentsQuery.isLoading || departmentsQuery.isError}
                   >
                     <option value="">{getDepartmentPlaceholder()}</option>
@@ -574,126 +654,88 @@ export function TaskFormModal({
                         {department.name}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
 
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Cobrança
                   </span>
-                  <select
+                  <ProjectSelect
                     value={editValues.billing}
                     onChange={(event) =>
                       updateEditValue("billing", event.target.value as TaskBilling)
                     }
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                   >
                     {TASK_BILLING_OPTIONS.map((billing) => (
                       <option key={billing} value={billing}>
                         {billing}
                       </option>
                     ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className={TASK_FORM_THREE_COLUMN_GRID_CLASSNAME}>
-                <label className={TASK_FORM_LABEL_CLASSNAME}>
-                  <span className="text-sm font-medium text-slate-700 dark:text-white">
-                    Responsável
-                  </span>
-                  <select
-                    value={editValues.responsible_id}
-                    onChange={(event) => updateEditValue("responsible_id", event.target.value)}
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={usersQuery.isLoading || usersQuery.isError}
-                  >
-                    <option value="">{getUserPlaceholder(false)}</option>
-                    {shouldRenderCurrentUserOption(editValues.responsible_id) ? (
-                      <option value={editValues.responsible_id}>Responsável atual</option>
-                    ) : null}
-                    {users.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className={TASK_FORM_LABEL_CLASSNAME}>
-                  <span className="text-sm font-medium text-slate-700 dark:text-white">
-                    Responsável 2
-                  </span>
-                  <select
-                    value={editValues.responsible2_id}
-                    onChange={(event) => updateEditValue("responsible2_id", event.target.value)}
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={usersQuery.isLoading || usersQuery.isError}
-                  >
-                    <option value="">{getUserPlaceholder(true)}</option>
-                    {shouldRenderCurrentUserOption(editValues.responsible2_id) ? (
-                      <option value={editValues.responsible2_id}>Responsável 2 atual</option>
-                    ) : null}
-                    {users.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className={TASK_FORM_LABEL_CLASSNAME}>
-                  <span className="text-sm font-medium text-slate-700 dark:text-white">
-                    Responsável 3
-                  </span>
-                  <select
-                    value={editValues.responsible3_id}
-                    onChange={(event) => updateEditValue("responsible3_id", event.target.value)}
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
-                    disabled={usersQuery.isLoading || usersQuery.isError}
-                  >
-                    <option value="">{getUserPlaceholder(true)}</option>
-                    {shouldRenderCurrentUserOption(editValues.responsible3_id) ? (
-                      <option value={editValues.responsible3_id}>Responsável 3 atual</option>
-                    ) : null}
-                    {users.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name}
-                      </option>
-                    ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
               </div>
 
               <div className={TASK_FORM_GRID_CLASSNAME}>
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
-                    Previsão
+                    Responsável
+                  </span>
+                  <ProjectSelect
+                    value={editValues.responsible_id}
+                    onChange={(event) => updateEditValue("responsible_id", event.target.value)}
+                    disabled={
+                      !editValues.department_id ||
+                      editResponsibleOptionsQuery.isLoading ||
+                      editResponsibleOptionsQuery.isError
+                    }
+                  >
+                    <option
+                      value=""
+                      disabled={editResponsibleCandidates.length > 0}
+                    >
+                      {editResponsibleCandidates.length > 0
+                        ? "Selecione um responsável"
+                        : "Sem responsável"}
+                    </option>
+                    {shouldRenderCurrentResponsibleOption(editValues.responsible_id) ? (
+                      <option value={editValues.responsible_id}>Responsável atual</option>
+                    ) : null}
+                    {editResponsibleCandidates.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.name}
+                      </option>
+                    ))}
+                  </ProjectSelect>
+                </label>
+              </div>
+
+              <div className={TASK_FORM_GRID_CLASSNAME}>
+                <label className={TASK_FORM_LABEL_CLASSNAME}>
+                  <span className="text-sm font-medium text-slate-700 dark:text-white">
+                    Previsão atual
                   </span>
                   <div className="relative">
                     <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       type="date"
                       value={editValues.prevision_date}
-                      onChange={(event) => updateEditValue("prevision_date", event.target.value)}
+                      readOnly
                       className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
                     />
                   </div>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Use Prorrogações para alterar a previsão.
+                  </span>
                 </label>
 
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Urgência
                   </span>
-                  <select
+                  <ProjectSelect
                     value={editValues.urgency}
                     onChange={(event) => updateEditValue("urgency", event.target.value)}
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                   >
                     <option value="">Selecione</option>
                     {editUrgencyOptions.map((urgency) => (
@@ -701,7 +743,7 @@ export function TaskFormModal({
                         {urgency}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
               </div>
 
@@ -721,6 +763,31 @@ export function TaskFormModal({
               </label>
             </>
           )}
+          {taskDetailQuery.data ? (
+            <TaskCompletionPanel
+              task={taskDetailQuery.data}
+              currentUserId={user?.id}
+              accessLevel={integracaoAccess.level}
+              isOwner={user?.type === "owner"}
+              canApproveCompletion={user?.task_completion === true}
+            />
+          ) : null}
+          {taskDetailQuery.data ? (
+            <TaskPostponementPanel
+              task={taskDetailQuery.data}
+              currentUserId={user?.id}
+              accessLevel={integracaoAccess.level}
+              isOwner={user?.type === "owner"}
+            />
+          ) : null}
+          {taskDetailQuery.data ? (
+            <TaskAttachmentPanel
+              task={taskDetailQuery.data}
+              currentUserId={user?.id}
+              accessLevel={integracaoAccess.level}
+              isOwner={user?.type === "owner"}
+            />
+          ) : null}
         </form>
       ) : (
         <form
@@ -738,11 +805,9 @@ export function TaskFormModal({
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Projeto</span>
-              <select
+              <ProjectSelect
                 value={createValues.project_id}
                 onChange={(event) => updateCreateValue("project_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={
                   !createValues.client_id ||
                   projectsQuery.isLoading ||
@@ -755,114 +820,171 @@ export function TaskFormModal({
                     {project.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
-          <div className={TASK_FORM_THREE_COLUMN_GRID_CLASSNAME}>
+          <div className={TASK_FORM_GRID_CLASSNAME}>
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
+              <span className="text-sm font-medium text-slate-700 dark:text-white">
+                Departamento
+              </span>
+              <ProjectSelect
+                value={createValues.department_id}
+                onChange={(event) => updateCreateValue("department_id", event.target.value)}
+                disabled={departmentsQuery.isLoading || departmentsQuery.isError}
+              >
+                <option value="">{getDepartmentPlaceholder()}</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </ProjectSelect>
+            </label>
+
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Modelo de tarefa
               </span>
-              <select
+              <ProjectSelect
                 value={createValues.model_id}
                 onChange={(event) => updateCreateValue("model_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
-                disabled={taskModelsQuery.isLoading}
+                disabled={
+                  !createValues.department_id ||
+                  taskModelsQuery.isLoading ||
+                  taskModelsQuery.isError
+                }
               >
                 <option value="">Selecione um modelo de tarefa</option>
-                {(taskModelsQuery.data ?? []).map((model) => (
+                {createTaskModels.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
+          </div>
 
+          <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Status de prospecção
               </span>
-              <select
+              <ProjectSelect
                 value={createValues.prospecting_status}
                 onChange={(event) =>
                   updateCreateValue("prospecting_status", event.target.value as ProspectingStatus)
                 }
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
               >
                 {PROSPECTING_STATUS_VALUES.map((status) => (
                   <option key={status} value={status}>
                     {status}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
-              <select
+              <ProjectSelect
                 value={createValues.urgency}
                 onChange={(event) =>
                   updateCreateValue("urgency", event.target.value as TaskUrgencyOption)
                 }
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
               >
                 {TASK_URGENCY_OPTIONS.map((urgency) => (
                   <option key={urgency} value={urgency}>
                     {urgency}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Nome</span>
-              <input value={createValues.name} onChange={(event) => updateCreateValue("name", event.target.value)} className={PROJECT_INPUT_CLASSNAME} placeholder="Usar o nome do modelo" />
+              <input
+                value={createValues.name}
+                onChange={(event) => updateCreateValue("name", event.target.value)}
+                className={PROJECT_INPUT_CLASSNAME}
+                placeholder="Usar o nome do modelo"
+              />
             </label>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
-              <select value={createValues.status} onChange={(event) => updateCreateValue("status", event.target.value as IntegracaoTaskStatus | "")} className={PROJECT_SELECT_CLASSNAME} style={PROJECT_SELECT_ARROW_STYLE}>
+              <ProjectSelect
+                value={createValues.status}
+                onChange={(event) =>
+                  updateCreateValue("status", event.target.value as IntegracaoTaskStatus | "")
+                }
+              >
                 <option value="">Usar regra de criação</option>
-                {INTEGRACAO_TASK_STATUS_VALUES.map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
+                {INTEGRACAO_TASK_STATUS_VALUES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </ProjectSelect>
             </label>
           </div>
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Departamento</span>
-              <select value={createValues.department_id} onChange={(event) => updateCreateValue("department_id", event.target.value)} className={PROJECT_SELECT_CLASSNAME} style={PROJECT_SELECT_ARROW_STYLE} disabled={departmentsQuery.isLoading || departmentsQuery.isError}>
-                <option value="">Usar departamento do modelo</option>
-                {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-              </select>
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Cobrança</span>
+              <ProjectSelect
+                value={createValues.billing}
+                onChange={(event) =>
+                  updateCreateValue("billing", event.target.value as TaskBilling | "")
+                }
+              >
+                <option value="">Usar cobrança do modelo</option>
+                {TASK_BILLING_OPTIONS.map((billing) => (
+                  <option key={billing} value={billing}>
+                    {billing}
+                  </option>
+                ))}
+              </ProjectSelect>
             </label>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Cobrança</span>
-              <select value={createValues.billing} onChange={(event) => updateCreateValue("billing", event.target.value as TaskBilling | "")} className={PROJECT_SELECT_CLASSNAME} style={PROJECT_SELECT_ARROW_STYLE}>
-                <option value="">Usar cobrança do modelo</option>
-                {TASK_BILLING_OPTIONS.map((billing) => <option key={billing} value={billing}>{billing}</option>)}
-              </select>
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Previsão</span>
+              <div className="relative">
+                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={createValues.prevision_date}
+                  onChange={(event) => updateCreateValue("prevision_date", event.target.value)}
+                  className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                />
+              </div>
             </label>
           </div>
-          <div className={TASK_FORM_THREE_COLUMN_GRID_CLASSNAME}>
-            {(["responsible_id", "responsible2_id", "responsible3_id"] as const).map((field, index) => (
-              <label key={field} className={TASK_FORM_LABEL_CLASSNAME}>
-                <span className="text-sm font-medium text-slate-700 dark:text-white">{index === 0 ? "Responsável" : `Responsável ${index + 1}`}</span>
-                <select value={createValues[field]} onChange={(event) => updateCreateValue(field, event.target.value)} className={PROJECT_SELECT_CLASSNAME} style={PROJECT_SELECT_ARROW_STYLE} disabled={usersQuery.isLoading || usersQuery.isError}>
-                  <option value="">Usar responsável do modelo</option>
-                  {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                </select>
-              </label>
-            ))}
+          <div className={TASK_FORM_GRID_CLASSNAME}>
+            <label className={TASK_FORM_LABEL_CLASSNAME}>
+              <span className="text-sm font-medium text-slate-700 dark:text-white">Responsável</span>
+              <ProjectSelect
+                value={createValues.responsible_id}
+                onChange={(event) => updateCreateValue("responsible_id", event.target.value)}
+                disabled={
+                  !createValues.model_id ||
+                  taskModelsQuery.isLoading ||
+                  taskModelsQuery.isError ||
+                  createResponsibleCandidates.length <= 1
+                }
+              >
+                <option value="" disabled={createResponsibleCandidates.length > 0}>
+                  {createResponsibleCandidates.length > 0
+                    ? "Selecione um responsável"
+                    : "Sem responsável"}
+                </option>
+                {createResponsibleCandidates.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </ProjectSelect>
+            </label>
           </div>
-          <label className={TASK_FORM_LABEL_CLASSNAME}>
-            <span className="text-sm font-medium text-slate-700 dark:text-white">Previsão</span>
-            <div className="relative"><CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input type="date" value={createValues.prevision_date} onChange={(event) => updateCreateValue("prevision_date", event.target.value)} className={`${PROJECT_INPUT_CLASSNAME} pl-10`} /></div>
-          </label>
 
           <label className={TASK_FORM_LABEL_CLASSNAME}>
             <span className="text-sm font-medium text-slate-700 dark:text-white">Observações</span>

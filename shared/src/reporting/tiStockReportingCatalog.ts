@@ -1,5 +1,15 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 function field(key: string, label: string, value_type: "string" | "number" | "boolean") {
-  return { key, label, value_type, filter_operators: [] as const, aggregations: [] as const };
+  return {
+    groupable: true,
+    sortable: true,
+    key,
+    label,
+    value_type,
+    filter_operators: [] as const,
+    aggregations: reportingAggregations(value_type),
+  };
 }
 
 export const TI_STOCK_REPORTING_SOURCES = ["ti.stock"] as const;

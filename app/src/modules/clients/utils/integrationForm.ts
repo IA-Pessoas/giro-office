@@ -2,9 +2,11 @@ import {
   formatBrazilianPhoneInput,
   formatCnpjInput,
   formatCpfInput,
+  normalizeCnpjInput,
 } from "../../../shared/utils/inputFormatting.ts";
 import type {
   Client,
+  ClientCompanyLookup,
   CreateClientIntegrationFormValues,
   CreateClientIntegrationPayload,
   UpdateClientIntegrationFormValues,
@@ -42,7 +44,50 @@ export function normalizeDocumentValue(value: string | null | undefined): string
 }
 
 export function hasUsableIntegrationData(client: Client | null | undefined): boolean {
-  return normalizeDocumentValue(client?.cpf_cnpj).length > 0;
+  const value = client?.type === "PJ" ? normalizeCnpjInput(client.cpf_cnpj) : normalizeDocumentValue(client?.cpf_cnpj);
+  return value.length > 0;
+}
+
+function normalizeIntegrationDocumentValue(value: string | null | undefined, type: "PJ" | "PF") {
+  return type === "PJ" ? normalizeCnpjInput(value) : normalizeDocumentValue(value);
+}
+
+export function mergeClientCompanyLookup(
+  values: CreateClientIntegrationFormValues,
+  lookup: ClientCompanyLookup,
+): CreateClientIntegrationFormValues;
+export function mergeClientCompanyLookup(
+  values: UpdateClientIntegrationFormValues,
+  lookup: ClientCompanyLookup,
+): UpdateClientIntegrationFormValues;
+export function mergeClientCompanyLookup(
+  values: CreateClientIntegrationFormValues | UpdateClientIntegrationFormValues,
+  lookup: ClientCompanyLookup,
+): CreateClientIntegrationFormValues | UpdateClientIntegrationFormValues {
+  const next = {
+    ...values,
+    name: lookup.name ?? values.name,
+    company_name: lookup.company_name ?? values.company_name,
+    fantasy_name: lookup.fantasy_name ?? values.fantasy_name,
+  };
+
+  if ("opening_date" in next && lookup.opening_date) {
+    next.opening_date = lookup.opening_date.slice(0, 10);
+  }
+
+  if ("address" in next) {
+    next.address = lookup.address ?? next.address;
+    next.cep = lookup.cep ?? next.cep;
+    next.neighborhood = lookup.neighborhood ?? next.neighborhood;
+    next.state = lookup.state ?? next.state;
+    next.city = lookup.city ?? next.city;
+  }
+
+  const changed = Object.keys(next).some(
+    (key) => next[key as keyof typeof next] !== values[key as keyof typeof values],
+  );
+
+  return changed ? next : values;
 }
 
 export function createClientIntegrationInitialValues(): CreateClientIntegrationFormValues {
@@ -108,7 +153,7 @@ export function buildCreateClientIntegrationPayload(
     organization_id: organizationId,
     type: values.type,
     name: values.name.trim(),
-    cpf_cnpj: normalizeDocumentValue(values.cpf_cnpj),
+    cpf_cnpj: normalizeIntegrationDocumentValue(values.cpf_cnpj, values.type),
     company_name: normalizeNullableTextValue(values.company_name),
     fantasy_name: normalizeNullableTextValue(values.fantasy_name),
     opening_date: normalizeNullableTextValue(values.opening_date),
@@ -145,8 +190,8 @@ export function buildUpdateClientIntegrationPayload(
     payload.name = nextName;
   }
 
-  const nextCpfCnpj = normalizeDocumentValue(values.cpf_cnpj);
-  const currentCpfCnpj = normalizeDocumentValue(currentValues.cpf_cnpj);
+  const nextCpfCnpj = normalizeIntegrationDocumentValue(values.cpf_cnpj, values.type);
+  const currentCpfCnpj = normalizeIntegrationDocumentValue(currentValues.cpf_cnpj, currentValues.type);
 
   if (nextCpfCnpj.length > 0 && nextCpfCnpj !== currentCpfCnpj) {
     payload.cpf_cnpj = nextCpfCnpj;

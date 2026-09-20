@@ -1994,7 +1994,7 @@ function classifyIdentity(value, field, reasonCode) {
   return isValidIdentity(value) ? prepared() : quarantine(field, reasonCode);
 }
 
-function classifyText(value, field, reasonCode) {
+function classifyText(_value, _field, _reasonCode) {
   return prepared();
 }
 

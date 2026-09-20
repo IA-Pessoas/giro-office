@@ -3,6 +3,7 @@ import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { departmentService, type DepItem } from "@modules/departments";
+import { regularizeService } from "@modules/regularize";
 import { useAssignableUsers } from "@modules/rh";
 import { ConfirmationDialog } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
@@ -15,6 +16,7 @@ import type {
   TaskDependent,
   TaskModel,
   TaskModelListItem,
+  TaskIntegrationRegularize,
 } from "../types";
 import {
   PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME,
@@ -22,8 +24,7 @@ import {
   PROJECT_INPUT_CLASSNAME,
   PROJECT_PRIMARY_BUTTON_CLASSNAME,
   PROJECT_SECONDARY_BUTTON_CLASSNAME,
-  PROJECT_SELECT_ARROW_STYLE,
-  PROJECT_SELECT_CLASSNAME,
+  ProjectSelect,
   PROJECT_SUBPANEL_CLASSNAME,
 } from "./projectUi";
 import {
@@ -93,6 +94,12 @@ export function TaskModelModal({
   const [departments, setDepartments] = useState<DepItem[]>([]);
   const [allTasks, setAllTasks] = useState<TaskModelListItem[]>([]);
   const [dependents, setDependents] = useState<TaskDependent[]>([]);
+  const [regularizeLinks, setRegularizeLinks] = useState<TaskIntegrationRegularize[]>([]);
+  const [regularizeDestination, setRegularizeDestination] = useState("");
+  const [regularizeType, setRegularizeType] = useState<"process" | "license">("process");
+  const [regularizeOptions, setRegularizeOptions] = useState<
+    Array<{ id: string; label: string; type: "process" | "license" }>
+  >([]);
   const [newDependent, setNewDependent] = useState({
     dependent_id: "",
     wait: false,
@@ -125,6 +132,8 @@ export function TaskModelModal({
     if (!isOpen) {
       setFormData(EMPTY_FORM_DATA);
       setDependents([]);
+      setRegularizeLinks([]);
+      setRegularizeDestination("");
       setNewDependent({ dependent_id: "", wait: false, observation: "" });
       setPendingDependentDeletion(null);
       setDependentDeletionError(null);
@@ -205,6 +214,10 @@ export function TaskModelModal({
 
       setLoadingDetail(true);
       setLoadingDependents(true);
+      const regularizeOptionsPromise = Promise.allSettled([
+        regularizeService.listProcesses({ status: "Todos" }),
+        regularizeService.listLicenses({ status: "Todos" }),
+      ]);
 
       try {
         const detail = await taskModelService.detail(initialData.id);
@@ -229,17 +242,44 @@ export function TaskModelModal({
           type: "Projeto",
         });
 
-        try {
-          const dependentsData = await taskModelService.listDependents(initialData.id);
-
-          if (!cancelled) {
-            setDependents(dependentsData);
-          }
-        } catch {
-          if (!cancelled) {
+        const [dependentsResult, linksResult, regularizeOptionsResult] = await Promise.allSettled([
+          taskModelService.listDependents(initialData.id),
+          taskModelService.listRegularizeLinks(initialData.id),
+          regularizeOptionsPromise,
+        ]);
+        if (!cancelled) {
+          if (dependentsResult.status === "fulfilled") {
+            setDependents(dependentsResult.value);
+          } else {
             setDependents([]);
             toast.warning("Não foi possível carregar dependências do modelo.");
           }
+          if (linksResult.status === "fulfilled") {
+            setRegularizeLinks(linksResult.value);
+          } else {
+            toast.warning("Não foi possível carregar vínculos do Regularize.");
+          }
+          if (regularizeOptionsResult.status === "rejected") {
+            toast.warning("Não foi possível carregar destinos do Regularize.");
+            return;
+          }
+          const [processesResult, licensesResult] = regularizeOptionsResult.value;
+          if (processesResult.status === "rejected" || licensesResult.status === "rejected") {
+            toast.warning("Não foi possível carregar destinos do Regularize.");
+            return;
+          }
+          setRegularizeOptions([
+            ...processesResult.value.map((item) => ({
+              id: item.id,
+              label: `Processo: ${item.process_type}`,
+              type: "process" as const,
+            })),
+            ...licensesResult.value.map((item) => ({
+              id: item.id,
+              label: `Licença: ${item.type_license}`,
+              type: "license" as const,
+            })),
+          ]);
         }
       } catch (error) {
         if (!cancelled) {
@@ -433,6 +473,26 @@ export function TaskModelModal({
     }
   }
 
+  async function handleAddRegularizeLink() {
+    if (!initialData?.id || !regularizeDestination) return;
+    try {
+      await taskModelService.addRegularizeLink(initialData.id, regularizeDestination, regularizeType);
+      setRegularizeLinks(await taskModelService.listRegularizeLinks(initialData.id));
+      setRegularizeDestination("");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Não foi possível adicionar vínculo do Regularize."));
+    }
+  }
+
+  async function handleDeleteRegularizeLink(id: string) {
+    try {
+      await taskModelService.deleteRegularizeLink(id);
+      setRegularizeLinks((current) => current.filter((link) => link.id !== id));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Não foi possível remover vínculo do Regularize."));
+    }
+  }
+
   const optionsUnavailable =
     loadingOptions || requiredOptionsWarning || usersQuery.isLoading || usersQuery.isError;
   const taskModelsUnavailable = loadingOptions || taskModelsWarning;
@@ -525,11 +585,9 @@ export function TaskModelModal({
               <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
                 Departamento
               </RequiredFieldLabel>
-              <select
+              <ProjectSelect
                 value={formData.department_id}
                 onChange={(event) => updateFormValue("department_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={optionsUnavailable}
                 aria-required="true"
               >
@@ -542,7 +600,7 @@ export function TaskModelModal({
                     {department.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
@@ -551,11 +609,9 @@ export function TaskModelModal({
               <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
                 Responsável
               </RequiredFieldLabel>
-              <select
+              <ProjectSelect
                 value={formData.responsible_id}
                 onChange={(event) => updateFormValue("responsible_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={optionsUnavailable}
                 aria-required="true"
               >
@@ -568,18 +624,16 @@ export function TaskModelModal({
                     {user.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Responsável 2
               </span>
-              <select
+              <ProjectSelect
                 value={formData.responsible2_id}
                 onChange={(event) => updateFormValue("responsible2_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={!formData.responsible_id || optionsUnavailable}
                 aria-describedby={
                   !formData.responsible_id ? "task-model-responsible2-help" : undefined
@@ -594,7 +648,7 @@ export function TaskModelModal({
                     {user.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
               {!formData.responsible_id ? (
                 <span
                   id="task-model-responsible2-help"
@@ -609,11 +663,9 @@ export function TaskModelModal({
               <span className="text-sm font-medium text-slate-700 dark:text-white">
                 Responsável 3
               </span>
-              <select
+              <ProjectSelect
                 value={formData.responsible3_id}
                 onChange={(event) => updateFormValue("responsible3_id", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
                 disabled={!formData.responsible2_id || optionsUnavailable}
                 aria-describedby={
                   !formData.responsible2_id ? "task-model-responsible3-help" : undefined
@@ -628,7 +680,7 @@ export function TaskModelModal({
                     {user.name}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
               {!formData.responsible2_id ? (
                 <span
                   id="task-model-responsible3-help"
@@ -658,18 +710,16 @@ export function TaskModelModal({
 
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Cobrança</span>
-              <select
+              <ProjectSelect
                 value={formData.billing}
                 onChange={(event) => updateFormValue("billing", event.target.value)}
-                className={PROJECT_SELECT_CLASSNAME}
-                style={PROJECT_SELECT_ARROW_STYLE}
               >
                 {BILLING_OPTIONS.map((billing) => (
                   <option key={billing} value={billing}>
                     {billing}
                   </option>
                 ))}
-              </select>
+              </ProjectSelect>
             </label>
           </div>
 
@@ -686,6 +736,74 @@ export function TaskModelModal({
             </div>
           </label>
 
+          {isEditing ? (
+            <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-3`}>
+              <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">
+                Regularize
+              </h3>
+              <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-end">
+                <ProjectSelect
+                  aria-label="Tipo de destino Regularize"
+                  value={regularizeType}
+                  onChange={(event) => {
+                    setRegularizeType(event.target.value as "process" | "license");
+                    setRegularizeDestination("");
+                  }}
+                >
+                  <option value="process">Processo</option>
+                  <option value="license">Licença</option>
+                </ProjectSelect>
+                <ProjectSelect
+                  aria-label="Destino Regularize"
+                  value={regularizeDestination}
+                  onChange={(event) => setRegularizeDestination(event.target.value)}
+                >
+                  <option value="">Selecione o destino</option>
+                  {regularizeOptions
+                    .filter((option) => option.type === regularizeType)
+                    .map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                </ProjectSelect>
+                <button
+                  type="button"
+                  onClick={() => void handleAddRegularizeLink()}
+                  className={PROJECT_COMPACT_PRIMARY_BUTTON_CLASSNAME}
+                  disabled={!regularizeDestination}
+                  aria-label="Adicionar vínculo Regularize"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Adicionar
+                </button>
+              </div>
+              <ul className="mt-3 space-y-2 text-sm">
+                {regularizeLinks.length === 0 ? (
+                  <li className="text-slate-500">Nenhum vínculo cadastrado.</li>
+                ) : (
+                  regularizeLinks.map((link) => (
+                    <li key={link.id} className="flex items-center justify-between gap-3">
+                      <span>
+                        {link.referring_type === "process" ? "Processo" : "Licença"}:{" "}
+                        {regularizeOptions.find((option) => option.id === link.referring)?.label.replace(/^(Processo|Licença): /, "") ??
+                          link.referring}
+                        {link.available ? "" : " (indisponível)"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteRegularizeLink(link.id)}
+                        className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME}
+                        aria-label="Remover vínculo Regularize"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </section>
+          ) : null}
           {isEditing ? (
             <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-3`}>
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -705,7 +823,7 @@ export function TaskModelModal({
                   <span className="text-sm font-medium text-slate-700 dark:text-white">
                     Modelo dependente
                   </span>
-                  <select
+                  <ProjectSelect
                     value={newDependent.dependent_id}
                     onChange={(event) =>
                       setNewDependent((currentValue) => ({
@@ -713,8 +831,6 @@ export function TaskModelModal({
                         dependent_id: event.target.value,
                       }))
                     }
-                    className={PROJECT_SELECT_CLASSNAME}
-                    style={PROJECT_SELECT_ARROW_STYLE}
                     disabled={taskModelsUnavailable}
                   >
                     <option value="">{getDependentPlaceholder()}</option>
@@ -723,7 +839,7 @@ export function TaskModelModal({
                         {task.name}
                       </option>
                     ))}
-                  </select>
+                  </ProjectSelect>
                 </label>
 
                 <label className={TASK_FORM_LABEL_CLASSNAME}>

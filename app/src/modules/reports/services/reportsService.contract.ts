@@ -1,7 +1,9 @@
 import type {
   ReportPreviewPayload,
   ReportPreviewResult,
+  ReportCompositionPreview,
   ReportDownloadResult,
+  ReportJob,
   ReportHistoryPage,
   ReportsCatalog,
   ReportsCatalogField,
@@ -49,9 +51,7 @@ function normalizeCatalogField(value: unknown): ReportsCatalogField | undefined 
 
   const type = value.type ?? value.value_type;
   const operators = asStringArray(value.operators ?? value.filter_operators);
-  const aggregationFunctions = asStringArray(
-    value.aggregationFunctions ?? value.aggregations,
-  );
+  const aggregationFunctions = asStringArray(value.aggregationFunctions ?? value.aggregations);
   if (
     !["string", "number", "boolean", "date"].includes(String(type)) ||
     !operators ||
@@ -105,9 +105,17 @@ function normalizeCatalogSource(value: Record<string, unknown>): ReportsCatalogS
     key: value.key as string,
     label: value.label as string,
     module: value.module as string,
+    ...(typeof value.department_label === "string"
+      ? { department_label: value.department_label }
+      : {}),
+    ...(typeof value.description === "string" ? { description: value.description } : {}),
     fields,
-    ...(Array.isArray(value.relations) ? { relations: value.relations as ReportsCatalogSource["relations"] } : {}),
-    ...(Array.isArray(value.parameters) ? { parameters: value.parameters as ReportsCatalogSource["parameters"] } : {}),
+    ...(Array.isArray(value.relations)
+      ? { relations: value.relations as ReportsCatalogSource["relations"] }
+      : {}),
+    ...(Array.isArray(value.parameters)
+      ? { parameters: value.parameters as ReportsCatalogSource["parameters"] }
+      : {}),
   };
 }
 
@@ -126,7 +134,11 @@ export function unwrapReportsEnvelope<T>(body: unknown): T {
 export function unwrapReportsCatalogEnvelope(body: unknown): ReportsCatalog {
   const catalog = unwrapReportsEnvelope<unknown>(body);
 
-  if (!isRecord(catalog) || !Array.isArray(catalog.items) || !catalog.items.every(isCatalogSource)) {
+  if (
+    !isRecord(catalog) ||
+    !Array.isArray(catalog.items) ||
+    !catalog.items.every(isCatalogSource)
+  ) {
     throw reportsError();
   }
 
@@ -177,7 +189,8 @@ function isPreviewResult(value: unknown): value is {
     isRecord(value.presentation) &&
     Array.isArray(value.presentation.columns) &&
     value.presentation.columns.every(
-      (column) => isRecord(column) && typeof column.key === "string" && typeof column.label === "string",
+      (column) =>
+        isRecord(column) && typeof column.key === "string" && typeof column.label === "string",
     ) &&
     Array.isArray(value.rows) &&
     value.rows.every(isRecord) &&
@@ -199,9 +212,30 @@ export function unwrapReportsPreviewEnvelope(body: unknown): ReportPreviewResult
   };
 }
 
-export function buildReportJobListParams(
-  params: Record<string, unknown>,
-): Record<string, unknown> {
+export function unwrapReportCompositionPreview(body: unknown): ReportCompositionPreview {
+  const result = unwrapReportsEnvelope<unknown>(body);
+  if (
+    !isRecord(result) ||
+    !Array.isArray(result.blocks) ||
+    !result.blocks.every(
+      (block) =>
+        isRecord(block) &&
+        typeof block.source === "string" &&
+        typeof block.label === "string" &&
+        isPreviewResult(block),
+    )
+  )
+    throw reportsError();
+  return {
+    blocks: result.blocks.map((block) => ({
+      ...unwrapReportsPreviewEnvelope(block),
+      source: block.source,
+      label: block.label,
+    })),
+  };
+}
+
+export function buildReportJobListParams(params: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(params).filter(([, value]) => {
       if (value === undefined || value === null) return false;
@@ -219,6 +253,26 @@ export function unwrapReportJobListEnvelope(body: unknown): ReportHistoryPage {
   };
 }
 
+export function unwrapReportJobEnvelope(body: unknown): ReportJob {
+  const payload = unwrapReportsEnvelope<unknown>(body);
+  if (
+    !isRecord(payload) ||
+    typeof payload.id !== "string" ||
+    typeof payload.status !== "string"
+  ) {
+    throw reportsError();
+  }
+  const job: ReportJob = {
+    id: payload.id,
+    status: payload.status as ReportJob["status"],
+  };
+  const errorMessage = payload.error_message;
+  if (errorMessage === null || typeof errorMessage === "string") {
+    job.error_message = errorMessage as string | null;
+  }
+  return job;
+}
+
 export function parseReportFilename(header: string | undefined, fallback: string): string {
   const encoded = header?.match(/filename\*=(?:UTF-8''|utf-8'')([^;]+)/i)?.[1];
   const quoted = header?.match(/filename="([^"]+)"/i)?.[1];
@@ -232,7 +286,12 @@ export function parseReportFilename(header: string | undefined, fallback: string
       filename = raw.trim().replace(/^"|"$/g, "");
     }
   }
-  return filename.split(/[\\/]/u).pop()?.replace(/[\u0000-\u001f<>:"|?*]/gu, "_") || fallback;
+  return (
+    filename
+      .split(/[\\/]/u)
+      .pop()
+      ?.replace(/[\u0000-\u001f<>:"|?*]/gu, "_") || fallback
+  );
 }
 
 export function unwrapReportDownload(

@@ -10,7 +10,9 @@ import { useFetch } from "@shared/hooks";
 import { rhPointService } from "../services/rhPointService";
 import type {
   ApproveRhPointAdjustmentPayload,
+  ApproveRhPointAdjustmentsBulkPayload,
   CreateRhPointAdjustmentPayload,
+  CreateRhRetroactivePointPayload,
   RhPointAdjustmentListFilters,
   RhPointAdjustmentRequest,
   RhPointCalculationResult,
@@ -22,6 +24,7 @@ import type {
   RhTodayPoint,
   UpsertRhPointConfigPayload,
   RejectRhPointAdjustmentPayload,
+  RecalculateRhPointsPayload,
 } from "../types";
 import { RH_QUERY_KEY } from "./useRhRequests";
 
@@ -175,6 +178,21 @@ export function useCalculateRhPointMutation(): UseMutationResult<
   });
 }
 
+export function useRecalculateRhPointsMutation(): UseMutationResult<
+  RhPointCalculationResult[],
+  Error,
+  RecalculateRhPointsPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => rhPointService.recalculatePoints(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
+    },
+  });
+}
+
 export function useRequestRhPointAdjustmentMutation(): UseMutationResult<
   RhPointAdjustmentRequest,
   Error,
@@ -214,6 +232,52 @@ export function useRejectRhPointAdjustmentMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => rhPointService.rejectAdjustment(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
+    },
+  });
+}
+
+export function useApproveRhPointAdjustmentsBulkMutation(): UseMutationResult<
+  RhPointAdjustmentRequest[],
+  Error,
+  ApproveRhPointAdjustmentsBulkPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => rhPointService.approveAdjustmentsBulk(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
+    },
+  });
+}
+
+export function useCreateRhRetroactivePointMutation(): UseMutationResult<
+  RhPointAdjustmentRequest,
+  Error,
+  CreateRhRetroactivePointPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => rhPointService.createRetroactiveAdjustment(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
+    },
+  });
+}
+
+export function useUploadRhPointAdjustmentAttachmentMutation(): UseMutationResult<
+  RhPointAdjustmentRequest,
+  Error,
+  { requestId: string; file: File }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ requestId, file }) =>
+      rhPointService.uploadAdjustmentAttachment(requestId, file),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RH_POINT_QUERY_KEY });
     },

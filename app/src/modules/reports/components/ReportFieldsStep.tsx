@@ -1,60 +1,71 @@
-import type { ReportBuilderState, ReportsCatalogSource } from "../types/report.types";
-import { isReportFieldSelectable } from "../utils/reportBuilder";
-import { ReportStep, reportMutedClassName } from "./ReportStep";
+import { Button } from "@shared/ui/newLayout/button";
+import type { ReportsCatalogSource } from "../types/report.types";
+import { getSelectableReportFields } from "../utils/reportBuilder";
+import { reportCheckboxClassName } from "./reportUi";
 
 export function ReportFieldsStep({
   source,
   fieldKeys,
   onFieldKeysChange,
+  disabled,
 }: {
   source: ReportsCatalogSource;
-  fieldKeys: ReportBuilderState["fieldKeys"];
+  fieldKeys: string[];
   onFieldKeysChange: (fieldKeys: string[]) => void;
+  disabled?: boolean;
 }) {
-  function toggleField(fieldKey: string, checked: boolean) {
-    onFieldKeysChange(checked ? [...new Set([...fieldKeys, fieldKey])] : fieldKeys.filter((key) => key !== fieldKey));
-  }
-
+  const fields = getSelectableReportFields(source);
   return (
-    <ReportStep
-      title="3. Campos"
-      description="Selecione os campos que serão exibidos. Campos protegidos ou não publicados permanecem indisponíveis."
+    <fieldset
+      disabled={disabled}
+      className="space-y-4 border-t border-gray-200 pt-4 dark:border-slate-700"
     >
-      {source.fields.length === 0 ? (
-        <p className={reportMutedClassName} role="status">Esta fonte não publicou campos para seleção.</p>
-      ) : (
-        <fieldset className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <legend className="sr-only">Campos do relatório</legend>
-          {source.fields.map((field) => {
-            const selectable = isReportFieldSelectable(field);
-            return (
-              <label
-                key={field.key}
-                className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${
-                  selectable
-                    ? "border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-                    : "border-gray-200 bg-gray-50 text-gray-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-500"
-                }`}
-                title={selectable ? undefined : "Este campo não foi publicado para seleção."}
-              >
-                <input
-                  type="checkbox"
-                  checked={fieldKeys.includes(field.key)}
-                  disabled={!selectable}
-                  onChange={(event) => toggleField(field.key, event.currentTarget.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span>
-                  <span className="block font-medium text-gray-900 dark:text-slate-100">{field.label}</span>
-                  <span className="mt-0.5 block text-xs text-gray-500 dark:text-slate-500">
-                    {selectable ? field.key : "Não selecionável por regra de negócio"}
-                  </span>
-                </span>
-              </label>
-            );
-          })}
-        </fieldset>
-      )}
-    </ReportStep>
+      <legend className="font-semibold text-gray-900 dark:text-white">
+        Campos de {source.label}
+      </legend>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onFieldKeysChange(fields.map((field) => field.key))}
+        >
+          Selecionar todos
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => onFieldKeysChange([])}>
+          Limpar todos
+        </Button>
+        <span className="text-xs text-gray-600 dark:text-slate-400">
+          {fieldKeys.length} de {fields.length} campos
+        </span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {fields.map((field) => (
+          <label
+            key={field.key}
+            className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-3 text-sm text-gray-900 dark:border-slate-700 dark:text-slate-100"
+          >
+            <input
+              type="checkbox"
+              checked={fieldKeys.includes(field.key)}
+              onChange={(event) =>
+                onFieldKeysChange(
+                  event.currentTarget.checked
+                    ? [...fieldKeys, field.key]
+                    : fieldKeys.filter((key) => key !== field.key),
+                )
+              }
+              className={reportCheckboxClassName}
+            />
+            {field.label}
+          </label>
+        ))}
+      </div>
+      {fieldKeys.length === 0 ? (
+        <p className="text-sm text-gray-600 dark:text-slate-300">
+          Escolha ao menos um campo nesta área para continuar.
+        </p>
+      ) : null}
+    </fieldset>
   );
 }

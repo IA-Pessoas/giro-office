@@ -29,7 +29,6 @@ const certificateWorkspaceUiSource = readFileSync(
   "utf8",
 );
 const legacyOperationalModuleSources = {
-  Commercial: readFileSync(new URL("./components/newLayout/Commercial.tsx", import.meta.url), "utf8"),
   DepartamentoPessoal: readFileSync(
     new URL("./components/newLayout/DepartamentoPessoal.tsx", import.meta.url),
     "utf8",

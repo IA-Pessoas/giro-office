@@ -11,6 +11,7 @@ const { prismaMock } = vi.hoisted(() => ({
       findMany: vi.fn(),
       findFirstOrThrow: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       count: vi.fn(),
     },
     pointsConfig: {
@@ -54,6 +55,43 @@ describe("TimeBankReleaseService", () => {
     const service = new TimeBankReleaseService();
     await expect(service.approve({ id: "rel-1", organization_id: "org-1" })).rejects.toMatchObject({
       statusCode: 404,
+    });
+  });
+
+  it("approve incrementa o saldo somente quando consegue reivindicar o lancamento", async () => {
+    prismaMock.timeBankReleases.findFirst.mockResolvedValue({
+      id: "rel-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+      minutes: 45,
+      is_approved: false,
+    });
+    prismaMock.pointsConfig.findUnique.mockResolvedValue({ user_id: "user-1" });
+    prismaMock.timeBankReleases.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.timeBankReleases.findFirstOrThrow.mockResolvedValue({
+      id: "rel-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+      minutes: 45,
+      is_approved: true,
+    });
+
+    await expect(
+      new TimeBankReleaseService().approve({ id: "rel-1", organization_id: "org-1" }),
+    ).resolves.toMatchObject({
+      id: "rel-1",
+      is_approved: true,
+    });
+    expect(prismaMock.pointsConfig.update).toHaveBeenCalledWith({
+      where: { user_id: "user-1" },
+      data: { bank_balance: { increment: 45 } },
+    });
+
+    prismaMock.timeBankReleases.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      new TimeBankReleaseService().approve({ id: "rel-1", organization_id: "org-1" }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
     });
   });
 

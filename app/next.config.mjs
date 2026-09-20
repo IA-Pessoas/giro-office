@@ -38,6 +38,7 @@ const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: workspaceRoot,
   reactStrictMode: true,
+  allowedDevOrigins: ["localhost", "127.0.0.1"],
   transpilePackages: ["@workspace/api"],
   async headers() {
     return [

@@ -80,8 +80,17 @@ const clientSelect = {
   deletion_date: true,
 } satisfies Prisma.ClientSelect;
 
+const clientCreateSelect = {
+  ...clientSelect,
+  regime: true,
+} satisfies Prisma.ClientSelect;
+
 type ClientRow = Prisma.ClientGetPayload<{
   select: typeof clientSelect;
+}>;
+
+type ClientCreateRow = Prisma.ClientGetPayload<{
+  select: typeof clientCreateSelect;
 }>;
 
 const clientDetailSelect = {
@@ -227,7 +236,7 @@ function appendPublicExtras(row: ClientRow | ClientDetailRow, out: ClientPublic)
 }
 
 function toPublic(
-  row: ClientRow | ClientDetailRow,
+  row: ClientRow | ClientCreateRow | ClientDetailRow,
   organization: OrganizationPublic,
 ): ClientPublic {
   return appendPublicExtras(row, {
@@ -427,7 +436,7 @@ export class ClientService implements IClientService {
           service_unique: input.service_unique,
           ...extended,
         } as Prisma.ClientUncheckedCreateInput,
-        select: clientSelect,
+        select: clientCreateSelect,
       }),
     ]);
 

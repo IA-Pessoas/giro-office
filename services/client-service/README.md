@@ -15,6 +15,7 @@ Ver `src/config/env.ts`:
 - `CLIENT_SERVICE_INTERNAL_TOKEN` - token compartilhado com o gateway para o contexto encaminhado e para `POST /internal/competence-output-update` (header `x-internal-service-token`); obrigatório em produção
 - `AUDIT_SERVICE_TOKEN` - fallback local do token interno apenas fora de produção, quando `CLIENT_SERVICE_INTERNAL_TOKEN` não é informado
 - `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET` - token e segredo HMAC compartilhados com `reports-service` para `/internal/reporting/*`; obrigatórios e fortes em produção
+- `CNPJ_LOOKUP_API_URL`, `CNPJ_LOOKUP_API_TOKEN` - credenciais do provider oficial; sem ambos, a consulta automática responde indisponível e o cadastro continua manual
 
 ## Gateway
 
@@ -27,15 +28,14 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | Metodo | Caminho | Descricao |
 |--------|---------|-----------|
 | `GET` | `/client/list` | Listagem paginada. Query: `page`, `limit`, `search`, `status`, `ref` (`integracao` \| `deps`), `organization_id` opcional. |
-| `GET` | `/client/commercial/overview` | Overview comercial com dados reais de clientes e dominios sem fonte real zerados. |
 | `GET` | `/client/:id` | Detalhe. |
 | `POST` | `/client` | Criar (campos estendidos alinhados ao Prisma: endereco, fiscal, modulos, datas, etc.). |
 | `PATCH` | `/client/:id` | Atualizar parcial. |
 | `DELETE` | `/client/:id` | Desativar (soft): `status` Inativo + `deletion_date`. Requer `permission: 2`. |
 | `POST` | `/client/:id/activate` | Reativar. |
 | `POST` | `/client/integration` | Fluxo integracao (cadastro). |
+| `GET` | `/client/integration?cnpj=...` | Consulta oficial de dados da empresa para o autopreenchimento do cadastro PJ. |
 | `PATCH` | `/client/:id/integration` | Atualizacao integracao. |
-| `PATCH` | `/client/:id/commercial` | Comercial (prospeccao + efeitos em tarefas). |
 | `PATCH` | `/client/:id/termination` | Distrato. |
 | `PATCH` | `/client/:id/finance` | Contrato (`contract`). |
 | `PATCH` | `/client/:id/regularize` | Regularize (dados cadastrais estendidos). |
@@ -47,6 +47,11 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | `GET` | `/client/histories/pending` | Lista pendencias; query opcional `user_id`. |
 | `DELETE` | `/client/histories/pending/:pendingId` | Remover pendencia (admin). |
 | `POST` | `/internal/competence-output-update` | Rotina batch (token interno). |
+| `POST` | `/internal/commercial/prospecting-transition` | Projeção idempotente de transição comercial (token interno). |
+
+Prospecção e cobrança públicas pertencem ao `commercial-service` (`/commercial/*`). Os antigos
+`GET /client/commercial/overview` e `PATCH /client/:id/commercial` foram removidos no corte; efeitos
+projetados continuam entrando por `POST /internal/commercial/prospecting-transition`.
 
 ## Competencia via Supabase Edge Function
 
@@ -75,3 +80,7 @@ pnpm --filter @workspace/client-service dev
 ```
 
 Testes: `pnpm --filter @workspace/client-service test`. Integracao Postgres opcional: `CLIENT_SERVICE_INTEGRATION=1` e `DATABASE_URL`.
+
+## Critérios de relatórios
+
+`POST /internal/reporting/extract` aceita `query` opcional com filtros tipados, grupos AND/OR, ordenação, agrupamento e agregações. O corpo completo e todos os campos utilizados pertencem ao grant assinado. A origem aplica o escopo organizacional e processa o conjunto completo em snapshot consistente antes do limite de saída; excesso de 50.000 registros/20 MiB retorna 422, sem resultado parcial. Payloads sem `query` preservam o contrato legado. Consulte a [matriz e semântica dos critérios](../reports-service/docs/criteria-origins.md) e o OpenAPI do serviço.

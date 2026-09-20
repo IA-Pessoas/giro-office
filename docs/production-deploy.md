@@ -53,7 +53,7 @@ permanece CNAME do domínio raiz e o Caddy o redireciona para `https://useoffice
      -f docker-compose.production.yml ps
    ```
 
-O script valida os envs e o Compose, constrói as 17 imagens sequencialmente antes da troca,
+O script valida os envs e o Compose, constrói as 19 imagens sequencialmente antes da troca,
 aplica migrations, recria a stack e aguarda endpoints. Em falha, restaura as tags anteriores e
 tenta reiniciar a versão anterior.
 

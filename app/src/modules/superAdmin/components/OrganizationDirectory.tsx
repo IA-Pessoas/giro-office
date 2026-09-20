@@ -47,7 +47,7 @@ export function OrganizationDirectory({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <aside className="flex min-h-[34rem] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
         <div className="flex items-start justify-between gap-3">
           <div>

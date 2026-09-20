@@ -6,7 +6,7 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
 import express, { type Request, type Response } from "express";
 import "express-async-errors";
@@ -17,9 +17,11 @@ import { requestContext } from "./middlewares/requestContext.js";
 import { buildRhServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
 import categoryRoutes from "./routes/category.routes.js";
+import employeeDossierRoutes from "./routes/employeeDossier.routes.js";
 import holidayRoutes from "./routes/holiday.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
-import messageRoutes from "./routes/message.routes.js";
+import { createMessageRoutes } from "./routes/message.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 import operationalUserRoutes from "./routes/operationalUser.routes.js";
 import pointRoutes from "./routes/point.routes.js";
 import pointConfigRoutes from "./routes/pointConfig.routes.js";
@@ -29,8 +31,16 @@ import scoreNitroRoutes from "./routes/scoreNitro.routes.js";
 import scoreQuarterRoutes from "./routes/scoreQuarter.routes.js";
 import scoreQuestionRoutes from "./routes/scoreQuestion.routes.js";
 import timeBankReleaseRoutes from "./routes/timeBankRelease.routes.js";
-import timeClockRequestRoutes from "./routes/timeClockRequest.routes.js";
+import { createTimeClockRequestRoutes } from "./routes/timeClockRequest.routes.js";
 import timeSheetRoutes from "./routes/timeSheet.routes.js";
+import {
+  createSupabaseRhPointAdjustmentStorage,
+  UnavailableRhPointAdjustmentStorage,
+} from "./services/rhPointAdjustmentStorage.js";
+import {
+  createSupabaseRhRequestMessageStorage,
+  UnavailableRhRequestMessageStorage,
+} from "./services/rhRequestMessageStorage.js";
 
 function rhErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -51,6 +61,22 @@ export function createApp(
   options: { internalReportingService?: InternalReportingService } = {},
 ): express.Express {
   const app = express();
+  const attachmentStorage =
+    env.supabaseUrl && env.supabaseServiceRoleKey
+      ? createSupabaseRhPointAdjustmentStorage(
+          env.supabaseUrl,
+          env.supabaseServiceRoleKey,
+          env.rhPointAdjustmentBucket ?? "rh-point-adjustments",
+        )
+      : new UnavailableRhPointAdjustmentStorage();
+  const requestMessageStorage =
+    env.supabaseUrl && env.supabaseServiceRoleKey
+      ? createSupabaseRhRequestMessageStorage(
+          env.supabaseUrl,
+          env.supabaseServiceRoleKey,
+          env.rhRequestMessageBucket ?? "rh-request-messages",
+        )
+      : new UnavailableRhRequestMessageStorage();
 
   app.set("trust proxy", true);
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
@@ -73,8 +99,9 @@ export function createApp(
 
   app.use("/rh/point-config", pointConfigRoutes);
   app.use("/rh/point", pointRoutes);
-  app.use("/rh/point", timeClockRequestRoutes);
+  app.use("/rh/point", createTimeClockRequestRoutes({ attachmentStorage }));
   app.use("/rh/categories", categoryRoutes);
+  app.use("/rh/profile", employeeDossierRoutes);
   app.use("/rh/operational-users", operationalUserRoutes);
   app.use("/rh/requests", requestRoutes);
   app.use("/rh/score/questions", scoreQuestionRoutes);
@@ -83,7 +110,8 @@ export function createApp(
   app.use("/rh/holidays", holidayRoutes);
   app.use("/rh/time-bank", timeBankReleaseRoutes);
   app.use("/rh/time-bank-releases", timeBankReleaseRoutes);
-  app.use("/rh/messages", messageRoutes);
+  app.use("/rh/messages", createMessageRoutes({ attachmentStorage: requestMessageStorage }));
+  app.use("/rh/notifications", notificationRoutes);
   app.use("/rh/timesheets", timeSheetRoutes);
   app.use("/rh/score/nitro", scoreNitroRoutes);
   if (env.enableApiDocs) {

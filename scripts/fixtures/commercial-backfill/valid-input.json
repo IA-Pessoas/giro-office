@@ -1,0 +1,66 @@
+{
+  "organizationId": "org-commercial",
+  "cutoffAt": "2026-09-10T12:00:00.000Z",
+  "namespace": "giro-office:migration:v2:castelo-contabilidade",
+  "legacy": {
+    "clients": [{ "id": 10 }],
+    "prospecting": [
+      {
+        "id": 20,
+        "cliente_id": 10,
+        "status_prospeccao": "Fechado",
+        "data_status": "2026-09-01T00:00:00.000Z",
+        "solucao": "Plano anual"
+      }
+    ],
+    "tasks": [{ "id": 30, "cliente_id": 10 }],
+    "taskBillings": [
+      {
+        "id": 30,
+        "task_id": 30,
+        "hiring_status": "A Realizar",
+        "payment": null,
+        "billing_description": "Contrato em análise"
+      }
+    ],
+    "proposalConfigs": [{ "id": 40, "name": "Plano anual", "contract_value": 1500 }],
+    "unsupported": []
+  },
+  "current": {
+    "clients": [
+      {
+        "id": "a5ec1a24-31af-5773-bb3b-7d335cfc544d",
+        "organization_id": "org-commercial",
+        "prospecting_status": "Fechado",
+        "date_status": "2026-09-01T00:00:00.000Z",
+        "description_prospecting": "Plano anual"
+      }
+    ],
+    "projects": [
+      {
+        "id": "e3d56c4a-950c-5657-9ad6-18e0fc878718",
+        "organization_id": "org-commercial",
+        "client_id": "a5ec1a24-31af-5773-bb3b-7d335cfc544d"
+      }
+    ],
+    "prospecting": [],
+    "tasks": [
+      {
+        "id": "25aa28ed-3efa-5593-8eaa-6c672b92bff7",
+        "organization_id": "org-commercial",
+        "client_id": "a5ec1a24-31af-5773-bb3b-7d335cfc544d",
+        "project_id": "e3d56c4a-950c-5657-9ad6-18e0fc878718",
+        "billing": "Realizar",
+        "status": "A Realizar",
+        "charge_comercial": false,
+        "charge_financeiro": false,
+        "hiring_status": null,
+        "payment": null,
+        "billing_description": null,
+        "date_updated": "2026-09-01T00:00:00.000Z"
+      }
+    ],
+    "taskBillings": [],
+    "proposalConfigs": []
+  }
+}

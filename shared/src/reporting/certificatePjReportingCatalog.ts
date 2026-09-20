@@ -1,3 +1,5 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
 const dateOperators = ["eq", "neq", "gt", "gte", "lt", "lte", "between"] as const;
 const booleanOperators = ["eq", "neq"] as const;
@@ -10,7 +12,15 @@ function field(
   filter_operators: readonly string[],
   aggregations: readonly string[] = [],
 ) {
-  return { key, label, value_type, filter_operators, aggregations };
+  return {
+    groupable: true,
+    sortable: true,
+    key,
+    label,
+    value_type,
+    filter_operators,
+    aggregations: [...new Set([...aggregations, ...reportingAggregations(value_type)])],
+  };
 }
 
 export const CERTIFICATE_PJ_REPORTING_SOURCES = ["certificado.pj"] as const;

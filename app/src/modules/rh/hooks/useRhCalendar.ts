@@ -13,6 +13,7 @@ import type {
   CreateRhHolidayPayload,
   CreateRhTimeBankReleasePayload,
   CreateRhTimeSheetPayload,
+  RebuildRhTimeSheetPayload,
   DeleteRhHolidayPayload,
   RhHoliday,
   RhMutationMessage,
@@ -23,6 +24,7 @@ import type {
   RhTimeSheetDetail,
   RhTimeSheetListItem,
   RhTimeSheetListFilters,
+  ReopenRhTimeSheetPayload,
   SignRhTimeSheetPayload,
   UpdateRhHolidayPayload,
 } from "../types";
@@ -223,6 +225,44 @@ export function useSignRhTimeSheetMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => rhCalendarService.signTimeSheet(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+    },
+  });
+}
+
+export function useRebuildRhTimeSheetMutation(): UseMutationResult<
+  RhTimeSheetDetail,
+  Error,
+  RebuildRhTimeSheetPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => rhCalendarService.rebuildTimeSheet(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
+    },
+  });
+}
+
+export function useDownloadRhTimeSheetPdfMutation(): UseMutationResult<
+  { blob: Blob; filename: string },
+  Error,
+  string
+> {
+  return useMutation({ mutationFn: (id) => rhCalendarService.downloadTimeSheetPdf(id) });
+}
+
+export function useReopenRhTimeSheetMutation(): UseMutationResult<
+  RhTimeSheetDetail,
+  Error,
+  ReopenRhTimeSheetPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => rhCalendarService.reopenTimeSheet(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RH_QUERY_KEY });
     },

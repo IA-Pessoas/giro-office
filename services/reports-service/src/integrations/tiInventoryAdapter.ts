@@ -1,5 +1,4 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
-
 import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
@@ -7,7 +6,6 @@ import {
   ServiceError,
   tiInventoryReportingCatalog,
 } from "@workspace/shared";
-
 import type {
   ReportCatalogRelation,
   ReportCatalogSource,
@@ -17,6 +15,12 @@ import type {
 } from "../catalog/types.js";
 import type { ReportsServiceEnv } from "../config/env.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
+import {
+  assertReportSourceResponse,
+  reportCriteria,
+  reportingQueryFields,
+  reportResultFields,
+} from "./reportCriteria.js";
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
@@ -93,13 +97,7 @@ export class TiInventoryAdapter implements ReportSourceAdapter {
 
   async preview(input: ReportPreviewAdapterInput): Promise<ReportPreviewAdapterResult> {
     const definition = input.definition as ReportDefinition;
-    if (
-      definition.sources.length !== 1 ||
-      definition.joins.length > 0 ||
-      definition.filters.length > 0 ||
-      definition.aggregations.length > 0 ||
-      definition.order_by.length > 0
-    ) {
+    if (definition.sources.length !== 1 || definition.joins.length > 0) {
       throw new ServiceError(
         400,
         "A prévia do inventário de Tecnologia aceita somente colunas de uma fonte.",
@@ -113,12 +111,17 @@ export class TiInventoryAdapter implements ReportSourceAdapter {
         "As colunas do inventário de Tecnologia devem usar campos únicos.",
       );
     }
-    const body = { source, fields, limit: Math.min(input.limit, MAX_TI_INVENTORY_REPORTING_LIMIT) };
+    const body = {
+      ...reportCriteria(definition, input.parameter_values),
+      source,
+      fields,
+      limit: Math.min(input.limit, MAX_TI_INVENTORY_REPORTING_LIMIT),
+    };
     const requestId = input.request_id || randomUUID();
     const signed = createGrant({
       secret: this.env.reportsGrantSecret,
       source,
-      fields,
+      fields: reportingQueryFields(fields, body.query),
       organizationId: input.organization_id,
       requestId,
       body,
@@ -136,12 +139,15 @@ export class TiInventoryAdapter implements ReportSourceAdapter {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(this.env.sourceTimeoutMs),
       });
+      assertReportSourceResponse(response);
       const payload: unknown = await response.json();
       if (!response.ok || !isExtractResponse(payload))
         throw new Error("Resposta interna inválida.");
       return {
         rows: payload.data.rows.map((row) =>
-          Object.fromEntries(fields.map((field) => [field, row[field]])),
+          Object.fromEntries(
+            reportResultFields(fields, body.query).map((field) => [field, row[field]]),
+          ),
         ),
         reachedLimit: payload.data.reachedLimit,
       };
@@ -149,6 +155,7 @@ export class TiInventoryAdapter implements ReportSourceAdapter {
       logError("Falha ao extrair inventário de Tecnologia para relatório", {
         errorType: err instanceof Error ? err.name : typeof err,
       });
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(
         503,
         "Não foi possível obter o inventário de Tecnologia para o relatório.",

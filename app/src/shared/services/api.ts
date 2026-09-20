@@ -31,7 +31,11 @@ export function readBrowserCookie(name: string): string | undefined {
   }
 }
 
-export function setupAPIClient(ctx?: ApiServerContext, onUnauthorized?: () => void) {
+export function setupAPIClient(
+  ctx?: ApiServerContext,
+  onUnauthorized?: () => void,
+  onCsrfFailure?: () => void,
+) {
   return createApiClient({
     baseURL: ctx
       ? process.env.API_INTERNAL_URL || "http://127.0.0.1:3010"
@@ -39,6 +43,7 @@ export function setupAPIClient(ctx?: ApiServerContext, onUnauthorized?: () => vo
     cookieHeader: ctx?.req?.headers?.cookie,
     getCsrfToken: () => readBrowserCookie("cw.csrf"),
     onUnauthorized,
+    onCsrfFailure,
     getUnauthorizedErrorForSsr: () => new AuthTokenError(),
     onServerError: () => {
       notifyServerError(toast);

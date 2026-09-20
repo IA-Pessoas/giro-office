@@ -57,6 +57,12 @@
       "development": "./src/routes/services.ts",
       "default": "./dist/routes/services.js"
     },
+    "./regularize": {
+      "types": "./dist/regularize/guidance.d.ts",
+      "development": "./src/regularize/guidance.ts",
+      "import": "./dist/regularize/guidance.js",
+      "default": "./dist/regularize/guidance.js"
+    },
     "./schemas": {
       "types": "./dist/schemas/index.d.ts",
       "import": "./dist/schemas/index.js",
@@ -72,6 +78,12 @@
       "import": "./dist/storage/index.js",
       "development": "./src/storage/index.ts",
       "default": "./dist/storage/index.js"
+    },
+    "./triagem": {
+      "types": "./dist/triagem/index.d.ts",
+      "development": "./src/triagem/index.ts",
+      "import": "./dist/triagem/index.js",
+      "default": "./dist/triagem/index.js"
     },
     "./upload": {
       "types": "./dist/upload/index.d.ts",
@@ -89,6 +101,12 @@
       "import": "./dist/testUtils/index.js",
       "development": "./src/testUtils/index.ts",
       "default": "./dist/testUtils/index.js"
+    },
+    "./openapi": {
+      "types": "./dist/http/swaggerUi.d.ts",
+      "development": "./src/http/swaggerUi.ts",
+      "import": "./dist/http/swaggerUi.js",
+      "default": "./dist/http/swaggerUi.js"
     },
     "./package.json": "./package.json"
   },

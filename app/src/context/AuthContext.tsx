@@ -26,6 +26,8 @@ interface UserProps {
     organization_id?: string | null;
     type?: "owner" | "admin" | "user" | null;
     modules?: Record<string, number>;
+    /** Permissão específica que autoriza decidir conclusões de tarefa no nível 2. */
+    task_completion?: boolean;
     auth_kind?: "organization" | "platform";
     platform_role?: "super_admin";
 }
@@ -59,6 +61,11 @@ type AuthProviderProps = {
 export const AuthContext = createContext({} as AuthContextData);
 const SESSION_TRANSITION_MIN_DURATION_MS = 380;
 const AUTH_DIAGNOSTIC_LOGS_ENABLED = process.env.NODE_ENV !== "production";
+const REGULARIZE_QUERY_ROOT = ["regularize"] as const;
+
+function clearRegularizeQueryCache(queryClient: ReturnType<typeof useQueryClient>) {
+    queryClient.removeQueries({ queryKey: REGULARIZE_QUERY_ROOT });
+}
 
 function logAuthError(message: string, details?: unknown) {
     if (!AUTH_DIAGNOSTIC_LOGS_ENABLED) {
@@ -187,6 +194,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 stopLoading: () => setLoading(false),
                 clearCache: () => {
                     queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                    clearRegularizeQueryCache(queryClient);
                     void clearPlatformQueryCache(queryClient);
                 },
             }),
@@ -212,6 +220,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (!isValidAuthUser(userData)) {
                 setUser(null);
                 queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                clearRegularizeQueryCache(queryClient);
                 return null;
             }
 
@@ -244,6 +253,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (!isValidPlatformUser(userData)) {
                 setUser(null);
                 queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                clearRegularizeQueryCache(queryClient);
                 await clearPlatformQueryCache(queryClient);
                 return null;
             }
@@ -257,6 +267,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 if (isAccessDenied(error)) {
                     setUser(null);
                     queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+                    clearRegularizeQueryCache(queryClient);
                     await clearPlatformQueryCache(queryClient);
                 }
                 logAuthError("Erro ao atualizar sessão da plataforma:", error);
@@ -317,6 +328,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (!isValidAuthUser(sessionData)) {
                 setUser(null);
                 toast.error("Resposta de autenticação inválida!");
+                clearRegularizeQueryCache(queryClient);
                 throw new Error("Invalid authentication response");
             }
 
@@ -327,6 +339,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const currentUser = buildCurrentUser(sessionData);
             setUser(currentUser);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            clearRegularizeQueryCache(queryClient);
 
             toast.success("Login Feito!");
             await Router.push("/dashboard");
@@ -384,6 +397,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         setUser(buildPlatformUser(userData));
         queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+        clearRegularizeQueryCache(queryClient);
         await clearPlatformQueryCache(queryClient);
         await Router.push("/super-admin");
     }
@@ -405,6 +419,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } finally {
             setUser(null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            clearRegularizeQueryCache(queryClient);
             await clearPlatformQueryCache(queryClient);
             await wait(SESSION_TRANSITION_MIN_DURATION_MS);
             await Router.push("/login");
@@ -423,6 +438,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } finally {
             setUser(null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            clearRegularizeQueryCache(queryClient);
             await clearPlatformQueryCache(queryClient);
             await wait(SESSION_TRANSITION_MIN_DURATION_MS);
             await Router.push("/super-admin/login");

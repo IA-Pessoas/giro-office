@@ -16,6 +16,18 @@ export interface CreateApiClientOptions {
   getUnauthorizedErrorForSsr?: () => Error;
   /** Browser only: chamado em respostas HTTP 5xx (ex.: toast genérico). */
   onServerError?: () => void;
+  /** Browser only: chamado quando o gateway rejeita a sessão por CSRF inválido. */
+  onCsrfFailure?: () => void;
+}
+
+function isCsrfFailure(error: AxiosError): boolean {
+  const data = error.response?.data;
+  return (
+    error.response?.status === 403 &&
+    !!data &&
+    typeof data === "object" &&
+    (data as { error?: unknown }).error === "Requisição não autorizada."
+  );
 }
 
 export function createApiClient(options: CreateApiClientOptions): AxiosInstance {
@@ -26,6 +38,7 @@ export function createApiClient(options: CreateApiClientOptions): AxiosInstance 
     onUnauthorized,
     getUnauthorizedErrorForSsr,
     onServerError,
+    onCsrfFailure,
   } = options;
   const api = axios.create({ baseURL, withCredentials: true });
   const csrfSnapshots = new WeakMap<object, string | undefined>();
@@ -157,6 +170,9 @@ export function createApiClient(options: CreateApiClientOptions): AxiosInstance 
     },
     (error: AxiosError) => {
       settleRefresh(error.config);
+      if (typeof window !== "undefined" && isCsrfFailure(error)) {
+        onCsrfFailure?.();
+      }
       if (error.response?.status === 401) {
         if (typeof window !== "undefined") {
           onUnauthorized?.();

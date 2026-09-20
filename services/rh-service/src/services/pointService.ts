@@ -2,7 +2,14 @@ import { error as logError, ServiceError, TimeUtils } from "@workspace/shared";
 import { getRhEnv } from "../config/env.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
+import {
+  DEFAULT_ORGANIZATION_TIMEZONE,
+  normalizeOrganizationDate,
+  organizationDateKey,
+  organizationDayBounds,
+} from "../utils/rhDateUtils.js";
 import { expectedMinutesFromPointConfig } from "../utils/rhPointTimeUtils.js";
+import { assertPointDayIsUnlocked } from "./rhTimeSheetLockService.js";
 
 const { pointMinIntervalMinutes } = getRhEnv();
 
@@ -36,6 +43,13 @@ export type CalculateDailyHoursResult = {
   expected_minutes: number;
   day_balance_minutes: number;
 };
+
+export interface RecalculatePointsInput {
+  organization_id: string;
+  user_id: string;
+  date_from: Date;
+  date_to: Date;
+}
 
 const POINT_SELECT = {
   id: true,
@@ -105,7 +119,7 @@ function nextActionFromPoint(point: PointSnapshot | null): RegisterPointAction |
   return "Saída";
 }
 
-function parseMonthBounds(month: string): { monthStart: Date; monthEnd: Date } {
+function parseMonthDateKeys(month: string): { startKey: string; endKey: string } {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
   if (!match) {
     throw new ServiceError(400, "month deve estar no formato YYYY-MM.");
@@ -113,14 +127,62 @@ function parseMonthBounds(month: string): { monthStart: Date; monthEnd: Date } {
 
   const year = Number(match[1]);
   const monthIndex = Number(match[2]) - 1;
+  const startKey = `${match[1]}-${match[2]}-01`;
+  const nextMonth = new Date(Date.UTC(year, monthIndex + 1, 1));
+  const endKey = new Date(nextMonth.getTime() - 86_400_000).toISOString().slice(0, 10);
+
+  return { startKey, endKey };
+}
+
+function parseMonthBounds(
+  month: string,
+  timezone: string,
+): { monthStart: Date; monthEnd: Date; startKey: string; endKey: string } {
+  const { startKey, endKey } = parseMonthDateKeys(month);
+  const monthStart = normalizeOrganizationDate(startKey, timezone);
+  const nextMonth = new Date(`${endKey}T00:00:00.000Z`);
+  nextMonth.setUTCDate(nextMonth.getUTCDate() + 1);
+  const nextMonthKey = nextMonth.toISOString().slice(0, 10);
+  const monthEnd = new Date(normalizeOrganizationDate(nextMonthKey, timezone).getTime() - 1);
 
   return {
-    monthStart: new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0)),
-    monthEnd: new Date(Date.UTC(year, monthIndex + 1, 0, 23, 59, 59, 999)),
+    monthStart,
+    monthEnd,
+    startKey,
+    endKey,
   };
 }
 
 class PointService {
+  private async organizationTimezone(organizationId: string): Promise<string> {
+    const dbWithOrganization = prismaClient as typeof prismaClient & {
+      organization?: {
+        findUnique: (args: unknown) => Promise<{ timezone?: string | null } | null>;
+      };
+    };
+    const organization = await dbWithOrganization.organization?.findUnique({
+      where: { id: organizationId },
+      select: { timezone: true },
+    });
+    return organization?.timezone?.trim() || DEFAULT_ORGANIZATION_TIMEZONE;
+  }
+
+  private async assertPointDayUnlocked(input: {
+    organizationId: string;
+    userId: string;
+    day: Date;
+    timezone: string;
+  }): Promise<void> {
+    if ("timeSheets" in prismaClient && prismaClient.timeSheets) {
+      await assertPointDayIsUnlocked(prismaClient as Pick<Prisma.TransactionClient, "timeSheets">, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        day: input.day,
+        timezone: input.timezone,
+      });
+    }
+  }
+
   async registerPoint(input: RegisterPointInput): Promise<RegisterPointResult> {
     try {
       if (!input.user_id?.trim()) {
@@ -131,7 +193,8 @@ class PointService {
       }
 
       const now = new Date();
-      const { dayStart, dayEnd } = TimeUtils.getUtcDayBounds(now);
+      const timezone = await this.organizationTimezone(input.organization_id);
+      const { start: dayStart, end: dayEnd } = organizationDayBounds(now, timezone);
 
       const existing = await prismaClient.point.findFirst({
         where: {
@@ -140,6 +203,13 @@ class PointService {
           clock_in: { gte: dayStart, lte: dayEnd },
         },
         select: POINT_SELECT,
+      });
+
+      await this.assertPointDayUnlocked({
+        organizationId: input.organization_id,
+        userId: input.user_id,
+        day: now,
+        timezone,
       });
 
       const assertMinInterval = (last: Date) => {
@@ -194,7 +264,7 @@ class PointService {
         select: POINT_SELECT,
       });
 
-      await this.calculateDailyHours(closed.id, input.organization_id);
+      await this.calculateDailyHours(closed.id, input.organization_id, prismaClient, timezone);
 
       const afterCalc = await prismaClient.point.findUniqueOrThrow({
         where: { id: closed.id },
@@ -214,6 +284,7 @@ class PointService {
     pointId: string,
     organizationId: string,
     db: Pick<Prisma.TransactionClient, "point" | "pointsConfig" | "holidays"> = prismaClient,
+    timezone = DEFAULT_ORGANIZATION_TIMEZONE,
   ): Promise<CalculateDailyHoursResult> {
     try {
       if (!pointId?.trim()) {
@@ -233,6 +304,7 @@ class PointService {
           lunch_out: true,
           lunch_in: true,
           clock_out: true,
+          time_bank_balance: true,
         },
       });
 
@@ -250,6 +322,15 @@ class PointService {
           400,
           "Registro incompleto para calculo (intervalo de almoco ausente).",
         );
+      }
+
+      if ("timeSheets" in db && db.timeSheets) {
+        await assertPointDayIsUnlocked(db as Pick<Prisma.TransactionClient, "timeSheets">, {
+          organizationId,
+          userId: point.user_id,
+          day: point.clock_in,
+          timezone,
+        });
       }
 
       const config = await db.pointsConfig.findUnique({
@@ -271,7 +352,8 @@ class PointService {
         throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
       }
 
-      const { dayStart, dayEnd } = TimeUtils.getUtcDayBounds(point.clock_in);
+      const { start: dayStart, end: dayEnd } = organizationDayBounds(point.clock_in, timezone);
+      const organizationDay = normalizeOrganizationDate(point.clock_in, timezone);
       const holiday = await db.holidays.findFirst({
         where: {
           organization_id: organizationId,
@@ -283,7 +365,7 @@ class PointService {
       let expectedMinutes = 0;
       if (holiday) {
         expectedMinutes = 0;
-      } else if (!TimeUtils.isWorkDayUtc(config.work_days, point.clock_in)) {
+      } else if (!TimeUtils.isWorkDayUtc(config.work_days, organizationDay)) {
         expectedMinutes = 0;
       } else {
         expectedMinutes = expectedMinutesFromPointConfig(config);
@@ -293,6 +375,13 @@ class PointService {
       const afternoonWorked = TimeUtils.diffMinutes(point.lunch_in, point.clock_out);
       const totalWorkedMinutes = morningWorked + afternoonWorked;
       const dayBalance = totalWorkedMinutes - expectedMinutes;
+
+      if (point.time_bank_balance !== null && point.time_bank_balance !== undefined) {
+        await db.pointsConfig.update({
+          where: { user_id: point.user_id },
+          data: { bank_balance: { decrement: point.time_bank_balance } },
+        });
+      }
 
       await db.point.update({
         where: { id: point.id },
@@ -323,24 +412,79 @@ class PointService {
     }
   }
 
+  async recalculateRange(input: RecalculatePointsInput): Promise<CalculateDailyHoursResult[]> {
+    try {
+      if (!input.organization_id?.trim() || !input.user_id?.trim()) {
+        throw new ServiceError(400, "organization_id e user_id sao obrigatorios.");
+      }
+      if (
+        Number.isNaN(input.date_from.getTime()) ||
+        Number.isNaN(input.date_to.getTime()) ||
+        input.date_from.getTime() > input.date_to.getTime()
+      ) {
+        throw new ServiceError(400, "Periodo de recalculo invalido.");
+      }
+
+      const dbWithOrganization = prismaClient as typeof prismaClient & {
+        organization?: {
+          findUnique: (args: unknown) => Promise<{ timezone?: string | null } | null>;
+        };
+      };
+      const organization = await dbWithOrganization.organization?.findUnique({
+        where: { id: input.organization_id },
+        select: { timezone: true },
+      });
+      const timezone = organization?.timezone?.trim() || DEFAULT_ORGANIZATION_TIMEZONE;
+      const points = await prismaClient.point.findMany({
+        where: {
+          organization_id: input.organization_id,
+          user_id: input.user_id,
+          clock_in: {
+            gte: organizationDayBounds(input.date_from, timezone).start,
+            lte: organizationDayBounds(input.date_to, timezone).end,
+          },
+        },
+        select: { id: true },
+        orderBy: [{ clock_in: "asc" }, { id: "asc" }],
+      });
+
+      return await prismaClient.$transaction(async (tx) => {
+        const results: CalculateDailyHoursResult[] = [];
+        for (const point of points) {
+          results.push(
+            await this.calculateDailyHours(point.id, input.organization_id, tx, timezone),
+          );
+        }
+        return results;
+      });
+    } catch (err: unknown) {
+      logError("Erro ao recalcular registros de ponto", { err });
+      if (err instanceof ServiceError) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ServiceError(500, `Erro interno ao recalcular registros de ponto. ${msg}`, err);
+    }
+  }
+
   async listPoints(organizationId: string, filters: PointListFilters): Promise<PointListItem[]> {
     try {
       if (!organizationId?.trim()) {
         throw new ServiceError(400, "organization_id e obrigatorio.");
       }
 
+      const timezone = await this.organizationTimezone(organizationId);
+
       const clockInFilter: Prisma.DateTimeFilter = {};
       if (filters.date_from !== undefined) {
         if (Number.isNaN(filters.date_from.getTime())) {
           throw new ServiceError(400, "date_from invalido.");
         }
-        clockInFilter.gte = TimeUtils.getUtcDayBounds(filters.date_from).dayStart;
+        clockInFilter.gte = organizationDayBounds(filters.date_from, timezone).start;
       }
       if (filters.date_to !== undefined) {
         if (Number.isNaN(filters.date_to.getTime())) {
           throw new ServiceError(400, "date_to invalido.");
         }
-        clockInFilter.lte = TimeUtils.getUtcDayBounds(filters.date_to).dayEnd;
+        clockInFilter.lte = organizationDayBounds(filters.date_to, timezone).end;
       }
 
       const where: Prisma.PointWhereInput = {
@@ -380,7 +524,8 @@ class PointService {
         throw new ServiceError(400, "organization_id e obrigatorio.");
       }
 
-      const { dayStart, dayEnd } = TimeUtils.getUtcDayBounds(new Date());
+      const timezone = await this.organizationTimezone(input.organization_id);
+      const { start: dayStart, end: dayEnd } = organizationDayBounds(new Date(), timezone);
       const point = await prismaClient.point.findFirst({
         where: {
           user_id: input.user_id,
@@ -421,7 +566,10 @@ class PointService {
         throw new ServiceError(400, "organization_id e obrigatorio.");
       }
 
-      const { monthStart, monthEnd } = parseMonthBounds(input.month);
+      const timezone = await this.organizationTimezone(input.organization_id);
+      const { monthStart, monthEnd, startKey, endKey } = parseMonthBounds(input.month, timezone);
+      const holidayMonthStart = new Date(`${startKey}T00:00:00.000Z`);
+      const holidayMonthEnd = new Date(`${endKey}T23:59:59.999Z`);
 
       const config = await prismaClient.pointsConfig.findUnique({
         where: { user_id: input.user_id },
@@ -456,7 +604,7 @@ class PointService {
         prismaClient.holidays.findMany({
           where: {
             organization_id: input.organization_id,
-            date: { gte: monthStart, lte: monthEnd },
+            date: { gte: holidayMonthStart, lte: holidayMonthEnd },
           },
           select: { date: true },
         }),
@@ -471,20 +619,20 @@ class PointService {
       ]);
 
       const holidayKeys = new Set(
-        holidays.map((holiday) => TimeUtils.getUtcDayBounds(holiday.date).dayStart.toISOString()),
+        holidays.map((holiday) => holiday.date.toISOString().slice(0, 10)),
       );
       const pointDayKeys = new Set(
-        points.map((point) => TimeUtils.getUtcDayBounds(point.clock_in).dayStart.toISOString()),
+        points.map((point) => organizationDateKey(point.clock_in, timezone)),
       );
 
       let absenceDays = 0;
       let expectedWorkDayCount = 0;
       for (
-        let cursor = new Date(monthStart);
-        cursor.getTime() <= monthEnd.getTime();
+        let cursor = new Date(`${startKey}T00:00:00.000Z`);
+        cursor.toISOString().slice(0, 10) <= endKey;
         cursor = new Date(cursor.getTime() + 86_400_000)
       ) {
-        const dayKey = TimeUtils.getUtcDayBounds(cursor).dayStart.toISOString();
+        const dayKey = cursor.toISOString().slice(0, 10);
         if (holidayKeys.has(dayKey)) {
           continue;
         }

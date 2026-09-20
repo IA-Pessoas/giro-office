@@ -1,4 +1,7 @@
-import type { PrismaClient } from "../generated/prisma/client.js";
+import { isDeepStrictEqual } from "node:util";
+import type { Prisma } from "../generated/prisma/client.js";
+
+type LogExecutor = { logs: Pick<Prisma.TransactionClient["logs"], "create"> };
 
 interface CreateLogInput {
   userId: string;
@@ -20,7 +23,7 @@ interface LogUpdateInput {
 }
 
 export class RegularizeLogService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: LogExecutor) {}
 
   async createLog(input: CreateLogInput): Promise<void> {
     await this.prisma.logs.create({
@@ -39,7 +42,7 @@ export class RegularizeLogService {
     const changes: Record<string, { from: unknown; to: unknown }> = {};
 
     for (const key of Object.keys(input.updatedData)) {
-      if (input.oldData?.[key] !== input.updatedData[key]) {
+      if (!isDeepStrictEqual(input.oldData?.[key], input.updatedData[key])) {
         changes[key] = {
           from: input.oldData?.[key],
           to: input.updatedData[key],

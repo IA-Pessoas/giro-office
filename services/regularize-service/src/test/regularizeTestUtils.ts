@@ -13,6 +13,7 @@ import type {
   RegularizeLicenseReportingService,
   RegularizeMunicipalTaxesReportingService,
 } from "../reporting/internalReportingService.js";
+import type { LicenseProtocolStorage } from "../services/licenseProtocolStorage.js";
 import { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 
 export const regularizeTestEnv: RegularizeServiceEnv = {
@@ -21,10 +22,13 @@ export const regularizeTestEnv: RegularizeServiceEnv = {
   databaseUrl: "postgresql://localhost/test",
   jwtSecret: "secret",
   auditServiceToken: "audit-service-token",
-  internalServiceToken: "internal-token",
+  internalServiceToken: "regularize-service-internal-token",
   regularizeReportingToken: "regularize-reporting-token",
   regularizeReportingGrantSecret: "regularize-reporting-grant-secret",
   encryptionKey: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+  supabaseUrl: "https://example.supabase.co",
+  supabaseServiceRoleKey: "test-service-role-key",
+  licenseProtocolBucket: "regularize-license-protocols",
   logLevel: "info",
   logPretty: false,
   enableApiDocs: false,
@@ -33,7 +37,7 @@ export const regularizeTestEnv: RegularizeServiceEnv = {
 
 export function gatewayHeaders(options: { permission?: number } = {}) {
   return {
-    [INTERNAL_SERVICE_TOKEN_HEADER]: regularizeTestEnv.auditServiceToken,
+    [INTERNAL_SERVICE_TOKEN_HEADER]: regularizeTestEnv.internalServiceToken,
     [FORWARDED_AUTH_USER_ID_HEADER]: "user-1",
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "a0000000-0000-4000-8000-000000000001",
     [FORWARDED_AUTH_PERMISSION_HEADER]: String(options.permission ?? 10),
@@ -66,6 +70,7 @@ export function createTestApp(
   prisma: PrismaClient = {} as PrismaClient,
   internalReportingService?: RegularizeLicenseReportingService,
   municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService,
+  protocolStorage?: LicenseProtocolStorage,
 ) {
   return createApp({
     env: regularizeTestEnv,
@@ -78,5 +83,6 @@ export function createTestApp(
     runClientPfDocumentsReconciliation: vi.fn(async () => ({ created: 0 })),
     internalReportingService,
     municipalTaxesReportingService,
+    protocolStorage,
   });
 }

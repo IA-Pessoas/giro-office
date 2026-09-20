@@ -2,7 +2,7 @@
 # O AGENTS.md da raiz aponta para este arquivo e para os arquivos em .codex/rules/.
 
 [rules]
-default = [".codex/rules/default.rules.md"]
+default = [".codex/rules/default.rules.md", ".codex/rules/agent-safety.rules.md"]
 
 [[rules.scoped]]
 name = "package-manager"

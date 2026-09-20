@@ -1,4 +1,4 @@
-﻿import { once } from "node:events";
+import { once } from "node:events";
 import { createServer, type IncomingMessage, request as nodeRequest, type Server } from "node:http";
 import { Writable } from "node:stream";
 
@@ -16,7 +16,6 @@ import {
   hashCsrfToken,
   INTERNAL_SERVICE_TOKEN_HEADER,
 } from "@workspace/shared";
-import { MemoryLogStream } from "@workspace/shared/testUtils";
 import express from "express";
 import jwt from "jsonwebtoken";
 import { expect, it, vi } from "vitest";
@@ -24,8 +23,13 @@ import { expect, it, vi } from "vitest";
 import { isAuthenticated as authenticateDepartment } from "../../department-service/src/middlewares/isAuthenticated.js";
 import { isAuthenticated as authenticateRh } from "../../rh-service/src/middlewares/isAuthenticated.js";
 import { createApp } from "./app.js";
-import type { GatewayEnv } from "./config/env.js";
 import { getGatewayServiceDefinitions } from "./config/serviceRegistry.js";
+import {
+  createTestEnv as createEnv,
+  createTestLogger,
+  startServer,
+  stopServer,
+} from "./test/gatewayTestUtils.js";
 
 class CapturingLogStream extends Writable {
   private readonly chunks: string[] = [];
@@ -62,31 +66,6 @@ async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
       }
     });
     request.on("error", reject);
-  });
-}
-
-async function startServer(server: Server): Promise<string> {
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-
-  const address = server.address();
-  if (!address || typeof address === "string") {
-    throw new Error("Could not resolve server address.");
-  }
-
-  return `http://127.0.0.1:${address.port}`;
-}
-
-async function stopServer(server: Server): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    server.close((error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
   });
 }
 
@@ -139,14 +118,6 @@ async function startAuditIngestServer(): Promise<{
   };
 }
 
-function createTestLogger() {
-  return createLogger({
-    service: "gateway-test",
-    env: "test",
-    destination: new MemoryLogStream(),
-  });
-}
-
 function createCapturedTestLogger() {
   const stream = new CapturingLogStream();
   const logger = createLogger({
@@ -158,50 +129,87 @@ function createCapturedTestLogger() {
   return { logger, stream };
 }
 
-function createEnv(overrides: Partial<GatewayEnv> = {}): GatewayEnv {
-  return {
-    nodeEnv: "test",
-    enableApiDocs: true,
-    authorizationMode: "enforce",
-    bearerAuthCompatibility: true,
-    authCookieSecure: false,
-    auditEnabled: false,
-    auditServiceToken: "audit-service-token",
-    userServiceInternalToken: "user-service-internal-token",
-    auditServiceUrl: "http://127.0.0.1:3020",
-    port: 0,
-    organizationServiceUrl: "http://127.0.0.1:3031",
-    rhServiceUrl: "http://127.0.0.1:3034",
-    userServiceUrl: "http://127.0.0.1:3030",
-    taskServiceUrl: "http://127.0.0.1:3032",
-    projectServiceUrl: "http://127.0.0.1:3033",
-    clientServiceUrl: "http://127.0.0.1:3035",
-    clientServiceInternalToken: "client-service-token",
-    departmentServiceUrl: "http://127.0.0.1:3336",
-    fiscalServiceUrl: "http://127.0.0.1:3037",
-    contabilServiceUrl: "http://127.0.0.1:3038",
-    regularizeServiceUrl: "http://127.0.0.1:3039",
-    tiServiceUrl: "http://127.0.0.1:3040",
-    tiServiceInternalToken: "ti-service-token",
-    certificateServiceUrl: "http://127.0.0.1:3041",
-    certificateServiceInternalToken: "certificate-service-token",
-    pessoalServiceUrl: "http://127.0.0.1:3042",
-    parcelamentoServiceUrl: "http://127.0.0.1:3043",
-    reportsServiceUrl: "http://127.0.0.1:3044",
-    databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
-
-    jwtSecret: "test-secret",
-    logLevel: "silent",
-    logPretty: false,
-    allowedOrigins: ["*"],
-    rateLimitMax: 300,
-    rateLimitWindowMs: 60_000,
-    authRateLimitMax: 10,
-    authRateLimitWindowMs: 60_000,
-    jsonBodyLimit: "1mb",
-    ...overrides,
-  };
-}
+it("autentica as quatro consultas de RH com cookie nos middlewares reais dos upstreams", async () => {
+  vi.stubEnv("JWT_SECRET", "test-secret");
+  vi.stubEnv("DATABASE_URL", "postgres://test:test@127.0.0.1:5432/test");
+  vi.stubEnv("NODE_ENV", "test");
+  const upstream = express();
+  upstream.use("/rh", authenticateRh);
+  upstream.use("/department", authenticateDepartment);
+  upstream.use((request, response) => {
+    response.json({
+      success: true,
+      data: { userId: request.user_id, organizationId: request.organization_id },
+    });
+  });
+  upstream.use(
+    (
+      error: Error,
+      _request: express.Request,
+      response: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      response.status(401).json({ success: false, error: error.message });
+    },
+  );
+  const upstreamServer = createServer(upstream);
+  const upstreamUrl = await startServer(upstreamServer);
+  const app = createApp(
+    createEnv({ rhServiceUrl: upstreamUrl, departmentServiceUrl: upstreamUrl }),
+    createTestLogger(),
+  );
+  const server = createServer(app);
+  const url = await startServer(server);
+  const token = jwt.sign(
+    {
+      user_id: "rh-user",
+      organization_id: "rh-org",
+      permission: 1,
+      type: "user",
+      modules: { rh: 3, ti: 1 },
+    },
+    "test-secret",
+    { expiresIn: "5m" },
+  );
+  try {
+    for (const path of [
+      "/rh/requests",
+      "/rh/score/evaluations/pending",
+      "/rh/timesheets",
+      "/department/list",
+    ]) {
+      const response = await fetch(`${url}${path}`, {
+        headers: { cookie: `cw.session=${token}`, authorization: "Bearer untrusted-browser-token" },
+      });
+      expect(await response.json(), path).toEqual({
+        success: true,
+        data: { userId: "rh-user", organizationId: "rh-org" },
+      });
+      expect(response.status).toBe(200);
+    }
+    const anonymous = await fetch(`${url}/rh/requests`);
+    expect(anonymous.status).toBe(401);
+    const noRhToken = jwt.sign(
+      {
+        user_id: "rh-user",
+        organization_id: "rh-org",
+        permission: 1,
+        type: "user",
+        modules: { rh: 0 },
+      },
+      "test-secret",
+      { expiresIn: "5m" },
+    );
+    const forbidden = await fetch(`${url}/rh/requests`, {
+      headers: { cookie: `cw.session=${noRhToken}` },
+    });
+    expect(forbidden.status).toBe(403);
+  } finally {
+    await stopServer(server);
+    await stopServer(upstreamServer);
+    vi.unstubAllEnvs();
+  }
+});
 
 it("autentica as quatro consultas de RH com cookie nos middlewares reais dos upstreams", async () => {
   vi.stubEnv("JWT_SECRET", "test-secret");
@@ -405,6 +413,65 @@ it("proxies reports requests with the authenticated context and no gateway modul
   } finally {
     await stopServer(gateway);
     await stopServer(reportsService);
+  }
+});
+
+it("protects report definition review with bound CSRF and forwarded identity", async () => {
+  const proof = "A".repeat(43);
+  const session = createToken({
+    user_id: "reports-user",
+    organization_id: "reports-org",
+    permission: 0,
+    type: "user",
+    csrf_hash: hashCsrfToken(proof),
+  });
+  let hits = 0;
+  const upstream = createServer((request, response) => {
+    hits += 1;
+    expect(request.url).toBe("/reports/definitions/validate");
+    expect(request.headers[FORWARDED_AUTH_USER_ID_HEADER]).toBe("reports-user");
+    expect(request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER]).toBe("reports-org");
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: {} }));
+  });
+  const reportsServiceUrl = await startServer(upstream);
+  const gateway = createServer(
+    createApp(
+      createEnv({
+        reportsServiceUrl,
+        allowedOrigins: ["https://useoffice.com.br"],
+        bearerAuthCompatibility: false,
+      }),
+      createTestLogger(),
+    ),
+  );
+  const url = await startServer(gateway);
+  try {
+    const headers = {
+      Cookie: `cw.session=${session}; cw.csrf=${proof}`,
+      Origin: "https://useoffice.com.br",
+      "content-type": "application/json",
+    };
+    const body = JSON.stringify({
+      definition: { version: 2, areas: [{ source: "integracao.projects", fields: ["name"] }] },
+    });
+    const denied = await fetch(`${url}/reports/definitions/validate`, {
+      method: "POST",
+      headers,
+      body,
+    });
+    expect(denied.status).toBe(403);
+    expect(hits).toBe(0);
+    const accepted = await fetch(`${url}/reports/definitions/validate`, {
+      method: "POST",
+      headers: { ...headers, [CSRF_HEADER_NAME]: proof },
+      body,
+    });
+    expect(accepted.status).toBe(200);
+    expect(hits).toBe(1);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
   }
 });
 
@@ -1215,13 +1282,18 @@ it("returns real dashboard stats for the authenticated organization", async () =
       castelo_med: 23,
     },
     monthlyTrends: [{ month: "Jul", newClients: 1146 }],
-    fiscal: {
-      obligations: [
-        { status: "Pendente", count: 0 },
-        { status: "Emitida", count: 0 },
-        { status: "Atrasada", count: 0 },
-      ],
+    financial: {
+      paidCertificateReceipts: 0,
+      unpaidCertificates: 0,
+      monthlyPaidCertificateReceipts: [],
     },
+    commercial: {
+      activeProspects: 0,
+      closedThisMonth: 0,
+      byStatus: [],
+      billing: { pending: 0, contracted: 0, notContracted: 0 },
+    },
+    departments: [],
     recentClients: [],
     insights: [],
     tasks: {
@@ -1241,11 +1313,6 @@ it("returns real dashboard stats for the authenticated organization", async () =
       inProgress: 283,
       delayed: 283,
       waiting: 47,
-    },
-    revenue: {
-      currentMonth: 0,
-      target: 0,
-      monthly: [{ month: "Jul", revenue: 0, expenses: 0 }],
     },
     performance: [{ week: "Sem 1", tasks: 10, completed: 5 }],
     pendingTasks: [],
@@ -1270,13 +1337,14 @@ it("returns real dashboard stats for the authenticated organization", async () =
     });
     const body = (await response.json()) as {
       success?: boolean;
-      data?: { totalClients?: number; revenue?: { currentMonth?: number } };
+      data?: { totalClients?: number; financial?: { paidCertificateReceipts?: number } };
     };
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.data?.totalClients).toBe(1146);
-    expect(body.data?.revenue?.currentMonth).toBe(0);
+    expect(body.data?.financial?.paidCertificateReceipts).toBe(0);
+    expect(body.data).not.toHaveProperty("fiscal");
     expect(getStats).toHaveBeenCalledWith("org-dashboard");
   } finally {
     await stopServer(server);
@@ -1658,7 +1726,7 @@ it("returns shared forbidden response when permission update is attempted withou
   }
 });
 
-it("strips client-supplied internal auth headers before proxying", async () => {
+it("replaces client-supplied internal auth headers before proxying", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -1716,7 +1784,7 @@ it("strips client-supplied internal auth headers before proxying", async () => {
     });
 
     expect(response.status).toBe(200);
-    expect(seenHeaders.internalToken).toBeUndefined();
+    expect(seenHeaders.internalToken).toBe("audit-service-token");
     expect(seenHeaders.userId).toBe("user-1");
     expect(seenHeaders.organizationId).toBe("org-1");
     expect(seenHeaders.permission).toBe("2");
@@ -2052,6 +2120,86 @@ it("rejects JSON request bodies above the configured gateway limit before proxyi
   }
 });
 
+it("forwards project-wizard extraction content larger than 1 MiB to task-service", async () => {
+  const content = "a".repeat(1024 * 1024 + 1);
+  let receivedContentBytes = 0;
+  const taskService = createServer(async (request, response) => {
+    const body = await readJsonBody<{ content: string }>(request);
+    receivedContentBytes = Buffer.byteLength(body.content, "utf8");
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { received: true } }));
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const gateway = createServer(createApp(createEnv({ taskServiceUrl }), createTestLogger()));
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+    modules: { integracao: 1 },
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/task/project-wizard/extract-tasks`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(receivedContentBytes).toBe(Buffer.byteLength(content, "utf8"));
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
+it("uses the extraction composition timeout only for its public gateway path", async () => {
+  const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+  const taskService = createServer((_request, response) => {
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: {} }));
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const gateway = createServer(createApp(createEnv({ taskServiceUrl }), createTestLogger()));
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+    modules: { integracao: 1 },
+  });
+
+  try {
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    };
+    const extraction = await fetch(`${gatewayUrl}/task/project-wizard/extract-tasks`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ content: "Ata" }),
+    });
+    const regularTaskRoute = await fetch(`${gatewayUrl}/task/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(extraction.status).toBe(200);
+    expect(regularTaskRoute.status).toBe(200);
+    expect(timeoutSpy).toHaveBeenCalledWith(3_600_000);
+    expect(timeoutSpy).toHaveBeenCalledWith(30_000);
+  } finally {
+    timeoutSpy.mockRestore();
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
 it("returns the shared success envelope for gateway health", async () => {
   const app = createApp(createEnv(), createTestLogger());
   const server = createServer(app);
@@ -2239,6 +2387,7 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/regularize/passwords"]).toBeTruthy();
     expect(body.paths["/fiscal/ncm"]).toBeTruthy();
     expect(body.paths["/contabil/controls"]).toBeTruthy();
+    expect(body.paths["/contabil/controls/list"]).toBeTruthy();
     expect(body.paths["/ti/requests/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/{id}/file"]).toBeTruthy();
@@ -2445,6 +2594,218 @@ it("proxies task-service routes mapped in the gateway", async () => {
   } finally {
     await stopServer(gateway);
     await stopServer(taskService);
+  }
+});
+
+it("proxies the three project-wizard routes with trusted authenticated context", async () => {
+  const seen: Array<{
+    path: string;
+    body: Record<string, unknown>;
+    internalToken: string | undefined;
+    userId: string | undefined;
+    organizationId: string | undefined;
+    modules: string | undefined;
+    authorization: string | undefined;
+  }> = [];
+  const taskService = createServer(async (request, response) => {
+    seen.push({
+      path: request.url ?? "",
+      body: await readJsonBody<Record<string, unknown>>(request),
+      internalToken: request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined,
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      organizationId: request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined,
+      modules: request.headers[FORWARDED_AUTH_MODULES_HEADER] as string | undefined,
+      authorization: request.headers.authorization,
+    });
+    response.statusCode = request.url === "/task/project-wizard" ? 201 : 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: {} }));
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const gateway = createServer(createApp(createEnv({ taskServiceUrl }), createTestLogger()));
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "wizard-user",
+    organization_id: "wizard-org",
+    permission: 0,
+    type: "user",
+    modules: { integracao: 2 },
+  });
+  const cases = [
+    { path: "/task/project-wizard/preview", body: { tasks: [] }, status: 200 },
+    {
+      path: "/task/project-wizard",
+      body: { client_id: "client-private" },
+      status: 201,
+    },
+    {
+      path: "/task/project-wizard/extract-tasks",
+      body: { content: "Ata privada" },
+      status: 200,
+    },
+  ];
+
+  try {
+    for (const testCase of cases) {
+      const response = await fetch(`${gatewayUrl}${testCase.path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          ...(testCase.path === "/task/project-wizard"
+            ? { "Idempotency-Key": "wizard-contract" }
+            : {}),
+        },
+        body: JSON.stringify(testCase.body),
+      });
+
+      expect(response.status, testCase.path).toBe(testCase.status);
+    }
+
+    expect(seen.map(({ path, body }) => ({ path, body }))).toEqual(
+      cases.map(({ path, body }) => ({ path, body })),
+    );
+    for (const received of seen) {
+      expect(received).toMatchObject({
+        internalToken: "audit-service-token",
+        userId: "wizard-user",
+        organizationId: "wizard-org",
+        authorization: undefined,
+      });
+      expect(JSON.parse(received.modules ?? "{}")).toMatchObject({ integracao: 2 });
+    }
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
+it("protects the three public project-wizard routes before proxying", async () => {
+  let upstreamHits = 0;
+  const taskService = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.end();
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const gateway = createServer(createApp(createEnv({ taskServiceUrl }), createTestLogger()));
+  const gatewayUrl = await startServer(gateway);
+  const viewerToken = createToken({
+    user_id: "wizard-viewer",
+    organization_id: "wizard-org",
+    permission: 0,
+    type: "user",
+    modules: { integracao: 1 },
+  });
+  const paths = [
+    "/task/project-wizard/preview",
+    "/task/project-wizard",
+    "/task/project-wizard/extract-tasks",
+  ];
+
+  try {
+    for (const path of paths) {
+      const unauthorized = await fetch(`${gatewayUrl}${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(unauthorized.status, path).toBe(401);
+      expect(await unauthorized.json(), path).toMatchObject({
+        success: false,
+        error: "Não autenticado.",
+        code: "UNAUTHORIZED",
+      });
+
+      const forbidden = await fetch(`${gatewayUrl}${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${viewerToken}`,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      });
+      expect(forbidden.status, path).toBe(403);
+      expect(await forbidden.json(), path).toMatchObject({
+        success: false,
+        error: "Acesso negado para esta rota.",
+        code: "FORBIDDEN",
+      });
+    }
+
+    expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+  }
+});
+
+it("keeps project-wizard request data out of gateway logs and audit", async () => {
+  const privateValues = [
+    "ATA-PRIVADA-995",
+    "CLIENTE-PRIVADO-995",
+    "responsavel.privado@example.invalid",
+  ];
+  const auditService = await startAuditIngestServer();
+  const taskService = createServer((_request, response) => {
+    response.statusCode = 502;
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify({
+        success: false,
+        error: "Não foi possível extrair tarefas da Ata inteira.",
+        code: "BAD_GATEWAY",
+      }),
+    );
+  });
+  const taskServiceUrl = await startServer(taskService);
+  const { logger, stream } = createCapturedTestLogger();
+  const gateway = createServer(
+    createApp(
+      createEnv({ auditEnabled: true, auditServiceUrl: auditService.url, taskServiceUrl }),
+      logger,
+    ),
+  );
+  const gatewayUrl = await startServer(gateway);
+  const token = createToken({
+    user_id: "wizard-user",
+    organization_id: "wizard-org",
+    permission: 0,
+    type: "user",
+    modules: { integracao: 2 },
+  });
+
+  try {
+    const response = await fetch(`${gatewayUrl}/task/project-wizard/extract-tasks`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        content: privateValues[0],
+        client_name: privateValues[1],
+        responsible_email: privateValues[2],
+      }),
+    });
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: "Não foi possível extrair tarefas da Ata inteira.",
+      code: "BAD_GATEWAY",
+    });
+    await waitForRecords(auditService.records, 1);
+    await waitForLogs();
+
+    const observability = JSON.stringify({ audit: auditService.records, logs: stream.entries() });
+    for (const privateValue of privateValues) {
+      expect(observability).not.toContain(privateValue);
+    }
+  } finally {
+    await stopServer(gateway);
+    await stopServer(taskService);
+    await stopServer(auditService.server);
   }
 });
 
@@ -4642,6 +5003,41 @@ it("allows Contabil module users to load RH operational users for selectors", as
 
     expect(response.status).toBe(200);
     expect(JSON.parse(seenModules ?? "{}")).toMatchObject({ contabil: 3, rh: 0 });
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("allows Triagem module users to load RH operational users for link selectors", async () => {
+  const token = createToken({
+    user_id: "triagem-editor",
+    organization_id: "org-1",
+    permission: 0,
+    type: "user",
+    modules: { triagem: 2, rh: 0 },
+  });
+  let upstreamHits = 0;
+
+  const upstream = createServer((_request, response) => {
+    upstreamHits += 1;
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: [] }));
+  });
+  const rhServiceUrl = await startServer(upstream);
+
+  const app = createApp(createEnv({ rhServiceUrl }), createTestLogger());
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/rh/operational-users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(upstreamHits).toBe(1);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

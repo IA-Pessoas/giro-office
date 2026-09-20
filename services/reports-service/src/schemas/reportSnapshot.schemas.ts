@@ -1,6 +1,7 @@
+import { MAX_REPORTING_QUERY_ROWS } from "@workspace/shared";
 import { z } from "zod";
 
-export const MAX_SNAPSHOT_ROWS = 50_000;
+export const MAX_SNAPSHOT_ROWS = MAX_REPORTING_QUERY_ROWS;
 export const MAX_SNAPSHOT_BYTES = 20 * 1024 * 1024;
 
 export const reportSnapshotSchema = z

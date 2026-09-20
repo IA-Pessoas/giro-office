@@ -25,6 +25,9 @@ tsconfig.tests*
 **/dist
 **/.next
 
+# Screenshots gerados pelos smokes de browser
+app/output/
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -71,3 +74,11 @@ services_env_summary.md
 # Codex execution plan/spec for the supply-chain PRs (local-only)
 /docs/superpowers/plans/2026-08-13-supply-chain-hardening.md
 /docs/superpowers/specs/2026-08-13-supply-chain-hardening-design.md
+
+# Atas de clientes usadas em QA local: contêm dado sensível, nunca versionar.
+ata-sample/
+
+# Exports e dumps de banco locais, que podem conter dados e credenciais.
+*.zip
+*.dump
+*.sql.gz

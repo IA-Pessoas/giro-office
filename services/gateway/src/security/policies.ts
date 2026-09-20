@@ -17,6 +17,7 @@ const rhModulePolicy: AuthPolicy = {
   },
 };
 const rhEditPolicy = createModulePolicy("rh", moduleEditPermission);
+const rhManagementPolicy = createModulePolicy("rh", 3);
 const tiModulePolicy = createModulePolicy("ti", moduleAccessPermission);
 const tiEditPolicy = createModulePolicy("ti", moduleEditPermission);
 const integracaoEditPolicy = createModulePolicy("integracao", moduleEditPermission);
@@ -26,12 +27,26 @@ const fiscalModulePolicy = createModulePolicy("fiscal", moduleAccessPermission);
 const fiscalEditPolicy = createModulePolicy("fiscal", moduleEditPermission);
 const contabilModulePolicy = createModulePolicy("contabil", moduleAccessPermission);
 const contabilEditPolicy = createModulePolicy("contabil", moduleEditPermission);
+const triagemModulePolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["contabil", "triagem"],
+    minPermission: moduleAccessPermission,
+  },
+};
+const triagemEditPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["contabil", "triagem"],
+    minPermission: moduleAccessPermission,
+  },
+};
 const certificateModulePolicy = createModulePolicy("certificado", moduleAccessPermission);
 const certificateEditPolicy = createModulePolicy("certificado", moduleEditPermission);
+const commercialModulePolicy = createModulePolicy("comercial", moduleAccessPermission);
+const commercialEditPolicy = createModulePolicy("comercial", moduleEditPermission);
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
-    modules: ["rh", "contabil"],
+    modules: ["rh", "contabil", "financeiro", "triagem"],
     minPermission: moduleAccessPermission,
   },
 };
@@ -95,6 +110,24 @@ const integracaoProjectPolicy: AuthPolicy = {
     minPermission: moduleAccessPermission,
   },
 };
+const financeiroTaskViewPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["financeiro", "integracao"],
+    minPermission: moduleAccessPermission,
+  },
+};
+const financeiroTaskAdminPolicy: AuthPolicy = {
+  anyModulePermission: {
+    modules: ["financeiro", "integracao"],
+    minPermission: 3,
+  },
+};
+const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao", 0);
+/**
+ * Rotas cuja matriz do task-service admite o responsável em nível 0/1; o escopo de
+ * responsável continua sendo validado no serviço.
+ */
+const integracaoResponsibleTaskPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 
 const integracaoClientPolicy: AuthPolicy = {
   modulePermission: {
@@ -122,6 +155,10 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /dashboard/stats", authenticatedPolicy],
   ["GET /client/list", clientListPolicy],
   ["GET /user/me", authenticatedPolicy],
+  ["GET /rh/notifications", rhModulePolicy],
+  ["PUT /rh/notifications/read", rhModulePolicy],
+  ["POST /rh/requests", rhModulePolicy],
+  ["POST /rh/messages", rhModulePolicy],
   ["POST /user/session/refresh", authenticatedPolicy],
   ["DELETE /user/session", authenticatedPolicy],
   ["GET /user", userManagementPolicy],
@@ -148,8 +185,54 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoModulePolicy },
   { method: "ANY", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoEditPolicy },
   { method: "ANY", path: /^\/reports(?:\/|$)/, policy: authenticatedPolicy },
+  { method: "GET", path: /^\/commercial(?:\/|$)/, policy: commercialModulePolicy },
+  { method: "ANY", path: /^\/commercial(?:\/|$)/, policy: commercialEditPolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
+  { method: "ANY", path: /^\/rh\/profile(?:\/|$)/, policy: rhModulePolicy },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/adjustment\/request$/,
+    policy: rhModulePolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/adjustment\/[^/]+\/attachment$/,
+    policy: rhModulePolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/recalculate$/,
+    policy: rhManagementPolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/adjustment\/retroactive$/,
+    policy: rhManagementPolicy,
+  },
+  {
+    method: "PUT",
+    path: /^\/rh\/timesheets\/reopen$/,
+    policy: rhManagementPolicy,
+  },
+  {
+    method: "PUT",
+    path: /^\/rh\/timesheets\/rebuild$/,
+    policy: rhManagementPolicy,
+  },
+  {
+    method: "GET",
+    path: /^\/rh\/timesheets\/[^/]+\/pdf$/,
+    policy: rhModulePolicy,
+  },
+  { method: "POST", path: /^\/rh\/point\/register$/, policy: rhModulePolicy },
+  { method: "PUT", path: /^\/rh\/timesheets\/sign$/, policy: rhModulePolicy },
+  {
+    method: "POST",
+    path: /^\/rh\/point\/[^/]+\/calculate$/,
+    policy: rhManagementPolicy,
+  },
+  { method: "POST", path: /^\/rh\/timesheets\/?$/, policy: rhManagementPolicy },
   { method: "GET", path: /^\/rh(?:\/|$)/, policy: rhModulePolicy },
   { method: "ANY", path: /^\/rh(?:\/|$)/, policy: rhEditPolicy },
   { method: "GET", path: /^\/user\/permission\/[^/]+$/, policy: userManagementPolicy },
@@ -177,6 +260,34 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "GET", path: /^\/task\/financeiro\/queue$/, policy: financeiroTaskViewPolicy },
+  {
+    method: "GET",
+    path: /^\/task\/financeiro\/collectors$/,
+    policy: financeiroTaskAdminPolicy,
+  },
+  { method: "PUT", path: /^\/task\/financeiro$/, policy: financeiroTaskViewPolicy },
+  {
+    method: "PUT",
+    path: /^\/task\/financeiro\/collectors$/,
+    policy: financeiroTaskAdminPolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/task\/financeiro\/(?:settle|express)$/,
+    policy: financeiroTaskViewPolicy,
+  },
+  {
+    method: "ANY",
+    path: /^\/task\/notifications(?:\/read)?$/,
+    policy: integracaoNotificationPolicy,
+  },
+  {
+    method: "ANY",
+    path: /^\/task\/(?:complete-request(?:\/list)?|postponement(?:\/list)?|attachment(?:\/list|\/access)?|conclusion)$/,
+    policy: integracaoResponsibleTaskPolicy,
+  },
+  { method: "GET", path: /^\/task(?:\/list)?$/, policy: integracaoResponsibleTaskPolicy },
   { method: "GET", path: /^\/task(?:\/|$)/, policy: integracaoProjectPolicy },
   { method: "ANY", path: /^\/task(?:\/|$)/, policy: integracaoEditPolicy },
   { method: "GET", path: /^\/department(?:\/|$)/, policy: tiModulePolicy },
@@ -187,6 +298,8 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/fiscal(?:\/|$)/, policy: fiscalEditPolicy },
   { method: "GET", path: /^\/contabil(?:\/|$)/, policy: contabilModulePolicy },
   { method: "ANY", path: /^\/contabil(?:\/|$)/, policy: contabilEditPolicy },
+  { method: "GET", path: /^\/triagem(?:\/|$)/, policy: triagemModulePolicy },
+  { method: "ANY", path: /^\/triagem(?:\/|$)/, policy: triagemEditPolicy },
   { method: "GET", path: /^\/ti(?:\/|$)/, policy: tiModulePolicy },
   { method: "ANY", path: /^\/ti(?:\/|$)/, policy: tiEditPolicy },
   { method: "GET", path: /^\/certificate(?:\/|$)/, policy: certificateModulePolicy },
