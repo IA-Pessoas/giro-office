@@ -27,6 +27,14 @@ são comandos individuais executados na raiz, sem sintaxe específica de Bash.
 Exemplo para os cinco pacotes da base, se esses nomes/scripts existirem:
 
 ```text
+pnpm dev -- --profile rh --plan
+pnpm dev -- --profile rh
+```
+
+O orquestrador compila os serviços estáveis selecionados com Turbo e inicia somente os
+componentes marcados para edição em watch. Para uma preparação manual equivalente, use:
+
+```text
 pnpm exec turbo run build --filter=@workspace/gateway --filter=@workspace/client-service --filter=@workspace/audit-service --filter=@workspace/user-service --filter=@workspace/organization-service
 ```
 
@@ -60,10 +68,10 @@ Nesta primeira versão, corrigir manifests/tsconfig fica fora da inicialização
 informe a correção necessária. Um comando alternativo já previsto e verificado
 no checkout pode ser usado, explicando qual será executado.
 
-Use a gestão de processos/terminais disponível no cliente; não conte com um
-comando bloqueante de curta duração para manter todos os processos vivos. Se o
-cliente não suportar sessões persistentes, deixe comandos precisos para terminais
-locais e explique a limitação. Registre IDs/PIDs/terminais e logs sem segredos.
+O orquestrador registra IDs/PIDs em `.turbo/dev/state.json`, reutiliza processos compatíveis
+e mantém os comandos ativos até receber SIGINT/SIGTERM. Se o cliente não suportar sessões
+persistentes, deixe comandos precisos para terminais locais e explique a limitação. Registre
+logs sem segredos.
 Ao encerrar, pare somente processos cuja propriedade foi confirmada.
 Processos preexistentes também precisam de autorização para substituição ou
 encerramento, que pode constar da proposta já aprovada.
