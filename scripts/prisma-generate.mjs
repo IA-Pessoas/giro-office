@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -123,6 +124,29 @@ async function tryAcquireLock() {
   }
 }
 
+// O lock e um mkdir e so o `finally` do detentor o remove. Se esse processo morre sem
+// rodar o finally (SIGKILL, timeout de CI, terminal fechado), o diretorio fica para tras
+// e todo processo seguinte espera para sempre no laco abaixo.
+// ponytail: descarta o lock pela idade; se a geracao passar a demorar mais que
+// LOCK_STALE_MS, grave o PID no lock e cheque se o processo ainda vive.
+export const LOCK_STALE_MS = 10 * 60 * 1000;
+
+export async function clearStaleLock(now = Date.now()) {
+  let info;
+  try {
+    info = await stat(lockDir);
+  } catch {
+    return false;
+  }
+
+  if (now - info.mtimeMs <= LOCK_STALE_MS) {
+    return false;
+  }
+
+  await rm(lockDir, { recursive: true, force: true });
+  return true;
+}
+
 async function ensureGeneratedClients() {
   await mkdir(stateDir, { recursive: true });
 
@@ -150,8 +174,15 @@ async function ensureGeneratedClients() {
       }
     }
 
+    await clearStaleLock();
     await sleep(250);
   }
 }
 
-await ensureGeneratedClients();
+// Roda a geracao so quando invocado como script; importar o modulo (nos testes) nao dispara nada.
+if (
+  process.argv[1] &&
+  realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+) {
+  await ensureGeneratedClients();
+}

@@ -82,13 +82,19 @@ test("o seed QA e o roteiro usam as fixtures declarativas", async () => {
     new URL("../infra/prisma/seed-qa.ts", import.meta.url),
     "utf8",
   );
+  // A regra de permissão vive no suporte compartilhado desde que o seed do wizard passou a usá-la.
+  const qaSeedSupportSource = await readFile(
+    new URL("../infra/prisma/qa-seed-support.ts", import.meta.url),
+    "utf8",
+  );
   const qaGuide = await readFile(
     new URL("../docs/qa/integracao-permissions-qa.md", import.meta.url),
     "utf8",
   );
 
   assert.match(seedQaSource, /INTEGRACAO_QA_FIXTURES/);
-  assert.match(seedQaSource, /moduleName === "integracao" \? level : 0/);
+  assert.match(seedQaSource, /upsertQaPermission/);
+  assert.match(qaSeedSupportSource, /moduleName === "integracao" \? integracaoLevel : 0/);
   assert.match(seedQaSource, /permission: 0/);
   assert.match(qaGuide, /prisma:seed:qa/);
   assert.match(qaGuide, /PROJECT_SERVICE_INTEGRATION=1/);

@@ -24,6 +24,8 @@ function setGatewayEnv(overrides: NodeJS.ProcessEnv) {
   process.env.AUDIT_SERVICE_TOKEN = "secure-internal-token-with-at-least-32-chars";
   process.env.USER_SERVICE_INTERNAL_TOKEN = "secure-user-service-token-with-at-least-32-chars";
   process.env.CLIENT_SERVICE_INTERNAL_TOKEN = "secure-client-service-token-with-at-least-32-chars";
+  process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN =
+    "secure-regularize-service-token-with-at-least-32-chars";
   process.env.TI_SERVICE_INTERNAL_TOKEN = "secure-ti-service-token-with-at-least-32-chars";
   process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN =
     "secure-certificate-service-token-with-at-least-32-chars";
@@ -58,12 +60,27 @@ describe("gateway env security validation", () => {
     expect(() => getGatewayEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN/);
   });
 
+  it("requires a dedicated regularize-service token in production", () => {
+    setGatewayEnv({});
+    delete process.env.REGULARIZE_SERVICE_INTERNAL_TOKEN;
+
+    expect(() => getGatewayEnv()).toThrow(/REGULARIZE_SERVICE_INTERNAL_TOKEN/);
+  });
+
   it("rejects reusing the audit token for user-service in production", () => {
     setGatewayEnv({
       USER_SERVICE_INTERNAL_TOKEN: "secure-internal-token-with-at-least-32-chars",
     });
 
     expect(() => getGatewayEnv()).toThrow(/USER_SERVICE_INTERNAL_TOKEN.*AUDIT_SERVICE_TOKEN/);
+  });
+
+  it("rejects reusing the audit token for regularize-service in production", () => {
+    setGatewayEnv({
+      REGULARIZE_SERVICE_INTERNAL_TOKEN: "secure-internal-token-with-at-least-32-chars",
+    });
+
+    expect(() => getGatewayEnv()).toThrow(/REGULARIZE_SERVICE_INTERNAL_TOKEN.*AUDIT_SERVICE_TOKEN/);
   });
 
   it("rejects insecure auth cookies in production", () => {
@@ -150,6 +167,13 @@ describe("gateway env security validation", () => {
     delete process.env.REPORTS_SERVICE_URL;
 
     expect(getGatewayEnv().reportsServiceUrl).toBe("http://localhost:3044");
+  });
+
+  it("uses commercial service default URL", () => {
+    setGatewayEnv({});
+    delete process.env.COMMERCIAL_SERVICE_URL;
+
+    expect(getGatewayEnv().commercialServiceUrl).toBe("http://localhost:3045");
   });
 
   it("parses optional gateway public URL and JSON body limit overrides", () => {

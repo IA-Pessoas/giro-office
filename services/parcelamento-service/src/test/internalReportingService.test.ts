@@ -36,11 +36,39 @@ describe("InternalReportingService", () => {
         fields: ["status"],
         limit: 10,
       }),
-    ).resolves.toEqual([{ status: "active" }]);
+    ).resolves.toEqual({ rows: [{ status: "active" }], reachedLimit: false });
     expect(installments.findMany).toHaveBeenCalledWith({
       where: { organization_id: "00000000-0000-4000-8000-000000000002" },
       select: { status: true },
-      take: 10,
+      take: 11,
+    });
+  });
+
+  it("processa query pelo callback e preserva reachedLimit do resultado", async () => {
+    const records = Array.from({ length: 150 }, (_, index) => ({
+      status: `Status ${String(index).padStart(3, "0")}`,
+    }));
+    const service = new InternalReportingService({
+      $transaction: async function (read: (transaction: unknown) => Promise<unknown>) {
+        return read(this);
+      },
+      installment: {
+        findMany: async ({ take, skip = 0 }: { take: number; skip?: number }) =>
+          records.slice(skip, skip + take),
+      },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId: "00000000-0000-4000-8000-000000000002",
+        source: "parcelamento.installments",
+        fields: ["status"],
+        limit: 1,
+        query: { order_by: [{ field: "status", direction: "desc" }] },
+      }),
+    ).resolves.toEqual({
+      rows: [{ status: "Status 149" }],
+      reachedLimit: true,
     });
   });
 });

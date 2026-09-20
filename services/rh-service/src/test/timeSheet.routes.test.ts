@@ -87,4 +87,74 @@ describe("timeSheet routes", () => {
     expect(res.status).toBe(200);
     expect(timeSheetServiceMock.sign).toHaveBeenCalledTimes(1);
   });
+
+  it("PUT /rh/timesheets/reopen reabre folha assinada", async () => {
+    const app = createTestApp();
+    const res = await request(app).put("/rh/timesheets/reopen").send({
+      id: itemId,
+      reason: "Correcao de ajuste aprovada",
+    });
+
+    expect(res.status).toBe(200);
+    expect(timeSheetServiceMock.reopen).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      timesheet_id: itemId,
+      reopened_by_user_id: userId,
+      reason: "Correcao de ajuste aprovada",
+    });
+  });
+
+  it("PUT /rh/timesheets/reopen bloqueia self-service", async () => {
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).put("/rh/timesheets/reopen").send({
+      id: itemId,
+      reason: "Nao permitido",
+    });
+
+    expect(res.status).toBe(403);
+    expect(timeSheetServiceMock.reopen).not.toHaveBeenCalled();
+  });
+
+  it("PUT /rh/timesheets/rebuild reconstrói folha aberta para RH", async () => {
+    const app = createTestApp();
+    const res = await request(app).put("/rh/timesheets/rebuild").send({ id: itemId });
+
+    expect(res.status).toBe(200);
+    expect(timeSheetServiceMock.rebuild).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      timesheet_id: itemId,
+    });
+  });
+
+  it("GET /rh/timesheets/:id/pdf devolve PDF apenas no escopo da folha", async () => {
+    timeSheetServiceMock.getPdf.mockResolvedValue({
+      buffer: Buffer.from("%PDF-1.7\n"),
+      fileName: "folha-ponto.pdf",
+    });
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).get(`/rh/timesheets/${itemId}/pdf`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/^application\/pdf/);
+    expect(res.headers["content-disposition"]).toBe('attachment; filename="folha-ponto.pdf"');
+    expect(timeSheetServiceMock.getPdf).toHaveBeenCalledWith({
+      organization_id: organizationId,
+      timesheet_id: itemId,
+    });
+  });
+
+  it("GET /rh/timesheets/:id/pdf bloqueia visualizador em folha de terceiro", async () => {
+    timeSheetServiceMock.getById.mockResolvedValueOnce({
+      id: itemId,
+      user_id: "00000000-0000-4000-8000-000000000099",
+      status: "Assinada",
+      days: [],
+      totals: { absence_count: 0 },
+    });
+    const app = createTestApp({ rhPermission: 1 });
+    const res = await request(app).get(`/rh/timesheets/${itemId}/pdf`);
+
+    expect(res.status).toBe(403);
+    expect(timeSheetServiceMock.getPdf).not.toHaveBeenCalled();
+  });
 });

@@ -24,6 +24,7 @@ it("agrega o catálogo público do reports-service", () => {
     departmentServiceUrl: "http://127.0.0.1:3336",
     fiscalServiceUrl: "http://127.0.0.1:3037",
     contabilServiceUrl: "http://127.0.0.1:3038",
+    triagemServiceUrl: "http://127.0.0.1:3046",
     regularizeServiceUrl: "http://127.0.0.1:3039",
     tiServiceUrl: "http://127.0.0.1:3040",
     tiServiceInternalToken: "ti-service-token",
@@ -32,6 +33,7 @@ it("agrega o catálogo público do reports-service", () => {
     pessoalServiceUrl: "http://127.0.0.1:3042",
     parcelamentoServiceUrl: "http://127.0.0.1:3043",
     reportsServiceUrl: "http://127.0.0.1:3044",
+    commercialServiceUrl: "http://127.0.0.1:3045",
     databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
     jwtSecret: "test-secret",
     logLevel: "silent",
@@ -45,6 +47,15 @@ it("agrega o catálogo público do reports-service", () => {
   } satisfies GatewayEnv);
 
   expect(spec.paths["/reports/catalog"]?.get?.["x-origin-service"]).toBe("reports-service");
+  expect(spec.paths["/commercial/proposal-configs"]?.get?.["x-origin-service"]).toBe(
+    "commercial-service",
+  );
+  expect(spec.paths["/commercial/prospecting"]?.post?.["x-origin-service"]).toBe(
+    "commercial-service",
+  );
+  expect(spec.paths["/triagem/catalogs"]?.get?.["x-origin-service"]).toBe("triagem-service");
+  expect(spec.paths["/triagem/external-links"]?.post?.["x-origin-service"]).toBe("triagem-service");
+  expect(spec.paths["/triagem/overview"]?.get?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/internal/reporting/access-context"]).toBeUndefined();
   expect(
     spec.paths["/platform/organizations/{organizationId}/users/{userId}/permissions"]?.get

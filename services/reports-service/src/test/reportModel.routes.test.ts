@@ -27,6 +27,10 @@ const model = {
     order_by: [],
   },
 };
+const composition = {
+  version: 2 as const,
+  areas: [{ source: "finance.ledger", fields: ["balance"] }],
+};
 
 function createApp(options?: {
   modelService?: Record<string, ReturnType<typeof vi.fn>>;
@@ -43,14 +47,33 @@ function createApp(options?: {
         get: vi.fn().mockResolvedValue(model),
         update: vi.fn().mockResolvedValue(model),
         delete: vi.fn().mockResolvedValue(undefined),
+        getShared: vi.fn().mockResolvedValue({ ...model, department_id: "department-1" }),
+        listShared: vi.fn().mockResolvedValue([]),
         ...options?.modelService,
       } as never,
       previewService: {
         preview: vi.fn().mockResolvedValue({ rows: [], hasMore: false }),
+        previewComposition: vi.fn().mockResolvedValue({ blocks: [] }),
         ...options?.previewService,
       } as never,
       authorizationService: {
         validateDefinition: vi.fn().mockResolvedValue({ definition: model.definition }),
+        validateComposition: vi.fn().mockResolvedValue({ definition: composition }),
+        getSharedDepartment: vi
+          .fn()
+          .mockResolvedValue({ id: "department-1", module: "financeiro" }),
+        getSharedExecutionContext: vi.fn().mockResolvedValue({
+          department: { id: "department-1", module: "financeiro" },
+          scope: { organization_id: organizationId, modules: { financeiro: 1 } },
+        }),
+        validateSharedDefinition: vi.fn().mockResolvedValue({
+          definition: composition,
+          grant: { sources: { "finance.ledger": ["balance"] }, relations: [] },
+        }),
+        authorizeSharedModel: vi.fn().mockResolvedValue({
+          definition: model.definition,
+          department_id: "department-1",
+        }),
         ...options?.authorizationService,
       } as never,
     }),
@@ -77,6 +100,10 @@ describe("report model routes", () => {
         department: { id: "department-1", module: "financeiro" },
         scope: { organization_id: organizationId, modules: { financeiro: 1 } },
       }),
+      validateSharedDefinition: vi.fn().mockResolvedValue({
+        definition: model.definition,
+        grant: sharedModel.grant,
+      }),
     };
     const previewService = { preview: vi.fn().mockResolvedValue({ rows: [], hasMore: false }) };
     const app = createApp({ modelService, authorizationService, previewService });
@@ -101,6 +128,11 @@ describe("report model routes", () => {
     };
     const authorizationService = {
       getSharedDepartment: vi.fn().mockResolvedValue({ id: "department-1", module: "financeiro" }),
+      validateSharedDefinition: vi.fn().mockResolvedValue({
+        definition: model.definition,
+        department_id: "department-1",
+        grant: { sources: { "finance.ledger": ["balance"] }, relations: [] },
+      }),
     };
     const app = createApp({ modelService, authorizationService });
 
@@ -110,6 +142,7 @@ describe("report model routes", () => {
       organizationId,
       userId,
       name: model.name,
+      description: undefined,
       definition: model.definition,
     });
   });
@@ -133,6 +166,7 @@ describe("report model routes", () => {
       organizationId,
       departmentId: "department-1",
       name: undefined,
+      description: undefined,
       definition: model.definition,
     });
   });
@@ -175,6 +209,7 @@ describe("report model routes", () => {
       organizationId,
       departmentId: "department-1",
       name: model.name,
+      description: undefined,
       definition: model.definition,
     });
   });
@@ -187,10 +222,7 @@ describe("report model routes", () => {
     const app = createApp({ modelService, authorizationService });
 
     const response = await authenticated(
-      request(app).post("/models").send({
-        name: model.name,
-        definition: model.definition,
-      }),
+      request(app).post("/models").send({ name: model.name, definition: model.definition }),
     ).expect(201);
 
     expect(response.body).toEqual({ success: true, data: model });
@@ -204,6 +236,7 @@ describe("report model routes", () => {
       userId,
       organizationId,
       name: model.name,
+      description: undefined,
       definition: model.definition,
     });
   });
@@ -220,5 +253,72 @@ describe("report model routes", () => {
     const response = await authenticated(request(app).get("/models/list")).expect(200);
 
     expect(response.body).toEqual({ success: true, data: { items: [] } });
+  });
+
+  it("cria modelo composto com descrição após revalidar a composição", async () => {
+    const modelService = {
+      create: vi.fn().mockResolvedValue({ ...model, definition: composition }),
+    };
+    const authorizationService = {
+      validateComposition: vi.fn().mockResolvedValue({ definition: composition }),
+      validateDefinition: vi.fn(),
+    };
+    const app = createApp({ modelService, authorizationService });
+
+    await authenticated(
+      request(app).post("/models").send({
+        name: "Saldo mensal",
+        description: "Consulta financeira mensal.",
+        definition: composition,
+      }),
+    ).expect(201);
+
+    expect(authorizationService.validateComposition).toHaveBeenCalledWith({
+      userId,
+      organizationId,
+      requestId: "reports-model-create",
+      definition: composition,
+    });
+    expect(authorizationService.validateDefinition).not.toHaveBeenCalled();
+    expect(modelService.create).toHaveBeenCalledWith({
+      userId,
+      organizationId,
+      name: "Saldo mensal",
+      description: "Consulta financeira mensal.",
+      definition: composition,
+    });
+  });
+
+  it("abre modelo compartilhado somente após revalidar acesso e definição", async () => {
+    const sharedModel = {
+      ...model,
+      department_id: "department-1",
+      definition: composition,
+      grant: { sources: { "finance.ledger": ["balance"] }, relations: [] },
+    };
+    const modelService = { getShared: vi.fn().mockResolvedValue(sharedModel) };
+    const authorizationService = {
+      getSharedExecutionContext: vi.fn().mockResolvedValue({
+        department: { id: "department-1", module: "financeiro" },
+        scope: { organization_id: organizationId, modules: { financeiro: 1 } },
+      }),
+      validateSharedDefinition: vi.fn().mockResolvedValue({
+        definition: composition,
+        grant: sharedModel.grant,
+      }),
+    };
+    const app = createApp({ modelService, authorizationService });
+
+    const response = await authenticated(request(app).get(`/models/shared/${model.id}`)).expect(
+      200,
+    );
+
+    expect(response.body.data.definition).toEqual(composition);
+    expect(authorizationService.validateSharedDefinition).toHaveBeenCalledWith({
+      userId,
+      organizationId,
+      requestId: "reports-shared-model-get",
+      definition: composition,
+    });
   });
 });

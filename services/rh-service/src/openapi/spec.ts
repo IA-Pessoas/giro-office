@@ -1,3 +1,4 @@
+import { reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { RhEnv } from "../config/env.js";
@@ -36,6 +37,7 @@ const internalReportingExtractRequestBody = createObjectRequestBody({
     source: { type: "string", enum: ["rh.requests", "rh.attendance", "rh.holidays"] },
     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
     limit: { type: "integer", minimum: 1, maximum: 101 },
+    query: reportingQueryOpenApiSchema,
   },
 });
 
@@ -86,22 +88,92 @@ const pointConfigRequestBody = createObjectRequestBody({
 const timeClockAdjustmentRequestBody = createObjectRequestBody({
   example: {
     point_id: "point-uuid",
+    date: "2026-04-02",
     clock_in: "2026-04-02T08:00:00.000Z",
     lunch_out: "2026-04-02T12:00:00.000Z",
     lunch_in: "2026-04-02T13:00:00.000Z",
     clock_out: "2026-04-02T17:30:00.000Z",
     justification: "Esqueci de bater o retorno do almoço.",
-    attachment: "https://cdn.castelo.com/rh/adjustment-proof.pdf",
   },
-  required: ["point_id", "clock_in", "lunch_out", "lunch_in", "clock_out", "justification"],
+  required: ["clock_in", "lunch_out", "lunch_in", "clock_out", "justification"],
   properties: {
-    point_id: { type: "string" },
+    point_id: { type: "string", format: "uuid" },
+    date: { type: "string", format: "date" },
     clock_in: { type: "string", format: "date-time" },
     lunch_out: { type: "string", format: "date-time" },
     lunch_in: { type: "string", format: "date-time" },
     clock_out: { type: "string", format: "date-time" },
     justification: { type: "string" },
-    attachment: { type: ["string", "null"] },
+  },
+});
+
+const bulkApproveTimeClockAdjustmentRequestBody = createObjectRequestBody({
+  example: {
+    request_ids: ["request-uuid-1", "request-uuid-2"],
+    obs_approver: "Conferido pelo RH.",
+  },
+  required: ["request_ids"],
+  properties: {
+    request_ids: {
+      type: "array",
+      minItems: 1,
+      maxItems: 100,
+      items: { type: "string", format: "uuid" },
+    },
+    obs_approver: { type: ["string", "null"] },
+  },
+});
+
+const retroactiveTimeClockAdjustmentRequestBody = createObjectRequestBody({
+  example: {
+    target_user_id: "user-uuid",
+    date: "2026-04-02",
+    clock_in: "2026-04-02T08:00:00.000Z",
+    lunch_out: "2026-04-02T12:00:00.000Z",
+    lunch_in: "2026-04-02T13:00:00.000Z",
+    clock_out: "2026-04-02T17:30:00.000Z",
+    justification: "Entrada retroativa autorizada pelo RH.",
+  },
+  required: [
+    "target_user_id",
+    "date",
+    "clock_in",
+    "lunch_out",
+    "lunch_in",
+    "clock_out",
+    "justification",
+  ],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    date: { type: "string", format: "date" },
+    clock_in: { type: "string", format: "date-time" },
+    lunch_out: { type: "string", format: "date-time" },
+    lunch_in: { type: "string", format: "date-time" },
+    clock_out: { type: "string", format: "date-time" },
+    justification: { type: "string" },
+  },
+});
+
+const recalculatePointsRequestBody = createObjectRequestBody({
+  example: {
+    target_user_id: "user-uuid",
+    date_from: "2026-04-01T00:00:00.000Z",
+    date_to: "2026-04-30T00:00:00.000Z",
+  },
+  required: ["target_user_id", "date_from", "date_to"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    date_from: { type: "string", format: "date-time" },
+    date_to: { type: "string", format: "date-time" },
+  },
+});
+
+const reopenTimeSheetRequestBody = createObjectRequestBody({
+  example: { id: "timesheet-uuid", reason: "Correção autorizada antes do fechamento." },
+  required: ["id", "reason"],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    reason: { type: "string" },
   },
 });
 
@@ -360,33 +432,71 @@ const timeBankReleaseApproveRequestBody = createObjectRequestBody({
   },
 });
 
-const messageCreateRequestBody = createObjectRequestBody({
-  example: {
-    request_id: "request-uuid",
-    message: "Seu pedido foi encaminhado para aprovação.",
-    type: "Message",
-    attachment: "https://cdn.castelo.com/rh/attachment.pdf",
+const messageCreateRequestBody = {
+  requestBody: {
+    required: true,
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["request_id", "message", "type"],
+          additionalProperties: false,
+          properties: {
+            request_id: { type: "string", format: "uuid" },
+            message: { type: "string" },
+            type: { type: "string", enum: ["Message", "Solution", "Rejection", "Acceptance"] },
+            attachment: { type: "string" },
+          },
+        },
+      },
+      "multipart/form-data": {
+        schema: {
+          type: "object",
+          required: ["request_id", "message", "type"],
+          properties: {
+            request_id: { type: "string", format: "uuid" },
+            message: { type: "string" },
+            type: { type: "string", enum: ["Message", "Solution", "Rejection", "Acceptance"] },
+            file: {
+              type: "string",
+              format: "binary",
+              description: "PDF, PNG ou JPEG de no máximo 10 MB.",
+            },
+          },
+        },
+      },
+    },
   },
-  required: ["request_id", "message", "type"],
+} as const;
+
+const rhNotificationReadRequestBody = createObjectRequestBody({
+  example: { request_id: "request-uuid" },
   properties: {
-    request_id: { type: "string" },
-    message: { type: "string" },
-    type: { type: "string", enum: ["Message", "Solution", "Rejection", "Acceptance"] },
-    attachment: { type: "string" },
+    id: { type: "string", format: "uuid" },
+    request_id: { type: "string", format: "uuid" },
+    all: { type: "boolean" },
   },
 });
 
 const timeSheetCreateRequestBody = createObjectRequestBody({
   example: {
     user_id: "user-uuid",
-    start_time: "2026-04-01T00:00:00.000Z",
-    end_time: "2026-04-30T23:59:59.999Z",
+    start_time: "2026-04-22T00:00:00.000Z",
+    end_time: "2026-05-22T23:59:59.999Z",
   },
-  required: ["user_id", "start_time", "end_time"],
+  required: ["user_id"],
   properties: {
     user_id: { type: "string", format: "uuid" },
     start_time: { type: "string", format: "date-time" },
     end_time: { type: "string", format: "date-time" },
+  },
+});
+
+const timeSheetRebuildRequestBody = createObjectRequestBody({
+  example: { id: "timesheet-uuid" },
+  required: ["id"],
+  properties: {
+    id: { type: "string", format: "uuid" },
   },
 });
 
@@ -395,7 +505,7 @@ const timeSheetSignRequestBody = createObjectRequestBody({
     id: "timesheet-uuid",
     signature: "Joao Silva",
   },
-  required: ["id", "signature"],
+  required: ["id"],
   properties: {
     id: { type: "string", format: "uuid" },
     signature: { type: "string" },
@@ -416,6 +526,95 @@ const scoreNitroUpdateRequestBody = createObjectRequestBody({
   },
 });
 
+const dossierUpdateRequestBody = createObjectRequestBody({
+  example: {
+    address: "Rua das Flores, 100",
+    email: "ana.silva@example.com",
+    phone: "+55 11 99999-9999",
+  },
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    full_name: { type: ["string", "null"] },
+    gender: { type: ["string", "null"] },
+    birth_date: { type: ["string", "null"], format: "date-time" },
+    cpf: { type: ["string", "null"] },
+    rg: { type: ["string", "null"] },
+    address: { type: ["string", "null"] },
+    job_title: { type: ["string", "null"] },
+    email: { type: ["string", "null"], format: "email" },
+    phone: { type: ["string", "null"] },
+    hire_date: { type: ["string", "null"], format: "date-time" },
+    dominio_hire_date: { type: ["string", "null"], format: "date-time" },
+    termination_date: { type: ["string", "null"], format: "date-time" },
+    photo_url: { type: ["string", "null"], format: "uri" },
+    status: { type: "string" },
+    department_id: { type: "string", format: "uuid" },
+  },
+});
+
+const contactCreateRequestBody = createObjectRequestBody({
+  example: { name: "Carlos Silva", phone: "+55 11 98888-8888", reference: "Irmão" },
+  required: ["name", "phone"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    name: { type: "string", minLength: 1 },
+    phone: { type: "string", minLength: 1 },
+    reference: { type: "string" },
+  },
+});
+
+const contactUpdateRequestBody = createObjectRequestBody({
+  example: { id: "contact-uuid", phone: "+55 11 97777-7777" },
+  required: ["id"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    id: { type: "string", format: "uuid" },
+    name: { type: "string", minLength: 1 },
+    phone: { type: "string", minLength: 1 },
+    reference: { type: ["string", "null"] },
+  },
+});
+
+const contactDeleteRequestBody = createObjectRequestBody({
+  example: { id: "contact-uuid" },
+  required: ["id"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    id: { type: "string", format: "uuid" },
+  },
+});
+
+const allergyReplaceRequestBody = createObjectRequestBody({
+  example: {
+    allergies: [{ name: "Poeira", fonts: "Ambiental", action: "Evitar exposição" }],
+  },
+  required: ["allergies"],
+  properties: {
+    target_user_id: { type: "string", format: "uuid" },
+    allergies: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["name", "fonts", "action"],
+        additionalProperties: false,
+        properties: {
+          name: { type: "string", minLength: 1 },
+          fonts: { type: "string", minLength: 1 },
+          action: { type: "string", minLength: 1 },
+        },
+      },
+    },
+  },
+});
+
+const dossierErrorResponses = {
+  "400": { description: "Payload ou parâmetros inválidos" },
+  "401": { description: "Autenticação ausente ou inválida" },
+  "403": { description: "Permissão insuficiente" },
+  "404": { description: "Colaborador ou contato não encontrado na organização" },
+  "409": { description: "Cadastro alterado por outra operação" },
+};
+
 export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
@@ -432,6 +631,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
       { name: "Ponto", description: "Configuracao, registro e ajuste de ponto" },
       { name: "Categorias", description: "Categorias de chamados RH" },
       { name: "OperacaoRH", description: "Dados auxiliares para operacao RH" },
+      { name: "DossieRH", description: "Dossie cadastral, alergias e contatos de emergencia" },
       { name: "Solicitacoes", description: "Chamados e solicitacoes RH" },
       { name: "Mensagens", description: "Mensagens vinculadas aos chamados RH" },
       { name: "ScoreQuestions", description: "Perguntas de score" },
@@ -494,6 +694,7 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           parameters: internalReportingParameters,
           ...internalReportingExtractRequestBody,
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": { description: "Dados extraídos", ...successJson },
             "400": { description: "Payload inválido" },
             "403": { description: "Credenciais, grant ou campo inválido" },
@@ -551,6 +752,17 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/point/recalculate": {
+        post: {
+          tags: ["Ponto"],
+          summary: "Recalcular pontos de um colaborador em um periodo",
+          security: bearer,
+          ...recalculatePointsRequestBody,
+          responses: {
+            "200": { description: "Pontos recalculados", ...successJson },
+          },
+        },
+      },
       "/rh/point": {
         get: {
           tags: ["Ponto"],
@@ -602,7 +814,62 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           security: bearer,
           ...timeClockAdjustmentRequestBody,
           responses: {
-            "200": { description: "Solicitacao criada", ...successJson },
+            "201": { description: "Solicitacao criada", ...successJson },
+          },
+        },
+      },
+      "/rh/point/adjustment/approve-bulk": {
+        put: {
+          tags: ["Ponto"],
+          summary: "Aprovar lote de ajustes de ponto",
+          security: bearer,
+          ...bulkApproveTimeClockAdjustmentRequestBody,
+          responses: {
+            "200": { description: "Lote aprovado", ...successJson },
+          },
+        },
+      },
+      "/rh/point/adjustment/retroactive": {
+        post: {
+          tags: ["Ponto"],
+          summary: "Criar entrada retroativa de ponto",
+          security: bearer,
+          ...retroactiveTimeClockAdjustmentRequestBody,
+          responses: {
+            "201": { description: "Entrada retroativa criada", ...successJson },
+          },
+        },
+      },
+      "/rh/point/adjustment/{requestId}/attachment": {
+        post: {
+          tags: ["Ponto"],
+          summary: "Enviar comprovante privado de ajuste",
+          security: bearer,
+          parameters: [
+            {
+              name: "requestId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["file"],
+                  properties: {
+                    file: { type: "string", format: "binary" },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Comprovante anexado", ...successJson },
           },
         },
       },
@@ -691,6 +958,118 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           security: bearer,
           responses: {
             "200": { description: "Lista de colaboradores ativos", ...successJson },
+          },
+        },
+      },
+      "/rh/profile/colaborator": {
+        get: {
+          tags: ["DossieRH"],
+          summary: "Obter dossie autorizado de colaborador",
+          description:
+            "O dossie completo inclui dados cadastrais e de vinculo apenas para o proprio colaborador ou RH administrativo.",
+          security: bearer,
+          parameters: [
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Dossie autorizado", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        put: {
+          tags: ["DossieRH"],
+          summary: "Atualizar dossie autorizado",
+          description:
+            "Colaborador pode atualizar endereco, email e telefone; RH administrativo pode atualizar o cadastro completo.",
+          security: bearer,
+          ...dossierUpdateRequestBody,
+          responses: {
+            "200": { description: "Dossie atualizado", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+      },
+      "/rh/profile/colaborator/list": {
+        get: {
+          tags: ["DossieRH"],
+          summary: "Listar projecao nao sensivel de colaboradores",
+          description:
+            "A lista nunca retorna CPF, RG, endereco, datas de vinculo, alergias ou contatos.",
+          security: bearer,
+          parameters: [
+            { name: "department_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Projecao nao sensivel", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+      },
+      "/rh/profile/contact": {
+        get: {
+          tags: ["DossieRH"],
+          summary: "Listar contatos de emergencia",
+          security: bearer,
+          parameters: [
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Contatos autorizados", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        post: {
+          tags: ["DossieRH"],
+          summary: "Criar contato de emergencia",
+          security: bearer,
+          ...contactCreateRequestBody,
+          responses: {
+            "200": { description: "Contato criado", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        put: {
+          tags: ["DossieRH"],
+          summary: "Atualizar contato de emergencia",
+          security: bearer,
+          ...contactUpdateRequestBody,
+          responses: {
+            "200": { description: "Contato atualizado", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        delete: {
+          tags: ["DossieRH"],
+          summary: "Excluir contato de emergencia",
+          security: bearer,
+          ...contactDeleteRequestBody,
+          responses: {
+            "200": { description: "Contato excluido", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+      },
+      "/rh/profile/allergy": {
+        get: {
+          tags: ["DossieRH"],
+          summary: "Listar alergias autorizadas",
+          security: bearer,
+          parameters: [
+            { name: "user_id", in: "query", schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": { description: "Alergias autorizadas", ...successJson },
+            ...dossierErrorResponses,
+          },
+        },
+        put: {
+          tags: ["DossieRH"],
+          summary: "Substituir alergias",
+          security: bearer,
+          ...allergyReplaceRequestBody,
+          responses: {
+            "200": { description: "Alergias atualizadas", ...successJson },
+            ...dossierErrorResponses,
           },
         },
       },
@@ -1038,6 +1417,27 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/notifications": {
+        get: {
+          tags: ["Notificacoes"],
+          summary: "Listar notificações de solicitações RH do usuário autenticado",
+          security: bearer,
+          responses: {
+            "200": { description: "Notificações RH", ...successJson },
+          },
+        },
+      },
+      "/rh/notifications/read": {
+        put: {
+          tags: ["Notificacoes"],
+          summary: "Marcar notificações RH como lidas",
+          security: bearer,
+          ...rhNotificationReadRequestBody,
+          responses: {
+            "200": { description: "Notificações atualizadas", ...successJson },
+          },
+        },
+      },
       "/rh/timesheets": {
         post: {
           tags: ["TimeSheets"],
@@ -1073,6 +1473,22 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           },
         },
       },
+      "/rh/timesheets/{id}/pdf": {
+        get: {
+          tags: ["TimeSheets"],
+          summary: "Baixar PDF privado da folha de ponto",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "PDF da folha",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+          },
+        },
+      },
       "/rh/timesheets/sign": {
         put: {
           tags: ["TimeSheets"],
@@ -1081,6 +1497,28 @@ export function buildRhServiceOpenApiSpec(env: RhEnv): OpenApiDocument {
           ...timeSheetSignRequestBody,
           responses: {
             "200": { description: "Folha assinada", ...successJson },
+          },
+        },
+      },
+      "/rh/timesheets/reopen": {
+        put: {
+          tags: ["TimeSheets"],
+          summary: "Reabrir folha de ponto assinada",
+          security: bearer,
+          ...reopenTimeSheetRequestBody,
+          responses: {
+            "200": { description: "Folha reaberta", ...successJson },
+          },
+        },
+      },
+      "/rh/timesheets/rebuild": {
+        put: {
+          tags: ["TimeSheets"],
+          summary: "Reconstruir uma folha de ponto aberta",
+          security: bearer,
+          ...timeSheetRebuildRequestBody,
+          responses: {
+            "200": { description: "Folha reconstruida", ...successJson },
           },
         },
       },

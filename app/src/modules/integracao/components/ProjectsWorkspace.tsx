@@ -38,8 +38,7 @@ import {
   PROJECT_INPUT_CLASSNAME,
   PROJECT_PANEL_CLASSNAME,
   PROJECT_PRIMARY_BUTTON_CLASSNAME,
-  PROJECT_SELECT_ARROW_STYLE,
-  PROJECT_SELECT_CLASSNAME,
+  ProjectSelect,
   PROJECT_SUBPANEL_CLASSNAME,
 } from "./projectUi";
 
@@ -600,11 +599,9 @@ export function ProjectsWorkspace() {
         <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-4`}>
           <label className="space-y-2">
             <span className="block text-sm font-medium text-slate-700 dark:text-white">Status</span>
-            <select
+            <ProjectSelect
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className={PROJECT_SELECT_CLASSNAME}
-              style={PROJECT_SELECT_ARROW_STYLE}
             >
               <option value="all">Todos</option>
               {statusOptions.map((status) => (
@@ -612,7 +609,7 @@ export function ProjectsWorkspace() {
                   {status}
                 </option>
               ))}
-            </select>
+            </ProjectSelect>
           </label>
         </section>
       </div>

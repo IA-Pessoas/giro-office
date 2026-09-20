@@ -333,6 +333,40 @@ await runTest("mantém pesquisa e paginação acessíveis e responsivas", () => 
   assert.match(superAdminPageSource, /lg:grid-cols/);
 });
 
+await runTest("alinha a paginação do diretório ao painel de configuração", () => {
+  assert.match(superAdminPageSource, /lg:items-stretch/);
+  assert.match(
+    organizationDirectorySource,
+    /<aside className="flex min-h-0 flex-col overflow-hidden/,
+  );
+  assert.doesNotMatch(organizationDirectorySource, /min-h-\[34rem\]/);
+  assert.match(organizationDirectorySource, /min-h-0 flex-1 overflow-y-auto/);
+});
+
+await runTest("mantém a paginação da auditoria visível no painel com tabela rolável", () => {
+  assert.match(superAdminPageSource, /lg:h-\[calc\(100vh-16rem\)\]/);
+  assert.match(
+    superAdminPageSource,
+    /flex min-h-0 flex-col rounded-xl border/,
+  );
+  assert.match(
+    superAdminPageSource,
+    /activePanel === "audit" \? "overflow-hidden" : "overflow-auto"/,
+  );
+  assert.match(
+    auditPanelSource,
+    /<section aria-labelledby="platform-audit-title" className="flex min-h-0 flex-1 flex-col">/,
+  );
+  assert.match(
+    auditPanelSource,
+    /className="min-h-0 flex-1 overflow-auto lg:min-h-\[24rem\]"/,
+  );
+  assert.ok(
+    auditPanelSource.indexOf("<PaginationControls") >
+      auditPanelSource.indexOf('className="min-h-0 flex-1 overflow-auto"'),
+  );
+});
+
 await runTest("oferece gestão explícita sem suporte ou CTA inerte", () => {
   assert.doesNotMatch(allSuperAdminSources, /Novo usuário|Modo suporte|Suporte assistido/);
   assert.doesNotMatch(allSuperAdminSources, /onClick=\{\(\) => \{\}\}/);
@@ -456,12 +490,39 @@ await runTest("auditoria é contextual por padrão e global somente por controle
   assert.match(auditPanelSource, /Mostrar auditoria global/);
   assert.match(auditPanelSource, /setPage\(1\)/);
   assert.match(auditPanelSource, /actorPlatformUserId/);
+  assert.match(auditPanelSource, /actorPlatformUserName/);
+  assert.match(auditPanelSource, /organizationName/);
+  assert.match(auditPanelSource, /Autor/);
+  assert.match(auditPanelSource, /Organização/);
+  assert.match(auditPanelSource, /Nome não disponível/);
+  assert.match(auditPanelSource, /\[page, search, showGlobal\]/);
   assert.match(auditPanelSource, /formatAuditChanges/);
   assert.doesNotMatch(auditHookSource, /placeholderData/);
   assert.doesNotMatch(
     typesSource + auditPanelSource,
     /metadata_json|errorMessage\s*\??:|userAgent\s*\??:|\bip\s*\??:/,
   );
+});
+
+await runTest("oferece detalhes da ação sob demanda sem perder o contexto da lista", () => {
+  assert.match(auditPanelSource, /useRef/);
+  assert.match(auditPanelSource, /selectedAudit/);
+  assert.match(auditPanelSource, /Ver detalhes da ação/);
+  assert.match(auditPanelSource, /<Dialog/);
+  assert.match(auditPanelSource, /title="Detalhes da ação"/);
+  assert.match(auditPanelSource, /requestId/);
+  assert.match(auditPanelSource, /serviceSource/);
+  assert.match(auditPanelSource, /durationMs/);
+  assert.match(auditPanelSource, /formatAuditChanges\(selectedAudit\.changes\)/);
+  assert.match(auditPanelSource, /onCloseAutoFocus/);
+  assert.match(auditPanelSource, /setSelectedAudit\(null\)/);
+});
+
+await runTest("exibe alterações de permissões por módulo no detalhe da auditoria", () => {
+  assert.match(typesSource, /modules\?: \{[\s\S]*before: Partial<Record<string, 0 \| 1 \| 2 \| 3>>/);
+  assert.match(managementUtilsSource, /changes\.modules/);
+  assert.match(managementUtilsSource, /Módulo \$\{moduleKey\}/);
+  assert.match(auditPanelSource, /selectedAuditChanges/);
 });
 
 await runTest("preserva rascunhos de outras ações ao atualizar um campo", () => {

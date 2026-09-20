@@ -10,6 +10,7 @@ const observedRouteNamespaces = new Set([
   "audit",
   "certificate",
   "client",
+  "commercial",
   "contabil",
   "dashboard",
   "department",

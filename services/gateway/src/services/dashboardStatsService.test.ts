@@ -14,33 +14,43 @@ function result(rows: unknown[]) {
   };
 }
 
-function dashboardQueryMock(activities: unknown[] = []) {
-  return vi
-    .fn()
-    .mockResolvedValueOnce(
-      result([
-        {
-          active_total: 0,
-          contabil: 0,
-          fiscal: 0,
-          pessoal: 0,
-          infoproduto: 0,
-          consultoria: 0,
-          castelo_med: 0,
-        },
-      ]),
-    )
-    .mockResolvedValueOnce(result([]))
-    .mockResolvedValueOnce(result([]))
-    .mockResolvedValueOnce(result([{ today: 0, completed_today: 0, pending: 0, urgent: 0 }]))
-    .mockResolvedValueOnce(result([]))
-    .mockResolvedValueOnce(
-      result([{ active: 0, completed: 0, in_progress: 0, delayed: 0, waiting: 0 }]),
-    )
-    .mockResolvedValueOnce(result([{ total: 0, pending: 0 }]))
-    .mockResolvedValueOnce(result([]))
-    .mockResolvedValueOnce(result(activities))
-    .mockResolvedValueOnce(result([{ updated_at: null }]));
+function dashboardQueryMock(
+  activities: unknown[] = [],
+  metrics: {
+    certificateReceipts?: unknown[];
+    commercial?: unknown[];
+    commercialBilling?: unknown[];
+    departments?: unknown[];
+  } = {},
+) {
+  const responses = [
+    result([
+      {
+        active_total: 0,
+        contabil: 0,
+        fiscal: 0,
+        pessoal: 0,
+        infoproduto: 0,
+        consultoria: 0,
+        castelo_med: 0,
+      },
+    ]),
+    result([]),
+    result([]),
+    result([{ today: 0, completed_today: 0, pending: 0, urgent: 0 }]),
+    result([]),
+    result([{ active: 0, completed: 0, in_progress: 0, delayed: 0, waiting: 0 }]),
+    result([{ total: 0, pending: 0 }]),
+    result(metrics.certificateReceipts ?? []),
+    result(metrics.commercial ?? []),
+    result(metrics.commercialBilling ?? []),
+    result(metrics.departments ?? []),
+    result([]),
+    result(activities),
+    result([{ updated_at: null }]),
+  ];
+
+  return vi.fn().mockImplementation(async () => responses.shift() ?? result([]));
 }
 
 describe("DashboardStatsService", () => {
@@ -68,7 +78,7 @@ describe("DashboardStatsService", () => {
 
     await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(2));
 
-    for (let expectedCalls = 3; expectedCalls <= 10; expectedCalls += 1) {
+    for (let expectedCalls = 3; expectedCalls <= 14; expectedCalls += 1) {
       releases.shift()?.();
       await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(expectedCalls));
     }
@@ -88,7 +98,7 @@ describe("DashboardStatsService", () => {
 
     await Promise.all([service.getStats("org-1"), service.getStats("org-1")]);
 
-    expect(query).toHaveBeenCalledTimes(10);
+    expect(query).toHaveBeenCalledTimes(14);
   });
 
   it("continues processing queued queries after a database failure", async () => {
@@ -104,10 +114,10 @@ describe("DashboardStatsService", () => {
     await expect(service.getStats("org-1")).rejects.toMatchObject({
       statusCode: 500,
     });
-    await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(10));
+    await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(14));
     await expect(service.getStats("org-1")).resolves.toBeDefined();
 
-    expect(query).toHaveBeenCalledTimes(20);
+    expect(query).toHaveBeenCalledTimes(28);
   });
 
   it("limits the dashboard pool through DATABASE_POOL_MAX", () => {
@@ -146,7 +156,7 @@ describe("DashboardStatsService", () => {
 
     await service.getStats("org-1");
 
-    const activitiesSql = String(query.mock.calls[8]?.[0]);
+    const activitiesSql = String(query.mock.calls[12]?.[0]);
     expect(activitiesSql).toContain("not coalesce(a.metadata_json ? 'activityVisible', false)");
     expect(activitiesSql).toContain("a.metadata_json @> '{\"activityVisible\": true}'::jsonb");
     expect(activitiesSql).toContain("a.outcome = 'success'");
@@ -214,6 +224,51 @@ describe("DashboardStatsService", () => {
     expect(stats.activities.map((activity) => activity.user)).toEqual(["Legado", "Sucesso"]);
   });
 
+  it("returns financial, commercial and department indicators from real query rows", async () => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const query = dashboardQueryMock([], {
+      certificateReceipts: [
+        { month: currentMonth, paid_amount: "1234.50", unpaid_certificates: 2 },
+      ],
+      commercial: [
+        {
+          active_prospects: 4,
+          closed_this_month: 1,
+          financial_analysis: 2,
+          scheduling: 1,
+          proposal: 1,
+          paused: 0,
+          refused: 0,
+          closed: 3,
+        },
+      ],
+      commercialBilling: [{ pending: 5, contracted: 2, not_contracted: 1 }],
+      departments: [
+        { id: "dept-1", name: "Fiscal", open_tasks: 7, completed_tasks: 3, urgent_tasks: 2 },
+      ],
+    });
+    const service = new DashboardStatsService({ pool: { query } as never });
+
+    const stats = await service.getStats("org-1");
+
+    expect(stats.financial).toMatchObject({
+      paidCertificateReceipts: 1234.5,
+      unpaidCertificates: 2,
+    });
+    expect(stats.commercial).toMatchObject({
+      activeProspects: 4,
+      closedThisMonth: 1,
+      billing: { pending: 5, contracted: 2, notContracted: 1 },
+    });
+    expect(stats.departments).toEqual([
+      { id: "dept-1", name: "Fiscal", openTasks: 7, completedTasks: 3, urgentTasks: 2 },
+    ]);
+    expect(stats).not.toHaveProperty("fiscal");
+    expect(String(query.mock.calls[7]?.[0])).toContain('"certificate.pj"');
+    expect(String(query.mock.calls[8]?.[0])).toContain('"commercial.prospecting"');
+    expect(String(query.mock.calls[10]?.[0])).toContain("public.departments");
+  });
+
   it("returns updatedAt from the latest real dashboard source timestamp", async () => {
     const query = vi
       .fn()
@@ -255,6 +310,10 @@ describe("DashboardStatsService", () => {
         ]),
       )
       .mockResolvedValueOnce(result([{ total: 0, pending: 0 }]))
+      .mockResolvedValueOnce(result([]))
+      .mockResolvedValueOnce(result([]))
+      .mockResolvedValueOnce(result([]))
+      .mockResolvedValueOnce(result([]))
       .mockResolvedValueOnce(result([]))
       .mockResolvedValueOnce(result([]))
       .mockResolvedValueOnce(result([{ updated_at: "2026-07-21T15:30:00.000Z" }]));

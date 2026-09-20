@@ -20,6 +20,7 @@ export const integracaoProjectCreateBodySchema = z
     name: zNonEmptyText("name"),
     client_id: z.string().uuid({ message: "client_id inválido." }),
     start_date: z.coerce.date({ invalid_type_error: "start_date inválida." }),
+    end_date: z.coerce.date({ invalid_type_error: "end_date inválida." }).optional(),
     objective: z.string(),
     sponsor_id: optionalSponsorId,
   })

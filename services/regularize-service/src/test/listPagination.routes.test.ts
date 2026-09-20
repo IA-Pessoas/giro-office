@@ -49,7 +49,7 @@ describe("regularize list pagination", () => {
 
     const where = {
       organization_id: "a0000000-0000-4000-8000-000000000001",
-      status: "Aberto",
+      status: { in: ["Andamento", "Aberto", "Em andamento"] },
       OR: [
         { process_type: { contains: "acme", mode: "insensitive" } },
         { cpf_cnpj: { contains: "acme", mode: "insensitive" } },

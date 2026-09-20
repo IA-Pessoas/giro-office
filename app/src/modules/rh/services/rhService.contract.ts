@@ -14,7 +14,13 @@ export const RH_ENDPOINTS = {
   requests: "/rh/requests",
   requestDetail: (id: string) => `/rh/requests/${id}`,
   messages: "/rh/messages",
+  notifications: "/rh/notifications",
+  markNotificationsRead: "/rh/notifications/read",
   operationalUsers: "/rh/operational-users",
+  dossier: "/rh/profile/colaborator",
+  dossierList: "/rh/profile/colaborator/list",
+  contact: "/rh/profile/contact",
+  allergy: "/rh/profile/allergy",
   pointConfig: "/rh/point-config",
   pointConfigByUser: (userId: string) => `/rh/point-config/${userId}`,
   points: "/rh/point",
@@ -23,9 +29,14 @@ export const RH_ENDPOINTS = {
   pointSummary: "/rh/point/summary",
   registerPoint: "/rh/point/register",
   calculatePoint: (pointId: string) => `/rh/point/${pointId}/calculate`,
+  recalculatePoints: "/rh/point/recalculate",
   requestPointAdjustment: "/rh/point/adjustment/request",
   approvePointAdjustment: "/rh/point/adjustment/approve",
   rejectPointAdjustment: "/rh/point/adjustment/reject",
+  approvePointAdjustmentsBulk: "/rh/point/adjustment/approve-bulk",
+  retroactivePointAdjustment: "/rh/point/adjustment/retroactive",
+  pointAdjustmentAttachment: (requestId: string) =>
+    `/rh/point/adjustment/${requestId}/attachment`,
   holidays: "/rh/holidays",
   timeBankSummary: "/rh/time-bank/summary",
   timeBankSummaryByUser: (userId: string) => `/rh/time-bank/summary/${userId}`,
@@ -35,7 +46,10 @@ export const RH_ENDPOINTS = {
   timeBankReleaseApprove: "/rh/time-bank-releases/approve",
   timeSheets: "/rh/timesheets",
   timeSheetDetail: (id: string) => `/rh/timesheets/${id}`,
+  timeSheetPdf: (id: string) => `/rh/timesheets/${id}/pdf`,
   signTimeSheet: "/rh/timesheets/sign",
+  reopenTimeSheet: "/rh/timesheets/reopen",
+  rebuildTimeSheet: "/rh/timesheets/rebuild",
   scoreQuestions: "/rh/score/questions",
   scoreQuartersGenerate: "/rh/score/quarters/generate",
   scoreQuartersNitro: "/rh/score/quarters/nitro",
@@ -45,6 +59,10 @@ export const RH_ENDPOINTS = {
   submitScoreEvaluation: "/rh/score/evaluations/submit",
   scoreNitroUpdate: "/rh/score/nitro/update",
 } as const;
+
+export function buildRhDossierTargetParams(userId?: string) {
+  return { user_id: userId };
+}
 
 export interface RhOperationalUserQueryParams {
   module?: string;

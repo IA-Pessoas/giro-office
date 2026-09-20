@@ -1,4 +1,9 @@
-import { ServiceError } from "@workspace/shared";
+import {
+  executeReportingQuery,
+  type ReportingQuery,
+  ServiceError,
+  withReportingSnapshot,
+} from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import {
@@ -11,27 +16,49 @@ type ReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, true>;
     take: number;
+    skip?: number;
+    orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
 export class ClientIntegrationReportingService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly inSnapshot = false,
+  ) {}
 
   async extract(input: {
+    query?: ReportingQuery;
+    offset?: number;
     organizationId: string;
     source: ClientIntegrationReportingSource;
     fields: readonly string[];
     limit: number;
-  }): Promise<readonly Record<string, unknown>[]> {
+  }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+    if (input.query && !this.inSnapshot) {
+      return withReportingSnapshot(this.prisma, (transaction) =>
+        new ClientIntegrationReportingService(transaction, true).extract(input),
+      );
+    }
+    if (input.query) {
+      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+        this.extract({ ...input, query: undefined, fields, limit, offset }),
+      );
+    }
     const allowedFields = getClientIntegrationReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
 
-    return (this.prisma.client as unknown as ReportingDelegate).findMany({
+    const rows = await (this.prisma.client as unknown as ReportingDelegate).findMany({
       where: { organization_id: input.organizationId },
       select: Object.fromEntries(input.fields.map((field) => [field, true])),
-      take: input.limit,
+      ...(input.offset !== undefined
+        ? { skip: input.offset, orderBy: { id: "asc" as const } }
+        : {}),
+      take: input.limit + 1,
     });
+
+    return { rows: rows.slice(0, input.limit), reachedLimit: rows.length > input.limit };
   }
 }

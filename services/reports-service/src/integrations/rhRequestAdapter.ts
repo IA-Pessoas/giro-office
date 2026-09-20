@@ -1,5 +1,4 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
-
 import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
@@ -7,7 +6,6 @@ import {
   rhRequestReportingCatalog,
   ServiceError,
 } from "@workspace/shared";
-
 import type {
   ReportCatalogRelation,
   ReportCatalogSource,
@@ -17,6 +15,12 @@ import type {
 } from "../catalog/types.js";
 import type { ReportsServiceEnv } from "../config/env.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
+import {
+  assertReportSourceResponse,
+  reportCriteria,
+  reportingQueryFields,
+  reportResultFields,
+} from "./reportCriteria.js";
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
@@ -107,13 +111,7 @@ export class RhRequestAdapter implements ReportSourceAdapter {
 
   async preview(input: ReportPreviewAdapterInput): Promise<ReportPreviewAdapterResult> {
     const definition = input.definition as ReportDefinition;
-    if (
-      definition.sources.length !== 1 ||
-      definition.joins.length > 0 ||
-      definition.filters.length > 0 ||
-      definition.aggregations.length > 0 ||
-      definition.order_by.length > 0
-    ) {
+    if (definition.sources.length !== 1 || definition.joins.length > 0) {
       throw new ServiceError(
         400,
         "A prévia de Solicitações de RH aceita somente colunas de uma fonte.",
@@ -125,6 +123,7 @@ export class RhRequestAdapter implements ReportSourceAdapter {
       throw new ServiceError(400, "As colunas de Solicitações de RH devem usar campos únicos.");
     }
     const body = {
+      ...reportCriteria(definition, input.parameter_values),
       source,
       fields,
       limit: Math.min(input.limit, MAX_RH_REQUEST_REPORTING_LIMIT),
@@ -133,7 +132,7 @@ export class RhRequestAdapter implements ReportSourceAdapter {
     const signed = createGrant({
       secret: this.env.reportsGrantSecret,
       source,
-      fields,
+      fields: reportingQueryFields(fields, body.query),
       organizationId: input.organization_id,
       requestId,
       body,
@@ -152,18 +151,20 @@ export class RhRequestAdapter implements ReportSourceAdapter {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(this.env.sourceTimeoutMs),
       });
+      assertReportSourceResponse(response);
       const payload: unknown = await response.json();
       if (!response.ok || !isExtractResponse(payload)) {
         throw new Error("Resposta interna inválida.");
       }
       return {
-        rows: projectRows(payload.data.rows, fields),
+        rows: projectRows(payload.data.rows, reportResultFields(fields, body.query)),
         reachedLimit: payload.data.reachedLimit,
       };
     } catch (err: unknown) {
       logError("Falha ao extrair solicitações de RH para relatório", {
         errorType: err instanceof Error ? err.name : typeof err,
       });
+      if (err instanceof ServiceError) throw err;
       throw new ServiceError(503, "Não foi possível obter Solicitações de RH para o relatório.");
     }
   }

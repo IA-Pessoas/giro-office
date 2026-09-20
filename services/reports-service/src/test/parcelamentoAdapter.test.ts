@@ -43,7 +43,10 @@ describe("ParcelamentoAdapter", () => {
   it("propaga request id e usa exclusivamente o extract interno", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: vi.fn().mockResolvedValue({ success: true, data: { rows: [{ status: "active" }] } }),
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: { rows: [{ status: "active" }], reachedLimit: true },
+      }),
     });
     vi.stubGlobal("fetch", fetchMock);
     const adapter = new ParcelamentoAdapter({
@@ -69,7 +72,7 @@ describe("ParcelamentoAdapter", () => {
         limit: 10,
         request_id: "request-811",
       }),
-    ).resolves.toEqual([{ status: "active" }]);
+    ).resolves.toEqual({ rows: [{ status: "active" }], reachedLimit: true });
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://parcelamento.test/internal/reporting/extract",
     );

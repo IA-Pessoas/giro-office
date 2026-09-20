@@ -9,6 +9,7 @@ import {
 } from "./services/pessoalService.contract.ts";
 import {
   buildPessoalLddListParams,
+  buildPessoalGroupPayload,
   buildPessoalObligationParams,
   buildPessoalPayrollPayload,
   buildPessoalPayrollUpdatePayload,
@@ -47,6 +48,12 @@ runTest("pessoal endpoints match the gateway public contract", () => {
   assert.equal(PESSOAL_ENDPOINTS.ldd, "/pessoal/ldd");
   assert.equal(PESSOAL_ENDPOINTS.lddDetail("ldd-1"), "/pessoal/ldd/ldd-1");
   assert.equal(PESSOAL_ENDPOINTS.overview, "/pessoal/overview");
+  assert.equal(PESSOAL_ENDPOINTS.groups, "/pessoal/groups");
+  assert.equal(PESSOAL_ENDPOINTS.groupDetail("group-1"), "/pessoal/groups/group-1");
+  assert.equal(
+    PESSOAL_ENDPOINTS.groupReactivate("group-1"),
+    "/pessoal/groups/group-1/reactivate",
+  );
   assert.equal(PESSOAL_ENDPOINTS.situations, "/pessoal/situations");
   assert.equal(
     PESSOAL_ENDPOINTS.situationDetail("situation-1"),
@@ -104,8 +111,31 @@ runTest("pessoal situations expose a permissioned delete confirmation with feedb
 runTest("pessoal tabs stay stable for branch integration", () => {
   assert.deepEqual(
     PESSOAL_TABS.map((tab) => tab.id),
-    ["overview", "unions", "payroll", "obligations", "tracking", "passwords"],
+    [
+      "overview",
+      "groups",
+      "groupAssignments",
+      "unions",
+      "payroll",
+      "obligations",
+      "tracking",
+      "passwords",
+    ],
   );
+});
+
+runTest("pessoal group assignments use the persisted preview contract", () => {
+  const service = readFileSync("src/modules/pessoal/services/pessoalService.ts", "utf8");
+  const section = readFileSync(
+    "src/modules/pessoal/components/PessoalGroupAssignmentSection.tsx",
+    "utf8",
+  );
+
+  assert.match(service, /createGroupAssignmentPreview\(\s*groupId: string,\s*clientIds: string\[\]/);
+  assert.match(service, /"Idempotency-Key": idempotencyKey/);
+  assert.match(section, /Prévia de atribuição em lote/);
+  assert.match(section, /Aplicar prévia/);
+  assert.match(section, /function clearPreview\(\)[\s\S]*createPreviewMutation\.reset\(\)/);
 });
 
 runTest("unwrapPessoalEnvelope extracts data and accepts raw fallback", () => {
@@ -221,6 +251,13 @@ runTest("union payload builder keeps backend field names", () => {
       base_date: null,
     },
   );
+});
+
+runTest("group payload trims input and preserves its policy before sending the catalog mutation", () => {
+  assert.deepEqual(buildPessoalGroupPayload({ name: "  Grupo A  ", policy: "NO_OBLIGATIONS" }), {
+    name: "Grupo A",
+    policy: "NO_OBLIGATIONS",
+  });
 });
 
 runTest("union cnpj helper formats progressively and keeps the 14-digit cap", () => {
@@ -384,7 +421,7 @@ runTest("payroll payload builder keeps backend payroll fields", () => {
     info: "Folha mensal",
     previous: false,
     onvio: false,
-    group: "Grupo A",
+    group_id: "group-1",
     vt: false,
     vt_value: null,
     vt_type: null,
@@ -472,7 +509,6 @@ runTest("payroll section binds the clarified labels to rendered payroll controls
 
   for (const [name, label] of [
     ["info", "Informações da folha"],
-    ["group", "Grupo da folha"],
     ["advance_type", "Tipo de adiantamento"],
     ["vt_type", "Tipo de vale-transporte"],
     ["contact", "Contato da folha"],
@@ -499,6 +535,9 @@ runTest("payroll section binds the clarified labels to rendered payroll controls
     payroll,
     /\{textFields\.map\(\(field\) => \{[\s\S]*?htmlFor=\{`payroll-\$\{field\.name\}`\}[\s\S]*?<input[\s\S]*?id=\{`payroll-\$\{field\.name\}`\}/,
   );
+  assert.match(payroll, /htmlFor="payroll-group_id"/);
+  assert.match(payroll, /usePessoalGroups/);
+  assert.doesNotMatch(payroll, /legacy_group|Grupo legado:/);
   assert.match(
     payroll,
     /\{numberFields\.map\(\(field\) => \([\s\S]*?htmlFor=\{`payroll-\$\{field\.name\}`\}[\s\S]*?<input[\s\S]*?id=\{`payroll-\$\{field\.name\}`\}/,
@@ -614,6 +653,7 @@ runTest("pessoal shell wires access, active client selector, and functional tabs
 
   assert.match(shell, /useModuleAccess\("pessoal"\)/);
   assert.match(shell, /PessoalUnionsSection canEdit=\{access\.canEdit\}/);
+  assert.match(shell, /PessoalGroupsSection canEdit=\{access\.canEdit\}/);
   assert.match(shell, /PessoalPayrollSection selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalObligationsSection selectedClientId=\{selectedClientId\}/);
   assert.match(shell, /PessoalTrackingSection selectedClientId=\{selectedClientId\}/);
@@ -627,6 +667,23 @@ runTest("pessoal shell wires access, active client selector, and functional tabs
   assert.doesNotMatch(clientSelector, /Departamento pessoal/);
   assert.match(clientSelector, /allowClearSelection/);
   assert.doesNotMatch(clientSelector, /useClients\(/);
+});
+
+runTest("group catalog supports create, edit, archive and reactivation without a destructive delete", () => {
+  const groups = readFileSync("src/modules/pessoal/components/PessoalGroupsSection.tsx", "utf8");
+  const groupTypes = readFileSync("src/modules/pessoal/types/groups.ts", "utf8");
+
+  assert.match(groups, /useCreatePessoalGroupMutation/);
+  assert.match(groups, /useUpdatePessoalGroupMutation/);
+  assert.match(groups, /useArchivePessoalGroupMutation/);
+  assert.match(groups, /useReactivatePessoalGroupMutation/);
+  assert.match(groups, /Novo grupo/);
+  assert.match(groups, /Política de obrigações/);
+  assert.match(groups, /PESSOAL_GROUP_POLICIES/);
+  assert.match(groupTypes, /NO_OBLIGATIONS/);
+  assert.match(groups, /Arquivar/);
+  assert.match(groups, /Reativar/);
+  assert.doesNotMatch(groups, /Trash2|Remover grupo/);
 });
 
 runTest("client-scoped sections block requests without selected client", () => {

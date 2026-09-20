@@ -1,5 +1,15 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 function field(key: string, label: string, value_type: "string" | "date") {
-  return { key, label, value_type, filter_operators: [], aggregations: [] } as const;
+  return {
+    groupable: true,
+    sortable: true,
+    key,
+    label,
+    value_type,
+    filter_operators: [],
+    aggregations: reportingAggregations(value_type),
+  } as const;
 }
 
 export const PESSOAL_UNIONS_REPORTING_SOURCES = ["pessoal.unions"] as const;

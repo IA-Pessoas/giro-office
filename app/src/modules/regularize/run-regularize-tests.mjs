@@ -4,6 +4,7 @@ import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildRegularizeClientPfListParams,
+  buildRegularizeGuidanceListParams,
   buildRegularizeLicenseListParams,
   buildRegularizeMunicipalTaxesListParams,
   buildRegularizeProcessListParams,
@@ -49,6 +50,159 @@ async function collectSourceFiles(directory) {
   return files;
 }
 
+await runTest(
+  "guidance form supports optional process and coherent PJ PF manual targets",
+  async () => {
+    const source = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+    assert.match(source, /defaultProcessId\?: string/);
+    assert.match(source, /processOptions\?: RegularizeFormOption\[\]/);
+    assert.match(source, /REGULARIZE_GUIDANCE_TARGET_TYPES\.map/);
+    assert.match(source, /ClientPickerModal/);
+    assert.match(source, /RegularizeClientPfSelect/);
+    assert.match(source, /legacyIntegrationStatusFilter: false/);
+    assert.match(source, /target_type === "PJ"/);
+    assert.match(source, /target_type === "PF"/);
+    assert.match(source, /target_type === "SEM_CLIENTE"/);
+    assert.match(source, /client_pj_id: "",\s*client_pf_id: ""/);
+    assert.match(source, /source: "manual"/);
+    assert.match(source, /!formState\.target_snapshot\.name\.trim\(\)/);
+    assert.match(source, /process_id: formState\.process_id \|\| null/);
+    assert.match(source, /Sem processo/);
+    assert.doesNotMatch(source, /process_id: guidance\.process_id,/);
+    assert.doesNotMatch(source, /if \(!formState\.process_id/);
+    assert.doesNotMatch(source, /disabled=\{isEditing\}/);
+    assert.doesNotMatch(source, /LegacyGuidanceDraft/);
+  },
+);
+
+await runTest(
+  "guidance form renders and submits the canonical checklist with conditional branch",
+  async () => {
+    const source = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+    const shared = await readFile(join(appRoot, "../shared/src/regularize/guidance.ts"), "utf8");
+    assert.equal((shared.match(/code: "/g) ?? []).length, 17);
+    assert.match(shared, /"Pendente",\s*"Concluído",\s*"Não se aplica"/);
+    assert.match(source, /@workspace\/shared\/regularize/);
+    assert.match(source, /checklist: REGULARIZE_GUIDANCE_CHECKLIST_ITEMS\.map/);
+    assert.match(source, /REGULARIZE_GUIDANCE_CHECKLIST_ITEMS\.map\(\(\{ code, label \}\)/);
+    assert.match(source, /REGULARIZE_GUIDANCE_CHECKLIST_STATUSES\.map/);
+    assert.match(source, /<textarea\s+value=\{item\?\.observation \?\? ""\}/);
+    assert.match(source, /item\.code === "branch" && item\.status === "Concluído"/);
+    assert.match(source, /code === "branch" && status !== "Concluído"/);
+    assert.match(source, /branch_data: null/);
+    assert.match(source, /disabled=\{!isBranchCompleted\}/);
+    assert.match(source, /branch_data:\s*isBranchCompleted\s*\?[\s\S]*?: undefined/);
+    assert.match(source, /branch\.name\.trim\(\)/);
+    assert.match(source, /branch\.address\.trim\(\)/);
+    assert.match(source, /branch\.city\.trim\(\)/);
+    assert.match(source, /branch\.state\.trim\(\)/);
+    assert.match(source, /observation: item\?\.observation\?\.trim\(\) \?\? ""/);
+    for (const field of [
+      "type",
+      "request",
+      "framework_obs",
+      "legal_nature",
+      "company_name",
+      "trade_name",
+      "cpf_cnpj",
+      "share_capital",
+      "iptu",
+      "address",
+      "comporate_purpose",
+      "carryng",
+      "regime",
+      "legal_representative",
+      "status",
+    ]) {
+      assert.ok(source.includes(`formState.${field}`), `preserves legacy ${field}`);
+    }
+  },
+);
+
+await runTest(
+  "guidance independent list preserves process scope permissions and mutation feedback",
+  async () => {
+    const page = await readModuleSource("components/RegularizePage.tsx");
+    const form = await readModuleSource("components/RegularizeGuidanceForm.tsx");
+    assert.match(page, /useRegularizeGuidance\(undefined, \{ enabled: true \}\)/);
+    assert.match(page, /function IndependentGuidanceSection/);
+    const independentSection = page.slice(
+      page.indexOf("function IndependentGuidanceSection"),
+      page.indexOf("function ProcessDetailContent"),
+    );
+    assert.match(
+      independentSection,
+      /canManageRegularizeCore \? \([\s\S]*?label="Nova orientação"/,
+    );
+    assert.doesNotMatch(independentSection, /currentProcessId/);
+    assert.match(page, /regularizeAccess\.canView \? \(\s*<IndependentGuidanceSection/);
+    assert.match(page, /onSetActiveForm\(\{ type: "guidance", mode: "create" \}\)/);
+    assert.match(page, /<QueryStatePanel query=\{independentGuidanceQuery\}/);
+    assert.match(page, /readOnly=\{!canManageRegularizeCore\}/);
+    assert.match(page, /Somente leitura/);
+    assert.match(page, /Orientação atualizada com sucesso/);
+    assert.match(page, /Orientação criada com sucesso/);
+    assert.match(page, /toast\.error\(message\);\s*throw new Error\(message\)/);
+    assert.match(form, /disabled=\{readOnly \|\| isSubmitting\}/);
+    assert.match(form, /if \(readOnly \|\| isSubmitting\)/);
+    assert.match(form, /getRegularizeMutationErrorMessage/);
+    assert.doesNotMatch(page, /LegacyGuidanceDraft/);
+  },
+);
+
+await runTest(
+  "guidance hardening preserves manual snapshots, API statuses and picker focus",
+  async () => {
+    const [guidanceSource, pickerSource] = await Promise.all([
+      readModuleSource("components/RegularizeGuidanceForm.tsx"),
+      readFile(join(appRoot, "src/modules/clients/components/ClientPickerModal.tsx"), "utf8"),
+    ]);
+
+    assert.match(
+      guidanceSource,
+      /const regularizeGuidanceStatusOptions = \["Em andamento", "Finalizado"\] as const;/,
+    );
+    assert.doesNotMatch(guidanceSource, /regularizeGuidanceStatusOptions,\s*/);
+    assert.match(guidanceSource, /\.\.\.\(guidance\?\.target_snapshot \?\? \{\}\)/);
+    assert.match(guidanceSource, /\.\.\.formState\.target_snapshot/);
+    assert.match(
+      guidanceSource,
+      /cpf_cnpj: formatCpfCnpjInput\(guidance\.cpf_cnpj \?\? targetSnapshot\.cpf_cnpj \?\? ""\)/,
+    );
+    assert.match(guidanceSource, /guidance\.share_capital \?\? targetSnapshot\.share_capital/);
+    assert.match(
+      guidanceSource,
+      /\.\.\.formState\.target_snapshot[\s\S]*?cpf_cnpj: normalizeDigits\(trimRegularizeOptionalText\(formState\.cpf_cnpj\) \?\? ""\)/,
+    );
+    assert.match(
+      guidanceSource,
+      /\.\.\.formState\.target_snapshot[\s\S]*?share_capital: toRegularizeOptionalNumber\(formState\.share_capital\)/,
+    );
+    assert.match(
+      guidanceSource,
+      /targetSnapshotAddress = formState\.target_snapshot\.address \?\? ""/,
+    );
+    assert.match(guidanceSource, /targetSnapshotCity = formState\.target_snapshot\.city \?\? ""/);
+    assert.match(guidanceSource, /targetSnapshotState = formState\.target_snapshot\.state \?\? ""/);
+    assert.match(guidanceSource, /targetSnapshotAddress\)/);
+    assert.match(guidanceSource, /targetSnapshotCity\)/);
+    assert.match(guidanceSource, /targetSnapshotState\)/);
+
+    assert.match(pickerSource, /useRef/);
+    assert.match(pickerSource, /useEffect/);
+    assert.match(pickerSource, /searchInputRef\.current\?\.focus\(\)/);
+    assert.match(pickerSource, /window\.addEventListener\("keydown",[\s\S]*?true\)/);
+    assert.match(pickerSource, /window\.removeEventListener\("keydown",[\s\S]*?true\)/);
+    assert.match(
+      pickerSource,
+      /function handleDialogKeyDown\(event: KeyboardEvent<HTMLDivElement>\)/,
+    );
+    assert.match(pickerSource, /onKeyDown=\{handleDialogKeyDown\}/);
+    assert.match(pickerSource, /event\.preventDefault\(\)/);
+    assert.match(pickerSource, /event\.stopPropagation\(\)/);
+  },
+);
+
 await runTest("regularize endpoints stay centralized in the frontend contract", async () => {
   const contractSource = await readModuleSource("services/regularizeService.contract.ts");
 
@@ -65,6 +219,8 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
     "/regularize/municipal-taxes-detail",
     "/regularize/processes",
     "/regularize/process",
+    "/regularize/process/send-to-fiscal",
+    "/regularize/process/return-from-fiscal",
     "/regularize/guidance/list",
     "/regularize/guidance/detail",
     "/regularize/guidance",
@@ -79,6 +235,104 @@ await runTest("regularize endpoints stay centralized in the frontend contract", 
   }
 });
 
+await runTest(
+  "regularize guidance supports independent filters and guards empty scopes",
+  async () => {
+  const [
+    typesSource,
+    contractSource,
+    serviceSource,
+    queryKeysSource,
+    operationsSource,
+    pageSource,
+  ] =
+    await Promise.all([
+      readModuleSource("types.ts"),
+      readModuleSource("services/regularizeService.contract.ts"),
+      readModuleSource("services/regularizeService.ts"),
+      readModuleSource("hooks/queryKeys.ts"),
+      readModuleSource("hooks/useRegularizeOperations.ts"),
+      readModuleSource("components/RegularizePage.tsx"),
+    ]);
+
+  assert.match(typesSource, /@workspace\/shared\/regularize/);
+  assert.match(typesSource, /export type RegularizeGuidanceChecklistInput/);
+  assert.match(typesSource, /export type RegularizeGuidanceManualSnapshot/);
+  assert.match(
+    typesSource,
+    /export type RegularizeGuidanceManualSnapshot[\s\S]*?source: "manual";/,
+  );
+  const createTypeSource = typesSource.match(
+    /type RegularizeGuidanceCompletePayload[\s\S]*?export type LegacyGuidanceDraft/,
+  )?.[0];
+  assert.ok(createTypeSource);
+  assert.match(createTypeSource, /checklist: RegularizeGuidanceChecklistInput\[\]/);
+  assert.doesNotMatch(createTypeSource, /checklist_items/);
+  assert.match(createTypeSource, /target_snapshot\?: RegularizeGuidanceManualSnapshot/);
+  const updateTypeSource = typesSource.match(
+    /export type UpdateRegularizeGuidancePayload[\s\S]*?export type AddRegularizeGuidanceActivityPayload/,
+  )?.[0];
+  assert.ok(updateTypeSource);
+  assert.match(updateTypeSource, /id: RegularizeId;/);
+  assert.match(updateTypeSource, /checklist\?: RegularizeGuidanceChecklistInput\[\]/);
+  assert.doesNotMatch(updateTypeSource, /checklist_items/);
+  assert.doesNotMatch(updateTypeSource, /economic_activities|partners/);
+  assert.doesNotMatch(updateTypeSource, /status: string/);
+  assert.match(
+    typesSource,
+    /type RegularizeGuidanceCreatePayloadFields[\s\S]*economic_activities[\s\S]*partners/,
+  );
+  assert.match(typesSource, /export type LegacyGuidanceDraft/);
+  assert.match(typesSource, /process_id: RegularizeId \| null/);
+  assert.match(contractSource, /target_type/);
+  assert.match(
+    serviceSource,
+    /createGuidance[\s\S]{0,500}isLegacyGuidanceDraft[\s\S]{0,300}throw new Error/,
+  );
+  assert.match(
+    serviceSource,
+    /updateGuidance[\s\S]{0,500}economic_activities[\s\S]{0,200}partners[\s\S]{0,300}api\.put\(REGULARIZE_ENDPOINTS\.guidance, body\)/,
+  );
+  assert.match(queryKeysSource, /filters\.process_id \?\? ""/);
+  assert.match(queryKeysSource, /filters\.target_type \?\? ""/);
+  assert.match(operationsSource, /function shouldEnableRegularizeGuidanceQuery/);
+  assert.match(operationsSource, /"process_id" in filters/);
+  assert.match(operationsSource, /"target_type" in filters/);
+  assert.match(operationsSource, /!hasEmptyProcessFilter/);
+  assert.match(operationsSource, /!hasEmptyTargetFilter/);
+  assert.match(operationsSource, /Boolean\(filters\.process_id \|\| filters\.target_type\)/);
+  assert.match(operationsSource, /const hasExplicitAllFilters/);
+  assert.match(operationsSource, /const hasEffectiveGuidanceFilter/);
+  assert.match(
+    operationsSource,
+    /return \(hasExplicitAllFilters \|\| hasEffectiveGuidanceFilter\) && \(options\?\.enabled \?\? true\)/,
+  );
+  assert.match(
+    pageSource,
+    /const guidanceQuery = useRegularizeGuidance\(\s*currentProcessId \? \{ process_id: currentProcessId \} : undefined,\s*\{ enabled: queryPolicy\.guidance && Boolean\(currentProcessId\) \},\s*\);/,
+  );
+  assert.match(
+    pageSource,
+    /function handleRefreshRegularize\(\) \{[\s\S]*?if \(queryPolicy\.guidance && Boolean\(currentProcessId\)\)\s*refreshes\.push\(guidanceQuery\.refetch\(\)\);/,
+  );
+  assert.match(
+    serviceSource,
+    /api\.post\(REGULARIZE_ENDPOINTS\.guidance, payload\)/,
+  );
+  assert.doesNotMatch(serviceSource, /checklist_items/);
+
+  assert.deepEqual(buildRegularizeGuidanceListParams({}), {});
+  assert.deepEqual(
+    buildRegularizeGuidanceListParams({ process_id: "process-1", target_type: "PJ" }),
+    { process_id: "process-1", target_type: "PJ" },
+  );
+  assert.deepEqual(
+    buildRegularizeGuidanceListParams({ process_id: "", target_type: "PF" }),
+    { target_type: "PF" },
+  );
+  },
+);
+
 await runTest("regularize licenses list uses paginated hook and keeps mutation invalidation", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
   const operationsSource = await readModuleSource("hooks/useRegularizeOperations.ts");
@@ -86,8 +340,11 @@ await runTest("regularize licenses list uses paginated hook and keeps mutation i
 
   assert.match(
     pageSource,
-    /const licensePageQuery = usePaginatedRegularizeLicenses\(\s*\{\s*status: "Todos",\s*page: licensePage,\s*limit: REGULARIZE_PAGE_SIZE,\s*\},\s*\{ enabled: activeTab === "licenses" \},\s*\);/,
+    /const licensePageQuery = usePaginatedRegularizeLicenses\(\s*\{\s*status: licenseStatus,\s*page: licensePage,\s*limit: REGULARIZE_PAGE_SIZE,\s*\},\s*\{ enabled: activeTab === "licenses" \},\s*\);/,
   );
+  assert.match(pageSource, /const \[licenseStatus, setLicenseStatus\] = useState\("Todos"\)/);
+  assert.match(pageSource, /regularizeLicenseStatusFilterOptions/);
+  assert.match(pageSource, /getRegularizeLicenseDisplayStatus\(item\.status, item\.due_date\)/);
   assert.match(pageSource, /const \[licensePage, setLicensePage\] = useState\(1\)/);
   assert.match(pageSource, /<PaginationControls[\s\S]{0,220}licensePageQuery\.data\?\.hasMore/);
   assert.deepEqual(
@@ -116,6 +373,110 @@ await runTest("regularize license responsible field uses the contextual selector
   assert.match(source, /<RegularizeNativeSelect[\s\S]*value=\{formState\.responsible_id\}/);
   assert.match(source, /Respons.vel atual/);
   assert.doesNotMatch(source, /Respons.vel ID/);
+});
+
+await runTest("regularize license protocol uses private upload and on-demand signed access", async () => {
+  const formSource = await readModuleSource("components/RegularizeLicenseForm.tsx");
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const serviceSource = await readModuleSource("services/regularizeService.ts");
+  const contractSource = await readModuleSource("services/regularizeService.contract.ts");
+
+  assert.match(
+    formSource,
+    /accept="\.pdf,\.jpg,\.jpeg,\.png,\.webp,application\/pdf,image\/jpeg,image\/png,image\/webp"/,
+  );
+  assert.match(formSource, /LICENSE_PROTOCOL_MAX_SIZE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(formSource, /Um novo envio substitui o protocolo vigente/);
+  assert.match(formSource, /onOpenProtocol/);
+  assert.match(contractSource, /licenseProtocol: \(id: RegularizeId\)/);
+  assert.match(serviceSource, /formData\.append\("file", file\)/);
+  assert.match(serviceSource, /api\.get\(REGULARIZE_ENDPOINTS\.licenseProtocol\(id\)\)/);
+  assert.match(pageSource, /useUploadRegularizeLicenseProtocolMutation/);
+  assert.match(pageSource, /useRegularizeLicenseProtocolAccessMutation/);
+  assert.match(pageSource, /protocolWindow\.location\.replace\(access\.url\)/);
+});
+
+await runTest("regularize license upload failure retries from the persisted license", async () => {
+  const { submitRegularizeLicense } = await import(
+    "./services/regularizeLicenseSubmission.ts"
+  );
+  const formSource = await readModuleSource("components/RegularizeLicenseForm.tsx");
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+  const createPayload = {
+    client_id: "client-1",
+    has: true,
+    type_license: "Alvará",
+    entry_date: "2026-09-19",
+    protocol: "PROTO-1",
+    status: "Em Andamento",
+    current_situation: "Em análise",
+    contact: "Contato",
+    urgency: "Média",
+    type: "Anual",
+  };
+  const protocolFile = {
+    name: "protocolo.pdf",
+    size: 128,
+    type: "application/pdf",
+  };
+  const persistedLicenseId = "license-1";
+  const calls = [];
+  let uploadAttempt = 0;
+  let retryLicenseId;
+
+  const dependencies = {
+    createLicense: async (payload) => {
+      calls.push(["POST", payload]);
+      return { id: persistedLicenseId };
+    },
+    updateLicense: async (payload) => {
+      calls.push(["PUT", payload]);
+      return { id: payload.id };
+    },
+    uploadProtocol: async ({ id, file }) => {
+      calls.push(["UPLOAD", id, file]);
+      uploadAttempt += 1;
+      if (uploadAttempt === 1) {
+        throw new Error("synthetic upload failure");
+      }
+    },
+    onLicenseSaved: ({ id, operation }) => {
+      calls.push(["SAVED", operation, id]);
+      retryLicenseId = id;
+    },
+  };
+
+  await assert.rejects(
+    submitRegularizeLicense(createPayload, protocolFile, dependencies),
+    /synthetic upload failure/,
+  );
+  assert.equal(retryLicenseId, persistedLicenseId);
+
+  await submitRegularizeLicense(
+    { ...createPayload, id: retryLicenseId },
+    protocolFile,
+    dependencies,
+  );
+
+  assert.deepEqual(
+    calls.map(([operation]) => operation),
+    ["POST", "SAVED", "UPLOAD", "PUT", "SAVED", "UPLOAD"],
+  );
+  assert.equal(calls.filter(([operation]) => operation === "POST").length, 1);
+  assert.equal(calls.filter(([operation]) => operation === "PUT").length, 1);
+  assert.equal(calls.filter(([operation]) => operation === "UPLOAD").length, 2);
+  assert.equal(calls[2][2], protocolFile);
+  assert.equal(calls[5][2], protocolFile);
+  assert.match(pageSource, /submitRegularizeLicense\(/);
+  assert.match(
+    pageSource,
+    /isCreateSubmission && persistedLicenseId[\s\S]*mode: "edit", id: persistedLicenseId/,
+  );
+  assert.match(pageSource, /key=\{licenseFormSessionKey\}/);
+  assert.doesNotMatch(
+    formSource,
+    /useEffect\(\(\) => \{[\s\S]*?setFormState\(buildLicenseFormState[\s\S]*?setProtocolFile\(null\)[\s\S]*?\}, \[defaultClientId, license, open\]\)/,
+  );
 });
 
 await runTest("regularize PF list contract preserves explicit search status and pagination", async () => {
@@ -277,9 +638,9 @@ await runTest("regularize dashboard has a centralized aggregate data contract", 
   assert.match(serviceSource, /async getDashboard\(year: number\)/);
   assert.match(serviceSource, /REGULARIZE_ENDPOINTS\.dashboard/);
   assert.match(hookSource, /useRegularizeDashboard/);
-  assert.match(hookSource, /regularizeQueryKeys\.dashboard\(year\)/);
+  assert.match(hookSource, /regularizeQueryKeys\.dashboard\(year, scope\)/);
   assert.match(queryKeysSource, /dashboardRoot/);
-  assert.match(queryKeysSource, /dashboard: \(year: number\)/);
+  assert.match(queryKeysSource, /dashboard: \(year: number, scope:/);
 });
 
 await runTest("regularize mutations invalidate aggregate dashboard data", async () => {
@@ -289,7 +650,7 @@ await runTest("regularize mutations invalidate aggregate dashboard data", async 
     "hooks/useRegularizeOperations.ts",
   ]) {
     const source = await readModuleSource(hookPath);
-    assert.match(source, /regularizeQueryKeys\.dashboardRoot\(\)/);
+    assert.match(source, /regularizeQueryKeys\.(?:dashboardRoot\((?:scope)?\)|root)/);
   }
 });
 
@@ -413,6 +774,43 @@ await runTest("regularize list params carry server search and pagination", async
   );
   const page = { data: [{ id: "row-21" }], total: 21, page: 2, limit: 20, hasMore: false };
   assert.deepEqual(unwrapRegularizePage({ data: page }, { page: 2, limit: 20 }), page);
+});
+
+await runTest("regularize process contract keeps canonical states and explicit Fiscal actions", async () => {
+  const [controlsSource, formSource, pageSource, contractSource, serviceSource, hooksSource] =
+    await Promise.all([
+      readModuleSource("components/regularizeFormControls.tsx"),
+      readModuleSource("components/RegularizeProcessForm.tsx"),
+      readModuleSource("components/RegularizePage.tsx"),
+      readModuleSource("services/regularizeService.contract.ts"),
+      readModuleSource("services/regularizeService.ts"),
+      readModuleSource("hooks/useRegularizeOperations.ts"),
+    ]);
+
+  assert.match(
+    controlsSource,
+    /regularizeProcessStatusOptions = \[\s*"Pendente",\s*"Andamento",\s*"Protocolado",\s*"Finalizado",\s*"Paralisado",\s*\]/,
+  );
+  assert.match(
+    controlsSource,
+    /regularizeFinancialStatusOptions = \[\s*"Pendente",\s*"Regular",\s*"Bônus",\s*"Não Contratado",\s*\]/,
+  );
+  assert.match(formSource, /financial_status/);
+  assert.match(formSource, /client_notice_date/);
+  assert.match(formSource, /useAssignableUsers/);
+  assert.match(formSource, /responsible1_id/);
+  assert.match(formSource, /responsible2_id/);
+  assert.match(formSource, /responsible3_id/);
+  assert.match(contractSource, /sendToFiscal: "\/regularize\/process\/send-to-fiscal"/);
+  assert.match(contractSource, /returnFromFiscal: "\/regularize\/process\/return-from-fiscal"/);
+  assert.match(serviceSource, /api\.post\(REGULARIZE_ENDPOINTS\.sendToFiscal/);
+  assert.match(serviceSource, /api\.post\(REGULARIZE_ENDPOINTS\.returnFromFiscal/);
+  assert.match(hooksSource, /useSendRegularizeProcessToFiscalMutation/);
+  assert.match(hooksSource, /useReturnRegularizeProcessFromFiscalMutation/);
+  assert.match(pageSource, /Enviar ao Fiscal/);
+  assert.match(pageSource, /Registrar retorno do Fiscal/);
+  assert.match(pageSource, /Status financeiro/);
+  assert.match(pageSource, /Aviso ao cliente/);
 });
 
 await runTest("regularize municipal tax contract carries filters and unwraps a page", async () => {
@@ -599,8 +997,10 @@ await runTest("regularize operations service exposes create and update endpoints
   for (const endpoint of [
     "guidanceActivityAdd",
     "guidanceActivityRemove",
+    "guidanceActivity",
     "guidancePartnerAdd",
     "guidancePartnerRemove",
+    "guidancePartner",
   ]) {
     assert.match(
       serviceSource,
@@ -634,8 +1034,10 @@ await runTest("regularize operations mutations stay in hooks and invalidate cach
     "useUpdateRegularizeGuidanceMutation",
     "useAddRegularizeGuidanceActivityMutation",
     "useRemoveRegularizeGuidanceActivityMutation",
+    "useUpdateRegularizeGuidanceActivityMutation",
     "useAddRegularizeGuidancePartnerMutation",
     "useRemoveRegularizeGuidancePartnerMutation",
+    "useUpdateRegularizeGuidancePartnerMutation",
     "useCreateRegularizeLicenseMutation",
     "useUpdateRegularizeLicenseMutation",
   ]) {
@@ -858,7 +1260,6 @@ await runTest("regularize finite status and urgency fields use native selects", 
   for (const optionExport of [
     "regularizeClientStatusOptions",
     "regularizeProcessStatusOptions",
-    "regularizeGuidanceStatusOptions",
     "regularizeLicenseStatusOptions",
     "regularizeUrgencyOptions",
     "getRegularizePresetOptions",
@@ -872,12 +1273,16 @@ await runTest("regularize finite status and urgency fields use native selects", 
   assert.match(processSource, /regularizeUrgencyOptions/);
   assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.urgency\}/);
-  assert.match(guidanceSource, /regularizeGuidanceStatusOptions/);
+  assert.match(guidanceSource, /const regularizeGuidanceStatusOptions = \["Em andamento", "Finalizado"\] as const;/);
   assert.match(guidanceSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(licenseSource, /regularizeLicenseStatusOptions/);
   assert.match(licenseSource, /regularizeUrgencyOptions/);
   assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.status\}/);
   assert.match(licenseSource, /<RegularizeNativeSelect\s+value=\{formState\.urgency\}/);
+  assert.match(
+    controlsSource,
+    /regularizeLicenseStatusOptions = \[\s*"Em Processo de Solicitação",\s*"Em Andamento",\s*"Finalizado",\s*"Paralisado",\s*\]/,
+  );
 });
 
 await runTest("regularize process task id uses the real task selector", async () => {
@@ -1101,9 +1506,9 @@ await runTest("regularize mutations invalidate subdomain roots to avoid stale fi
   const peopleSource = await readModuleSource("hooks/useRegularizePeople.ts");
   const operationsSource = await readModuleSource("hooks/useRegularizeOperations.ts");
 
-  assert.match(credentialsSource, /queryKey: regularizeQueryKeys\.credentials\(\)/);
-  assert.match(peopleSource, /queryKey: regularizeQueryKeys\.people\(\)/);
-  assert.match(operationsSource, /queryKey: regularizeQueryKeys\.operations\(\)/);
+  assert.match(credentialsSource, /queryKey: regularizeQueryKeys\.credentials\(scope\)/);
+  assert.match(peopleSource, /queryKey: regularizeQueryKeys\.people\(scope\)/);
+  assert.match(operationsSource, /queryKey: regularizeQueryKeys\.root/);
   assert.doesNotMatch(peopleSource, /regularizeQueryKeys\.clientPfs\(\{ status: payload\.status \}\)/);
   assert.doesNotMatch(operationsSource, /regularizeQueryKeys\.processes\(\{ status: payload\.status \}\)/);
   assert.doesNotMatch(operationsSource, /regularizeQueryKeys\.licenses\(\{ status: payload\.status \}\)/);

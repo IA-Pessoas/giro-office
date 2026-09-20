@@ -11,7 +11,7 @@ import {
   type LogLevel,
   ServiceError,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { isGatewayRouteDisabled } from "./config/disabledRoutes.js";
@@ -38,6 +38,13 @@ import { DashboardStatsService } from "./services/dashboardStatsService.js";
 type GatewayOpenApiSpec = ReturnType<typeof buildGatewayOpenApiSpec>;
 type AuditRecorder = ReturnType<typeof createAuditRecorder>;
 type GatewayProxy = ReturnType<typeof buildHttpProxyMiddleware>;
+
+const PROJECT_WIZARD_EXTRACTION_PATH = "/task/project-wizard/extract-tasks";
+const PROJECT_WIZARD_SOURCE_MAX_BYTES = 10 * 1024 * 1024;
+const PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES =
+  PROJECT_WIZARD_SOURCE_MAX_BYTES * 6 + 1024 * 1024;
+// Até 105 partes sequenciais de 100 mil caracteres, com 30 s por chamada e margem operacional.
+const PROJECT_WIZARD_EXTRACTION_UPSTREAM_TIMEOUT_MS = 60 * 60 * 1000;
 
 export interface GatewayAppDeps {
   dashboardStatsService?: DashboardStatsProvider;
@@ -239,12 +246,55 @@ function mountObservability(
   app.use(buildRequestLifecycleMiddleware(logger));
 }
 
+/**
+ * Guarda os bytes originais do corpo para o proxy reenviar sem re-serializar.
+ * Evita um JSON.stringify por request e preserva o payload byte a byte.
+ */
+const keepRawBody: NonNullable<Parameters<typeof express.json>[0]>["verify"] = (
+  request,
+  _response,
+  buffer,
+) => {
+  (request as Request).rawBody = buffer;
+};
+
+/**
+ * Teto de tamanho da extração do wizard, aplicado sem materializar o corpo.
+ * Um corpo sem content-length é recusado: sem parser e sem esse cabeçalho não
+ * há como saber o tamanho antes de já ter recebido tudo.
+ */
+export function assertWizardExtractionSize(request: Request): ServiceError | undefined {
+  const declaredLength = Number(request.headers["content-length"]);
+
+  if (!Number.isFinite(declaredLength)) {
+    return new ServiceError(411, "Informe o tamanho do conteúdo enviado.");
+  }
+  if (declaredLength > PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES) {
+    return new ServiceError(413, "Conteúdo enviado excede o limite permitido.");
+  }
+  return undefined;
+}
+
 function mountCorsAndParsing(app: express.Express, env: GatewayEnv): void {
   const corsOptions = createServiceCorsOptions(env.allowedOrigins, "gateway");
 
   app.use(cors(corsOptions));
   app.options("*", cors(corsOptions));
-  app.use(express.json({ limit: env.jsonBodyLimit ?? "1mb" }));
+  // A extração do wizard fica fora do express.json: o corpo chega a 61MB e
+  // bufferizá-lo custava esse tanto de heap por request concorrente, num
+  // container de 256MB. Sem parser, o proxy encaminha o stream direto ao
+  // upstream. Nada no gateway lê o body dessa rota — a auditoria dela usa só
+  // método e caminho (audit/activityCatalog.ts:61). O teto de tamanho que o
+  // express.json aplicava passa a ser verificado pelo content-length, antes de
+  // qualquer byte entrar.
+  const parseJsonBody = express.json({ limit: env.jsonBodyLimit ?? "1mb", verify: keepRawBody });
+  app.use((request, response, next) => {
+    if (request.path !== PROJECT_WIZARD_EXTRACTION_PATH) {
+      parseJsonBody(request, response, next);
+      return;
+    }
+    next(assertWizardExtractionSize(request));
+  });
   app.use(normalizeJsonBodyError);
 }
 
@@ -385,10 +435,12 @@ function mountDashboardRoutes(
   app.use("/dashboard", createDashboardRoutes(dashboardStatsService));
 }
 
-function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
+function buildServiceProxyMap(
+  services: ReturnType<typeof getGatewayServiceDefinitions>,
+): Map<string, GatewayProxy> {
   const proxyByServiceKey = new Map<string, GatewayProxy>();
 
-  for (const service of getGatewayServiceDefinitions(env)) {
+  for (const service of services) {
     proxyByServiceKey.set(
       service.key,
       buildHttpProxyMiddleware(service.targetUrl, {
@@ -406,9 +458,22 @@ function buildServiceProxyMap(env: GatewayEnv): Map<string, GatewayProxy> {
 }
 
 function mountServiceRoutes(app: express.Express, env: GatewayEnv): void {
-  const proxyByServiceKey = buildServiceProxyMap(env);
+  const services = getGatewayServiceDefinitions(env);
+  const taskService = services.find((service) => service.key === "task-service");
+  if (!taskService) {
+    throw new Error("task-service não configurado na registry do gateway.");
+  }
+  const proxyByServiceKey = buildServiceProxyMap(services);
 
-  for (const service of getGatewayServiceDefinitions(env)) {
+  app.post(
+    PROJECT_WIZARD_EXTRACTION_PATH,
+    buildHttpProxyMiddleware(taskService.targetUrl, {
+      internalServiceToken: taskService.internalServiceToken,
+      upstreamTimeoutMs: PROJECT_WIZARD_EXTRACTION_UPSTREAM_TIMEOUT_MS,
+    }),
+  );
+
+  for (const service of services) {
     const proxy = proxyByServiceKey.get(service.key);
 
     for (const routePrefix of service.routePrefixes) {

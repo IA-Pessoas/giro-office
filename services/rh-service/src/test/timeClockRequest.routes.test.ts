@@ -16,10 +16,17 @@ describe("timeClockRequest routes", () => {
     const res = await request(app).get("/rh/point/adjustment/requests?status=Pendente");
 
     expect(res.status).toBe(200);
-    expect(timeClockRequestServiceMock.list).toHaveBeenCalledWith(organizationId, {
-      status: "Pendente",
-      user_id: undefined,
-    });
+    expect(timeClockRequestServiceMock.list).toHaveBeenCalledWith(
+      organizationId,
+      {
+        status: "Pendente",
+        user_id: undefined,
+      },
+      {
+        actor_user_id: "00000000-0000-4000-8000-000000000001",
+        rh_permission: 3,
+      },
+    );
   });
 
   it("GET /rh/point/adjustment/requests retorna 400 para status invalido", async () => {
@@ -41,8 +48,50 @@ describe("timeClockRequest routes", () => {
       justification: "Ajuste",
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(timeClockRequestServiceMock.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /rh/point/adjustment/retroactive exige permissao de gestao", async () => {
+    const app = createTestApp();
+    const res = await request(app).post("/rh/point/adjustment/retroactive").send({
+      target_user_id: "00000000-0000-4000-8000-000000000099",
+      date: "2025-01-01T00:00:00.000Z",
+      clock_in: "2025-01-01T08:00:00.000Z",
+      lunch_out: "2025-01-01T12:00:00.000Z",
+      lunch_in: "2025-01-01T13:00:00.000Z",
+      clock_out: "2025-01-01T18:00:00.000Z",
+      justification: "Lancamento retroativo autorizado",
+    });
+
+    expect(res.status).toBe(201);
+    expect(timeClockRequestServiceMock.createRetroactive).toHaveBeenCalledTimes(1);
+  });
+
+  it("PUT /rh/point/adjustment/approve-bulk aprova lote", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .put("/rh/point/adjustment/approve-bulk")
+      .send({
+        request_ids: [requestId],
+        obs_approver: "Lote conferido",
+      });
+
+    expect(res.status).toBe(200);
+    expect(timeClockRequestServiceMock.approveBulk).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST /rh/point/adjustment/:id/attachment valida e encaminha comprovante", async () => {
+    const app = createTestApp();
+    const res = await request(app)
+      .post(`/rh/point/adjustment/${requestId}/attachment`)
+      .attach("file", Buffer.from("%PDF-1.7\ncomprovante"), {
+        filename: "comprovante.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(res.status).toBe(200);
+    expect(timeClockRequestServiceMock.uploadAttachment).toHaveBeenCalledTimes(1);
   });
 
   it("PUT /rh/point/adjustment/approve aprova solicitacao", async () => {
@@ -82,9 +131,16 @@ describe("timeClockRequest routes", () => {
     const res = await request(app).get("/rh/point/adjustment/requests?status=Rejeitado");
 
     expect(res.status).toBe(200);
-    expect(timeClockRequestServiceMock.list).toHaveBeenCalledWith(organizationId, {
-      status: "Rejeitado",
-      user_id: undefined,
-    });
+    expect(timeClockRequestServiceMock.list).toHaveBeenCalledWith(
+      organizationId,
+      {
+        status: "Rejeitado",
+        user_id: undefined,
+      },
+      {
+        actor_user_id: "00000000-0000-4000-8000-000000000001",
+        rh_permission: 3,
+      },
+    );
   });
 });

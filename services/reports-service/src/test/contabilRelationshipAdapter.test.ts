@@ -64,9 +64,12 @@ describe("ContabilRelationshipAdapter", () => {
         limit: 10,
         request_id: "request-836",
       }),
-    ).resolves.toEqual([
-      { bidding: true, chart_accounts: "Plano A", tool: "Ferramenta A", system: "Sistema A" },
-    ]);
+    ).resolves.toEqual({
+      rows: [
+        { bidding: true, chart_accounts: "Plano A", tool: "Ferramenta A", system: "Sistema A" },
+      ],
+      reachedLimit: false,
+    });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
     expect(JSON.parse(String(request.body))).toEqual({

@@ -16,7 +16,6 @@ router.get('/client', isAuthenticated.bind(isAuthenticated), clientController.de
 router.delete('/clients', isAuthenticated.bind(isAuthenticated), clientController.delete.bind(ClientController))
 router.post('/clients-integracao', isAuthenticated.bind(isAuthenticated), clientController.createIntegracao.bind(ClientController))
 router.put('/clients-integracao', isAuthenticated.bind(isAuthenticated), clientController.updateIntegracao.bind(ClientController))
-router.put('/clients-comercial', isAuthenticated.bind(isAuthenticated), clientController.updateComercial.bind(ClientController))
 router.put('/clients-distrato', isAuthenticated.bind(isAuthenticated), clientController.termination.bind(ClientController))
 router.put('/clients-financeiro', isAuthenticated.bind(isAuthenticated), clientController.updateFinanceiro.bind(ClientController))
 router.put('/clients-regularize', isAuthenticated.bind(isAuthenticated), clientController.updateRegularize.bind(ClientController))

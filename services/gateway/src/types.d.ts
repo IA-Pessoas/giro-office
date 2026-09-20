@@ -9,6 +9,8 @@ declare global {
       requestId?: string;
       auditErrorCode?: string;
       auditErrorMessage?: string;
+      /** Bytes originais do corpo JSON, preservados por express.json({ verify }). */
+      rawBody?: Buffer;
       user_id: string;
       organization_id: string;
     }

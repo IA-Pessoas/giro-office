@@ -113,10 +113,65 @@ runTest("AppShell header notifications do not embed mock notification rows", () 
   assert.equal(appShellSource.includes("Novo chamado crítico aberto"), false);
   assert.equal(appShellSource.includes("Prazo de tarefa próximo do vencimento"), false);
   assert.equal(appShellSource.includes("Backup diário finalizado"), false);
-  assert.match(appShellSource, /const notifications: AppShellNotification\[] = \[];/);
-  assert.match(appShellSource, /const hasUnreadNotifications = notifications\.some/);
+  // O sino junta duas origens desde o merge das notificacoes de RH com as de tarefa.
+  assert.match(
+    appShellSource,
+    /const taskNotifications: AppShellNotification\[] = \(notificationQuery\.data\?\.items \?\? \[]\)/,
+  );
+  assert.match(
+    appShellSource,
+    /const rhNotifications: AppShellNotification\[] = \(rhNotificationsQuery\.data \?\? \[]\)/,
+  );
+  assert.match(
+    appShellSource,
+    /const hasUnreadNotifications = notifications\.some\(\(item\) => item\.unread\);/,
+  );
   assert.match(appShellSource, /hasUnreadNotifications \?/);
   assert.match(appShellSource, /Nenhuma notificação encontrada\./);
+});
+
+runTest("AppShell header notifications expose loading, retryable error, and empty states", () => {
+  assert.match(
+    appShellSource,
+    /const isNotificationsLoading = notificationQuery\.isLoading \|\| rhNotificationsQuery\.isLoading;/,
+  );
+  assert.match(
+    appShellSource,
+    /const hasNotificationsError = notificationQuery\.isError \|\| rhNotificationsQuery\.isError;/,
+  );
+  assert.match(appShellSource, /Carregando notificações\.\.\./);
+  assert.match(appShellSource, /Não foi possível carregar todas as notificações\./);
+  assert.match(appShellSource, /notificationQuery\.isError[\s\S]*notificationQuery\.refetch\(\)/);
+  assert.match(appShellSource, /rhNotificationsQuery\.isError[\s\S]*rhNotificationsQuery\.refetch\(\)/);
+  assert.match(appShellSource, />\s*Tentar novamente\s*<\/button>/);
+  assert.match(
+    appShellSource,
+    /!isNotificationsLoading && !hasNotificationsError[\s\S]*Nenhuma notificação encontrada\./,
+  );
+});
+
+runTest("AppShell assistant discloses its local session-only behavior", () => {
+  assert.match(
+    appShellSource,
+    /Assistente local da sessão: as mensagens ficam apenas nesta sessão, não são\s+enviadas ao servidor/,
+  );
+  assert.match(
+    appShellSource,
+    /Este assistente ainda não está conectado a uma IA\. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor\./,
+  );
+  assert.doesNotMatch(appShellSource, /Recebi sua mensagem\. Em breve vou responder por aqui\./);
+});
+
+runTest("AppShell task notifications preserve task deep-links and report read failures", () => {
+  assert.match(appShellSource, /taskId\?: string;/);
+  assert.match(appShellSource, /taskId: item\.task_id,/);
+  assert.match(
+    appShellSource,
+    /router\.push\(\{[\s\S]*?pathname: "\/tasks",[\s\S]*?query: \{ taskId: item\.taskId \},[\s\S]*?\}\)/,
+  );
+  assert.match(appShellSource, /import \{ toast \} from "react-toastify";/);
+  assert.match(appShellSource, /Não foi possível marcar a notificação de RH como lida\./);
+  assert.match(appShellSource, /Não foi possível marcar a notificação de tarefa como lida\./);
 });
 
 runTest("AppShell AI chat uses Radix Dialog primitives", () => {

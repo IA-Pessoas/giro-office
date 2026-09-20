@@ -1,6 +1,10 @@
 import { ServiceError } from "@workspace/shared";
 
-import { deriveReportCatalogGrant, type ReportCatalogScope } from "../catalog/types.js";
+import {
+  deriveReportCatalogGrant,
+  deriveReportCatalogGrantFromComposition,
+  type ReportCatalogScope,
+} from "../catalog/types.js";
 import type { ReportsPrismaClient } from "../prisma/index.js";
 import type { ClaimedReportJob, ReportJobRepository } from "../prisma/reportJobRepository.js";
 import {
@@ -8,9 +12,11 @@ import {
   getReportingCatalogScope,
   type ReportingAccessContextClient,
 } from "../routes/reportingContext.js";
+import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
+import type { ReportModelDefinition } from "../schemas/reportModel.schemas.js";
 import { DEFAULT_REPORT_RETENTION_DAYS } from "../schemas/reportRetention.schemas.js";
-import type { ReportExecutionService } from "./reportExecutionService.js";
+import { ReportAreaExecutionError, type ReportExecutionService } from "./reportExecutionService.js";
 import type { ReportLifecycleService } from "./reportLifecycleService.js";
 
 export class ReportWorkerService {
@@ -34,12 +40,15 @@ export class ReportWorkerService {
 
     try {
       const { definition, scope } = await this.loadAuthorizedDefinition(job);
-      const rows = await this.execution.execute({
-        definition,
-        scope,
-        parameterValues: this.parameterValues(job),
-        requestId: job.id,
-      });
+      const result =
+        "version" in definition
+          ? await this.execution.executeComposition({ definition, scope, requestId: job.id })
+          : await this.execution.execute({
+              definition,
+              scope,
+              parameterValues: this.parameterValues(job),
+              requestId: job.id,
+            });
       const active = await this.prisma.reportJob.findFirst({
         where: {
           id: job.id,
@@ -52,12 +61,14 @@ export class ReportWorkerService {
         await this.cancelIfRequested(job);
         return true;
       }
+      const latestAuthorization = await this.loadAuthorizedDefinition(job);
+      this.execution.assertAuthorizedDefinition(latestAuthorization);
       await this.lifecycle.complete({
         job_id: job.id,
         organization_id: job.organization_id,
         actor_id: job.requester_id,
         lease_token: leaseToken,
-        rows,
+        ...("blocks" in result ? { blocks: result.blocks } : { rows: result }),
         expires_at: new Date(Date.now() + this.retentionDays(job) * 24 * 60 * 60 * 1000),
       });
     } catch (error) {
@@ -65,7 +76,7 @@ export class ReportWorkerService {
         await this.cancelIfRequested(job);
         return true;
       }
-      await this.fail(job);
+      await this.fail(job, error);
     } finally {
       clearInterval(renewal);
     }
@@ -91,7 +102,7 @@ export class ReportWorkerService {
   }
 
   private async loadAuthorizedDefinition(job: ClaimedReportJob): Promise<{
-    definition: ReportDefinition;
+    definition: ReportDefinition | ReportComposition;
     scope: ReportCatalogScope;
   }> {
     const version = await this.prisma.reportModelVersion.findFirst({
@@ -105,7 +116,7 @@ export class ReportWorkerService {
 
     if (model.created_by_user_id === job.requester_id) {
       return {
-        definition: version.definition_json as ReportDefinition,
+        definition: version.definition_json as ReportModelDefinition,
         scope: await getReportingCatalogScope(this.accessContext, {
           userId: job.requester_id,
           organizationId: job.organization_id,
@@ -125,13 +136,16 @@ export class ReportWorkerService {
         "O modelo compartilhado não está mais autorizado para o solicitante.",
       );
     }
-    const definition = version.definition_json as ReportDefinition;
+    const definition = version.definition_json as ReportModelDefinition;
     return {
       definition,
       scope: {
         organization_id: job.organization_id,
         modules: context.modules,
-        grant: deriveReportCatalogGrant(definition),
+        grant:
+          "version" in definition
+            ? deriveReportCatalogGrantFromComposition(definition)
+            : deriveReportCatalogGrant(definition),
       },
     };
   }
@@ -156,7 +170,7 @@ export class ReportWorkerService {
       : DEFAULT_REPORT_RETENTION_DAYS;
   }
 
-  private async fail(job: ClaimedReportJob): Promise<void> {
+  private async fail(job: ClaimedReportJob, cause: unknown): Promise<void> {
     try {
       await this.lifecycle.transition({
         job_id: job.id,
@@ -164,6 +178,10 @@ export class ReportWorkerService {
         actor_id: job.requester_id,
         status: "failed",
         lease_token: job.lease_token ?? "",
+        error_message:
+          cause instanceof ReportAreaExecutionError
+            ? cause.userMessage
+            : "Não foi possível gerar o relatório. Confira o acesso e os critérios e tente novamente.",
       });
     } catch (error) {
       if (!(error instanceof ServiceError && error.statusCode === 409)) throw error;

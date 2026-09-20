@@ -24,32 +24,56 @@ import type {
   RegularizeLicenseDetail,
   RegularizeLicenseListFilters,
   RegularizeLicenseListItem,
+  RegularizeLicenseProtocolAccess,
+  RegularizeLicenseProtocolMetadata,
   RegularizeMunicipalTaxesDetail,
   RegularizeMunicipalTaxesListFilters,
   RegularizeMunicipalTaxesPage,
+  RegularizeProcessActionPayload,
+  RegularizeProcessActionResult,
   RegularizeProcessDetail,
   RegularizeProcessListFilters,
   RegularizeProcessListItem,
   UpdateRegularizeGuidancePayload,
+  UpdateRegularizeGuidanceActivityPayload,
+  UpdateRegularizeGuidancePartnerPayload,
   UpdateRegularizeLicensePayload,
   UpdateRegularizeMunicipalTaxPayload,
   UpdateRegularizeProcessPayload,
 } from "../types";
-import { regularizeQueryKeys } from "./queryKeys";
+import { regularizeQueryKeys, useRegularizeQueryScope } from "./queryKeys";
 
 type RegularizeReadQueryOptions = {
   enabled?: boolean;
 };
+
+function shouldEnableRegularizeGuidanceQuery(
+  filters: RegularizeGuidanceListFilters | undefined,
+  options?: RegularizeReadQueryOptions,
+): boolean {
+  const hasEmptyProcessFilter =
+    filters !== undefined && "process_id" in filters && !filters.process_id;
+  const hasEmptyTargetFilter =
+    filters !== undefined && "target_type" in filters && !filters.target_type;
+  const hasExplicitAllFilters = filters === undefined && options?.enabled === true;
+  const hasEffectiveGuidanceFilter =
+    filters !== undefined &&
+    !hasEmptyProcessFilter &&
+    !hasEmptyTargetFilter &&
+    Boolean(filters.process_id || filters.target_type);
+
+  return (hasExplicitAllFilters || hasEffectiveGuidanceFilter) && (options?.enabled ?? true);
+}
 
 async function invalidateRegularizeOperations(
   queryClient: ReturnType<typeof useQueryClient>,
 ): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({
-      queryKey: regularizeQueryKeys.operations(),
+      queryKey: regularizeQueryKeys.root,
     }),
     queryClient.invalidateQueries({
-      queryKey: regularizeQueryKeys.dashboardRoot(),
+      queryKey: regularizeQueryKeys.root,
     }),
   ]);
 }
@@ -58,8 +82,10 @@ export function useRegularizeMunicipalTaxes(
   filters: RegularizeMunicipalTaxesListFilters,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeMunicipalTaxesPage, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.municipalTaxes(filters),
+    regularizeQueryKeys.municipalTaxes(filters, scope),
     () => regularizeService.listMunicipalTaxes(filters),
     {
       enabled: Boolean(filters.year) && (options?.enabled ?? true),
@@ -71,8 +97,10 @@ export function useRegularizeMunicipalTaxDetail(
   id: RegularizeId | undefined | null,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeMunicipalTaxesDetail, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.municipalTaxDetail(id),
+    regularizeQueryKeys.municipalTaxDetail(id, scope),
     () => regularizeService.getMunicipalTax(id ?? ""),
     {
       enabled: Boolean(id) && (options?.enabled ?? true),
@@ -110,8 +138,10 @@ export function useRegularizeProcesses(
   filters: RegularizeProcessListFilters,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeProcessListItem[], Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.processes(filters),
+    regularizeQueryKeys.processes(filters, scope),
     () => regularizeService.listProcesses(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
@@ -123,8 +153,10 @@ export function usePaginatedRegularizeProcesses(
   filters: RegularizeProcessListFilters & { page: number; limit: number },
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<PaginatedResult<RegularizeProcessListItem>, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.processesPage(filters),
+    regularizeQueryKeys.processesPage(filters, scope),
     () => regularizeService.listProcessesPage(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
@@ -136,8 +168,10 @@ export function useRegularizeProcessDetail(
   id: RegularizeId | undefined | null,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeProcessDetail, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.processDetail(id),
+    regularizeQueryKeys.processDetail(id, scope),
     () => regularizeService.getProcess(id ?? ""),
     {
       enabled: Boolean(id) && (options?.enabled ?? true),
@@ -171,17 +205,44 @@ export function useUpdateRegularizeProcessMutation(): UseMutationResult<
   });
 }
 
+export function useSendRegularizeProcessToFiscalMutation(): UseMutationResult<
+  RegularizeProcessActionResult,
+  Error,
+  RegularizeProcessActionPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.sendProcessToFiscal(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useReturnRegularizeProcessFromFiscalMutation(): UseMutationResult<
+  RegularizeProcessActionResult,
+  Error,
+  RegularizeProcessActionPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.returnProcessFromFiscal(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
 export function useRegularizeGuidance(
   filters: RegularizeGuidanceListFilters | undefined,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeGuidance[], Error> {
-  const safeFilters = filters ?? { process_id: "" };
+  const safeFilters = filters ?? {};
+  const scope = useRegularizeQueryScope();
 
   return useFetch(
-    regularizeQueryKeys.guidance(safeFilters),
+    regularizeQueryKeys.guidance(safeFilters, scope),
     () => regularizeService.listGuidance(safeFilters),
     {
-      enabled: Boolean(filters?.process_id) && (options?.enabled ?? true),
+      enabled: shouldEnableRegularizeGuidanceQuery(filters, options),
     },
   );
 }
@@ -190,8 +251,10 @@ export function useRegularizeGuidanceDetail(
   id: RegularizeId | undefined | null,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeGuidance, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.guidanceDetail(id),
+    regularizeQueryKeys.guidanceDetail(id, scope),
     () => regularizeService.getGuidance(id ?? ""),
     {
       enabled: Boolean(id) && (options?.enabled ?? true),
@@ -251,6 +314,19 @@ export function useRemoveRegularizeGuidanceActivityMutation(): UseMutationResult
   });
 }
 
+export function useUpdateRegularizeGuidanceActivityMutation(): UseMutationResult<
+  RegularizeGuidance,
+  Error,
+  UpdateRegularizeGuidanceActivityPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.updateGuidanceActivity(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
 export function useAddRegularizeGuidancePartnerMutation(): UseMutationResult<
   RegularizeGuidance,
   Error,
@@ -277,12 +353,27 @@ export function useRemoveRegularizeGuidancePartnerMutation(): UseMutationResult<
   });
 }
 
+export function useUpdateRegularizeGuidancePartnerMutation(): UseMutationResult<
+  RegularizeGuidance,
+  Error,
+  UpdateRegularizeGuidancePartnerPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => regularizeService.updateGuidancePartner(payload),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
 export function useRegularizeLicenses(
   filters: RegularizeLicenseListFilters,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeLicenseListItem[], Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.licenses(filters),
+    regularizeQueryKeys.licenses(filters, scope),
     () => regularizeService.listLicenses(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
@@ -294,8 +385,10 @@ export function usePaginatedRegularizeLicenses(
   filters: RegularizeLicenseListFilters & { page: number; limit: number },
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<PaginatedResult<RegularizeLicenseListItem>, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.licensesPage(filters),
+    regularizeQueryKeys.licensesPage(filters, scope),
     () => regularizeService.listLicensesPage(filters),
     {
       enabled: Boolean(filters.status) && (options?.enabled ?? true),
@@ -333,11 +426,36 @@ export function useRegularizeLicenseDetail(
   id: RegularizeId | undefined | null,
   options?: RegularizeReadQueryOptions,
 ): UseQueryResult<RegularizeLicenseDetail, Error> {
+  const scope = useRegularizeQueryScope();
+
   return useFetch(
-    regularizeQueryKeys.licenseDetail(id),
+    regularizeQueryKeys.licenseDetail(id, scope),
     () => regularizeService.getLicense(id ?? ""),
     {
       enabled: Boolean(id) && (options?.enabled ?? true),
     },
   );
+}
+
+export function useUploadRegularizeLicenseProtocolMutation(): UseMutationResult<
+  RegularizeLicenseProtocolMetadata,
+  Error,
+  { id: RegularizeId; file: File }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, file }) => regularizeService.uploadLicenseProtocol(id, file),
+    onSuccess: () => invalidateRegularizeOperations(queryClient),
+  });
+}
+
+export function useRegularizeLicenseProtocolAccessMutation(): UseMutationResult<
+  RegularizeLicenseProtocolAccess,
+  Error,
+  RegularizeId
+> {
+  return useMutation({
+    mutationFn: (id) => regularizeService.getLicenseProtocolAccess(id),
+  });
 }

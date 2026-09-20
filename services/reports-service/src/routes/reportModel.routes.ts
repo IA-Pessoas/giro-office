@@ -11,6 +11,7 @@ import { type Request, Router } from "express";
 
 import {
   createReportModelSchema,
+  type ReportModelDefinition,
   reportModelIdParamsSchema,
   updateReportModelSchema,
 } from "../schemas/reportModel.schemas.js";
@@ -35,6 +36,27 @@ export function createReportModelRouter(options: {
     return { userId: userId ?? "", organizationId: organizationId ?? "" };
   };
 
+  const validateModelDefinition = async (
+    context: { userId: string; organizationId: string },
+    definition: ReportModelDefinition,
+    requestId: string,
+  ) =>
+    "version" in definition
+      ? (
+          await options.authorizationService.validateComposition({
+            ...context,
+            requestId,
+            definition,
+          })
+        ).definition
+      : (
+          await options.authorizationService.validateDefinition({
+            ...context,
+            requestId,
+            definition,
+          })
+        ).definition;
+
   router.post("/models/shared", async (request, response) => {
     const context = getContext(request);
     const body = parseWithZod(createReportModelSchema, request.body);
@@ -50,6 +72,7 @@ export function createReportModelRouter(options: {
           organizationId: context.organizationId,
           departmentId: authorized.department_id,
           name: body.name,
+          description: body.description,
           definition: authorized.definition,
         }),
       ),
@@ -81,10 +104,16 @@ export function createReportModelRouter(options: {
       organizationId: context.organizationId,
       departmentId: department.id,
     });
+    const authorized = await options.authorizationService.validateSharedDefinition({
+      ...context,
+      requestId: request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-copy",
+      definition: shared.definition,
+    });
     const personal = await options.modelService.create({
       ...context,
       name: shared.name,
-      definition: shared.definition,
+      description: shared.description,
+      definition: authorized.definition,
     });
     response.status(201).json(createSuccessResponse(personal));
   });
@@ -96,20 +125,58 @@ export function createReportModelRouter(options: {
       ...context,
       requestId: request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-preview",
     });
+    const requestId = request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-preview";
     const shared = await options.modelService.getShared({
       id,
       organizationId: context.organizationId,
       departmentId: execution.department.id,
     });
-    const requestId = request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-preview";
+    const authorized = await options.authorizationService.validateSharedDefinition({
+      ...context,
+      requestId,
+      definition: shared.definition,
+    });
     response.json(
       createSuccessResponse(
-        await options.previewService.preview(
-          shared.definition,
-          { ...execution.scope, grant: shared.grant },
-          requestId,
-        ),
+        "version" in authorized.definition
+          ? await options.previewService.previewComposition(
+              authorized.definition,
+              { ...execution.scope, grant: authorized.grant },
+              requestId,
+            )
+          : await options.previewService.preview(
+              authorized.definition,
+              { ...execution.scope, grant: authorized.grant },
+              requestId,
+            ),
       ),
+    );
+  });
+
+  router.get("/models/shared/:id", async (request, response) => {
+    const context = getContext(request);
+    const { id } = parseWithZod(reportModelIdParamsSchema, request.params);
+    const requestId = request.get(REQUEST_ID_HEADER) ?? "reports-shared-model-get";
+    const execution = await options.authorizationService.getSharedExecutionContext({
+      ...context,
+      requestId,
+    });
+    const shared = await options.modelService.getShared({
+      id,
+      organizationId: context.organizationId,
+      departmentId: execution.department.id,
+    });
+    const authorized = await options.authorizationService.validateSharedDefinition({
+      ...context,
+      requestId,
+      definition: shared.definition,
+    });
+    response.json(
+      createSuccessResponse({
+        ...shared,
+        definition: authorized.definition,
+        grant: authorized.grant,
+      }),
     );
   });
 
@@ -136,6 +203,7 @@ export function createReportModelRouter(options: {
           organizationId: context.organizationId,
           departmentId: authorized.department_id,
           name: body.name,
+          description: body.description,
           definition: authorized.definition,
         }),
       ),
@@ -145,21 +213,22 @@ export function createReportModelRouter(options: {
   router.post("/models", async (request, response) => {
     const context = getContext(request);
     const body = parseWithZod(createReportModelSchema, request.body);
-    const definition = (
-      await options.authorizationService.validateDefinition({
-        ...context,
-        requestId: request.get(REQUEST_ID_HEADER) ?? "reports-model-create",
-        definition: body.definition,
-      })
-    ).definition;
+    const definition = await validateModelDefinition(
+      context,
+      body.definition,
+      request.get(REQUEST_ID_HEADER) ?? "reports-model-create",
+    );
 
-    response
-      .status(201)
-      .json(
-        createSuccessResponse(
-          await options.modelService.create({ ...context, name: body.name, definition }),
-        ),
-      );
+    response.status(201).json(
+      createSuccessResponse(
+        await options.modelService.create({
+          ...context,
+          name: body.name,
+          description: body.description,
+          definition,
+        }),
+      ),
+    );
   });
 
   router.get("/models/list", async (request, response) => {
@@ -168,11 +237,11 @@ export function createReportModelRouter(options: {
     const items = await Promise.all(
       models.map(async (model) => {
         try {
-          await options.authorizationService.validateDefinition({
-            ...context,
-            requestId: request.get(REQUEST_ID_HEADER) ?? "reports-model-list",
-            definition: model.definition,
-          });
+          await validateModelDefinition(
+            context,
+            model.definition,
+            request.get(REQUEST_ID_HEADER) ?? "reports-model-list",
+          );
           return model;
         } catch (error) {
           if (error instanceof ServiceError && error.statusCode === 403) return null;
@@ -188,12 +257,12 @@ export function createReportModelRouter(options: {
     const context = getContext(request);
     const { id } = parseWithZod(reportModelIdParamsSchema, request.params);
     const model = await options.modelService.get({ ...context, id });
-    await options.authorizationService.validateDefinition({
-      ...context,
-      requestId: request.get(REQUEST_ID_HEADER) ?? "reports-model-get",
-      definition: model.definition,
-    });
-    response.json(createSuccessResponse(model));
+    const definition = await validateModelDefinition(
+      context,
+      model.definition,
+      request.get(REQUEST_ID_HEADER) ?? "reports-model-get",
+    );
+    response.json(createSuccessResponse({ ...model, definition }));
   });
 
   router.patch("/models/:id", async (request, response) => {
@@ -201,17 +270,21 @@ export function createReportModelRouter(options: {
     const { id } = parseWithZod(reportModelIdParamsSchema, request.params);
     const body = parseWithZod(updateReportModelSchema, request.body);
     const existing = await options.modelService.get({ ...context, id });
-    const definition = (
-      await options.authorizationService.validateDefinition({
-        ...context,
-        requestId: request.get(REQUEST_ID_HEADER) ?? "reports-model-update",
-        definition: body.definition ?? existing.definition,
-      })
-    ).definition;
+    const definition = await validateModelDefinition(
+      context,
+      body.definition ?? existing.definition,
+      request.get(REQUEST_ID_HEADER) ?? "reports-model-update",
+    );
 
     response.json(
       createSuccessResponse(
-        await options.modelService.update({ ...context, id, name: body.name, definition }),
+        await options.modelService.update({
+          ...context,
+          id,
+          name: body.name,
+          description: body.description,
+          definition,
+        }),
       ),
     );
   });

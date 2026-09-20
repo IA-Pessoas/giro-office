@@ -4,15 +4,16 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
+import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
 import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { ContabilServiceEnv } from "./config/env.js";
 import prismaClient from "./integrations/prisma.js";
-import { requestContext } from "./middlewares/requestContext.js";
+import { TriagemOverviewClient } from "./integrations/triagemOverviewClient.js";
 import { buildContabilServiceOpenApiSpec } from "./openapi/spec.js";
 import { type ControlRouteDeps, createControlRoutes } from "./routes/control.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
@@ -21,10 +22,20 @@ import {
   type RelationshipRouteDeps,
 } from "./routes/relationship.routes.js";
 import { createResponsibleRoutes, type ResponsibleRouteDeps } from "./routes/responsible.routes.js";
+import {
+  createTriageClosingRoutes,
+  type TriageClosingRouteDeps,
+} from "./routes/triageClosing.routes.js";
+import {
+  createTriageDocumentsRoutes,
+  type TriageDocumentsRouteDeps,
+} from "./routes/triageDocuments.routes.js";
 import { ControlService } from "./services/controlService.js";
 import { InternalReportingService } from "./services/internalReportingService.js";
 import { RelationshipService } from "./services/relationshipService.js";
 import { ResponsibleService } from "./services/responsibleService.js";
+import { TriageClosingService } from "./services/triageClosingService.js";
+import { TriageDocumentsService } from "./services/triageDocumentsService.js";
 
 function contabilServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -52,12 +63,23 @@ export function createContabilApp(options: {
   controlRouteDeps?: ControlRouteDeps;
   responsibleRouteDeps?: ResponsibleRouteDeps;
   relationshipRouteDeps?: RelationshipRouteDeps;
+  triageDocumentsRouteDeps?: TriageDocumentsRouteDeps;
+  triageClosingRouteDeps?: TriageClosingRouteDeps;
   internalReportingService?: InternalReportingService;
 }): express.Express {
   const { env, logger } = options;
   const controlRouteDeps = options.controlRouteDeps ?? new ControlService();
   const responsibleRouteDeps = options.responsibleRouteDeps ?? new ResponsibleService();
   const relationshipRouteDeps = options.relationshipRouteDeps ?? new RelationshipService();
+  const triagemOverviewClient = new TriagemOverviewClient({
+    baseUrl: env.triagemServiceUrl,
+    serviceToken: env.triagemInternalToken,
+    timeoutMs: env.triagemRequestTimeoutMs,
+  });
+  const triageDocumentsRouteDeps =
+    options.triageDocumentsRouteDeps ??
+    new TriageDocumentsService(prismaClient, undefined, triagemOverviewClient);
+  const triageClosingRouteDeps = options.triageClosingRouteDeps ?? new TriageClosingService();
   const internalReportingService =
     options.internalReportingService ?? new InternalReportingService(prismaClient);
 
@@ -86,6 +108,8 @@ export function createContabilApp(options: {
   app.use("/contabil", createControlRoutes(controlRouteDeps));
   app.use("/contabil", createResponsibleRoutes(responsibleRouteDeps));
   app.use("/contabil", createRelationshipRoutes(relationshipRouteDeps));
+  app.use("/triagem", createTriageDocumentsRoutes(triageDocumentsRouteDeps));
+  app.use("/triagem", createTriageClosingRoutes(triageClosingRouteDeps));
   app.use(
     "/internal",
     createInternalReportingRouter({ env, reportingService: internalReportingService }),

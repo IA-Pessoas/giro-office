@@ -11,9 +11,35 @@ const { Pool } = pg;
 type Queryable = Pick<pg.Pool, "query">;
 const DASHBOARD_MAX_CONCURRENT_QUERIES = 2;
 
-export interface FiscalObligationSummary {
-  status: "Pendente" | "Emitida" | "Atrasada";
-  count: number;
+export interface DashboardFinancialSummary {
+  paidCertificateReceipts: number;
+  unpaidCertificates: number;
+  monthlyPaidCertificateReceipts: Array<{
+    month: string;
+    amount: number;
+  }>;
+}
+
+export interface DashboardCommercialSummary {
+  activeProspects: number;
+  closedThisMonth: number;
+  byStatus: Array<{
+    status: string;
+    count: number;
+  }>;
+  billing: {
+    pending: number;
+    contracted: number;
+    notContracted: number;
+  };
+}
+
+export interface DashboardDepartmentSummary {
+  id: string;
+  name: string;
+  openTasks: number;
+  completedTasks: number;
+  urgentTasks: number;
 }
 
 export interface DashboardStats {
@@ -31,9 +57,9 @@ export interface DashboardStats {
     month: string;
     newClients: number;
   }>;
-  fiscal: {
-    obligations: FiscalObligationSummary[];
-  };
+  financial: DashboardFinancialSummary;
+  commercial: DashboardCommercialSummary;
+  departments: DashboardDepartmentSummary[];
   recentClients: Array<{
     id: string;
     name: string;
@@ -63,15 +89,6 @@ export interface DashboardStats {
     inProgress: number;
     delayed: number;
     waiting: number;
-  };
-  revenue: {
-    currentMonth: number;
-    target: number;
-    monthly: Array<{
-      month: string;
-      revenue: number;
-      expenses: number;
-    }>;
   };
   performance: Array<{
     week: string;
@@ -169,6 +186,37 @@ interface ActivityRow {
 
 interface UpdatedAtRow {
   updated_at: Date | string | null;
+}
+
+interface CertificateReceiptRow {
+  month: string;
+  paid_amount: number | string | null;
+  unpaid_certificates: number | string | null;
+}
+
+interface CommercialSummaryRow {
+  active_prospects: number | string | null;
+  closed_this_month: number | string | null;
+  financial_analysis: number | string | null;
+  scheduling: number | string | null;
+  proposal: number | string | null;
+  paused: number | string | null;
+  refused: number | string | null;
+  closed: number | string | null;
+}
+
+interface CommercialBillingSummaryRow {
+  pending: number | string | null;
+  contracted: number | string | null;
+  not_contracted: number | string | null;
+}
+
+interface DepartmentSummaryRow {
+  id: string;
+  name: string;
+  open_tasks: number | string | null;
+  completed_tasks: number | string | null;
+  urgent_tasks: number | string | null;
 }
 
 const MONTH_LABELS = [
@@ -292,17 +340,10 @@ function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function buildEmptyRevenueMonths(): DashboardStats["revenue"]["monthly"] {
-  const current = new Date();
-
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(current.getFullYear(), current.getMonth() - (6 - index), 1);
-    return {
-      month: MONTH_LABELS[date.getMonth()] ?? "",
-      revenue: 0,
-      expenses: 0,
-    };
-  });
+function monthLabelFromKey(value: string): string {
+  const [, month] = value.split("-");
+  const monthIndex = Number(month) - 1;
+  return MONTH_LABELS[monthIndex] ?? value;
 }
 
 function fillMonthlyClientTrends(rows: MonthlyClientRow[]): DashboardStats["monthlyTrends"] {
@@ -426,6 +467,10 @@ export class DashboardStatsService {
         pendingTasksResult,
         projectSummaryResult,
         notificationsResult,
+        certificateReceiptsResult,
+        commercialSummaryResult,
+        commercialBillingResult,
+        departmentSummaryResult,
         performanceResult,
         activitiesResult,
         updatedAtResult,
@@ -437,6 +482,10 @@ export class DashboardStatsService {
         query<PendingTaskRow>(PENDING_TASKS_SQL),
         query<ProjectSummaryRow>(PROJECT_SUMMARY_SQL),
         query<NotificationSummaryRow>(NOTIFICATION_SUMMARY_SQL),
+        query<CertificateReceiptRow>(CERTIFICATE_RECEIPTS_SQL),
+        query<CommercialSummaryRow>(COMMERCIAL_SUMMARY_SQL),
+        query<CommercialBillingSummaryRow>(COMMERCIAL_BILLING_SUMMARY_SQL),
+        query<DepartmentSummaryRow>(DEPARTMENT_SUMMARY_SQL),
         query<PerformanceRow>(PERFORMANCE_SQL),
         query<ActivityRow>(ACTIVITIES_SQL),
         query<UpdatedAtRow>(UPDATED_AT_SQL),
@@ -446,12 +495,22 @@ export class DashboardStatsService {
       const taskSummary = taskSummaryResult.rows[0];
       const projectSummary = projectSummaryResult.rows[0];
       const notifications = notificationsResult.rows[0];
+      const certificateReceipts = certificateReceiptsResult.rows;
+      const commercialSummary = commercialSummaryResult.rows[0];
+      const commercialBilling = commercialBillingResult.rows[0];
       const monthlyTrends = fillMonthlyClientTrends(monthlyClientsResult.rows);
       const totalClients = toNumber(clientSummary?.active_total);
       const pendingTasks = toNumber(taskSummary?.pending);
       const completedProjects = toNumber(projectSummary?.completed);
       const activeProjects = toNumber(projectSummary?.active);
       const updatedAt = formatNullableIsoDate(updatedAtResult.rows[0]?.updated_at);
+      const currentMonth = monthKey(new Date());
+      const monthlyPaidCertificateReceipts = certificateReceipts.map((row) => ({
+        month: monthLabelFromKey(row.month),
+        amount: toNumber(row.paid_amount),
+      }));
+      const paidCertificateReceipts =
+        certificateReceipts.find((row) => row.month === currentMonth)?.paid_amount ?? 0;
 
       return {
         updatedAt,
@@ -465,13 +524,38 @@ export class DashboardStatsService {
           castelo_med: toNumber(clientSummary?.castelo_med),
         },
         monthlyTrends,
-        fiscal: {
-          obligations: [
-            { status: "Pendente", count: 0 },
-            { status: "Emitida", count: 0 },
-            { status: "Atrasada", count: 0 },
-          ],
+        financial: {
+          paidCertificateReceipts: toNumber(paidCertificateReceipts),
+          unpaidCertificates: toNumber(certificateReceipts[0]?.unpaid_certificates),
+          monthlyPaidCertificateReceipts,
         },
+        commercial: {
+          activeProspects: toNumber(commercialSummary?.active_prospects),
+          closedThisMonth: toNumber(commercialSummary?.closed_this_month),
+          byStatus: [
+            {
+              status: "Análise Financeira",
+              count: toNumber(commercialSummary?.financial_analysis),
+            },
+            { status: "Análise/Agendamento", count: toNumber(commercialSummary?.scheduling) },
+            { status: "Envio de Proposta", count: toNumber(commercialSummary?.proposal) },
+            { status: "Paralisado", count: toNumber(commercialSummary?.paused) },
+            { status: "Recusado pelo Cliente", count: toNumber(commercialSummary?.refused) },
+            { status: "Fechado", count: toNumber(commercialSummary?.closed) },
+          ],
+          billing: {
+            pending: toNumber(commercialBilling?.pending),
+            contracted: toNumber(commercialBilling?.contracted),
+            notContracted: toNumber(commercialBilling?.not_contracted),
+          },
+        },
+        departments: departmentSummaryResult.rows.map((department) => ({
+          id: department.id,
+          name: department.name,
+          openTasks: toNumber(department.open_tasks),
+          completedTasks: toNumber(department.completed_tasks),
+          urgentTasks: toNumber(department.urgent_tasks),
+        })),
         recentClients: recentClientsResult.rows.map((client) => ({
           id: client.id,
           name: client.name ?? "Cliente sem nome",
@@ -508,11 +592,6 @@ export class DashboardStatsService {
           inProgress: toNumber(projectSummary?.in_progress),
           delayed: toNumber(projectSummary?.delayed),
           waiting: toNumber(projectSummary?.waiting),
-        },
-        revenue: {
-          currentMonth: 0,
-          target: 0,
-          monthly: buildEmptyRevenueMonths(),
         },
         performance: performanceResult.rows.map((row) => ({
           week: row.week,
@@ -580,6 +659,12 @@ const OPEN_TASK_CONDITION = `
   and lower(coalesce(status, '')) not like '%não contratado%'
   and lower(coalesce(status, '')) not like '%nao contratado%'
   and lower(coalesce(status, '')) <> 'migrado'
+`;
+const OPEN_TASK_CONDITION_WITH_TASK_ALIAS = `
+  lower(coalesce(t.status, '')) <> all(${COMPLETED_TASK_STATUS_SQL})
+  and lower(coalesce(t.status, '')) not like '%não contratado%'
+  and lower(coalesce(t.status, '')) not like '%nao contratado%'
+  and lower(coalesce(t.status, '')) <> 'migrado'
 `;
 const INACTIVE_PROJECT_STATUS_LIST = INACTIVE_PROJECT_STATUSES.map((status) => `'${status}'`).join(
   ", ",
@@ -679,6 +764,91 @@ const NOTIFICATION_SUMMARY_SQL = `
       + (select count(*) from public."notification.pessoal" where organization_id = $1 and read is false)
       + (select count(*) from public."notification.regularize" where organization_id = $1 and read is false)
     )::int as pending
+`;
+
+const CERTIFICATE_RECEIPTS_SQL = `
+  with certificates as (
+    select was_paid, payment_date, payment_amount
+    from public."certificate.pj"
+    where organization_id = $1
+    union all
+    select was_paid, payment_date, payment_amount
+    from public."certificate.pf"
+    where organization_id = $1
+  ), months as (
+    select generate_series(
+      date_trunc('month', current_date) - interval '6 months',
+      date_trunc('month', current_date),
+      interval '1 month'
+    ) as month
+  )
+  select
+    to_char(months.month, 'YYYY-MM') as month,
+    coalesce(sum(certificates.payment_amount) filter (where certificates.was_paid is true), 0)::numeric as paid_amount,
+    (
+      select count(*)::int
+      from certificates
+      where certificates.was_paid is not true
+    ) as unpaid_certificates
+  from months
+  left join certificates
+    on certificates.was_paid is true
+    and certificates.payment_date >= months.month
+    and certificates.payment_date < months.month + interval '1 month'
+  group by months.month
+  order by months.month
+`;
+
+const COMMERCIAL_SUMMARY_SQL = `
+  select
+    count(*) filter (
+      where archived_at is null
+        and status not in ('Fechado', 'Recusado pelo Cliente')
+    )::int as active_prospects,
+    count(*) filter (
+      where archived_at is null
+        and status = 'Fechado'
+        and status_date >= date_trunc('month', current_date)
+    )::int as closed_this_month,
+    count(*) filter (where archived_at is null and status = 'Análise Financeira')::int as financial_analysis,
+    count(*) filter (where archived_at is null and status = 'Análise/Agendamento')::int as scheduling,
+    count(*) filter (where archived_at is null and status = 'Envio de Proposta')::int as proposal,
+    count(*) filter (where archived_at is null and status = 'Paralisado')::int as paused,
+    count(*) filter (where archived_at is null and status = 'Recusado pelo Cliente')::int as refused,
+    count(*) filter (where archived_at is null and status = 'Fechado')::int as closed
+  from public."commercial.prospecting"
+  where organization_id = $1
+`;
+
+const COMMERCIAL_BILLING_SUMMARY_SQL = `
+  select
+    count(*) filter (where hiring_status = 'A Realizar')::int as pending,
+    count(*) filter (where hiring_status = 'Contratado')::int as contracted,
+    count(*) filter (where hiring_status = 'Não Contratado')::int as not_contracted
+  from public."commercial.task_billing"
+  where organization_id = $1
+`;
+
+const DEPARTMENT_SUMMARY_SQL = `
+  select
+    d.id,
+    d.name,
+    count(t.id) filter (where ${OPEN_TASK_CONDITION_WITH_TASK_ALIAS})::int as open_tasks,
+    count(t.id) filter (where lower(coalesce(t.status, '')) = any(${COMPLETED_TASK_STATUS_SQL}))::int as completed_tasks,
+    count(t.id) filter (
+      where ${OPEN_TASK_CONDITION_WITH_TASK_ALIAS}
+        and (
+          t.prevision_date::date < current_date
+          or lower(coalesce(t.urgency, '')) in ('alta', 'alto', 'urgente', 'crítica', 'critica', 'crítico', 'critico')
+        )
+    )::int as urgent_tasks
+  from public.departments d
+  left join public."integracao.tasks" t
+    on t.department_id = d.id
+    and t.organization_id = $1
+  where d.organization_id = $1
+  group by d.id, d.name
+  order by open_tasks desc, d.name asc
 `;
 
 const PERFORMANCE_SQL = `
@@ -786,6 +956,26 @@ const UPDATED_AT_SQL = `
     union all
     select max(create_at) as updated_at
     from public."notification.regularize"
+    where organization_id = $1
+
+    union all
+    select max(payment_date) as updated_at
+    from public."certificate.pj"
+    where organization_id = $1
+
+    union all
+    select max(payment_date) as updated_at
+    from public."certificate.pf"
+    where organization_id = $1
+
+    union all
+    select max(updated_at) as updated_at
+    from public."commercial.prospecting"
+    where organization_id = $1
+
+    union all
+    select max(updated_at) as updated_at
+    from public."commercial.task_billing"
     where organization_id = $1
   ) sources
   where updated_at <= current_timestamp

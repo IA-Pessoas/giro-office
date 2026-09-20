@@ -37,6 +37,8 @@ services:
         condition: service_started
       contabil-service:
         condition: service_started
+      triagem-service:
+        condition: service_started
       regularize-service:
         condition: service_started
       rh-service:
@@ -48,6 +50,8 @@ services:
       pessoal-service:
         condition: service_started
       parcelamento-service:
+        condition: service_started
+      commercial-service:
         condition: service_started
       reports-service:
         condition: service_started
@@ -88,6 +92,10 @@ services:
     healthcheck:
       disable: true
 
+  triagem-service:
+    healthcheck:
+      disable: true
+
   regularize-service:
     healthcheck:
       disable: true
@@ -109,6 +117,10 @@ services:
       disable: true
 
   parcelamento-service:
+    healthcheck:
+      disable: true
+
+  commercial-service:
     healthcheck:
       disable: true
 

@@ -1,0 +1,99 @@
+import type { ProjectWizardTask, ProjectWizardTaskProposal, TaskModel } from "../types";
+import { getAutomaticTaskResponsibleId } from "./taskFormModalUi.ts";
+
+export const WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING = "Prazo fora do período do projeto.";
+export const WIZARD_EXTRACTION_MAX_ATTEMPTS = 3;
+export const WIZARD_EXTRACTION_MAX_SOURCE_BYTES = 10 * 1024 * 1024;
+
+const WIZARD_EXTRACTION_FILE_MIME_TYPES: Record<string, readonly string[]> = {
+  ".txt": ["text/plain"],
+  ".md": ["text/markdown", "text/plain", "text/x-markdown"],
+  ".docx": ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  ".pdf": ["application/pdf"],
+};
+
+export function canAttemptWizardExtraction(consumedAttempts: number): boolean {
+  return (
+    Number.isInteger(consumedAttempts) &&
+    consumedAttempts >= 0 &&
+    consumedAttempts < WIZARD_EXTRACTION_MAX_ATTEMPTS
+  );
+}
+
+interface WizardExtractionSourceValidationInput {
+  text?: string;
+  file?: Pick<File, "name" | "size" | "type"> | null;
+}
+
+export function getWizardExtractionSourceValidationMessage({
+  text = "",
+  file = null,
+}: WizardExtractionSourceValidationInput): string | null {
+  if (file) {
+    if (file.size === 0) return "O arquivo da Ata é obrigatório e não pode estar vazio.";
+    if (file.size > WIZARD_EXTRACTION_MAX_SOURCE_BYTES) {
+      return "Arquivo excede o limite de 10 MB.";
+    }
+
+    const dotIndex = file.name.lastIndexOf(".");
+    const extension = dotIndex > 0 ? file.name.slice(dotIndex).toLowerCase() : "";
+    if (!WIZARD_EXTRACTION_FILE_MIME_TYPES[extension]?.includes(file.type)) {
+      return "Tipo de arquivo não permitido.";
+    }
+
+    return null;
+  }
+
+  if (!text.trim()) return "Informe o texto ou selecione um arquivo da Ata.";
+  if (new TextEncoder().encode(text).byteLength > WIZARD_EXTRACTION_MAX_SOURCE_BYTES) {
+    return "A Ata deve ter no máximo 10 MB.";
+  }
+
+  return null;
+}
+
+/**
+ * Trocar departamento ou Modelo derruba as seleções que deixaram de ser compatíveis; editar o
+ * prazo derruba o aviso da IA sobre ele.
+ */
+export function applyWizardTaskChange<T extends ProjectWizardTaskProposal>(
+  task: T,
+  field: keyof ProjectWizardTask,
+  value: string,
+  taskModels: TaskModel[],
+): T {
+  if (field === "department_id") {
+    return { ...task, department_id: value, model_id: "", responsible_id: null };
+  }
+
+  if (field === "model_id") {
+    const model = taskModels.find(
+      (item) => item.id === value && item.department_id === task.department_id,
+    );
+    return {
+      ...task,
+      model_id: value,
+      responsible_id:
+        getAutomaticTaskResponsibleId(model?.responsible_id, model?.department?.users ?? []) || null,
+    };
+  }
+
+  if (field === "prevision_date") {
+    return { ...task, prevision_date: value || undefined, prevision_date_warning: undefined };
+  }
+
+  return { ...task, [field]: value };
+}
+
+/** Aviso do prazo: o da IA enquanto o campo está vazio, o do período assim que ele é preenchido. */
+export function getWizardTaskDateWarning(
+  task: Pick<ProjectWizardTaskProposal, "prevision_date" | "prevision_date_warning">,
+  startDate: string,
+  endDate?: string | null,
+): string | null {
+  if (!task.prevision_date) return task.prevision_date_warning ?? null;
+
+  return task.prevision_date < startDate || (endDate ? task.prevision_date > endDate : false)
+    ? WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING
+    : null;
+}

@@ -103,6 +103,12 @@ const PLATFORM_ORGANIZATION_SELECT = {
 } as const;
 
 const ACTIVE_DEPARTMENT_STATUS: status = "active";
+const DEFAULT_PESSOAL_GROUP = {
+  name: "Sem Movimento",
+  normalized_name: "sem movimento",
+  policy: "NO_OBLIGATIONS",
+  system_key: "NO_MOVEMENT",
+};
 
 const DEFAULT_PLATFORM_DEPARTMENTS = [
   { name: "Administração", color: "#6B7280", status: ACTIVE_DEPARTMENT_STATUS, solution: false },
@@ -308,6 +314,7 @@ class OrganizationService {
           status: "active",
           subscription_plan: "trial",
           departments: { create: DEFAULT_PLATFORM_DEPARTMENTS },
+          pessoalGroups: { create: DEFAULT_PESSOAL_GROUP },
         },
         select: PLATFORM_ORGANIZATION_SELECT,
       });
@@ -429,6 +436,7 @@ class OrganizationService {
           slug,
           email_created_by,
           cnpj,
+          pessoalGroups: { create: DEFAULT_PESSOAL_GROUP },
         },
         select: ORGANIZATION_CREATE_SELECT,
       });

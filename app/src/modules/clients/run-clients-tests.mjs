@@ -14,12 +14,6 @@ import {
   unwrapClientPaDetail,
 } from "./services/clientService.contract.ts";
 import {
-  buildCommercialPayload,
-  COMMERCIAL_STATUS_OPTIONS,
-  createCommercialInitialValues,
-  hasCommercialChanges,
-} from "./utils/commercialForm.ts";
-import {
   formatCpfCnpjInput,
   validateCpfCnpjDocument,
   validateOptionalCpfDocument,
@@ -182,7 +176,6 @@ runTest("client endpoints use only /client contract", () => {
   assert.equal(CLIENT_ENDPOINTS.createIntegration, "/client/integration");
   assert.equal(CLIENT_ENDPOINTS.detail("123"), "/client/123");
   assert.equal(CLIENT_ENDPOINTS.updateIntegration("123"), "/client/123/integration");
-  assert.equal(CLIENT_ENDPOINTS.updateCommercial("123"), "/client/123/commercial");
   assert.equal(CLIENT_ENDPOINTS.updateFinance("123"), "/client/123/finance");
   assert.equal(CLIENT_ENDPOINTS.updateRegularize("123"), "/client/123/regularize");
   assert.equal(CLIENT_ENDPOINTS.terminate("123"), "/client/123/termination");
@@ -436,6 +429,7 @@ runTest("integration phone comparison and payload use canonical digits", () => {
 
 runTest("integration edit guard blocks when normalized cpf_cnpj is missing", () => {
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "12.345.678/0001-90" }), true);
+  assert.equal(hasUsableIntegrationData({ type: "PJ", cpf_cnpj: "AB123456780001" }), true);
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "   " }), false);
   assert.equal(hasUsableIntegrationData({ cpf_cnpj: "..../-" }), false);
   assert.equal(hasUsableIntegrationData(null), false);
@@ -459,6 +453,8 @@ runTest("document input formatter masks and limits by person type", () => {
   assert.equal(formatCpfCnpjInput("123456789101112", "PJ"), "12.345.678/9101-11");
   assert.equal(formatCpfCnpjInput("abc1234", "PF"), "123.4");
   assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
+  assert.equal(formatCpfCnpjInput("AB123456780001", "PJ"), "AB.123.456/7800-01");
+  assert.equal(validateCpfCnpjDocument("AB.123.456/7800-01", "PJ"), null);
 });
 
 runTest("client input masks forward formatted document and phone values through event-compatible targets", () => {
@@ -516,63 +512,6 @@ runTest("optional cpf validation accepts empty values and rejects invalid length
     validateOptionalCpfDocument("CPF do responsável", "123"),
     "CPF do responsável deve ter 11 dígitos.",
   );
-});
-
-runTest("commercial options separate backend value from UI label", () => {
-  assert.deepEqual(COMMERCIAL_STATUS_OPTIONS[0], {
-    value: "Análise/Agendamento",
-    label: "Análise/Agendamento",
-  });
-});
-
-runTest("commercial warning explains the client-status impact without technical wording", () => {
-  const commercialForm = readFileSync(
-    "src/modules/clients/components/ClientCommercialForm.tsx",
-    "utf8",
-  );
-
-  assert.match(
-    commercialForm,
-    /Alterar o status de prospecção pode impactar o status geral do cliente\./,
-  );
-  assert.doesNotMatch(commercialForm, /backend/i);
-});
-
-runTest("commercial initial values normalize dates to input format", () => {
-  const client = {
-    prospecting_status: "Análise/Agendamento",
-    date_status: "2026-04-03T12:00:00.000Z",
-    description_prospecting: "Primeiro contato",
-    register_date_prospecting: new Date("2026-04-01T00:00:00.000Z"),
-  };
-
-  assert.deepEqual(createCommercialInitialValues(client), {
-    prospecting_status: "Análise/Agendamento",
-    date_status: "2026-04-03",
-    description_prospecting: "Primeiro contato",
-    register_date_prospecting: "2026-04-01",
-  });
-});
-
-runTest("commercial payload keeps required status and only includes changed optional fields", () => {
-  const client = {
-    prospecting_status: "Análise/Agendamento",
-    date_status: "2026-04-03T12:00:00.000Z",
-    description_prospecting: "Primeiro contato",
-    register_date_prospecting: "2026-04-01T00:00:00.000Z",
-  };
-
-  const values = {
-    ...createCommercialInitialValues(client),
-    prospecting_status: "Fechado",
-    description_prospecting: "",
-  };
-
-  assert.deepEqual(buildCommercialPayload(values, client), {
-    prospecting_status: "Fechado",
-    description_prospecting: null,
-  });
-  assert.equal(hasCommercialChanges(values, client), true);
 });
 
 runTest("finance helpers block unchanged submit and send boolean payload", () => {
@@ -824,10 +763,6 @@ runTest("client creation discloses name and document as required", () => {
 });
 
 runTest("legacy client tabs use toast warnings for validation", () => {
-  const commercialSource = readFileSync(
-    "src/components/Forms/ClientTabs/Comercial/DataTab.tsx",
-    "utf8",
-  );
   const regularizeSource = readFileSync(
     "src/components/Forms/ClientTabs/Regularize/DataTab.tsx",
     "utf8",
@@ -837,11 +772,8 @@ runTest("legacy client tabs use toast warnings for validation", () => {
     "utf8",
   );
 
-  assert.match(commercialSource, /toast\.warn\('Preencha todos os campos'\)/);
-  assert.match(commercialSource, /toast\.warn\('Preencha a competencia de saída'\)/);
   assert.match(regularizeSource, /toast\.warn\('Preencha todos os campos'\)/);
   assert.match(integrationSource, /toast\.warn\('Preencha todos os campos'\)/);
-  assert.doesNotMatch(commercialSource, /\balert\(/);
   assert.doesNotMatch(regularizeSource, /\balert\(/);
   assert.doesNotMatch(integrationSource, /\balert\(/);
 });

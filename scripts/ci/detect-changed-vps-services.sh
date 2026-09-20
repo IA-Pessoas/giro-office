@@ -122,6 +122,9 @@ for f in "${files[@]}"; do
     services/contabil-service/* )
       add_service contabil-service
       ;;
+    services/triagem-service/* )
+      add_service triagem-service
+      ;;
     services/regularize-service/* )
       add_service regularize-service
       ;;
@@ -139,6 +142,9 @@ for f in "${files[@]}"; do
       ;;
     services/reports-service/* )
       add_service reports-service
+      ;;
+    services/commercial-service/* )
+      add_service commercial-service
       ;;
     services/audit-service/* )
       add_service audit-service

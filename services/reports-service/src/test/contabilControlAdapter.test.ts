@@ -22,7 +22,7 @@ describe("ContabilControlAdapter", () => {
       ok: true,
       json: vi.fn().mockResolvedValue({
         success: true,
-        data: { rows: [{ competence: "2026-01", monthly_closing: true }], reachedLimit: false },
+        data: { rows: [{ competence: "2026-01", monthly_closing: true }], reachedLimit: true },
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -59,7 +59,10 @@ describe("ContabilControlAdapter", () => {
         limit: 10,
         request_id: "request-834",
       }),
-    ).resolves.toEqual([{ competence: "2026-01", monthly_closing: true }]);
+    ).resolves.toEqual({
+      rows: [{ competence: "2026-01", monthly_closing: true }],
+      reachedLimit: true,
+    });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
     const body = {
@@ -115,7 +118,7 @@ describe("ContabilControlAdapter", () => {
       ok: true,
       json: vi.fn().mockResolvedValue({
         success: true,
-        data: { rows: [{ customer_with_movement: true }], reachedLimit: false },
+        data: { rows: [{ customer_with_movement: true }], reachedLimit: true },
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -148,7 +151,10 @@ describe("ContabilControlAdapter", () => {
         limit: 10,
         request_id: "request-835",
       }),
-    ).resolves.toEqual([{ customer_with_movement: true }]);
+    ).resolves.toEqual({
+      rows: [{ customer_with_movement: true }],
+      reachedLimit: true,
+    });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
     expect(JSON.parse(String(request.body))).toEqual({

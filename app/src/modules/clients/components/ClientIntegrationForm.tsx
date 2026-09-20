@@ -31,6 +31,7 @@ interface ClientIntegrationFormProps {
   ) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  cnpjLookupStatus?: "idle" | "loading" | "success" | "unavailable";
 }
 
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-white";
@@ -50,6 +51,7 @@ export function ClientIntegrationForm({
   onChange,
   onSubmit,
   onCancel,
+  cnpjLookupStatus = "idle",
 }: ClientIntegrationFormProps) {
   const isCreate = mode === "create" && isCreateValues(values);
   const createValues = isCreate ? values : null;
@@ -106,6 +108,15 @@ export function ClientIntegrationForm({
             placeholder="Somente números"
             className={clientTextFieldClassName}
           />
+          {cnpjLookupStatus === "loading" ? (
+            <span className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+              Consultando dados oficiais...
+            </span>
+          ) : cnpjLookupStatus === "unavailable" ? (
+            <span className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+              Consulta automática indisponível; preencha os dados manualmente.
+            </span>
+          ) : null}
         </label>
 
         <label className="space-y-1.5">

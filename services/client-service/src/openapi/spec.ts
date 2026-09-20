@@ -1,3 +1,4 @@
+import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { ClientServiceEnv } from "../config/env.js";
@@ -24,6 +25,15 @@ const reportingGrantParameters = [
     schema: { type: "string" },
   },
 ];
+
+const reportingExtractResponseSchema: OpenApiSchema = {
+  type: "object",
+  required: ["rows", "reachedLimit"],
+  properties: {
+    rows: { type: "array", items: { type: "object", additionalProperties: true } },
+    reachedLimit: { type: "boolean" },
+  },
+};
 
 function successEnvelopeContent(dataSchema?: OpenApiSchema) {
   return {
@@ -63,7 +73,6 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
     tags: [
       { name: "Health", description: "Saude do servico" },
       { name: "Clients", description: "CRUD principal de clientes" },
-      { name: "Commercial", description: "Overview comercial baseado em clientes reais" },
       { name: "Integration", description: "Fluxos de integracao de clientes" },
       { name: "Verticals", description: "Atualizacoes por vertical do cliente" },
       { name: "Histories", description: "Historicos e pendencias do cliente" },
@@ -215,21 +224,6 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
-      "/client/commercial/overview": {
-        get: {
-          tags: ["Commercial"],
-          summary: "Overview comercial",
-          description:
-            "Retorna dados comerciais reais derivados de clientes. Dominios sem fonte real retornam zerados.",
-          security: [{ bearerAuth: [] }],
-          responses: {
-            "200": {
-              description: "Overview comercial",
-              ...successEnvelopeContent(),
-            },
-          },
-        },
-      },
       "/client": {
         post: {
           tags: ["Clients"],
@@ -358,6 +352,25 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
         },
       },
       "/client/integration": {
+        get: {
+          tags: ["Integration"],
+          summary: "Consultar dados oficiais de CNPJ",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "cnpj",
+              in: "query",
+              required: true,
+              schema: { type: "string", minLength: 14, maxLength: 32 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Dados oficiais da empresa",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
         post: {
           tags: ["Integration"],
           summary: "Criar cliente pela integracao",
@@ -494,40 +507,6 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           responses: {
             "200": {
               description: "PA atualizado",
-              ...successEnvelopeContent(),
-            },
-          },
-        },
-      },
-      "/client/{id}/commercial": {
-        patch: {
-          tags: ["Verticals"],
-          summary: "Atualizar dados comerciais",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
-          ],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    prospecting_status: { type: "string" },
-                    date_status: { type: "string", format: "date-time" },
-                    description_prospecting: { type: ["string", "null"] },
-                    register_date_prospecting: { type: "string", format: "date-time" },
-                  },
-                  required: ["prospecting_status"],
-                  additionalProperties: false,
-                },
-              },
-            },
-          },
-          responses: {
-            "200": {
-              description: "Dados comerciais atualizados",
               ...successEnvelopeContent(),
             },
           },
@@ -840,6 +819,27 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/internal/commercial/prospecting-transition": {
+        post: {
+          tags: ["Internal"],
+          summary: "Aplicar projeção comercial idempotente no Cliente",
+          security: [{ internalToken: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": { schema: { type: "object", additionalProperties: false } },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Projeção aplicada ou já processada",
+              ...successEnvelopeContent(),
+            },
+            "403": { description: "Token interno inválido" },
+            "409": { description: "Evento de outro tenant" },
+          },
+        },
+      },
       "/internal/reporting/catalog": {
         get: {
           tags: ["Internal"],
@@ -869,14 +869,19 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                   properties: {
                     source: { type: "string", enum: ["integracao.clients"] },
                     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
-                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                    limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
+                    query: reportingQueryOpenApiSchema,
                   },
                 },
               },
             },
           },
           responses: {
-            "200": { description: "Linhas autorizadas", ...successEnvelopeContent() },
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
+            "200": {
+              description: "Linhas autorizadas",
+              ...successEnvelopeContent(reportingExtractResponseSchema),
+            },
             "403": { description: "Token, grant ou campos inválidos" },
           },
         },

@@ -100,6 +100,19 @@ export interface ClientListPage {
   hasMore: boolean;
 }
 
+export interface ClientCompanyLookup {
+  cnpj: string;
+  name: string | null;
+  company_name: string | null;
+  fantasy_name: string | null;
+  opening_date: string | null;
+  address: string | null;
+  cep: string | null;
+  neighborhood: string | null;
+  state: string | null;
+  city: string | null;
+}
+
 export interface ClientListFilters {
   search?: string;
   ref?: "integracao" | "deps";
@@ -329,13 +342,6 @@ export interface UpdateClientIntegrationPayload {
   city?: string | null;
 }
 
-export interface UpdateClientCommercialPayload {
-  prospecting_status?: string;
-  date_status?: string;
-  description_prospecting?: string | null;
-  register_date_prospecting?: string;
-}
-
 export interface UpdateClientFinancePayload {
   contract?: boolean;
 }
@@ -381,13 +387,6 @@ export interface TerminateClientPayload {
   competence_output: string;
 }
 
-export interface ClientCommercialFormValues {
-  prospecting_status: string;
-  date_status: string;
-  description_prospecting: string;
-  register_date_prospecting: string;
-}
-
 export interface ClientFinanceFormValues {
   contract: boolean;
 }
@@ -431,18 +430,6 @@ export interface ClientTerminationFormValues {
   reason: string;
   description: string;
   competence_output: string;
-}
-
-export interface ClientCommercialRecord {
-  id: string;
-  name: string;
-  company_name: string | null;
-  fantasy_name: string | null;
-  cpf_cnpj: string | null;
-  prospecting_status: string | null;
-  date_status: string | null;
-  description_prospecting: string | null;
-  register_date_prospecting: string | null;
 }
 
 export interface ClientFinanceRecord {

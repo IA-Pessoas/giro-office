@@ -14,6 +14,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
   Trash2,
@@ -80,6 +81,7 @@ import {
   useCreateRegularizeProcessMutation,
   useRegularizeGuidance,
   useRegularizeLicenseDetail,
+  useRegularizeLicenseProtocolAccessMutation,
   usePaginatedRegularizeLicenses,
   useRegularizeMunicipalTaxDetail,
   useRegularizeMunicipalTaxes,
@@ -88,11 +90,17 @@ import {
   usePaginatedRegularizeProcesses,
   useRemoveRegularizeGuidanceActivityMutation,
   useRemoveRegularizeGuidancePartnerMutation,
+  useUpdateRegularizeGuidanceActivityMutation,
+  useUpdateRegularizeGuidancePartnerMutation,
+  useReturnRegularizeProcessFromFiscalMutation,
+  useSendRegularizeProcessToFiscalMutation,
   useUpdateRegularizeGuidanceMutation,
   useUpdateRegularizeLicenseMutation,
   useUpdateRegularizeMunicipalTaxMutation,
   useUpdateRegularizeProcessMutation,
+  useUploadRegularizeLicenseProtocolMutation,
 } from "../hooks/useRegularizeOperations";
+import { submitRegularizeLicense } from "../services/regularizeLicenseSubmission";
 import type {
   AddRegularizeGuidanceActivityPayload,
   AddRegularizeGuidancePartnerPayload,
@@ -113,11 +121,14 @@ import type {
   RegularizeMunicipalTaxesClientSummary,
   RegularizePartner,
   RegularizePasswordListItem,
+  RegularizeProcessActionPayload,
   RegularizeProcessListItem,
   RegularizeSitePasswordListItem,
   RegularizeStatus,
   UpdateRegularizeClientPfPayload,
   UpdateRegularizeGuidancePayload,
+  UpdateRegularizeGuidanceActivityPayload,
+  UpdateRegularizeGuidancePartnerPayload,
   UpdateRegularizeLicensePayload,
   UpdateRegularizeMunicipalTaxPayload,
   UpdateRegularizePartnerPayload,
@@ -137,6 +148,9 @@ import {
 import {
   type RegularizeFormOption,
   regularizePrimaryButtonClassName,
+  getRegularizeLicenseDisplayStatus,
+  regularizeLicenseStatusFilterOptions,
+  regularizeProcessStatusFilterOptions,
 } from "./regularizeFormControls";
 
 const REGULARIZE_PAGE_SIZE = 20;
@@ -160,10 +174,34 @@ type RegularizeFormState =
   | { type: "municipal-tax"; mode: "edit"; id: RegularizeId; clientId?: RegularizeId }
   | { type: "process"; mode: "create" }
   | { type: "process"; mode: "edit"; id: RegularizeId }
-  | { type: "guidance"; mode: "create"; processId: RegularizeId }
+  | { type: "guidance"; mode: "create"; processId?: RegularizeId }
   | { type: "guidance"; mode: "edit"; guidance: RegularizeGuidance }
-  | { type: "guidance-activity"; guidanceId: RegularizeId; processId: RegularizeId }
-  | { type: "guidance-partner"; guidanceId: RegularizeId; processId: RegularizeId }
+  | {
+      type: "guidance-activity";
+      mode: "create";
+      guidanceId: RegularizeId;
+      processId?: RegularizeId;
+    }
+  | {
+      type: "guidance-activity";
+      mode: "edit";
+      guidanceId: RegularizeId;
+      processId?: RegularizeId;
+      activity: RegularizeGuidanceEconomicActivity;
+    }
+  | {
+      type: "guidance-partner";
+      mode: "create";
+      guidanceId: RegularizeId;
+      processId?: RegularizeId;
+    }
+  | {
+      type: "guidance-partner";
+      mode: "edit";
+      guidanceId: RegularizeId;
+      processId?: RegularizeId;
+      partner: RegularizeGuidancePartner;
+    }
   | { type: "license"; mode: "create" }
   | { type: "license"; mode: "edit"; id: RegularizeId };
 
@@ -226,6 +264,10 @@ function getStatusBadgeConfig(status: RegularizeStatus | null | undefined): Stat
 
   if (normalized === "pendente" || normalized === "a vencer" || normalized === "urgente") {
     return { label: formatText(status, "Pendente"), variant: "warning", icon: CalendarDays };
+  }
+
+  if (normalized === "vencido") {
+    return { label: formatText(status, "Vencido"), variant: "danger", icon: XCircle };
   }
 
   return { label: formatText(status, "Sem status"), variant: "neutral" };
@@ -694,12 +736,86 @@ function getSiteCredentialDetailStatus(error: unknown): string {
   return "Credencial indisponivel para revelacao.";
 }
 
+function IndependentGuidanceSection({
+  canManageRegularizeCore,
+  onSetActiveForm,
+}: {
+  canManageRegularizeCore: boolean;
+  onSetActiveForm: (form: RegularizeFormState) => void;
+}) {
+  const independentGuidanceQuery = useRegularizeGuidance(undefined, { enabled: true });
+
+  return (
+    <section className="space-y-4" aria-label="Orientações da organização">
+      <TabActionHeader
+        title="Orientações"
+        description="Orientações da organização, com ou sem processo vinculado."
+        action={
+          canManageRegularizeCore ? (
+            <PrimaryActionButton
+              icon={Plus}
+              label="Nova orientação"
+              onClick={() => onSetActiveForm({ type: "guidance", mode: "create" })}
+            />
+          ) : (
+            <span className="text-sm text-gray-500">Somente leitura</span>
+          )
+        }
+      />
+      <PrimaryActionButton
+        icon={RefreshCw}
+        label="Atualizar orientações"
+        disabled={independentGuidanceQuery.isFetching}
+        onClick={() => void independentGuidanceQuery.refetch()}
+      />
+      <QueryStatePanel query={independentGuidanceQuery} emptyTitle="Sem orientações.">
+        {(rows) => (
+          <div className="grid gap-3 md:grid-cols-2">
+            {rows.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-lg border border-gray-200 p-3 dark:border-slate-700"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium">{getGuidanceTitle(item)}</p>
+                    <p className="text-sm text-gray-500">{getGuidanceDescription(item)}</p>
+                  </div>
+                  <TableActionButton
+                    icon={canManageRegularizeCore ? Pencil : Eye}
+                    title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
+                    onClick={() =>
+                      onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                    }
+                  />
+                </div>
+                <FieldLine
+                  label="Alvo"
+                  value={item.target_type === "SEM_CLIENTE" ? "Não cliente" : item.target_type}
+                />
+                <FieldLine label="Nome" value={formatText(item.target_snapshot?.name)} />
+                <FieldLine
+                  label="Processo"
+                  value={item.process_id ? "Vinculado" : "Sem processo"}
+                />
+                <FieldLine label="Status" value={formatText(item.status)} />
+              </div>
+            ))}
+          </div>
+        )}
+      </QueryStatePanel>
+    </section>
+  );
+}
+
 function ProcessDetailContent({
   canManageRegularizeCore,
   currentProcessId,
   guidanceQuery,
   onRemoveGuidanceActivity,
   onRemoveGuidancePartner,
+  onReturnProcessFromFiscal,
+  onSendProcessToFiscal,
   onSetActiveForm,
   processDetailQuery,
   processSelectionOrigin,
@@ -717,6 +833,10 @@ function ProcessDetailContent({
     processId: RegularizeId,
     itemId: RegularizeId | undefined,
   ) => void | Promise<void>;
+  onReturnProcessFromFiscal: (
+    payload: RegularizeProcessActionPayload,
+  ) => void | Promise<void>;
+  onSendProcessToFiscal: (payload: RegularizeProcessActionPayload) => void | Promise<void>;
   onSetActiveForm: (form: RegularizeFormState) => void;
   processDetailQuery: ReturnType<typeof useRegularizeProcessDetail>;
   processSelectionOrigin: ProcessSelectionOrigin;
@@ -746,9 +866,79 @@ function ProcessDetailContent({
               />
             }
           />
+          <FieldLine
+            label="Status financeiro"
+            value={formatText(processDetailQuery.data.financial_status)}
+          />
+          <FieldLine
+            label="Aviso ao cliente"
+            value={formatDate(processDetailQuery.data.client_notice_date)}
+          />
           <FieldLine label="Entrada" value={formatDate(processDetailQuery.data.entry_date)} />
           <FieldLine label="Previsto" value={formatDate(processDetailQuery.data.expected_date)} />
+          <FieldLine
+            label="Dias corridos"
+            value={
+              processDetailQuery.data.elapsed_days === null ||
+              processDetailQuery.data.elapsed_days === undefined
+                ? "-"
+                : String(processDetailQuery.data.elapsed_days)
+            }
+          />
           <FieldLine label="Urgência" value={formatText(processDetailQuery.data.urgency)} />
+          <FieldLine
+            label="Responsáveis"
+            value={
+              [
+                processDetailQuery.data.responsible1,
+                processDetailQuery.data.responsible2,
+                processDetailQuery.data.responsible3,
+              ]
+                .filter((responsible): responsible is NonNullable<typeof responsible> => Boolean(responsible))
+                .map((responsible) => responsible.name)
+                .join(", ") || "Sem responsáveis"
+            }
+          />
+          {canManageRegularizeCore ? (
+            <div className="flex flex-wrap gap-2 pt-2">
+              <PrimaryActionButton
+                icon={ArrowRight}
+                label="Enviar ao Fiscal"
+                onClick={() =>
+                  void onSendProcessToFiscal({ id: processDetailQuery.data?.id ?? currentProcessId ?? "" })
+                }
+              />
+              <PrimaryActionButton
+                icon={RotateCcw}
+                label="Registrar retorno do Fiscal"
+                onClick={() =>
+                  void onReturnProcessFromFiscal({ id: processDetailQuery.data?.id ?? currentProcessId ?? "" })
+                }
+              />
+            </div>
+          ) : null}
+          {(processDetailQuery.data.history?.length ?? 0) > 0 ? (
+            <div className="space-y-2 pt-2">
+              <p className="text-xs font-semibold uppercase text-gray-500 dark:text-slate-500">
+                Histórico
+              </p>
+              <ol className="space-y-2">
+                {processDetailQuery.data.history?.map((item) => (
+                  <li
+                    key={item.id}
+                    className="rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-800/70"
+                  >
+                    <span className="font-medium text-gray-700 dark:text-slate-200">
+                      {item.action}
+                    </span>
+                    <span className="ml-2 text-gray-500 dark:text-slate-400">
+                      {formatDate(item.date)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
         </>
       ) : (
         <FieldLine label="Status" value="Sem seleção." />
@@ -784,15 +974,13 @@ function ProcessDetailContent({
                         {getGuidanceDescription(item)}
                       </p>
                     </div>
-                    {canManageRegularizeCore ? (
-                      <TableActionButton
-                        icon={Pencil}
-                        title="Editar orientação"
-                        onClick={() =>
-                          onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
-                        }
-                      />
-                    ) : null}
+                    <TableActionButton
+                      icon={canManageRegularizeCore ? Pencil : Eye}
+                      title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
+                      onClick={() =>
+                        onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                      }
+                    />
                   </div>
 
                   {canManageRegularizeCore ? (
@@ -803,6 +991,7 @@ function ProcessDetailContent({
                         onClick={() =>
                           onSetActiveForm({
                             type: "guidance-activity",
+                            mode: "create",
                             guidanceId: item.id,
                             processId: item.process_id,
                           })
@@ -814,6 +1003,7 @@ function ProcessDetailContent({
                         onClick={() =>
                           onSetActiveForm({
                             type: "guidance-partner",
+                            mode: "create",
                             guidanceId: item.id,
                             processId: item.process_id,
                           })
@@ -837,18 +1027,36 @@ function ProcessDetailContent({
                               {formatText(activity.code)} - {formatText(activity.description)}
                             </span>
                             {canManageRegularizeCore ? (
-                              <TableActionButton
-                                disabled={!activity.id}
-                                icon={Trash2}
-                                title="Remover atividade"
-                                onClick={() => {
-                                  void onRemoveGuidanceActivity(
-                                    item.id,
-                                    item.process_id,
-                                    activity.id,
-                                  );
-                                }}
-                              />
+                              <span className="flex shrink-0 gap-1">
+                                <TableActionButton
+                                  disabled={!activity.id}
+                                  icon={Pencil}
+                                  title="Editar atividade"
+                                  onClick={() =>
+                                    activity.id
+                                      ? onSetActiveForm({
+                                          type: "guidance-activity",
+                                          mode: "edit",
+                                          guidanceId: item.id,
+                                          processId: item.process_id,
+                                          activity,
+                                        })
+                                      : undefined
+                                  }
+                                />
+                                <TableActionButton
+                                  disabled={!activity.id}
+                                  icon={Trash2}
+                                  title="Remover atividade"
+                                  onClick={() => {
+                                    void onRemoveGuidanceActivity(
+                                      item.id,
+                                      item.process_id,
+                                      activity.id,
+                                    );
+                                  }}
+                                />
+                              </span>
                             ) : null}
                           </div>
                         ),
@@ -868,20 +1076,42 @@ function ProcessDetailContent({
                         >
                           <span className="min-w-0 text-gray-700 dark:text-slate-200">
                             {formatText(partner.name)} - {formatDocument(partner.cpf ?? partner.document)}
+                            {partner.profession ? `, ${formatText(partner.profession)}` : ""}
+                            {partner.percentage ?? partner.share
+                              ? ` (${formatText(partner.percentage ?? partner.share)}%)`
+                              : ""}
                           </span>
                           {canManageRegularizeCore ? (
-                            <TableActionButton
-                              disabled={!partner.id}
-                              icon={Trash2}
-                              title="Remover sócio"
-                              onClick={() => {
-                                void onRemoveGuidancePartner(
-                                  item.id,
-                                  item.process_id,
-                                  partner.id,
-                                );
-                              }}
-                            />
+                            <span className="flex shrink-0 gap-1">
+                              <TableActionButton
+                                disabled={!partner.id}
+                                icon={Pencil}
+                                title="Editar sócio"
+                                onClick={() =>
+                                  partner.id
+                                    ? onSetActiveForm({
+                                        type: "guidance-partner",
+                                        mode: "edit",
+                                        guidanceId: item.id,
+                                        processId: item.process_id,
+                                        partner,
+                                      })
+                                    : undefined
+                                }
+                              />
+                              <TableActionButton
+                                disabled={!partner.id}
+                                icon={Trash2}
+                                title="Remover sócio"
+                                onClick={() => {
+                                  void onRemoveGuidancePartner(
+                                    item.id,
+                                    item.process_id,
+                                    partner.id,
+                                  );
+                                }}
+                              />
+                            </span>
                           ) : null}
                         </div>
                       ))}
@@ -913,6 +1143,7 @@ export function RegularizePage() {
   const [activeSitePasswordId, setActiveSitePasswordId] = useState<RegularizeId>();
   const [isSiteCredentialDialogOpen, setIsSiteCredentialDialogOpen] = useState(false);
   const [activeForm, setActiveForm] = useState<RegularizeFormState | null>(null);
+  const [licenseFormSessionKey, setLicenseFormSessionKey] = useState(0);
   const [processSearch, setProcessSearch] = useState("");
   const [processStatus, setProcessStatus] = useState("Todos");
   const [processPage, setProcessPage] = useState(1);
@@ -927,6 +1158,7 @@ export function RegularizePage() {
   const [taxType, setTaxType] = useState<"Todos" | "TFF" | "TLP" | "TLL">("Todos");
   const [taxYear, setTaxYear] = useState(() => new Date().getFullYear());
   const [taxPage, setTaxPage] = useState(1);
+  const [licenseStatus, setLicenseStatus] = useState("Todos");
   const [licensePage, setLicensePage] = useState(1);
   const debouncedProcessSearch = useDebouncedValue(processSearch.trim(), 300);
   const debouncedSiteSearch = useDebouncedValue(siteSearch.trim(), 300);
@@ -982,7 +1214,7 @@ export function RegularizePage() {
   );
   const licensePageQuery = usePaginatedRegularizeLicenses(
     {
-      status: "Todos",
+      status: licenseStatus,
       page: licensePage,
       limit: REGULARIZE_PAGE_SIZE,
     },
@@ -1019,14 +1251,20 @@ export function RegularizePage() {
   const updateMunicipalTaxMutation = useUpdateRegularizeMunicipalTaxMutation();
   const createProcessMutation = useCreateRegularizeProcessMutation();
   const updateProcessMutation = useUpdateRegularizeProcessMutation();
+  const sendProcessToFiscalMutation = useSendRegularizeProcessToFiscalMutation();
+  const returnProcessFromFiscalMutation = useReturnRegularizeProcessFromFiscalMutation();
   const createGuidanceMutation = useCreateRegularizeGuidanceMutation();
   const updateGuidanceMutation = useUpdateRegularizeGuidanceMutation();
   const addGuidanceActivityMutation = useAddRegularizeGuidanceActivityMutation();
   const removeGuidanceActivityMutation = useRemoveRegularizeGuidanceActivityMutation();
+  const updateGuidanceActivityMutation = useUpdateRegularizeGuidanceActivityMutation();
   const addGuidancePartnerMutation = useAddRegularizeGuidancePartnerMutation();
   const removeGuidancePartnerMutation = useRemoveRegularizeGuidancePartnerMutation();
+  const updateGuidancePartnerMutation = useUpdateRegularizeGuidancePartnerMutation();
   const createLicenseMutation = useCreateRegularizeLicenseMutation();
   const updateLicenseMutation = useUpdateRegularizeLicenseMutation();
+  const uploadLicenseProtocolMutation = useUploadRegularizeLicenseProtocolMutation();
+  const licenseProtocolAccessMutation = useRegularizeLicenseProtocolAccessMutation();
 
   const visiblePfRows = isPfSearchPending ? [] : pfPageQuery.data?.data ?? [];
   const pfNameById = new Map(
@@ -1055,7 +1293,7 @@ export function RegularizePage() {
   );
   const guidanceQuery = useRegularizeGuidance(
     currentProcessId ? { process_id: currentProcessId } : undefined,
-    { enabled: queryPolicy.guidance },
+    { enabled: queryPolicy.guidance && Boolean(currentProcessId) },
   );
   const clientPfDetailQuery = useRegularizeClientPfDetail(currentClientPfId, {
     enabled: activeTab === "pf",
@@ -1192,6 +1430,14 @@ export function RegularizePage() {
     activeForm?.type === "guidance-activity" || activeForm?.type === "guidance-partner"
       ? activeForm
       : null;
+  const activeGuidanceActivity =
+    activeGuidanceAction?.type === "guidance-activity" && activeGuidanceAction.mode === "edit"
+      ? activeGuidanceAction.activity
+      : null;
+  const activeGuidancePartner =
+    activeGuidanceAction?.type === "guidance-partner" && activeGuidanceAction.mode === "edit"
+      ? activeGuidanceAction.partner
+      : null;
   const activeLicenseForForm =
     activeForm?.type === "license" && activeForm.mode === "edit"
       ? licenseDetailQuery.data ?? null
@@ -1247,7 +1493,8 @@ export function RegularizePage() {
     if (activeTab === "licenses") refreshes.push(licensePageQuery.refetch());
     if (queryPolicy.partners) refreshes.push(partnerQuery.refetch());
     if (queryPolicy.passwords) refreshes.push(credentialQuery.refetch());
-    if (queryPolicy.guidance) refreshes.push(guidanceQuery.refetch());
+    if (queryPolicy.guidance && Boolean(currentProcessId))
+      refreshes.push(guidanceQuery.refetch());
 
     void Promise.all(refreshes);
   }
@@ -1391,9 +1638,38 @@ export function RegularizePage() {
     }
   }
 
+  async function handleSendProcessToFiscal(payload: RegularizeProcessActionPayload) {
+    try {
+      await sendProcessToFiscalMutation.mutateAsync(payload);
+      toast.success("Envio ao Fiscal registrado com sucesso.");
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível registrar o envio ao Fiscal.",
+      );
+      toast.error(message);
+    }
+  }
+
+  async function handleReturnProcessFromFiscal(payload: RegularizeProcessActionPayload) {
+    try {
+      await returnProcessFromFiscalMutation.mutateAsync(payload);
+      toast.success("Retorno do Fiscal registrado com sucesso.");
+    } catch (error) {
+      const message = getRegularizeMutationErrorMessage(
+        error,
+        "Não foi possível registrar o retorno do Fiscal.",
+      );
+      toast.error(message);
+    }
+  }
+
   async function handleSubmitGuidance(
     payload: CreateRegularizeGuidancePayload | UpdateRegularizeGuidancePayload,
   ) {
+    if (!canManageRegularizeCore) {
+      throw new Error("Você tem acesso somente leitura às orientações.");
+    }
     try {
       if ("id" in payload) {
         await updateGuidanceMutation.mutateAsync(payload);
@@ -1414,15 +1690,24 @@ export function RegularizePage() {
     }
   }
 
-  async function handleSubmitGuidanceActivity(payload: AddRegularizeGuidanceActivityPayload) {
+  async function handleSubmitGuidanceActivity(
+    payload: AddRegularizeGuidanceActivityPayload | UpdateRegularizeGuidanceActivityPayload,
+  ) {
     try {
-      await addGuidanceActivityMutation.mutateAsync(payload);
-      toast.success("Atividade adicionada com sucesso.");
+      if (payload.activity.id) {
+        await updateGuidanceActivityMutation.mutateAsync(
+          payload as UpdateRegularizeGuidanceActivityPayload,
+        );
+        toast.success("Atividade atualizada com sucesso.");
+      } else {
+        await addGuidanceActivityMutation.mutateAsync(payload);
+        toast.success("Atividade adicionada com sucesso.");
+      }
       closeCoreForm();
     } catch (error) {
       const message = getRegularizeMutationErrorMessage(
         error,
-        "Não foi possível adicionar a atividade.",
+        "Não foi possível salvar a atividade.",
       );
       toast.error(message);
       throw new Error(message);
@@ -1453,15 +1738,24 @@ export function RegularizePage() {
     }
   }
 
-  async function handleSubmitGuidancePartner(payload: AddRegularizeGuidancePartnerPayload) {
+  async function handleSubmitGuidancePartner(
+    payload: AddRegularizeGuidancePartnerPayload | UpdateRegularizeGuidancePartnerPayload,
+  ) {
     try {
-      await addGuidancePartnerMutation.mutateAsync(payload);
-      toast.success("Sócio adicionado com sucesso.");
+      if (payload.partner.id) {
+        await updateGuidancePartnerMutation.mutateAsync(
+          payload as UpdateRegularizeGuidancePartnerPayload,
+        );
+        toast.success("Sócio atualizado com sucesso.");
+      } else {
+        await addGuidancePartnerMutation.mutateAsync(payload);
+        toast.success("Sócio adicionado com sucesso.");
+      }
       closeCoreForm();
     } catch (error) {
       const message = getRegularizeMutationErrorMessage(
         error,
-        "Não foi possível adicionar o sócio.",
+        "Não foi possível salvar o sócio.",
       );
       toast.error(message);
       throw new Error(message);
@@ -1492,24 +1786,70 @@ export function RegularizePage() {
 
   async function handleSubmitLicense(
     payload: CreateRegularizeLicensePayload | UpdateRegularizeLicensePayload,
+    protocolFile?: File,
   ) {
+    const isCreateSubmission = !("id" in payload);
+    let savedLicenseId: RegularizeId | undefined;
     try {
-      if ("id" in payload) {
-        await updateLicenseMutation.mutateAsync(payload);
-        toast.success("Licença atualizada com sucesso.");
-      } else {
-        await createLicenseMutation.mutateAsync(payload);
-        toast.success("Licença criada com sucesso.");
+      await submitRegularizeLicense(payload, protocolFile, {
+        createLicense: createLicenseMutation.mutateAsync,
+        updateLicense: updateLicenseMutation.mutateAsync,
+        uploadProtocol: uploadLicenseProtocolMutation.mutateAsync,
+        onLicenseSaved: ({ id, operation }) => {
+          savedLicenseId = id;
+          toast.success(
+            operation === "create"
+              ? "Licença criada com sucesso."
+              : "Licença atualizada com sucesso.",
+          );
+        },
+      });
+
+      if (protocolFile) {
+        toast.success("Protocolo armazenado com segurança.");
       }
 
       closeCoreForm();
     } catch (error) {
+      const persistedLicenseId = savedLicenseId;
+      if (isCreateSubmission && persistedLicenseId) {
+        setActiveForm((currentForm) =>
+          currentForm?.type === "license" && currentForm.mode === "create"
+            ? { type: "license", mode: "edit", id: persistedLicenseId }
+            : currentForm,
+        );
+      }
       const message = getRegularizeMutationErrorMessage(
         error,
-        "Não foi possível salvar a licença.",
+        savedLicenseId
+          ? "A licença foi salva, mas não foi possível armazenar o protocolo."
+          : "Não foi possível salvar a licença.",
       );
       toast.error(message);
       throw new Error(message);
+    }
+  }
+
+  async function handleOpenLicenseProtocol() {
+    if (!activeLicenseId) {
+      return;
+    }
+
+    const protocolWindow = window.open("about:blank", "_blank");
+    if (!protocolWindow) {
+      toast.error("Permita pop-ups para abrir o protocolo.");
+      return;
+    }
+    protocolWindow.opener = null;
+
+    try {
+      const access = await licenseProtocolAccessMutation.mutateAsync(activeLicenseId);
+      protocolWindow.location.replace(access.url);
+    } catch (error) {
+      protocolWindow.close();
+      toast.error(
+        getRegularizeMutationErrorMessage(error, "Não foi possível abrir o protocolo."),
+      );
     }
   }
 
@@ -1519,6 +1859,16 @@ export function RegularizePage() {
       return;
     }
 
+    if (form.type === "license") {
+      openLicenseForm(form);
+      return;
+    }
+
+    setActiveForm(form);
+  }
+
+  function openLicenseForm(form: Extract<RegularizeFormState, { type: "license" }>) {
+    setLicenseFormSessionKey((currentKey) => currentKey + 1);
     setActiveForm(form);
   }
 
@@ -1757,7 +2107,7 @@ export function RegularizePage() {
                   setProcessPage(1);
                 }}
               >
-                {["Todos", "Aberto", "Em andamento", "Pendente", "Concluído", "Cancelado"].map(
+                {regularizeProcessStatusFilterOptions.map(
                   (status) => (
                     <option key={status} value={status}>
                       {status}
@@ -1776,7 +2126,9 @@ export function RegularizePage() {
             >
               {(processRows) => (
                 <div>
-                  <DataTable headers={["Processo", "Cliente", "Documento", "Status", ""]}>
+                  <DataTable
+                    headers={["Processo", "Cliente", "Documento", "Status", "Financeiro", ""]}
+                  >
                     {processRows.map((item) => (
                     <tr
                       key={item.id}
@@ -1792,6 +2144,7 @@ export function RegularizePage() {
                       <td className="px-4 py-3">
                         <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
                       </td>
+                      <td className="px-4 py-3 text-sm">{formatText(item.financial_status)}</td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <TableActionButton
@@ -1842,6 +2195,8 @@ export function RegularizePage() {
                   guidanceQuery={guidanceQuery}
                   onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
                   onRemoveGuidancePartner={handleRemoveGuidancePartner}
+                  onReturnProcessFromFiscal={handleReturnProcessFromFiscal}
+                  onSendProcessToFiscal={handleSendProcessToFiscal}
                   onSetActiveForm={setActiveForm}
                   processDetailQuery={processDetailQuery}
                   processSelectionOrigin={processSelectionOrigin}
@@ -1849,6 +2204,13 @@ export function RegularizePage() {
               </DetailPanel>
             ) : null}
           </div>
+
+          {regularizeAccess.canView ? (
+            <IndependentGuidanceSection
+              canManageRegularizeCore={canManageRegularizeCore}
+              onSetActiveForm={setActiveForm}
+            />
+          ) : null}
 
           <Dialog
             open={isProcessDetailDialogOpen}
@@ -1863,6 +2225,8 @@ export function RegularizePage() {
                 guidanceQuery={guidanceQuery}
                 onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
                 onRemoveGuidancePartner={handleRemoveGuidancePartner}
+                onReturnProcessFromFiscal={handleReturnProcessFromFiscal}
+                onSendProcessToFiscal={handleSendProcessToFiscal}
                 onSetActiveForm={setActiveForm}
                 processDetailQuery={processDetailQuery}
                 processSelectionOrigin={processSelectionOrigin}
@@ -1889,7 +2253,37 @@ export function RegularizePage() {
             }
           />
 
-          <QueryStatePanel query={licenseTableQuery} emptyTitle="Nenhuma licença encontrada.">
+          <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_220px] dark:border-gray-700 dark:bg-gray-900">
+            <div className="text-sm text-gray-600 dark:text-slate-300">
+              Os estados de vencimento são calculados pela data de vencimento e não alteram o
+              status cadastrado.
+            </div>
+            <label className="space-y-1.5">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Status</span>
+              <RegularizeNativeSelect
+                value={licenseStatus}
+                onChange={(event) => {
+                  setLicenseStatus(event.target.value);
+                  setLicensePage(1);
+                }}
+              >
+                {regularizeLicenseStatusFilterOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
+            </label>
+          </div>
+
+          <QueryStatePanel
+            query={licenseTableQuery}
+            emptyTitle={
+              licenseStatus === "Todos"
+                ? "Nenhuma licença encontrada."
+                : "Nenhuma licença corresponde ao filtro."
+            }
+          >
             {(licenseRows) => (
               <div>
                 <DataTable headers={["Licença", "Protocolo", "Contato", "Status", "Vencimento", ""]}>
@@ -1899,7 +2293,12 @@ export function RegularizePage() {
                       <td className="px-4 py-3">{formatText(item.protocol)}</td>
                       <td className="px-4 py-3">{formatText(item.contact)}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
+                        <StatusBadge
+                          config={getStatusBadgeConfig(
+                            getRegularizeLicenseDisplayStatus(item.status, item.due_date),
+                          )}
+                          size="sm"
+                        />
                       </td>
                       <td className="px-4 py-3">{formatDate(item.due_date)}</td>
                       <td className="px-4 py-3">
@@ -1909,7 +2308,7 @@ export function RegularizePage() {
                               icon={Pencil}
                               title="Editar licença"
                               onClick={() =>
-                                setActiveForm({ type: "license", mode: "edit", id: item.id })
+                                openLicenseForm({ type: "license", mode: "edit", id: item.id })
                               }
                             />
                           ) : null}
@@ -2641,6 +3040,16 @@ export function RegularizePage() {
             : currentProcessId ?? ""
         }
         processOptions={processOptions}
+        processOptionsLoading={processQuery.isLoading}
+        processOptionsError={
+          processQuery.error
+            ? getRegularizeErrorMessage(
+                processQuery.error,
+                "Não foi possível carregar processos. Atualize a página para tentar novamente.",
+              )
+            : null
+        }
+        readOnly={!canManageRegularizeCore}
         isSubmitting={createGuidanceMutation.isPending || updateGuidanceMutation.isPending}
         onClose={closeCoreForm}
         onSubmit={handleSubmitGuidance}
@@ -2648,23 +3057,30 @@ export function RegularizePage() {
 
       <RegularizeGuidanceActivityForm
         open={activeForm?.type === "guidance-activity"}
+        mode={activeGuidanceAction?.type === "guidance-activity" ? activeGuidanceAction.mode : "create"}
+        activity={activeGuidanceActivity}
         guidanceId={activeGuidanceAction?.guidanceId}
         processId={activeGuidanceAction?.processId}
-        isSubmitting={addGuidanceActivityMutation.isPending}
+        isSubmitting={
+          addGuidanceActivityMutation.isPending || updateGuidanceActivityMutation.isPending
+        }
         onClose={closeCoreForm}
         onSubmit={handleSubmitGuidanceActivity}
       />
 
       <RegularizeGuidancePartnerForm
         open={activeForm?.type === "guidance-partner"}
+        mode={activeGuidanceAction?.type === "guidance-partner" ? activeGuidanceAction.mode : "create"}
+        partner={activeGuidancePartner}
         guidanceId={activeGuidanceAction?.guidanceId}
         processId={activeGuidanceAction?.processId}
-        isSubmitting={addGuidancePartnerMutation.isPending}
+        isSubmitting={addGuidancePartnerMutation.isPending || updateGuidancePartnerMutation.isPending}
         onClose={closeCoreForm}
         onSubmit={handleSubmitGuidancePartner}
       />
 
       <RegularizeLicenseForm
+        key={licenseFormSessionKey}
         open={activeForm?.type === "license"}
         mode={activeForm?.type === "license" ? activeForm.mode : "create"}
         license={activeLicenseForForm}
@@ -2674,8 +3090,14 @@ export function RegularizePage() {
           activeForm.mode === "edit" &&
           licenseDetailQuery.isLoading
         }
-        isSubmitting={createLicenseMutation.isPending || updateLicenseMutation.isPending}
+        isSubmitting={
+          createLicenseMutation.isPending ||
+          updateLicenseMutation.isPending ||
+          uploadLicenseProtocolMutation.isPending
+        }
+        isOpeningProtocol={licenseProtocolAccessMutation.isPending}
         onClose={closeCoreForm}
+        onOpenProtocol={handleOpenLicenseProtocol}
         onSubmit={handleSubmitLicense}
       />
     </div>

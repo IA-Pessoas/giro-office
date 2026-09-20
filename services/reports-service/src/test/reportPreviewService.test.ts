@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import type { ReportSourceAdapter } from "../catalog/types.js";
@@ -39,6 +39,20 @@ const scope = {
 };
 
 describe("ReportPreviewService", () => {
+  beforeEach(() => vi.clearAllMocks());
+  it("apresenta as colunas dos resumos com os aliases executados", async () => {
+    const catalog = new SourceCatalogService([adapter]);
+    const service = new ReportPreviewService(catalog, new ReportDefinitionService(catalog), 2);
+    vi.mocked(adapter.preview).mockResolvedValue([{ total: 150 }]);
+    const summary = reportDefinitionSchema.parse({
+      ...definition,
+      aggregations: [
+        { source: "finance.ledger", field: "balance", function: "sum", alias: "total" },
+      ],
+    });
+    const result = await service.preview(summary, scope);
+    expect(result.presentation.columns).toEqual([{ key: "total", label: "total" }]);
+  });
   it("não extrai quando a definição não está autorizada", async () => {
     const catalog = new SourceCatalogService([adapter]);
     const service = new ReportPreviewService(catalog, new ReportDefinitionService(catalog), 2);

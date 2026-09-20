@@ -29,14 +29,33 @@ interface TaskRouteMocks {
     list: Mock;
   };
   taskLifecycleServiceMock: {
+    requestTaskCompletion: Mock;
     concludeTask: Mock;
     approveTaskCompletion: Mock;
-  };
-  taskComercialServiceMock: {
-    updateChargeComercial: Mock;
+    cancelTaskCompletion: Mock;
+    listTaskCompletionRequests: Mock;
+    reopenTask: Mock;
   };
   taskFinanceiroServiceMock: {
-    updateChargeFinanceiro: Mock;
+    listCollectors: Mock;
+    listQueue: Mock;
+    setCollectors: Mock;
+    settle: Mock;
+    settleExpress: Mock;
+  };
+  taskAttachmentServiceMock: {
+    upload: Mock;
+    list: Mock;
+    createAccessUrl: Mock;
+    remove: Mock;
+  };
+  taskPostponementServiceMock: {
+    create: Mock;
+    list: Mock;
+  };
+  taskOperationalNotificationServiceMock: {
+    list: Mock;
+    markRead: Mock;
   };
 }
 
@@ -67,14 +86,33 @@ const taskRouteMocks: TaskRouteMocks = vi.hoisted(
       list: vi.fn(),
     },
     taskLifecycleServiceMock: {
+      requestTaskCompletion: vi.fn(),
       concludeTask: vi.fn(),
       approveTaskCompletion: vi.fn(),
-    },
-    taskComercialServiceMock: {
-      updateChargeComercial: vi.fn(),
+      cancelTaskCompletion: vi.fn(),
+      listTaskCompletionRequests: vi.fn(),
+      reopenTask: vi.fn(),
     },
     taskFinanceiroServiceMock: {
-      updateChargeFinanceiro: vi.fn(),
+      listCollectors: vi.fn(),
+      listQueue: vi.fn(),
+      setCollectors: vi.fn(),
+      settle: vi.fn(),
+      settleExpress: vi.fn(),
+    },
+    taskAttachmentServiceMock: {
+      upload: vi.fn(),
+      list: vi.fn(),
+      createAccessUrl: vi.fn(),
+      remove: vi.fn(),
+    },
+    taskPostponementServiceMock: {
+      create: vi.fn(),
+      list: vi.fn(),
+    },
+    taskOperationalNotificationServiceMock: {
+      list: vi.fn(),
+      markRead: vi.fn(),
     },
   }),
 );
@@ -109,15 +147,27 @@ vi.mock("../services/taskLifecycleService.js", () => ({
   }),
 }));
 
-vi.mock("../services/taskComercialService.js", () => ({
-  TaskComercialService: vi.fn(function TaskComercialService() {
-    return taskRouteMocks.taskComercialServiceMock;
-  }),
-}));
-
 vi.mock("../services/taskFinanceiroService.js", () => ({
   TaskFinanceiroService: vi.fn(function TaskFinanceiroService() {
     return taskRouteMocks.taskFinanceiroServiceMock;
+  }),
+}));
+
+vi.mock("../services/taskAttachmentService.js", () => ({
+  TaskAttachmentService: vi.fn(function TaskAttachmentService() {
+    return taskRouteMocks.taskAttachmentServiceMock;
+  }),
+}));
+
+vi.mock("../services/taskPostponementService.js", () => ({
+  TaskPostponementService: vi.fn(function TaskPostponementService() {
+    return taskRouteMocks.taskPostponementServiceMock;
+  }),
+}));
+
+vi.mock("../services/taskOperationalNotificationService.js", () => ({
+  TaskOperationalNotificationService: vi.fn(function TaskOperationalNotificationService() {
+    return taskRouteMocks.taskOperationalNotificationServiceMock;
   }),
 }));
 
@@ -143,7 +193,15 @@ export function createTestApp() {
     auditEnabled: false,
     auditServiceUrl: "http://localhost:3020",
     auditServiceToken: "audit-service-token",
+    commercialServiceToken: "audit-service-token",
     projectServiceUrl: "http://localhost:3033",
+    supabaseUrl: "http://localhost:54321",
+    supabaseServiceRoleKey: "task-attachment-storage-test-key",
+    taskAttachmentStorageBucket: "TaskAttachmentsPrivate",
+    aiExtractionMode: "fake" as const,
+    aiExtractionTimeoutMs: 30_000,
+    aiExtractionRateLimitMax: 10,
+    aiExtractionRateLimitWindowMs: 60_000,
     enableApiDocs: false,
   } satisfies TaskServiceEnv;
   const logger = createLogger({
@@ -164,8 +222,11 @@ export function resetTaskRouteMocks() {
   const taskDependentServiceMock = taskRouteMocks.taskDependentServiceMock;
   const taskIntegrationRegularizeServiceMock = taskRouteMocks.taskIntegrationRegularizeServiceMock;
   const taskLifecycleServiceMock = taskRouteMocks.taskLifecycleServiceMock;
-  const taskComercialServiceMock = taskRouteMocks.taskComercialServiceMock;
   const taskFinanceiroServiceMock = taskRouteMocks.taskFinanceiroServiceMock;
+  const taskAttachmentServiceMock = taskRouteMocks.taskAttachmentServiceMock;
+  const taskPostponementServiceMock = taskRouteMocks.taskPostponementServiceMock;
+  const taskOperationalNotificationServiceMock =
+    taskRouteMocks.taskOperationalNotificationServiceMock;
 
   taskCrudServiceMock.createTask.mockResolvedValue({ id: "task-1" });
   taskCrudServiceMock.listTasks.mockResolvedValue([{ id: "task-1" }]);
@@ -188,9 +249,38 @@ export function resetTaskRouteMocks() {
   taskIntegrationRegularizeServiceMock.list.mockResolvedValue([{ id: "integration-1" }]);
 
   taskLifecycleServiceMock.concludeTask.mockResolvedValue({ id: "task-1" });
+  taskLifecycleServiceMock.requestTaskCompletion.mockResolvedValue({
+    id: "request-1",
+    status: "pending",
+  });
   taskLifecycleServiceMock.approveTaskCompletion.mockResolvedValue({ id: "task-1" });
-  taskComercialServiceMock.updateChargeComercial.mockResolvedValue({ id: "task-1" });
-  taskFinanceiroServiceMock.updateChargeFinanceiro.mockResolvedValue({ id: "task-1" });
+  taskLifecycleServiceMock.cancelTaskCompletion.mockResolvedValue({
+    id: "request-1",
+    status: "canceled",
+  });
+  taskLifecycleServiceMock.listTaskCompletionRequests.mockResolvedValue([]);
+  taskLifecycleServiceMock.reopenTask.mockResolvedValue({ id: "task-1", status: "Em Andamento" });
+  taskFinanceiroServiceMock.listQueue.mockResolvedValue([]);
+  taskFinanceiroServiceMock.listCollectors.mockResolvedValue([]);
+  taskFinanceiroServiceMock.setCollectors.mockResolvedValue({
+    department_id: "department-1",
+    collector_ids: [],
+  });
+  taskFinanceiroServiceMock.settle.mockResolvedValue({ task_ids: ["task-1"], settled: 1 });
+  taskFinanceiroServiceMock.settleExpress.mockResolvedValue({ task_ids: ["task-1"], settled: 1 });
+  taskAttachmentServiceMock.upload.mockResolvedValue({ id: "attachment-1" });
+  taskAttachmentServiceMock.list.mockResolvedValue([]);
+  taskAttachmentServiceMock.createAccessUrl.mockResolvedValue({
+    url: "https://signed.example/file",
+  });
+  taskAttachmentServiceMock.remove.mockResolvedValue({ id: "attachment-1" });
+  taskPostponementServiceMock.create.mockResolvedValue({ id: "postponement-1" });
+  taskPostponementServiceMock.list.mockResolvedValue([]);
+  taskOperationalNotificationServiceMock.list.mockResolvedValue({ items: [], unread_count: 0 });
+  taskOperationalNotificationServiceMock.markRead.mockResolvedValue({
+    id: "notification-1",
+    read_at: new Date("2026-09-17T00:00:00.000Z"),
+  });
 }
 
 const taskCrudServiceMock: TaskRouteMocks["taskCrudServiceMock"] =
@@ -203,16 +293,22 @@ const taskIntegrationRegularizeServiceMock: TaskRouteMocks["taskIntegrationRegul
   taskRouteMocks.taskIntegrationRegularizeServiceMock;
 const taskLifecycleServiceMock: TaskRouteMocks["taskLifecycleServiceMock"] =
   taskRouteMocks.taskLifecycleServiceMock;
-const taskComercialServiceMock: TaskRouteMocks["taskComercialServiceMock"] =
-  taskRouteMocks.taskComercialServiceMock;
 const taskFinanceiroServiceMock: TaskRouteMocks["taskFinanceiroServiceMock"] =
   taskRouteMocks.taskFinanceiroServiceMock;
+const taskAttachmentServiceMock: TaskRouteMocks["taskAttachmentServiceMock"] =
+  taskRouteMocks.taskAttachmentServiceMock;
+const taskPostponementServiceMock: TaskRouteMocks["taskPostponementServiceMock"] =
+  taskRouteMocks.taskPostponementServiceMock;
+const taskOperationalNotificationServiceMock: TaskRouteMocks["taskOperationalNotificationServiceMock"] =
+  taskRouteMocks.taskOperationalNotificationServiceMock;
 
 export {
-  taskComercialServiceMock,
   taskCrudServiceMock,
   taskDependentServiceMock,
   taskFinanceiroServiceMock,
+  taskAttachmentServiceMock,
+  taskPostponementServiceMock,
+  taskOperationalNotificationServiceMock,
   taskIntegrationRegularizeServiceMock,
   taskLifecycleServiceMock,
   taskModelServiceMock,

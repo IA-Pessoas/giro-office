@@ -149,9 +149,8 @@ function finding(relativePath, ruleId, blobSha, line) {
   };
 }
 
-async function collectFiles(root, directory = root) {
+async function collectFiles(root, directory = root, files = []) {
   const entries = await readdir(directory, { withFileTypes: true });
-  const files = [];
 
   for (const entry of entries) {
     if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) {
@@ -167,7 +166,7 @@ async function collectFiles(root, directory = root) {
       continue;
     }
     if (stats.isDirectory()) {
-      files.push(...(await collectFiles(root, filePath)));
+      await collectFiles(root, filePath, files);
     } else if (stats.isFile()) {
       files.push(filePath);
     }

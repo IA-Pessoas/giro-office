@@ -1,3 +1,5 @@
+import { reportingAggregations } from "./reportingCapabilities.js";
+
 const stringOperators = ["eq", "neq", "contains", "in"] as const;
 const booleanOperators = ["eq", "neq"] as const;
 
@@ -7,7 +9,15 @@ function field(
   value_type: "string" | "boolean" | "date",
   filter_operators: readonly string[],
 ) {
-  return { key, label, value_type, filter_operators, aggregations: [] };
+  return {
+    groupable: true,
+    sortable: true,
+    key,
+    label,
+    value_type,
+    filter_operators,
+    aggregations: reportingAggregations(value_type),
+  };
 }
 
 export const CLIENT_INTEGRATION_REPORTING_SOURCES = ["integracao.clients"] as const;

@@ -8,6 +8,7 @@ import { useReportSnapshot } from "../hooks/useReports";
 import type { ReportHistoryItem, ReportHistoryScope } from "../types/report.types";
 import { formatReportDate, getReportStatusConfig, panelClassName } from "./reportUi";
 import { ReportDownloadActions } from "./ReportDownloadActions";
+import { ReportResultBlocks } from "./ReportResultBlocks";
 
 export function ReportSnapshotTable({
   job,
@@ -24,6 +25,9 @@ export function ReportSnapshotTable({
   const snapshotQuery = useReportSnapshot(job.id, scope, cursor);
   const snapshotId = snapshotQuery.data?.snapshot.id;
   const rows = snapshotQuery.data?.rows ?? [];
+  const blocks = snapshotQuery.data?.blocks;
+  const visibleBlockRows = blocks?.reduce((total, block) => total + block.rows.length, 0) ?? 0;
+  const totalBlockRows = blocks?.reduce((total, block) => total + block.rowCount, 0) ?? 0;
   const headers = rows.length > 0 ? Object.keys(rows[0]?.values ?? {}) : [];
 
   return (
@@ -38,7 +42,7 @@ export function ReportSnapshotTable({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ReportDownloadActions id={snapshotId ?? ""} disabled={!snapshotId} />
+          {snapshotId ? <ReportDownloadActions id={snapshotId} /> : null}
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">
             Fechar
           </button>
@@ -50,6 +54,31 @@ export function ReportSnapshotTable({
         </div>
       ) : snapshotQuery.isError ? (
         <p role="alert" className="py-5 text-sm text-red-600 dark:text-red-400">Não foi possível carregar o snapshot.</p>
+      ) : blocks ? (
+        <>
+          <ReportResultBlocks blocks={blocks} snapshot />
+          <PaginationControls
+            page={page}
+            limit={100}
+            total={totalBlockRows}
+            count={visibleBlockRows}
+            hasMore={Boolean(snapshotQuery.data?.nextCursor)}
+            isFetching={snapshotQuery.isFetching}
+            onPrevious={() => {
+              const nextStack = [...cursorStack];
+              const previousCursor = nextStack.pop();
+              setCursorStack(nextStack);
+              setCursor(previousCursor);
+              setPage((current) => Math.max(1, current - 1));
+            }}
+            onNext={() => {
+              if (snapshotQuery.data?.nextCursor === null || snapshotQuery.data?.nextCursor === undefined) return;
+              setCursorStack((current) => [...current, cursor]);
+              setCursor(snapshotQuery.data.nextCursor);
+              setPage((current) => current + 1);
+            }}
+          />
+        </>
       ) : rows.length === 0 ? (
         <p className="py-5 text-sm text-gray-600 dark:text-slate-400" role="status">O snapshot não possui linhas.</p>
       ) : (

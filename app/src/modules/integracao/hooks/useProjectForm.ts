@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
   CreateProjectData,
@@ -30,45 +30,53 @@ export function useProjectForm(project?: ProjectDetail | null) {
     }));
   }, []);
 
-  const reset = useCallback((nextProject?: ProjectDetail | null) => {
-    setValues(createInitialValues(nextProject ?? project));
-  }, [project]);
+  const reset = useCallback(
+    (nextProject?: ProjectDetail | null) => {
+      setValues(createInitialValues(nextProject ?? project));
+    },
+    [project],
+  );
 
-  const validate = useCallback((): string | null => {
-    if (!values.name.trim()) {
-      return "Preencha o nome do projeto.";
-    }
+  const validationErrors = useMemo(
+    () => ({
+      name: values.name.trim() ? null : "Preencha o nome do projeto.",
+      start_date: values.start_date ? null : "Preencha a data de início.",
+      objective: values.objective.trim() ? null : "Preencha o objetivo do projeto.",
+    }),
+    [values.name, values.objective, values.start_date],
+  );
 
-    if (!values.start_date) {
-      return "Preencha a data de início.";
-    }
+  const validate = useCallback(
+    (): string | null =>
+      validationErrors.name ?? validationErrors.start_date ?? validationErrors.objective,
+    [validationErrors],
+  );
 
-    if (!values.objective.trim()) {
-      return "Preencha o objetivo do projeto.";
-    }
+  const buildCreatePayload = useCallback(
+    (clientId: string): CreateProjectData => {
+      return {
+        client_id: clientId,
+        name: values.name.trim(),
+        start_date: values.start_date,
+        objective: values.objective.trim(),
+        ...(values.end_date ? { end_date: values.end_date } : {}),
+      };
+    },
+    [values.end_date, values.name, values.objective, values.start_date],
+  );
 
-    return null;
-  }, [values.end_date, values.name, values.objective, values.start_date]);
-
-  const buildCreatePayload = useCallback((clientId: string): CreateProjectData => {
-    return {
-      client_id: clientId,
-      name: values.name.trim(),
-      start_date: values.start_date,
-      objective: values.objective.trim(),
-      ...(values.end_date ? { end_date: values.end_date } : {}),
-    };
-  }, [values.end_date, values.name, values.objective, values.start_date]);
-
-  const buildUpdatePayload = useCallback((projectId: string): UpdateProjectData => {
-    return {
-      project_id: projectId,
-      name: values.name.trim(),
-      start_date: values.start_date,
-      end_date: values.end_date || values.start_date,
-      objective: values.objective.trim(),
-    };
-  }, [values.end_date, values.name, values.objective, values.start_date]);
+  const buildUpdatePayload = useCallback(
+    (projectId: string): UpdateProjectData => {
+      return {
+        project_id: projectId,
+        name: values.name.trim(),
+        start_date: values.start_date,
+        end_date: values.end_date || values.start_date,
+        objective: values.objective.trim(),
+      };
+    },
+    [values.end_date, values.name, values.objective, values.start_date],
+  );
 
   return {
     values,
@@ -76,6 +84,7 @@ export function useProjectForm(project?: ProjectDetail | null) {
     updateValue,
     reset,
     validate,
+    validationErrors,
     buildCreatePayload,
     buildUpdatePayload,
   };

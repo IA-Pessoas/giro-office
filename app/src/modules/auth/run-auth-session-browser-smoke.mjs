@@ -1,19 +1,27 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
+
+import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
 const PORT = process.env.AUTH_SESSION_SMOKE_PORT || "3116";
 const configuredBaseUrl = process.env.AUTH_SESSION_SMOKE_BASE_URL?.replace(/\/$/, "");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const smokeEnv = browserSmokeEnv();
 const evidenceDir = fileURLToPath(
   new URL("../../../../docs/superpowers/evidence/", import.meta.url),
 );
 const loginEvidencePath = `${evidenceDir}2026-08-20-issue-772-login.png`;
 const authenticatedEvidencePath = `${evidenceDir}2026-08-20-issue-772-authenticated-session.png`;
+const dashboardEvidencePath = process.env.DASHBOARD_SCREENSHOT_PATH;
+const browserViewport = process.env.DASHBOARD_SMOKE_MOBILE === "1"
+  ? { height: 844, width: 390 }
+  : { height: 900, width: 1440 };
 
 const smokeUser = {
   department_id: "department-auth-session-smoke",
@@ -26,12 +34,56 @@ const smokeUser = {
   type: "user",
 };
 
+const dashboardStatsFixture = {
+  updatedAt: "2026-09-18T15:30:00.000Z",
+  totalClients: 42,
+  clientsByService: {
+    contabil: 18,
+    fiscal: 23,
+    pessoal: 16,
+    infoproduto: 2,
+    consultoria: 3,
+    castelo_med: 1,
+  },
+  monthlyTrends: [{ month: "Set", newClients: 4 }],
+  financial: {
+    paidCertificateReceipts: 1250,
+    unpaidCertificates: 2,
+    monthlyPaidCertificateReceipts: [
+      { month: "Jul", amount: 800 },
+      { month: "Ago", amount: 1100 },
+      { month: "Set", amount: 1250 },
+    ],
+  },
+  commercial: {
+    activeProspects: 7,
+    closedThisMonth: 2,
+    byStatus: [
+      { status: "Análise Financeira", count: 3 },
+      { status: "Envio de Proposta", count: 4 },
+    ],
+    billing: { pending: 5, contracted: 3, notContracted: 1 },
+  },
+  departments: [
+    { id: "department-auth-session-smoke", name: "Integração", openTasks: 8, completedTasks: 14, urgentTasks: 2 },
+    { id: "department-finance-smoke", name: "Financeiro", openTasks: 3, completedTasks: 9, urgentTasks: 1 },
+  ],
+  recentClients: [],
+  insights: [],
+  tasks: { today: 6, completedToday: 4, pending: 12, urgent: 2 },
+  notifications: { total: 3, urgent: 1, pending: 2 },
+  projects: { active: 5, completed: 9, inProgress: 3, delayed: 1, waiting: 1 },
+  performance: [{ week: "Sem 1", tasks: 10, completed: 7 }],
+  pendingTasks: [],
+  activities: [],
+};
+
 async function installApiMocks(page, context) {
   let authenticated = false;
 
   await page.route("**/dashboard/stats*", async (route) => {
     await route.fulfill({
-      body: JSON.stringify({ success: true, data: {} }),
+      body: JSON.stringify({ success: true, data: dashboardStatsFixture }),
       contentType: "application/json",
       status: 200,
     });
@@ -106,7 +158,7 @@ async function runBrowserProof() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     baseURL: baseUrl,
-    viewport: { height: 900, width: 1440 },
+    viewport: browserViewport,
   });
   const page = await context.newPage();
   const pageErrors = [];
@@ -148,6 +200,11 @@ async function runBrowserProof() {
     const sessionCookie = (await context.cookies()).find((cookie) => cookie.name === "cw.session");
     assert.equal(sessionCookie?.httpOnly, true);
     await page.screenshot({ path: authenticatedEvidencePath, fullPage: true });
+    if (dashboardEvidencePath) {
+      await page.locator(".Toastify__toast-close-button").first().click().catch(() => {});
+      await mkdir(dirname(dashboardEvidencePath), { recursive: true });
+      await page.screenshot({ path: dashboardEvidencePath, fullPage: true });
+    }
     assert.deepEqual(pageErrors, []);
   } finally {
     await browser.close();
@@ -163,6 +220,8 @@ async function withNextServer(test) {
     return;
   }
 
+  buildApp();
+
   const command = process.platform === "win32" ? "cmd" : "corepack";
   const args =
     process.platform === "win32"
@@ -170,7 +229,7 @@ async function withNextServer(test) {
       : ["pnpm", "exec", "next", "start", "--port", PORT];
   const serverProcess = spawn(command, args, {
     cwd: appRoot,
-    env: process.env,
+    env: smokeEnv,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -189,6 +248,21 @@ async function withNextServer(test) {
   } finally {
     stopServer(serverProcess);
   }
+}
+
+function buildApp() {
+  const command = process.platform === "win32" ? "cmd" : "corepack";
+  const args =
+    process.platform === "win32"
+      ? ["/c", "corepack", "pnpm", "run", "build"]
+      : ["pnpm", "run", "build"];
+
+  execFileSync(command, args, {
+    cwd: appRoot,
+    env: smokeEnv,
+    stdio: "inherit",
+    windowsHide: true,
+  });
 }
 
 async function waitForServer(serverProcess, getOutput) {

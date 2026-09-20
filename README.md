@@ -76,16 +76,45 @@ Em desenvolvimento, a aplicação web usa `http://localhost:3000` e o gateway us
    - saúde do gateway: <http://localhost:3010/health>;
    - documentação OpenAPI: <http://localhost:3010/docs>.
 
-`pnpm dev` inicia a aplicação, o gateway e os serviços do workspace. Para trabalhar em uma
-parte isolada, use:
+`pnpm dev` inicia o perfil `base`, com a aplicação em watch e as dependências HTTP compiladas
+e executadas com `start`. O comando não encerra processos nem remove caches. Para trabalhar
+em uma área, use um perfil:
 
 ```bash
-pnpm dev:app
-pnpm dev:gateway
-pnpm --filter @workspace/user-service dev
+pnpm dev -- --profile rh
+pnpm dev -- --profile contabil
+pnpm dev -- --profile integracao
+pnpm dev:full
 ```
 
-O último comando aceita qualquer pacote listado em `pnpm-workspace.yaml`.
+Os perfis incluem UI e a base de autenticação, organização e auditoria. `rh`, `contabil` e
+`integracao` acrescentam as dependências HTTP da área; `full` inclui todos os serviços HTTP.
+Serviços extras podem ser adicionados explicitamente:
+
+```bash
+pnpm dev:profile -- --profile rh --service ti-service
+pnpm dev -- --profile rh --watch app,rh-service
+pnpm dev -- --profile rh --watch shared
+pnpm dev -- --profile full --worker
+```
+
+Serviços sem `--watch` são compilados seletivamente pelo Turbo e executados sem watcher.
+`app` permanece em watch; `shared` só entra em watch quando selecionado. O plano pode ser
+conferido sem iniciar processos com `--plan`. Portas ocupadas por processos não registrados
+geram conflito e nunca são encerradas automaticamente.
+
+Para recuperação explícita, primeiro confira o estado e só depois aplique a ação:
+
+```bash
+pnpm dev:recover
+pnpm dev:recover -- --apply
+pnpm dev:recover -- --apply --clean-next
+```
+
+A recuperação encerra apenas PIDs registrados em `.turbo/dev/state.json`; `--clean-next`
+remove somente `app/.next/dev`. O worker de Relatórios é opcional porque é um job, não uma
+dependência de todo fluxo. Os perfis são uma seleção operacional documentada: URLs e portas
+customizadas por env continuam sendo responsabilidade da configuração do serviço.
 
 ## Verificações
 
@@ -97,6 +126,35 @@ pnpm lint
 pnpm test
 pnpm build
 ```
+
+### Pre-push
+
+O hook seleciona os pacotes alterados e seus dependentes pelo grafo do Turbo.
+Documentação dispensa verificações de código; mudanças globais validam todo o workspace.
+O fluxo mantém lint, typecheck e testes. Mudanças em manifestos, lockfiles ou configuração
+do gerenciador também executam a auditoria de dependências. No escopo global, os testes
+dos scripts da raiz e o QA de integração continuam obrigatórios.
+
+Os testes dos serviços executam os fontes e dispensam o build de produção do próprio
+serviço. As dependências `^build` permanecem para preparar as bibliotecas e invalidar os
+caches. O app mantém seu build porque os testes de navegador usam `next start`. Instale
+o navegador local com `pnpm --filter @workspace/app exec playwright install chromium`.
+
+A configuração do hook é derivada de `turbo.json` em `.turbo/git-hooks/turbo.pre-push.json`,
+um artefato local ignorado pelo Git. `pnpm test` mantém a validação completa com builds.
+O hook mostra o tempo de cada comando e suprime a repetição de logs de tarefas em cache.
+
+```bash
+# Inspecionar o plano sem executar as verificações
+node scripts/git-hook-scope.mjs pre-push --dry-run
+# Executar audit:ci, check, typecheck e test, inclusive sem alterações
+node scripts/git-hook-scope.mjs pre-push --full
+# Validar a seleção e o grafo de tarefas do hook
+pnpm hooks:test
+```
+
+Sem uma base de comparação confiável, o hook conserva a sequência completa como fallback.
+Falhas continuam bloqueando o push; os pré-requisitos locais devem estar instalados.
 
 ## Deploy
 

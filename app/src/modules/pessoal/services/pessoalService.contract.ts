@@ -5,6 +5,13 @@ export const PESSOAL_ENDPOINTS = {
   ldd: "/pessoal/ldd",
   lddDetail: (id: string) => `/pessoal/ldd/${id}`,
   overview: "/pessoal/overview",
+  groups: "/pessoal/groups",
+  groupDetail: (id: string) => `/pessoal/groups/${id}`,
+  groupReactivate: (id: string) => `/pessoal/groups/${id}/reactivate`,
+  groupAssignmentEligible: "/pessoal/group-assignments/eligible",
+  groupAssignmentPreviews: "/pessoal/group-assignments/previews",
+  groupAssignmentPreview: (id: string) => `/pessoal/group-assignments/previews/${id}`,
+  groupAssignmentApply: "/pessoal/group-assignments/apply",
   situations: "/pessoal/situations",
   situationDetail: (id: string) => `/pessoal/situations/${id}`,
   unions: "/pessoal/unions",
@@ -21,6 +28,8 @@ export const PESSOAL_ENDPOINTS = {
 
 export const PESSOAL_TABS: PessoalTab[] = [
   { id: "overview", label: "Visao geral" },
+  { id: "groups", label: "Grupos" },
+  { id: "groupAssignments", label: "Atribuição em lote" },
   { id: "unions", label: "Sindicatos" },
   { id: "payroll", label: "Folha" },
   { id: "obligations", label: "Obrigações" },

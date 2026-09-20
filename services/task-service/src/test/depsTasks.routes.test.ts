@@ -37,7 +37,7 @@ function gatewayHeaders(): Record<string, string> {
   };
 }
 
-function createTestApp() {
+function createTestApp(onOptions?: (departmentId: string | undefined) => void) {
   const app = express();
   const logger = createTestLogger();
 
@@ -48,7 +48,8 @@ function createTestApp() {
       async listDepartmentsWithTaskModels() {
         return [];
       },
-      async listTaskModelOptions() {
+      async listTaskModelOptions(_organizationId, departmentId) {
+        onOptions?.(departmentId);
         return { users: [], departments: [] };
       },
     }),
@@ -89,6 +90,22 @@ describe("depsTasks routes", () => {
       success: true,
       data: { users: [], departments: [] },
     });
+  });
+
+  it("GET /task/deps/options encaminha o departamento para responsáveis de tarefa", async () => {
+    const departmentId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    let capturedDepartmentId: string | undefined;
+    const app = createTestApp((value) => {
+      capturedDepartmentId = value;
+    });
+
+    const response = await request(app)
+      .get("/task/deps/options")
+      .query({ department_id: departmentId })
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(capturedDepartmentId).toBe(departmentId);
   });
 
   it("GET /task/deps/options sem autenticacao retorna 401", async () => {

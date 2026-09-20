@@ -293,27 +293,6 @@ class TaskController {
         response.json(update)
     }
 
-    // Cobranças
-    public updateChargeComercial = async (request: Request, response: Response): Promise<void> => {
-        const { 
-            task_id,
-            hiring_status,
-            payment,
-            billing_description,
-        } = request.body
-        const my_id = request.user_id
-
-        const ts = new TaskService()
-        const update = await ts.updateChargeComercial({
-            my_id,
-            task_id,
-            hiring_status,
-            payment,
-            billing_description,
-        })
-
-        response.json(update)
-    }
     public updateChargeFinanciero = async (request: Request, response: Response): Promise<void> => {
         const { task_id } = request.body
         const my_id = request.user_id

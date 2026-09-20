@@ -41,6 +41,10 @@ const rhSources = {
     "src/modules/rh/components/RhPointAdjustmentPanel.tsx",
     "utf8",
   ),
+  dossierSection: readFileSync("src/modules/rh/components/RhDossierSection.tsx", "utf8"),
+  dossierService: readFileSync("src/modules/rh/services/rhProfileService.ts", "utf8"),
+  dossierHook: readFileSync("src/modules/rh/hooks/useRhProfile.ts", "utf8"),
+  dossierRoute: readFileSync("../services/rh-service/src/routes/employeeDossier.routes.ts", "utf8"),
 };
 
 function runTest(name, fn) {
@@ -72,6 +76,23 @@ runTest("assignable RH users keep context in cache keys and request params", () 
   assert.match(hookSource, /params:\s*\{/);
   assert.match(hookSource, /department_id:\s*options\?\.departmentId/);
   assert.match(hookSource, /department_name:\s*options\?\.departmentName/);
+});
+
+runTest("RH dossiê mantém contrato, estados e autorização de superfície", () => {
+  const contractSource = readFileSync("src/modules/rh/services/rhService.contract.ts", "utf8");
+  const shellSource = readFileSync("src/shared/components/newLayout/RH.tsx", "utf8");
+
+  assert.match(contractSource, /dossier:\s*"\/rh\/profile\/colaborator"/);
+  assert.match(contractSource, /dossierList:\s*"\/rh\/profile\/colaborator\/list"/);
+  assert.match(rhSources.dossierService, /RH_ENDPOINTS\.contact/);
+  assert.match(rhSources.dossierHook, /invalidateQueries\(\{ queryKey: RH_PROFILE_QUERY_KEY \}\)/);
+  assert.match(rhSources.dossierRoute, /requireRhPermission\(RH_SELF_SERVICE_PERMISSION\)/);
+  assert.match(rhSources.dossierSection, /Carregando dossiê/);
+  assert.match(rhSources.dossierSection, /Não foi possível carregar/);
+  assert.match(rhSources.dossierSection, /Nenhum colaborador/);
+  assert.match(shellSource, /activeTab === "dossier"/);
+  assert.match(shellSource, /label="Dossiê"/);
+  assert.match(shellSource, /<RhDossierSection \/>/);
 });
 
 runTest("task assignment selectors use the contextual RH source", () => {

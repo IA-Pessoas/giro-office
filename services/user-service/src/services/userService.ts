@@ -129,7 +129,7 @@ interface DepartmentAccessContext {
 
 type UserPublicRow = Prisma.UserGetPayload<{ select: typeof USER_PUBLIC_SELECT }>;
 type UserCreateRow = Prisma.UserGetPayload<{ select: typeof USER_CREATE_SELECT }>;
-type UserSessionRow = UserPublicRow & { modules: ModulePermissions };
+type UserSessionRow = UserPublicRow & { modules: ModulePermissions; task_completion: boolean };
 
 const REPORTING_ACCESS_CONTEXT_SELECT = {
   id: true,
@@ -361,9 +361,15 @@ class UserManagementService {
       }
     }
 
+    const specific = await prismaClient.permissionSpecific.findFirst({
+      where: { user_id: id, organization_id: organizationId },
+      select: { task_completion: true },
+    });
+
     return {
       ...user,
       modules: normalizeModulePermissions(permission),
+      task_completion: specific?.task_completion === true,
     };
   }
 

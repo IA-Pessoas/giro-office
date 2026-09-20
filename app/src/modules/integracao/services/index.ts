@@ -11,11 +11,19 @@ export {
   buildCreateIntegracaoTaskPayload,
   buildDeleteIntegracaoTaskPayload,
   buildIntegracaoTaskListParams,
+  buildTaskCompletionDecisionPayload,
+  buildTaskCompletionRequestPayload,
+  buildTaskReopenPayload,
+  buildTaskPostponementPayload,
   buildUpdateIntegracaoTaskPayload,
   INTEGRACAO_TASKS_ENDPOINTS,
   unwrapCreatedIntegracaoTask,
   unwrapIntegracaoTaskDetail,
   unwrapIntegracaoTaskList,
+  unwrapTaskCompletionRequestHistory,
+  unwrapTaskPostponementHistory,
+  unwrapTaskAttachmentList,
+  unwrapTaskAttachmentAccessUrl,
   unwrapUpdatedIntegracaoTask,
 } from "./integracaoTasksService.contract";
 export {
@@ -32,3 +40,4 @@ export {
   unwrapUpdatedProject,
 } from "./projectService.contract";
 export { projectService } from "./projectService";
+export { projectPlanService } from "./projectPlanService";

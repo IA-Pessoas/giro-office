@@ -45,6 +45,8 @@ export type ReportsCatalogSource = {
   key: string;
   label: string;
   module: string;
+  department_label?: string;
+  description?: string;
   fields: ReportsCatalogField[];
   relations?: ReportsCatalogRelation[];
   parameters?: ReportsCatalogParameter[];
@@ -52,6 +54,27 @@ export type ReportsCatalogSource = {
 
 export type ReportsCatalog = {
   items: ReportsCatalogSource[];
+};
+
+export type ReportComposition = {
+  version: 2;
+  areas: ReportArea[];
+};
+
+export type ReportModelDefinition = ReportDefinition | ReportComposition;
+
+export type ReportArea = {
+  source: string;
+  fields: string[];
+  filters?: { field: string; operator: string; value: unknown }[];
+  filterLogic?: "and" | "or";
+  parameterValues?: Record<string, unknown>;
+  groupBy?: string[];
+  aggregations?: { field: string; function: string }[];
+  orderBy?: { field: string; direction: "asc" | "desc" }[];
+};
+export type ReportCompositionPreview = {
+  blocks: (ReportPreviewResult & { source: string; label: string })[];
 };
 
 export type ReportsServiceError = {
@@ -71,7 +94,8 @@ export type ReportDefinition = {
   filters: { source: string; field: string; operator: string; parameter: string }[];
   filter_groups: { operator: ReportFilterLogic; filters: string[] }[];
   parameters: { name: string; type: ReportValueType }[];
-  aggregations: { source: string; field: string; function: string }[];
+  aggregations: { source: string; field: string; function: string; alias?: string }[];
+  group_by?: { source: string; field: string }[];
   order_by: { source: string; field: string; direction: "asc" | "desc" }[];
 };
 
@@ -100,13 +124,34 @@ export type ReportPreviewResult = {
   limit: number;
   hasMore: boolean;
 };
+export type ReportResultBlock = {
+  source: string;
+  label: string;
+  columns: ReportPreviewColumn[];
+  rows: Record<string, unknown>[];
+};
+export type ReportSnapshotBlock = {
+  source: string;
+  label: string;
+  columns: ReportPreviewColumn[];
+  rowCount: number;
+  rows: Array<{ row_number: number; values: Record<string, unknown> }>;
+  nextCursor: number | null;
+};
+export type ReportJob = {
+  id: string;
+  status: ReportJobStatus;
+  error_message?: string | null;
+};
 
 export type ReportModel = {
   id: string;
   organization_id: string;
   name: string;
+  description?: string | null;
   version: number;
-  definition: ReportDefinition;
+  version_id?: string;
+  definition: ReportModelDefinition;
   created_by_user_id?: string | null;
   owner_id?: string | null;
   owner_name?: string | null;
@@ -141,6 +186,7 @@ export type ReportHistoryItem = {
   model_name?: string | null;
   model_version?: number | null;
   author_name?: string | null;
+  error_message?: string | null;
 };
 
 export type ReportHistoryPage = { items: ReportHistoryItem[]; nextCursor: number | null };
@@ -148,6 +194,7 @@ export type ReportSnapshotPage = {
   snapshot: { id: string; created_at: string };
   rows: Array<{ row_number: number; values: Record<string, unknown> }>;
   nextCursor: number | null;
+  blocks?: ReportSnapshotBlock[];
 };
 export type ReportDownloadResult = { blob: Blob; filename: string; mimeType: string };
 export type ReportHistoryScope = "personal" | "library";

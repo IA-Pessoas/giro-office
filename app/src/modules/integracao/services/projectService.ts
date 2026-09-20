@@ -2,16 +2,23 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   CreateProjectData,
+  CreateProjectWizardData,
+  ExtractProjectTasksData,
   ProjectDetail,
   ProjectListItem,
   ProjectListParams,
   ProjectMetrics,
   ProjectProgressResponse,
+  ProjectWizardPreview,
+  ProjectWizardResult,
+  ProjectWizardTask,
+  ProjectWizardTaskProposal,
   UpdateProjectData,
 } from "../types";
 import {
   buildCreateProjectPayload,
   buildDeleteProjectPayload,
+  buildExtractProjectTasksPayload,
   buildProjectListParams,
   PROJECT_ENDPOINTS,
   unwrapCreatedProject,
@@ -20,6 +27,9 @@ import {
   unwrapProjectMetrics,
   unwrapProjectProgress,
   unwrapUpdatedProject,
+  unwrapProjectTaskProposals,
+  unwrapProjectWizardResult,
+  unwrapProjectWizardPreview,
 } from "./projectService.contract";
 
 export const projectService = {
@@ -31,7 +41,6 @@ export const projectService = {
 
     return unwrapProjectList(response.data);
   },
-
 
   async metrics(): Promise<ProjectMetrics> {
     const api = setupAPIClient();
@@ -54,6 +63,39 @@ export const projectService = {
     const response = await api.post(PROJECT_ENDPOINTS.crud, buildCreateProjectPayload(payload));
 
     return unwrapCreatedProject(response.data);
+  },
+
+  async createWithWizard(payload: CreateProjectWizardData): Promise<ProjectWizardResult> {
+    const api = setupAPIClient();
+    const { idempotencyKey, revision, tasks, ...data } = payload;
+    const response = await api.post(
+      PROJECT_ENDPOINTS.wizard,
+      {
+        ...buildCreateProjectPayload(data),
+        ...(tasks !== undefined ? { tasks } : {}),
+        revision,
+      },
+      { headers: { "Idempotency-Key": idempotencyKey } },
+    );
+
+    return unwrapProjectWizardResult(response.data);
+  },
+
+  async extractTasks(payload: ExtractProjectTasksData): Promise<ProjectWizardTaskProposal[]> {
+    const api = setupAPIClient();
+    const response = await api.post(
+      PROJECT_ENDPOINTS.wizardExtractTasks,
+      buildExtractProjectTasksPayload(payload),
+    );
+
+    return unwrapProjectTaskProposals(response.data);
+  },
+
+  async previewWizard(tasks: ProjectWizardTask[]): Promise<ProjectWizardPreview> {
+    const api = setupAPIClient();
+    const response = await api.post(PROJECT_ENDPOINTS.wizardPreview, { tasks });
+
+    return unwrapProjectWizardPreview(response.data);
   },
 
   async update(payload: UpdateProjectData): Promise<ProjectDetail> {

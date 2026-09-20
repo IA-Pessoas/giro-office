@@ -37,8 +37,6 @@ router.post("/", isAuthenticated, async (req: Request, res: Response, next: Next
       billing: body.billing,
       urgency: body.urgency,
       responsible_id: body.responsible_id,
-      responsible2_id: body.responsible2_id,
-      responsible3_id: body.responsible3_id,
       prevision_date: body.prevision_date,
       integracaoLevel: normalizeModulePermission(req.modules?.integracao),
       isOwner: req.user_type === "owner",

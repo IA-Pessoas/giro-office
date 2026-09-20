@@ -1,18 +1,14 @@
-import { useCallback, useState } from "react";
-
-import type { ReportBuilderState } from "../types/report.types";
-import { createInitialReportBuilderState } from "../utils/reportBuilder";
+import { useState } from "react";
+import type { ReportComposition } from "../types/report.types";
 
 export function useReportBuilder() {
-  const [state, setState] = useState<ReportBuilderState>(() => createInitialReportBuilderState());
-
-  const update = useCallback(<K extends keyof ReportBuilderState>(key: K, value: ReportBuilderState[K]) => {
-    setState((current) => ({ ...current, [key]: value }));
-  }, []);
-
-  const reset = useCallback((sourceKey: string) => {
-    setState(createInitialReportBuilderState(sourceKey));
-  }, []);
-
-  return { state, setState, update, reset };
+  const [areas, setAreas] = useState<ReportComposition["areas"]>([]);
+  function toggleArea(source: string) {
+    setAreas((current) =>
+      current.some((area) => area.source === source)
+        ? current.filter((area) => area.source !== source)
+        : [...current, { source, fields: [] }],
+    );
+  }
+  return { areas, setAreas, toggleArea };
 }

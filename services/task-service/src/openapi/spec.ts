@@ -1,6 +1,10 @@
+import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { TaskServiceEnv } from "../config/env.js";
+import { TASK_ASSIGNMENT_FILTER_VALUES } from "../constants/integracaoTask.js";
+import { DOCX_MIME_TYPE } from "../utils/docx.js";
+import { PDF_MIME_TYPE } from "../utils/pdf.js";
 
 const successJson = {
   content: {
@@ -49,11 +53,16 @@ const createTaskRequestBody = createObjectRequestBody({
     billing: "Realizar",
     urgency: "ALTA",
     responsible_id: "user-uuid",
-    responsible2_id: "backup-user-uuid",
-    responsible3_id: null,
     prevision_date: "2026-04-10",
   },
-  required: ["model_id", "project_id", "client_id", "prospecting_status", "urgency"],
+  required: [
+    "model_id",
+    "project_id",
+    "client_id",
+    "prospecting_status",
+    "urgency",
+    "department_id",
+  ],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
@@ -65,9 +74,7 @@ const createTaskRequestBody = createObjectRequestBody({
     observations: { type: "string" },
     billing: { type: "string" },
     urgency: { type: "string" },
-    responsible_id: { type: "string" },
-    responsible2_id: { type: ["string", "null"] },
-    responsible3_id: { type: ["string", "null"] },
+    responsible_id: { type: ["string", "null"] },
     prevision_date: { type: "string", format: "date" },
   },
 });
@@ -75,6 +82,7 @@ const createTaskRequestBody = createObjectRequestBody({
 const updateTaskRequestBody = createObjectRequestBody({
   example: {
     task_id: "task-uuid",
+    model_id: "task-model-uuid",
     name: "Contato com cliente",
     status: "Em Andamento",
     department_id: "department-uuid",
@@ -82,23 +90,18 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: "Realizar",
     urgency: "MEDIA",
     responsible_id: "user-uuid",
-    responsible2_id: "backup-user-uuid",
-    responsible3_id: null,
-    prevision_date: "2026-04-10T09:00:00.000Z",
   },
   required: ["task_id"],
   properties: {
     task_id: { type: "string" },
+    model_id: { type: "string" },
     name: { type: "string" },
     status: { type: "string" },
     department_id: { type: "string" },
     observations: { type: "string" },
     billing: { type: "string" },
     urgency: { type: "string" },
-    responsible_id: { type: "string" },
-    responsible2_id: { type: ["string", "null"] },
-    responsible3_id: { type: ["string", "null"] },
-    prevision_date: { type: ["string", "null"], format: "date-time" },
+    responsible_id: { type: ["string", "null"] },
   },
 });
 
@@ -175,14 +178,14 @@ const createTaskDependentRequestBody = createObjectRequestBody({
 const createTaskIntegrationRequestBody = createObjectRequestBody({
   example: {
     task_model_id: "task-model-uuid",
-    referring: "regularize-step-uuid",
+    referring: "regularize-process-uuid",
     referring_type: "process",
   },
   required: ["task_model_id", "referring", "referring_type"],
   properties: {
     task_model_id: { type: "string" },
     referring: { type: "string" },
-    referring_type: { type: "string" },
+    referring_type: { type: "string", enum: ["process", "license"] },
   },
 });
 
@@ -194,6 +197,14 @@ const deleteTaskIntegrationRequestBody = createObjectRequestBody({
   },
 });
 
+const settleFinanceiroRequestBody = createObjectRequestBody({
+  example: { task_ids: ["task-uuid"] },
+  required: ["task_ids"],
+  properties: {
+    task_ids: { type: "array", items: { type: "string" }, minItems: 1 },
+  },
+});
+
 const updateFinanceiroRequestBody = createObjectRequestBody({
   example: { task_id: "task-uuid" },
   required: ["task_id"],
@@ -202,27 +213,34 @@ const updateFinanceiroRequestBody = createObjectRequestBody({
   },
 });
 
-const updateComercialRequestBody = createObjectRequestBody({
-  example: {
-    task_id: "task-uuid",
-    hiring_status: "Contratado",
-    payment: "Cartao",
-    billing_description: "Entrada de 50% e saldo em 30 dias.",
-  },
-  required: ["task_id", "hiring_status", "payment", "billing_description"],
+const expressFinanceiroRequestBody = createObjectRequestBody({
+  example: { client_id: "client-uuid" },
+  required: ["client_id"],
   properties: {
-    task_id: { type: "string" },
-    hiring_status: { type: "string" },
-    payment: { type: "string" },
-    billing_description: { type: "string" },
+    client_id: { type: "string" },
   },
 });
+
+const collectorsFinanceiroRequestBody = createObjectRequestBody({
+  example: { department_id: "department-uuid", collector_ids: ["user-uuid"] },
+  required: ["department_id", "collector_ids"],
+  properties: {
+    department_id: { type: "string" },
+    collector_ids: { type: "array", items: { type: "string" } },
+  },
+});
+
+const financeiroIdempotencyHeader = {
+  name: "Idempotency-Key",
+  in: "header",
+  required: true,
+  schema: { type: "string", minLength: 1, maxLength: 255 },
+} as const;
 
 const concludeTaskRequestBody = createObjectRequestBody({
   example: {
     task_id: "task-uuid",
     status: "Concluida",
-    prevision_date: "2026-04-10T09:00:00.000Z",
     end_date: "2026-04-12T18:00:00.000Z",
     responsible_id: "user-uuid",
     responsible2_id: "backup-user-uuid",
@@ -234,9 +252,8 @@ const concludeTaskRequestBody = createObjectRequestBody({
   properties: {
     task_id: { type: "string" },
     status: { type: "string" },
-    prevision_date: { type: ["string", "null"], format: "date-time" },
     end_date: { type: ["string", "null"], format: "date-time" },
-    responsible_id: { type: "string" },
+    responsible_id: { type: ["string", "null"] },
     responsible2_id: { type: ["string", "null"] },
     responsible3_id: { type: ["string", "null"] },
     observations: { type: "string" },
@@ -245,10 +262,45 @@ const concludeTaskRequestBody = createObjectRequestBody({
 });
 
 const approveConclusionRequestBody = createObjectRequestBody({
-  example: { task_id: "task-uuid" },
+  example: { task_id: "task-uuid", request_id: "completion-request-uuid", decision: "approved" },
   required: ["task_id"],
   properties: {
     task_id: { type: "string" },
+    request_id: { type: "string" },
+    decision: { type: "string", enum: ["approved", "refused"] },
+    reason: { type: "string" },
+  },
+});
+
+const createConclusionRequestBody = createObjectRequestBody({
+  example: { task_id: "task-uuid", reason: "Documentação revisada." },
+  required: ["task_id"],
+  properties: {
+    task_id: { type: "string" },
+    reason: { type: "string" },
+  },
+});
+
+const createTaskPostponementRequestBody = createObjectRequestBody({
+  example: {
+    task_id: "task-uuid",
+    new_prevision_date: "2026-04-20",
+    justification: "Aguardando documento obrigatório do cliente.",
+  },
+  required: ["task_id", "new_prevision_date", "justification"],
+  properties: {
+    task_id: { type: "string" },
+    new_prevision_date: { type: "string", format: "date" },
+    justification: { type: "string", minLength: 1, maxLength: 2000 },
+  },
+});
+
+const reopenTaskRequestBody = createObjectRequestBody({
+  example: { task_id: "task-uuid", reason: "Documento complementar pendente." },
+  required: ["task_id", "reason"],
+  properties: {
+    task_id: { type: "string" },
+    reason: { type: "string" },
   },
 });
 
@@ -328,6 +380,126 @@ const hireProjectPlanRequestBody = createObjectRequestBody({
   },
 });
 
+const createProjectWizardRequestBody = createObjectRequestBody({
+  example: {
+    client_id: "client-uuid",
+    name: "Novo projeto",
+    start_date: "2026-09-01T00:00:00.000Z",
+    end_date: "2026-09-30T00:00:00.000Z",
+    objective: "Objetivo do projeto",
+    revision: "revisao-opaca-da-previa",
+    tasks: [
+      {
+        name: "Revisar documentação",
+        department_id: "department-uuid",
+        model_id: "task-model-uuid",
+        prevision_date: "2026-09-15",
+        responsible_id: "user-uuid",
+      },
+    ],
+  },
+  required: ["client_id", "name", "start_date", "objective", "revision"],
+  properties: {
+    client_id: { type: "string", format: "uuid" },
+    name: { type: "string" },
+    start_date: { type: "string", format: "date-time" },
+    end_date: { type: "string", format: "date-time" },
+    objective: { type: "string" },
+    revision: { type: "string", description: "Revisão opaca retornada pela prévia do wizard." },
+    tasks: {
+      type: "array",
+      description: "Modelos repetidos na composição canônica retornam conflito.",
+      items: {
+        type: "object",
+        required: ["name", "department_id", "model_id"],
+        properties: {
+          name: { type: "string" },
+          department_id: { type: "string" },
+          model_id: { type: "string" },
+          prevision_date: { type: "string", format: "date" },
+          responsible_id: { type: ["string", "null"] },
+        },
+      },
+    },
+  },
+});
+
+const projectWizardPreviewRequestBody = createObjectRequestBody({
+  example: {
+    tasks: [
+      {
+        name: "Revisar documentação",
+        department_id: "department-uuid",
+        model_id: "task-model-uuid",
+      },
+    ],
+  },
+  properties: {
+    tasks: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["name", "department_id", "model_id"],
+        properties: {
+          name: { type: "string" },
+          department_id: { type: "string" },
+          model_id: { type: "string" },
+          prevision_date: { type: "string", format: "date" },
+          responsible_id: { type: ["string", "null"] },
+        },
+      },
+    },
+  },
+});
+
+const extractProjectWizardTasksProperties = {
+  content: {
+    type: "string",
+    description:
+      "Ata de reunião em texto, com conteúdo de até 10 MiB em bytes UTF-8. Conteúdo transitório: não é persistido, auditado nem registrado em log.",
+  },
+  name: { type: "string" },
+  objective: { type: "string" },
+  start_date: { type: "string", format: "date-time" },
+  end_date: { type: "string", format: "date-time" },
+};
+
+const extractProjectWizardTasksRequestBody = {
+  requestBody: {
+    required: true,
+    content: {
+      "application/json": {
+        schema: {
+          type: "object",
+          required: ["content", "name", "objective", "start_date"],
+          properties: extractProjectWizardTasksProperties,
+        },
+      },
+      "multipart/form-data": {
+        schema: {
+          type: "object",
+          required: ["file", "name", "objective", "start_date"],
+          properties: {
+            file: {
+              type: "string",
+              format: "binary",
+              description:
+                `Ata .txt, .md, .docx ou .pdf de até 10 MB; aceita text/plain para .txt, text/markdown, ` +
+                `text/plain ou text/x-markdown para .md, ${DOCX_MIME_TYPE} para .docx e ${PDF_MIME_TYPE} ` +
+                `para .pdf; só o texto já presente no arquivo é lido, sem OCR e sem executar macros, ` +
+                `campos ativos ou ações; conteúdo transitório.`,
+            },
+            name: extractProjectWizardTasksProperties.name,
+            objective: extractProjectWizardTasksProperties.objective,
+            start_date: extractProjectWizardTasksProperties.start_date,
+            end_date: extractProjectWizardTasksProperties.end_date,
+          },
+        },
+      },
+    },
+  },
+};
+
 export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
 
@@ -347,11 +519,12 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
       { name: "IntegracaoTasks", description: "CRUD tarefas de integracao" },
       { name: "TaskModel", description: "Modelos de tarefa" },
       { name: "ProjectPlan", description: "Planos de projeto" },
+      { name: "ProjectWizard", description: "Criação de projeto com tarefas manuais" },
       { name: "TaskDependent", description: "Dependencias entre modelos" },
       { name: "TaskIntegration", description: "Vinculos integracao Regularize" },
       { name: "Financeiro", description: "Cobranca financeira" },
-      { name: "Comercial", description: "Cobranca comercial" },
       { name: "Lifecycle", description: "Conclusao e aprovacao" },
+      { name: "Notifications", description: "Notificações operacionais por destinatário" },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
@@ -469,13 +642,15 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                   properties: {
                     source: { type: "string", enum: ["integracao.tasks"] },
                     fields: { type: "array", minItems: 1, items: { type: "string" } },
-                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                    limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
+                    query: reportingQueryOpenApiSchema,
                   },
                 },
               },
             },
           },
           responses: {
+            "422": { description: "Capacidade de consulta excedida; nenhum resultado parcial" },
             "200": { description: "Linhas extraídas" },
             "400": { description: "Entrada inválida" },
             "403": { description: "Grant, token ou campo inválido" },
@@ -540,6 +715,12 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
             { name: "ref", in: "query", schema: { type: "string" } },
             { name: "ref_id", in: "query", schema: { type: "string" } },
             { name: "search", in: "query", schema: { type: "string" } },
+            { name: "client_id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "assignment",
+              in: "query",
+              schema: { type: "string", enum: TASK_ASSIGNMENT_FILTER_VALUES },
+            },
             { name: "page", in: "query", schema: { type: "integer" } },
             { name: "limit", in: "query", schema: { type: "integer" } },
           ],
@@ -561,10 +742,11 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                             type: "array",
                             items: {
                               type: "object",
-                              required: ["id", "isOwn"],
+                              required: ["id", "isOwn", "isUnassigned"],
                               properties: {
                                 id: { type: "string" },
                                 isOwn: { type: "boolean" },
+                                isUnassigned: { type: "boolean" },
                               },
                             },
                           },
@@ -703,39 +885,152 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           summary: "Criar vinculo Regularize",
           security: bearer,
           ...createTaskIntegrationRequestBody,
-          responses: { "201": { description: "Criado", ...successJson } },
+          responses: {
+            "201": { description: "Criado", ...successJson },
+            "400": { description: "Tipo de destino inválido." },
+            "403": { description: "Acesso negado." },
+            "404": { description: "Modelo ou destino não encontrado." },
+            "409": { description: "Vínculo já existe." },
+          },
         },
         delete: {
           tags: ["TaskIntegration"],
           summary: "Remover vinculo",
           security: bearer,
           ...deleteTaskIntegrationRequestBody,
-          responses: { "200": { description: "Removido", ...successJson } },
+          responses: {
+            "200": { description: "Removido", ...successJson },
+            "403": { description: "Acesso negado." },
+            "404": { description: "Vínculo não encontrado." },
+          },
         },
         get: {
           tags: ["TaskIntegration"],
-          summary: "Listar vinculos",
+          summary: "Listar vínculos e disponibilidade dos destinos",
           security: bearer,
           parameters: [{ name: "task_model_id", in: "query", schema: { type: "string" } }],
-          responses: { "200": { description: "Lista", ...successJson } },
+          responses: {
+            "200": {
+              description: "Lista; vínculos de destinos removidos têm available=false.",
+              ...successJson,
+            },
+            "403": { description: "Acesso negado." },
+            "404": { description: "Modelo não encontrado no escopo da organização." },
+          },
+        },
+      },
+      "/task/financeiro/queue": {
+        get: {
+          tags: ["Financeiro"],
+          summary: "Listar fila financeira no escopo do cobrador",
+          security: bearer,
+          parameters: [
+            { name: "department_id", in: "query", schema: { type: "string" } },
+            { name: "client_id", in: "query", schema: { type: "string" } },
+          ],
+          responses: {
+            "200": { description: "Fila pendente", ...successJson },
+            "403": { description: "Fora do escopo" },
+          },
         },
       },
       "/task/financeiro": {
         put: {
           tags: ["Financeiro"],
-          summary: "Atualizar cobranca financeira",
+          summary: "Atualizar cobrança financeira de uma tarefa",
           security: bearer,
           ...updateFinanceiroRequestBody,
-          responses: { "200": { description: "Atualizado", ...successJson } },
+          parameters: [{ ...financeiroIdempotencyHeader, required: false }],
+          responses: {
+            "200": { description: "Baixa realizada", ...successJson },
+            "403": { description: "Fora do escopo" },
+            "404": { description: "Tarefa não encontrada" },
+            "409": { description: "Tarefa não está pendente" },
+          },
         },
       },
-      "/task/comercial": {
-        put: {
-          tags: ["Comercial"],
-          summary: "Atualizar cobranca comercial",
+      "/task/financeiro/collectors": {
+        get: {
+          tags: ["Financeiro"],
+          summary: "Listar cobradores ativos do departamento",
           security: bearer,
-          ...updateComercialRequestBody,
-          responses: { "200": { description: "Atualizado", ...successJson } },
+          parameters: [
+            { name: "department_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: {
+            "200": { description: "Cobradores", ...successJson },
+            "403": { description: "Somente administradores" },
+          },
+        },
+        put: {
+          tags: ["Financeiro"],
+          summary: "Configurar cobradores ativos do departamento",
+          security: bearer,
+          ...collectorsFinanceiroRequestBody,
+          responses: {
+            "200": { description: "Configurado", ...successJson },
+            "403": { description: "Somente administradores" },
+          },
+        },
+      },
+      "/task/financeiro/settle": {
+        post: {
+          tags: ["Financeiro"],
+          summary: "Baixar tarefas financeiras atomicamente",
+          description:
+            "O mesmo Idempotency-Key e o mesmo lote retornam o resultado original; outra carga retorna conflito.",
+          security: bearer,
+          parameters: [financeiroIdempotencyHeader],
+          ...settleFinanceiroRequestBody,
+          responses: {
+            "200": { description: "Baixa realizada ou repetida", ...successJson },
+            "403": { description: "Cobrador fora do departamento" },
+            "409": { description: "Conflito de chave ou lote não pendente" },
+          },
+        },
+      },
+      "/task/financeiro/express": {
+        post: {
+          tags: ["Financeiro"],
+          summary: "Baixar toda a fila atual de um cliente",
+          security: bearer,
+          parameters: [financeiroIdempotencyHeader],
+          ...expressFinanceiroRequestBody,
+          responses: {
+            "200": { description: "Baixa realizada", ...successJson },
+            "403": { description: "Fora do escopo" },
+            "409": { description: "Fila alterada" },
+          },
+        },
+      },
+      "/internal/commercial/task-billing": {
+        post: {
+          tags: ["Commercial"],
+          summary: "Projetar cobrança comercial na tarefa",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: {
+            "200": successJson,
+            "400": { description: "Evento inválido." },
+            "403": { description: "Acesso negado." },
+          },
+        },
+      },
+      "/internal/commercial/prospecting-close": {
+        post: {
+          tags: ["Commercial"],
+          summary: "Aplicar fechamento comercial e devolver competência",
+          requestBody: {
+            required: true,
+            content: { "application/json": { schema: { type: "object" } } },
+          },
+          responses: {
+            "200": successJson,
+            "400": { description: "Evento inválido." },
+            "403": { description: "Acesso negado." },
+          },
         },
       },
       "/task/conclusion": {
@@ -748,12 +1043,154 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
         },
       },
       "/task/complete-request": {
+        post: {
+          tags: ["Lifecycle"],
+          summary: "Solicitar conclusão de tarefa",
+          security: bearer,
+          ...createConclusionRequestBody,
+          responses: {
+            "200": { description: "Solicitação criada", ...successJson },
+            "409": { description: "Já existe uma solicitação pendente" },
+          },
+        },
         put: {
           tags: ["Lifecycle"],
-          summary: "Aprovar pedido de conclusao",
+          summary: "Aprovar ou recusar pedido de conclusao",
           security: bearer,
           ...approveConclusionRequestBody,
-          responses: { "200": { description: "Aprovado", ...successJson } },
+          responses: { "200": { description: "Decidido", ...successJson } },
+        },
+        delete: {
+          tags: ["Lifecycle"],
+          summary: "Cancelar solicitação de conclusão",
+          security: bearer,
+          ...approveConclusionRequestBody,
+          responses: { "200": { description: "Cancelado", ...successJson } },
+        },
+      },
+      "/task/complete-request/list": {
+        get: {
+          tags: ["Lifecycle"],
+          summary: "Listar histórico de solicitações de conclusão",
+          security: bearer,
+          parameters: [
+            { name: "task_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Histórico", ...successJson } },
+        },
+      },
+      "/task/postponement": {
+        post: {
+          tags: ["Lifecycle"],
+          summary: "Prorrogar tarefa vencida em andamento",
+          security: bearer,
+          ...createTaskPostponementRequestBody,
+          responses: {
+            "201": { description: "Prorrogação registrada", ...successJson },
+            "400": { description: "Dados inválidos" },
+            "409": { description: "Tarefa sem elegibilidade ou data inválida" },
+          },
+        },
+      },
+      "/task/postponement/list": {
+        get: {
+          tags: ["Lifecycle"],
+          summary: "Listar histórico de prorrogações da tarefa",
+          security: bearer,
+          parameters: [
+            { name: "task_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Histórico", ...successJson } },
+        },
+      },
+      "/task/notifications": {
+        get: {
+          tags: ["Notifications"],
+          summary: "Listar notificações operacionais do destinatário autenticado",
+          security: bearer,
+          responses: { "200": { description: "Caixa de entrada", ...successJson } },
+        },
+      },
+      "/task/notifications/read": {
+        put: {
+          tags: ["Notifications"],
+          summary: "Marcar notificação operacional como lida",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: { notification_id: "notification-uuid" },
+            required: ["notification_id"],
+            properties: { notification_id: { type: "string" } },
+          }),
+          responses: { "200": { description: "Notificação lida", ...successJson } },
+        },
+      },
+      "/task/attachment": {
+        post: {
+          tags: ["TaskAttachment"],
+          summary: "Anexar arquivo privado à tarefa",
+          security: bearer,
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["task_id", "file"],
+                  properties: {
+                    task_id: { type: "string" },
+                    file: { type: "string", format: "binary" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Anexo criado", ...successJson },
+            "400": { description: "Arquivo inválido ou acima de 10 MB" },
+          },
+        },
+        delete: {
+          tags: ["TaskAttachment"],
+          summary: "Remover logicamente anexo da tarefa",
+          security: bearer,
+          ...createObjectRequestBody({
+            example: { task_id: "task-uuid", attachment_id: "attachment-uuid" },
+            required: ["task_id", "attachment_id"],
+            properties: { task_id: { type: "string" }, attachment_id: { type: "string" } },
+          }),
+          responses: { "200": { description: "Anexo removido", ...successJson } },
+        },
+      },
+      "/task/attachment/list": {
+        get: {
+          tags: ["TaskAttachment"],
+          summary: "Listar metadados de anexos privados da tarefa",
+          security: bearer,
+          parameters: [
+            { name: "task_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "Anexos", ...successJson } },
+        },
+      },
+      "/task/attachment/access": {
+        get: {
+          tags: ["TaskAttachment"],
+          summary: "Gerar URL assinada temporária para anexo privado",
+          security: bearer,
+          parameters: [
+            { name: "task_id", in: "query", required: true, schema: { type: "string" } },
+            { name: "attachment_id", in: "query", required: true, schema: { type: "string" } },
+          ],
+          responses: { "200": { description: "URL assinada", ...successJson } },
+        },
+      },
+      "/task/reopen": {
+        put: {
+          tags: ["Lifecycle"],
+          summary: "Reabrir tarefa concluída",
+          security: bearer,
+          ...reopenTaskRequestBody,
+          responses: { "200": { description: "Reaberta", ...successJson } },
         },
       },
       "/task/project-plan": {
@@ -835,6 +1272,75 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           responses: { "200": { description: "Contratado", ...successJson } },
         },
       },
+      "/task/project-wizard": {
+        post: {
+          tags: ["ProjectWizard"],
+          summary: "Confirmar projeto e tarefas atomicamente pelo wizard",
+          description:
+            "Idempotência por organização e chave: o mesmo comando, inclusive concorrente, retorna o snapshot original sem novas criações. Auditoria após commit, somente na criação nova, com IDs e contagens; falha de auditoria não altera a resposta.",
+          security: bearer,
+          parameters: [
+            {
+              name: "Idempotency-Key",
+              in: "header",
+              required: true,
+              description: "Na mesma organização, reutilize a chave apenas para o mesmo comando.",
+              schema: { type: "string", minLength: 1, maxLength: 255 },
+            },
+          ],
+          ...createProjectWizardRequestBody,
+          responses: {
+            "201": {
+              description:
+                "Projeto, tarefas principais e dependências criados, ou snapshot original no replay",
+              ...successJson,
+            },
+            "400": { description: "Entrada ou chave inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de Integração" },
+            "404": { description: "Cliente não encontrado na organização" },
+            "409": {
+              description: "Chave usada com outro comando, prévia desatualizada ou Modelo repetido",
+            },
+            "500": { description: "Falha na confirmação; nenhuma criação parcial é persistida" },
+          },
+        },
+      },
+      "/task/project-wizard/extract-tasks": {
+        post: {
+          tags: ["ProjectWizard"],
+          summary: "Extrair Tarefas propostas de uma Ata com a OpenAI",
+          description:
+            "Exige nível 2+ em Integração ou owner. Atas extensas são processadas integralmente em partes; uma falha em qualquer parte invalida a Ata inteira. A Ata e a resposta bruta do provedor são transitórias.",
+          security: bearer,
+          ...extractProjectWizardTasksRequestBody,
+          responses: {
+            "200": { description: "Tarefas propostas para revisão", ...successJson },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de Integração" },
+            "422": { description: "Nenhuma tarefa identificada na Ata" },
+            "429": { description: "Muitas extrações seguidas" },
+            "502": { description: "Falha do provedor de IA" },
+          },
+        },
+      },
+      "/task/project-wizard/preview": {
+        post: {
+          tags: ["ProjectWizard"],
+          summary: "Gerar prévia canônica das tarefas e dependências do wizard",
+          security: bearer,
+          ...projectWizardPreviewRequestBody,
+          responses: {
+            "200": { description: "Prévia e revisão opaca", ...successJson },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de Integração" },
+            "409": { description: "Modelo repetido na composição" },
+            "422": { description: "Modelo, departamento ou responsável inelegível" },
+          },
+        },
+      },
       "/task/deps/list": {
         get: {
           tags: ["TaskDependent"],
@@ -848,6 +1354,13 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           tags: ["TaskDependent"],
           summary: "Listar opções ativas para modelos de tarefa",
           security: bearer,
+          parameters: [
+            {
+              name: "department_id",
+              in: "query",
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
           responses: { "200": { description: "Opções", ...successJson } },
         },
       },

@@ -4,8 +4,8 @@ import {
   createServiceCorsOptions,
   createSuccessResponse,
 } from "@workspace/shared";
-import { mountOpenApiDocs } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
+import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
 import express from "express";
 import "express-async-errors";
@@ -120,6 +120,7 @@ export function createReportsApp({
     auditService,
     jobService,
     authorizationService,
+    accessContextClient,
   );
   const retentionService = new ReportRetentionService(prisma, auditService);
   const lifecycleService = new ReportLifecycleService(prisma as never, auditService);

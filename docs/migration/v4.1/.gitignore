@@ -1,0 +1,13 @@
+# Dados privados da migração; somente metadados estruturais devem ser versionados.
+/artifacts/
+/backups/
+/crosswalk/
+/dry-run/
+/manifest.json
+/preflight/
+/quarantine/
+/reports/
+/snapshots/
+/staging/
+.env
+.env.*

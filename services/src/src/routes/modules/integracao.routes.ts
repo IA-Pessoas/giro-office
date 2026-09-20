@@ -48,7 +48,6 @@ router.put('/integracao-tasks-conclusion', isAuthenticated.bind(isAuthenticated)
 router.put('/integracao-tasks-completeRequest', isAuthenticated.bind(isAuthenticated), taskController.completeRequest.bind(taskController))
 
 // Cobranças
-router.put('/comercial-tasks', isAuthenticated.bind(isAuthenticated), taskController.updateChargeComercial.bind(taskController))
 router.put('/financeiro-tasks', isAuthenticated.bind(isAuthenticated), taskController.updateChargeFinanciero.bind(taskController))
 
 // Planos

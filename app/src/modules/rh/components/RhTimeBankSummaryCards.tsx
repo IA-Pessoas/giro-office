@@ -1,21 +1,5 @@
 import type { RhTimeBankSummary } from "../types";
-
-function formatMinutesLabel(minutes: number) {
-  const sign = minutes > 0 ? "+" : minutes < 0 ? "-" : "";
-  const absoluteMinutes = Math.abs(minutes);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const remainingMinutes = absoluteMinutes % 60;
-
-  if (hours === 0) {
-    return `${sign}${remainingMinutes}min`;
-  }
-
-  if (remainingMinutes === 0) {
-    return `${sign}${hours}h`;
-  }
-
-  return `${sign}${hours}h ${remainingMinutes}min`;
-}
+import { formatRhDuration } from "../utils/rhDuration";
 
 interface RhTimeBankSummaryCardsProps {
   currentUserLabel: string;
@@ -65,7 +49,7 @@ export function RhTimeBankSummaryCards({
                   Saldo atual
                 </p>
                 <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {formatMinutesLabel(summary.balance_minutes)}
+                  {formatRhDuration(summary.balance_minutes, { showPositiveSign: true })}
                 </p>
               </div>
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700/30">

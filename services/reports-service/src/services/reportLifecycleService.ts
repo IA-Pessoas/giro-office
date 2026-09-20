@@ -9,6 +9,7 @@ import type {
   ReportAuditStore,
 } from "./reportAuditService.js";
 import { createReportAuditEvent } from "./reportAuditService.js";
+import type { ReportResultBlock } from "./reportExecutionService.js";
 
 export const REPORT_LIFECYCLE_STATUSES = [
   "queued",
@@ -31,6 +32,7 @@ type ReportJob = {
   status: string;
   cancel_requested_at?: Date | null;
   materialization_token?: string | null;
+  error_message?: string | null;
 };
 
 type LifecycleTransaction = ReportAuditStore & {
@@ -49,6 +51,7 @@ type LifecycleTransaction = ReportAuditStore & {
         started_at?: Date;
         finished_at?: Date;
         materialization_token?: string | null;
+        error_message?: string | null;
       };
     }): Promise<{ count: number }>;
   };
@@ -75,11 +78,27 @@ type LifecycleTransaction = ReportAuditStore & {
     }): Promise<Array<{ id: string }>>;
     deleteMany(args: { where: { report_job_id?: string; id?: string } }): Promise<unknown>;
   };
+  reportSnapshotBlock: {
+    createMany(args: {
+      data: Array<{
+        id: string;
+        organization_id: string;
+        snapshot_id: string;
+        position: number;
+        source: string;
+        label: string;
+        columns_json: ReportResultBlock["columns"];
+        row_count: number;
+      }>;
+    }): Promise<unknown>;
+    deleteMany(args: { where: { snapshot_id: { in: string[] } } }): Promise<unknown>;
+  };
   reportSnapshotRow: {
     createMany(args: {
       data: Array<{
         organization_id: string;
         snapshot_id: string;
+        block_id?: string;
         row_number: number;
         data_json: Record<string, unknown>;
       }>;
@@ -115,11 +134,13 @@ interface ReportLifecycleInput {
 export interface TransitionReportJobInput extends ReportLifecycleInput {
   status: Exclude<ReportLifecycleStatus, "processing" | "completed" | "expired" | "deleted">;
   lease_token?: string;
+  error_message?: string;
 }
 
 export interface CompleteReportJobInput extends ReportLifecycleInput {
   lease_token: string;
-  rows: ReadonlyArray<Record<string, unknown>>;
+  rows?: ReadonlyArray<Record<string, unknown>>;
+  blocks?: readonly ReportResultBlock[];
   expires_at?: Date;
 }
 
@@ -185,6 +206,7 @@ export class ReportLifecycleService {
         data: {
           status: input.status,
           finished_at: occurredAt,
+          ...(input.error_message ? { error_message: input.error_message } : {}),
         },
       });
       this.assertUpdated(result.count);
@@ -201,8 +223,8 @@ export class ReportLifecycleService {
   }
 
   async complete(input: CompleteReportJobInput): Promise<void> {
-    const snapshotRows = this.materializeSnapshotRows(input.rows);
-    const snapshotBytes = this.assertSnapshotLimits(snapshotRows);
+    const materialized = this.materializeResult(input);
+    const snapshotBytes = this.assertSnapshotLimits(materialized.rows.map((row) => row.data_json));
     const materializationToken = randomUUID();
     await this.prisma.$transaction(async (transaction) => {
       const job = await this.getJob(transaction, input.job_id);
@@ -236,16 +258,31 @@ export class ReportLifecycleService {
           ...(input.expires_at ? { expires_at: input.expires_at } : {}),
         },
       });
-      for (let start = 0; start < snapshotRows.length; start += SNAPSHOT_WRITE_CHUNK_SIZE) {
+      if (materialized.blocks.length > 0) {
+        await transaction.reportSnapshotBlock.createMany({
+          data: materialized.blocks.map((block, position) => ({
+            id: block.id,
+            organization_id: job.organization_id,
+            snapshot_id: snapshot.id,
+            position,
+            source: block.source,
+            label: block.label,
+            columns_json: block.columns,
+            row_count: block.rows.length,
+          })),
+        });
+      }
+      for (let start = 0; start < materialized.rows.length; start += SNAPSHOT_WRITE_CHUNK_SIZE) {
         this.assertNotCancelled(await this.getJob(transaction, input.job_id));
         await transaction.reportSnapshotRow.createMany({
-          data: snapshotRows
+          data: materialized.rows
             .slice(start, start + SNAPSHOT_WRITE_CHUNK_SIZE)
-            .map((data_json, offset) => ({
+            .map((row, offset) => ({
               organization_id: job.organization_id,
               snapshot_id: snapshot.id,
+              ...(row.block_id ? { block_id: row.block_id } : {}),
               row_number: start + offset + 1,
-              data_json,
+              data_json: row.data_json,
             })),
         });
       }
@@ -267,7 +304,7 @@ export class ReportLifecycleService {
 
       const auditEvent = this.auditEvent(job, input, "report.completed", occurredAt, {
         ...input.counts,
-        rows: snapshotRows.length,
+        rows: materialized.rows.length,
         bytes: snapshotBytes,
       });
       await this.audit.recordLocal(transaction, auditEvent);
@@ -372,6 +409,9 @@ export class ReportLifecycleService {
         await transaction.reportSnapshotRow.deleteMany({
           where: { snapshot_id: { in: snapshots.map((snapshot) => snapshot.id) } },
         });
+        await transaction.reportSnapshotBlock?.deleteMany({
+          where: { snapshot_id: { in: snapshots.map((snapshot) => snapshot.id) } },
+        });
       }
       await transaction.reportSnapshot.deleteMany(
         requestedSnapshot
@@ -428,10 +468,30 @@ export class ReportLifecycleService {
     }
   }
 
-  private materializeSnapshotRows(
-    rows: ReadonlyArray<Record<string, unknown>>,
-  ): ReadonlyArray<Record<string, unknown>> {
-    return JSON.parse(JSON.stringify(rows)) as ReadonlyArray<Record<string, unknown>>;
+  private materializeResult(input: CompleteReportJobInput): {
+    blocks: Array<ReportResultBlock & { id: string }>;
+    rows: Array<{ block_id?: string; data_json: Record<string, unknown> }>;
+  } {
+    if (input.blocks) {
+      const blocks = input.blocks.map((block) => ({
+        ...block,
+        id: randomUUID(),
+        rows: JSON.parse(JSON.stringify(block.rows)) as Record<string, unknown>[],
+      }));
+      return {
+        blocks,
+        rows: blocks.flatMap((block) =>
+          block.rows.map((data_json) => ({ block_id: block.id, data_json })),
+        ),
+      };
+    }
+    if (!input.rows) throw new ServiceError(400, "O resultado do relatório está vazio.");
+    return {
+      blocks: [],
+      rows: JSON.parse(JSON.stringify(input.rows)).map((data_json: Record<string, unknown>) => ({
+        data_json,
+      })),
+    };
   }
 
   private assertSnapshotLimits(rows: ReadonlyArray<Record<string, unknown>>): number {

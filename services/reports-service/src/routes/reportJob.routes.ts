@@ -14,6 +14,7 @@ import {
   reportJobListQuerySchema,
 } from "../schemas/reportHistory.schemas.js";
 import { createReportJobSchema, reportJobIdParamsSchema } from "../schemas/reportJob.schemas.js";
+import type { ReportModelDefinition } from "../schemas/reportModel.schemas.js";
 import type { ReportAuthorizationService } from "../services/reportAuthorizationService.js";
 import type { ReportJobService } from "../services/reportJobService.js";
 import type { ReportLifecycleService } from "../services/reportLifecycleService.js";
@@ -57,17 +58,27 @@ export function createReportJobRouter(options: {
       ...(includeEphemeral ? { includeEphemeral: true } : {}),
     });
     if (version.model.created_by_user_id === actor.userId) {
-      await options.authorizationService.validateDefinition({
-        ...actor,
-        requestId,
-        definition: version.version.definition_json as never,
-      });
+      const definition = version.version.definition_json as ReportModelDefinition;
+      if ("version" in definition) {
+        await options.authorizationService.validateComposition({
+          ...actor,
+          requestId,
+          definition,
+        });
+      } else {
+        await options.authorizationService.validateDefinition({
+          ...actor,
+          requestId,
+          definition,
+        });
+      }
       return version;
     }
+    const definition = version.version.definition_json as ReportModelDefinition;
     const shared = await options.authorizationService.validateSharedDefinition({
       ...actor,
       requestId,
-      definition: version.version.definition_json as never,
+      definition,
     });
     if (version.model.department_id !== shared.department_id) {
       throw new ServiceError(403, "O modelo compartilhado não pertence ao departamento atual.");
@@ -86,13 +97,22 @@ export function createReportJobRouter(options: {
     const job = body.definition
       ? await options.jobService.createFromDefinition({
           ...actor,
-          definition: (
-            await options.authorizationService.validateDefinition({
-              ...actor,
-              requestId,
-              definition: body.definition,
-            })
-          ).definition,
+          definition:
+            "version" in body.definition
+              ? (
+                  await options.authorizationService.validateComposition({
+                    ...actor,
+                    requestId,
+                    definition: body.definition,
+                  })
+                ).definition
+              : (
+                  await options.authorizationService.validateDefinition({
+                    ...actor,
+                    requestId,
+                    definition: body.definition,
+                  })
+                ).definition,
           payload,
         })
       : await (async () => {
@@ -123,22 +143,41 @@ export function createReportJobRouter(options: {
     if (query.scope === "library" && !access?.department) {
       throw new ServiceError(403, "O acervo compartilhado exige membro de departamento.");
     }
-    response.json(
-      createSuccessResponse(
-        await options.jobService.listHistory({
-          ...actor,
-          scope: query.scope,
-          ...(access?.department ? { departmentId: access.department.id } : {}),
-          ...(query.status ? { status: query.status } : {}),
-          ...(query.from ? { from: query.from } : {}),
-          ...(query.to ? { to: query.to } : {}),
-          ...(query.model_id ? { modelId: query.model_id } : {}),
-          ...(query.author_id ? { authorId: query.author_id } : {}),
-          ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
-          limit: query.limit,
-        }),
-      ),
-    );
+    const history = await options.jobService.listHistory({
+      ...actor,
+      scope: query.scope,
+      ...(access?.department ? { departmentId: access.department.id } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.from ? { from: query.from } : {}),
+      ...(query.to ? { to: query.to } : {}),
+      ...(query.model_id ? { modelId: query.model_id } : {}),
+      ...(query.author_id ? { authorId: query.author_id } : {}),
+      ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
+      limit: query.limit,
+    });
+    const visibleHistory =
+      query.scope === "library"
+        ? {
+            ...history,
+            items: (
+              await Promise.all(
+                history.items.map(async (item) => {
+                  try {
+                    await validateVersion(
+                      actor,
+                      request.get(REQUEST_ID_HEADER) ?? "reports-job-list",
+                      item.report_model_version_id,
+                    );
+                    return item;
+                  } catch {
+                    return null;
+                  }
+                }),
+              )
+            ).filter((item): item is NonNullable<typeof item> => item !== null),
+          }
+        : history;
+    response.json(createSuccessResponse(visibleHistory));
   });
 
   router.get("/jobs/:id", async (request, response) => {
@@ -191,6 +230,17 @@ export function createReportJobRouter(options: {
         : null;
     if (query.scope === "library" && !access?.department) {
       throw new ServiceError(403, "O acervo compartilhado exige membro de departamento.");
+    }
+    if (query.scope === "library") {
+      const job = await options.jobService.getVersionId({
+        organizationId: actor.organizationId,
+        id,
+      });
+      await validateVersion(
+        actor,
+        request.get(REQUEST_ID_HEADER) ?? "reports-job-snapshot",
+        job.report_model_version_id,
+      );
     }
     response.json(
       createSuccessResponse(

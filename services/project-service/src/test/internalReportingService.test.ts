@@ -8,6 +8,43 @@ const ORG_A = "00000000-0000-4000-8000-000000000001";
 const ORG_B = "00000000-0000-4000-8000-000000000002";
 
 describe("InternalReportingService", () => {
+  it("aplica critérios ao conjunto da organização antes do limite", async () => {
+    const records = Array.from({ length: 150 }, (_, index) => ({
+      organization_id: ORG_A,
+      name: `Projeto ${index}`,
+    }));
+    records.push({ organization_id: ORG_B, name: "Projeto 149" });
+    const service = new InternalReportingService({
+      $transaction: async function (read: (transaction: unknown) => Promise<unknown>) {
+        return read(this);
+      },
+      project: {
+        findMany: async ({
+          where,
+          take,
+          skip = 0,
+        }: {
+          where: { organization_id: string };
+          take: number;
+          skip?: number;
+        }) =>
+          records
+            .filter((row) => row.organization_id === where.organization_id)
+            .slice(skip, skip + take),
+      },
+    } as never);
+    await expect(
+      service.extract({
+        organizationId: ORG_A,
+        source: "integracao.projects",
+        fields: ["name"],
+        limit: 1,
+        query: {
+          filters: [{ field: "name", operator: "eq", parameter: "name", value: "Projeto 149" }],
+        },
+      }),
+    ).resolves.toEqual({ rows: [{ name: "Projeto 149" }], reachedLimit: false });
+  });
   it("extrai somente campos publicados na organização do grant e identifica corte", async () => {
     const projects = {
       findMany: vi

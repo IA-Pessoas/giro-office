@@ -13,6 +13,9 @@ import type {
   CreateRegularizeSitePasswordPayload,
   RemoveRegularizeGuidanceActivityPayload,
   RemoveRegularizeGuidancePartnerPayload,
+  UpdateRegularizeGuidanceActivityPayload,
+  UpdateRegularizeGuidancePartnerPayload,
+  LegacyGuidanceDraft,
   RegularizeClientPfDetail,
   RegularizeClientPfListFilters,
   RegularizeClientPfListItem,
@@ -23,11 +26,15 @@ import type {
   RegularizeLicenseDetail,
   RegularizeLicenseListFilters,
   RegularizeLicenseListItem,
+  RegularizeLicenseProtocolAccess,
+  RegularizeLicenseProtocolMetadata,
   RegularizeMunicipalTaxesDetail,
   RegularizeMunicipalTaxesListFilters,
   RegularizeMunicipalTaxesPage,
   RegularizePartner,
   RegularizePartnerListFilters,
+  RegularizeProcessActionPayload,
+  RegularizeProcessActionResult,
   RegularizePasswordDetail,
   RegularizePasswordListFilters,
   RegularizePasswordListItem,
@@ -75,6 +82,17 @@ function stripSitePasswordSecret(
 
   return safeItem;
 }
+
+function isLegacyGuidanceDraft(
+  payload: CreateRegularizeGuidancePayload,
+): payload is LegacyGuidanceDraft {
+  return !("checklist" in payload);
+}
+
+type RegularizeGuidanceUpdateRequest = UpdateRegularizeGuidancePayload & {
+  economic_activities?: never;
+  partners?: never;
+};
 
 export const regularizeService = {
   async getDashboard(year: number): Promise<RegularizeDashboard> {
@@ -331,7 +349,7 @@ export const regularizeService = {
     const api = setupAPIClient();
     const response = await api.post(REGULARIZE_ENDPOINTS.process, payload);
 
-    return unwrapRegularizeEnvelope<RegularizeProcessDetail>(response.data);
+    return unwrapRegularizeEntity<RegularizeProcessDetail>(response.data, "create");
   },
 
   async updateProcess(
@@ -341,6 +359,24 @@ export const regularizeService = {
     const response = await api.put(REGULARIZE_ENDPOINTS.process, payload);
 
     return unwrapRegularizeEnvelope<RegularizeProcessDetail>(response.data);
+  },
+
+  async sendProcessToFiscal(
+    payload: RegularizeProcessActionPayload,
+  ): Promise<RegularizeProcessActionResult> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.sendToFiscal, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeProcessActionResult>(response.data);
+  },
+
+  async returnProcessFromFiscal(
+    payload: RegularizeProcessActionPayload,
+  ): Promise<RegularizeProcessActionResult> {
+    const api = setupAPIClient();
+    const response = await api.post(REGULARIZE_ENDPOINTS.returnFromFiscal, payload);
+
+    return unwrapRegularizeEnvelope<RegularizeProcessActionResult>(response.data);
   },
 
   async listGuidance(filters: RegularizeGuidanceListFilters): Promise<RegularizeGuidance[]> {
@@ -362,6 +398,12 @@ export const regularizeService = {
   },
 
   async createGuidance(payload: CreateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
+    if (isLegacyGuidanceDraft(payload)) {
+      throw new Error(
+        "Rascunho legado de orientação não pode ser enviado; a Task 7 deve migrar este caller para checklist.",
+      );
+    }
+
     const api = setupAPIClient();
     const response = await api.post(REGULARIZE_ENDPOINTS.guidance, payload);
 
@@ -370,7 +412,12 @@ export const regularizeService = {
 
   async updateGuidance(payload: UpdateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
     const api = setupAPIClient();
-    const { process_id: _processId, ...body } = payload;
+    const requestPayload: RegularizeGuidanceUpdateRequest = payload;
+    const {
+      economic_activities: _economicActivities,
+      partners: _partners,
+      ...body
+    } = requestPayload;
     const response = await api.put(REGULARIZE_ENDPOINTS.guidance, body);
 
     return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
@@ -396,6 +443,16 @@ export const regularizeService = {
     return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
   },
 
+  async updateGuidanceActivity(
+    payload: UpdateRegularizeGuidanceActivityPayload,
+  ): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const { process_id: _processId, ...body } = payload;
+    const response = await api.put(REGULARIZE_ENDPOINTS.guidanceActivity, body);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
+  },
+
   async addGuidancePartner(
     payload: AddRegularizeGuidancePartnerPayload,
   ): Promise<RegularizeGuidance> {
@@ -412,6 +469,16 @@ export const regularizeService = {
     const api = setupAPIClient();
     const { process_id: _processId, ...body } = payload;
     const response = await api.post(REGULARIZE_ENDPOINTS.guidancePartnerRemove, body);
+
+    return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
+  },
+
+  async updateGuidancePartner(
+    payload: UpdateRegularizeGuidancePartnerPayload,
+  ): Promise<RegularizeGuidance> {
+    const api = setupAPIClient();
+    const { process_id: _processId, ...body } = payload;
+    const response = await api.put(REGULARIZE_ENDPOINTS.guidancePartner, body);
 
     return unwrapRegularizeEnvelope<RegularizeGuidance>(response.data);
   },
@@ -459,5 +526,24 @@ export const regularizeService = {
     const response = await api.put(REGULARIZE_ENDPOINTS.license, payload);
 
     return unwrapRegularizeEnvelope<RegularizeLicenseDetail>(response.data);
+  },
+
+  async uploadLicenseProtocol(
+    id: RegularizeId,
+    file: File,
+  ): Promise<RegularizeLicenseProtocolMetadata> {
+    const api = setupAPIClient();
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post(REGULARIZE_ENDPOINTS.licenseProtocol(id), formData);
+
+    return unwrapRegularizeEnvelope<RegularizeLicenseProtocolMetadata>(response.data);
+  },
+
+  async getLicenseProtocolAccess(id: RegularizeId): Promise<RegularizeLicenseProtocolAccess> {
+    const api = setupAPIClient();
+    const response = await api.get(REGULARIZE_ENDPOINTS.licenseProtocol(id));
+
+    return unwrapRegularizeEnvelope<RegularizeLicenseProtocolAccess>(response.data);
   },
 };

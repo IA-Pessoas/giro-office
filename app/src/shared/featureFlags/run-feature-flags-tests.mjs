@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -99,4 +100,11 @@ test("frontend initialization and evaluation failures use safe defaults", async 
 
   assert.equal(await unavailable.isEnabled("future.flag", false), false);
   assert.equal(unavailable.status, "unavailable");
+});
+
+test("frontend feature flags use a static provider import for webpack", async () => {
+  const source = await readFile(new URL("./client.ts", import.meta.url), "utf8");
+
+  assert.match(source, /await import\("@launchdarkly\/js-client-sdk"\)/);
+  assert.doesNotMatch(source, /const moduleName: string/);
 });

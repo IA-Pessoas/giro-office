@@ -142,7 +142,12 @@ describe("OrganizationService", () => {
       await create(new OrganizationService(), cnpj);
 
       expect(prismaMock.organization.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ cnpj: "11222333000181" }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            cnpj: "11222333000181",
+            pessoalGroups: { create: expect.objectContaining({ system_key: "NO_MOVEMENT" }) },
+          }),
+        }),
       );
       expect(prismaMock.organization.findFirst).toHaveBeenCalledWith({
         where: { cnpj: { in: ["11222333000181", "11.222.333/0001-81"] } },
@@ -241,6 +246,14 @@ describe("OrganizationService", () => {
             { name: "Comercial", color: "#EF4444", status: "active", solution: false },
             { name: "Financeiro", color: "#14B8A6", status: "active", solution: false },
           ],
+        },
+        pessoalGroups: {
+          create: {
+            name: "Sem Movimento",
+            normalized_name: "sem movimento",
+            policy: "NO_OBLIGATIONS",
+            system_key: "NO_MOVEMENT",
+          },
         },
       },
       select: {

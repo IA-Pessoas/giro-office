@@ -17,7 +17,34 @@ export const TASK_FORM_AUXILIARY_WARNING_CLASSNAME =
   "rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200";
 
 export const TASK_CREATE_REQUIRED_FIELDS_MESSAGE =
-  "Preencha cliente, projeto, modelo, status de prospecção e urgência.";
+  "Preencha cliente, projeto, departamento, modelo, status de prospecção e urgência.";
+
+export function getAutomaticTaskResponsibleId(
+  modelDefaultId: string | null | undefined,
+  candidates: Array<{ id: string }>,
+): string {
+  if (modelDefaultId && candidates.some(({ id }) => id === modelDefaultId)) {
+    return modelDefaultId;
+  }
+
+  return candidates.length === 1 ? candidates[0].id : "";
+}
+
+export function getTaskEditValidationMessage(values: {
+  name: string;
+  status: string;
+  department_id: string;
+  model_id: string;
+  urgency: string;
+}): string | null {
+  return !values.name.trim() ||
+    !values.status ||
+    !values.department_id ||
+    !values.model_id ||
+    !values.urgency.trim()
+    ? "Preencha nome, status, departamento, modelo e urgência."
+    : null;
+}
 
 export const TASK_URGENCY_OPTIONS = ["Baixa", "Normal", "Alta", "Urgente"] as const;
 
@@ -53,20 +80,30 @@ interface GetTaskCreateValidationMessageParams {
   clientId: string;
   projectId: string;
   modelId: string;
+  departmentId: string;
   prospectingStatus: string;
   urgency: string;
   observations: string;
+  eligibleResponsibleCount: number;
+  responsibleId: string;
 }
 
 export function getTaskCreateValidationMessage({
   clientId,
   projectId,
   modelId,
+  departmentId,
   prospectingStatus,
   urgency,
+  eligibleResponsibleCount,
+  responsibleId,
 }: GetTaskCreateValidationMessageParams): string | null {
-  if (!clientId || !projectId || !modelId || !prospectingStatus || !urgency) {
+  if (!clientId || !projectId || !departmentId || !modelId || !prospectingStatus || !urgency) {
     return TASK_CREATE_REQUIRED_FIELDS_MESSAGE;
+  }
+
+  if (eligibleResponsibleCount > 1 && !responsibleId) {
+    return "Selecione um responsável elegível para a tarefa.";
   }
 
   return null;

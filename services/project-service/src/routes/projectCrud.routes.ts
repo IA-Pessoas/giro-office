@@ -53,6 +53,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
         name: body.name,
         client_id: body.client_id,
         start_date: body.start_date,
+        end_date: body.end_date,
         objective: body.objective,
         sponsor_id: body.sponsor_id ?? undefined,
       });

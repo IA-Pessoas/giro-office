@@ -53,6 +53,16 @@ export const serviceRegistry = [
     prismaOutputPath: "services/contabil-service/src/generated/prisma",
   },
   {
+    name: "commercial-service",
+    packagePath: "services/commercial-service",
+    defaultUrl: "http://localhost:3045",
+    urlEnvKey: "COMMERCIAL_SERVICE_URL",
+    openapiSpecPath: "services/commercial-service/src/openapi/spec.ts",
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "AUDIT_SERVICE_TOKEN",
+    prismaOutputPath: "services/commercial-service/src/generated/prisma",
+  },
+  {
     name: "department-service",
     packagePath: "services/department-service",
     defaultUrl: "http://localhost:3036",
@@ -161,6 +171,16 @@ export const serviceRegistry = [
     authModes: ["public", "bearer", "admin-bearer", "internal-token"],
     internalTokenEnvKey: "REPORTS_INTERNAL_TOKEN",
     prismaOutputPath: "services/task-service/src/generated/prisma",
+  },
+  {
+    name: "triagem-service",
+    packagePath: "services/triagem-service",
+    defaultUrl: "http://localhost:3046",
+    urlEnvKey: "TRIAGEM_SERVICE_URL",
+    openapiSpecPath: "services/triagem-service/src/openapi/spec.ts",
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "AUDIT_SERVICE_TOKEN",
+    prismaOutputPath: "services/triagem-service/src/generated/prisma",
   },
   {
     name: "ti-service",

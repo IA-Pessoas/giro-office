@@ -1,3 +1,4 @@
+import { reportingQuerySchema } from "@workspace/shared";
 import { z } from "zod";
 
 import { FISCAL_ICMS_REPORTING_SOURCES } from "../reporting/fiscalIcmsReportingCatalog.js";
@@ -8,6 +9,7 @@ const reportingFieldSchema = z.string().trim().min(1).max(64);
 
 export const internalReportingExtractBodySchema = z
   .object({
+    query: reportingQuerySchema.optional(),
     source: z.enum([
       ...FISCAL_ICMS_REPORTING_SOURCES,
       ...FISCAL_NCM_REPORTING_SOURCES,
