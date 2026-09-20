@@ -357,6 +357,8 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
   const pageErrors = [];
   const consoleErrors = [];
   const appRequests = [];
+  let assistantObservationActive = false;
+  let assistantUnexpectedRequest = null;
 
   await context.addCookies([
     {
@@ -379,6 +381,9 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
   });
   page.on("request", (request) => {
     appRequests.push(request.url());
+    if (assistantObservationActive) {
+      assistantUnexpectedRequest = request.url();
+    }
   });
   const notificationState = await installApiMocks(page, currentUser);
 
@@ -427,6 +432,7 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
     await page.goto("/contabil", { waitUntil: "networkidle" });
     await page.locator("aside").waitFor({ state: "visible" });
     const requestsBeforeAssistant = appRequests.length;
+    assistantObservationActive = true;
     await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").fill("Como está minha operação?");
     await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").press("Enter");
     await page.getByRole("heading", { name: "Assistente IA", level: 2 }).waitFor({ state: "visible" });
@@ -434,6 +440,13 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
       "Este assistente ainda não está conectado a uma IA. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor.",
       { exact: true },
     ).waitFor({ state: "visible" });
+    await page.waitForTimeout(250);
+    assistantObservationActive = false;
+    assert.equal(
+      assistantUnexpectedRequest,
+      null,
+      `O fluxo local do Assistente IA gerou uma requisição inesperada: ${assistantUnexpectedRequest ?? ""}`,
+    );
     assert.deepEqual(
       appRequests.slice(requestsBeforeAssistant),
       [],
@@ -563,6 +576,19 @@ async function assertConfigurationAndAdministrationNavigation() {
     await page.locator("aside").waitFor({ state: "visible" });
     await page.getByRole("link", { name: "Configurações", exact: true }).waitFor({ state: "visible" });
     await page.getByRole("link", { name: "Administração", exact: true }).waitFor({ state: "visible" });
+    assert.equal(
+      await page.getByRole("link", { name: "Configurações", exact: true }).getAttribute("href"),
+      "/configuracoes",
+    );
+    assert.equal(
+      await page.getByRole("link", { name: "Administração", exact: true }).getAttribute("href"),
+      "/administracao",
+    );
+    assert.equal(
+      await page.evaluate(() => window.innerWidth),
+      browserViewport.width,
+      "O smoke deve executar no viewport responsivo configurado.",
+    );
   } finally {
     await browser.close();
   }
