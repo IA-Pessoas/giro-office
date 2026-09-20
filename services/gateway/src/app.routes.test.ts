@@ -1262,6 +1262,7 @@ it("returns real dashboard stats for the authenticated organization", async () =
     expect(body.success).toBe(true);
     expect(body.data?.totalClients).toBe(1146);
     expect(body.data?.financial?.paidCertificateReceipts).toBe(0);
+    expect(body.data).not.toHaveProperty("fiscal");
     expect(getStats).toHaveBeenCalledWith("org-dashboard");
   } finally {
     await stopServer(server);
