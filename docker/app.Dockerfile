@@ -34,12 +34,14 @@ ENV NEXT_PUBLIC_LAUNCHDARKLY_INIT_TIMEOUT_MS=$NEXT_PUBLIC_LAUNCHDARKLY_INIT_TIME
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY packages/api/package.json ./packages/api/package.json
 COPY app/package.json ./app/package.json
+COPY shared/package.json ./shared/package.json
 
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY turbo.json tsconfig.base.json biome.json ./
 COPY packages/api ./packages/api
 COPY app ./app
+COPY shared ./shared
 
 RUN --mount=type=cache,id=workspace-next-cache,target=/workspace/app/.next/cache \
   pnpm turbo run build --filter=@workspace/app
