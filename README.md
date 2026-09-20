@@ -76,16 +76,45 @@ Em desenvolvimento, a aplicação web usa `http://localhost:3000` e o gateway us
    - saúde do gateway: <http://localhost:3010/health>;
    - documentação OpenAPI: <http://localhost:3010/docs>.
 
-`pnpm dev` inicia a aplicação, o gateway e os serviços do workspace. Para trabalhar em uma
-parte isolada, use:
+`pnpm dev` inicia o perfil `base`, com a aplicação em watch e as dependências HTTP compiladas
+e executadas com `start`. O comando não encerra processos nem remove caches. Para trabalhar
+em uma área, use um perfil:
 
 ```bash
-pnpm dev:app
-pnpm dev:gateway
-pnpm --filter @workspace/user-service dev
+pnpm dev -- --profile rh
+pnpm dev -- --profile contabil
+pnpm dev -- --profile integracao
+pnpm dev:full
 ```
 
-O último comando aceita qualquer pacote listado em `pnpm-workspace.yaml`.
+Os perfis incluem UI e a base de autenticação, organização e auditoria. `rh`, `contabil` e
+`integracao` acrescentam as dependências HTTP da área; `full` inclui todos os serviços HTTP.
+Serviços extras podem ser adicionados explicitamente:
+
+```bash
+pnpm dev:profile -- --profile rh --service ti-service
+pnpm dev -- --profile rh --watch app,rh-service
+pnpm dev -- --profile rh --watch shared
+pnpm dev -- --profile full --worker
+```
+
+Serviços sem `--watch` são compilados seletivamente pelo Turbo e executados sem watcher.
+`app` permanece em watch; `shared` só entra em watch quando selecionado. O plano pode ser
+conferido sem iniciar processos com `--plan`. Portas ocupadas por processos não registrados
+geram conflito e nunca são encerradas automaticamente.
+
+Para recuperação explícita, primeiro confira o estado e só depois aplique a ação:
+
+```bash
+pnpm dev:recover
+pnpm dev:recover -- --apply
+pnpm dev:recover -- --apply --clean-next
+```
+
+A recuperação encerra apenas PIDs registrados em `.turbo/dev/state.json`; `--clean-next`
+remove somente `app/.next/dev`. O worker de Relatórios é opcional porque é um job, não uma
+dependência de todo fluxo. Os perfis são uma seleção operacional documentada: URLs e portas
+customizadas por env continuam sendo responsabilidade da configuração do serviço.
 
 ## Verificações
 
