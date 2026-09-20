@@ -10,11 +10,6 @@ import { QuickActions } from "./QuickActions";
 import { RecentClientsTable } from "./RecentClientsTable";
 import { StatCard } from "./StatCard";
 
-const FiscalObligationsChart = dynamic(
-  () => import("./FiscalObligationsChart").then((mod) => mod.FiscalObligationsChart),
-  { ssr: false, loading: () => <ChartSkeleton height={240} /> },
-);
-
 const ServiceDistributionChart = dynamic(
   () => import("./ServiceDistributionChart").then((mod) => mod.ServiceDistributionChart),
   { ssr: false, loading: () => <ChartSkeleton height={240} /> },
@@ -92,10 +87,7 @@ export function DashboardGrid({ stats, isLoading }: DashboardGridProps) {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <FiscalObligationsChart data={stats.fiscal.obligations} />
-        <InsightsPanel insights={stats.insights} />
-      </div>
+      <InsightsPanel insights={stats.insights} />
 
       <div>
         <RecentClientsTable data={stats.recentClients} />

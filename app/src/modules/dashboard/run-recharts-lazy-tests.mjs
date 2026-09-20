@@ -41,7 +41,6 @@ runTest("dashboard page lazy-loads the full Dashboard component", () => {
 runTest("DashboardGrid lazy-loads chart components as wholes", () => {
   const src = read("modules/dashboard/components/DashboardGrid.tsx");
   assert.match(src, /next\/dynamic/);
-  assert.match(src, /FiscalObligationsChart/);
   assert.match(src, /ServiceDistributionChart/);
   assert.match(src, /ClientTrendsChart/);
   assert.match(src, /ssr:\s*false/);
@@ -53,7 +52,6 @@ runTest("DashboardGrid lazy-loads chart components as wholes", () => {
 
 const chartLeaves = [
   "modules/dashboard/components/ServiceDistributionChart.tsx",
-  "modules/dashboard/components/FiscalObligationsChart.tsx",
   "modules/dashboard/components/ClientTrendsChart.tsx",
   "shared/components/newLayout/Dashboard.tsx",
 ];

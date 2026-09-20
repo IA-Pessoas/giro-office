@@ -1200,13 +1200,6 @@ it("returns real dashboard stats for the authenticated organization", async () =
       castelo_med: 23,
     },
     monthlyTrends: [{ month: "Jul", newClients: 1146 }],
-    fiscal: {
-      obligations: [
-        { status: "Pendente", count: 0 },
-        { status: "Emitida", count: 0 },
-        { status: "Atrasada", count: 0 },
-      ],
-    },
     financial: {
       paidCertificateReceipts: 0,
       unpaidCertificates: 0,
@@ -1269,6 +1262,7 @@ it("returns real dashboard stats for the authenticated organization", async () =
     expect(body.success).toBe(true);
     expect(body.data?.totalClients).toBe(1146);
     expect(body.data?.financial?.paidCertificateReceipts).toBe(0);
+    expect(body.data).not.toHaveProperty("fiscal");
     expect(getStats).toHaveBeenCalledWith("org-dashboard");
   } finally {
     await stopServer(server);

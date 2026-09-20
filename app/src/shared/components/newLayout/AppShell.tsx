@@ -900,6 +900,7 @@ export function AppShell({
                   <div
                     aria-hidden="true"
                     className="fixed inset-0 z-40"
+                    data-testid="app-shell-notifications-backdrop"
                     onClick={() => setShowNotifications(false)}
                   />
                   <div
