@@ -347,7 +347,7 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
   });
   const pageErrors = [];
   const consoleErrors = [];
-  const assistantRequests = [];
+  const appRequests = [];
 
   await context.addCookies([
     {
@@ -369,10 +369,7 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
     }
   });
   page.on("request", (request) => {
-    const pathname = new URL(request.url()).pathname;
-    if (/\/(?:ai|assistant)(?:\/|$)/u.test(pathname)) {
-      assistantRequests.push(pathname);
-    }
+    appRequests.push(request.url());
   });
   const notificationState = await installApiMocks(page, currentUser);
 
@@ -420,6 +417,7 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
     assert.equal(notificationState.readCalls(), 1, "A interação deve marcar a notificação como lida.");
     await page.goto("/contabil", { waitUntil: "networkidle" });
     await page.locator("aside").waitFor({ state: "visible" });
+    const requestsBeforeAssistant = appRequests.length;
     await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").fill("Como está minha operação?");
     await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").press("Enter");
     await page.getByRole("heading", { name: "Assistente IA", level: 2 }).waitFor({ state: "visible" });
@@ -427,7 +425,11 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
       "Este assistente ainda não está conectado a uma IA. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor.",
       { exact: true },
     ).waitFor({ state: "visible" });
-    assert.deepEqual(assistantRequests, [], "O fluxo local do Assistente IA não deve chamar um endpoint de IA.");
+    assert.deepEqual(
+      appRequests.slice(requestsBeforeAssistant),
+      [],
+      "O fluxo local do Assistente IA não deve gerar requisições de rede.",
+    );
     if (assistantEvidencePath && currentUser.id === integrationRestrictedProfiles[0].id) {
       await mkdir(dirname(assistantEvidencePath), { recursive: true });
       await page.screenshot({ path: assistantEvidencePath, fullPage: true });
