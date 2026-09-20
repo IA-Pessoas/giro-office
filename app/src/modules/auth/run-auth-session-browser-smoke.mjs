@@ -46,13 +46,6 @@ const dashboardStatsFixture = {
     castelo_med: 1,
   },
   monthlyTrends: [{ month: "Set", newClients: 4 }],
-  fiscal: {
-    obligations: [
-      { status: "Pendente", count: 3 },
-      { status: "Emitida", count: 8 },
-      { status: "Atrasada", count: 1 },
-    ],
-  },
   financial: {
     paidCertificateReceipts: 1250,
     unpaidCertificates: 2,

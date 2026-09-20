@@ -11,11 +11,6 @@ const { Pool } = pg;
 type Queryable = Pick<pg.Pool, "query">;
 const DASHBOARD_MAX_CONCURRENT_QUERIES = 2;
 
-export interface FiscalObligationSummary {
-  status: "Pendente" | "Emitida" | "Atrasada";
-  count: number;
-}
-
 export interface DashboardFinancialSummary {
   paidCertificateReceipts: number;
   unpaidCertificates: number;
@@ -62,9 +57,6 @@ export interface DashboardStats {
     month: string;
     newClients: number;
   }>;
-  fiscal: {
-    obligations: FiscalObligationSummary[];
-  };
   financial: DashboardFinancialSummary;
   commercial: DashboardCommercialSummary;
   departments: DashboardDepartmentSummary[];
@@ -532,13 +524,6 @@ export class DashboardStatsService {
           castelo_med: toNumber(clientSummary?.castelo_med),
         },
         monthlyTrends,
-        fiscal: {
-          obligations: [
-            { status: "Pendente", count: 0 },
-            { status: "Emitida", count: 0 },
-            { status: "Atrasada", count: 0 },
-          ],
-        },
         financial: {
           paidCertificateReceipts: toNumber(paidCertificateReceipts),
           unpaidCertificates: toNumber(certificateReceipts[0]?.unpaid_certificates),
