@@ -263,6 +263,7 @@ describe("DashboardStatsService", () => {
     expect(stats.departments).toEqual([
       { id: "dept-1", name: "Fiscal", openTasks: 7, completedTasks: 3, urgentTasks: 2 },
     ]);
+    expect(stats).not.toHaveProperty("fiscal");
     expect(String(query.mock.calls[7]?.[0])).toContain('"certificate.pj"');
     expect(String(query.mock.calls[8]?.[0])).toContain('"commercial.prospecting"');
     expect(String(query.mock.calls[10]?.[0])).toContain("public.departments");
