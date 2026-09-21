@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -8,6 +8,7 @@ import {
   checkComposeSecurity,
   checkProductionComposeSecurity,
   checkResolvedProductionSecurity,
+  parseComposeSecurityMetadata,
 } from "./check-compose-security.mjs";
 
 async function writeFixture(contents) {
@@ -105,6 +106,19 @@ test("workspace VPS compose files keep gateway ports private and auth cookies se
   const result = await checkComposeSecurity();
 
   assert.deepEqual(result.errors, []);
+});
+
+test("develop slot publishes only reverse-proxy on port 8086", async () => {
+  const composeFile = new URL("../docker-compose.vps.slot-develop.yml", import.meta.url);
+  const contents = await readFile(composeFile, "utf8");
+  const { services } = parseComposeSecurityMetadata(contents);
+
+  assert.deepEqual(services.get("reverse-proxy")?.publishedPorts, ["8086:80"]);
+  for (const serviceName of ["gateway", "web"]) {
+    const service = services.get(serviceName);
+    assert.equal(service?.hasPorts, true, `${serviceName} must override the base ports list`);
+    assert.deepEqual(service?.publishedPorts, [], `${serviceName} must not publish a host port`);
+  }
 });
 
 test("checkComposeSecurity fails when a workspace service publishes host ports", async () => {

@@ -13,7 +13,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": ["NODE_ENV", "NEXT_PUBLIC_*", "API_INTERNAL_URL", "DATABASE_URL"],
+      "env": ["NODE_ENV", "NEXT_PUBLIC_*", "API_INTERNAL_URL", "DATABASE_URL", "DEPLOY_SLOT"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "tsconfig.tsbuildinfo"]
     },
     "dev": {

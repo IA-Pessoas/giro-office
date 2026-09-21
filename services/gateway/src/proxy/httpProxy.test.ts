@@ -88,7 +88,6 @@ describe("buildForwardHeaders", () => {
     expect(headers.get(FORWARDED_AUTH_PERMISSION_HEADER)).toBe("2");
     expect(headers.get(FORWARDED_AUTH_MODULES_HEADER)).toBeNull();
   });
-
   it("mantém o vínculo secreto da sessão fora de upstreams comuns", () => {
     const headers = buildForwardHeaders(authenticatedRequest, {
       internalServiceToken: "shared-token",

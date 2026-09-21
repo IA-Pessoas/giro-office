@@ -34,10 +34,10 @@ if [[ -z "${DOCKER_REGISTRY_URL:-}" || -z "${DOCKER_REGISTRY_USERNAME:-}" || -z 
   exit 1
 fi
 
-# staging: base + runtime override → 8085 / 3010 / 3000 (web)
-# develop: + slot-develop → 8086 / 3011 / 3001 (web)
-# test-develop: + slot-test-develop → 8087 / 3013 / 3002 (web)
-# test-staging: + slot-test-staging → 8086 / 3012 / 3003 (web)
+# staging: base + runtime override → reverse-proxy 8085; web/gateway privados
+# develop: + slot-develop → reverse-proxy 8086; web/gateway privados
+# test-develop: + slot-test-develop → reverse-proxy 8087; web/gateway privados
+# test-staging: + slot-test-staging → reverse-proxy 8086; web/gateway privados
 vps_build_compose_args
 
 export WORKSPACE_VPS_IMAGE_TAG="${WORKSPACE_VPS_IMAGE_TAG:-vps}"
