@@ -2,7 +2,7 @@
 
 ## Estado
 
-O `commercial-service` já envia notificações de fechamento ao adaptador HTTP e repete falhas pela outbox. O workflow N8N de produção ainda precisa ser configurado e validado no ambiente autorizado. Este repositório não inclui export de workflow nem credenciais: faltam acesso ao N8N, credenciais do provedor/remetente, escolha aprovada para persistência de idempotência e um procedimento operacional para reprocessamento manual.
+O `commercial-service` já envia notificações de fechamento ao adaptador HTTP e repete falhas pela outbox. O workflow N8N e sua URL de webhook já existem fora deste repositório. Este PR não altera nem chama o endpoint. O export anteriormente disponível para análise estava inativo e usava um formato antigo de payload; portanto, ele não comprova que o workflow publicado atende ao contrato atual. É necessário verificar o workflow atual, a autenticação, a idempotência persistente, a configuração segura da VPS e o procedimento de reprocessamento antes de concluir a validação ponta a ponta.
 
 ## Contrato HTTP
 
