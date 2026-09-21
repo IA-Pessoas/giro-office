@@ -430,12 +430,14 @@ test("compose-vps-buildx-push passes the develop slot to the web build", async (
   assert.match(output, /--build-arg DEPLOY_SLOT=develop/);
 });
 
-test("compose-vps-buildx-push infers the develop slot from the checked out branch", async () => {
-  const output = await dryRunBuildxPush("web", {
-    deploySlot: null,
-    githubRefName: "develop",
-  });
-  assert.match(output, /--build-arg DEPLOY_SLOT=develop/);
+test("compose-vps-buildx-push infers develop and staging slots from the checked out branch", async () => {
+  for (const slot of ["develop", "staging"]) {
+    const output = await dryRunBuildxPush("web", {
+      deploySlot: null,
+      githubRefName: slot,
+    });
+    assert.match(output, new RegExp(`--build-arg DEPLOY_SLOT=${slot}`));
+  }
 });
 
 test("triagem and contabil examples share the internal token required by the deploy contract", async () => {

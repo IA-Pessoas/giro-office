@@ -35,20 +35,22 @@ function getHeader(headers, name) {
   return headers.find((header) => header.key.toLowerCase() === name.toLowerCase())?.value;
 }
 
-test("develop slot allows HTTP asset requests and keeps the other security headers", async () => {
-  const headers = await readSecurityHeaders("develop");
-  const csp = getHeader(headers, "Content-Security-Policy");
+test("develop and staging slots allow HTTP asset requests and keep the other security headers", async () => {
+  for (const slot of ["develop", "staging"]) {
+    const headers = await readSecurityHeaders(slot);
+    const csp = getHeader(headers, "Content-Security-Policy");
 
-  assert.ok(csp);
-  assert.doesNotMatch(csp, /(?:^|;\s*)upgrade-insecure-requests(?:;|$)/);
-  assert.match(csp, /default-src 'self'/);
-  assert.match(csp, /script-src 'self' 'unsafe-inline'/);
-  assert.match(csp, /style-src 'self' 'unsafe-inline'/);
-  assert.equal(getHeader(headers, "Strict-Transport-Security"), "max-age=31536000; includeSubDomains");
+    assert.ok(csp);
+    assert.doesNotMatch(csp, /(?:^|;\s*)upgrade-insecure-requests(?:;|$)/);
+    assert.match(csp, /default-src 'self'/);
+    assert.match(csp, /script-src 'self' 'unsafe-inline'/);
+    assert.match(csp, /style-src 'self' 'unsafe-inline'/);
+    assert.equal(getHeader(headers, "Strict-Transport-Security"), "max-age=31536000; includeSubDomains");
+  }
 });
 
 test("production and other slots retain upgrade-insecure-requests", async () => {
-  for (const slot of [undefined, "production", "staging"]) {
+  for (const slot of [undefined, "production", "test-develop", "test-staging"]) {
     const headers = await readSecurityHeaders(slot);
     const csp = getHeader(headers, "Content-Security-Policy");
 
