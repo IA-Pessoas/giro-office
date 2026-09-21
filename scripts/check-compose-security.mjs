@@ -255,6 +255,7 @@ export async function checkComposeSecurity({ composeFiles, registry = serviceReg
     const contents = await readFile(file, "utf8");
     const metadata = parseComposeSecurityMetadata(contents);
     const displayPath = path.relative(rootDir, file) || file;
+    const isDevelopSlot = path.basename(file) === "docker-compose.vps.slot-develop.yml";
 
     for (const [serviceName, service] of metadata.services) {
       if (service.authCookieSecure === false) {
@@ -280,7 +281,10 @@ export async function checkComposeSecurity({ composeFiles, registry = serviceReg
       if (
         ["gateway", "reverse-proxy", "web"].includes(serviceName) &&
         service.publishedPorts.some(
-          (port) => !port.startsWith("127.0.0.1:") && !port.startsWith("[::1]:"),
+          (port) =>
+            !port.startsWith("127.0.0.1:") &&
+            !port.startsWith("[::1]:") &&
+            !(isDevelopSlot && serviceName === "reverse-proxy" && port === "8086:80"),
         )
       ) {
         errors.push(`${displayPath}: service "${serviceName}" host ports must bind to loopback.`);

@@ -19,7 +19,7 @@ const contentSecurityPolicy = [
   "connect-src 'self'",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  "upgrade-insecure-requests",
+  ...(process.env.DEPLOY_SLOT === "develop" ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 export const securityHeaders = [

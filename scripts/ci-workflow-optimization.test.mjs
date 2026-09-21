@@ -135,16 +135,25 @@ test("detect-changed-vps-services emits ALL for lockfile changes", async () => {
 
 const buildxPushScript = path.join(repoRoot, "scripts", "ci", "compose-vps-buildx-push.sh");
 
-async function dryRunBuildxPush(scope) {
+test("Turbo build task forwards DEPLOY_SLOT to Next.js configuration", async () => {
+  const turboConfig = JSON.parse(await readFile(path.join(repoRoot, "turbo.json"), "utf8"));
+  assert.ok(turboConfig.tasks.build.env.includes("DEPLOY_SLOT"));
+});
+
+async function dryRunBuildxPush(scope, { deploySlot = "production", githubRefName } = {}) {
+  const env = {
+    DOCKER_REGISTRY_URL: "ghcr.io/example-org/workspace",
+    STAGING_DOCKER_TAG: "abc1234",
+    VPS_PUSH_SERVICES: scope,
+    NEXT_PUBLIC_API_URL: "https://api.example.test",
+    API_INTERNAL_URL: "http://gateway:3010",
+    CI_DRY_RUN: "1",
+  };
+  if (deploySlot !== null) env.DEPLOY_SLOT = deploySlot;
+  if (githubRefName !== undefined) env.GITHUB_REF_NAME = githubRefName;
+
   const { stdout } = await run(bashCommand, [buildxPushScript], {
-    env: {
-      DOCKER_REGISTRY_URL: "ghcr.io/example-org/workspace",
-      STAGING_DOCKER_TAG: "abc1234",
-      VPS_PUSH_SERVICES: scope,
-      NEXT_PUBLIC_API_URL: "https://api.example.test",
-      API_INTERNAL_URL: "http://gateway:3010",
-      CI_DRY_RUN: "1",
-    },
+    env,
   });
   return stdout;
 }
@@ -408,11 +417,48 @@ test("compose-vps-buildx-push plans cached web build with Next.js build args", a
   assert.match(output, /--build-arg NEXT_PUBLIC_API_URL=https:\/\/api\.example\.test/);
   assert.doesNotMatch(output, /NEXT_PUBLIC_AUTH_COOKIE_SECURE/);
   assert.match(output, /--build-arg API_INTERNAL_URL=http:\/\/gateway:3010/);
+  assert.match(output, /--build-arg DEPLOY_SLOT=production/);
   assert.match(
     output,
     /--cache-from type=registry,ref=ghcr\.io\/example-org\/workspace\/buildcache-web:buildcache/,
   );
   assert.match(output, /--tag ghcr\.io\/example-org\/workspace\/web:abc1234/);
+});
+
+test("compose-vps-buildx-push passes the develop slot to the web build", async () => {
+  const output = await dryRunBuildxPush("web", { deploySlot: "develop" });
+  assert.match(output, /--build-arg DEPLOY_SLOT=develop/);
+});
+
+test("compose-vps-buildx-push infers the develop slot from the checked out branch", async () => {
+  const output = await dryRunBuildxPush("web", {
+    deploySlot: null,
+    githubRefName: "develop",
+  });
+  assert.match(output, /--build-arg DEPLOY_SLOT=develop/);
+});
+
+test("triagem and contabil examples share the internal token required by the deploy contract", async () => {
+  const [triagemExample, contabilExample, deployManifest] = await Promise.all([
+    readFile(path.join(repoRoot, "services", "triagem-service", ".env.example"), "utf8"),
+    readFile(path.join(repoRoot, "services", "contabil-service", ".env.example"), "utf8"),
+    readFile(path.join(repoRoot, "scripts", "ci", "vps-secrets.manifest"), "utf8"),
+  ]);
+  const valueFor = (contents, key) => {
+    const line = contents.match(new RegExp(`^${key}=(.*)$`, "m"));
+    assert.ok(line, `${key} should be documented`);
+    return line[1];
+  };
+
+  assert.equal(
+    valueFor(triagemExample, "INTERNAL_SERVICE_TOKEN"),
+    valueFor(contabilExample, "TRIAGEM_INTERNAL_TOKEN"),
+  );
+  assert.match(deployManifest, /INTERNAL_SERVICE_TOKEN deve coincidir com AUDIT_SERVICE_TOKEN do gateway e TRIAGEM_INTERNAL_TOKEN do contabil-service/);
+  assert.equal(
+    valueFor(triagemExample, "INTERNAL_SERVICE_TOKEN"),
+    valueFor(triagemExample, "AUDIT_SERVICE_TOKEN"),
+  );
 });
 
 const deployScopeScript = path.join(repoRoot, "scripts", "ci", "vps-deploy-scope.sh");
