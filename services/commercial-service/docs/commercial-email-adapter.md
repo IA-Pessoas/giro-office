@@ -2,7 +2,7 @@
 
 ## Estado
 
-O `commercial-service` já envia notificações de fechamento ao adaptador HTTP e repete falhas pela outbox. O workflow N8N e sua URL de webhook já existem fora deste repositório. Este PR não altera nem chama o endpoint. O export anteriormente disponível para análise estava inativo e usava um formato antigo de payload; portanto, ele não comprova que o workflow publicado atende ao contrato atual. É necessário verificar o workflow atual, a autenticação, a idempotência persistente, a configuração segura da VPS e o procedimento de reprocessamento antes de concluir a validação ponta a ponta.
+O `commercial-service` já envia notificações de fechamento ao adaptador HTTP e repete falhas pela outbox. O workflow N8N e sua URL de webhook já existem fora deste repositório. A URL informada para `COMMERCIAL_EMAIL_ADAPTER_URL` é `https://n8n.iapessoas.com.br/webhook/email-office`. Este PR não altera nem chama o endpoint, e a configuração atualmente implantada ainda não foi verificada. O export anteriormente disponível para análise estava inativo e usava um formato antigo de payload; portanto, ele não comprova que o workflow publicado atende ao contrato atual. É necessário verificar o workflow atual, a autenticação, a idempotência persistente, a configuração segura da VPS e o procedimento de reprocessamento antes de concluir a validação ponta a ponta.
 
 ## Contrato HTTP
 
@@ -43,7 +43,7 @@ A persistência de `commercial.email_notifications` protege o processamento no s
 
 Configure no gestor de segredos do `commercial-service`:
 
-- `COMMERCIAL_EMAIL_ADAPTER_URL`: URL HTTPS do webhook de produção;
+- `COMMERCIAL_EMAIL_ADAPTER_URL`: `https://n8n.iapessoas.com.br/webhook/email-office` (URL informada para o workflow existente);
 - `COMMERCIAL_EMAIL_ADAPTER_TOKEN`: mesmo token interno cadastrado como credencial no N8N;
 - `COMMERCIAL_EMAIL_FROM`: endereço remetente válido e autorizado pelo provedor;
 - `COMMERCIAL_EMAIL_ADAPTER_TIMEOUT_MS`: timeout da chamada, em milissegundos (padrão `10000`).
