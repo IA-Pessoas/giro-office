@@ -128,7 +128,10 @@ describe("verifyHs256Jwt", () => {
     const cases = [
       ["malformed token", "not-a-jwt"],
       ["wrong algorithm", await signToken({ sub: "user-123" }, "test-secret", { alg: "none" })],
-      ["invalid signature", `${await signToken({ sub: "user-123" })}.tampered`],
+      [
+        "invalid signature",
+        (await signToken({ sub: "user-123" })).split(".").slice(0, 2).concat("tampered").join("."),
+      ],
       ["non-object payload", await signToken(null)],
       ["expired token", await signToken({ exp: Math.floor(Date.now() / 1000) - 1 })],
       ["future token", await signToken({ nbf: Math.floor(Date.now() / 1000) + 60 })],
