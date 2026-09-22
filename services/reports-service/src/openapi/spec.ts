@@ -407,6 +407,14 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           tags: ["Reports"],
           summary: "Enfileirar execução durável de relatório",
           security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "Idempotency-Key",
+              in: "header",
+              required: false,
+              schema: { type: "string", minLength: 1, maxLength: 255 },
+            },
+          ],
           requestBody: {
             required: true,
             content: {

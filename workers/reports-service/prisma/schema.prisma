@@ -47,6 +47,8 @@ model ReportJob {
   report_model_version_id String
   status                  String   @default("queued")
   payload_json            Json?
+  idempotency_key         String?  @db.VarChar(255)
+  idempotency_hash        String?  @db.Char(64)
   requested_at            DateTime @default(now())
   started_at              DateTime?
   finished_at             DateTime?
@@ -59,6 +61,7 @@ model ReportJob {
   updated_at              DateTime @updatedAt
 
   @@index([organization_id, requester_id, requested_at])
+  @@unique([organization_id, requester_id, idempotency_key], map: "uq_reports_jobs_org_requester_idempotency_key")
   @@map("reports.jobs")
 }
 

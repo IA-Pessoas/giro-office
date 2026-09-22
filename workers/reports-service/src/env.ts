@@ -1,4 +1,4 @@
-import type { WorkerEnv } from "@workspace/runtime";
+import type { ServiceBinding, WorkerEnv } from "@workspace/runtime";
 import type { ReportsServiceEnv } from "../../../services/reports-service/src/config/env.js";
 
 export interface ReportsWorkerEnv extends WorkerEnv {
@@ -14,6 +14,8 @@ export interface ReportsWorkerEnv extends WorkerEnv {
   AUDIT_ENABLED?: string;
   AUDIT_SERVICE_URL?: string;
   AUDIT_SERVICE_TOKEN?: string;
+  AUDIT_SERVICE?: ServiceBinding;
+  USER_SERVICE?: ServiceBinding;
   PARCELAMENTO_SERVICE_URL?: string;
   CLIENT_SERVICE_URL?: string;
   CONTABIL_SERVICE_URL?: string;
@@ -25,11 +27,18 @@ export interface ReportsWorkerEnv extends WorkerEnv {
   REGULARIZE_SERVICE_URL?: string;
   TI_SERVICE_URL?: string;
   RH_SERVICE_URL?: string;
-  REPORTS_SOURCE_TIMEOUT_MS?: number;
-  REPORTS_PREVIEW_ROW_LIMIT?: number;
+  REPORTS_SOURCE_TIMEOUT_MS?: string;
+  REPORTS_PREVIEW_ROW_LIMIT?: string;
 }
 
 const localServiceUrl = "http://127.0.0.1:9";
+
+function positiveInteger(value: string | number | undefined, fallback: number, maximum?: number) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 && (maximum === undefined || parsed <= maximum)
+    ? parsed
+    : fallback;
+}
 
 export function toReportsServiceEnv(env: Partial<ReportsWorkerEnv>): ReportsServiceEnv {
   return {
@@ -41,7 +50,7 @@ export function toReportsServiceEnv(env: Partial<ReportsWorkerEnv>): ReportsServ
     certificateReportingToken: env.CERTIFICATE_REPORTING_TOKEN ?? "",
     certificateReportingGrantSecret: env.CERTIFICATE_REPORTING_GRANT_SECRET ?? "",
     auditEnabled: env.AUDIT_ENABLED !== "false",
-    auditServiceUrl: env.AUDIT_SERVICE_URL ?? "http://127.0.0.1:3020",
+    auditServiceUrl: env.AUDIT_SERVICE_URL ?? "",
     auditServiceToken: env.AUDIT_SERVICE_TOKEN ?? "",
     userServiceUrl: env.USER_SERVICE_URL ?? localServiceUrl,
     parcelamentoServiceUrl: env.PARCELAMENTO_SERVICE_URL ?? localServiceUrl,
@@ -57,7 +66,7 @@ export function toReportsServiceEnv(env: Partial<ReportsWorkerEnv>): ReportsServ
     regularizeReportingToken: env.REGULARIZE_REPORTING_TOKEN ?? "",
     regularizeReportingGrantSecret: env.REGULARIZE_REPORTING_GRANT_SECRET ?? "",
     rhServiceUrl: env.RH_SERVICE_URL ?? localServiceUrl,
-    sourceTimeoutMs: env.REPORTS_SOURCE_TIMEOUT_MS ?? 10_000,
-    previewRowLimit: env.REPORTS_PREVIEW_ROW_LIMIT ?? 100,
+    sourceTimeoutMs: positiveInteger(env.REPORTS_SOURCE_TIMEOUT_MS, 10_000),
+    previewRowLimit: positiveInteger(env.REPORTS_PREVIEW_ROW_LIMIT, 100, 1000),
   } as ReportsServiceEnv;
 }

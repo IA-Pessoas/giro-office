@@ -1,3 +1,4 @@
+import { hashCsrfToken } from "@workspace/runtime";
 import { describe, expect, it, vi } from "vitest";
 import { createReportsWorkerApp } from "./app.js";
 import type { ReportsWorkerEnv } from "./env.js";
@@ -68,6 +69,119 @@ describe("reports-service Worker", () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toMatchObject({ success: false, code: "UNAUTHORIZED" });
+  });
+
+  it("recusa mutação por cookie sem CSRF antes de chamar o serviço", async () => {
+    const csrf = "A".repeat(43);
+    const token = await sign({
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_id: "session-1",
+      session_version: 1,
+      csrf_hash: await hashCsrfToken(csrf),
+    });
+    const cancel = vi.fn();
+    const app = createReportsWorkerApp({
+      env: { ...env, REPORTS_INTERNAL_TOKEN: "reports-internal-token" },
+      services: { jobService: { cancel } } as never,
+    });
+
+    const response = await app.request(
+      "https://reports.test/reports/jobs/00000000-0000-4000-8000-000000000003/cancel",
+      {
+        method: "POST",
+        headers: { cookie: `cw.session=${token}; cw.csrf=${csrf}` },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it("valida sessão e CSRF para mutação por cookie, mantendo Bearer sem essa barreira", async () => {
+    const csrf = "B".repeat(43);
+    const token = await sign({
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_id: "session-1",
+      session_version: 1,
+      csrf_hash: await hashCsrfToken(csrf),
+    });
+    const userService = {
+      fetch: vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+    };
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    const app = createReportsWorkerApp({
+      env: {
+        ...env,
+        REPORTS_INTERNAL_TOKEN: "reports-internal-token",
+        USER_SERVICE: userService,
+      } as never,
+      services: { jobService: { cancel } } as never,
+    });
+
+    const response = await app.request(
+      "https://reports.test/reports/jobs/00000000-0000-4000-8000-000000000003/cancel",
+      {
+        method: "POST",
+        headers: {
+          cookie: `cw.session=${token}; cw.csrf=${csrf}`,
+          "x-csrf-token": csrf,
+        },
+      },
+    );
+
+    expect(response.status).toBe(204);
+    expect(userService.fetch).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledWith({
+      userId: "user-1",
+      organizationId: "org-1",
+      id: "00000000-0000-4000-8000-000000000003",
+    });
+  });
+
+  it("repassa a chave de idempotência do POST de jobs ao serviço", async () => {
+    const token = await sign({
+      user_id: "user-1",
+      organization_id: "org-1",
+      modules: { integracao: 1 },
+    });
+    const definition = {
+      sources: ["integracao.clients"],
+      columns: [{ source: "integracao.clients", field: "name", alias: "name" }],
+      joins: [],
+      filters: [],
+      filter_groups: [],
+      parameters: [],
+      aggregations: [],
+      order_by: [],
+    };
+    const createFromDefinition = vi.fn().mockResolvedValue({ id: "job-1", status: "queued" });
+    const app = createReportsWorkerApp({
+      env,
+      services: {
+        authorizationService: { validateDefinition: vi.fn().mockResolvedValue({ definition }) },
+        jobService: { createFromDefinition },
+      } as never,
+    });
+
+    const response = await app.request("https://reports.test/reports/jobs", {
+      method: "POST",
+      headers: {
+        ...authHeaders(token),
+        "content-type": "application/json",
+        "Idempotency-Key": "job-attempt-1",
+      },
+      body: JSON.stringify({ definition, format: "json" }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(createFromDefinition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: "job-attempt-1",
+        idempotencyHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      }),
+    );
   });
 
   it("expõe somente fontes autorizadas pelo organization_id e pelos módulos do JWT", async () => {
@@ -343,5 +457,16 @@ describe("reports-service Worker", () => {
         format: "csv",
       }),
     );
+    const exportResponse = responses[18];
+    expect(exportResponse?.headers.get("content-type")).toContain("text/csv");
+    expect(exportResponse?.headers.get("content-disposition")).toBe(
+      'attachment; filename="report.csv"',
+    );
+    expect(exportResponse?.headers.get("cache-control")).toBe("no-store");
+    await expect(exportResponse?.text()).resolves.toBe("name\r\n");
+    await expect(responses[0]?.json()).resolves.toMatchObject({
+      success: true,
+      data: { items: expect.any(Array) },
+    });
   });
 });

@@ -13,7 +13,12 @@ import {
   deleteReportJobSchema,
   reportJobListQuerySchema,
 } from "../schemas/reportHistory.schemas.js";
-import { createReportJobSchema, reportJobIdParamsSchema } from "../schemas/reportJob.schemas.js";
+import {
+  createReportJobIdempotencyHash,
+  createReportJobSchema,
+  reportJobIdempotencyKeySchema,
+  reportJobIdParamsSchema,
+} from "../schemas/reportJob.schemas.js";
 import type { ReportModelDefinition } from "../schemas/reportModel.schemas.js";
 import type { ReportAuthorizationService } from "../services/reportAuthorizationService.js";
 import type { ReportJobService } from "../services/reportJobService.js";
@@ -89,11 +94,22 @@ export function createReportJobRouter(options: {
   router.post("/jobs", async (request, response) => {
     const actor = context(request);
     const body = parseWithZod(createReportJobSchema, request.body);
+    const idempotencyKey = request.get("Idempotency-Key")
+      ? parseWithZod(reportJobIdempotencyKeySchema, request.get("Idempotency-Key"))
+      : undefined;
     const requestId = request.get(REQUEST_ID_HEADER) ?? "reports-job-create";
     const payload = {
       format: body.format,
       parameterValues: body.parameterValues ?? {},
     };
+    const idempotencyHash = idempotencyKey
+      ? createReportJobIdempotencyHash({
+          definition: body.definition,
+          modelVersionId: body.modelVersionId,
+          parameterValues: body.parameterValues ?? {},
+          format: body.format,
+        })
+      : undefined;
     const job = body.definition
       ? await options.jobService.createFromDefinition({
           ...actor,
@@ -114,6 +130,7 @@ export function createReportJobRouter(options: {
                   })
                 ).definition,
           payload,
+          ...(idempotencyKey ? { idempotencyKey, idempotencyHash } : {}),
         })
       : await (async () => {
           const version = await validateVersion(actor, requestId, body.modelVersionId ?? "");
@@ -125,6 +142,7 @@ export function createReportJobRouter(options: {
             ...actor,
             modelVersionId: version.version.id,
             payload: { ...payload, retentionDays },
+            ...(idempotencyKey ? { idempotencyKey, idempotencyHash } : {}),
           });
         })();
     response.status(201).json(createSuccessResponse(job));

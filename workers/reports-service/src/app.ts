@@ -1,7 +1,15 @@
 import {
+  AUTH_SESSION_COOKIE_NAME,
   authenticateWorkerRequest,
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
+  hashCsrfToken,
+  readCookie,
+  validateWorkerSession,
+  verifyCsrfToken,
   type WorkerAuthContext,
   WorkerAuthenticationError,
+  WorkerSessionValidationError,
   withWorkerPrisma,
 } from "@workspace/runtime";
 import {
@@ -30,7 +38,9 @@ import {
   reportJobListQuerySchema,
 } from "../../../services/reports-service/src/schemas/reportHistory.schemas.js";
 import {
+  createReportJobIdempotencyHash,
   createReportJobSchema,
+  reportJobIdempotencyKeySchema,
   reportJobIdParamsSchema,
 } from "../../../services/reports-service/src/schemas/reportJob.schemas.js";
 import {
@@ -41,7 +51,7 @@ import {
 } from "../../../services/reports-service/src/schemas/reportModel.schemas.js";
 import { reportPreviewRequestSchema } from "../../../services/reports-service/src/schemas/reportPreview.schemas.js";
 import { reportRetentionPolicySchema } from "../../../services/reports-service/src/schemas/reportRetention.schemas.js";
-import { createReportAuditService } from "../../../services/reports-service/src/services/reportAuditService.js";
+import { ReportAuditService } from "../../../services/reports-service/src/services/reportAuditService.js";
 import { ReportAuthorizationService } from "../../../services/reports-service/src/services/reportAuthorizationService.js";
 import { ReportDefinitionService } from "../../../services/reports-service/src/services/reportDefinitionService.js";
 import { ReportExportService } from "../../../services/reports-service/src/services/reportExportService.js";
@@ -51,6 +61,7 @@ import { ReportModelService } from "../../../services/reports-service/src/servic
 import { ReportPreviewService } from "../../../services/reports-service/src/services/reportPreviewService.js";
 import { ReportRetentionService } from "../../../services/reports-service/src/services/reportRetentionService.js";
 import { ReportSnapshotService } from "../../../services/reports-service/src/services/reportSnapshotService.js";
+import { createReportsAuditRecorder } from "./audit.js";
 import { createReportsSourceCatalog } from "./catalog.js";
 import type { ReportsWorkerEnv } from "./env.js";
 import { toReportsServiceEnv } from "./env.js";
@@ -140,6 +151,37 @@ function requireOrganizationAuth(
     if (auth.actorKind !== "organization" || !auth.organizationId) {
       throw new ServiceError(403, "A organização do relatório não está autorizada.");
     }
+    if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) {
+      const cookies = c.req.header("cookie") ?? undefined;
+      const sessionToken = readCookie(cookies, AUTH_SESSION_COOKIE_NAME);
+      if (sessionToken) {
+        const csrfCookie = readCookie(cookies, CSRF_COOKIE_NAME);
+        const csrfHeader = c.req.header(CSRF_HEADER_NAME);
+        const expectedHash = auth.claims.csrf_hash;
+        if (
+          !csrfCookie ||
+          !csrfHeader ||
+          !expectedHash ||
+          !(await verifyCsrfToken(csrfHeader, await hashCsrfToken(csrfCookie))) ||
+          !(await verifyCsrfToken(csrfHeader, expectedHash))
+        ) {
+          throw new ServiceError(403, "Token CSRF inválido.");
+        }
+        if (!env.USER_SERVICE || !env.REPORTS_INTERNAL_TOKEN) {
+          throw new ServiceError(503, "Validação de sessão indisponível para mutação por cookie.");
+        }
+        try {
+          await validateWorkerSession(auth, env.USER_SERVICE, "cookie", {
+            internalServiceToken: env.REPORTS_INTERNAL_TOKEN,
+          });
+        } catch (error) {
+          if (error instanceof WorkerSessionValidationError) {
+            throw new ServiceError(error.statusCode, error.message);
+          }
+          throw error;
+        }
+      }
+    }
     c.set("auth", auth);
     await next();
   };
@@ -185,7 +227,7 @@ function createPureServices(c: ReportsContext, options: ReportsWorkerOptions) {
       new ReportPreviewService(
         sourceCatalog,
         definitionService,
-        env.REPORTS_PREVIEW_ROW_LIMIT ?? 100,
+        toReportsServiceEnv(env).previewRowLimit,
       ),
   };
 }
@@ -205,15 +247,15 @@ async function withPureServices<T>(
 }
 
 function createAudit(prisma: ReportsPrismaClient, env: ReportsWorkerEnv) {
-  return createReportAuditService(prisma as never, {
-    enabled: env.AUDIT_ENABLED !== "false",
-    serviceUrl: env.AUDIT_SERVICE_URL ?? "http://127.0.0.1:3020",
-    serviceToken: env.AUDIT_SERVICE_TOKEN ?? "",
-    logger: {
-      warn: (value: unknown) => console.warn(value),
-      error: (value: unknown) => console.error(value),
-    } as never,
-  });
+  return new ReportAuditService(
+    prisma as never,
+    createReportsAuditRecorder({
+      enabled: env.AUDIT_ENABLED !== "false",
+      service: env.AUDIT_SERVICE,
+      serviceUrl: env.AUDIT_SERVICE_URL,
+      serviceToken: env.AUDIT_SERVICE_TOKEN,
+    }),
+  );
 }
 
 async function withReportsServices<T>(
@@ -680,7 +722,20 @@ export function createReportsWorkerApp(options: ReportsWorkerOptions = {}) {
       const currentActor = actor(c);
       const body = parseWithZod(createReportJobSchema, await jsonBody(c));
       const requestIdValue = requestId(c, "reports-job-create");
+      const rawIdempotencyKey = c.req.header("Idempotency-Key");
+      const idempotencyKey =
+        rawIdempotencyKey === undefined
+          ? undefined
+          : parseWithZod(reportJobIdempotencyKeySchema, rawIdempotencyKey);
       const payload = { format: body.format, parameterValues: body.parameterValues ?? {} };
+      const idempotencyHash = idempotencyKey
+        ? createReportJobIdempotencyHash({
+            definition: body.definition,
+            modelVersionId: body.modelVersionId,
+            parameterValues: body.parameterValues ?? {},
+            format: body.format,
+          })
+        : undefined;
       const job = body.definition
         ? await services.jobService.createFromDefinition({
             ...currentActor,
@@ -691,6 +746,7 @@ export function createReportsWorkerApp(options: ReportsWorkerOptions = {}) {
               requestIdValue,
             ),
             payload,
+            ...(idempotencyKey ? { idempotencyKey, idempotencyHash } : {}),
           })
         : await (async () => {
             const version = await validateVersion(
@@ -707,6 +763,7 @@ export function createReportsWorkerApp(options: ReportsWorkerOptions = {}) {
               ...currentActor,
               modelVersionId: version.version.id,
               payload: { ...payload, retentionDays },
+              ...(idempotencyKey ? { idempotencyKey, idempotencyHash } : {}),
             });
           })();
       return c.json(createSuccessResponse(job), 201);

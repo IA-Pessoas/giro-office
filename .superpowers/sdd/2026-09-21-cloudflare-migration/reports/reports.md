@@ -13,7 +13,7 @@ O Worker Hono em `workers/reports-service` agora cobre as superfícies do servi�
 - retenção: `GET` e `PUT /reports/retention`;
 - health/readiness existentes foram preservados.
 
-As rotas delegam aos schemas e serviços reais de `services/reports-service`: catálogo/adapters de fontes, autorização, preview, modelos, jobs, snapshots, exportação, retenção, lifecycle e auditoria. Não houve alteração em `services/**`.
+As rotas delegam aos schemas e serviços reais de `services/reports-service`: catálogo/adapters de fontes, autorização, preview, modelos, jobs, snapshots, exportação, retenção, lifecycle e auditoria. A migração original não alterou `services/**`; esta revisão atualizou somente os contratos de job necessários para a idempotência.
 
 ## Preservação de contratos
 
@@ -48,13 +48,34 @@ O endereço usado acima é somente um valor local não funcional para permitir a
 
 ## Lacunas e gates ainda abertos
 
-- Não foi feita integração contra clone/staging do PostgreSQL/Supabase: não havia credenciais/binding autorizados neste checkout. O dry-run mostrou somente `NODE_ENV` e `ENABLE_API_DOCS`; `HYPERDRIVE`, `JWT_SECRET`, tokens de serviços, Storage e Queue precisam ser configurados fora do código antes de qualquer preview funcional.
+- Não foi feita integração contra clone/staging do PostgreSQL/Supabase: não havia credenciais/binding autorizados neste checkout. O dry-run da migração original mostrava somente `NODE_ENV` e `ENABLE_API_DOCS`; nesta correção os bindings explícitos `USER_SERVICE` e `AUDIT_SERVICE` foram adicionados, enquanto `HYPERDRIVE`, `JWT_SECRET`, tokens de serviços, Storage e Queue continuam dependentes de configuração externa.
 - O consumidor assíncrono `reports-worker`/Queue não foi criado, porque o escopo autorizado restringe a edição a `workers/reports-service/**`. A API preserva a criação, status, cancelamento, lease/campos e lifecycle dos jobs por meio dos serviços reais, mas a execução assíncrona continua sendo um lote posterior.
 - A compatibilidade de PDF em runtime Cloudflare/Browser Run ainda não foi demonstrada. O Worker reutiliza o `ReportExportService` existente e mantém falhas reais; não há shim que simule PDF bem-sucedido.
 - Não houve smoke autenticado de preview contra fontes reais, verificação de OpenAPI/smoke coverage, validação de Storage ou confirmação de RLS. Portanto este Worker não deve ser marcado como publishable.
-- Nenhum deploy, alteração de gateway, secret, binding, migration ou banco foi executado.
+- Nenhum deploy, alteração de gateway, secret ou banco foi executado; a única migration adicionada é o artefato versionado de idempotência, não aplicado neste checkout.
 
 ## Commit
 
 - Implementação: `df0cf7ef` (`feat(workers): migrate reports service routes`).
 - Relatório: commit separado após esta revisão.
+
+## Fix report — revisão de bloqueadores
+
+Esta rodada ficou restrita ao Worker/serviço de Reports, seus schemas/migration e testes. Queue, consumidor assíncrono, PDF/Browser Run, staging e deploy continuam fora do escopo e permanecem como gaps.
+
+- Mutações diretas autenticadas por `cw.session` agora exigem o par cookie/header CSRF, o `csrf_hash` do JWT e validação da sessão pelo binding `USER_SERVICE` através de `validateWorkerSession` do runtime. Ausência de binding/token e falhas de sessão são explícitas; Bearer continua funcionando sem a barreira de cookie.
+- `REPORTS_PREVIEW_ROW_LIMIT` e `REPORTS_SOURCE_TIMEOUT_MS` são normalizados de bindings string para inteiros positivos, com defaults seguros; o loopback de auditoria foi removido.
+- Auditoria externa só é chamada quando `AUDIT_SERVICE` ou `AUDIT_SERVICE_URL` foi configurado explicitamente. Sem destino, o Worker não chama loopback nem outro endpoint. HTTP não-2xx, transporte e timeout retornam erros explícitos (`503`/`504`) e o recorder faz uma única tentativa.
+- `POST /reports/jobs` aceita o header opcional `Idempotency-Key`, calcula hash canônico do comando, persiste chave/hash com unicidade por organização/solicitante e devolve o job original para repetição do mesmo comando; reutilização com comando diferente retorna `409`. A chave foi adicionada ao OpenAPI e à migration `20260922100000_report_job_idempotency` sem alterar clientes que ainda não a enviam.
+- Testes focados cobrem negação de CSRF/permissão, sessão válida, Bearer, normalização de bindings, auditoria sem destino e com falhas explícitas, idempotência e envelope/headers (`Content-Type`, `Content-Disposition`, `Cache-Control`) de exportação.
+
+### Validações desta correção
+
+- RED focado confirmou os bloqueadores antes da implementação; GREEN focado: **30 testes passaram**.
+- `DATABASE_URL=postgresql://127.0.0.1:1/reports_codegen pnpm --filter @workspace/reports-service test`: **400 testes / 64 arquivos passaram**.
+- `DATABASE_URL=postgresql://127.0.0.1:1/reports_codegen pnpm --filter @workspace/reports-worker test`: **13 testes / 3 arquivos passaram**.
+- Typecheck e build passaram nos dois pacotes: `@workspace/reports-service` e `@workspace/reports-worker`.
+- Check passou nos dois pacotes; Biome verificou **140 arquivos** do serviço e **13 arquivos** do Worker.
+- `pnpm exec prisma validate --schema infra/prisma/schema.prisma`: schema válido.
+- `pnpm exec wrangler deploy --dry-run --config workers/reports-service/wrangler.jsonc`: passou sem publicar; bundle **7994.07 KiB**, gzip **2305.39 KiB**, bindings explícitos `USER_SERVICE` e `AUDIT_SERVICE`.
+- `git diff --check`: passou. Nenhum deploy, secret, chamada de staging ou alteração de Queue/PDF/Browser foi executado.
