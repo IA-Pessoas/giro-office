@@ -1922,6 +1922,16 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
 
   app.notFound(() => errorResponse(new ServiceError(404, "Recurso não encontrado.")));
   app.onError((error, c) => {
+    // Erro esperado vira resposta; o inesperado vira 500 generico e precisa ficar no log.
+    if (!(error instanceof ServiceError)) {
+      console.error("Erro inesperado no user-service", {
+        requestId: c.req.header(REQUEST_ID_HEADER),
+        method: c.req.method,
+        path: new URL(c.req.url).pathname,
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
     const serialized = serializeError(error, {
       requestId: c.req.header(REQUEST_ID_HEADER),
       fallbackMessage: "Erro interno no user-service.",
