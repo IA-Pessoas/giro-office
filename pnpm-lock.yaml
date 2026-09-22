@@ -2245,6 +2245,9 @@ importers:
 
   workers/user-service:
     dependencies:
+      '@noble/hashes':
+        specifier: 1.8.0
+        version: 1.8.0
       '@prisma/adapter-pg':
         specifier: 7.9.1
         version: 7.9.1
@@ -2260,9 +2263,9 @@ importers:
       '@workspace/user-service':
         specifier: workspace:*
         version: link:../../services/user-service
-      hash-wasm:
-        specifier: 4.12.0
-        version: 4.12.0
+      bcryptjs:
+        specifier: 2.4.3
+        version: 2.4.3
       hono:
         specifier: 4.12.25
         version: 4.12.25
@@ -2273,6 +2276,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.4.5
         version: 2.4.5
+      '@types/bcryptjs':
+        specifier: 2.4.6
+        version: 2.4.6
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.2
@@ -5757,9 +5763,6 @@ packages:
   has-tostringtag@1.0.2:
     resolution: {integrity: sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==}
     engines: {node: '>= 0.4'}
-
-  hash-wasm@4.12.0:
-    resolution: {integrity: sha512-+/2B2rYLb48I/evdOIhP+K/DD2ca2fgBjp6O+GBEnCDk2e4rpeXIK8GvIyRPjTezgmWn9gmKwkQjjx6BtqDHVQ==}
 
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
@@ -11664,8 +11667,6 @@ snapshots:
   has-tostringtag@1.0.2:
     dependencies:
       has-symbols: 1.1.0
-
-  hash-wasm@4.12.0: {}
 
   hasown@2.0.4:
     dependencies:
