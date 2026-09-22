@@ -342,6 +342,27 @@ function withDefaultSelfServiceModules(
   };
 }
 
+function normalizedModulesForNonOwner(
+  type: unknown,
+  permission: number,
+  departmentName: unknown,
+  status: unknown = "active",
+): Record<string, number> {
+  if (status !== "active") return { ...EMPTY_MODULES };
+  if (type === "owner") return { ...MAX_MODULES };
+
+  const modules = { ...EMPTY_MODULES };
+  if (permission >= DEFAULT_NON_OWNER_PERMISSION) {
+    modules.rh = DEFAULT_NON_OWNER_PERMISSION;
+    modules.ti = DEFAULT_NON_OWNER_PERMISSION;
+  }
+  if (type === "admin") {
+    const departmentModuleName = departmentModule(departmentName);
+    if (departmentModuleName) modules[departmentModuleName] = MAX_MODULE_PERMISSION;
+  }
+  return modules;
+}
+
 function photoObjectPath(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -624,6 +645,7 @@ async function updateOrganizationUser(
   }
   const modules = input.modules as Record<string, number> | undefined;
   let modulesToApply: Record<string, number> | null = null;
+  let normalizationDepartmentName: unknown;
   const modulePatch = modules
     ? Object.fromEntries(
         ACTIVE_MODULE_KEYS.filter((key) => modules[key] !== undefined).map((key) => [
@@ -632,35 +654,31 @@ async function updateOrganizationUser(
         ]),
       )
     : undefined;
-  if (input.type === "owner" && (input.type === "owner" || input.first_owner_flag === true)) {
-    modulesToApply = MAX_MODULES;
-  } else if (modulePatch) {
-    modulesToApply = modulePatch;
-  }
-  if (input.type === "user" && input.modules === undefined) {
-    modulesToApply = EMPTY_MODULES;
-  }
-  if (
-    input.permission !== undefined &&
-    Number(input.permission) <= DEFAULT_NON_OWNER_PERMISSION &&
-    requestedType !== "admin" &&
-    input.modules === undefined
-  ) {
-    modulesToApply = EMPTY_MODULES;
-  }
-  if (
-    input.type === "admin" &&
-    (input.type !== undefined ||
-      input.permission !== undefined ||
-      input.department_id !== undefined)
-  ) {
+  const normalizesTypeOrPermission =
+    input.type !== undefined || input.permission !== undefined || input.department_id !== undefined;
+  if (requestedType === "admin" && normalizesTypeOrPermission) {
     const department = await requireDepartmentInOrganization(
       db,
       String(input.department_id ?? existing.department_id),
       organizationId,
     );
-    const module = departmentModule(department.name);
-    if (module) modulesToApply = { ...(modulesToApply ?? {}), [module]: MAX_MODULE_PERMISSION };
+    normalizationDepartmentName = department.name;
+  }
+  if (input.type === "owner" && (input.type === "owner" || input.first_owner_flag === true)) {
+    modulesToApply = { ...MAX_MODULES };
+  } else if (normalizesTypeOrPermission) {
+    const effectivePermission =
+      typeof data.permission === "number"
+        ? data.permission
+        : normalizePermissionForType(requestedType, Number(existing.permission ?? 0));
+    modulesToApply = normalizedModulesForNonOwner(
+      requestedType,
+      effectivePermission,
+      normalizationDepartmentName,
+      input.status ?? existing.status,
+    );
+  } else if (modulePatch) {
+    modulesToApply = modulePatch;
   }
   if (input.password !== undefined) {
     data.password = await hashPassword(String(input.password));
@@ -691,7 +709,11 @@ async function updateOrganizationUser(
             String(input.type ?? existing.type),
             Number(existing.permission ?? 0),
           );
-    if (modulesToApply && effectivePermission >= DEFAULT_NON_OWNER_PERMISSION) {
+    if (
+      modulesToApply &&
+      (input.status ?? existing.status) === "active" &&
+      effectivePermission >= DEFAULT_NON_OWNER_PERMISSION
+    ) {
       modulesToApply = withDefaultSelfServiceModules(modulesToApply, effectivePermission);
     }
     if (modulesToApply && Object.keys(modulesToApply).length > 0) {
@@ -732,7 +754,10 @@ async function updateOrganizationUser(
     );
   };
 
-  return db.$transaction ? db.$transaction(run, { isolationLevel: "Serializable" }) : run(db);
+  if (!db.$transaction) {
+    throw new ServiceError(503, "Atualização de usuário não configurada com transação.");
+  }
+  return db.$transaction(run, { isolationLevel: "Serializable" });
 }
 
 async function deactivateOrganizationUser(
@@ -740,36 +765,44 @@ async function deactivateOrganizationUser(
   userId: string,
   organizationId: string,
 ): Promise<void> {
-  const existing = await db.user.findFirst({
-    where: organizationUserWhere(userId, organizationId),
-    select: userSelect(),
-  });
-  if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
-  if (existing.type === "owner" && existing.status === "active") {
-    const owners = await db.user.count({
-      where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
-    });
-    if (owners <= 1) {
-      throw new ServiceError(
-        409,
-        "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
-      );
-    }
+  if (!db.$transaction) {
+    throw new ServiceError(503, "Desativação de usuário não configurada com transação.");
   }
-  if (!db.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
-  const updated = await db.user.updateMany({
-    where: {
-      ...organizationUserWhere(userId, organizationId),
-      version: existing.version ?? 1,
+  await db.$transaction(
+    async (transaction) => {
+      const existing = await transaction.user.findFirst({
+        where: organizationUserWhere(userId, organizationId),
+        select: userSelect(),
+      });
+      if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
+      if (existing.type === "owner" && existing.status === "active") {
+        const owners = await transaction.user.count({
+          where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
+        });
+        if (owners <= 1) {
+          throw new ServiceError(
+            409,
+            "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+          );
+        }
+      }
+      if (!transaction.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
+      const updated = await transaction.user.updateMany({
+        where: {
+          ...organizationUserWhere(userId, organizationId),
+          version: existing.version ?? 1,
+        },
+        data: { status: "inactive", session_version: { increment: 1 }, version: { increment: 1 } },
+      });
+      if (updated.count !== 1) {
+        throw new ServiceError(
+          409,
+          "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+        );
+      }
     },
-    data: { status: "inactive", session_version: { increment: 1 }, version: { increment: 1 } },
-  });
-  if (updated.count !== 1) {
-    throw new ServiceError(
-      409,
-      "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
-    );
-  }
+    { isolationLevel: "Serializable" },
+  );
 }
 
 async function transferOwnership(
@@ -785,85 +818,142 @@ async function transferOwnership(
   if (input.currentOwnerId === input.successorUserId) {
     throw new ServiceError(400, "O sucessor deve ser diferente do owner atual.");
   }
-  return db.$transaction(async (transaction) => {
-    const select = { ...userSelect(), session_version: true };
-    const currentOwner = await transaction.user.findFirst({
-      where: organizationUserWhere(input.currentOwnerId, organizationId),
-      select,
-    });
-    if (!currentOwner) throw new ServiceError(404, "Owner atual não encontrado na organização.");
-    if (currentOwner.type !== "owner" || currentOwner.status !== "active") {
-      throw new ServiceError(409, "O usuário selecionado não é um owner ativo.");
-    }
-    const successor = await transaction.user.findFirst({
-      where: organizationUserWhere(input.successorUserId, organizationId),
-      select,
-    });
-    if (!successor) throw new ServiceError(404, "Sucessor não encontrado na organização.");
-    if (successor.status !== "active")
-      throw new ServiceError(409, "O sucessor precisa estar ativo.");
-    if (!transaction.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
+  return db.$transaction(
+    async (transaction) => {
+      const select = { ...userSelect(), session_version: true };
+      const currentOwner = await transaction.user.findFirst({
+        where: organizationUserWhere(input.currentOwnerId, organizationId),
+        select,
+      });
+      if (!currentOwner) throw new ServiceError(404, "Owner atual não encontrado na organização.");
+      if (currentOwner.type !== "owner" || currentOwner.status !== "active") {
+        throw new ServiceError(409, "O usuário selecionado não é um owner ativo.");
+      }
+      const successor = await transaction.user.findFirst({
+        where: organizationUserWhere(input.successorUserId, organizationId),
+        select,
+      });
+      if (!successor) throw new ServiceError(404, "Sucessor não encontrado na organização.");
+      if (successor.status !== "active")
+        throw new ServiceError(409, "O sucessor precisa estar ativo.");
+      if (!transaction.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
 
-    const promoted = await transaction.user.updateMany({
-      where: {
-        ...organizationUserWhere(String(successor.id), organizationId),
-        version: successor.version,
-      },
-      data: {
-        type: "owner",
-        permission: 2,
-        session_version: { increment: 1 },
-        version: { increment: 1 },
-      },
-    });
-    if (promoted.count !== 1) {
-      throw new ServiceError(409, "O sucessor foi alterado por outra edição. Tente novamente.");
-    }
+      const currentOwnerStatus = input.previousOwnerAction === "deactivate" ? "inactive" : "active";
+      let demotedModules = { ...EMPTY_MODULES };
+      if (currentOwnerStatus === "active") {
+        const department = await requireDepartmentInOrganization(
+          transaction,
+          String(currentOwner.department_id),
+          organizationId,
+        );
+        demotedModules = normalizedModulesForNonOwner("admin", 1, department.name);
+      }
+      const demotedPermission = await transaction.permission.updateMany({
+        where: { user_id: String(currentOwner.id), organization_id: organizationId },
+        data: demotedModules,
+      });
+      if (demotedPermission.count !== 1) {
+        throw new ServiceError(404, "Permissão não encontrada.");
+      }
 
-    const demoted = await transaction.user.updateMany({
-      where: {
-        ...organizationUserWhere(String(currentOwner.id), organizationId),
-        version: currentOwner.version,
-      },
-      data: {
-        type: "admin",
-        permission: 1,
-        status: input.previousOwnerAction === "deactivate" ? "inactive" : "active",
-        session_version: { increment: 1 },
-        version: { increment: 1 },
-      },
-    });
-    if (demoted.count !== 1) {
-      throw new ServiceError(409, "O owner atual foi alterado por outra edição. Tente novamente.");
-    }
-
-    const activeOwners = await transaction.user.count({
-      where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
-    });
-    if (activeOwners < 1)
-      throw new ServiceError(409, "A organização deve manter ao menos um owner ativo.");
-    return {
-      currentOwner: toUser(
-        {
-          ...currentOwner,
-          type: "admin",
-          permission: 1,
-          status: input.previousOwnerAction === "deactivate" ? "inactive" : "active",
-          version: Number(currentOwner.version ?? 1) + 1,
+      const promoted = await transaction.user.updateMany({
+        where: {
+          ...organizationUserWhere(String(successor.id), organizationId),
+          version: successor.version,
         },
-        organizationId,
-      ),
-      successor: toUser(
-        {
-          ...successor,
+        data: {
           type: "owner",
           permission: 2,
-          version: Number(successor.version ?? 1) + 1,
+          session_version: { increment: 1 },
+          version: { increment: 1 },
         },
-        organizationId,
-      ),
-    };
-  });
+      });
+      if (promoted.count !== 1) {
+        throw new ServiceError(409, "O sucessor foi alterado por outra edição. Tente novamente.");
+      }
+
+      const demoted = await transaction.user.updateMany({
+        where: {
+          ...organizationUserWhere(String(currentOwner.id), organizationId),
+          version: currentOwner.version,
+        },
+        data: {
+          type: "admin",
+          permission: 1,
+          status: currentOwnerStatus,
+          session_version: { increment: 1 },
+          version: { increment: 1 },
+        },
+      });
+      if (demoted.count !== 1) {
+        throw new ServiceError(
+          409,
+          "O owner atual foi alterado por outra edição. Tente novamente.",
+        );
+      }
+
+      const activeOwners = await transaction.user.count({
+        where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
+      });
+      if (activeOwners < 1)
+        throw new ServiceError(409, "A organização deve manter ao menos um owner ativo.");
+      return {
+        currentOwner: toUser(
+          {
+            ...currentOwner,
+            type: "admin",
+            permission: 1,
+            status: currentOwnerStatus,
+            version: Number(currentOwner.version ?? 1) + 1,
+          },
+          organizationId,
+        ),
+        successor: toUser(
+          {
+            ...successor,
+            type: "owner",
+            permission: 2,
+            version: Number(successor.version ?? 1) + 1,
+          },
+          organizationId,
+        ),
+      };
+    },
+    { isolationLevel: "Serializable" },
+  );
+}
+
+async function updatePermissionAtomically(
+  db: UserPrismaClient,
+  userId: string,
+  organizationId: string,
+  modules: Record<string, number>,
+): Promise<Row | null> {
+  if (!db.$transaction) {
+    throw new ServiceError(503, "Atualização de permissões não configurada com transação.");
+  }
+  return db.$transaction(
+    async (transaction) => {
+      const updated = await transaction.permission.updateMany({
+        where: { user_id: userId, organization_id: organizationId },
+        data: modules,
+      });
+      if (updated.count !== 1) throw new ServiceError(404, "Permissão não encontrada.");
+      if (!transaction.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
+      const session = await transaction.user.updateMany({
+        where: organizationUserWhere(userId, organizationId),
+        data: { session_version: { increment: 1 } },
+      });
+      if (session.count !== 1) {
+        throw new ServiceError(409, "Usuário foi alterado por outra edição. Tente novamente.");
+      }
+      return transaction.permission.findFirst({
+        where: { user_id: userId, organization_id: organizationId },
+        select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
+      });
+    },
+    { isolationLevel: "Serializable" },
+  );
 }
 
 async function authFor(
@@ -1399,6 +1489,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
     withDb(c, options, async (db) => {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
       requireManageUsers(auth);
+      await requireCsrf(c.req.raw, auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
       const { file, extension } = await parseUserPhoto(c);
       const storage = userPhotoStorage(envOf(c, options), options);
@@ -1433,6 +1524,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
     withDb(c, options, async (db) => {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
       requireManageUsers(auth);
+      await requireCsrf(c.req.raw, auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
       const storage = userPhotoStorage(envOf(c, options), options);
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
@@ -1538,19 +1630,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       await requireCsrf(c.req.raw, auth);
       const { userId } = parse(permissionUserIdParamsSchema, c.req.param());
       const modules = parse(updatePermissionBodySchema, await jsonBody(c));
-      const updated = await db.permission.updateMany({
-        where: { user_id: userId, organization_id: auth.organizationId },
-        data: modules,
-      });
-      if (updated.count !== 1) throw new ServiceError(404, "Permissão não encontrada.");
-      await db.user.updateMany?.({
-        where: organizationUserWhere(userId, auth.organizationId),
-        data: { session_version: { increment: 1 } },
-      });
-      const permission = await db.permission.findFirst({
-        where: { user_id: userId, organization_id: auth.organizationId },
-        select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
-      });
+      const permission = await updatePermissionAtomically(db, userId, auth.organizationId, modules);
       await options.audit?.({
         actorUserId: auth.userId,
         organizationId: auth.organizationId,
@@ -1587,20 +1667,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       await requireCsrf(c.req.raw, auth);
       const { organizationId, userId } = parse(platformOrganizationUserParamsSchema, c.req.param());
       const modules = parse(updatePermissionBodySchema, await jsonBody(c));
-      const updated = await db.permission.updateMany({
-        where: { user_id: userId, organization_id: organizationId },
-        data: modules,
-      });
-      if (updated.count !== 1) throw new ServiceError(404, "Permissão não encontrada.");
-      if (!db.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
-      await db.user.updateMany({
-        where: organizationUserWhere(userId, organizationId),
-        data: { session_version: { increment: 1 } },
-      });
-      const permission = await db.permission.findFirst({
-        where: { user_id: userId, organization_id: organizationId },
-        select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
-      });
+      const permission = await updatePermissionAtomically(db, userId, organizationId, modules);
       await options.audit?.({
         platformActorUserId: auth.userId,
         organizationId,

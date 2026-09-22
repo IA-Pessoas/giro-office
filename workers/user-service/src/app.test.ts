@@ -18,7 +18,7 @@ function env(): UserWorkerEnv {
 }
 
 function prisma() {
-  return {
+  const db = {
     user: {
       findFirst: vi.fn(async () => user()),
       findMany: vi.fn(async () => [user()]),
@@ -79,6 +79,11 @@ function prisma() {
     },
     $disconnect: vi.fn(async () => {}),
   };
+  const transactionalDb = db as typeof db & { $transaction: ReturnType<typeof vi.fn> };
+  transactionalDb.$transaction = vi.fn(async (callback: (transaction: unknown) => unknown) =>
+    callback(transactionalDb),
+  );
+  return transactionalDb;
 }
 
 function user() {
@@ -701,7 +706,7 @@ describe("user Worker", () => {
     expect(db.permission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { user_id: USER_ID, organization_id: ORGANIZATION_ID },
-        data: expect.objectContaining({ rh: 1, ti: 1 }),
+        data: expect.objectContaining({ rh: 1, ti: 1, financeiro: 0, triagem: 0 }),
       }),
     );
     expect(db.user.updateMany).toHaveBeenCalledWith(
@@ -734,6 +739,46 @@ describe("user Worker", () => {
         }),
       }),
     );
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("desativa owner dentro de transação serializável, incluindo a contagem", async () => {
+    const db = prisma();
+    const transactionCount = vi.fn(async () => 2);
+    const transactionFindFirst = vi.fn(async () => user());
+    const transactionUpdate = vi.fn(async () => ({ count: 1 }));
+    const transaction = {
+      ...db,
+      user: {
+        ...db.user,
+        findFirst: transactionFindFirst,
+        count: transactionCount,
+        updateMany: transactionUpdate,
+      },
+    };
+    db.$transaction.mockImplementation(async (callback: (client: unknown) => unknown) =>
+      callback(transaction),
+    );
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request(`https://user.test/user/${USER_ID}`, {
+      method: "DELETE",
+      headers: forwardedHeaders(),
+    });
+
+    expect(response.status).toBe(200);
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    });
+    expect(transactionCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ type: "owner", status: "active" }),
+      }),
+    );
+    expect(transactionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "inactive" }) }),
+    );
+    expect(db.user.count).not.toHaveBeenCalled();
     expect(db.user.updateMany).not.toHaveBeenCalled();
   });
 
@@ -976,6 +1021,64 @@ describe("user Worker", () => {
       headers: forwardedHeaders(),
     });
 
+    expect(removed.status).toBe(200);
+    expect(storage.remove).toHaveBeenCalledWith("Fotos", USER_ID);
+  });
+
+  it("exige CSRF criptográfico para upload e remoção de foto", async () => {
+    const db = prisma();
+    const storage = {
+      getBucket: vi.fn(async () => ({ public: false })),
+      upload: vi.fn(async () => {}),
+      download: vi.fn(async () => new Response(null)),
+      remove: vi.fn(async () => {}),
+      createSignedUrl: vi.fn(async () => "https://storage.example/object/sign/Fotos/photo?token=1"),
+    };
+    const app = createUserWorkerApp({ env: env(), prisma: db, storage } as never);
+    const makeForm = () => {
+      const form = new FormData();
+      form.set(
+        "file",
+        new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "avatar.png", {
+          type: "image/png",
+        }),
+      );
+      return form;
+    };
+
+    const missing = await app.request(`https://user.test/user/${USER_ID}/photo`, {
+      method: "POST",
+      headers: forwardedHeaders({ "x-csrf-token": "" }),
+      body: makeForm(),
+    });
+    expect(missing.status).toBe(403);
+
+    const incorrect = await app.request(`https://user.test/user/${USER_ID}/photo`, {
+      method: "POST",
+      headers: forwardedHeaders({ "x-csrf-token": "incorrect-token" }),
+      body: makeForm(),
+    });
+    expect(incorrect.status).toBe(403);
+    expect(storage.upload).not.toHaveBeenCalled();
+
+    const uploaded = await app.request(`https://user.test/user/${USER_ID}/photo`, {
+      method: "POST",
+      headers: forwardedHeaders(),
+      body: makeForm(),
+    });
+    expect(uploaded.status).toBe(200);
+
+    const removedIncorrectly = await app.request(`https://user.test/user/${USER_ID}/photo`, {
+      method: "DELETE",
+      headers: forwardedHeaders({ "x-csrf-token": "incorrect-token" }),
+    });
+    expect(removedIncorrectly.status).toBe(403);
+    expect(storage.remove).not.toHaveBeenCalled();
+
+    const removed = await app.request(`https://user.test/user/${USER_ID}/photo`, {
+      method: "DELETE",
+      headers: forwardedHeaders(),
+    });
     expect(removed.status).toBe(200);
     expect(storage.remove).toHaveBeenCalledWith("Fotos", USER_ID);
   });
@@ -1234,5 +1337,108 @@ describe("user Worker", () => {
 
     expect(response.status).toBe(201);
     expect(hashPassword).toHaveBeenCalledWith("secret");
+  });
+
+  it("normaliza todos os módulos do owner que perde ownership", async () => {
+    const db = prisma();
+    const csrfToken = "T".repeat(43);
+    const csrfHash = await hashCsrfToken(csrfToken);
+    const currentOwner = { ...user(), id: USER_ID, type: "owner", permission: 2, version: 1 };
+    const successor = {
+      ...user(),
+      id: "d0000000-0000-4000-8000-000000000002",
+      type: "admin",
+      permission: 1,
+      version: 1,
+    };
+    db.user.findFirst.mockResolvedValueOnce(currentOwner).mockResolvedValueOnce(successor);
+    db.platformAuthSession.findFirst.mockResolvedValue({
+      csrf_hash: csrfHash,
+      platformUser: platformUser(),
+    });
+    db.user.count.mockResolvedValue(1);
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request(
+      `https://user.test/platform/organizations/${ORGANIZATION_ID}/ownership-transfer`,
+      {
+        method: "POST",
+        headers: {
+          ...forwardedHeaders({
+            "x-auth-kind": "platform",
+            "x-auth-platform-role": "super_admin",
+            "x-auth-user-id": PLATFORM_USER_ID,
+            "x-auth-organization-id": "",
+            "x-auth-session-id": "platform-session-1",
+            "x-auth-session-version": "1",
+            "x-auth-csrf-hash": csrfHash,
+            "x-csrf-token": csrfToken,
+          }),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          currentOwnerId: USER_ID,
+          successorUserId: successor.id,
+          previousOwnerAction: "demote",
+          justification: "Rotação operacional",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    });
+    expect(db.permission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { user_id: USER_ID, organization_id: ORGANIZATION_ID },
+        data: expect.objectContaining({
+          certificado: 0,
+          financeiro: 0,
+          triagem: 0,
+          rh: 1,
+          ti: 3,
+        }),
+      }),
+    );
+    expect(db.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: USER_ID }),
+        data: expect.objectContaining({ session_version: { increment: 1 } }),
+      }),
+    );
+  });
+
+  it("mantém módulos e session_version na mesma transação quando a sessão falha", async () => {
+    const db = prisma();
+    const transactionPermissionUpdate = vi.fn(async () => ({ count: 1 }));
+    const transactionUserUpdate = vi.fn(async () => {
+      throw new Error("falha ao invalidar sessão");
+    });
+    const transaction = {
+      ...db,
+      permission: { ...db.permission, updateMany: transactionPermissionUpdate },
+      user: { ...db.user, updateMany: transactionUserUpdate },
+    };
+    db.$transaction.mockImplementation(async (callback: (client: unknown) => unknown) =>
+      callback(transaction),
+    );
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request(`https://user.test/user/permission/${USER_ID}`, {
+      method: "PUT",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ financeiro: 3, triagem: 2 }),
+    });
+
+    expect(response.status).toBe(500);
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    });
+    expect(transactionPermissionUpdate).toHaveBeenCalled();
+    expect(transactionUserUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { session_version: { increment: 1 } } }),
+    );
+    expect(db.permission.updateMany).not.toHaveBeenCalled();
   });
 });
