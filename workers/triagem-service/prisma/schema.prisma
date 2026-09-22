@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model TriageCatalogItem {
+  id              String   @id @default(uuid())
+  organization_id String
+  kind            String
+  code            String
+  label           String
+  url             String?
+  archived_at     DateTime?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("triagem.catalog_items")
+}
