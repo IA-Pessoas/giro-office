@@ -6,11 +6,15 @@ import type { GatewayWorkerEnv } from "./env.js";
 const SECRET = "gateway-worker-test-secret-with-enough-length";
 const TOKEN = "gateway-internal-token";
 
-function env(binding?: { fetch: ReturnType<typeof vi.fn> }): GatewayWorkerEnv {
+function env(
+  binding?: { fetch: ReturnType<typeof vi.fn> },
+  extras: Partial<GatewayWorkerEnv> = {},
+): GatewayWorkerEnv {
   return {
     JWT_SECRET: SECRET,
     INTERNAL_SERVICE_TOKEN: TOKEN,
     DEPARTMENT_SERVICE: binding,
+    ...extras,
   };
 }
 
@@ -72,6 +76,30 @@ describe("gateway Worker", () => {
     const forwarded = binding.fetch.mock.calls[0]?.[0] as Request;
     expect(forwarded.headers.get("x-internal-service-token")).toBe(TOKEN);
     expect(forwarded.headers.get("x-auth-organization-id")).toBe("org-1");
+  });
+
+  it("routes the project and TI pilots through their bindings", async () => {
+    const projectBinding = {
+      fetch: vi.fn(async () => new Response("project", { status: 200 })),
+    };
+    const tiBinding = {
+      fetch: vi.fn(async () => new Response("ti", { status: 200 })),
+    };
+    const app = createGatewayWorkerApp({
+      env: env(undefined, { PROJECT_SERVICE: projectBinding, TI_SERVICE: tiBinding }),
+    });
+
+    const project = await app.request("https://gateway.test/project", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+    const ti = await app.request("https://gateway.test/ti", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+
+    expect(project.status).toBe(200);
+    expect(ti.status).toBe(200);
+    expect(projectBinding.fetch).toHaveBeenCalledOnce();
+    expect(tiBinding.fetch).toHaveBeenCalledOnce();
   });
 
   it("requires CSRF for cookie mutations", async () => {

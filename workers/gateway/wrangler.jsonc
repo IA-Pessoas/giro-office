@@ -14,7 +14,9 @@
     { "binding": "CERTIFICATE_SERVICE", "service": "giro-certificate-service" },
     { "binding": "REPORTS_SERVICE", "service": "giro-reports-service" },
     { "binding": "PARCELAMENTO_SERVICE", "service": "giro-parcelamento-service" },
-    { "binding": "CONTABIL_SERVICE", "service": "giro-contabil-service" }
+    { "binding": "CONTABIL_SERVICE", "service": "giro-contabil-service" },
+    { "binding": "PROJECT_SERVICE", "service": "giro-project-service" },
+    { "binding": "TI_SERVICE", "service": "giro-ti-service" }
   ],
   "observability": { "enabled": true }
 }
