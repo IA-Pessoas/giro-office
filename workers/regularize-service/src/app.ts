@@ -24,6 +24,16 @@ import {
   updatePartnerBodySchema,
 } from "@workspace/regularize-service/src/schemas/partners.schemas.js";
 import {
+  createPasswordBodySchema,
+  createSitePasswordBodySchema,
+  listPasswordsQuerySchema,
+  listSitePasswordsQuerySchema,
+  passwordDetailQuerySchema,
+  sitePasswordDetailQuerySchema,
+  updatePasswordBodySchema,
+  updateSitePasswordBodySchema,
+} from "@workspace/regularize-service/src/schemas/password.schemas.js";
+import {
   createProcessBodySchema,
   listProcessesQuerySchema,
   processActionBodySchema,
@@ -34,6 +44,7 @@ import { buildLicenseStatusFilter } from "@workspace/regularize-service/src/sche
 import { ClientPfService } from "@workspace/regularize-service/src/services/clientPfService.js";
 import { MunicipalTaxesService } from "@workspace/regularize-service/src/services/municipalTaxesService.js";
 import { PartnersService } from "@workspace/regularize-service/src/services/partnersService.js";
+import { PasswordService } from "@workspace/regularize-service/src/services/passwordService.js";
 import { ProcessService } from "@workspace/regularize-service/src/services/processService.js";
 import { RegularizeReconciliationService } from "@workspace/regularize-service/src/services/regularizeReconciliationService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
@@ -95,6 +106,10 @@ export type RegularizePartnersService = Pick<
   PartnersService,
   "create" | "update" | "detail" | "list" | "remove"
 >;
+export type RegularizePasswordService = Pick<
+  PasswordService,
+  "create" | "update" | "list" | "detail" | "createSite" | "updateSite" | "listSites" | "detailSite"
+>;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
@@ -103,6 +118,7 @@ type RegularizeOptions = {
   municipalTaxesService?: RegularizeMunicipalTaxesService;
   clientPfService?: RegularizeClientPfService;
   partnersService?: RegularizePartnersService;
+  passwordService?: RegularizePasswordService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -270,6 +286,24 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       const prisma = client as never;
       return callback(new PartnersService(prisma, new RegularizeReconciliationService(prisma)));
     });
+  };
+  const withPasswordService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizePasswordService) => Promise<T>,
+  ) => {
+    if (options.passwordService) return callback(options.passwordService);
+    const env = options.env ?? c.env;
+    if (!env.MTK_ENCRYPTION_KEY) {
+      throw new ServiceError(503, "Criptografia do Regularize não configurada.");
+    }
+    return withWorkerPrisma(env, PrismaClient, (client) =>
+      callback(new PasswordService(client as never, env.MTK_ENCRYPTION_KEY as string)),
+    );
+  };
+  const requirePasswordReveal = (c: RegularizeContext): void => {
+    if (Number(c.get("auth").claims.permission ?? 0) < 2) {
+      throw new ServiceError(403, "Permissao insuficiente para revelar credencial.");
+    }
   };
   app.post("/regularize/process", async (c) =>
     withProcessService(c, async (service) => {
@@ -495,6 +529,103 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
             id,
           }),
         ),
+      );
+    }),
+  );
+  app.post("/regularize/passwords", async (c) =>
+    withPasswordService(c, async (service) => {
+      const body = parseWithZod(createPasswordBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.create({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+        201,
+      );
+    }),
+  );
+  app.put("/regularize/passwords", async (c) =>
+    withPasswordService(c, async (service) => {
+      const body = parseWithZod(updatePasswordBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.update({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/passwords", async (c) =>
+    withPasswordService(c, async (service) => {
+      const { client_id: clientId } = parseWithZod(listPasswordsQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(await service.list(c.get("auth").organizationId, clientId)),
+      );
+    }),
+  );
+  app.get("/regularize/password", async (c) =>
+    withPasswordService(c, async (service) => {
+      requirePasswordReveal(c);
+      const { id } = parseWithZod(passwordDetailQuerySchema, c.req.query());
+      return c.json(createSuccessResponse(await service.detail(c.get("auth").organizationId, id)));
+    }),
+  );
+  app.post("/regularize/sites-pass", async (c) =>
+    withPasswordService(c, async (service) => {
+      const body = parseWithZod(createSitePasswordBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.createSite({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+        201,
+      );
+    }),
+  );
+  app.put("/regularize/sites-pass", async (c) =>
+    withPasswordService(c, async (service) => {
+      const body = parseWithZod(updateSitePasswordBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.updateSite({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/sites-pass", async (c) =>
+    withPasswordService(c, async (service) => {
+      const query = parseWithZod(listSitePasswordsQuerySchema, c.req.query());
+      const url = new URL(c.req.url);
+      return c.json(
+        createSuccessResponse(
+          await service.listSites({
+            organizationId: c.get("auth").organizationId,
+            ...query,
+            paginationRequested: url.searchParams.has("page") || url.searchParams.has("limit"),
+          }),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/sites-pass-detail", async (c) =>
+    withPasswordService(c, async (service) => {
+      requirePasswordReveal(c);
+      const { id } = parseWithZod(sitePasswordDetailQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(await service.detailSite(c.get("auth").organizationId, id)),
       );
     }),
   );

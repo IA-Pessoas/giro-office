@@ -41,6 +41,7 @@ Esta matriz documenta nomes e escopo. Ela não contém valores, tokens ou URLs p
 | `SUPABASE_SERVICE_ROLE_KEY` | Secret | somente backend/Worker | nunca em Pages ou `NEXT_PUBLIC_*` |
 | `*_BUCKET` | var | serviço dono do bucket | preservar nome, privacidade e prefixos existentes |
 | `REGULARIZE_LICENSE_PROTOCOL_BUCKET` | var | regularize-service | bucket privado de protocolos; default `regularize-license-protocols` |
+| `MTK_ENCRYPTION_KEY` | Secret | regularize-service | mesma chave AES-256-GCM legada; nunca expor no Pages |
 | `AUDIT_SERVICE_TOKEN` | Secret | integrações de auditoria | substituir por binding quando o fluxo estiver portado |
 | chaves de criptografia | Secret | certificados, TI/RH/Pessoal | rotação e versão devem permanecer compatíveis |
 

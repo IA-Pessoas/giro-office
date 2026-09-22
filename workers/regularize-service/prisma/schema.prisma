@@ -47,6 +47,8 @@ model Organization {
   partners  Partners[]
   permissions Permission[]
   regularizeNotifications RegularizeNotification[]
+  sitePasswordsRegularize SitePasswordsRegularize[]
+  passwordsRegularize PasswordRegularize[]
 }
 
 model Client {
@@ -61,6 +63,7 @@ model Client {
   processes       Process[] @relation("processClientPJ")
   municipalTaxes  MunicipalTaxes[]
   partners        Partners[] @relation("partnerClientPJ")
+  passwordsRegularize PasswordRegularize[]
 
   @@map("clients")
 }
@@ -212,6 +215,36 @@ model RegularizeNotification {
   user            User @relation(fields: [user_id], references: [id])
 
   @@map("notification.regularize")
+}
+
+model SitePasswordsRegularize {
+  id              String @id @default(uuid())
+  name            String
+  sphere          String
+  link            String?
+  user            String
+  password        String
+  status          Boolean @default(true)
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  passwords       PasswordRegularize[]
+
+  @@map("regularize.passowordsSites")
+}
+
+model PasswordRegularize {
+  id              String @id @default(uuid())
+  client_id       String
+  site_id         String
+  login           String
+  password        String
+  notes           String?
+  organization_id String
+  client          Client @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  site            SitePasswordsRegularize @relation(fields: [site_id], references: [id])
+
+  @@map("regularize.passwordsRegularize")
 }
 
 model MunicipalTaxes {

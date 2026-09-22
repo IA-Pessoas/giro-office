@@ -6,6 +6,7 @@ import {
   type RegularizeLicenseService,
   type RegularizeMunicipalTaxesService,
   type RegularizePartnersService,
+  type RegularizePasswordService,
   type RegularizeProcessService,
   type RegularizeWorkerEnv,
 } from "./app.js";
@@ -87,6 +88,19 @@ function partnersService(): RegularizePartnersService {
     detail: vi.fn(async () => ({ detail: { id: "partner-1" } })),
     list: vi.fn(async () => []),
     remove: vi.fn(async () => ({ ok: true })),
+  };
+}
+
+function passwordService(): RegularizePasswordService {
+  return {
+    create: vi.fn(async () => ({ id: "password-1" })),
+    update: vi.fn(async () => ({ id: "password-1" })),
+    list: vi.fn(async () => []),
+    detail: vi.fn(async () => ({ id: "password-1", login: "login", password: "secret" })),
+    createSite: vi.fn(async () => ({ id: "site-1" })),
+    updateSite: vi.fn(async () => ({ id: "site-1" })),
+    listSites: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
+    detailSite: vi.fn(async () => ({ id: "site-1", password: "secret" })),
   };
 }
 
@@ -418,5 +432,74 @@ describe("regularize Worker", () => {
       userId: USER_ID,
       id: LICENSE_ID,
     });
+  });
+
+  it("routes encrypted passwords and sites while requiring reveal permission", async () => {
+    const passwords = passwordService();
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      passwordService: passwords,
+    });
+    const passwordBody = {
+      client_id: ORGANIZATION_ID,
+      site_id: LICENSE_ID,
+      login: "user@example.com",
+      password: "secret",
+      notes: "nota",
+    };
+    const created = await app.request("https://regularize.test/regularize/passwords", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify(passwordBody),
+    });
+    const updated = await app.request("https://regularize.test/regularize/passwords", {
+      method: "PUT",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ ...passwordBody, id: LICENSE_ID }),
+    });
+    const list = await app.request(
+      `https://regularize.test/regularize/passwords?client_id=${ORGANIZATION_ID}`,
+      { headers: headers() },
+    );
+    const detail = await app.request(
+      `https://regularize.test/regularize/password?id=${LICENSE_ID}`,
+      { headers: { ...headers(), "x-auth-permission": "2" } },
+    );
+    const siteBody = {
+      name: "Portal",
+      sphere: "Federal",
+      link: "https://example.com",
+      user: "admin",
+      password: "site-secret",
+    };
+    const createdSite = await app.request("https://regularize.test/regularize/sites-pass", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify(siteBody),
+    });
+    const updatedSite = await app.request("https://regularize.test/regularize/sites-pass", {
+      method: "PUT",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ ...siteBody, id: LICENSE_ID, status: true }),
+    });
+    const listSites = await app.request(
+      "https://regularize.test/regularize/sites-pass?status=true&search=Portal&page=1&limit=20",
+      { headers: headers() },
+    );
+    const detailSite = await app.request(
+      `https://regularize.test/regularize/sites-pass-detail?id=${LICENSE_ID}`,
+      { headers: { ...headers(), "x-auth-permission": "2" } },
+    );
+
+    expect(
+      [created, updated, list, detail, createdSite, updatedSite, listSites, detailSite].map(
+        (response) => response.status,
+      ),
+    ).toEqual([201, 200, 200, 200, 201, 200, 200, 200]);
+    expect(passwords.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+    expect(passwords.detail).toHaveBeenCalledWith(ORGANIZATION_ID, LICENSE_ID);
   });
 });
