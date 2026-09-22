@@ -1,5 +1,6 @@
 packages:
   - "packages/*"
+  - "workers/runtime"
   - "app"
   - "infra"
   - "services/gateway"
