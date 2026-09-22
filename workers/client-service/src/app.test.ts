@@ -79,6 +79,16 @@ function service(): ClientWorkerService {
     createPending: vi.fn(async () => ({ id: PENDING_ID, client_id: CLIENT_ID, reason: "Retorno" })),
     listPending: vi.fn(async () => ({ list: [] })),
     deletePending: vi.fn(async () => undefined),
+    createPA: vi.fn(async () => ({ client_id: CLIENT_ID })),
+    getPADetail: vi.fn(async () => ({ client_id: CLIENT_ID })),
+    updatePA: vi.fn(async () => ({ client_id: CLIENT_ID })),
+    terminate: vi.fn(async () => ({ id: "termination-1" })),
+    updateFinance: vi.fn(async () => ({ id: CLIENT_ID })),
+    updateRegularize: vi.fn(async () => ({ id: CLIENT_ID })),
+    runCompetenceOutputUpdate: vi.fn(async () => ({ updated: 0 })),
+    applyCommercialProjection: vi.fn(async () => ({ applied: true })),
+    reportingCatalog: vi.fn(async () => ({ sources: [], relations: [] })),
+    extractReporting: vi.fn(async () => ({ rows: [], reachedLimit: false })),
   };
 }
 

@@ -17,47 +17,126 @@ model Organization {
   clients           Client[]
   histories         ClientHistory[]
   pendingHistories  ClientHistoryPending[]
+  pas               PA[]
+  terminations      ClientTermination[]
+  tasks             Task[]
 
   @@map("organizations")
 }
 
 model Client {
-  id              String                  @id @default(uuid())
-  name            String
-  organization_id String
-  status          String
-  cpf_cnpj        String                  @default("")
-  company_name    String?
-  fantasy_name    String?
-  service_unique  Boolean?
-  deletion_date   DateTime?
-  dominio_code    String?
-  address         String?
-  cep             String?
-  neighborhood    String?
-  state           String?
-  city            String?
-  customer_since  DateTime?
-  opening_date    DateTime?
-  responsible     String?
-  email           String?
-  type            String                  @default("PJ")
-  type_registration String               @default("Novo")
-  prospecting_status String
-  organization    Organization            @relation(fields: [organization_id], references: [id])
-  histories       ClientHistory[]
-  pendingHistories ClientHistoryPending[]
+  id                            String       @id @default(uuid())
+  dominio_code                  String?
+  name                          String
+  company_name                  String?
+  fantasy_name                  String?
+  cnae                          String?
+  responsible                   String?
+  cpf_responsible               String?
+  agent                         String?
+  cpf_agent                     String?
+  number                        String?
+  email                         String?
+  address                       String?
+  cep                           String?
+  neighborhood                  String?
+  state                         String?
+  city                          String?
+  customer_since                DateTime?
+  municipal_registration        String?
+  state_registration            String?
+  commercial_board_registration String?
+  status                        String
+  competence_entry              DateTime?
+  competence_output             DateTime?
+  opening_date                  DateTime?
+  instagram                     String?
+  indication                    String?
+  regime                        String?
+  size                          String?
+  segment                       String?
+  start_strike                  DateTime?
+  end_strike                    DateTime?
+  deletion_date                 DateTime?
+  contract                      Boolean?
+  prospecting_status            String
+  date_status                   DateTime?
+  description_prospecting       String?
+  participants_meet             String?
+  meet_type                     String?
+  closing_date                  DateTime?
+  register_date_prospecting     DateTime @default(now())
+  contabil                      Boolean?
+  fiscal                        Boolean?
+  pessoal                       Boolean?
+  infoproduto                   Boolean?
+  consultoria                   Boolean?
+  castelo_med                   Boolean?
+  cnae_secondary                String?
+  service_unique                Boolean?
+  cpf_cnpj                      String       @default("")
+  type                          String       @default("PJ")
+  type_registration             String       @default("Novo")
+  organization_id               String
+  organization                  Organization @relation(fields: [organization_id], references: [id])
+  histories                     ClientHistory[]
+  pendingHistories              ClientHistoryPending[]
+  pa                            PA?
+  terminations                  ClientTermination[]
+  tasks                         Task[]
 
   @@map("clients")
 }
 
+model Department {
+  id    String @id
+  name  String
+  users User[]
+
+  @@map("departments")
+}
+
 model User {
-  id        String           @id
-  name      String
-  histories ClientHistory[]
+  id               String                  @id
+  name             String
+  department_id    String
+  department       Department              @relation(fields: [department_id], references: [id])
+  histories        ClientHistory[]
   pendingHistories ClientHistoryPending[]
 
   @@map("users")
+}
+
+model PA {
+  client_id                 String       @id
+  activities                String?
+  tax_billing               String?
+  management_billing        String?
+  works_bidding             Boolean?
+  dissatisfaction           String?
+  registered_collabortors   Int?
+  unregistered_collabortors Int?
+  esocial                   Boolean?
+  how_many_banks             Boolean?
+  whitch_banks               String?
+  responsible_departments    String?
+  works_system               Boolean?
+  system_name                String?
+  system_usage_time          String?
+  system_value               String?
+  system_contact             String?
+  system_operations          String?
+  cloud_storage              Boolean?
+  which_cloud_storage        String?
+  rental_agreement           Boolean?
+  assessment_regime          String?
+  permit                     String?
+  services                   String?
+  organization_id            String
+  client                     Client       @relation(fields: [client_id], references: [id])
+  organization               Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("clients.pa")
 }
 
 model ClientHistory {
@@ -86,4 +165,43 @@ model ClientHistoryPending {
   user            User         @relation(fields: [user_id], references: [id])
 
   @@map("clients.historyPending")
+}
+
+model ClientTermination {
+  id              String       @id @default(uuid())
+  client_id       String
+  reason          String
+  description     String
+  competence      String
+  date            DateTime     @default(now())
+  user_id         String
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("clients.termination")
+}
+
+model Task {
+  id              String       @id @default(uuid())
+  client_id       String
+  status          String
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("integracao.tasks")
+}
+
+model ClientCommercialProjectionEvent {
+  id                   String   @id
+  organization_id      String
+  client_id            String
+  event_type           String
+  audit_correlation_id String
+  applied_at           DateTime @default(now())
+  created_at           DateTime @default(now())
+
+  @@index([organization_id, client_id, applied_at], map: "idx_client_commercial_projection_client")
+  @@map("client.commercial_projection_events")
 }

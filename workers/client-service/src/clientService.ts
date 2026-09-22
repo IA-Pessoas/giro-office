@@ -1,10 +1,18 @@
 import type { ServiceBinding } from "@workspace/runtime";
-import { ServiceError } from "@workspace/shared/http";
+import {
+  clientIntegrationReportingCatalog,
+  executeReportingQuery,
+  getClientIntegrationReportingFields,
+  ServiceError,
+  withReportingSnapshot,
+} from "@workspace/shared";
 import type { PrismaClient } from "./generated/prisma/client.js";
+import type { WorkerHistoryStorageLike } from "./historyStorage.js";
 
 export type ClientAuthorization = {
   userId: string;
   level: number;
+  modules?: Record<string, number>;
   permission?: number;
   isOwner: boolean;
 };
@@ -83,6 +91,41 @@ export type ClientWorkerService = {
   ) => Promise<unknown>;
   listPending: (organizationId: string, userId?: string) => Promise<unknown>;
   deletePending: (pendingId: string, organizationId: string) => Promise<void>;
+  createPA: (clientId: string, organizationId: string) => Promise<unknown>;
+  getPADetail: (clientId: string, organizationId: string) => Promise<unknown>;
+  updatePA: (
+    clientId: string,
+    organizationId: string,
+    input: Record<string, unknown>,
+  ) => Promise<unknown>;
+  terminate: (
+    clientId: string,
+    organizationId: string,
+    userId: string,
+    input: Record<string, unknown>,
+  ) => Promise<unknown>;
+  updateFinance: (
+    clientId: string,
+    organizationId: string,
+    input: Record<string, unknown>,
+  ) => Promise<unknown>;
+  updateRegularize: (
+    clientId: string,
+    organizationId: string,
+    userId: string,
+    input: Record<string, unknown>,
+  ) => Promise<unknown>;
+  runCompetenceOutputUpdate: () => Promise<unknown>;
+  applyCommercialProjection: (event: Record<string, unknown>) => Promise<unknown>;
+  reportingCatalog: () => Promise<unknown>;
+  extractReporting: (input: {
+    organizationId: string;
+    source: string;
+    fields: readonly string[];
+    limit: number;
+    query?: unknown;
+    offset?: number;
+  }) => Promise<unknown>;
 };
 
 type ClientRow = Record<string, unknown>;
@@ -105,7 +148,12 @@ const clientSelect = {
   company_name: true,
   fantasy_name: true,
   service_unique: true,
+  responsible: true,
+  email: true,
   deletion_date: true,
+  type: true,
+  type_registration: true,
+  prospecting_status: true,
   dominio_code: true,
   address: true,
   cep: true,
@@ -113,15 +161,177 @@ const clientSelect = {
   state: true,
   city: true,
   customer_since: true,
+  municipal_registration: true,
+  state_registration: true,
+  commercial_board_registration: true,
+  competence_entry: true,
+  competence_output: true,
   opening_date: true,
-  responsible: true,
-  email: true,
+  instagram: true,
+  indication: true,
+  regime: true,
+  size: true,
+  segment: true,
+  start_strike: true,
+  end_strike: true,
+  cnae: true,
+  cnae_secondary: true,
+  cpf_responsible: true,
+  agent: true,
+  cpf_agent: true,
+  number: true,
+  contabil: true,
+  fiscal: true,
+  pessoal: true,
+  infoproduto: true,
+  consultoria: true,
+  castelo_med: true,
+  contract: true,
+  date_status: true,
+  description_prospecting: true,
+  participants_meet: true,
+  meet_type: true,
+  register_date_prospecting: true,
 } as const;
+
+const clientListSelect = {
+  id: true,
+  name: true,
+  organization_id: true,
+  status: true,
+  cpf_cnpj: true,
+  company_name: true,
+  fantasy_name: true,
+  service_unique: true,
+  deletion_date: true,
+} as const;
+
+const paSelect = {
+  client_id: true,
+  activities: true,
+  tax_billing: true,
+  management_billing: true,
+  works_bidding: true,
+  dissatisfaction: true,
+  registered_collabortors: true,
+  unregistered_collabortors: true,
+  esocial: true,
+  how_many_banks: true,
+  whitch_banks: true,
+  responsible_departments: true,
+  works_system: true,
+  system_name: true,
+  system_usage_time: true,
+  system_value: true,
+  system_contact: true,
+  system_operations: true,
+  cloud_storage: true,
+  which_cloud_storage: true,
+  rental_agreement: true,
+  assessment_regime: true,
+  permit: true,
+  services: true,
+} as const;
+
+const paDetailSelect = {
+  ...paSelect,
+  client: {
+    select: {
+      company_name: true,
+      cpf_cnpj: true,
+      responsible: true,
+      opening_date: true,
+      number: true,
+      register_date_prospecting: true,
+      participants_meet: true,
+      email: true,
+      meet_type: true,
+      indication: true,
+      instagram: true,
+      regime: true,
+      cnae: true,
+      cnae_secondary: true,
+      contabil: true,
+      fiscal: true,
+      pessoal: true,
+      infoproduto: true,
+      consultoria: true,
+      castelo_med: true,
+    },
+  },
+} as const;
+
+const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
+const CLIENT_DOMAIN_MODULES = [
+  "comercial",
+  "contabil",
+  "financeiro",
+  "fiscal",
+  "pessoal",
+  "regularize",
+] as const;
 
 function requirePermission(auth: ClientAuthorization, minimum: number): void {
   if (!auth.isOwner && auth.level < minimum) {
     throw new ServiceError(403, "Usuário não possui permissão para este domínio.");
   }
+}
+
+function requireClientListPermission(auth: ClientAuthorization): void {
+  const domainAccess = CLIENT_DOMAIN_MODULES.some((module) => (auth.modules?.[module] ?? 0) >= 1);
+  if (!auth.isOwner && (auth.permission ?? 0) < 1 && auth.level < 1 && !domainAccess) {
+    throw new ServiceError(403, "Usuário não possui permissão para este domínio.");
+  }
+}
+
+function statusWhere(filters: ClientFilters): Record<string, unknown> | undefined {
+  const status = filters.status;
+  if (!status || status === "Todos") return undefined;
+  if (!filters.ref) return { status: status === "Prospect" ? "Prospecção" : status };
+  if (filters.ref === "integracao") {
+    if (status === "Ativo" || status === "Inativo") {
+      return { AND: [{ status }, { dominio_code: { not: null } }, { dominio_code: { not: "" } }] };
+    }
+    if (status === "Ativo e Prospecção") return { status: { in: ["Fechado", "Prospecção"] } };
+    if (
+      [
+        "Ativo PJ",
+        "Prospecção PJ",
+        "Inativo PJ",
+        "Ativo PF",
+        "Prospecção PF",
+        "Inativo PF",
+      ].includes(status)
+    ) {
+      const [statusPart, type] = status.split(" ");
+      return { status: statusPart, type };
+    }
+    if (status === "Não Contradados e Paralisados" || status === "Não Contradado e Paralisado") {
+      return { prospecting_status: { in: ["Paralisado", "Recusado pelo Cliente"] } };
+    }
+    return { status };
+  }
+  if (filters.ref === "deps") {
+    const department = status.split(" ")[1];
+    if (
+      status.startsWith("Departamento ") &&
+      department &&
+      ["contabil", "fiscal", "pessoal", "infoproduto", "consultoria", "castelo_med"].includes(
+        department,
+      )
+    ) {
+      return { [department]: true, status: "Ativo" };
+    }
+  }
+  return undefined;
+}
+
+function cleanCnpj(value: string): string {
+  return value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+}
+
+function cleanDocument(value: string | null | undefined): string {
+  return value?.replace(/\D/g, "") ?? "";
 }
 
 function serialize(value: unknown): unknown {
@@ -143,6 +353,9 @@ export class ClientService implements ClientWorkerService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly cnpjService?: ServiceBinding,
+    private readonly cnpjServiceUrl?: string,
+    private readonly historyStorage?: WorkerHistoryStorageLike,
+    private readonly inReportingSnapshot = false,
   ) {}
 
   private async organization(organizationId: string): Promise<ClientRow> {
@@ -168,18 +381,25 @@ export class ClientService implements ClientWorkerService {
     filters: ClientFilters,
     authorization: ClientAuthorization,
   ): Promise<unknown> {
-    requirePermission(authorization, 1);
-    const where: Record<string, unknown> = { organization_id: organizationId };
-    if (filters.status && filters.status !== "Todos")
-      where.status = filters.status === "Prospect" ? "Prospecção" : filters.status;
+    requireClientListPermission(authorization);
+    const where: Record<string, unknown> = {
+      organization_id: organizationId,
+      ...(statusWhere(filters) ?? {}),
+    };
     if (filters.search?.trim()) {
       const term = filters.search.trim();
-      where.OR = [
-        { name: { contains: term, mode: "insensitive" } },
-        { company_name: { contains: term, mode: "insensitive" } },
-        { fantasy_name: { contains: term, mode: "insensitive" } },
-        { cpf_cnpj: { contains: term, mode: "insensitive" } },
-      ];
+      const search = {
+        OR: [
+          { name: { contains: term, mode: "insensitive" } },
+          { company_name: { contains: term, mode: "insensitive" } },
+          { fantasy_name: { contains: term, mode: "insensitive" } },
+          { cpf_cnpj: { contains: term, mode: "insensitive" } },
+        ],
+      };
+      Object.assign(
+        where,
+        Object.keys(where).length > 1 ? { AND: [{ ...where }, search] } : search,
+      );
     }
     const organization = await this.organization(organizationId);
     const rows = await (this.prisma as any).client.findMany({
@@ -187,7 +407,7 @@ export class ClientService implements ClientWorkerService {
       orderBy: { name: "asc" },
       skip: (filters.page - 1) * filters.pageSize,
       take: filters.pageSize,
-      select: clientSelect,
+      select: clientListSelect,
     });
     const total = await (this.prisma as any).client.count({ where });
     return {
@@ -205,7 +425,12 @@ export class ClientService implements ClientWorkerService {
     authorization: ClientAuthorization,
   ): Promise<unknown> {
     requirePermission(authorization, 1);
-    return toPublic(await this.client(id, organizationId), await this.organization(organizationId));
+    const row = await (this.prisma as any).client.findFirst({
+      where: { id, organization_id: organizationId },
+      select: clientSelect,
+    });
+    if (!row) throw new ServiceError(404, "Cliente não encontrado.");
+    return toPublic(row, await this.organization(organizationId));
   }
 
   async create(
@@ -244,7 +469,8 @@ export class ClientService implements ClientWorkerService {
     authorization: ClientAuthorization,
   ): Promise<unknown> {
     requirePermission(authorization, 3);
-    await this.client(id, organizationId);
+    const existing = await this.client(id, organizationId);
+    if (existing.status === "Inativo") throw new ServiceError(409, "Cliente já está inativo.");
     const row = await (this.prisma as any).client.update({
       where: { id },
       data: { status: "Inativo", deletion_date: new Date() },
@@ -259,7 +485,8 @@ export class ClientService implements ClientWorkerService {
     authorization: ClientAuthorization,
   ): Promise<unknown> {
     requirePermission(authorization, 3);
-    await this.client(id, organizationId);
+    const existing = await this.client(id, organizationId);
+    if (existing.status === "Ativo") throw new ServiceError(409, "Cliente já está ativo.");
     const row = await (this.prisma as any).client.update({
       where: { id },
       data: { status: "Ativo", deletion_date: null },
@@ -268,13 +495,18 @@ export class ClientService implements ClientWorkerService {
     return toPublic(row, await this.organization(organizationId));
   }
 
-  async lookupCnpj(cnpj: string): Promise<unknown> {
-    if (!this.cnpjService) throw new ServiceError(503, "Consulta oficial de CNPJ indisponível.");
+  async lookupCnpj(cnpj: string, _organizationId: string): Promise<unknown> {
+    if (!this.cnpjService || !this.cnpjServiceUrl) {
+      throw new ServiceError(503, "Consulta oficial de CNPJ indisponível.");
+    }
     let response: Response;
     try {
-      response = await this.cnpjService.fetch(
-        new Request(`https://cnpj-service.internal/lookup?cnpj=${encodeURIComponent(cnpj)}`),
-      );
+      const baseUrl = this.cnpjServiceUrl.endsWith("/")
+        ? this.cnpjServiceUrl
+        : `${this.cnpjServiceUrl}/`;
+      const url = new URL("lookup", baseUrl);
+      url.searchParams.set("cnpj", cnpj);
+      response = await this.cnpjService.fetch(new Request(url));
     } catch {
       throw new ServiceError(502, "O provedor oficial de CNPJ não respondeu corretamente.");
     }
@@ -287,7 +519,40 @@ export class ClientService implements ClientWorkerService {
     input: Record<string, unknown>,
     authorization: ClientAuthorization,
   ): Promise<unknown> {
-    return this.create(input, authorization);
+    requirePermission(authorization, 2);
+    const organizationId = String(input.organization_id);
+    const cpfCnpj = cleanCnpj(String(input.cpf_cnpj));
+    const exists = await (this.prisma as any).client.findFirst({
+      where: { cpf_cnpj: cpfCnpj, organization_id: organizationId },
+      select: { id: true },
+    });
+    if (exists) throw new ServiceError(409, "Cliente já cadastrado.");
+    return (this.prisma as any).client.create({
+      data: {
+        organization_id: organizationId,
+        type: input.type,
+        name: input.name,
+        company_name: input.company_name ?? null,
+        fantasy_name: input.fantasy_name ?? null,
+        cpf_cnpj: cpfCnpj,
+        opening_date: input.opening_date ?? null,
+        responsible: input.responsible ?? null,
+        cpf_responsible: cleanDocument(input.cpf_responsible as string | null | undefined),
+        number: input.number ?? null,
+        email: input.email ?? null,
+        agent: input.agent ?? null,
+        cpf_agent: cleanDocument(input.cpf_agent as string | null | undefined),
+        instagram: input.instagram ?? null,
+        indication: input.indication ?? null,
+        participants_meet: input.participants_meet ?? null,
+        meet_type: input.meet_type ?? null,
+        type_registration: input.type_registration ?? "Novo",
+        service_unique: input.service_unique ?? false,
+        status: input.type_registration === "Novo" ? "Prospecção" : "Ativo",
+        prospecting_status: input.type_registration === "Novo" ? "Análise/Agendamento" : "Fechado",
+      },
+      select: { id: true, name: true, cpf_cnpj: true },
+    });
   }
 
   async updateIntegration(
@@ -296,7 +561,40 @@ export class ClientService implements ClientWorkerService {
     input: Record<string, unknown>,
     authorization: ClientAuthorization,
   ): Promise<unknown> {
-    return this.update(id, organizationId, input, authorization);
+    requirePermission(authorization, 2);
+    await this.client(id, organizationId);
+    const data: Record<string, unknown> = { ...input };
+    if (data.cpf_cnpj !== undefined) data.cpf_cnpj = cleanCnpj(String(data.cpf_cnpj));
+    if (data.cpf_responsible !== undefined)
+      data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
+    if (data.cpf_agent !== undefined) data.cpf_agent = cleanDocument(String(data.cpf_agent));
+    return (this.prisma as any).client.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        type: true,
+        name: true,
+        company_name: true,
+        fantasy_name: true,
+        cpf_cnpj: true,
+        responsible: true,
+        cpf_responsible: true,
+        agent: true,
+        cpf_agent: true,
+        number: true,
+        email: true,
+        address: true,
+        cep: true,
+        neighborhood: true,
+        state: true,
+        city: true,
+        instagram: true,
+        indication: true,
+        type_registration: true,
+        service_unique: true,
+      },
+    });
   }
 
   private async ensureClient(id: string, organizationId: string): Promise<void> {
@@ -309,7 +607,15 @@ export class ClientService implements ClientWorkerService {
       list: await (this.prisma as any).clientHistory.findMany({
         where: { client_id: clientId, organization_id: organizationId },
         orderBy: { date: "asc" },
-        select: { id: true, client_id: true, date: true, history: true, file: true, user_id: true },
+        select: {
+          id: true,
+          client_id: true,
+          date: true,
+          history: true,
+          file: true,
+          user_id: true,
+          user: { select: { name: true, department: { select: { name: true } } } },
+        },
       }),
     };
   }
@@ -330,7 +636,14 @@ export class ClientService implements ClientWorkerService {
         history: input.history,
         file: input.file ?? null,
       },
-      select: { id: true, client_id: true, date: true, history: true, file: true, user_id: true },
+      select: {
+        id: true,
+        client_id: true,
+        date: true,
+        history: true,
+        file: true,
+        user_id: true,
+      },
     });
     if (input.pending_id) {
       await (this.prisma as any).clientHistoryPending.deleteMany({
@@ -343,7 +656,16 @@ export class ClientService implements ClientWorkerService {
   async getHistory(clientId: string, historyId: string, organizationId: string): Promise<unknown> {
     const row = await (this.prisma as any).clientHistory.findFirst({
       where: { id: historyId, client_id: clientId, organization_id: organizationId },
-      select: { id: true, client_id: true, date: true, history: true, file: true, user_id: true },
+      select: {
+        id: true,
+        client_id: true,
+        date: true,
+        history: true,
+        file: true,
+        user_id: true,
+        user: { select: { name: true, department: { select: { name: true } } } },
+        client: { select: { company_name: true, cpf_cnpj: true } },
+      },
     });
     if (!row) throw new ServiceError(404, "Histórico não encontrado.");
     return { detail: row };
@@ -358,7 +680,9 @@ export class ClientService implements ClientWorkerService {
       detail: ClientRow;
     };
     if (!row.detail.file) throw new ServiceError(404, "Anexo não encontrado.");
-    return { url: row.detail.file };
+    if (/^https?:\/\//iu.test(String(row.detail.file))) return { url: row.detail.file };
+    if (!this.historyStorage) throw new ServiceError(503, "Storage de históricos não configurado.");
+    return { url: await this.historyStorage.createSignedAccessUrl(String(row.detail.file)) };
   }
 
   async updateHistory(
@@ -376,7 +700,7 @@ export class ClientService implements ClientWorkerService {
       throw new ServiceError(403, "Usuário não tem permissão para editar este histórico.");
     return (this.prisma as any).clientHistory.update({
       where: { id: historyId },
-      data: input,
+      data: { date: input.date, history: input.history },
       select: { id: true, date: true, history: true, user_id: true },
     });
   }
@@ -398,7 +722,12 @@ export class ClientService implements ClientWorkerService {
     return {
       list: await (this.prisma as any).clientHistoryPending.findMany({
         where: { organization_id: organizationId, ...(userId ? { user_id: userId } : {}) },
-        select: { id: true, reason: true, client_id: true },
+        select: {
+          id: true,
+          reason: true,
+          client_id: true,
+          client: { select: { company_name: true, cpf_cnpj: true } },
+        },
       }),
     };
   }
@@ -410,5 +739,330 @@ export class ClientService implements ClientWorkerService {
     });
     if (!exists) throw new ServiceError(404, "Pendência não encontrada.");
     await (this.prisma as any).clientHistoryPending.delete({ where: { id: pendingId } });
+  }
+
+  async createPA(clientId: string, organizationId: string): Promise<unknown> {
+    await this.ensureClient(clientId, organizationId);
+    const exists = await (this.prisma as any).pA.findFirst({
+      where: { client_id: clientId, organization_id: organizationId },
+      select: { client_id: true },
+    });
+    if (exists) throw new ServiceError(409, "PA já cadastrado para este cliente.");
+    return (this.prisma as any).pA.create({
+      data: { client_id: clientId, organization_id: organizationId },
+      select: paSelect,
+    });
+  }
+
+  async getPADetail(clientId: string, organizationId: string): Promise<unknown> {
+    await this.ensureClient(clientId, organizationId);
+    return (this.prisma as any).pA.findFirst({
+      where: { client_id: clientId, organization_id: organizationId },
+      select: paDetailSelect,
+    });
+  }
+
+  async updatePA(
+    clientId: string,
+    organizationId: string,
+    input: Record<string, unknown>,
+  ): Promise<unknown> {
+    const exists = await (this.prisma as any).pA.findFirst({
+      where: { client_id: clientId, organization_id: organizationId },
+      select: { client_id: true },
+    });
+    if (!exists) throw new ServiceError(404, "PA não encontrado.");
+    if (Object.keys(input).length === 0)
+      throw new ServiceError(400, "Informe ao menos um campo para atualizar.");
+    return (this.prisma as any).pA.update({
+      where: { client_id: clientId },
+      data: input,
+      select: paSelect,
+    });
+  }
+
+  async terminate(
+    clientId: string,
+    organizationId: string,
+    userId: string,
+    input: Record<string, unknown>,
+  ): Promise<unknown> {
+    await this.ensureClient(clientId, organizationId);
+    const competence = String(input.competence_output);
+    const [year, month] = competence.split("-").map(Number);
+    const competenceDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      await tx.task.updateMany({
+        where: {
+          status: { in: [...OPEN_TASK_STATUSES] },
+          client_id: clientId,
+          organization_id: organizationId,
+        },
+        data: { status: "Paralisado" },
+      });
+      await tx.client.update({
+        where: { id: clientId },
+        data: { status: "Processo de Inativação", competence_output: competenceDate },
+        select: { id: true },
+      });
+      return tx.clientTermination.create({
+        data: {
+          client_id: clientId,
+          reason: input.reason,
+          description: input.description,
+          competence,
+          user_id: userId,
+          organization_id: organizationId,
+        },
+        select: {
+          id: true,
+          client_id: true,
+          reason: true,
+          description: true,
+          competence: true,
+          user_id: true,
+        },
+      });
+    });
+  }
+
+  async updateFinance(
+    clientId: string,
+    organizationId: string,
+    input: Record<string, unknown>,
+  ): Promise<unknown> {
+    await this.ensureClient(clientId, organizationId);
+    return (this.prisma as any).client.update({
+      where: { id: clientId },
+      data: { contract: input.contract },
+      select: { id: true, contract: true },
+    });
+  }
+
+  async updateRegularize(
+    clientId: string,
+    organizationId: string,
+    _userId: string,
+    input: Record<string, unknown>,
+  ): Promise<unknown> {
+    await this.ensureClient(clientId, organizationId);
+    const data = { ...input };
+    if (data.cpf_cnpj !== undefined) data.cpf_cnpj = cleanDocument(String(data.cpf_cnpj));
+    if (data.cpf_responsible !== undefined)
+      data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
+    return (this.prisma as any).client.update({
+      where: { id: clientId },
+      data,
+      select: {
+        id: true,
+        dominio_code: true,
+        name: true,
+        company_name: true,
+        fantasy_name: true,
+        cpf_cnpj: true,
+        cnae_secondary: true,
+        cnae: true,
+        responsible: true,
+        cpf_responsible: true,
+        address: true,
+        cep: true,
+        neighborhood: true,
+        state: true,
+        city: true,
+        customer_since: true,
+        municipal_registration: true,
+        state_registration: true,
+        commercial_board_registration: true,
+        status: true,
+        competence_entry: true,
+        competence_output: true,
+        opening_date: true,
+        regime: true,
+        size: true,
+        segment: true,
+        contabil: true,
+        fiscal: true,
+        pessoal: true,
+        infoproduto: true,
+        consultoria: true,
+        start_strike: true,
+        end_strike: true,
+        deletion_date: true,
+      },
+    });
+  }
+
+  async runCompetenceOutputUpdate(): Promise<unknown> {
+    const clients = await (this.prisma as any).client.findMany({
+      where: { competence_output: { lte: new Date() }, status: "Processo de Inativação" },
+      select: { id: true },
+    });
+    if (clients.length === 0) return { updated: 0 };
+    await (this.prisma as any).client.updateMany({
+      where: { id: { in: clients.map((client: { id: string }) => client.id) } },
+      data: { status: "Inativo" },
+    });
+    return { updated: clients.length };
+  }
+
+  async applyCommercialProjection(event: Record<string, unknown>): Promise<unknown> {
+    try {
+      return await (this.prisma as any).$transaction(async (tx: any) => {
+        const previous = await tx.clientCommercialProjectionEvent.findUnique({
+          where: { id: event.event_id },
+          select: { organization_id: true, client_id: true },
+        });
+        if (previous) {
+          if (
+            previous.organization_id !== event.organization_id ||
+            previous.client_id !== event.client_id
+          ) {
+            throw new ServiceError(409, "Evento comercial pertence a outro tenant.");
+          }
+          const client = await tx.client.findFirst({
+            where: { id: event.client_id, organization_id: event.organization_id },
+            select: {
+              id: true,
+              name: true,
+              company_name: true,
+              fantasy_name: true,
+              service_unique: true,
+              type_registration: true,
+            },
+          });
+          if (!client) throw new ServiceError(404, "Cliente não encontrado nesta organização.");
+          return {
+            event_id: event.event_id,
+            applied: false,
+            duplicate: true,
+            client_id: event.client_id,
+            client,
+          };
+        }
+        const client = await tx.client.findFirst({
+          where: { id: event.client_id, organization_id: event.organization_id },
+          select: {
+            id: true,
+            name: true,
+            company_name: true,
+            fantasy_name: true,
+            service_unique: true,
+            type_registration: true,
+          },
+        });
+        if (!client) throw new ServiceError(404, "Cliente não encontrado nesta organização.");
+        const status =
+          event.to_status === "Fechado"
+            ? "Ativo"
+            : event.to_status === "Recusado pelo Cliente"
+              ? "Não Contratado"
+              : event.to_status === "Paralisado"
+                ? "Paralisado"
+                : "Prospecção";
+        const updated = await tx.client.updateMany({
+          where: { id: event.client_id, organization_id: event.organization_id },
+          data: {
+            status,
+            prospecting_status: event.to_status,
+            date_status: event.status_date ? new Date(String(event.status_date)) : null,
+            description_prospecting: event.description,
+          },
+        });
+        if (updated.count !== 1)
+          throw new ServiceError(404, "Cliente não encontrado nesta organização.");
+        await tx.clientCommercialProjectionEvent.create({
+          data: {
+            id: event.event_id,
+            organization_id: event.organization_id,
+            client_id: event.client_id,
+            event_type: event.event_type,
+            audit_correlation_id: event.audit_correlation_id,
+          },
+        });
+        return {
+          event_id: event.event_id,
+          applied: true,
+          duplicate: false,
+          client_id: event.client_id,
+          client,
+        };
+      });
+    } catch (error) {
+      if (error instanceof ServiceError) throw error;
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "P2002"
+      ) {
+        throw new ServiceError(409, "Evento comercial já está sendo processado.", error);
+      }
+      throw error;
+    }
+  }
+
+  async reportingCatalog(): Promise<unknown> {
+    return clientIntegrationReportingCatalog;
+  }
+
+  async extractReporting(input: {
+    organizationId: string;
+    source: string;
+    fields: readonly string[];
+    limit: number;
+    query?: unknown;
+    offset?: number;
+  }): Promise<unknown> {
+    if (input.query && !this.inReportingSnapshot) {
+      return withReportingSnapshot(this.prisma, (transaction) =>
+        new ClientService(
+          transaction as PrismaClient,
+          this.cnpjService,
+          this.cnpjServiceUrl,
+          this.historyStorage,
+          true,
+        ).extractReporting(input),
+      );
+    }
+    const load = async (fields: readonly string[], limit: number, offset = 0) => {
+      const allowedFields = getClientIntegrationReportingFields(
+        input.source as "integracao.clients",
+      );
+      if (fields.some((field) => !allowedFields.includes(field))) {
+        throw new ServiceError(403, "Campo não publicado para relatórios.");
+      }
+      const select = Object.fromEntries(
+        fields.map((field) => [field === "client_id" ? "id" : field, true]),
+      );
+      const rows = await (this.prisma as any).client.findMany({
+        where: { organization_id: input.organizationId },
+        select,
+        skip: offset,
+        orderBy: { id: "asc" },
+        take: limit + 1,
+      });
+      return {
+        rows: rows
+          .slice(0, limit)
+          .map((row: Record<string, unknown>) =>
+            Object.fromEntries(
+              fields.map((field) => [field, field === "client_id" ? row.id : row[field]]),
+            ),
+          ),
+        reachedLimit: rows.length > limit,
+      };
+    };
+    if (input.query) {
+      return executeReportingQuery(
+        {
+          source: input.source,
+          fields: input.fields,
+          limit: input.limit,
+          query: input.query as never,
+        },
+        load,
+      );
+    }
+    return load(input.fields, input.limit, input.offset);
   }
 }
