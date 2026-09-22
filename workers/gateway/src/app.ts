@@ -77,10 +77,83 @@ const routes: Route[] = [
   { prefix: "/regularize", binding: "REGULARIZE_SERVICE", module: "regularize" },
 ];
 
+/**
+ * Superfície `/platform`: no Node ela não é prefixo, são `routeMatchers` por
+ * método + path, porque o mesmo `/platform/organizations/:id` pertence ao
+ * organization-service num método e ao user-service em outro. Espelha
+ * `serviceRegistry.ts` matcher a matcher, na mesma ordem.
+ */
+type RouteMatcher = {
+  methods: readonly string[];
+  path: RegExp;
+  binding: keyof GatewayWorkerEnv;
+};
+
+const platformMatchers: RouteMatcher[] = [
+  // organization-service
+  {
+    methods: ["GET", "POST"],
+    path: /^\/platform\/organizations\/?$/u,
+    binding: "ORGANIZATION_SERVICE",
+  },
+  {
+    methods: ["PATCH"],
+    path: /^\/platform\/organizations\/[^/]+\/(?:status|subscription-plan|logo-url)\/?$/u,
+    binding: "ORGANIZATION_SERVICE",
+  },
+  // user-service
+  { methods: ["POST", "DELETE"], path: /^\/platform\/session\/?$/u, binding: "USER_SERVICE" },
+  { methods: ["POST"], path: /^\/platform\/session\/refresh\/?$/u, binding: "USER_SERVICE" },
+  { methods: ["GET"], path: /^\/platform\/me\/?$/u, binding: "USER_SERVICE" },
+  {
+    methods: ["GET", "POST"],
+    path: /^\/platform\/organizations\/[^/]+\/users\/?$/u,
+    binding: "USER_SERVICE",
+  },
+  {
+    methods: ["GET"],
+    path: /^\/platform\/organizations\/[^/]+\/(?:users\/[^/]+(?:\/permissions)?|departments)\/?$/u,
+    binding: "USER_SERVICE",
+  },
+  {
+    methods: ["PUT"],
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions\/?$/u,
+    binding: "USER_SERVICE",
+  },
+  {
+    methods: ["PATCH", "DELETE"],
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/?$/u,
+    binding: "USER_SERVICE",
+  },
+  {
+    methods: ["POST"],
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/u,
+    binding: "USER_SERVICE",
+  },
+  {
+    methods: ["POST"],
+    path: /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/u,
+    binding: "USER_SERVICE",
+  },
+  // Precisa vir depois dos matchers mais específicos acima, senão engoliria
+  // `/platform/organizations/:id/users` e `/platform/organizations/:id/status`.
+  {
+    methods: ["GET"],
+    path: /^\/platform\/organizations\/[^/]+\/?$/u,
+    binding: "ORGANIZATION_SERVICE",
+  },
+];
+
 /** `PUT /user/:id` do próprio usuário, exceção do authorize.ts:8 do Node. */
 const SELF_USER_PUT_PATH = /^\/user\/(?!me$|session$|start-config$|permission\/)([^/]+)$/;
 
-function routeFor(path: string): Route | undefined {
+function routeFor(method: string, path: string): Route | undefined {
+  const verb = method.toUpperCase();
+  const matcher = platformMatchers.find(
+    (entry) => entry.methods.includes(verb) && entry.path.test(path),
+  );
+  // `/platform` não tem permissionModule no Node: a permissão global é encaminhada.
+  if (matcher) return { prefix: path, binding: matcher.binding };
   return routes.find(({ prefix }) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
@@ -228,7 +301,7 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     // Paridade com o `authorize` do Node: path inválido é negado antes de qualquer coisa.
     const path = normalizeGatewayPath(new URL(c.req.url).pathname);
     if (!path) throw new ServiceError(403, "Acesso negado para esta rota.");
-    const route = routeFor(path);
+    const route = routeFor(c.req.method, path);
     if (!route) throw new ServiceError(404, "Rota não mapeada no gateway.");
     const env = options.env ?? c.env;
     const binding = env[route.binding];
