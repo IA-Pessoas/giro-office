@@ -1,65 +1,100 @@
-# Relatório — restante de User no Worker
+# Relatório — correção crítica do User Worker
 
 ## Escopo
 
-Implementação limitada a `workers/user-service/**`, ao lockfile necessário para a dependência Web-compatible fixada e a este relatório, comparando as rotas de User, autenticação de plataforma, usuários de plataforma e reporting interno do serviço Express. Não houve alteração em `services/**`, gateway, UI ou `app/next-env.d.ts`; alterações concorrentes fora de User foram preservadas.
+Este ciclo ficou limitado a `workers/user-service/**`, ao forwarding/testes do
+gateway em `services/gateway/src/proxy/httpProxy.ts`,
+`services/gateway/src/proxy/httpProxy.test.ts` e aos testes de rota necessários
+em `services/gateway/src/app.routes.test.ts`, além deste relatório. Não houve
+alteração em Pessoal, migration de Reports, UI, `app/next-env.d.ts`, lockfile,
+deploy ou push. Alterações concorrentes fora do escopo foram preservadas.
 
-## Rotas migradas
+## Correções entregues
 
-- `POST /user/session`, `POST /user/session/refresh`, `DELETE /user/session`, `GET /user/session/validate` e `GET /user/me`.
-- Listagem, detalhe, permissões, atualização, desativação e fotos de usuários da organização (`/user` e `/user/:id...`), com escopo por organização, CSRF em mutações e revogação por `session_version`.
-- `POST /platform/session`, `POST /platform/session/refresh`, `DELETE /platform/session`, `GET /platform/me` e `POST /platform/session/validate`.
-- Usuários da plataforma: ownership transfer, criação, detalhe, permissões, departamentos, listagem, atualização, desativação e reativação.
-- `POST /internal/reporting/access-context`, exigindo `REPORTS_INTERNAL_TOKEN` dedicado.
-- `POST /user` e `POST /user/start-config`, com o contrato Node, validação de departamento e bootstrap legado (`organization_id: null`).
+- Gateway: mutações `POST /user`, `PUT/DELETE /user/:id`, fotos e permissões
+  agora estão na regra CSRF do proxy; o `x-csrf-token` recebido no request é
+  o único valor encaminhado, e sua ausência gera `403`. O vínculo secreto de
+  sessão continua sendo encaminhado somente ao User Worker, que valida
+  `session_id`, `session_version`, hash CSRF, usuário e organização no banco.
+- PUT: troca de senha incrementa `session_version` junto com a atualização
+  otimista de `version`, invalidando sessões antigas. Downgrade de `type`
+  normaliza a permissão, limpa módulos não aplicáveis e preserva somente os
+  módulos self-service legados (`rh`/`ti` quando cabível); também revoga a
+  versão da sessão. A checagem de último owner ativo ocorre dentro da
+  transação serializável antes da mutação.
+- Fotos: `Fotos` precisa ser privado; o Worker verifica o bucket, grava apenas
+  o caminho do objeto e devolve URL assinada com TTL de 3600 segundos. URLs
+  públicas legadas são convertidas para o caminho do objeto quando possível,
+  sem devolver `/public/`; falhas de bucket ou assinatura retornam erro
+  observável. A leitura só assina caminho pertencente ao usuário solicitado.
+- Auditoria: binding ausente, token ausente, resposta não-2xx e falha de
+  comunicação geram `console.warn` observável e testes; a mutação continua
+  best-effort somente porque esse é o contrato legado atual. Não foi criado
+  outbox transacional.
+- Runtime: `withDb` não usa fallback `DATABASE_URL` no Worker e retorna `503`
+  sem `HYPERDRIVE`. Não foi encontrado ID autorizado no repositório; por isso
+  `wrangler.jsonc` contém guard explícito `BLOCKED`, sem inventar ID/credencial.
+  O binding deverá ser adicionado na configuração de deploy quando provisionado.
+- Hash: Argon2id e bcrypt legado continuam verificáveis no adapter Worker;
+  login válido com bcrypt regrava condicionalmente o hash para Argon2id por
+  `id + password`, sem invalidar sessões existentes.
+- Contratos anteriores permanecem cobertos: `POST /user`,
+  `POST /user/start-config`, departamento cross-tenant e usuários legados com
+  `organization_id` nulo quando o departamento vincula à organização.
 
-As sessões mantêm cookies de sessão/CSRF, claims, rotação de CSRF, expiração, revogação no banco e invalidação por versão. As rotas protegidas de plataforma exigem token interno, identidade encaminhada `platform`, papel `super_admin` e id do ator. Quando o gateway encaminha identidade junto com cookies, o cookie do navegador continua tendo precedência para validar a sessão e a revogação no banco.
+## TDD deste ciclo
 
-Identidades encaminhadas agora exigem `session_id`, `session_version` e hash CSRF bem formado; organização e plataforma são conferidas contra a sessão correspondente no banco. Mutações encaminhadas exigem prova CSRF de transporte. `activeOrganizationId` só resolve quando usuário ativo, departamento e organização formam o mesmo vínculo. Consultas e mutações de usuário aceitam o legado com `organization_id` nulo somente quando o departamento pertence à organização resolvida.
+RED antes da implementação:
 
-O entrypoint injeta `hash-wasm@4.12.0` para Argon2id canônico e bcrypt legado (`$2a$`, `$2b$`, `$2y$`), além do adapter Supabase Storage criado exclusivamente com `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` server-side. O segredo não é retornado nem incorporado em resposta; mutações relevantes usam `AUDIT_SERVICE` por binding.
+- proxy: 12 falhas — 6 mutações User não encaminhavam o token real e 6 não
+  rejeitavam CSRF ausente;
+- Worker: 6 falhas — senha sem incremento de sessão, downgrade sem
+  normalização, último owner aceito, foto pública, upload sem guard de bucket
+  privado e bucket público aceito;
+- entrypoint: 2 falhas — auditoria silenciosa e ausência do guard Hyperdrive;
+- bcrypt: 1 falha — login legado não rehashava.
 
-O schema Prisma mínimo foi ajustado somente para refletir tabelas existentes necessárias ao contrato: relação `Organization`–`Department`/`User` e `PlatformUser.password`. Não foi criada migration, tabela D1 ou campo fora do schema de origem.
+GREEN após os slices verticais:
 
-## TDD
-
-RED observado antes dos ajustes de produção:
-
-- rodada de rotas de login/autorização: 15 testes, 12 passando e 3 falhando — login de organização ausente, login de plataforma sem a proteção esperada e cookie de plataforma aceito sem gateway;
-- token de reporting dedicado: 15 testes, 1 falhando (`403` com `REPORTS_INTERNAL_TOKEN` configurado);
-- sessão de plataforma atrás do gateway: 18 testes, 1 falhando (`401` no refresh porque o Worker priorizava os headers encaminhados e não validava o cookie).
-- fotos no Worker: 17 testes, 2 falhando com `404` antes dos handlers de leitura/upload/remoção;
-- suspensão de organização: 19 testes, 1 falhando com `200` antes da validação do status da organização;
-- login para organização suspensa: 20 testes, 1 falhando com `200` antes da validação do vínculo ativo.
-- criação/onboarding: 3 testes falhando com `404` antes das rotas; criação platform: 1 teste falhando com `501`; alteração de departamento cross-tenant: 1 teste falhando antes da validação.
-
-GREEN observado:
-
-- `pnpm --filter @workspace/user-worker test`: **35/35 testes passando**;
-- refactor de imports/formatação com Biome e nova execução de check: **passou**.
+- `pnpm --filter @workspace/user-worker test`: **41/41 testes passando**;
+- `pnpm --filter @workspace/gateway exec vitest run --maxWorkers=1`:
+  **521/521 testes passando em 25 arquivos**.
 
 ## Validação
 
-- `pnpm --filter @workspace/user-worker typecheck`: **passou**;
-- `pnpm --filter @workspace/user-worker build`: **passou**;
-- `pnpm --filter @workspace/user-worker check`: **passou**;
-- `pnpm exec wrangler deploy --dry-run --config workers/user-service/wrangler.jsonc`: **passou**, upload estimado de 5935.58 KiB (1941.60 KiB gzip), apenas `AUDIT_SERVICE`, sem publicação;
-- `pnpm graphify:update:services`: **passou**;
-- `git diff --check`: **passou**;
-- inspeção de superfície do entrypoint: **passou**; o adapter Storage recebe o service-role somente por env server-side, não o serializa nem o inclui em respostas;
-- `pnpm test` na raiz: scripts passaram, mas a suíte completa foi bloqueada antes das suítes pelo `@workspace/client-service#prisma:generate`, que não consegue resolver `DATABASE_URL`. Isso é limitação de configuração externa e não foi tratado como sucesso do workspace.
+- Worker `typecheck`: passou;
+- Worker `build`: passou;
+- Worker `check`: passou;
+- gateway `typecheck`: passou;
+- gateway `build`: passou;
+- gateway `check`: passou;
+- `pnpm graphify:context:services`: passou antes da edição;
+- `pnpm graphify:update:services`: passou depois da edição; grafo atualizado
+  (9.296 nós, 16.931 arestas; visualização HTML omitida pelo limite local de
+  5.000 nós);
+- `pnpm exec wrangler --version`: `4.135.0`;
+- `pnpm exec wrangler deploy --dry-run --config workers/user-service/wrangler.jsonc`:
+  passou, sem publicação, listando somente `AUDIT_SERVICE`; a ausência de
+  Hyperdrive continua deliberadamente bloqueante para runtime de banco;
+- `git diff --check`: passou.
 
-## Lacunas registradas
+## Lacunas reais restantes
 
-- Não houve teste autenticado contra PostgreSQL/Supabase real nem smoke remoto do binding `AUDIT_SERVICE`; a cobertura disponível é de seam HTTP com Prisma/binding fakes.
-- O adapter de auditoria é best-effort, compatível com o contrato Node atual; não há outbox transacional no escopo deste Worker.
-- A instalação normal da nova dependência depende de acesso ao registry; a resolução foi fixada no `pnpm-lock.yaml` e o bundle dry-run local foi concluído, mas nenhum deploy foi feito.
+- Não existe ID/configuração de Hyperdrive autorizado no workspace. O dry-run
+  valida o bundle, mas não prova deploy funcional de banco; provisionamento e
+  binding de produção continuam bloqueados até autorização externa.
+- Não houve smoke autenticado contra PostgreSQL/Supabase real, bucket Supabase
+  real ou `AUDIT_SERVICE` remoto; os testes usam seams HTTP/Prisma/bindings
+  fakes.
+- Auditoria continua best-effort: agora falhas são observáveis, mas a
+  transação de mutação não é revertida quando o serviço de auditoria falha,
+  conforme o legado.
+- Nenhum deploy, publicação ou push foi executado.
 
-## Commit
+## Commits
 
-- `ade440f4 feat(user-worker): migrate remaining user routes`
-- `ad4cf112 fix(user-worker): preserve organization auth checks`
-- `c3d0eab4 fix(user-worker): close auth and onboarding gaps`
-- `620cfbc7 docs(user-worker): record critical fix validation`
+- Commit de código: `a885c7b1 fix(user-worker): close critical parity blockers`.
+- Commit separado deste relatório: será registrado após este update final.
 
-Nenhum deploy ou push foi executado.
+Histórico anterior relacionado: `ade440f4`, `ad4cf112`, `c3d0eab4`,
+`620cfbc7c`, `1750e6eef`.
