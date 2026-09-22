@@ -148,3 +148,33 @@ describe("parcelamento Worker", () => {
     });
   });
 });
+
+describe("parcelamento Worker — OpenAPI docs", () => {
+  const app = (extra: Partial<ParcelamentoWorkerEnv>) =>
+    createParcelamentoWorkerApp({ env: { ...env(), ...extra } });
+
+  it("serve /openapi.json e /docs com ENABLE_API_DOCS fora de produção", async () => {
+    const docsApp = app({ ENABLE_API_DOCS: "true" });
+    const spec = await docsApp.request("https://parcelamento.test/openapi.json");
+    expect(spec.status).toBe(200);
+    expect(((await spec.json()) as { paths: Record<string, unknown> }).paths).toHaveProperty(
+      "/parcelamento/installments",
+    );
+    const docs = await docsApp.request("https://parcelamento.test/docs");
+    expect(docs.status).toBe(200);
+    expect(docs.headers.get("content-type")).toContain("text/html");
+    const html = await docs.text();
+    expect(html).toContain("<title>Parcelamento Service - OpenAPI</title>");
+    expect(html).toContain('url: "/openapi.json"');
+  });
+
+  it.each([
+    {},
+    { ENABLE_API_DOCS: "false" },
+    { ENABLE_API_DOCS: "true", NODE_ENV: "production" },
+  ])("oculta /openapi.json e /docs com %o", async (extra) => {
+    const docsApp = app(extra);
+    expect((await docsApp.request("https://parcelamento.test/openapi.json")).status).toBe(404);
+    expect((await docsApp.request("https://parcelamento.test/docs")).status).toBe(404);
+  });
+});

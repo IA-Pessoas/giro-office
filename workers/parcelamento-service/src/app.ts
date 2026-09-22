@@ -1,3 +1,4 @@
+import { buildParcelamentoServiceOpenApiSpec } from "@workspace/parcelamento-service/src/openapi/spec.js";
 import type { ListInstallmentsQuery } from "@workspace/parcelamento-service/src/schemas/installment.schemas.js";
 import {
   createInstallmentBodySchema,
@@ -106,6 +107,36 @@ async function readJson(c: ParcelamentoContext): Promise<unknown> {
   }
 }
 
+// Equivalente ao `mountOpenApiDocs` do Node (swagger-ui-express): mesma versão do
+// swagger-ui-dist do lockfile, servida por CDN com SRI porque o Worker não empacota os assets.
+// ponytail: HTML duplicado nos Workers contabil/fiscal/triagem/parcelamento; mover para
+// @workspace/runtime quando outro Worker também servir /docs.
+const SWAGGER_UI_CDN = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.2";
+
+function swaggerUiHtml(title: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <link rel="stylesheet" href="${SWAGGER_UI_CDN}/swagger-ui.css" integrity="sha384-F7uqyyVZgBbuOv+8gNy6ZGJB8Rf12CczPWm130Pxrau0cyZlj1Dl18cDOWpQSrGh" crossorigin="anonymous">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="${SWAGGER_UI_CDN}/swagger-ui-bundle.js" integrity="sha384-phexB4pLDnmX1PhMxW3Ojwp92jIrirblcgNHltMum/KEQzYuBelzyulhx5ALflmy" crossorigin="anonymous"></script>
+  <script>window.ui = SwaggerUIBundle({ url: "/openapi.json", dom_id: "#swagger-ui" });</script>
+</body>
+</html>`;
+}
+
+// Mesmo gate do fiscal Worker: opt-in explícito e nunca em produção. O Node liga por padrão
+// fora de produção, mas o Worker não recebe NODE_ENV por padrão e exporia a spec em produção.
+function apiDocsEnabled(env: ParcelamentoWorkerEnv): boolean {
+  return (
+    (env.ENABLE_API_DOCS === "true" || env.ENABLE_API_DOCS === "1") && env.NODE_ENV !== "production"
+  );
+}
+
 export function createParcelamentoWorkerApp(options: ParcelamentoWorkerOptions = {}) {
   const app = new Hono<Env>();
   const envOf = (c: ParcelamentoContext) => options.env ?? c.env;
@@ -168,6 +199,21 @@ export function createParcelamentoWorkerApp(options: ParcelamentoWorkerOptions =
     });
     return c.json(createSuccessResponse({ status: "ready", service: "parcelamento-service" }));
   });
+
+  app.get("/openapi.json", (c) =>
+    apiDocsEnabled(envOf(c))
+      ? c.json(
+          buildParcelamentoServiceOpenApiSpec({ port: 8787 } as Parameters<
+            typeof buildParcelamentoServiceOpenApiSpec
+          >[0]),
+        )
+      : c.notFound(),
+  );
+  app.get("/docs", (c) =>
+    apiDocsEnabled(envOf(c))
+      ? c.html(swaggerUiHtml("Parcelamento Service - OpenAPI"))
+      : c.notFound(),
+  );
 
   app.use("/parcelamento/*", async (c, next) => {
     c.set("auth", await authenticateParcelamentoRequest(c.req.raw, envOf(c)));
