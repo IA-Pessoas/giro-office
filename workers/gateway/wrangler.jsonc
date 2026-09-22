@@ -17,7 +17,8 @@
     { "binding": "CONTABIL_SERVICE", "service": "giro-contabil-service" },
     { "binding": "PROJECT_SERVICE", "service": "giro-project-service" },
     { "binding": "TI_SERVICE", "service": "giro-ti-service" },
-    { "binding": "RH_SERVICE", "service": "giro-rh-service" }
+    { "binding": "RH_SERVICE", "service": "giro-rh-service" },
+    { "binding": "COMMERCIAL_SERVICE", "service": "giro-commercial-service" }
   ],
   "observability": { "enabled": true }
 }

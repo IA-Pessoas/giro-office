@@ -88,11 +88,15 @@ describe("gateway Worker", () => {
     const rhBinding = {
       fetch: vi.fn(async () => new Response("rh", { status: 200 })),
     };
+    const commercialBinding = {
+      fetch: vi.fn(async () => new Response("commercial", { status: 200 })),
+    };
     const app = createGatewayWorkerApp({
       env: env(undefined, {
         PROJECT_SERVICE: projectBinding,
         TI_SERVICE: tiBinding,
         RH_SERVICE: rhBinding,
+        COMMERCIAL_SERVICE: commercialBinding,
       }),
     });
 
@@ -105,13 +109,18 @@ describe("gateway Worker", () => {
     const rh = await app.request("https://gateway.test/rh", {
       headers: { authorization: `Bearer ${await jwt()}` },
     });
+    const commercial = await app.request("https://gateway.test/commercial", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
 
     expect(project.status).toBe(200);
     expect(ti.status).toBe(200);
     expect(rh.status).toBe(200);
+    expect(commercial.status).toBe(200);
     expect(projectBinding.fetch).toHaveBeenCalledOnce();
     expect(tiBinding.fetch).toHaveBeenCalledOnce();
     expect(rhBinding.fetch).toHaveBeenCalledOnce();
+    expect(commercialBinding.fetch).toHaveBeenCalledOnce();
   });
 
   it("requires CSRF for cookie mutations", async () => {
