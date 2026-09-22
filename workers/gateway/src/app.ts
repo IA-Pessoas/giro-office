@@ -29,6 +29,7 @@ const routes: Route[] = [
   { prefix: "/rh", binding: "RH_SERVICE" },
   { prefix: "/commercial", binding: "COMMERCIAL_SERVICE" },
   { prefix: "/triagem", binding: "TRIAGEM_SERVICE" },
+  { prefix: "/pessoal", binding: "PESSOAL_SERVICE" },
 ];
 
 function routeFor(path: string): Route | undefined {

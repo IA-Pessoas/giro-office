@@ -94,6 +94,9 @@ describe("gateway Worker", () => {
     const triagemBinding = {
       fetch: vi.fn(async () => new Response("triagem", { status: 200 })),
     };
+    const pessoalBinding = {
+      fetch: vi.fn(async () => new Response("pessoal", { status: 200 })),
+    };
     const app = createGatewayWorkerApp({
       env: env(undefined, {
         PROJECT_SERVICE: projectBinding,
@@ -101,6 +104,7 @@ describe("gateway Worker", () => {
         RH_SERVICE: rhBinding,
         COMMERCIAL_SERVICE: commercialBinding,
         TRIAGEM_SERVICE: triagemBinding,
+        PESSOAL_SERVICE: pessoalBinding,
       }),
     });
 
@@ -119,17 +123,22 @@ describe("gateway Worker", () => {
     const triagem = await app.request("https://gateway.test/triagem", {
       headers: { authorization: `Bearer ${await jwt()}` },
     });
+    const pessoal = await app.request("https://gateway.test/pessoal", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
 
     expect(project.status).toBe(200);
     expect(ti.status).toBe(200);
     expect(rh.status).toBe(200);
     expect(commercial.status).toBe(200);
     expect(triagem.status).toBe(200);
+    expect(pessoal.status).toBe(200);
     expect(projectBinding.fetch).toHaveBeenCalledOnce();
     expect(tiBinding.fetch).toHaveBeenCalledOnce();
     expect(rhBinding.fetch).toHaveBeenCalledOnce();
     expect(commercialBinding.fetch).toHaveBeenCalledOnce();
     expect(triagemBinding.fetch).toHaveBeenCalledOnce();
+    expect(pessoalBinding.fetch).toHaveBeenCalledOnce();
   });
 
   it("requires CSRF for cookie mutations", async () => {

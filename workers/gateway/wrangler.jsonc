@@ -19,7 +19,8 @@
     { "binding": "TI_SERVICE", "service": "giro-ti-service" },
     { "binding": "RH_SERVICE", "service": "giro-rh-service" },
     { "binding": "COMMERCIAL_SERVICE", "service": "giro-commercial-service" },
-    { "binding": "TRIAGEM_SERVICE", "service": "giro-triagem-service" }
+    { "binding": "TRIAGEM_SERVICE", "service": "giro-triagem-service" },
+    { "binding": "PESSOAL_SERVICE", "service": "giro-pessoal-service" }
   ],
   "observability": { "enabled": true }
 }
