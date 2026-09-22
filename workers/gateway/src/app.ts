@@ -1,5 +1,5 @@
 import type { AuditOutcome, AuditQuery, CreateAuditRequestPayload } from "@workspace/shared/audit";
-import { type AuthPolicy, canAccessRoute } from "@workspace/shared/auth";
+import { canAccessRoute } from "@workspace/shared/auth";
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -9,17 +9,30 @@ import {
 } from "@workspace/shared/http";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { authenticateGatewayRequest, forwardIdentity, requireCsrfForMutation } from "./auth.js";
+// Fonte única das regras de autorização: reusa os arquivos do gateway Node em vez de
+// duplicar 18 rotas exatas + 69 matchers, que divergiriam na primeira alteração.
+// São módulos puros, sem Express nem dependência de runtime Node.
+import { getRoutePolicy } from "../../../services/gateway/src/security/policies.js";
+import { isPublicRoute } from "../../../services/gateway/src/security/publicRoutes.js";
+import { normalizeGatewayPath } from "../../../services/gateway/src/security/routeClassification.js";
+import {
+  authenticateGatewayRequest,
+  clearForwardedIdentity,
+  forwardIdentity,
+  requireCsrfForMutation,
+} from "./auth.js";
 import type { GatewayWorkerEnv } from "./env.js";
 
 type GatewayBindings = { Bindings: GatewayWorkerEnv; Variables: { requestId: string } };
 type GatewayOptions = { env?: GatewayWorkerEnv };
-/** Espelha `services/gateway`: `module` = `permissionModule`, `policy` = [GET, demais métodos]. */
+/**
+ * Espelha `services/gateway`: `module` = `permissionModule` do serviceRegistry.
+ * A policy não vive aqui: vem de `getRoutePolicy`, a mesma tabela que o Node usa.
+ */
 type Route = {
   prefix: string;
   binding: keyof GatewayWorkerEnv;
   module?: string;
-  policy?: readonly [AuthPolicy, AuthPolicy];
 };
 type FetchBinding = { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> };
 
@@ -27,17 +40,8 @@ const AUDIT_REQUEST_URL = "https://audit-service.internal/internal/audit/request
 const SENSITIVE_QUERY_KEY =
   /(?:authorization|cookie|token|secret|password|passwd|jwt|api[_-]?key)/iu;
 
-function modulePolicy(module: string): readonly [AuthPolicy, AuthPolicy] {
-  return [
-    { modulePermission: { module, minPermission: 1 } },
-    { modulePermission: { module, minPermission: 2 } },
-  ];
-}
-const triagemAccess: AuthPolicy = {
-  anyModulePermission: { modules: ["contabil", "triagem"], minPermission: 1 },
-};
-const triagemPolicy = [triagemAccess, triagemAccess] as const;
-// Mesma ordem do Node: estes subpaths vão ao triagem-service; o resto de /triagem ao contabil.
+// Ordem do `getGatewayServiceDefinitions` do Node: os subpaths de triagem vêm antes
+// de `/triagem`, que cai no contabil (triagem-legacy-service).
 const triagemServiceRoutes: Route[] = [
   "overview",
   "competencies",
@@ -48,60 +52,33 @@ const triagemServiceRoutes: Route[] = [
   prefix: `/triagem/${path}`,
   binding: "TRIAGEM_SERVICE",
   module: "triagem",
-  policy: triagemPolicy,
 }));
 
+/** `module` espelha `permissionModule` do serviceRegistry.ts do Node, serviço a serviço. */
 const routes: Route[] = [
   { prefix: "/audit", binding: "AUDIT_SERVICE" },
   { prefix: "/department", binding: "DEPARTMENT_SERVICE" },
   { prefix: "/organizations", binding: "ORGANIZATION_SERVICE" },
   { prefix: "/user", binding: "USER_SERVICE" },
   { prefix: "/client", binding: "CLIENT_SERVICE" },
-  {
-    prefix: "/fiscal",
-    binding: "FISCAL_SERVICE",
-    module: "fiscal",
-    policy: modulePolicy("fiscal"),
-  },
-  {
-    prefix: "/certificate",
-    binding: "CERTIFICATE_SERVICE",
-    module: "certificado",
-    policy: modulePolicy("certificado"),
-  },
+  { prefix: "/fiscal", binding: "FISCAL_SERVICE", module: "fiscal" },
+  { prefix: "/certificate", binding: "CERTIFICATE_SERVICE", module: "certificado" },
   { prefix: "/reports", binding: "REPORTS_SERVICE" },
-  {
-    prefix: "/parcelamento",
-    binding: "PARCELAMENTO_SERVICE",
-    module: "parcelamento",
-    policy: modulePolicy("parcelamento"),
-  },
-  {
-    prefix: "/contabil",
-    binding: "CONTABIL_SERVICE",
-    module: "contabil",
-    policy: modulePolicy("contabil"),
-  },
+  { prefix: "/parcelamento", binding: "PARCELAMENTO_SERVICE", module: "parcelamento" },
+  { prefix: "/contabil", binding: "CONTABIL_SERVICE", module: "contabil" },
   { prefix: "/project", binding: "PROJECT_SERVICE" },
-  { prefix: "/ti", binding: "TI_SERVICE" },
-  { prefix: "/rh", binding: "RH_SERVICE" },
-  { prefix: "/commercial", binding: "COMMERCIAL_SERVICE" },
+  { prefix: "/ti", binding: "TI_SERVICE", module: "ti" },
+  { prefix: "/rh", binding: "RH_SERVICE", module: "rh" },
+  { prefix: "/commercial", binding: "COMMERCIAL_SERVICE", module: "comercial" },
   ...triagemServiceRoutes,
   // triagem-legacy-service do Node: sem permissionModule, encaminha a permissão global.
-  { prefix: "/triagem", binding: "CONTABIL_SERVICE", policy: triagemPolicy },
-  {
-    prefix: "/pessoal",
-    binding: "PESSOAL_SERVICE",
-    module: "pessoal",
-    policy: modulePolicy("pessoal"),
-  },
-  {
-    prefix: "/regularize",
-    binding: "REGULARIZE_SERVICE",
-    module: "regularize",
-    policy: modulePolicy("regularize"),
-  },
+  { prefix: "/triagem", binding: "CONTABIL_SERVICE" },
+  { prefix: "/pessoal", binding: "PESSOAL_SERVICE", module: "pessoal" },
+  { prefix: "/regularize", binding: "REGULARIZE_SERVICE", module: "regularize" },
 ];
+
+/** `PUT /user/:id` do próprio usuário, exceção do authorize.ts:8 do Node. */
+const SELF_USER_PUT_PATH = /^\/user\/(?!me$|session$|start-config$|permission\/)([^/]+)$/;
 
 function routeFor(path: string): Route | undefined {
   return routes.find(({ prefix }) => path === prefix || path.startsWith(`${prefix}/`));
@@ -162,7 +139,7 @@ function auditPayload(
   request: Request,
   url: URL,
   route: Route,
-  auth: Awaited<ReturnType<typeof authenticateGatewayRequest>>,
+  auth: Awaited<ReturnType<typeof authenticateGatewayRequest>> | undefined,
   requestId: string,
   createdAt: string,
   finishedAt: string,
@@ -173,9 +150,9 @@ function auditPayload(
 ): CreateAuditRequestPayload {
   return {
     requestId,
-    organizationId: auth.organizationId || null,
-    userId: auth.userId,
-    permission: auth.claims.permission ?? null,
+    organizationId: auth?.organizationId || null,
+    userId: auth?.userId ?? null,
+    permission: auth?.claims.permission ?? null,
     method: request.method,
     path: url.pathname,
     query: safeQuery(url),
@@ -187,7 +164,7 @@ function auditPayload(
     createdAt,
     finishedAt,
     metadata: {
-      actorKind: auth.actorKind,
+      actorKind: auth?.actorKind ?? "public",
       routeTarget: route.binding,
       routePrefix: route.prefix,
     },
@@ -248,7 +225,10 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
   );
 
   app.all("*", async (c) => {
-    const route = routeFor(new URL(c.req.url).pathname);
+    // Paridade com o `authorize` do Node: path inválido é negado antes de qualquer coisa.
+    const path = normalizeGatewayPath(new URL(c.req.url).pathname);
+    if (!path) throw new ServiceError(403, "Acesso negado para esta rota.");
+    const route = routeFor(path);
     if (!route) throw new ServiceError(404, "Rota não mapeada no gateway.");
     const env = options.env ?? c.env;
     const binding = env[route.binding];
@@ -256,17 +236,32 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
       throw new ServiceError(503, "Serviço não configurado no gateway.");
     }
 
-    const auth = await authenticateGatewayRequest(c.req.raw, env);
-    await requireCsrfForMutation(c.req.raw, auth);
+    // Rota pública (login, start-config, socket.io) pula autenticação, CSRF e autorização,
+    // exatamente como authenticate.ts, csrfProtection.ts e authorize.ts do Node.
+    const isPublic = isPublicRoute(c.req.method, path);
+    let auth: Awaited<ReturnType<typeof authenticateGatewayRequest>> | undefined;
+    if (!isPublic) {
+      auth = await authenticateGatewayRequest(c.req.raw, env);
+      await requireCsrfForMutation(c.req.raw, auth);
+      // Negação por padrão: rota não classificada não passa, como o modo `enforce` do Node.
+      const policy = getRoutePolicy(c.req.method, path);
+      if (!policy) throw new ServiceError(403, "Acesso negado para esta rota.");
+      const selfUserPut =
+        c.req.method.toUpperCase() === "PUT" ? SELF_USER_PUT_PATH.exec(path) : null;
+      const isSelfUserPut =
+        auth.actorKind === "organization" &&
+        auth.organizationId.length > 0 &&
+        selfUserPut?.[1] === auth.userId;
+      if (!isSelfUserPut && !canAccessRoute({ ...auth, claims: { ...auth.claims } }, policy)) {
+        throw new ServiceError(403, "Acesso negado para esta rota.");
+      }
+    }
     const requestId = requestIdFor(c.req.raw);
     c.set("requestId", requestId);
-    const policy = route.policy?.[c.req.method === "GET" ? 0 : 1];
-    if (policy && !canAccessRoute({ ...auth, claims: { ...auth.claims } }, policy)) {
-      throw new ServiceError(403, "Acesso negado para esta rota.");
-    }
     const headers = new Headers(c.req.raw.headers);
     headers.set(REQUEST_ID_HEADER, requestId);
-    forwardIdentity(headers, auth, env, route.module);
+    if (auth) forwardIdentity(headers, auth, env, route.module);
+    else clearForwardedIdentity(headers, env);
     const forwardedRequest = new Request(c.req.raw, { headers });
 
     if (route.prefix === "/audit")

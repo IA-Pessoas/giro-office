@@ -10,6 +10,7 @@ import {
   WorkerAuthenticationError,
 } from "@workspace/runtime";
 import {
+  AUTH_SESSION_TRANSPORT_HEADER,
   FORWARDED_AUTH_CSRF_HASH_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
@@ -83,6 +84,16 @@ function forwardedPermission(auth: WorkerAuthContext, module?: string): number |
   return auth.claims.modules[module as keyof WorkerAuthContext["claims"]["modules"]];
 }
 
+/**
+ * Rota pública não tem identidade para encaminhar, mas o cliente não pode forjar uma.
+ * Espelha o `strippedClientHeaders` do httpProxy.ts do Node na parte de identidade.
+ */
+export function clearForwardedIdentity(headers: Headers, env: GatewayWorkerEnv): void {
+  for (const header of FORWARDED_IDENTITY_HEADERS) headers.delete(header);
+  headers.delete(AUTH_SESSION_TRANSPORT_HEADER);
+  headers.set(INTERNAL_SERVICE_TOKEN_HEADER, env.INTERNAL_SERVICE_TOKEN);
+}
+
 export function forwardIdentity(
   headers: Headers,
   auth: WorkerAuthContext,
@@ -90,6 +101,7 @@ export function forwardIdentity(
   module?: string,
 ) {
   for (const header of FORWARDED_IDENTITY_HEADERS) headers.delete(header);
+  headers.delete(AUTH_SESSION_TRANSPORT_HEADER);
   headers.set(INTERNAL_SERVICE_TOKEN_HEADER, env.INTERNAL_SERVICE_TOKEN);
   headers.set(FORWARDED_AUTH_USER_ID_HEADER, auth.userId);
   headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, auth.organizationId);

@@ -75,6 +75,8 @@ async function jwt(csrfHash?: string, session?: Record<string, unknown>): Promis
     organization_id: "org-1",
     auth_kind: "organization",
     type: "owner",
+    // `minPermission` não tem atalho de owner no canAccessRoute: exige a claim numérica.
+    permission: 3,
     modules: { contabil: 2 },
     ...(csrfHash ? { csrf_hash: csrfHash } : {}),
     ...session,
