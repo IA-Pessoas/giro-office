@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Installment {
+  id                               String   @id @default(uuid())
+  client_id                        String
+  type                             String
+  jurisdiction                     String
+  is_automatic_debit               Boolean
+  consolidated_total_amount        Float
+  first_installment_amount         Float
+  current_month_installment_amount Float
+  outstanding_balance              Float
+  paid_installments_count          Int
+  agreed_installments_count        Int
+  remaining_installments_count     Int
+  overdue_installments_count       Int
+  enrollment_date                  DateTime?
+  document_url                     String
+  status                           String
+  completion_date                  DateTime?
+  down_payment_installments_count  Int
+  legal_nature                     String
+  situation_shutdown                String?
+  agreement_number                 String?
+  organization_id                  String
+
+  @@map("parcelamento.installments")
+}
