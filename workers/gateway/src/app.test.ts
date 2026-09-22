@@ -7,6 +7,9 @@ import {
   REQUEST_ID_HEADER,
 } from "@workspace/shared/http";
 import { describe, expect, it, vi } from "vitest";
+import { createAuditWorkerApp } from "../../audit-service/src/app.js";
+import type { AuditWorkerEnv } from "../../audit-service/src/env.js";
+import type { AuditRequestRepository } from "../../audit-service/src/repository.js";
 import { createGatewayWorkerApp } from "./app.js";
 import type { GatewayWorkerEnv } from "./env.js";
 
@@ -21,8 +24,29 @@ function env(
   return {
     JWT_SECRET: SECRET,
     INTERNAL_SERVICE_TOKEN: TOKEN,
+    AUDIT_SERVICE_TOKEN: AUDIT_TOKEN,
+    AUDIT_SERVICE: {
+      fetch: vi.fn(async () => new Response(null, { status: 201 })),
+    },
     DEPARTMENT_SERVICE: binding,
     ...extras,
+  };
+}
+
+function auditRepository(): AuditRequestRepository {
+  return {
+    create: vi.fn(async () => undefined),
+    search: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 50 })),
+    searchPlatform: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 50 })),
+    findByRequestId: vi.fn(async () => null),
+  };
+}
+
+function auditEnv(): AuditWorkerEnv {
+  return {
+    AUDIT_ENABLED: "true",
+    INTERNAL_SERVICE_TOKEN: AUDIT_TOKEN,
+    JWT_SECRET: SECRET,
   };
 }
 
@@ -65,7 +89,7 @@ describe("gateway Worker", () => {
       data: { status: "ok", service: "gateway" },
     });
     expect(await (await app.request("https://gateway.test/ready")).json()).toMatchObject({
-      data: { services: 1 },
+      data: { services: 2 },
     });
   });
 
@@ -152,6 +176,43 @@ describe("gateway Worker", () => {
     expect(Date.parse(String(payload.createdAt))).not.toBeNaN();
     expect(Date.parse(String(payload.finishedAt))).not.toBeNaN();
     expect(payload.durationMs).toEqual(expect.any(Number));
+  });
+
+  it("sends prototype-like query keys as a payload accepted by the Audit Worker", async () => {
+    const binding = {
+      fetch: vi.fn(async () => new Response("ok", { status: 200 })),
+    };
+    const repository = auditRepository();
+    const auditApp = createAuditWorkerApp({ env: auditEnv(), repository });
+    const auditRequests: Request[] = [];
+    const auditBinding = {
+      fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = new Request(input, init);
+        auditRequests.push(request.clone());
+        return auditApp.fetch(request);
+      }),
+    };
+    const app = createGatewayWorkerApp({
+      env: env(binding, { AUDIT_SERVICE: auditBinding, AUDIT_SERVICE_TOKEN: AUDIT_TOKEN }),
+    });
+
+    const response = await app.request(
+      "https://gateway.test/department?toString=one&constructor=two&__proto__=three",
+      { headers: { authorization: `Bearer ${await jwt()}` } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(auditBinding.fetch).toHaveBeenCalledOnce();
+    expect(repository.create).toHaveBeenCalledOnce();
+    const sentPayload = (await auditRequests[0]?.json()) as {
+      query?: Record<string, unknown>;
+    };
+    expect(Object.hasOwn(sentPayload.query ?? {}, "toString")).toBe(true);
+    expect(Object.hasOwn(sentPayload.query ?? {}, "constructor")).toBe(true);
+    expect(Object.hasOwn(sentPayload.query ?? {}, "__proto__")).toBe(true);
+    expect(sentPayload.query?.toString).toBe("one");
+    expect(sentPayload.query?.constructor).toBe("two");
+    expect(sentPayload.query?.__proto__).toBe("three");
   });
 
   it("generates and forwards a request id when the caller did not provide one", async () => {
@@ -267,7 +328,10 @@ describe("gateway Worker", () => {
     };
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const app = createGatewayWorkerApp({
-      env: env(mutationBinding, { AUDIT_SERVICE: auditRouteBinding }),
+      env: env(mutationBinding, {
+        AUDIT_SERVICE: auditRouteBinding,
+        AUDIT_SERVICE_TOKEN: undefined,
+      }),
     });
 
     const mutation = await app.request("https://gateway.test/department", {
@@ -307,6 +371,36 @@ describe("gateway Worker", () => {
     expect(errorSpy).toHaveBeenCalledWith(
       "[gateway-worker] AUDIT_SERVICE_TOKEN deve ser distinto de INTERNAL_SERVICE_TOKEN.",
     );
+    errorSpy.mockRestore();
+  });
+
+  it.each([
+    "binding",
+    "token",
+  ] as const)("fails closed for authenticated reads when the audit %s is absent", async (missing) => {
+    const binding = { fetch: vi.fn(async () => new Response("ok", { status: 200 })) };
+    const auditBinding = { fetch: vi.fn(async () => new Response(null, { status: 201 })) };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const app = createGatewayWorkerApp({
+      env: env(
+        binding,
+        missing === "binding"
+          ? { AUDIT_SERVICE: undefined }
+          : { AUDIT_SERVICE_TOKEN: undefined, AUDIT_SERVICE: auditBinding },
+      ),
+    });
+
+    const response = await app.request("https://gateway.test/department", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      code: "SERVICE_UNAVAILABLE",
+      requestId: expect.any(String),
+    });
+    expect(binding.fetch).not.toHaveBeenCalled();
     errorSpy.mockRestore();
   });
 

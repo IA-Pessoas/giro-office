@@ -61,10 +61,10 @@ function isMutation(method: string): boolean {
 }
 
 function safeQuery(url: URL): AuditQuery | undefined {
-  const query: AuditQuery = {};
+  const query = Object.create(null) as AuditQuery;
   for (const [key, value] of url.searchParams.entries()) {
     const safeValue = SENSITIVE_QUERY_KEY.test(key) ? "[REDACTED]" : value;
-    const current = query[key];
+    const current = Object.hasOwn(query, key) ? query[key] : undefined;
     query[key] =
       current === undefined
         ? safeValue
@@ -204,7 +204,7 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
       return withRequestId(await binding.fetch(forwardedRequest), requestId);
 
     const audit = auditAvailability(env);
-    if (!audit && isMutation(c.req.method)) {
+    if (!audit) {
       throw new ServiceError(503, "Auditoria do gateway não está configurada.");
     }
 
