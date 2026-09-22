@@ -8,6 +8,6 @@
     "rootDir": "../..",
     "types": ["node"]
   },
-  "include": ["src", "../../services/task-service/src/types.d.ts"],
+  "include": ["src"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
 }
