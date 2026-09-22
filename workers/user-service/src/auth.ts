@@ -178,6 +178,27 @@ function sessionClaims(auth: UserAuthContext): {
   return { sessionId, sessionVersion: sessionVersion as number, csrfHash };
 }
 
+export function activeOrganizationId(user: Row): string | undefined {
+  const department = user.department as Row | undefined;
+  const departmentOrganization = department?.organization as Row | undefined;
+  const explicitOrganization = user.organization as Row | undefined;
+  const resolvedOrganizationId =
+    (typeof user.organization_id === "string" && user.organization_id) ||
+    (typeof department?.organization_id === "string" && department.organization_id);
+  if (!resolvedOrganizationId) return undefined;
+
+  const organization = user.organization_id ? explicitOrganization : departmentOrganization;
+  if (!organization) return resolvedOrganizationId;
+  return organization.id === resolvedOrganizationId &&
+    (organization.status === "active" || organization.status === "trial")
+    ? resolvedOrganizationId
+    : undefined;
+}
+
+function hasActiveOrganization(user: Row, organizationId: string): boolean {
+  return activeOrganizationId(user) === organizationId;
+}
+
 export async function validateUserSession(
   auth: UserAuthContext,
   prisma: UserPrismaClient,
@@ -193,7 +214,20 @@ export async function validateUserSession(
     },
     select: {
       csrf_hash: true,
-      user: { select: { organization_id: true, session_version: true, status: true } },
+      user: {
+        select: {
+          organization_id: true,
+          session_version: true,
+          status: true,
+          organization: { select: { id: true, status: true } },
+          department: {
+            select: {
+              organization_id: true,
+              organization: { select: { id: true, status: true } },
+            },
+          },
+        },
+      },
     },
   });
   const user = (session?.user ?? null) as Row | null;
@@ -201,7 +235,7 @@ export async function validateUserSession(
     !session ||
     session.csrf_hash !== csrfHash ||
     user?.status !== "active" ||
-    user.organization_id !== auth.organizationId ||
+    !hasActiveOrganization(user, auth.organizationId) ||
     user.session_version !== sessionVersion
   ) {
     throw new ServiceError(401, "Sessão inválida.");

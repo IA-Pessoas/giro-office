@@ -13,6 +13,14 @@ enum enumType {
   user
 }
 
+enum status {
+  trial
+  past_due
+  active
+  suspended
+  cancelled
+}
+
 enum PlatformRole {
   super_admin
 }
@@ -20,6 +28,7 @@ enum PlatformRole {
 model Organization {
   id          String       @id @default(uuid())
   name        String
+  status      status       @default(active)
   departments Department[]
   users       User[]       @relation("UserOrganization")
 

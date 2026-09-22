@@ -510,6 +510,33 @@ describe("user Worker", () => {
     );
   });
 
+  it("does not create an organization session for a suspended organization", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({
+      ...user(),
+      password: "stored-password-hash",
+      organization: { id: ORGANIZATION_ID, status: "suspended" },
+      department: {
+        organization_id: ORGANIZATION_ID,
+        organization: { id: ORGANIZATION_ID, status: "suspended" },
+      },
+    });
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      verifyPassword: vi.fn(async () => true),
+    } as never);
+
+    const response = await app.request("https://user.test/user/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: "usuario@example.com", password: "secret" }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(db.authSession.create).not.toHaveBeenCalled();
+  });
+
   it("creates a platform session only with the internal gateway token", async () => {
     const db = prisma();
     const app = createUserWorkerApp({
@@ -615,6 +642,36 @@ describe("user Worker", () => {
         }),
       }),
     );
+  });
+
+  it("rejects an organization cookie session when the organization is suspended", async () => {
+    const db = prisma();
+    const csrfToken = "I".repeat(43);
+    const token = await sign({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      auth_kind: "organization",
+      type: "owner",
+      session_version: 1,
+      session_id: "session-suspended-org",
+      csrf_hash: await hashCsrfToken(csrfToken),
+    });
+    db.authSession.findFirst.mockResolvedValue({
+      csrf_hash: await hashCsrfToken(csrfToken),
+      user: {
+        session_version: 1,
+        organization_id: ORGANIZATION_ID,
+        status: "active",
+        organization: { id: ORGANIZATION_ID, status: "suspended" },
+      },
+    });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request("https://user.test/user/me", {
+      headers: { cookie: `cw.session=${token}; cw.csrf=${csrfToken}` },
+    });
+
+    expect(response.status).toBe(401);
   });
 
   it("reads a public user photo through the worker", async () => {

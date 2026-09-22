@@ -40,6 +40,7 @@ import {
 } from "../../../services/user-service/src/schemas/user.schemas.js";
 import {
   ACTIVE_MODULE_KEYS,
+  activeOrganizationId,
   authenticatePlatformValidationRequest,
   authenticateUserRequest,
   type PlatformIdentity,
@@ -674,14 +675,26 @@ async function createOrganizationSession(
   }
   const user = await db.user.findFirst({
     where: { login: input.login.trim() },
-    select: { ...userSelect(), password: true, session_version: true },
+    select: {
+      ...userSelect(),
+      password: true,
+      session_version: true,
+      organization: { select: { id: true, status: true } },
+      department: {
+        select: {
+          organization_id: true,
+          organization: { select: { id: true, status: true } },
+        },
+      },
+    },
   });
   const valid = await options.verifyPassword(input.password, String(user?.password ?? ""));
-  if (!user || !valid || user.status !== "active" || typeof user.organization_id !== "string") {
+  const organizationId = user ? activeOrganizationId(user) : undefined;
+  if (!user || !valid || user.status !== "active" || !organizationId) {
     throw new ServiceError(401, "Login ou senha inválidos.");
   }
   const permission = await db.permission.findFirst({
-    where: { user_id: user.id, organization_id: user.organization_id },
+    where: { user_id: user.id, organization_id: organizationId },
     select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
   });
   const csrfToken = createCsrfToken();
@@ -700,7 +713,7 @@ async function createOrganizationSession(
   const token = await signSessionToken(
     {
       user_id: user.id,
-      organization_id: user.organization_id,
+      organization_id: organizationId,
       name: user.name,
       login: user.login,
       permission: user.permission,
@@ -712,7 +725,7 @@ async function createOrganizationSession(
     },
     env.JWT_SECRET,
   );
-  return { ...sessionUserData(user, user.organization_id, modules), token, csrfToken };
+  return { ...sessionUserData(user, organizationId, modules), token, csrfToken };
 }
 
 async function createPlatformSession(
@@ -859,8 +872,10 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
 
   app.post("/internal/reporting/access-context", async (c) => {
     const env = envOf(c, options);
-    const reportsToken = env.REPORTS_INTERNAL_TOKEN ?? env.INTERNAL_SERVICE_TOKEN;
-    if (c.req.header("x-internal-service-token") !== reportsToken) {
+    if (
+      !env.REPORTS_INTERNAL_TOKEN ||
+      c.req.header("x-internal-service-token") !== env.REPORTS_INTERNAL_TOKEN
+    ) {
       throw new ServiceError(403, "Acesso negado.");
     }
     return withDb(c, options, async (db) => {
