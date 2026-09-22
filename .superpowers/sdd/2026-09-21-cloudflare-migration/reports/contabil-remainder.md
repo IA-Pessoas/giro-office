@@ -73,3 +73,64 @@ Warnings de `resolutions` em `services/src/package.json` e aviso de atualizaçã
 ## Commit
 
 O código e este relatório estão registrados no commit local desta entrega, sem push e sem deploy.
+
+## Revalidação rota a rota (ciclo 2, base 2d4ebe02)
+
+Graphify: `pnpm graphify:context:services -- "paridade contabil-service worker"` retornou "sem grafo local em services/graphify-out/graph.json" no worktree; foi usada descoberta manual (`rg`, leitura de `services/contabil-service/src/{app,routes,middlewares,schemas,services}`, `services/gateway/src/{config/serviceRegistry,security/policies,proxy/httpProxy}.ts`, `shared/src/auth/policy.ts` e `workers/gateway/src/auth.ts`). `graphify:update:services` não se aplica (grafo inexistente no escopo).
+
+### Inventário
+
+Todas as rotas usam envelope `createSuccessResponse`, erros via `serializeError` (`{ success: false, error, code }`) e nenhuma é paginada (paginação só existe no reporting, via `limit`). "Auth" = autenticação encaminhada/Bearer/cookie + CSRF/sessão; "leitura"/"escrita" = policy do gateway Node reproduzida no Worker.
+
+| Método | Path | Node (gateway + serviço) | Worker | Status |
+| --- | --- | --- | --- | --- |
+| GET | `/health`, `/ready` | 200 sem auth | 200; `/ready` faz `SELECT 1` (503 sem banco) | ok (readiness mais estrita) |
+| GET | `/contabil/controls/list` | leitura contabil ≥ 1, `competence` | idem | fechada (owner) |
+| GET | `/contabil/controls` | leitura, `client_id`+`competence` | idem | fechada (owner) |
+| POST | `/contabil/controls` | escrita contabil ≥ 2, 201/200 | idem | fechada |
+| POST | `/contabil/controls/year` | escrita, `confirmed` | idem | fechada |
+| DELETE | `/contabil/controls` | escrita, body competência | idem | fechada |
+| POST | `/contabil/controls/restore` | escrita | idem | fechada |
+| PATCH | `/contabil/controls/:id` | escrita, `field`/`value` | idem | fechada |
+| PATCH | `/contabil/controls/:id/items` | escrita | idem | fechada |
+| POST/PUT/DELETE | `/contabil/relationships[/:id]` | escrita, 201 no POST | idem | fechada |
+| GET | `/contabil/relationships/client/:clientId` | leitura | idem | fechada (owner) |
+| POST/PUT/DELETE | `/contabil/responsibles[/:id]` | escrita, 201 no POST | idem | fechada |
+| GET | `/contabil/responsibles/client/:clientId` | leitura | idem | fechada (owner) |
+| GET/PUT/DELETE | `/triagem/closing` | policy contabil/triagem ≥ 1; escrita exige `modules.contabil ≥ 2` no service | idem | fechada (policy + mensagem de status) |
+| GET | `/triagem/editability` | policy contabil/triagem ≥ 1 | idem | fechada (policy) |
+| GET/POST | `/triagem/monthly` | policy; RLS/Serializable no create | idem | fechada (policy) |
+| PATCH | `/triagem/monthly/:id/item`, `/items` | policy; `canEdit` por módulo ou responsável | idem | fechada (policy + `justification`) |
+| GET/PUT/DELETE | `/triagem/statements` | policy; tenant do cliente | idem | fechada (policy + mensagem `bank_id`) |
+| GET | `/internal/reporting/catalog` | token + grant HMAC | idem | fechada (503 sem secrets) |
+| POST | `/internal/reporting/extract` | token + grant HMAC, allowlist, `RepeatableRead` | idem | fechada (503 sem secrets) |
+
+### Lacunas reais encontradas e fechadas com TDD
+
+Cada item teve teste RED observado antes do GREEN (commit `fix(contabil-worker): align module auth and validation with Node contract`).
+
+1. **Permissão contábil efetiva.** O gateway Node registra `contabil-service` com `permissionModule: "contabil"`: encaminha `permission = 3` para owner e `modules.contabil` para os demais, e a policy libera owner sem olhar módulos. O Worker exigia `claims.permission` global ≥ 2 **e** `modules.contabil` ≥ 2, e o gateway Worker encaminha a permissão global. Resultado: owner com `contabil = 0` recebia 403 em leitura e escrita, e usuário com `contabil = 2` e permissão global 1 não conseguia escrever. Agora `contabilPermission(auth)` (owner = 3, ator de plataforma = 0, demais `modules.contabil`) é usado no middleware `/contabil`, em `requireContabilWrite`, nos inputs dos serviços de controle e no `permission` gravado na auditoria, como no Node. Os checks internos do control service voltaram a `permission ≥ 2`, como no Node. O bloqueio anterior (permissão global 3 com `contabil = 0`, não owner → 403) continua valendo. Testes: `usa a permissão efetiva do módulo contábil como o gateway Node encaminha` e `autoriza escrita de controles pela permissão contábil efetiva, sem exigir claims.modules`.
+2. **Policy de `/triagem`.** No Node o gateway exige owner ou `contabil`/`triagem` ≥ 1 (`triagemModulePolicy`). O gateway Worker não avalia policies, e o Worker contábil aceitava qualquer autenticado. Adicionado `requireTriagemModule`. Teste: `exige módulo contabil ou triagem nas rotas /triagem como a policy do gateway Node`.
+3. **Mensagens de validação.** `parseWithZod` devolve a primeira mensagem no campo `error`. Alinhados: `status de fechamento inválido.`, `bank_id é obrigatório.` e `justification` sem `min(1)`: string vazia chega ao service e recebe o mesmo 400 do Node. Teste: `mantém as mensagens de validação da triagem do serviço Node`.
+4. **Reporting sem secrets.** Sem `REPORTS_INTERNAL_TOKEN` ou `REPORTS_GRANT_SECRET` o Worker respondia 403 (erro de acesso enganoso); o Node nem subia. Agora responde 503 explícito. Teste parametrizado: `falha explícita com 503 quando %s não está configurado`.
+
+### Validações (ciclo 2)
+
+Setup: `pnpm install --frozen-lockfile` saiu com `ERR_PNPM_IGNORED_BUILDS` (política do pnpm para postinstall), mas linkou as dependências sem alterar o lockfile; `git status` ficou limpo. `pnpm --filter @workspace/runtime build` foi necessário para gerar o `dist` do runtime no worktree novo.
+
+- `pnpm --filter @workspace/contabil-worker test`: GREEN, 4 arquivos e 28 testes (baseline 22; 6 novos).
+- `pnpm --filter @workspace/contabil-worker typecheck`: GREEN.
+- `pnpm --filter @workspace/contabil-worker build`: GREEN.
+- `pnpm --filter @workspace/contabil-worker check`: GREEN (18 arquivos).
+- `pnpm --filter @workspace/contabil-worker exec prisma validate --schema prisma/schema.prisma`: válido.
+- `pnpm exec prisma validate --schema infra/prisma/schema.prisma`: válido.
+- `pnpm exec wrangler deploy --dry-run --config workers/contabil-service/wrangler.jsonc`: GREEN, 6368.89 KiB / gzip 1991.50 KiB, bindings `AUDIT_SERVICE`, `TRIAGEM_SERVICE`, `USER_SERVICE`; sem deploy.
+- `git diff --check`: limpo.
+- Hook pre-commit (supply-chain test + integrity scan de 3441 arquivos): 0 findings.
+
+### Riscos de staging remanescentes (fora do escopo deste Worker)
+
+- **Roteamento `/triagem`:** no Node, `/triagem/{monthly,statements,closing,editability}` vai para o contabil-service (`triagem-legacy-service`) e só `overview`/`competencies`/`catalogs`/`external-links`/`urgent-requests` vão para o triagem-service. O gateway Worker manda todo `/triagem` para `TRIAGEM_SERVICE`, então essas rotas do Worker contábil ficam inalcançáveis pelo gateway até o escopo Gateway rotear por subpath.
+- **Policies no gateway Worker:** ele não aplica `canAccessRoute` e encaminha a permissão global em vez da permissão por módulo. O Worker contábil compensa localmente; outros Workers podem ter a mesma divergência.
+- **Continua do ciclo 1:** `HYPERDRIVE` não declarado no `wrangler.jsonc` (guard 503 mantido). Secrets (`DATABASE_URL`, `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, tokens de audit/user/triagem/reporting) precisam ser provisionados no ambiente. Não houve validação contra PostgreSQL/Hyperdrive reais nem smoke autenticado.
+- Grant de reporting decodificado com `atob` (latin1): só aceita grants ASCII. Os grants atuais são ASCII (UUIDs, nomes de campo, request id); só ajustar se o emissor passar a incluir texto UTF-8.
