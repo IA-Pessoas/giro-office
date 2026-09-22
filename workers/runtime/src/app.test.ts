@@ -1,6 +1,32 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { WorkerBindings } from "./index.js";
-import { createWorkerApp, forwardToService } from "./index.js";
+import { createWorkerApp, forwardToService, verifyHs256Jwt } from "./index.js";
+
+const encodeBase64Url = (value: Uint8Array | string) => {
+  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
+};
+
+const signToken = async (
+  payload: Record<string, unknown> | unknown,
+  secret = "test-secret",
+  header: Record<string, unknown> = { alg: "HS256", typ: "JWT" },
+) => {
+  const encodedHeader = encodeBase64Url(JSON.stringify(header));
+  const encodedPayload = encodeBase64Url(JSON.stringify(payload));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signingInput));
+  return `${signingInput}.${encodeBase64Url(new Uint8Array(signature))}`;
+};
 
 describe("runtime worker", () => {
   it("forwards the original request to a declared service binding", async () => {
@@ -85,5 +111,31 @@ describe("runtime worker", () => {
       status: "ready",
       service: "billing",
     });
+  });
+});
+
+describe("verifyHs256Jwt", () => {
+  it("verifies a valid HS256 token and accepts omitted exp/nbf", async () => {
+    const token = await signToken({ sub: "user-123", role: "admin" });
+
+    await expect(verifyHs256Jwt(token, "test-secret")).resolves.toEqual({
+      sub: "user-123",
+      role: "admin",
+    });
+  });
+
+  it("rejects malformed, unsafe, and invalid tokens with a generic error", async () => {
+    const cases = [
+      ["malformed token", "not-a-jwt"],
+      ["wrong algorithm", await signToken({ sub: "user-123" }, "test-secret", { alg: "none" })],
+      ["invalid signature", `${await signToken({ sub: "user-123" })}.tampered`],
+      ["non-object payload", await signToken(null)],
+      ["expired token", await signToken({ exp: Math.floor(Date.now() / 1000) - 1 })],
+      ["future token", await signToken({ nbf: Math.floor(Date.now() / 1000) + 60 })],
+    ] as const;
+
+    for (const [_scenario, token] of cases) {
+      await expect(verifyHs256Jwt(token, "test-secret")).rejects.toThrow("Invalid token");
+    }
   });
 });

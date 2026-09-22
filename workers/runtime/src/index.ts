@@ -1,5 +1,6 @@
 export { createWorkerApp } from "./app.js";
 export type { HyperdriveBinding, ServiceBinding, WorkerBindings, WorkerEnv } from "./env.js";
+export { verifyHs256Jwt } from "./jwt.js";
 
 import type { ServiceBinding, WorkerEnv } from "./env.js";
 
