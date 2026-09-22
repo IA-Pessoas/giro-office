@@ -1,83 +1,74 @@
-# Relatório — restante de TI no Worker
+# Relatório — correções TDD do TI Worker
 
 ## Escopo executado
 
-Implementado somente em `workers/ti-service/**`, com este relatório como único
-artefato fora do Worker:
+Implementado somente em `workers/ti-service/**`, com este relatório como
+único artefato fora do Worker:
 
-- rotas de inventário, categorias e locais de inventário;
-- ramais, senhas, chamados, mensagens e categorias de chamados;
-- robôs e execuções;
-- termos e assinatura;
-- dashboard;
-- estoque, movimentações, categorias e locais;
-- `/internal/reporting/catalog` e `/internal/reporting/extract`.
+- `CategoryStock.id` e `LocationStock.id` agora usam `@default(uuid())`; o
+  cliente Prisma foi regenerado e os handlers de criação continuam sem exigir
+  `id`.
+- Autorização de TI valida `claims.modules.ti`. Chamadas encaminhadas pelo
+  gateway continuam aceitas pelo token interno; cookies diretos exigem CSRF e
+  validação de sessão pelo `USER_SERVICE` service binding.
+- Transferência de chamado preserva a exceção de owner com TI Viewer e usa
+  `assigned_to_id` no `updateMany`, retornando conflito (`409`) em corrida.
+- Reporting usa `withReportingSnapshot` com `RepeatableRead` para consultas
+  paginadas e grava o replay guard em `reports.grant_uses`, tabela já definida
+  no schema/migration canônico de `infra/prisma`; não foi criada tabela D1.
+- `P2002` de categoria de estoque é convertido em `409`.
+- O adaptador de imagem ganhou `remove`; falha em `createMessage` remove o
+  upload já realizado sem mascarar o erro original.
 
-As rotas foram conferidas contra `services/ti-service/src/app.ts` e seus
-routers reais. Os contratos Zod existentes foram reutilizados. A autorização
-mantém os níveis Viewer/Requester/Technician/Admin do serviço Node; o escopo
-de organização e, no estoque, o departamento Tecnologia são aplicados nas
-consultas. A lista de candidatos de transferência preserva também o filtro
-de permissão TI do usuário.
-
-O schema Prisma do Worker foi ampliado somente com os modelos e relações TI
-necessários, derivados do schema canônico em `infra/prisma/schema.prisma`.
-Senhas continuam usando `EncryptionService`/AES-256-GCM e o Worker exige
-`MTK_ENCRYPTION_KEY` para operações de senha. Mensagens aceitam JSON e
-multipart com JPEG/PNG/WebP, limite de 5 MiB, validação de assinatura,
-upload privado no Supabase e URL assinada por 300 segundos.
+As decisões foram comparadas com `services/ti-service` e os helpers
+compartilhados de runtime/reporting. Não foram alterados `services/ti-service`,
+`shared`, gateway ou outros Workers.
 
 ## TDD e validação
 
-O baseline inicial tinha 3 testes passando. Foram escritos primeiro 4 testes de
-comportamento de rotas; a execução RED observada foi 4 falhas por `404` para as
-rotas ainda não migradas. Depois da implementação, esses testes passaram. Um
-teste adicional de autorização para listagem de chamados também foi escrito,
-observado em RED (`403` em vez de `200`) e passou após alinhar a permissão
-Viewer ao serviço Node.
+Os testes foram escritos antes da implementação em dois ciclos RED/GREEN.
+O RED observou falhas nos contratos de `modules.ti`, UUID, `P2002`, owner
+Viewer/concurrency, CSRF/sessão, snapshot, replay persistente e compensação de
+upload. A implementação mínima foi aplicada e os testes ficaram verdes.
 
-Evidências finais locais:
+Evidências finais locais em 2026-09-22:
 
 | Comando | Resultado |
 | --- | --- |
-| `pnpm --filter @workspace/ti-worker test` | PASS — 8/8 |
+| `pnpm --filter @workspace/ti-worker test` | PASS — 20/20 |
 | `pnpm --filter @workspace/ti-worker typecheck` | PASS |
 | `pnpm --filter @workspace/ti-worker build` | PASS |
 | `pnpm --filter @workspace/ti-worker check` | PASS — Biome |
-| `pnpm exec wrangler deploy --dry-run` | PASS — 6504.55 KiB, sem bindings; não publicou |
-| `pnpm graphify:update:services` | PASS — grafo de services atualizado |
+| `pnpm --filter @workspace/ti-worker exec prisma validate --schema prisma/schema.prisma` | PASS |
+| `pnpm graphify:update:services` | PASS — grafo escopado atualizado |
+| `pnpm exec wrangler deploy --dry-run --config workers/ti-service/wrangler.jsonc` | PASS — 6512.98 KiB, binding `USER_SERVICE`, sem publicação |
+| `git diff --check` | PASS |
 
-O `prisma generate` executado pelos scripts também passou. O `git diff
---check` passou.
+Os scripts de teste, typecheck e build também executaram `prisma generate` com
+sucesso. O hook de commit de segurança passou sem findings.
 
 ## Limites e lacunas honestas
 
-- Não houve deploy real, smoke autenticado contra Postgres/Supabase nem teste
-  de URL pública, conforme solicitado.
-- O dry-run informa `No bindings found`; a configuração real de Hyperdrive,
-  segredos de criptografia, grants de reporting e Supabase Storage continua
-  sendo responsabilidade do ambiente de publicação. Nenhuma credencial foi
-  inventada.
-- A consulta de reporting com `query` foi implementada usando o executor
-  compartilhado, com filtros tipados, grupos, ordenação, agrupamento,
-  agregações, limite de 50.000 registros/20 MiB e transação de leitura. Não
-  foi criado schema ou contrato novo.
+- Não houve deploy real, push, smoke autenticado contra Postgres/Supabase nem
+  teste de URL pública.
+- O dry-run valida empacotamento e binding declarado, não a configuração real
+  de Hyperdrive, secrets, `USER_SERVICE`, grants ou Supabase Storage.
 - O Worker não foi validado com dados reais; portanto este relatório não
   afirma equivalência funcional de produção.
 
 ## Isolamento de mudanças
 
-Não foram alterados `services/ti-service`, gateway, `shared`, app ou outros
-Workers. Havia mudanças concorrentes/preexistentes em `app/next-env.d.ts`, em
-`workers/pessoal-service/**` e no relatório de User; elas foram preservadas
-fora do escopo TI e não fazem parte do estado final do Worker TI.
+Mudanças concorrentes/preexistentes em `app/next-env.d.ts`,
+`workers/pessoal-service/**`, `workers/rh-service/**` e relatórios fora de TI
+foram preservadas e não fazem parte dos commits TI. Também não foram tocados
+`reports/user-remainder.md` nem os demais arquivos de Pessoal, Reports, User,
+RH ou app.
 
 ## Commits
 
-- `adce9ba0 feat(workers): migrate remaining ti routes` — código, testes,
-  schema, ambiente e relatório TI.
-- `0cedea54 chore: remove concurrent report from ti commit` — correção aditiva
-  para retirar do tip a alteração concorrente de User que estava staged antes
-  do commit TI.
+- `0dfe4207 fix(ti-worker): close migration gaps` — código, schema, ambiente,
+  testes e validações do TI Worker.
+- commit seguinte — atualização deste relatório TI, separada do commit de
+  código conforme solicitado.
 
 Não houve deploy nem push.
