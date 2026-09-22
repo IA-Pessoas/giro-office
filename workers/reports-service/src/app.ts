@@ -246,7 +246,7 @@ async function withPureServices<T>(
   });
 }
 
-function createAudit(prisma: ReportsPrismaClient, env: ReportsWorkerEnv) {
+export function createAudit(prisma: ReportsPrismaClient, env: ReportsWorkerEnv) {
   return new ReportAuditService(
     prisma as never,
     createReportsAuditRecorder({
