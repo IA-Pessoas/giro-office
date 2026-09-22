@@ -166,6 +166,65 @@ Estava no escopo: o plano o coloca no **Lote B**, com `client`, `project` e
 ninguém chegou a trabalhar nele. É o mais complexo do lote (multipart, Storage,
 IA, Queues), mas não há incompatibilidade de runtime.
 
+## 6b. `/platform` fechado, `legacy-api` descartado, `task-service` bloqueado
+
+### `/platform` — fechado
+
+Commit `26a74b58`. O gateway Worker roteava só por prefixo, então toda a
+superfície super-admin caía em 404. Os 16 `routeMatchers` do Node foram
+espelhados como matching por método + path, porque o mesmo
+`/platform/organizations/:id` pertence ao organization-service num método e ao
+user-service em outro. 23 testes novos, 128/128 no pacote, deployado.
+
+Duas restrições que os testes revelaram: ator de plataforma é recusado via
+Bearer e só entra por cookie de sessão (`runtime/auth.ts:159`); mutação com esse
+cookie exige o par CSRF, cujo token tem formato fixo de 43 caracteres base64url
+(`session.ts:8`).
+
+### `legacy-api` — não é lacuna
+
+`services/src` (`@workspace/legacy-api`, 152 arquivos, 21.591 linhas) serve
+`/chat` e `/messages`, que nenhum dos dois gateways roteia. Auditando o
+frontend, a cadeia de render está morta:
+
+```
+ChatContext (api.get('/chat')) ← ChatProvider ← ChatOverlay ← ChatControllerUI ← nada
+```
+
+`ChatControllerUI` não é importado em lugar nenhum, e
+`app/src/context/socketConfig.ts:15` devolve `enabled: false` incondicionalmente.
+As chamadas nunca executam. Não há o que migrar.
+
+`/configs` apareceu na primeira varredura como chamada de API, mas são rotas de
+página do Next — falso positivo.
+
+### `task-service` — bloqueado por dependência, não por complexidade
+
+Criar `workers/task-service` exige registrar um pacote novo no workspace, o que
+exige `pnpm install`. Ele falha:
+
+```
+ERR_PNPM_EXOTIC_SUBDEP  Exotic dependency "postcss" (resolved via undefined)
+is not allowed in subdependencies when blockExoticSubdeps is enabled
+This error happened while installing the dependencies of @tailwindcss/postcss@4.2.2
+```
+
+A guarda veio de `d7eda89f security: harden pnpm dependency installation (#768)`
+(2026-08-14), junto com `minimumReleaseAge`, `trustPolicy: no-downgrade` e
+`strictDepBuilds`. O `.codex/rules/agent-safety.rules.md` registra o motivo: um
+incidente de supply chain com payload ofuscado em `app/postcss.config.js`
+(94 bytes limpo, 8.547 infectado).
+
+**Desabilitar `blockExoticSubdeps` para destravar a migração desligaria uma
+defesa instalada depois de um ataque real. Não foi feito e não deve ser.**
+
+O lockfile está consistente — resolve `postcss: 8.5.26` sob
+`@tailwindcss/postcss@4.2.2`, e `pnpm install --frozen-lockfile` funciona. O erro
+só aparece na re-resolução que um pacote novo dispara. A correção é no `app/`.
+
+Enquanto isso não for resolvido, **nenhum Worker novo pode ser criado neste
+workspace**.
+
 ## 7. Validação
 
 **Smoke local: 20 de 21 verdes**, contra Postgres real em container descartável,
