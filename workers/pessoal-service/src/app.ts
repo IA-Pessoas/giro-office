@@ -4,6 +4,14 @@ import {
   updateGroupBodySchema,
 } from "@workspace/pessoal-service/src/schemas/group.schemas.js";
 import {
+  applyGroupAssignmentPreviewBodySchema,
+  createGroupAssignmentPreviewBodySchema,
+  groupAssignmentEligibleQuerySchema,
+  groupAssignmentIdempotencyKeySchema,
+  groupAssignmentPreviewParamsSchema,
+  groupAssignmentPreviewQuerySchema,
+} from "@workspace/pessoal-service/src/schemas/groupAssignment.schemas.js";
+import {
   createLddBodySchema,
   lddIdParamsSchema,
   listLddQuerySchema,
@@ -62,6 +70,13 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { authenticatePessoalRequest, requirePessoalPermission } from "./auth.js";
 import type { PessoalWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
+import {
+  createPessoalAuditRecorder,
+  GroupAssignmentService,
+  type PessoalAssignmentPrisma,
+  type PessoalNotificationPrisma,
+  UnionNotificationService,
+} from "./remainderServices.js";
 
 type GroupRow = Record<string, unknown> & { organization_id: string };
 export type PessoalGroupPrisma = {
@@ -151,59 +166,61 @@ export type PessoalObligationService = {
 export type PessoalOverviewService = {
   getSummary(context: { organizationId: string }): Promise<unknown>;
 };
-export type PessoalDomainPrisma = PessoalGroupPrisma & {
-  unionPessoal: {
-    findMany(args: Record<string, unknown>): Promise<unknown[]>;
-    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
-    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    count(args: Record<string, unknown>): Promise<number>;
+export type PessoalDomainPrisma = PessoalGroupPrisma &
+  PessoalAssignmentPrisma &
+  PessoalNotificationPrisma & {
+    unionPessoal: {
+      findMany(args: Record<string, unknown>): Promise<unknown[]>;
+      findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+      create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      count(args: Record<string, unknown>): Promise<number>;
+    };
+    payroll: {
+      count(args: Record<string, unknown>): Promise<number>;
+      findMany(args: Record<string, unknown>): Promise<unknown[]>;
+      findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+      create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    };
+    client: {
+      findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+      findMany(args: Record<string, unknown>): Promise<unknown[]>;
+    };
+    situationsPessoal: {
+      findMany(args: Record<string, unknown>): Promise<unknown[]>;
+      findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+      create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    };
+    lddPessoal: {
+      findMany(args: Record<string, unknown>): Promise<unknown[]>;
+      findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+      create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    };
+    passwordPessoal: {
+      findMany(args: Record<string, unknown>): Promise<unknown[]>;
+      findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+      create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    };
+    user: {
+      findMany(args: Record<string, unknown>): Promise<unknown[]>;
+      findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+    };
+    obrigationsPessoal: {
+      findMany(args: Record<string, unknown>): Promise<unknown[]>;
+      findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+      create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+      createMany(args: Record<string, unknown>): Promise<{ count: number }>;
+    };
   };
-  payroll: {
-    count(args: Record<string, unknown>): Promise<number>;
-    findMany(args: Record<string, unknown>): Promise<unknown[]>;
-    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
-    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-  };
-  client: {
-    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
-    findMany(args: Record<string, unknown>): Promise<unknown[]>;
-  };
-  situationsPessoal: {
-    findMany(args: Record<string, unknown>): Promise<unknown[]>;
-    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
-    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-  };
-  lddPessoal: {
-    findMany(args: Record<string, unknown>): Promise<unknown[]>;
-    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
-    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-  };
-  passwordPessoal: {
-    findMany(args: Record<string, unknown>): Promise<unknown[]>;
-    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
-    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-  };
-  user: {
-    findMany(args: Record<string, unknown>): Promise<unknown[]>;
-    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
-  };
-  obrigationsPessoal: {
-    findMany(args: Record<string, unknown>): Promise<unknown[]>;
-    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
-    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    createMany(args: Record<string, unknown>): Promise<{ count: number }>;
-  };
-};
 type PessoalOptions = {
   env?: PessoalWorkerEnv;
   prisma?: PessoalDomainPrisma;
@@ -215,11 +232,18 @@ type PessoalOptions = {
   payrollService?: PessoalPayrollService;
   obligationService?: PessoalObligationService;
   overviewService?: PessoalOverviewService;
+  groupAssignmentService?: GroupAssignmentService;
+  unionNotificationService?: UnionNotificationService;
 };
 type PessoalWorkerContext = { Bindings: PessoalWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type PessoalContext = Context<PessoalWorkerContext>;
 
-function domainContext(c: PessoalContext): Record<string, unknown> {
+function domainContext(c: PessoalContext): {
+  organizationId: string;
+  userId: string;
+  permission: number;
+  requestId?: string;
+} {
   const auth = c.get("auth");
   return {
     organizationId: auth.organizationId,
@@ -1571,6 +1595,36 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       callback(localOverviewService(client as unknown as PessoalDomainPrisma)),
     );
   };
+  const withGroupAssignmentService = async <T>(
+    c: PessoalContext,
+    callback: (service: GroupAssignmentService) => Promise<T>,
+  ) => {
+    if (options.groupAssignmentService) return callback(options.groupAssignmentService);
+    const env = options.env ?? c.env;
+    return withWorkerPrisma(env, PrismaClient, (client) =>
+      callback(
+        new GroupAssignmentService(
+          client as unknown as PessoalAssignmentPrisma,
+          createPessoalAuditRecorder(env),
+        ),
+      ),
+    );
+  };
+  const withUnionNotificationService = async <T>(
+    c: PessoalContext,
+    callback: (service: UnionNotificationService) => Promise<T>,
+  ) => {
+    if (options.unionNotificationService) return callback(options.unionNotificationService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new UnionNotificationService(client as unknown as PessoalNotificationPrisma)),
+    );
+  };
+  const requireInternalToken = (c: PessoalContext): void => {
+    const token = c.req.header(INTERNAL_SERVICE_TOKEN_HEADER);
+    const expected = (options.env ?? c.env).INTERNAL_SERVICE_TOKEN;
+    if (!token) throw new ServiceError(401, "Token interno nao informado.");
+    if (token !== expected) throw new ServiceError(403, "Acesso negado.");
+  };
   app.get("/pessoal/groups", (c) =>
     withService(c, async (service) => {
       requirePessoalPermission(c.get("auth"), 1);
@@ -1876,6 +1930,62 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       );
     }),
   );
+  app.get("/pessoal/group-assignments/eligible", (c) =>
+    withGroupAssignmentService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const query = parseWithZod(groupAssignmentEligibleQuerySchema, c.req.query());
+      return c.json(createSuccessResponse(await service.listEligible(domainContext(c), query)));
+    }),
+  );
+  app.post("/pessoal/group-assignments/previews", (c) =>
+    withGroupAssignmentService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(createGroupAssignmentPreviewBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(await service.createPreview(domainContext(c), body)),
+        201,
+      );
+    }),
+  );
+  app.get("/pessoal/group-assignments/previews/:preview_id", (c) =>
+    withGroupAssignmentService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const params = parseWithZod(groupAssignmentPreviewParamsSchema, {
+        preview_id: c.req.param("preview_id"),
+      });
+      const query = parseWithZod(groupAssignmentPreviewQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.detailPreview(domainContext(c), params.preview_id, query),
+        ),
+      );
+    }),
+  );
+  app.post("/pessoal/group-assignments/apply", (c) =>
+    withGroupAssignmentService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(applyGroupAssignmentPreviewBodySchema, await c.req.json());
+      const idempotencyKey = parseWithZod(
+        groupAssignmentIdempotencyKeySchema,
+        c.req.header("Idempotency-Key"),
+      );
+      return c.json(
+        createSuccessResponse(await service.apply(domainContext(c), body, idempotencyKey)),
+      );
+    }),
+  );
+  app.post("/internal/pessoal/group-assignments/audit-outbox/reconcile", async (c) => {
+    requireInternalToken(c);
+    return withGroupAssignmentService(c, async (service) =>
+      c.json(createSuccessResponse(await service.reconcilePendingAuditEvents())),
+    );
+  });
+  app.post("/internal/pessoal/union-notifications/run", async (c) => {
+    requireInternalToken(c);
+    return withUnionNotificationService(c, async (service) =>
+      c.json(createSuccessResponse(await service.runForDate({ now: new Date() }))),
+    );
+  });
   app.notFound((c) =>
     c.json({ success: false, error: "Recurso não encontrado.", code: "NOT_FOUND" }, 404),
   );
