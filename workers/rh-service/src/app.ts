@@ -22,7 +22,7 @@ import {
   timeBankSummaryUserParamsSchema,
 } from "@workspace/rh-service/src/schemas/timeBankRelease.schemas.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
-import { parseTimeToDate, parseWithZod } from "@workspace/shared";
+import { error as logError, parseTimeToDate, parseWithZod, TimeUtils } from "@workspace/shared";
 import {
   createSuccessResponse,
   REQUEST_ID_HEADER,
@@ -37,7 +37,7 @@ import type { RhWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
 
 export type RhCategoryPrisma = {
-  $queryRaw: (query: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
+  $queryRaw: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
   $transaction?: (callback: (client: RhCategoryPrisma) => Promise<unknown>) => Promise<unknown>;
   rhCategory: {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
@@ -45,9 +45,6 @@ export type RhCategoryPrisma = {
     create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
     update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
     deleteMany(args: Record<string, unknown>): Promise<{ count: number }>;
-  };
-  rhRequest: {
-    count(args: Record<string, unknown>): Promise<number>;
   };
   scoreQuestion: {
     create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -136,6 +133,14 @@ type RhOptions = {
 type RhWorkerContext = { Bindings: RhWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type RhContext = Context<RhWorkerContext>;
 
+async function jsonBody(c: RhContext): Promise<unknown> {
+  try {
+    return await c.req.json<unknown>();
+  } catch {
+    throw new ServiceError(400, "JSON inválido.");
+  }
+}
+
 function localService(prisma: RhCategoryPrisma): RhCategoryService {
   return {
     list: (organizationId, activeOnly) =>
@@ -168,16 +173,22 @@ function localService(prisma: RhCategoryPrisma): RhCategoryService {
         where: { id, organization_id: organizationId },
       });
       if (!existing) throw new ServiceError(404, "Categoria não encontrada.");
-      const requestCount = await prisma.rhRequest.count({
-        where: { category_id: id, organization_id: organizationId },
-      });
-      if (requestCount > 0) {
+      const linkedRequests = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT EXISTS(
+          SELECT 1
+          FROM "rh.requests"
+          WHERE "category_id" = ${id}
+            AND "organization_id" = ${organizationId}
+        ) AS "exists"
+      `;
+      if (linkedRequests[0]?.exists === true) {
         throw new ServiceError(
           409,
           "Não é possível remover a categoria: existem solicitações vinculadas a ela.",
         );
       }
-      return prisma.rhCategory.deleteMany({ where: { id, organization_id: organizationId } });
+      await prisma.rhCategory.deleteMany({ where: { id, organization_id: organizationId } });
+      return { message: "Categoria removida com sucesso" };
     },
   };
 }
@@ -651,7 +662,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.post("/rh/categories", (c) =>
     withService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = parseWithZod(createCategoryBodySchema, await c.req.json());
+      const body = parseWithZod(createCategoryBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(await service.create(c.get("auth").organizationId, body)),
         200,
@@ -661,7 +672,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.put("/rh/categories", (c) =>
     withService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = parseWithZod(updateCategoryBodySchema, await c.req.json());
+      const body = parseWithZod(updateCategoryBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(await service.update(c.get("auth").organizationId, body)),
       );
@@ -670,7 +681,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.delete("/rh/categories", (c) =>
     withService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = parseWithZod(deleteCategoryBodySchema, await c.req.json());
+      const body = parseWithZod(deleteCategoryBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(await service.delete(c.get("auth").organizationId, body.id)),
       );
@@ -679,7 +690,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.post("/rh/score/questions", (c) =>
     withScoreQuestionService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = parseWithZod(createScoreQuestionBodySchema, await c.req.json());
+      const body = parseWithZod(createScoreQuestionBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(
           await service.create({
@@ -694,7 +705,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.put("/rh/score/questions", (c) =>
     withScoreQuestionService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = parseWithZod(updateScoreQuestionBodySchema, await c.req.json());
+      const body = parseWithZod(updateScoreQuestionBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(
           await service.update({
@@ -725,7 +736,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.delete("/rh/score/questions", (c) =>
     withScoreQuestionService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = parseWithZod(deleteScoreQuestionBodySchema, await c.req.json());
+      const body = parseWithZod(deleteScoreQuestionBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(
           await service.delete({
@@ -739,7 +750,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.post("/rh/holidays", (c) =>
     withHolidayService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = parseWithZod(createHolidayBodySchema, await c.req.json());
+      const body = parseWithZod(createHolidayBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(
           await service.create({
@@ -754,7 +765,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.put("/rh/holidays", (c) =>
     withHolidayService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = parseWithZod(updateHolidayBodySchema, await c.req.json());
+      const body = parseWithZod(updateHolidayBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(
           await service.update({
@@ -776,7 +787,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.delete("/rh/holidays", (c) =>
     withHolidayService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = parseWithZod(deleteHolidayBodySchema, await c.req.json());
+      const body = parseWithZod(deleteHolidayBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(
           await service.delete({
@@ -790,7 +801,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.put("/rh/point-config", (c) =>
     withPointConfigService(c, async (service) => {
       requireRhPermission(c.get("auth"), 3);
-      const body = (await c.req.json()) as Record<string, unknown>;
+      const body = (await jsonBody(c)) as Record<string, unknown>;
       const targetUserId = String(body.target_user_id ?? c.get("auth").userId);
       return c.json(
         createSuccessResponse(
@@ -841,8 +852,12 @@ export function createRhWorkerApp(options: RhOptions = {}) {
             ...(query.is_approved !== undefined
               ? { is_approved: query.is_approved === "true" }
               : {}),
-            ...(query.date_from !== undefined ? { date_from: query.date_from } : {}),
-            ...(query.date_to !== undefined ? { date_to: query.date_to } : {}),
+            ...(query.date_from !== undefined
+              ? { date_from: TimeUtils.getUtcDayBounds(query.date_from).dayStart }
+              : {}),
+            ...(query.date_to !== undefined
+              ? { date_to: TimeUtils.getUtcDayBounds(query.date_to).dayEnd }
+              : {}),
           }),
         ),
       );
@@ -852,7 +867,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
     withTimeBankService(c, async (service) => {
       const auth = c.get("auth");
       requireRhPermission(auth, 3);
-      const body = parseWithZod(createTimeBankReleaseBodySchema, await c.req.json());
+      const body = parseWithZod(createTimeBankReleaseBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(
           await service.create({
@@ -871,7 +886,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
     withTimeBankService(c, async (service) => {
       const auth = c.get("auth");
       requireRhPermission(auth, 3);
-      const body = parseWithZod(approveTimeBankReleaseBodySchema, await c.req.json());
+      const body = parseWithZod(approveTimeBankReleaseBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(
           await service.approve({ id: body.id, organization_id: auth.organizationId }),
@@ -918,7 +933,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   app.put("/rh/notifications/read", (c) =>
     withNotificationService(c, async (service) => {
       requireRhPermission(c.get("auth"), 1);
-      const body = parseWithZod(markRhNotificationReadBodySchema, await c.req.json());
+      const body = parseWithZod(markRhNotificationReadBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(
           await service.markRead({
@@ -934,6 +949,13 @@ export function createRhWorkerApp(options: RhOptions = {}) {
     c.json({ success: false, error: "Recurso não encontrado.", code: "NOT_FOUND" }, 404),
   );
   app.onError((error, c) => {
+    logError("Erro na requisição do rh-worker", {
+      method: c.req.method,
+      path: new URL(c.req.url).pathname,
+      statusCode: error instanceof ServiceError ? error.statusCode : 500,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      requestId: c.req.header(REQUEST_ID_HEADER),
+    });
     const serialized = serializeError(error, {
       requestId: c.req.header(REQUEST_ID_HEADER),
       fallbackMessage: "Erro interno no rh-service.",

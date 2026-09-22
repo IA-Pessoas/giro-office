@@ -20,13 +20,41 @@ function env(): RhWorkerEnv {
   };
 }
 
-function headers(permission = "3"): HeadersInit {
+function base64url(value: string): string {
+  return Buffer.from(value).toString("base64url");
+}
+
+async function signedToken(): Promise<string> {
+  const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = base64url(
+    JSON.stringify({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      auth_kind: "organization",
+      permission: 3,
+      modules: { rh: 3 },
+    }),
+  );
+  const input = `${header}.${payload}`;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(env().JWT_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(input));
+  return `${input}.${Buffer.from(signature).toString("base64url")}`;
+}
+
+function headers(permission = "3", rhPermission = permission): HeadersInit {
   return {
     "x-internal-service-token": TOKEN,
     "x-auth-user-id": USER_ID,
     "x-auth-organization-id": ORGANIZATION_ID,
     "x-auth-kind": "organization",
     "x-auth-permission": permission,
+    "x-auth-modules": JSON.stringify({ rh: Number(rhPermission) }),
   };
 }
 
@@ -64,6 +92,66 @@ describe("rh Worker", () => {
     expect(categoryService.list).not.toHaveBeenCalled();
   });
 
+  it("requires the RH module claim in addition to the numeric permission", async () => {
+    const categoryService = service();
+    const app = createRhWorkerApp({ env: env(), categoryService });
+
+    expect(
+      (await app.request("https://rh.test/rh/categories", { headers: headers("3", "0") })).status,
+    ).toBe(403);
+    expect(
+      (
+        await app.request("https://rh.test/rh/categories", {
+          method: "POST",
+          headers: { ...headers("0", "3"), "content-type": "application/json" },
+          body: JSON.stringify({ name: "Férias" }),
+        })
+      ).status,
+    ).toBe(403);
+    expect(categoryService.list).not.toHaveBeenCalled();
+    expect(categoryService.create).not.toHaveBeenCalled();
+  });
+
+  it("accepts only gateway-forwarded identity at the binding boundary", async () => {
+    const categoryService = service();
+    const app = createRhWorkerApp({ env: env(), categoryService });
+    const token = await signedToken();
+
+    const bearer = await app.request("https://rh.test/rh/categories", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const cookie = await app.request("https://rh.test/rh/categories", {
+      method: "POST",
+      headers: {
+        cookie: `cw.session=${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Férias" }),
+    });
+
+    expect([bearer.status, cookie.status]).toEqual([401, 401]);
+    expect(categoryService.list).not.toHaveBeenCalled();
+    expect(categoryService.create).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid JSON bodies", async () => {
+    const categoryService = service();
+    const app = createRhWorkerApp({ env: env(), categoryService });
+
+    const response = await app.request("https://rh.test/rh/categories", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: "{invalid",
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      error: "JSON inválido.",
+    });
+    expect(categoryService.create).not.toHaveBeenCalled();
+  });
+
   it("keeps category operations scoped to the forwarded organization", async () => {
     const categoryService = service();
     const app = createRhWorkerApp({ env: env(), categoryService });
@@ -96,8 +184,9 @@ describe("rh Worker", () => {
 
   it("deletes a category only inside the forwarded organization", async () => {
     const deleteMany = vi.fn(async () => ({ count: 1 }));
-    const count = vi.fn(async () => 0);
+    const queryRaw = vi.fn(async () => [{ exists: false }]);
     const prisma = {
+      $queryRaw: queryRaw,
       rhCategory: {
         findMany: vi.fn(async () => []),
         findFirst: vi.fn(async () => ({ id: CATEGORY_ID })),
@@ -109,7 +198,6 @@ describe("rh Worker", () => {
         findMany: vi.fn(async () => []),
         updateMany: vi.fn(async () => ({ count: 0 })),
       },
-      rhRequest: { count },
     } as unknown as RhCategoryPrisma;
     const app = createRhWorkerApp({ env: env(), prisma });
 
@@ -120,12 +208,42 @@ describe("rh Worker", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(count).toHaveBeenCalledWith({
-      where: { category_id: CATEGORY_ID, organization_id: ORGANIZATION_ID },
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      data: { message: "Categoria removida com sucesso" },
     });
+    expect(queryRaw).toHaveBeenCalledOnce();
+    const [query, categoryId, organizationId] = queryRaw.mock.calls[0] ?? [];
+    expect(String(query)).toContain('FROM "rh.requests"');
+    expect([categoryId, organizationId]).toEqual([CATEGORY_ID, ORGANIZATION_ID]);
     expect(deleteMany).toHaveBeenCalledWith({
       where: { id: CATEGORY_ID, organization_id: ORGANIZATION_ID },
     });
+  });
+
+  it("keeps linked requests from being deleted with their category", async () => {
+    const deleteMany = vi.fn(async () => ({ count: 1 }));
+    const prisma = {
+      $queryRaw: vi.fn(async () => [{ exists: true }]),
+      rhCategory: {
+        findFirst: vi.fn(async () => ({ id: CATEGORY_ID })),
+        deleteMany,
+      },
+    } as unknown as RhCategoryPrisma;
+    const app = createRhWorkerApp({ env: env(), prisma });
+
+    const response = await app.request("https://rh.test/rh/categories", {
+      method: "DELETE",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ id: CATEGORY_ID }),
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      error: "Não é possível remover a categoria: existem solicitações vinculadas a ela.",
+    });
+    expect(deleteMany).not.toHaveBeenCalled();
   });
 
   it("rejects a category rename that duplicates another category in the organization", async () => {
@@ -302,7 +420,7 @@ describe("rh Worker", () => {
     const app = createRhWorkerApp({ env: env(), timeBankService } as never);
 
     const listed = await app.request(
-      "https://rh.test/rh/time-bank-releases/list?user_id=00000000-0000-4000-8000-000000000009&is_approved=false",
+      "https://rh.test/rh/time-bank-releases/list?user_id=00000000-0000-4000-8000-000000000009&is_approved=false&date_from=2026-09-22T14:30:00.000Z&date_to=2026-09-23T14:30:00.000Z",
       { headers: headers("1") },
     );
     const created = await app.request("https://rh.test/rh/time-bank-releases", {
@@ -341,6 +459,8 @@ describe("rh Worker", () => {
     expect(timeBankService.list).toHaveBeenCalledWith(ORGANIZATION_ID, {
       user_id: USER_ID,
       is_approved: false,
+      date_from: new Date("2026-09-22T00:00:00.000Z"),
+      date_to: new Date("2026-09-23T23:59:59.999Z"),
     });
     expect(timeBankService.create).toHaveBeenCalledWith({
       organization_id: ORGANIZATION_ID,

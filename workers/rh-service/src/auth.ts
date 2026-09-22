@@ -1,8 +1,4 @@
-import {
-  authenticateWorkerRequest,
-  type WorkerAuthContext,
-  WorkerAuthenticationError,
-} from "@workspace/runtime";
+import type { WorkerAuthContext } from "@workspace/runtime";
 import { normalizeModulePermissions } from "@workspace/shared/auth";
 import {
   FORWARDED_AUTH_KIND_HEADER,
@@ -68,19 +64,15 @@ export async function authenticateRhRequest(
 ): Promise<WorkerAuthContext> {
   const forwarded = forwardedAuth(request, env);
   if (forwarded) return forwarded;
-  try {
-    return await authenticateWorkerRequest(request, {
-      jwtSecret: env.JWT_SECRET,
-      allowBearer: true,
-    });
-  } catch (error) {
-    if (error instanceof WorkerAuthenticationError) throw new ServiceError(401, "Não autenticado.");
-    throw error;
-  }
+  throw new ServiceError(401, "Não autenticado.");
 }
 
 export function requireRhPermission(auth: WorkerAuthContext, minimum: number): void {
-  if (typeof auth.claims.permission !== "number" || auth.claims.permission < minimum) {
+  if (
+    typeof auth.claims.permission !== "number" ||
+    auth.claims.permission < minimum ||
+    auth.claims.modules.rh < minimum
+  ) {
     throw new ServiceError(403, "Permissão insuficiente para acessar o módulo RH.");
   }
 }
