@@ -263,15 +263,61 @@ dead-letter, sem backoff.
 
 Nada foi implementado, conforme instrução.
 
-## 7. Situação
+## 7. Decisão de escopo: o banco fica no Supabase
+
+Definido pelo usuário: migram-se **serviços e UI**; o banco **permanece no
+Supabase**. Isso reclassifica dois itens acima.
+
+- **§3 deixa de ser bloqueio de release.** As 2 migrations não replayáveis só
+  mordem ao criar banco do zero. Com o Supabase preservado, as 175 já estão
+  aplicadas. Continua valendo para ambiente novo (staging, CI, onboarding) —
+  vira dívida, não impedimento.
+- **`extensions.crypt` deixa de ser risco.** É convenção Supabase e o Supabase
+  provê. Era exatamente por isso que o smoke passava: a imagem padrão do harness
+  é `public.ecr.aws/supabase/postgres:17.6.1.167` (`run.mjs:183`), o mesmo sabor
+  do banco real.
+- **§2 muda de natureza, não some.** Hyperdrive não move banco — é pooler na
+  frente dele. Importa porque cada isolate de Worker abre conexão própria e o
+  Postgres do Supabase tem limite de conexões. Segue exigindo credencial real.
+
+## 8. Transação real — bloqueio fechado
+
+`scripts/cloudflare-smoke/run.mjs` ganhou o check
+`transacao.parcelamento_lock_concorrente` (commit `8ba8131e`): 6 `POST
+competencies` disparados com `Promise.all` no mesmo parcelamento, depois `GET`
+conferindo se o agregado recalculado somou as 6; em seguida a mesma competência
+duas vezes em paralelo, exigindo exatamente um 201 e um 409, com o total
+inalterado além do vencedor.
+
+Evidência executada contra PostgreSQL real, sem mock:
+
+| | `paid_installments_count` após 6 escritas concorrentes |
+|---|---|
+| com `FOR NO KEY UPDATE` | **6** |
+| sem o lock (removido de propósito e restaurado) | **1** — 5 escritas perdidas |
+
+Sem o lock o check falha com
+`lost update: paid_installments_count=1, esperado 6`. Ou seja, ele detecta a
+regressão que justifica sua existência — não é verde decorativo.
+
+Cobre: concorrência real, `SELECT ... FOR NO KEY UPDATE`, transação real
+(`$transaction` com `ReadCommitted`), 409 e rollback do perdedor.
+
+**Continuam sem evidência**: deadlock e `P2028`. Ambos exigem forçar condições
+não determinísticas; não foram simulados e não se declara o contrário.
+
+## 9. Situação
 
 A migração **não está finalizada**. Bloqueios reais abertos:
 
-| # | bloqueio | tipo |
-|---|---|---|
-| 1 | Generators de `infra/prisma/schema.prisma` servindo Node e workerd ao mesmo tempo | arquitetura |
-| 2 | Nenhum binding Hyperdrive provisionado | infra |
-| 3 | 2 migrations não replayáveis do zero | forward-only fix |
-| 4 | Transação/concorrência sem evidência real | teste |
-| 5 | Credenciais chegando aos 17 upstreams | produto (ver `gateway-session-forwarding.md`) |
-| 6 | Triagem reconcile sem mecanismo | produto |
+| # | bloqueio | tipo | estado |
+|---|---|---|---|
+| 1 | Generators de `infra/prisma/schema.prisma` servindo Node e workerd ao mesmo tempo | arquitetura | **aberto** |
+| 2 | Nenhum binding Hyperdrive apontando para o Supabase | infra | **aberto** |
+| 3 | 2 migrations não replayáveis do zero | dívida | rebaixado (§7) |
+| 4 | Transação/concorrência sem evidência real | teste | **fechado** (§8) |
+| 5 | Credenciais chegando aos 17 upstreams | produto | **aberto** (`gateway-session-forwarding.md`) |
+| 6 | Triagem reconcile sem mecanismo | produto | **aberto** |
+
+#1 e #2 bloqueiam deploy. Nenhum dos dois se resolve sem decisão de quem tem as
+credenciais e a palavra sobre arquitetura.
