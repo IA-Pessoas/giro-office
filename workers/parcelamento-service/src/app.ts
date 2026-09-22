@@ -83,8 +83,16 @@ function requestContext(c: ParcelamentoContext): ParcelamentoRequestContext {
   };
 }
 
-function queryOf(c: ParcelamentoContext): Record<string, string> {
-  return Object.fromEntries(new URL(c.req.url).searchParams.entries());
+function queryOf(c: ParcelamentoContext): Record<string, string | string[]> {
+  const params = new URL(c.req.url).searchParams;
+  const query: Record<string, string | string[]> = {};
+
+  for (const key of new Set(params.keys())) {
+    const values = params.getAll(key);
+    query[key] = values.length === 1 ? values[0] : values;
+  }
+
+  return query;
 }
 
 /** express.json() do Node: corpo ausente vira {}; JSON malformado vira 400. */
@@ -314,11 +322,11 @@ export function createParcelamentoWorkerApp(options: ParcelamentoWorkerOptions =
     c.json({ success: false, error: "Recurso não encontrado.", code: "NOT_FOUND" }, 404),
   );
   app.onError((error, c) => {
+    const requestId = c.get("requestId") ?? c.req.header(REQUEST_ID_HEADER);
     const serialized = serializeError(error, {
-      requestId: c.req.header(REQUEST_ID_HEADER),
+      requestId,
       fallbackMessage: "Erro interno no parcelamento-service.",
     });
-    const requestId = c.get("requestId");
     if (requestId) c.header(REQUEST_ID_HEADER, requestId);
     return c.json(serialized.body, serialized.statusCode as ContentfulStatusCode);
   });

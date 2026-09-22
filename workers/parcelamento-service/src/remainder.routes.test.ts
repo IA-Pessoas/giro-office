@@ -207,6 +207,39 @@ describe("parcelamento Worker — paridade restante", () => {
     expect(response.headers.get("x-request-id")).toBe("req-123");
   });
 
+  it("inclui o request id gerado no envelope de erro", async () => {
+    const requestHeaders = headers();
+    delete requestHeaders["x-request-id"];
+    const app = createParcelamentoWorkerApp({
+      env: env({ HYPERDRIVE: undefined }),
+    });
+
+    const response = await app.request("https://parcelamento.test/parcelamento/installments", {
+      headers: requestHeaders,
+    });
+    const requestId = response.headers.get("x-request-id");
+
+    expect(response.status).toBe(503);
+    expect(requestId).toBeTruthy();
+    expect(await response.json()).toMatchObject({ requestId });
+  });
+
+  it("rejeita query key repetida como o Express rejeita arrays no schema", async () => {
+    const installmentService = {
+      list: vi.fn(async () => ({ items: [], total: 0, page: 1, page_size: 50, has_more: false })),
+      getById: vi.fn(async () => ({})),
+    };
+    const app = createParcelamentoWorkerApp({ env: env(), installmentService });
+
+    const response = await app.request(
+      "https://parcelamento.test/parcelamento/installments?page=1&page=2",
+      { headers: headers() },
+    );
+
+    expect(response.status).toBe(400);
+    expect(installmentService.list).not.toHaveBeenCalled();
+  });
+
   it("falha explícito com 503 sem HYPERDRIVE nem DATABASE_URL", async () => {
     const app = createParcelamentoWorkerApp({ env: env({ HYPERDRIVE: undefined }) });
     const response = await app.request("https://parcelamento.test/parcelamento/installments", {
