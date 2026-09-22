@@ -293,6 +293,78 @@ describe("GroupAssignmentService do Worker", () => {
     expect(requestIds[1]).toBe(requestIds[0]);
   });
 
+  it("reconcilia duas entregas legadas com o mesmo requestId derivado do evento", async () => {
+    const event = {
+      id: "legacy-outbox-event-id",
+      payload: {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        action: "Atualizacao",
+        referring: "pessoal.group-assignment",
+        referringId: PREVIEW_ID,
+      },
+    };
+    let status = "pending";
+    const tx = {
+      $executeRaw: vi.fn(async () => {
+        if (status !== "pending") return 0;
+        status = "processing";
+        return 1;
+      }),
+      pessoalAuditOutboxEvent: {
+        updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          status = String(data.status);
+          return { count: 1 };
+        }),
+      },
+    };
+    const prisma = {
+      $queryRaw: vi.fn(async () => []),
+      $transaction: vi.fn(async (callback: (transaction: typeof tx) => Promise<unknown>) => {
+        const previousStatus = status;
+        try {
+          return await callback(tx);
+        } catch (error) {
+          status = previousStatus;
+          throw error;
+        }
+      }),
+      pessoalGroup: {},
+      client: {},
+      payroll: {},
+      pessoalGroupAssignmentPreview: {},
+      pessoalGroupAssignmentPreviewDetail: {},
+      pessoalAuditOutboxEvent: {
+        findMany: vi.fn(async () => (status === "pending" ? [event] : [])),
+        count: vi.fn(async () => (status === "pending" ? 1 : 0)),
+        update: vi.fn(),
+        updateMany: vi.fn(),
+      },
+    } as unknown as PessoalAssignmentPrisma;
+    const requestIds: string[] = [];
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo) => {
+        const request = input instanceof Request ? input : new Request(input);
+        const payload = (await request.json()) as { requestId?: string };
+        requestIds.push(String(payload.requestId));
+        return new Response(null, { status: requestIds.length === 1 ? 503 : 200 });
+      }),
+    };
+    const audit = createPessoalAuditRecorder({
+      INTERNAL_SERVICE_TOKEN: "audit-test-token",
+      AUDIT_SERVICE: binding,
+    } as unknown as PessoalWorkerEnv);
+    const service = new GroupAssignmentService(prisma, audit, () => FIXED_NOW);
+
+    await expect(service.reconcilePendingAuditEvents()).rejects.toMatchObject({ statusCode: 502 });
+    await expect(service.reconcilePendingAuditEvents()).resolves.toEqual({
+      processed: 1,
+      pending: 0,
+    });
+
+    expect(requestIds).toEqual(["legacy-outbox-event-id", "legacy-outbox-event-id"]);
+  });
+
   it("reconcilia apenas auditoria pendente e não altera folha", async () => {
     const prisma = assignmentPrisma();
     prisma.pessoalAuditOutboxEvent.findMany.mockResolvedValueOnce([
@@ -400,6 +472,7 @@ describe("GroupAssignmentService do Worker", () => {
 
     await expect(
       recorder({
+        requestId: "audit-request-http",
         organizationId: ORGANIZATION_ID,
         userId: USER_ID,
         action: "Atualizacao",
@@ -433,6 +506,7 @@ describe("GroupAssignmentService do Worker", () => {
         AUDIT_SERVICE: binding,
       } as unknown as PessoalWorkerEnv);
       const pending = recorder({
+        requestId: "audit-request-timeout",
         organizationId: ORGANIZATION_ID,
         userId: USER_ID,
         action: "Atualizacao",

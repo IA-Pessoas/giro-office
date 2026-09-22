@@ -146,9 +146,11 @@ function requireUserId(context: { userId?: string }): string {
 }
 
 function toAuditPayload(input: PessoalAuditChangeInput, now: Date): Record<string, unknown> {
+  const requestId = input.requestId?.trim();
+  if (!requestId) throw new ServiceError(422, "RequestId de auditoria ausente.");
   const timestamp = now.toISOString();
   return {
-    requestId: input.requestId?.trim() || crypto.randomUUID(),
+    requestId,
     organizationId: input.organizationId,
     userId: input.userId,
     permission: input.permission ?? null,
@@ -660,7 +662,11 @@ export class GroupAssignmentService {
           return false;
         }
 
-        if (!(await this.audit(payload))) {
+        const auditPayload = {
+          ...payload,
+          requestId: payload.requestId?.trim() || String(event.id),
+        };
+        if (!(await this.audit(auditPayload))) {
           await tx.pessoalAuditOutboxEvent.updateMany({
             where: { id: event.id, status: PROCESSING_AUDIT_OUTBOX_STATUS },
             data: { status: PENDING_AUDIT_OUTBOX_STATUS },

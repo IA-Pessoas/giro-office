@@ -165,3 +165,30 @@ O mesmo payload é usado pela entrega imediata e pela reconciliação. Portanto,
 
 - Alterados somente `workers/pessoal-service/**` e este relatório; alterações preexistentes em User, TI, Reports, Prisma, `pnpm-lock.yaml` e `app/next-env.d.ts` permaneceram fora do commit.
 - Nenhum deploy ou push foi executado.
+
+## Fix report — quarta correção focada: requestId determinístico para legado
+
+### Finding corrigido
+
+`toAuditPayload` não gera mais UUID aleatório quando o payload não possui `requestId`; sem um ID canônico, a conversão falha explicitamente. Durante `reconcilePendingAuditEvents`, payloads legados sem `requestId` recebem o `event.id` estável da outbox como fallback determinístico antes da chamada ao `AUDIT_SERVICE`. Assim, duas entregas/reconciliações do mesmo evento enviam o mesmo `requestId` e continuam idempotentes no Audit Service. Novos `apply` seguem persistindo o `requestId` canônico na outbox.
+
+### TDD
+
+- RED: `pnpm exec vitest run src/remainderServices.test.ts -t "reconcilia duas entregas legadas"` — 1 falha; duas entregas do mesmo evento chegaram com UUIDs diferentes.
+- GREEN: o mesmo comando — 1 teste passou; o caso simula falha HTTP na primeira entrega, retry do mesmo evento legado e confirma o mesmo `requestId` recebido pelo `AUDIT_SERVICE`.
+
+### Validação
+
+- `pnpm --filter @workspace/pessoal-worker test` — PASS, 3 arquivos e 23 testes.
+- `pnpm --filter @workspace/pessoal-worker typecheck` — PASS.
+- `pnpm --filter @workspace/pessoal-worker build` — PASS.
+- `pnpm --filter @workspace/pessoal-worker check` — PASS, 13 arquivos; sem fixes do Biome.
+- `pnpm exec wrangler deploy --dry-run` — PASS, 6395.46 KiB (1994.16 KiB gzip); binding `AUDIT_SERVICE` detectado, sem publicação.
+- `app/postcss.config.js` permaneceu com 94 bytes e `lint-staged.config.mjs` com 766 bytes.
+- A primeira tentativa paralela de teste/typecheck encontrou `EEXIST` no `prisma generate`; a execução serial subsequente passou e não exigiu remoção de artefatos.
+- Permaneceu apenas o warning preexistente de `resolutions` em `services/src/package.json`.
+
+### Limites
+
+- Alterados somente `workers/pessoal-service/**` e este relatório; User, Reports, TI e demais alterações preexistentes permaneceram fora do commit.
+- Nenhum deploy ou push foi executado.
