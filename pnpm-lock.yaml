@@ -2160,6 +2160,43 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(vite@7.3.5(@types/node@25.5.2)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
 
+  workers/task-service:
+    dependencies:
+      '@prisma/adapter-pg':
+        specifier: 7.9.1
+        version: 7.9.1
+      '@workspace/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@workspace/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@workspace/task-service':
+        specifier: workspace:*
+        version: link:../../services/task-service
+      express:
+        specifier: ^4.18.2
+        version: 4.22.1
+      iconv-lite:
+        specifier: 0.7.2
+        version: 0.7.2
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.4.5
+        version: 2.4.5
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.2
+      typescript:
+        specifier: 5.3.3
+        version: 5.3.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(vite@7.3.5(@types/node@25.5.2)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3))
+
   workers/ti-service:
     dependencies:
       '@prisma/adapter-pg':

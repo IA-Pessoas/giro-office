@@ -1,0 +1,29 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "giro-task-service",
+  "main": "src/index.ts",
+  "workers_dev": false,
+  "compatibility_date": "2026-09-22",
+  "compatibility_flags": ["nodejs_compat"],
+  // O Worker roda o app Express do services/task-service sem porte. Estes aliases
+  // trocam só os módulos que não sobem no workerd ou que falam HTTP com outros
+  // serviços; manter em sincronia com vitest.config.ts.
+  "alias": {
+    "./prisma/index.js": "./src/shims/prisma.ts",
+    "../prisma/index.js": "./src/shims/prisma.ts",
+    "../config/env.js": "./src/shims/env.ts",
+    "../middlewares/isAuthenticated.js": "./src/shims/isAuthenticated.ts",
+    "../integrations/audit.js": "./src/shims/audit.ts",
+    "../integrations/projectProgress.js": "./src/shims/projectProgress.ts",
+    // iconv-lite 0.4 (via body-parser 1.x do Express 4) quebra no load do workerd.
+    "iconv-lite": "./node_modules/iconv-lite/lib/index.js"
+  },
+  "vars": { "NODE_ENV": "production", "AI_EXTRACTION_MODE": "openai" },
+  "services": [
+    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" },
+    { "binding": "PROJECT_SERVICE", "service": "giro-project-service" },
+    { "binding": "USER_SERVICE", "service": "giro-user-service" }
+  ],
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
+  "observability": { "enabled": true }
+}
