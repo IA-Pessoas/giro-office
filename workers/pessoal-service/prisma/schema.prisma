@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model PessoalGroup {
+  id              String   @id @default(uuid())
+  name            String
+  normalized_name String
+  policy          String   @default("NORMAL")
+  system_key      String?
+  archived_at     DateTime?
+  organization_id String
+
+  @@map("pessoal.group")
+}
