@@ -8,47 +8,97 @@ datasource db {
   provider = "postgresql"
 }
 
-model RhCategory {
-  id              String  @id @default(uuid())
-  name            String
-  active          Boolean @default(true)
-  organization_id String
+model User {
+  id                       String             @id @default(uuid())
+  name                     String
+  login                    String
+  password                 String
+  permission               Int
+  status                   String
+  organization_id          String?
+  type                     enumType?
+  first_owner_flag         Boolean?           @default(false)
+  session_version          Int                @default(0)
+  version                  Int                @default(1)
+  permission_id            String?            @unique
+  department_id            String
+  invited_by               String?
+  joined_at                DateTime?          @default(now())
+  photo_url                String?
+  full_name                String?
+  gender                   String?
+  birth_date               DateTime?
+  cpf                      String?            @unique
+  rg                       String?            @unique
+  address                  String?
+  job_title                String?
+  email                    String?
+  phone                    String?
+  hire_date                DateTime?
+  dominio_hire_date        DateTime?
+  termination_date         DateTime?
+  allergies                Json?
+  emergency_contacts       Json?
+  permissionRef            Permission?        @relation("UserPrimaryPermission", fields: [permission_id], references: [id])
+  permissions              Permission[]
+  pointConfig              PointsConfig?
+  points                   Point[]
+  senderMsgRH              RhMessage[]
+  assignerRH               RhRequest[]        @relation("RequestAssignee")
+  requesterRH              RhRequest[]        @relation("RequestOwner")
+  rhNotifications          RhNotification[]
+  rhRequestReads           RhRequestRead[]
+  rhMessageReads           RhMessageRead[]
+  scores                   ScoreQuarter[]
+  scoresEvaluaion          ScoreEvaluation[]
+  timeBankRealeasesAdded   TimeBankReleases[] @relation("add")
+  timeBankRealeases        TimeBankReleases[] @relation("user")
+  timeClockRequestApproved TimeClockRequest[] @relation("approver")
+  timeClockRequest         TimeClockRequest[] @relation("user")
+  timeSheets               TimeSheets[]
+  department               Department         @relation(fields: [department_id], references: [id])
 
-  @@map("rh.request_categories")
+  @@unique([login], map: "users_login_key")
+  @@index([organization_id, name, id])
+  @@map("users")
 }
 
-model RhNotification {
-  id              String   @id @default(uuid())
+model Permission {
+  id              String @id @default(uuid())
   user_id         String
-  request_id      String
-  event_key       String
-  title           String
-  message         String
-  read            Boolean  @default(false)
-  created_at      DateTime @default(now())
+  certificado     Int    @default(0)
+  comercial       Int    @default(0)
+  contabil        Int    @default(0)
+  financeiro      Int    @default(0)
+  fiscal          Int    @default(0)
+  integracao      Int    @default(0)
+  marketing       Int    @default(0)
+  parcelamento    Int    @default(0)
+  pessoal         Int    @default(0)
+  regularize      Int    @default(0)
+  rh              Int    @default(0)
+  ti              Int    @default(0)
+  triagem         Int    @default(0)
   organization_id String
+  user            User   @relation(fields: [user_id], references: [id])
+  userPrimary     User?  @relation("UserPrimaryPermission")
 
-  @@unique([organization_id, user_id, request_id, event_key], map: "uq_rh_notifications_event")
-  @@index([organization_id, user_id, read, created_at], map: "idx_rh_notifications_user_state")
-  @@map("rh.notifications")
+  @@unique([user_id, organization_id], map: "uq_permissions_user_org")
+  @@map("permissions")
 }
 
-enum ScoreQuestionType {
-  behavioral
-  technical
-  tech
-  leadership
-}
-
-model ScoreQuestion {
-  id              String            @id @default(uuid())
-  question        String
-  type            ScoreQuestionType
-  active          Boolean           @default(true)
-  question_id     String
+model Department {
+  id              String   @id @default(uuid())
+  name            String
+  color           String
+  status          String
+  solution        Boolean?
   organization_id String
+  users           User[]
 
-  @@map("rh.score_questions")
+  @@unique([organization_id, name], map: "uq_departments_org_name")
+  @@index([organization_id, name], map: "idx_departments_org_name")
+  @@map("departments")
 }
 
 model Holidays {
@@ -59,6 +109,24 @@ model Holidays {
 
   @@index([organization_id, date])
   @@map("rh.holidays")
+}
+
+model Point {
+  id                String             @id @default(uuid())
+  user_id           String
+  clock_in          DateTime
+  lunch_out         DateTime?
+  lunch_in          DateTime?
+  clock_out         DateTime?
+  workload_hours    Int?
+  signature         String?
+  time_bank_balance Int?
+  organization_id   String
+  user              User               @relation(fields: [user_id], references: [id])
+  timeClockRequests TimeClockRequest[]
+
+  @@index([user_id, clock_in])
+  @@map("rh.points")
 }
 
 model PointsConfig {
@@ -72,19 +140,166 @@ model PointsConfig {
   bank_balance    Int      @default(0)
   work_days       String   @default("1,2,3,4,5")
   organization_id String
+  user            User     @relation(fields: [user_id], references: [id])
 
   @@map("rh.pointConfig")
 }
 
-model User {
-  id              String  @id @default(uuid())
+model RhCategory {
+  id              String      @id @default(uuid())
   name            String
-  permission      Int
-  status          String
-  organization_id String?
-  department_id   String
+  active          Boolean     @default(true)
+  organization_id String
+  requests        RhRequest[]
 
-  @@map("users")
+  @@map("rh.request_categories")
+}
+
+model RhMessage {
+  id              String          @id @default(uuid())
+  request_id      String
+  sender_user_id  String
+  message         String
+  attachment      String?
+  type            RhMessageType
+  is_read         Boolean         @default(false)
+  created_at      DateTime        @default(now())
+  organization_id String
+  request         RhRequest       @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  sender          User            @relation(fields: [sender_user_id], references: [id])
+  reads           RhMessageRead[]
+
+  @@map("rh.request_messages")
+}
+
+model RhMessageRead {
+  id              String    @id @default(uuid())
+  message_id      String
+  user_id         String
+  organization_id String
+  read_at         DateTime  @default(now())
+  message         RhMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, message_id, user_id], map: "uq_rh_message_reads_scope")
+  @@index([organization_id, user_id, read_at], map: "idx_rh_message_reads_user")
+  @@map("rh.message_reads")
+}
+
+model RhNotification {
+  id              String    @id @default(uuid())
+  user_id         String
+  request_id      String
+  event_key       String
+  title           String
+  message         String
+  read            Boolean   @default(false)
+  created_at      DateTime  @default(now())
+  organization_id String
+  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  request         RhRequest @relation(fields: [request_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, user_id, request_id, event_key], map: "uq_rh_notifications_event")
+  @@index([organization_id, user_id, read, created_at], map: "idx_rh_notifications_user_state")
+  @@map("rh.notifications")
+}
+
+model RhRequest {
+  id                  String           @id @default(uuid())
+  title               String
+  description         String
+  requester_user_id   String
+  category_id         String
+  assigned_to_user_id String
+  urgency             RhRequestUrgency
+  status              RhRequestStatus
+  created_at          DateTime         @default(now())
+  updated_at          DateTime         @updatedAt
+  organization_id     String
+  messages            RhMessage[]
+  reads               RhRequestRead[]
+  notifications       RhNotification[]
+  assigned_to         User?            @relation("RequestAssignee", fields: [assigned_to_user_id], references: [id])
+  category            RhCategory       @relation(fields: [category_id], references: [id])
+  requester           User             @relation("RequestOwner", fields: [requester_user_id], references: [id])
+
+  @@map("rh.requests")
+}
+
+model RhRequestRead {
+  id              String    @id @default(uuid())
+  request_id      String
+  user_id         String
+  organization_id String
+  read_at         DateTime  @default(now())
+  request         RhRequest @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, request_id, user_id], map: "uq_rh_request_reads_scope")
+  @@index([organization_id, user_id, read_at], map: "idx_rh_request_reads_user")
+  @@map("rh.request_reads")
+}
+
+model ScoreEvaluation {
+  id              String                @id @default(uuid())
+  score_id        String
+  evaluator_id    String?
+  type            ScoreQuestionType
+  status          ScoreEvaluationStatus
+  answers         Json
+  average_score   Float                 @default(0)
+  evaluator_role  ScoreEvaluatorRole
+  organization_id String
+  evaluator       User?                 @relation(fields: [evaluator_id], references: [id])
+  scoreQuarter    ScoreQuarter          @relation(fields: [score_id], references: [id], onDelete: Cascade)
+
+  @@map("rh.score_evaluations")
+}
+
+model ScoreNitro {
+  id              String       @id @default(uuid())
+  score_id        String       @unique
+  projects_score  Float        @default(0)
+  hours_score     Float        @default(0)
+  errors_score    Float        @default(0)
+  folders_score   Float        @default(0)
+  total_hours     Int          @default(0)
+  total_errors    Int          @default(0)
+  organization_id String
+  scoreQuarter    ScoreQuarter @relation(fields: [score_id], references: [id], onDelete: Cascade)
+
+  @@map("rh.score_nitro")
+}
+
+model ScoreQuarter {
+  id              String            @id @default(uuid())
+  user_id         String
+  quarter         String
+  behavioral      Float             @default(0)
+  technical       Float             @default(0)
+  technology      Float             @default(0)
+  leadership      Float             @default(0)
+  final_score     Float             @default(0)
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  organization_id String
+  user            User              @relation(fields: [user_id], references: [id])
+  evaluations     ScoreEvaluation[]
+  nitro           ScoreNitro?
+
+  @@unique([user_id, quarter])
+  @@map("rh.score")
+}
+
+model ScoreQuestion {
+  id              String            @id @default(uuid())
+  question        String
+  type            ScoreQuestionType
+  active          Boolean           @default(true)
+  question_id     String
+  organization_id String
+
+  @@map("rh.score_questions")
 }
 
 model TimeBankReleases {
@@ -96,6 +311,96 @@ model TimeBankReleases {
   is_approved      Boolean
   added_by_user_id String
   organization_id  String
+  added_by_user    User     @relation("add", fields: [added_by_user_id], references: [id])
+  user             User     @relation("user", fields: [user_id], references: [id])
 
   @@map("rh.timeBankReleases")
+}
+
+model TimeClockRequest {
+  id               String    @id @default(uuid())
+  user_id          String
+  point_id         String?
+  clock_in         DateTime
+  lunch_out        DateTime?
+  lunch_in         DateTime?
+  clock_out        DateTime?
+  justification    String
+  attachment       String?
+  date             DateTime  @default(now())
+  status           String
+  approver_user_id String?
+  obs_approver     String?
+  organization_id  String
+  approver         User?     @relation("approver", fields: [approver_user_id], references: [id])
+  point            Point?    @relation(fields: [point_id], references: [id])
+  user             User      @relation("user", fields: [user_id], references: [id])
+
+  @@map("rh.timeClockRequest")
+}
+
+model TimeSheets {
+  id                  String    @id @default(uuid())
+  user_id             String
+  start_time          DateTime
+  end_time            DateTime
+  signature           String?
+  status              String    @default("Gerada")
+  reopen_reason       String?
+  reopened_at         DateTime?
+  reopened_by_user_id String?
+  days                Json?
+  totals              Json?
+  organization_id     String
+  user                User      @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, start_time])
+  @@map("rh.timeSheets")
+}
+
+enum enumType {
+  admin
+  owner
+  user
+}
+
+enum RhMessageType {
+  Message
+  Solution
+  Rejection
+  Acceptance
+}
+
+enum RhRequestUrgency {
+  Low
+  Medium
+  High
+}
+
+enum RhRequestStatus {
+  New
+  In_Progress
+  Resolved
+  Closed
+}
+
+enum ScoreQuestionType {
+  behavioral
+  technical
+  tech
+  leadership
+}
+
+enum ScoreEvaluationStatus {
+  Pending
+  Completed
+}
+
+enum ScoreEvaluatorRole {
+  SELF
+  LEADER
+  RH
+  DIRECTOR
+  SUBORDINATE
+  TI
 }
