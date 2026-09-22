@@ -6,6 +6,7 @@ export interface UserPrismaClient {
     findMany(args: Record<string, unknown>): Promise<Row[]>;
     count(args: Record<string, unknown>): Promise<number>;
     updateMany?(args: Record<string, unknown>): Promise<{ count: number }>;
+    create?(args: Record<string, unknown>): Promise<Row>;
   };
   permission: {
     findFirst(args: Record<string, unknown>): Promise<Row | null>;
@@ -16,12 +17,25 @@ export interface UserPrismaClient {
   };
   authSession: {
     findFirst(args: Record<string, unknown>): Promise<Row | null>;
+    create?(args: Record<string, unknown>): Promise<Row>;
+    updateMany?(args: Record<string, unknown>): Promise<{ count: number }>;
   };
   platformAuthSession: {
     findFirst(args: Record<string, unknown>): Promise<Row | null>;
+    create?(args: Record<string, unknown>): Promise<Row>;
+    updateMany?(args: Record<string, unknown>): Promise<{ count: number }>;
+  };
+  platformUser: {
+    findFirst(args: Record<string, unknown>): Promise<Row | null>;
+    findUnique(args: Record<string, unknown>): Promise<Row | null>;
   };
   department: {
     findMany(args: Record<string, unknown>): Promise<Row[]>;
+    findFirst?(args: Record<string, unknown>): Promise<Row | null>;
   };
+  $transaction?<T>(
+    callback: (client: UserPrismaClient) => Promise<T>,
+    options?: Record<string, unknown>,
+  ): Promise<T>;
   $disconnect(): Promise<void>;
 }

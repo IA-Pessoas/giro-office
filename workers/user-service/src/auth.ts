@@ -116,8 +116,14 @@ export async function authenticateUserRequest(
   request: Request,
   env: UserWorkerEnv,
 ): Promise<UserAuthContext> {
-  const forwarded = forwardedAuth(request, env);
-  if (forwarded) return forwarded;
+  const hasBrowserSession = readCookie(
+    request.headers.get("cookie") ?? undefined,
+    AUTH_SESSION_COOKIE_NAME,
+  );
+  if (!hasBrowserSession) {
+    const forwarded = forwardedAuth(request, env);
+    if (forwarded) return forwarded;
+  }
 
   try {
     const auth = await authenticateWorkerRequest(request, {
@@ -135,6 +141,26 @@ export async function authenticateUserRequest(
       throw new ServiceError(401, "Não autenticado.");
     }
     throw error;
+  }
+}
+
+export function requirePlatformGatewayAuthorization(
+  request: Request,
+  env: UserWorkerEnv,
+  login = false,
+): void {
+  if (request.headers.get(INTERNAL_SERVICE_TOKEN_HEADER) !== env.INTERNAL_SERVICE_TOKEN) {
+    throw new ServiceError(login ? 403 : 401, login ? "Acesso negado." : "Não autenticado.");
+  }
+  if (login) return;
+  if (
+    request.headers.get(FORWARDED_AUTH_KIND_HEADER) !== "platform" ||
+    request.headers.get(FORWARDED_AUTH_PLATFORM_ROLE_HEADER) !== "super_admin"
+  ) {
+    throw new ServiceError(403, "Acesso negado.");
+  }
+  if (!request.headers.get(FORWARDED_AUTH_USER_ID_HEADER)) {
+    throw new ServiceError(401, "Não autenticado.");
   }
 }
 

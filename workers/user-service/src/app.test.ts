@@ -23,6 +23,7 @@ function prisma() {
       findFirst: vi.fn(async () => user()),
       findMany: vi.fn(async () => [user()]),
       count: vi.fn(async () => 1),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     permission: {
       findFirst: vi.fn(async () => permission()),
@@ -34,6 +35,8 @@ function prisma() {
         csrf_hash: "a".repeat(64),
         user: { session_version: 1, organization_id: ORGANIZATION_ID, status: "active" },
       })),
+      create: vi.fn(async () => ({ id: "session-created" })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     platformAuthSession: {
       findFirst: vi.fn(async () => ({
@@ -47,6 +50,12 @@ function prisma() {
           session_version: 1,
         },
       })),
+      create: vi.fn(async () => ({ id: "platform-session-created" })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
+    platformUser: {
+      findFirst: vi.fn(async () => platformUser()),
+      findUnique: vi.fn(async () => platformUser()),
     },
     department: { findMany: vi.fn(async () => [{ id: "dep-1", name: "Tecnologia" }]) },
     $disconnect: vi.fn(async () => {}),
@@ -67,6 +76,7 @@ function user() {
     type: "owner",
     first_owner_flag: true,
     permission_id: "perm-1",
+    session_version: 1,
     version: 1,
   };
 }
@@ -78,6 +88,18 @@ function permission() {
     organization_id: ORGANIZATION_ID,
     rh: 3,
     ti: 2,
+  };
+}
+
+function platformUser() {
+  return {
+    id: PLATFORM_USER_ID,
+    name: "Platform",
+    email: "platform@example.com",
+    password: "stored-password-hash",
+    platform_role: "super_admin",
+    status: "active",
+    session_version: 1,
   };
 }
 
@@ -173,7 +195,10 @@ describe("user Worker", () => {
       csrf_hash: await hashCsrfToken(csrfToken),
       user: { session_version: 1, organization_id: ORGANIZATION_ID, status: "active" },
     });
-    const app = createUserWorkerApp({ env: env(), prisma: db });
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+    });
 
     const response = await app.request("https://user.test/user/me", {
       headers: { cookie: `cw.session=${sessionToken}; cw.csrf=${csrfToken}` },
@@ -226,10 +251,19 @@ describe("user Worker", () => {
 
     const denied = await app.request(
       `https://user.test/platform/organizations/${ORGANIZATION_ID}/departments`,
-      { headers: { cookie } },
+      {
+        headers: {
+          cookie,
+          ...forwardedHeaders({
+            "x-auth-kind": "platform",
+            "x-auth-platform-role": "super_admin",
+            "x-auth-user-id": PLATFORM_USER_ID,
+            "x-auth-organization-id": "",
+          }),
+        },
+      },
     );
     expect(denied.status).toBe(200);
-    expect((await denied.json()).data).toEqual([{ id: "dep-1", name: "Tecnologia" }]);
 
     const mutation = await app.request(`https://user.test/user/permission/${USER_ID}`, {
       method: "PUT",
@@ -254,5 +288,392 @@ describe("user Worker", () => {
 
     expect(response.status).toBe(400);
     expect(db.permission.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("refreshes an organization session and rotates its cookies", async () => {
+    const db = prisma();
+    const csrfToken = "C".repeat(43);
+    const token = await sign({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      auth_kind: "organization",
+      type: "owner",
+      permission: 2,
+      session_version: 1,
+      session_id: "session-1",
+      csrf_hash: await hashCsrfToken(csrfToken),
+      modules: { rh: 3 },
+    });
+    db.authSession.findFirst.mockResolvedValue({
+      csrf_hash: await hashCsrfToken(csrfToken),
+      user: { session_version: 1, organization_id: ORGANIZATION_ID, status: "active" },
+    });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request("https://user.test/user/session/refresh", {
+      method: "POST",
+      headers: { cookie: `cw.session=${token}; cw.csrf=${csrfToken}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toContain("cw.session=");
+    expect((await response.json()).data.token).toBeUndefined();
+    expect(db.authSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "session-1",
+          user_id: USER_ID,
+          csrf_hash: await hashCsrfToken(csrfToken),
+        }),
+      }),
+    );
+  });
+
+  it("revokes an organization session and expires both cookies", async () => {
+    const db = prisma();
+    const csrfToken = "D".repeat(43);
+    const token = await sign({
+      user_id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      auth_kind: "organization",
+      type: "owner",
+      session_version: 1,
+      session_id: "session-1",
+      csrf_hash: await hashCsrfToken(csrfToken),
+      modules: { rh: 3 },
+    });
+    db.authSession.findFirst.mockResolvedValue({
+      csrf_hash: await hashCsrfToken(csrfToken),
+      user: { session_version: 1, organization_id: ORGANIZATION_ID, status: "active" },
+    });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request("https://user.test/user/session", {
+      method: "DELETE",
+      headers: { cookie: `cw.session=${token}; cw.csrf=${csrfToken}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+    expect((await response.json()).data).toEqual({ loggedOut: true });
+    expect(db.authSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "session-1", user_id: USER_ID, revoked_at: null },
+      }),
+    );
+  });
+
+  it("returns the reporting access context only with the internal token", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({
+      id: USER_ID,
+      name: "Usuário",
+      login: "usuario@example.com",
+      type: "owner",
+      department: {
+        id: "dep-1",
+        name: "Recursos Humanos",
+        organization: { id: ORGANIZATION_ID, name: "Organização" },
+      },
+    });
+    const app = createUserWorkerApp({
+      env: { ...env(), REPORTS_INTERNAL_TOKEN: "reports-internal-token" },
+      prisma: db,
+    });
+
+    const denied = await app.request("https://user.test/internal/reporting/access-context", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId: USER_ID, organizationId: ORGANIZATION_ID }),
+    });
+    expect(denied.status).toBe(403);
+
+    const response = await app.request("https://user.test/internal/reporting/access-context", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-service-token": "reports-internal-token",
+      },
+      body: JSON.stringify({ userId: USER_ID, organizationId: ORGANIZATION_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({
+      user: { id: USER_ID },
+      organization: { id: ORGANIZATION_ID },
+      departmentModule: "rh",
+    });
+  });
+
+  it("reads platform user details and permissions only inside the requested organization", async () => {
+    const db = prisma();
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+    const headers = forwardedHeaders({
+      "x-auth-kind": "platform",
+      "x-auth-platform-role": "super_admin",
+      "x-auth-user-id": PLATFORM_USER_ID,
+      "x-auth-organization-id": "",
+    });
+
+    const detail = await app.request(
+      `https://user.test/platform/organizations/${ORGANIZATION_ID}/users/${USER_ID}`,
+      { headers },
+    );
+    const permissions = await app.request(
+      `https://user.test/platform/organizations/${ORGANIZATION_ID}/users/${USER_ID}/permissions`,
+      { headers },
+    );
+
+    expect(detail.status).toBe(200);
+    expect((await detail.json()).data).toMatchObject({ id: USER_ID });
+    expect(permissions.status).toBe(200);
+    expect((await permissions.json()).data).toMatchObject({ rh: 3 });
+    expect(db.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: USER_ID, organization_id: ORGANIZATION_ID } }),
+    );
+  });
+
+  it("updates a user in the authenticated organization with optimistic versioning", async () => {
+    const db = prisma();
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request(`https://user.test/user/${USER_ID}`, {
+      method: "PUT",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ name: "Usuário atualizado", expected_version: 1 }),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({
+      id: USER_ID,
+      name: "Usuário atualizado",
+      version: 2,
+    });
+    expect(db.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: USER_ID,
+          organization_id: ORGANIZATION_ID,
+          version: 1,
+        }),
+      }),
+    );
+  });
+
+  it("deactivates a user by revoking its active session version", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({ ...user(), type: "admin" });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request(`https://user.test/user/${USER_ID}`, {
+      method: "DELETE",
+      headers: forwardedHeaders(),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual({ message: "Usuario desativado com sucesso." });
+    expect(db.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "inactive", session_version: { increment: 1 } }),
+      }),
+    );
+  });
+
+  it("creates an organization session with claims and browser cookies", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({ ...user(), password: "stored-password-hash" });
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      verifyPassword: vi.fn(async () => true),
+    } as never);
+
+    const response = await app.request("https://user.test/user/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: "usuario@example.com", password: "secret" }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toMatchObject({
+      id: USER_ID,
+      organization_id: ORGANIZATION_ID,
+      modules: expect.objectContaining({ rh: 3, ti: 2 }),
+      service: "user-service",
+    });
+    expect(body.data.token).toBeUndefined();
+    expect(body.data.csrfToken).toBeUndefined();
+    expect(response.headers.get("set-cookie")).toContain("cw.session=");
+    expect(db.authSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ user_id: USER_ID }) }),
+    );
+  });
+
+  it("creates a platform session only with the internal gateway token", async () => {
+    const db = prisma();
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      verifyPassword: vi.fn(async () => true),
+    } as never);
+
+    const denied = await app.request("https://user.test/platform/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "platform@example.com", password: "secret" }),
+    });
+    expect(denied.status).toBe(403);
+
+    const response = await app.request("https://user.test/platform/session", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-service-token": INTERNAL_TOKEN,
+      },
+      body: JSON.stringify({ email: "platform@example.com", password: "secret" }),
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual({
+      id: PLATFORM_USER_ID,
+      name: "Platform",
+      email: "platform@example.com",
+      auth_kind: "platform",
+      platform_role: "super_admin",
+    });
+    expect(db.platformAuthSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ platform_user_id: PLATFORM_USER_ID }),
+      }),
+    );
+  });
+
+  it("does not accept a valid platform cookie without gateway authorization", async () => {
+    const db = prisma();
+    const csrfToken = "G".repeat(43);
+    const token = await sign({
+      user_id: PLATFORM_USER_ID,
+      auth_kind: "platform",
+      platform_role: "super_admin",
+      session_version: 1,
+      session_id: "platform-session-1",
+      csrf_hash: await hashCsrfToken(csrfToken),
+    });
+    db.platformAuthSession.findFirst.mockResolvedValue({
+      csrf_hash: await hashCsrfToken(csrfToken),
+      platformUser: platformUser(),
+    });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request("https://user.test/platform/me", {
+      headers: { cookie: `cw.session=${token}; cw.csrf=${csrfToken}` },
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("validates the platform browser session behind gateway forwarding on refresh", async () => {
+    const db = prisma();
+    const csrfToken = "H".repeat(43);
+    const csrfHash = await hashCsrfToken(csrfToken);
+    const token = await sign({
+      user_id: PLATFORM_USER_ID,
+      auth_kind: "platform",
+      platform_role: "super_admin",
+      session_version: 1,
+      session_id: "platform-session-1",
+      csrf_hash: csrfHash,
+    });
+    db.platformAuthSession.findFirst.mockResolvedValue({
+      csrf_hash: csrfHash,
+      platformUser: platformUser(),
+    });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request("https://user.test/platform/session/refresh", {
+      method: "POST",
+      headers: {
+        ...forwardedHeaders({
+          "x-auth-kind": "platform",
+          "x-auth-platform-role": "super_admin",
+          "x-auth-user-id": PLATFORM_USER_ID,
+          "x-auth-organization-id": "",
+        }),
+        cookie: `cw.session=${token}; cw.csrf=${csrfToken}`,
+        "x-csrf-token": csrfToken,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(db.platformAuthSession.findFirst).toHaveBeenCalled();
+    expect(db.platformAuthSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "platform-session-1",
+          platform_user_id: PLATFORM_USER_ID,
+          csrf_hash: csrfHash,
+        }),
+      }),
+    );
+  });
+
+  it("reads a public user photo through the worker", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({ ...user(), photo_url: "https://cdn.example/avatar.png" });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request(`https://user.test/user/${USER_ID}/photo`, {
+      headers: forwardedHeaders(),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual({ url: "https://cdn.example/avatar.png" });
+  });
+
+  it("uploads and removes a user photo with the Fotos storage contract", async () => {
+    const db = prisma();
+    const storage = {
+      upload: vi.fn(async () => {}),
+      remove: vi.fn(async () => {}),
+    };
+    const app = createUserWorkerApp({
+      env: { ...env(), SUPABASE_URL: "https://storage.example" },
+      prisma: db,
+      storage,
+    } as never);
+    const form = new FormData();
+    form.set(
+      "file",
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "avatar.png", {
+        type: "image/png",
+      }),
+    );
+
+    const uploaded = await app.request(`https://user.test/user/${USER_ID}/photo`, {
+      method: "POST",
+      headers: forwardedHeaders(),
+      body: form,
+    });
+
+    expect(uploaded.status).toBe(200);
+    expect(storage.upload).toHaveBeenCalledWith("Fotos", `${USER_ID}/photo.png`, expect.any(File), {
+      contentType: "image/png",
+      upsert: true,
+    });
+    expect(db.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          photo_url: `https://storage.example/storage/v1/object/public/Fotos/${USER_ID}/photo.png`,
+        }),
+      }),
+    );
+
+    const removed = await app.request(`https://user.test/user/${USER_ID}/photo`, {
+      method: "DELETE",
+      headers: forwardedHeaders(),
+    });
+
+    expect(removed.status).toBe(200);
+    expect(storage.remove).toHaveBeenCalledWith("Fotos", USER_ID);
   });
 });

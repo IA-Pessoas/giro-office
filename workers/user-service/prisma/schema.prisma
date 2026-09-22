@@ -17,11 +17,21 @@ enum PlatformRole {
   super_admin
 }
 
+model Organization {
+  id          String       @id @default(uuid())
+  name        String
+  departments Department[]
+  users       User[]       @relation("UserOrganization")
+
+  @@map("organizations")
+}
+
 model Department {
   id              String @id @default(uuid())
   name            String
   organization_id String
   users           User[]
+  organization    Organization @relation(fields: [organization_id], references: [id])
 
   @@map("departments")
 }
@@ -44,6 +54,7 @@ model User {
   photo_url         String?
   authSessions      AuthSession[]
   department        Department       @relation(fields: [department_id], references: [id])
+  organization      Organization?    @relation("UserOrganization", fields: [organization_id], references: [id])
   permissions       Permission[]
   permissionSpecific PermissionSpecific?
 
@@ -100,6 +111,7 @@ model PlatformUser {
   id              String               @id @default(uuid())
   name            String
   email           String               @unique
+  password        String
   platform_role   PlatformRole        @default(super_admin)
   status          String              @default("active")
   session_version Int                  @default(0)
