@@ -32,6 +32,8 @@ model Organization {
   status      status       @default(active)
   departments Department[]
   users       User[]       @relation("UserOrganization")
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
 
   @@map("organizations")
 }
@@ -79,6 +81,8 @@ model AuthSession {
   expires_at DateTime
   revoked_at DateTime?
   user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   @@index([user_id])
   @@index([expires_at])
@@ -126,6 +130,8 @@ model PlatformUser {
   status          String              @default("active")
   session_version Int                  @default(0)
   authSessions    PlatformAuthSession[]
+  created_at      DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
 
   @@map("platform_users")
 }
