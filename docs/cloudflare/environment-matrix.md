@@ -29,6 +29,7 @@ Esta matriz documenta nomes e escopo. Ela não contém valores, tokens ou URLs p
 | `TI_SERVICE` | `giro-ti-service` | dry-run configurado |
 | `RH_SERVICE` | `giro-rh-service` | dry-run configurado |
 | `COMMERCIAL_SERVICE` | `giro-commercial-service` | dry-run configurado |
+| `TRIAGEM_SERVICE` | `giro-triagem-service` | dry-run configurado |
 
 ## Supabase e recursos externos
 
