@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createRegularizeWorkerApp,
   type RegularizeClientPfService,
+  type RegularizeDashboardService,
   type RegularizeGuidanceService,
   type RegularizeLicensePrisma,
   type RegularizeLicenseService,
@@ -117,6 +118,25 @@ function guidanceService(): RegularizeGuidanceService {
     addPartner: vi.fn(async () => ({ id: "guidance-1" })),
     updatePartner: vi.fn(async () => ({ id: "guidance-1" })),
     removePartner: vi.fn(async () => ({ id: "guidance-1" })),
+  };
+}
+
+function dashboardService(): RegularizeDashboardService {
+  return {
+    getDashboard: vi.fn(async (_organizationId, year) => ({
+      year,
+      metrics: {
+        openProcesses: 1,
+        activeLicenses: 1,
+        activeClientPfs: 1,
+        activeSites: 1,
+        municipalTaxesCompleted: 1,
+        municipalTaxesPending: 0,
+        municipalTaxesTotal: 1,
+      },
+      recentProcesses: [],
+      trackedLicenses: [],
+    })),
   };
 }
 
@@ -618,5 +638,21 @@ describe("regularize Worker", () => {
     expect(guidance.updatePartner).toHaveBeenCalledWith(
       expect.objectContaining({ guidanceId, organizationId: ORGANIZATION_ID }),
     );
+  });
+
+  it("routes the dashboard query through the organization-scoped service", async () => {
+    const dashboard = dashboardService();
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      dashboardService: dashboard,
+    });
+    const response = await app.request("https://regularize.test/regularize/dashboard?year=2026", {
+      headers: headers(),
+    });
+
+    expect(response.status).toBe(200);
+    expect(dashboard.getDashboard).toHaveBeenCalledWith(ORGANIZATION_ID, 2026);
+    expect((await response.json()).data.year).toBe(2026);
   });
 });

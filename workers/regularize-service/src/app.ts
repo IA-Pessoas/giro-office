@@ -4,6 +4,7 @@ import {
   listClientPfQuerySchema,
   updateClientPfBodySchema,
 } from "@workspace/regularize-service/src/schemas/clientPf.schemas.js";
+import { regularizeDashboardQuerySchema } from "@workspace/regularize-service/src/schemas/dashboard.schemas.js";
 import {
   addGuidanceActivityBodySchema,
   addGuidancePartnerBodySchema,
@@ -62,6 +63,10 @@ import { MunicipalTaxesService } from "@workspace/regularize-service/src/service
 import { PartnersService } from "@workspace/regularize-service/src/services/partnersService.js";
 import { PasswordService } from "@workspace/regularize-service/src/services/passwordService.js";
 import { ProcessService } from "@workspace/regularize-service/src/services/processService.js";
+import {
+  RegularizeDashboardService as RegularizeDashboardServiceImpl,
+  type RegularizeDashboardService as RegularizeDashboardServiceType,
+} from "@workspace/regularize-service/src/services/regularizeDashboardService.js";
 import { RegularizeReconciliationService } from "@workspace/regularize-service/src/services/regularizeReconciliationService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
@@ -139,6 +144,7 @@ export type RegularizeGuidanceService = Pick<
   | "updatePartner"
   | "removePartner"
 >;
+export type RegularizeDashboardService = Pick<RegularizeDashboardServiceType, "getDashboard">;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
@@ -149,6 +155,7 @@ type RegularizeOptions = {
   partnersService?: RegularizePartnersService;
   passwordService?: RegularizePasswordService;
   guidanceService?: RegularizeGuidanceService;
+  dashboardService?: RegularizeDashboardService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -339,11 +346,28 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new GuidanceService(client as never)),
     );
   };
+  const withDashboardService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeDashboardService) => Promise<T>,
+  ) => {
+    if (options.dashboardService) return callback(options.dashboardService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new RegularizeDashboardServiceImpl(client as never)),
+    );
+  };
   const requirePasswordReveal = (c: RegularizeContext): void => {
     if (Number(c.get("auth").claims.permission ?? 0) < 2) {
       throw new ServiceError(403, "Permissao insuficiente para revelar credencial.");
     }
   };
+  app.get("/regularize/dashboard", async (c) =>
+    withDashboardService(c, async (service) => {
+      const { year } = parseWithZod(regularizeDashboardQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(await service.getDashboard(c.get("auth").organizationId, year)),
+      );
+    }),
+  );
   app.post("/regularize/guidance", async (c) =>
     withGuidanceService(c, async (service) => {
       const body = parseWithZod(createGuidanceBodySchema, await c.req.json());
