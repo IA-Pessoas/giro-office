@@ -2124,6 +2124,9 @@ importers:
       hono:
         specifier: 4.12.25
         version: 4.12.25
+      pdfkit:
+        specifier: 0.19.1
+        version: 0.19.1
       zod:
         specifier: ^3.24.0
         version: 3.25.76
