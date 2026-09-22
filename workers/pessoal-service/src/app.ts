@@ -3,6 +3,18 @@ import {
   groupIdParamsSchema,
   updateGroupBodySchema,
 } from "@workspace/pessoal-service/src/schemas/group.schemas.js";
+import {
+  createSituationBodySchema,
+  listSituationQuerySchema,
+  situationIdParamsSchema,
+  updateSituationBodySchema,
+} from "@workspace/pessoal-service/src/schemas/situation.schemas.js";
+import {
+  createUnionBodySchema,
+  listUnionsQuerySchema,
+  unionIdParamsSchema,
+  updateUnionBodySchema,
+} from "@workspace/pessoal-service/src/schemas/union.schemas.js";
 import { NORMAL_GROUP_POLICY } from "@workspace/pessoal-service/src/services/pessoalGroupPolicy.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
@@ -43,13 +55,66 @@ export type PessoalGroupService = {
   archive(organizationId: string, userId: string, id: string): Promise<unknown>;
   reactivate(organizationId: string, userId: string, id: string): Promise<unknown>;
 };
+export type PessoalUnionService = {
+  list(context: { organizationId: string }, query: Record<string, unknown>): Promise<unknown>;
+  detail(context: { organizationId: string }, id: string): Promise<unknown>;
+  create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
+  update(
+    context: Record<string, unknown>,
+    id: string,
+    body: Record<string, unknown>,
+  ): Promise<unknown>;
+  delete(context: Record<string, unknown>, id: string): Promise<unknown>;
+};
+export type PessoalSituationService = {
+  list(context: { organizationId: string }, query: Record<string, unknown>): Promise<unknown>;
+  detail(context: { organizationId: string }, id: string): Promise<unknown>;
+  create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
+  update(
+    context: Record<string, unknown>,
+    id: string,
+    body: Record<string, unknown>,
+  ): Promise<unknown>;
+  delete(context: Record<string, unknown>, id: string): Promise<unknown>;
+};
+export type PessoalDomainPrisma = PessoalGroupPrisma & {
+  unionPessoal: {
+    findMany(args: Record<string, unknown>): Promise<unknown[]>;
+    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    count(args: Record<string, unknown>): Promise<number>;
+  };
+  payroll: { count(args: Record<string, unknown>): Promise<number> };
+  client: { findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null> };
+  situationsPessoal: {
+    findMany(args: Record<string, unknown>): Promise<unknown[]>;
+    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
+};
 type PessoalOptions = {
   env?: PessoalWorkerEnv;
-  prisma?: PessoalGroupPrisma;
+  prisma?: PessoalDomainPrisma;
   groupService?: PessoalGroupService;
+  unionService?: PessoalUnionService;
+  situationService?: PessoalSituationService;
 };
 type PessoalWorkerContext = { Bindings: PessoalWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type PessoalContext = Context<PessoalWorkerContext>;
+
+function domainContext(c: PessoalContext): Record<string, unknown> {
+  const auth = c.get("auth");
+  return {
+    organizationId: auth.organizationId,
+    userId: auth.userId,
+    permission: Number(auth.claims.permission ?? 0),
+    ...(c.req.header(REQUEST_ID_HEADER) ? { requestId: c.req.header(REQUEST_ID_HEADER) } : {}),
+  };
+}
 
 function normalizeName(name: string): string {
   return name
@@ -236,6 +301,278 @@ function localService(prisma: PessoalGroupPrisma, env?: PessoalWorkerEnv): Pesso
   };
 }
 
+function localUnionService(
+  prisma: PessoalDomainPrisma,
+  env?: PessoalWorkerEnv,
+): PessoalUnionService {
+  const select = { id: true, name: true, cnpj: true, base_date: true, organization_id: true };
+  return {
+    async list(context, query) {
+      const where = {
+        organization_id: context.organizationId,
+        ...(query.search
+          ? {
+              OR: [
+                { name: { contains: query.search, mode: "insensitive" } },
+                { cnpj: { contains: query.search, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      };
+      const args = {
+        where,
+        select,
+        orderBy: { name: "asc" },
+        ...(query.paginationRequested
+          ? { skip: (Number(query.page) - 1) * Number(query.limit), take: Number(query.limit) }
+          : {}),
+      };
+      const data = await prisma.unionPessoal.findMany(args);
+      if (!query.paginationRequested) return data;
+      const total = await prisma.unionPessoal.count({ where });
+      return {
+        data,
+        total,
+        page: Number(query.page),
+        limit: Number(query.limit),
+        hasMore: Number(query.page) * Number(query.limit) < total,
+      };
+    },
+    async detail(context, id) {
+      const row = await prisma.unionPessoal.findFirst({
+        where: { id, organization_id: context.organizationId },
+        select,
+      });
+      if (!row) throw new ServiceError(404, "Sindicato nao encontrado.");
+      return row;
+    },
+    async create(context, body) {
+      const organizationId = String(context.organizationId);
+      const existing = await prisma.unionPessoal.findFirst({
+        where: {
+          organization_id: organizationId,
+          name: body.name,
+          cnpj: body.cnpj,
+          base_date: body.base_date ?? null,
+        },
+        select: { id: true },
+      });
+      if (existing) throw new ServiceError(409, "Sindicato ja cadastrado.");
+      const row = await prisma.unionPessoal.create({
+        data: {
+          name: body.name,
+          cnpj: body.cnpj,
+          base_date: body.base_date ?? null,
+          organization_id: organizationId,
+        },
+        select,
+      });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: "pessoal.union",
+        referringId: String(row.id),
+        department: "pessoal",
+      });
+      return row;
+    },
+    async update(context, id, body) {
+      const organizationId = String(context.organizationId);
+      const current = await prisma.unionPessoal.findFirst({
+        where: { id, organization_id: organizationId },
+        select,
+      });
+      if (!current) throw new ServiceError(404, "Sindicato nao encontrado.");
+      const data = {
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.cnpj !== undefined ? { cnpj: body.cnpj } : {}),
+        ...(body.base_date !== undefined ? { base_date: body.base_date } : {}),
+      };
+      const duplicate = await prisma.unionPessoal.findFirst({
+        where: {
+          organization_id: organizationId,
+          name: body.name ?? current.name,
+          cnpj: body.cnpj ?? current.cnpj,
+          base_date: body.base_date !== undefined ? body.base_date : current.base_date,
+          id: { not: id },
+        },
+        select: { id: true },
+      });
+      if (duplicate) throw new ServiceError(409, "Sindicato ja cadastrado.");
+      const row = await prisma.unionPessoal.update({ where: { id }, data, select });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Atualizacao",
+        referring: "pessoal.union",
+        referringId: id,
+        department: "pessoal",
+      });
+      return row;
+    },
+    async delete(context, id) {
+      const organizationId = String(context.organizationId);
+      const current = await prisma.unionPessoal.findFirst({
+        where: { id, organization_id: organizationId },
+        select,
+      });
+      if (!current) throw new ServiceError(404, "Sindicato nao encontrado.");
+      if (
+        (await prisma.payroll.count({ where: { organization_id: organizationId, union_id: id } })) >
+        0
+      ) {
+        throw new ServiceError(
+          409,
+          "Nao e possivel remover o sindicato porque ele esta vinculado a uma ou mais configuracoes de folha.",
+        );
+      }
+      const row = await prisma.unionPessoal.delete({ where: { id }, select });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Exclusao",
+        referring: "pessoal.union",
+        referringId: id,
+        department: "pessoal",
+      });
+      return row;
+    },
+  };
+}
+
+function localSituationService(
+  prisma: PessoalDomainPrisma,
+  env?: PessoalWorkerEnv,
+): PessoalSituationService {
+  const select = {
+    id: true,
+    client_id: true,
+    status: true,
+    title: true,
+    description: true,
+    registration_date: true,
+    completion_date: true,
+    registered_by_id: true,
+    completed_by_id: true,
+    organization_id: true,
+  };
+  return {
+    list: (context, query) =>
+      prisma.situationsPessoal.findMany({
+        where: { organization_id: context.organizationId, client_id: query.client_id },
+        select,
+        orderBy: { registration_date: "desc" },
+      }),
+    async detail(context, id) {
+      const row = await prisma.situationsPessoal.findFirst({
+        where: { id, organization_id: context.organizationId },
+        select,
+      });
+      if (!row) throw new ServiceError(404, "Situacao nao encontrada.");
+      return row;
+    },
+    async create(context, body) {
+      const organizationId = String(context.organizationId);
+      const client = await prisma.client.findFirst({
+        where: { id: body.client_id, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      const row = await prisma.situationsPessoal.create({
+        data: {
+          client_id: body.client_id,
+          status: "Em andamento",
+          title: body.title,
+          description: body.description,
+          registered_by_id: String(context.userId),
+          organization_id: organizationId,
+        },
+        select,
+      });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: "pessoal.situations",
+        referringId: String(row.id),
+        department: "pessoal",
+      });
+      return row;
+    },
+    async update(context, id, body) {
+      const organizationId = String(context.organizationId);
+      const current = await prisma.situationsPessoal.findFirst({
+        where: { id, organization_id: organizationId },
+        select,
+      });
+      if (!current) throw new ServiceError(404, "Situacao nao encontrada.");
+      const data = {
+        ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.title !== undefined ? { title: body.title } : {}),
+        ...(body.description !== undefined ? { description: body.description } : {}),
+        ...(body.status === "Finalizado"
+          ? { completed_by_id: String(context.userId), completion_date: new Date() }
+          : body.status === "Em andamento"
+            ? { completed_by_id: null, completion_date: null }
+            : {}),
+      };
+      const row = await prisma.situationsPessoal.update({ where: { id }, data, select });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Atualizacao",
+        referring: "pessoal.situations",
+        referringId: id,
+        department: "pessoal",
+      });
+      return row;
+    },
+    async delete(context, id) {
+      const organizationId = String(context.organizationId);
+      const current = await prisma.situationsPessoal.findFirst({
+        where: { id, organization_id: organizationId },
+        select,
+      });
+      if (!current) throw new ServiceError(404, "Situacao nao encontrada.");
+      const row = await prisma.situationsPessoal.delete({ where: { id }, select });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Exclusao",
+        referring: "pessoal.situations",
+        referringId: id,
+        department: "pessoal",
+      });
+      return row;
+    },
+  };
+}
+
 export function createPessoalWorkerApp(options: PessoalOptions = {}) {
   const app = new Hono<PessoalWorkerContext>();
   app.get("/health", (c) =>
@@ -266,6 +603,26 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     if (options.groupService) return callback(options.groupService);
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
       callback(localService(client as unknown as PessoalGroupPrisma, options.env ?? c.env)),
+    );
+  };
+  const withUnionService = async <T>(
+    c: PessoalContext,
+    callback: (service: PessoalUnionService) => Promise<T>,
+  ) => {
+    if (options.unionService) return callback(options.unionService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(localUnionService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
+    );
+  };
+  const withSituationService = async <T>(
+    c: PessoalContext,
+    callback: (service: PessoalSituationService) => Promise<T>,
+  ) => {
+    if (options.situationService) return callback(options.situationService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(
+        localSituationService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
+      ),
     );
   };
   app.get("/pessoal/groups", (c) =>
@@ -325,6 +682,101 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
           await service.reactivate(c.get("auth").organizationId, c.get("auth").userId, id),
         ),
       );
+    }),
+  );
+  app.get("/pessoal/unions", (c) =>
+    withUnionService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const query = parseWithZod(listUnionsQuerySchema, c.req.query());
+      const url = new URL(c.req.url);
+      return c.json(
+        createSuccessResponse(
+          await service.list(
+            { organizationId: c.get("auth").organizationId },
+            {
+              ...query,
+              paginationRequested: url.searchParams.has("page") || url.searchParams.has("limit"),
+            },
+          ),
+        ),
+      );
+    }),
+  );
+  app.get("/pessoal/unions/:id", (c) =>
+    withUnionService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const { id } = parseWithZod(unionIdParamsSchema, { id: c.req.param("id") });
+      return c.json(
+        createSuccessResponse(
+          await service.detail({ organizationId: c.get("auth").organizationId }, id),
+        ),
+      );
+    }),
+  );
+  app.post("/pessoal/unions", (c) =>
+    withUnionService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(createUnionBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.create(domainContext(c), body)), 201);
+    }),
+  );
+  app.patch("/pessoal/unions/:id", (c) =>
+    withUnionService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const { id } = parseWithZod(unionIdParamsSchema, { id: c.req.param("id") });
+      const body = parseWithZod(updateUnionBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.update(domainContext(c), id, body)));
+    }),
+  );
+  app.delete("/pessoal/unions/:id", (c) =>
+    withUnionService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const { id } = parseWithZod(unionIdParamsSchema, { id: c.req.param("id") });
+      return c.json(createSuccessResponse(await service.delete(domainContext(c), id)));
+    }),
+  );
+  app.get("/pessoal/situations", (c) =>
+    withSituationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const query = parseWithZod(listSituationQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.list({ organizationId: c.get("auth").organizationId }, query),
+        ),
+      );
+    }),
+  );
+  app.get("/pessoal/situations/:id", (c) =>
+    withSituationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const { id } = parseWithZod(situationIdParamsSchema, { id: c.req.param("id") });
+      return c.json(
+        createSuccessResponse(
+          await service.detail({ organizationId: c.get("auth").organizationId }, id),
+        ),
+      );
+    }),
+  );
+  app.post("/pessoal/situations", (c) =>
+    withSituationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(createSituationBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.create(domainContext(c), body)), 201);
+    }),
+  );
+  app.patch("/pessoal/situations/:id", (c) =>
+    withSituationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const { id } = parseWithZod(situationIdParamsSchema, { id: c.req.param("id") });
+      const body = parseWithZod(updateSituationBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.update(domainContext(c), id, body)));
+    }),
+  );
+  app.delete("/pessoal/situations/:id", (c) =>
+    withSituationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const { id } = parseWithZod(situationIdParamsSchema, { id: c.req.param("id") });
+      return c.json(createSuccessResponse(await service.delete(domainContext(c), id)));
     }),
   );
   app.notFound((c) =>

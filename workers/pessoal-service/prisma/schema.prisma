@@ -18,3 +18,43 @@ model PessoalGroup {
 
   @@map("pessoal.group")
 }
+
+model UnionPessoal {
+  id              String   @id @default(uuid())
+  name            String
+  cnpj            String
+  base_date       DateTime?
+  organization_id String
+
+  @@map("pessoal.union")
+}
+
+model Payroll {
+  id              String  @id @default(uuid())
+  union_id        String?
+  organization_id String
+
+  @@map("pessoal.payroll")
+}
+
+model Client {
+  id              String @id @default(uuid())
+  organization_id String
+
+  @@map("clients")
+}
+
+model SituationsPessoal {
+  id                String   @id @default(uuid())
+  client_id         String
+  status            String
+  title             String
+  description       String
+  registration_date DateTime @default(now())
+  completion_date   DateTime?
+  registered_by_id  String
+  completed_by_id   String?
+  organization_id   String
+
+  @@map("pessoal.situations")
+}
