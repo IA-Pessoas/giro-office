@@ -70,10 +70,24 @@ function forwardedAuth(request: Request, env: UserWorkerEnv): UserAuthContext | 
     return undefined;
 
   const userId = header(request, FORWARDED_AUTH_USER_ID_HEADER);
-  const kind =
-    header(request, FORWARDED_AUTH_KIND_HEADER) === "platform" ? "platform" : "organization";
+  const kindHeader = header(request, FORWARDED_AUTH_KIND_HEADER);
+  if (kindHeader !== "platform" && kindHeader !== "organization") return undefined;
+  const kind = kindHeader;
   const organizationId = header(request, FORWARDED_AUTH_ORGANIZATION_ID_HEADER);
-  if (!userId || (kind === "organization" && !organizationId)) return undefined;
+  const sessionId = header(request, FORWARDED_AUTH_SESSION_ID_HEADER);
+  const sessionVersion = Number(header(request, FORWARDED_AUTH_SESSION_VERSION_HEADER));
+  const csrfHash = header(request, FORWARDED_AUTH_CSRF_HASH_HEADER);
+  if (
+    !userId ||
+    !sessionId ||
+    !csrfHash ||
+    !/^[a-f0-9]{64}$/u.test(csrfHash) ||
+    !Number.isSafeInteger(sessionVersion) ||
+    sessionVersion < 0 ||
+    (kind === "organization" && !organizationId)
+  ) {
+    return undefined;
+  }
 
   const modules = (modulePermissions(request) ??
     normalizeModulePermissions(undefined)) as WorkerAuthClaims["modules"];
@@ -81,8 +95,6 @@ function forwardedAuth(request: Request, env: UserWorkerEnv): UserAuthContext | 
   const permission = permissionHeader === undefined ? undefined : Number(permissionHeader);
   const type = header(request, FORWARDED_AUTH_TYPE_HEADER);
   const platformRole = header(request, FORWARDED_AUTH_PLATFORM_ROLE_HEADER);
-  const sessionVersion = Number(header(request, FORWARDED_AUTH_SESSION_VERSION_HEADER));
-  const csrfHash = header(request, FORWARDED_AUTH_CSRF_HASH_HEADER);
   const claims: WorkerAuthClaims = {
     user_id: userId,
     ...(organizationId ? { organization_id: organizationId } : {}),
@@ -92,13 +104,9 @@ function forwardedAuth(request: Request, env: UserWorkerEnv): UserAuthContext | 
     ...(Number.isSafeInteger(permission) ? { permission } : {}),
     ...(type === "owner" || type === "admin" || type === "user" ? { type } : {}),
     ...(platformRole === "super_admin" ? { platform_role: "super_admin" as const } : {}),
-    ...(Number.isSafeInteger(sessionVersion) && sessionVersion >= 0
-      ? { session_version: sessionVersion }
-      : {}),
-    ...(header(request, FORWARDED_AUTH_SESSION_ID_HEADER)
-      ? { session_id: header(request, FORWARDED_AUTH_SESSION_ID_HEADER) }
-      : {}),
-    ...(csrfHash ? { csrf_hash: csrfHash } : {}),
+    session_version: sessionVersion,
+    session_id: sessionId,
+    csrf_hash: csrfHash,
   };
 
   return {
@@ -121,8 +129,17 @@ export async function authenticateUserRequest(
     AUTH_SESSION_COOKIE_NAME,
   );
   if (!hasBrowserSession) {
-    const forwarded = forwardedAuth(request, env);
-    if (forwarded) return forwarded;
+    try {
+      const auth = await authenticateWorkerRequest(request, {
+        jwtSecret: env.JWT_SECRET,
+        allowBearer: true,
+      });
+      return { ...auth, transport: "bearer" };
+    } catch (error) {
+      if (!(error instanceof WorkerAuthenticationError)) throw error;
+      const forwarded = forwardedAuth(request, env);
+      if (forwarded) return forwarded;
+    }
   }
 
   try {
@@ -179,17 +196,25 @@ function sessionClaims(auth: UserAuthContext): {
 }
 
 export function activeOrganizationId(user: Row): string | undefined {
+  if (user.status !== "active") return undefined;
   const department = user.department as Row | undefined;
   const departmentOrganization = department?.organization as Row | undefined;
   const explicitOrganization = user.organization as Row | undefined;
   const resolvedOrganizationId =
     (typeof user.organization_id === "string" && user.organization_id) ||
     (typeof department?.organization_id === "string" && department.organization_id);
-  if (!resolvedOrganizationId) return undefined;
+  if (
+    !resolvedOrganizationId ||
+    !department ||
+    department.organization_id !== resolvedOrganizationId ||
+    !departmentOrganization ||
+    departmentOrganization.id !== resolvedOrganizationId
+  ) {
+    return undefined;
+  }
 
   const organization = user.organization_id ? explicitOrganization : departmentOrganization;
-  if (!organization) return resolvedOrganizationId;
-  return organization.id === resolvedOrganizationId &&
+  return organization?.id === resolvedOrganizationId &&
     (organization.status === "active" || organization.status === "trial")
     ? resolvedOrganizationId
     : undefined;
@@ -203,7 +228,6 @@ export async function validateUserSession(
   auth: UserAuthContext,
   prisma: UserPrismaClient,
 ): Promise<void> {
-  if (auth.transport === "forwarded") return;
   const { sessionId, sessionVersion, csrfHash } = sessionClaims(auth);
   const session = await prisma.authSession.findFirst({
     where: {
@@ -301,15 +325,6 @@ export async function validatePlatformSession(
   prisma: UserPrismaClient,
 ): Promise<PlatformIdentity> {
   if (!auth.isPlatformAdmin) throw new ServiceError(403, "Acesso negado.");
-  if (auth.transport === "forwarded") {
-    return {
-      id: auth.userId,
-      name: auth.claims.name ?? "",
-      email: auth.claims.login ?? "",
-      auth_kind: "platform",
-      platform_role: "super_admin",
-    };
-  }
   const { sessionId, sessionVersion, csrfHash } = sessionClaims(auth);
   const session = await prisma.platformAuthSession.findFirst({
     where: {
@@ -353,10 +368,19 @@ export async function validatePlatformSession(
 }
 
 export async function requireCsrf(request: Request, auth: UserAuthContext): Promise<void> {
-  if (auth.transport === "forwarded") return;
   const cookieToken = readCookie(request.headers.get("cookie") ?? undefined, CSRF_COOKIE_NAME);
   const submittedToken = request.headers.get(CSRF_HEADER_NAME);
   const expectedHash = auth.claims.csrf_hash;
+  if (auth.transport === "forwarded") {
+    if (
+      !submittedToken ||
+      !expectedHash ||
+      !(await verifyCsrfToken(submittedToken, expectedHash))
+    ) {
+      throw new ServiceError(403, "Requisição não autorizada.");
+    }
+    return;
+  }
   if (
     !cookieToken ||
     !submittedToken ||

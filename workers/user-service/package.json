@@ -21,6 +21,7 @@
     "@workspace/user-service": "workspace:*",
     "@workspace/runtime": "workspace:*",
     "@workspace/shared": "workspace:*",
+    "hash-wasm": "4.12.0",
     "hono": "4.12.25",
     "zod": "^3.24.0"
   },

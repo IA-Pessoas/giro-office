@@ -23,17 +23,28 @@ function prisma() {
       findFirst: vi.fn(async () => user()),
       findMany: vi.fn(async () => [user()]),
       count: vi.fn(async () => 1),
+      create: vi.fn(async () => user()),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     permission: {
       findFirst: vi.fn(async () => permission()),
+      create: vi.fn(async () => ({ id: "perm-created" })),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     permissionSpecific: { findFirst: vi.fn(async () => ({ task_completion: true })) },
     authSession: {
       findFirst: vi.fn(async () => ({
-        csrf_hash: "a".repeat(64),
-        user: { session_version: 1, organization_id: ORGANIZATION_ID, status: "active" },
+        csrf_hash: "0f007385b6f9d4b7eeb2748605afe1a984a0a3bfa3f014d09e2a784ce9e5cd1a",
+        user: {
+          session_version: 1,
+          organization_id: ORGANIZATION_ID,
+          status: "active",
+          organization: { id: ORGANIZATION_ID, status: "active" },
+          department: {
+            organization_id: ORGANIZATION_ID,
+            organization: { id: ORGANIZATION_ID, status: "active" },
+          },
+        },
       })),
       create: vi.fn(async () => ({ id: "session-created" })),
       updateMany: vi.fn(async () => ({ count: 1 })),
@@ -57,7 +68,15 @@ function prisma() {
       findFirst: vi.fn(async () => platformUser()),
       findUnique: vi.fn(async () => platformUser()),
     },
-    department: { findMany: vi.fn(async () => [{ id: "dep-1", name: "Tecnologia" }]) },
+    organization: { findFirst: vi.fn(async () => ({ id: ORGANIZATION_ID })) },
+    department: {
+      findFirst: vi.fn(async () => ({
+        id: "dep-1",
+        organization_id: ORGANIZATION_ID,
+        name: "Tecnologia",
+      })),
+      findMany: vi.fn(async () => [{ id: "dep-1", name: "Tecnologia" }]),
+    },
     $disconnect: vi.fn(async () => {}),
   };
 }
@@ -108,8 +127,13 @@ function forwardedHeaders(overrides: Record<string, string> = {}): HeadersInit {
     "x-internal-service-token": INTERNAL_TOKEN,
     "x-auth-user-id": USER_ID,
     "x-auth-organization-id": ORGANIZATION_ID,
+    "x-auth-kind": "organization",
     "x-auth-type": "owner",
     "x-auth-modules": JSON.stringify({ rh: 3 }),
+    "x-auth-session-id": "session-1",
+    "x-auth-session-version": "1",
+    "x-auth-csrf-hash": "0f007385b6f9d4b7eeb2748605afe1a984a0a3bfa3f014d09e2a784ce9e5cd1a",
+    "x-csrf-token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     ...overrides,
   };
 }
@@ -174,7 +198,16 @@ describe("user Worker", () => {
       },
     });
     expect(db.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { organization_id: ORGANIZATION_ID }, skip: 2, take: 10 }),
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { organization_id: ORGANIZATION_ID },
+            { organization_id: null, department: { organization_id: ORGANIZATION_ID } },
+          ]),
+        }),
+        skip: 2,
+        take: 10,
+      }),
     );
   });
 
@@ -193,7 +226,16 @@ describe("user Worker", () => {
     });
     db.authSession.findFirst.mockResolvedValue({
       csrf_hash: await hashCsrfToken(csrfToken),
-      user: { session_version: 1, organization_id: ORGANIZATION_ID, status: "active" },
+      user: {
+        session_version: 1,
+        organization_id: ORGANIZATION_ID,
+        status: "active",
+        organization: { id: ORGANIZATION_ID, status: "active" },
+        department: {
+          organization_id: ORGANIZATION_ID,
+          organization: { id: ORGANIZATION_ID, status: "active" },
+        },
+      },
     });
     const app = createUserWorkerApp({
       env: env(),
@@ -244,7 +286,16 @@ describe("user Worker", () => {
     });
     db.authSession.findFirst.mockResolvedValue({
       csrf_hash: await hashCsrfToken(csrfToken),
-      user: { session_version: 1, organization_id: ORGANIZATION_ID, status: "active" },
+      user: {
+        session_version: 1,
+        organization_id: ORGANIZATION_ID,
+        status: "active",
+        organization: { id: ORGANIZATION_ID, status: "active" },
+        department: {
+          organization_id: ORGANIZATION_ID,
+          organization: { id: ORGANIZATION_ID, status: "active" },
+        },
+      },
     });
     const app = createUserWorkerApp({ env: env(), prisma: db });
     const cookie = `cw.session=${platformToken}; cw.csrf=${csrfToken}`;
@@ -306,7 +357,16 @@ describe("user Worker", () => {
     });
     db.authSession.findFirst.mockResolvedValue({
       csrf_hash: await hashCsrfToken(csrfToken),
-      user: { session_version: 1, organization_id: ORGANIZATION_ID, status: "active" },
+      user: {
+        session_version: 1,
+        organization_id: ORGANIZATION_ID,
+        status: "active",
+        organization: { id: ORGANIZATION_ID, status: "active" },
+        department: {
+          organization_id: ORGANIZATION_ID,
+          organization: { id: ORGANIZATION_ID, status: "active" },
+        },
+      },
     });
     const app = createUserWorkerApp({ env: env(), prisma: db });
 
@@ -344,7 +404,16 @@ describe("user Worker", () => {
     });
     db.authSession.findFirst.mockResolvedValue({
       csrf_hash: await hashCsrfToken(csrfToken),
-      user: { session_version: 1, organization_id: ORGANIZATION_ID, status: "active" },
+      user: {
+        session_version: 1,
+        organization_id: ORGANIZATION_ID,
+        status: "active",
+        organization: { id: ORGANIZATION_ID, status: "active" },
+        department: {
+          organization_id: ORGANIZATION_ID,
+          organization: { id: ORGANIZATION_ID, status: "active" },
+        },
+      },
     });
     const app = createUserWorkerApp({ env: env(), prisma: db });
 
@@ -413,6 +482,9 @@ describe("user Worker", () => {
       "x-auth-platform-role": "super_admin",
       "x-auth-user-id": PLATFORM_USER_ID,
       "x-auth-organization-id": "",
+      "x-auth-session-id": "platform-session-1",
+      "x-auth-session-version": "1",
+      "x-auth-csrf-hash": "b".repeat(64),
     });
 
     const detail = await app.request(
@@ -429,7 +501,15 @@ describe("user Worker", () => {
     expect(permissions.status).toBe(200);
     expect((await permissions.json()).data).toMatchObject({ rh: 3 });
     expect(db.user.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: USER_ID, organization_id: ORGANIZATION_ID } }),
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: USER_ID,
+          OR: expect.arrayContaining([
+            { organization_id: ORGANIZATION_ID },
+            { organization_id: null, department: { organization_id: ORGANIZATION_ID } },
+          ]),
+        }),
+      }),
     );
   });
 
@@ -453,7 +533,10 @@ describe("user Worker", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: USER_ID,
-          organization_id: ORGANIZATION_ID,
+          OR: expect.arrayContaining([
+            { organization_id: ORGANIZATION_ID },
+            { organization_id: null, department: { organization_id: ORGANIZATION_ID } },
+          ]),
           version: 1,
         }),
       }),
@@ -481,7 +564,15 @@ describe("user Worker", () => {
 
   it("creates an organization session with claims and browser cookies", async () => {
     const db = prisma();
-    db.user.findFirst.mockResolvedValue({ ...user(), password: "stored-password-hash" });
+    db.user.findFirst.mockResolvedValue({
+      ...user(),
+      password: "stored-password-hash",
+      organization: { id: ORGANIZATION_ID, status: "active" },
+      department: {
+        organization_id: ORGANIZATION_ID,
+        organization: { id: ORGANIZATION_ID, status: "active" },
+      },
+    });
     const app = createUserWorkerApp({
       env: env(),
       prisma: db,
@@ -507,6 +598,51 @@ describe("user Worker", () => {
     expect(response.headers.get("set-cookie")).toContain("cw.session=");
     expect(db.authSession.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ user_id: USER_ID }) }),
+    );
+  });
+
+  it("uses the Worker hash adapter for canonical organization login", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({
+      ...user(),
+      password:
+        "$argon2id$v=19$m=19456,p=1,t=2$dS0wPBAUPX/qYBGOMitPRw$6pkSNGexYumsTctHxTFdkGj/DzFIduoI+AqkAjvWO34",
+      organization: { id: ORGANIZATION_ID, status: "active" },
+      department: {
+        organization_id: ORGANIZATION_ID,
+        organization: { id: ORGANIZATION_ID, status: "active" },
+      },
+    });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request("https://user.test/user/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: "usuario@example.com", password: "secret" }),
+    });
+
+    expect(response.status).toBe(200);
+  });
+
+  it("hashes password mutations instead of returning 501", async () => {
+    const db = prisma();
+    const hashPassword = vi.fn(async () => "new-argon2id-hash");
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword,
+    } as never);
+
+    const response = await app.request(`https://user.test/user/${USER_ID}`, {
+      method: "PUT",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ password: "new-secret" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(hashPassword).toHaveBeenCalledWith("new-secret");
+    expect(db.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ password: "new-argon2id-hash" }) }),
     );
   });
 
@@ -663,6 +799,10 @@ describe("user Worker", () => {
         organization_id: ORGANIZATION_ID,
         status: "active",
         organization: { id: ORGANIZATION_ID, status: "suspended" },
+        department: {
+          organization_id: ORGANIZATION_ID,
+          organization: { id: ORGANIZATION_ID, status: "suspended" },
+        },
       },
     });
     const app = createUserWorkerApp({ env: env(), prisma: db });
@@ -732,5 +872,233 @@ describe("user Worker", () => {
 
     expect(removed.status).toBe(200);
     expect(storage.remove).toHaveBeenCalledWith("Fotos", USER_ID);
+  });
+
+  it("rejects forwarded platform identity without a database-bound session", async () => {
+    const db = prisma();
+    db.platformAuthSession.findFirst.mockResolvedValue(null);
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request("https://user.test/platform/me", {
+      headers: forwardedHeaders({
+        "x-auth-kind": "platform",
+        "x-auth-platform-role": "super_admin",
+        "x-auth-user-id": PLATFORM_USER_ID,
+        "x-auth-organization-id": "",
+        "x-auth-session-id": "platform-session-1",
+        "x-auth-session-version": "1",
+        "x-auth-csrf-hash": "b".repeat(64),
+      }),
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("requires CSRF transport proof for forwarded platform mutations", async () => {
+    const db = prisma();
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request(
+      `https://user.test/platform/organizations/${ORGANIZATION_ID}/users/${USER_ID}`,
+      {
+        method: "DELETE",
+        headers: forwardedHeaders({
+          "x-auth-kind": "platform",
+          "x-auth-platform-role": "super_admin",
+          "x-auth-user-id": PLATFORM_USER_ID,
+          "x-auth-organization-id": "",
+          "x-auth-session-id": "platform-session-1",
+          "x-auth-session-version": "1",
+          "x-auth-csrf-hash": "b".repeat(64),
+          "x-csrf-token": "",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects a user whose department and explicit organization disagree", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({
+      ...user(),
+      password: "stored-password-hash",
+      organization: { id: ORGANIZATION_ID, status: "active" },
+      department: {
+        organization_id: "other-organization",
+        organization: { id: "other-organization", status: "active" },
+      },
+    });
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      verifyPassword: vi.fn(async () => true),
+    });
+
+    const response = await app.request("https://user.test/user/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: "usuario@example.com", password: "secret" }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(db.authSession.create).not.toHaveBeenCalled();
+  });
+
+  it("creates an organization user with a tenant-bound department and permission", async () => {
+    const db = prisma();
+    const hashPassword = vi.fn(async () => "created-argon2id-hash");
+    const audit = vi.fn(async () => {});
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword,
+      audit,
+    } as never);
+
+    const response = await app.request("https://user.test/user", {
+      method: "POST",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Novo usuário",
+        login: "novo@example.com",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        type: "user",
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(hashPassword).toHaveBeenCalledWith("secret");
+    expect(db.department.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "dep-1", organization_id: ORGANIZATION_ID } }),
+    );
+    expect(db.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          department_id: "dep-1",
+          organization_id: ORGANIZATION_ID,
+          password: "created-argon2id-hash",
+        }),
+      }),
+    );
+    expect(db.permission.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { user_id: USER_ID, organization_id: ORGANIZATION_ID } }),
+    );
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "CREATE", referring: "user" }),
+    );
+  });
+
+  it("rejects organization user creation for a department in another tenant", async () => {
+    const db = prisma();
+    db.department.findFirst.mockResolvedValue(null);
+    const app = createUserWorkerApp({ env: env(), prisma: db } as never);
+
+    const response = await app.request("https://user.test/user", {
+      method: "POST",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Fora do tenant",
+        login: "fora@example.com",
+        password: "secret",
+        department_id: "other-department",
+        permission: 1,
+        type: "user",
+      }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(db.user.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects changing a user to a department in another tenant", async () => {
+    const db = prisma();
+    db.department.findFirst.mockResolvedValue(null);
+    const app = createUserWorkerApp({ env: env(), prisma: db } as never);
+
+    const response = await app.request(`https://user.test/user/${USER_ID}`, {
+      method: "PUT",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ department_id: "other-department" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("starts configuration with a legacy admin whose organization remains null", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue(null);
+    const hashPassword = vi.fn(async () => "bootstrap-argon2id-hash");
+    const app = createUserWorkerApp({
+      env: { ...env(), ADMIN_PASSWORD: "admin-secret" },
+      prisma: db,
+      hashPassword,
+    } as never);
+
+    const response = await app.request("https://user.test/user/start-config", { method: "POST" });
+
+    expect(response.status).toBe(200);
+    expect(hashPassword).toHaveBeenCalledWith("admin-secret");
+    expect(db.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          department_id: "dep-1",
+          organization_id: null,
+          password: "bootstrap-argon2id-hash",
+          type: "owner",
+        }),
+      }),
+    );
+  });
+
+  it("creates a platform-managed organization user instead of returning 501", async () => {
+    const db = prisma();
+    const csrfToken = "B".repeat(43);
+    const csrfHash = await hashCsrfToken(csrfToken);
+    db.platformAuthSession.findFirst.mockResolvedValue({
+      csrf_hash: csrfHash,
+      platformUser: platformUser(),
+    });
+    const hashPassword = vi.fn(async () => "platform-created-hash");
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword,
+    } as never);
+
+    const response = await app.request(
+      `https://user.test/platform/organizations/${ORGANIZATION_ID}/users`,
+      {
+        method: "POST",
+        headers: {
+          ...forwardedHeaders({
+            "x-auth-kind": "platform",
+            "x-auth-platform-role": "super_admin",
+            "x-auth-user-id": PLATFORM_USER_ID,
+            "x-auth-organization-id": "",
+            "x-auth-session-id": "platform-session-1",
+            "x-auth-session-version": "1",
+            "x-auth-csrf-hash": csrfHash,
+            "x-csrf-token": csrfToken,
+          }),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Platform user",
+          login: "platform-user@example.com",
+          password: "secret",
+          department_id: "dep-1",
+          permission: 1,
+          type: "user",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(201);
+    expect(hashPassword).toHaveBeenCalledWith("secret");
   });
 });

@@ -10,6 +10,7 @@ export interface UserPrismaClient {
   };
   permission: {
     findFirst(args: Record<string, unknown>): Promise<Row | null>;
+    create?(args: Record<string, unknown>): Promise<Row>;
     updateMany(args: Record<string, unknown>): Promise<{ count: number }>;
   };
   permissionSpecific: {
@@ -32,6 +33,9 @@ export interface UserPrismaClient {
   department: {
     findMany(args: Record<string, unknown>): Promise<Row[]>;
     findFirst?(args: Record<string, unknown>): Promise<Row | null>;
+  };
+  organization: {
+    findFirst(args: Record<string, unknown>): Promise<Row | null>;
   };
   $transaction?<T>(
     callback: (client: UserPrismaClient) => Promise<T>,

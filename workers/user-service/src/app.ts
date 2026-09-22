@@ -2,6 +2,7 @@ import {
   createCsrfToken,
   createExpiredSessionCookieHeaders,
   createSessionCookieHeaders,
+  createSupabaseStorageClient,
   hashCsrfToken,
   SESSION_MAX_AGE_SECONDS,
   type SupabaseStorageClient,
@@ -38,6 +39,7 @@ import {
   updateUserBodySchema,
   userIdParamsSchema,
 } from "../../../services/user-service/src/schemas/user.schemas.js";
+import type { UserAuditRecorder } from "./audit.js";
 import {
   ACTIVE_MODULE_KEYS,
   activeOrganizationId,
@@ -56,6 +58,10 @@ import {
 import type { UserWorkerEnv } from "./env.js";
 import { errorResponse } from "./errors.js";
 import { PrismaClient } from "./generated/prisma/client.js";
+import {
+  hashPassword as defaultHashPassword,
+  verifyPassword as defaultVerifyPassword,
+} from "./passwordHash.js";
 import type { Row, UserPrismaClient } from "./types.js";
 
 interface HonoEnv {
@@ -68,6 +74,8 @@ interface UserWorkerOptions {
   prisma?: UserPrismaClient;
   storage?: SupabaseStorageClient;
   verifyPassword?: (password: string, hash: string) => Promise<boolean>;
+  hashPassword?: (password: string) => Promise<string>;
+  audit?: UserAuditRecorder;
 }
 
 const USER_PHOTO_BUCKET = "Fotos";
@@ -140,6 +148,69 @@ function modulesFrom(row: Row | null): Record<string, number> {
 
 function toUser(row: Row, organizationId: string): Row {
   return { ...row, organization_id: row.organization_id ?? organizationId };
+}
+
+function organizationUserWhere(userId: string, organizationId: string): Record<string, unknown> {
+  return {
+    id: userId,
+    OR: [
+      { organization_id: organizationId },
+      { organization_id: null, department: { organization_id: organizationId } },
+    ],
+  };
+}
+
+function organizationUsersWhere(organizationId: string): Record<string, unknown> {
+  return {
+    OR: [
+      { organization_id: organizationId },
+      { organization_id: null, department: { organization_id: organizationId } },
+    ],
+  };
+}
+
+async function requireDepartmentInOrganization(
+  db: UserPrismaClient,
+  departmentId: string,
+  organizationId: string,
+): Promise<Row> {
+  if (!db.department.findFirst) throw new ServiceError(503, "Departamentos não configurados.");
+  const department = await db.department.findFirst({
+    where: { id: departmentId, organization_id: organizationId },
+    select: { id: true, name: true, organization_id: true },
+  });
+  if (!department) throw new ServiceError(403, "Departamento não pertence à organização.");
+  return department;
+}
+
+function knownModules(input: unknown): Record<string, number> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  return Object.fromEntries(
+    ACTIVE_MODULE_KEYS.filter(
+      (key) => typeof (input as Record<string, unknown>)[key] === "number",
+    ).map((key) => [key, (input as Record<string, number>)[key]]),
+  );
+}
+
+function modulesForCreate(
+  type: unknown,
+  permission: number,
+  departmentName: unknown,
+  supplied: unknown,
+): Record<string, number> {
+  const modules = knownModules(supplied);
+  if (type === "owner") {
+    return Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, 3]));
+  }
+  if (permission >= 1) {
+    modules.rh = Math.max(modules.rh ?? 0, 1);
+    modules.ti = Math.max(modules.ti ?? 0, 1);
+  }
+  if (type === "admin") {
+    const module = departmentModule(departmentName);
+    if (module) modules[module] = 3;
+  }
+  return modules;
 }
 
 function base64url(value: Uint8Array | string): string {
@@ -222,10 +293,15 @@ function departmentModule(name: unknown): string | null {
 }
 
 function userPhotoStorage(
-  _env: UserWorkerEnv,
+  env: UserWorkerEnv,
   options: UserWorkerOptions,
 ): SupabaseStorageClient | undefined {
-  return options.storage;
+  if (options.storage) return options.storage;
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return undefined;
+  return createSupabaseStorageClient({
+    SUPABASE_URL: env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+  });
 }
 
 function publicPhotoUrl(env: UserWorkerEnv, objectPath: string): string {
@@ -288,7 +364,7 @@ async function refreshOrganizationSession(
   }
 
   const user = await db.user.findFirst({
-    where: { id: auth.userId, organization_id: auth.organizationId },
+    where: organizationUserWhere(auth.userId, auth.organizationId),
     select: { ...userSelect(), password: false, session_version: true },
   });
   if (!user || user.status !== "active" || user.session_version !== sessionVersion) {
@@ -441,9 +517,10 @@ async function updateOrganizationUser(
   userId: string,
   organizationId: string,
   input: Record<string, unknown>,
+  hashPassword: (password: string) => Promise<string> = defaultHashPassword,
 ): Promise<Row> {
   const existing = await db.user.findFirst({
-    where: { id: userId, organization_id: organizationId },
+    where: organizationUserWhere(userId, organizationId),
     select: userSelect(),
   });
   if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
@@ -456,6 +533,9 @@ async function updateOrganizationUser(
       ? input.expected_version
       : Number(existing.version ?? 1);
   const data: Record<string, unknown> = {};
+  if (input.department_id !== undefined) {
+    await requireDepartmentInOrganization(db, String(input.department_id), organizationId);
+  }
   for (const field of USER_MUTABLE_FIELDS) {
     if (input[field] !== undefined) data[field] = input[field];
   }
@@ -473,7 +553,7 @@ async function updateOrganizationUser(
       )
     : undefined;
   if (input.password !== undefined) {
-    throw new ServiceError(501, "A troca de senha requer o adapter de hash do user-service.");
+    data.password = await hashPassword(String(input.password));
   }
 
   const run = async (transaction: UserPrismaClient): Promise<Row> => {
@@ -493,7 +573,7 @@ async function updateOrganizationUser(
     if (sessionInvalidation) data.session_version = { increment: 1 };
     if (!transaction.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
     const updated = await transaction.user.updateMany({
-      where: { id: userId, organization_id: organizationId, version: expectedVersion },
+      where: { ...organizationUserWhere(userId, organizationId), version: expectedVersion },
       data,
     });
     if (updated.count !== 1) {
@@ -523,13 +603,13 @@ async function deactivateOrganizationUser(
   organizationId: string,
 ): Promise<void> {
   const existing = await db.user.findFirst({
-    where: { id: userId, organization_id: organizationId },
+    where: organizationUserWhere(userId, organizationId),
     select: userSelect(),
   });
   if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
   if (existing.type === "owner" && existing.status === "active") {
     const owners = await db.user.count({
-      where: { organization_id: organizationId, type: "owner", status: "active" },
+      where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
     });
     if (owners <= 1) {
       throw new ServiceError(
@@ -540,7 +620,10 @@ async function deactivateOrganizationUser(
   }
   if (!db.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
   const updated = await db.user.updateMany({
-    where: { id: userId, organization_id: organizationId, version: existing.version ?? 1 },
+    where: {
+      ...organizationUserWhere(userId, organizationId),
+      version: existing.version ?? 1,
+    },
     data: { status: "inactive", session_version: { increment: 1 }, version: { increment: 1 } },
   });
   if (updated.count !== 1) {
@@ -567,7 +650,7 @@ async function transferOwnership(
   return db.$transaction(async (transaction) => {
     const select = { ...userSelect(), session_version: true };
     const currentOwner = await transaction.user.findFirst({
-      where: { id: input.currentOwnerId, organization_id: organizationId },
+      where: organizationUserWhere(input.currentOwnerId, organizationId),
       select,
     });
     if (!currentOwner) throw new ServiceError(404, "Owner atual não encontrado na organização.");
@@ -575,7 +658,7 @@ async function transferOwnership(
       throw new ServiceError(409, "O usuário selecionado não é um owner ativo.");
     }
     const successor = await transaction.user.findFirst({
-      where: { id: input.successorUserId, organization_id: organizationId },
+      where: organizationUserWhere(input.successorUserId, organizationId),
       select,
     });
     if (!successor) throw new ServiceError(404, "Sucessor não encontrado na organização.");
@@ -585,8 +668,7 @@ async function transferOwnership(
 
     const promoted = await transaction.user.updateMany({
       where: {
-        id: successor.id,
-        organization_id: organizationId,
+        ...organizationUserWhere(String(successor.id), organizationId),
         version: successor.version,
       },
       data: {
@@ -602,8 +684,7 @@ async function transferOwnership(
 
     const demoted = await transaction.user.updateMany({
       where: {
-        id: currentOwner.id,
-        organization_id: organizationId,
+        ...organizationUserWhere(String(currentOwner.id), organizationId),
         version: currentOwner.version,
       },
       data: {
@@ -619,7 +700,7 @@ async function transferOwnership(
     }
 
     const activeOwners = await transaction.user.count({
-      where: { organization_id: organizationId, type: "owner", status: "active" },
+      where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
     });
     if (activeOwners < 1)
       throw new ServiceError(409, "A organização deve manter ao menos um owner ativo.");
@@ -670,9 +751,7 @@ async function createOrganizationSession(
   options: UserWorkerOptions,
   env: UserWorkerEnv,
 ): Promise<Row & { token: string; csrfToken: string }> {
-  if (!options.verifyPassword) {
-    throw new ServiceError(501, "O login requer o adapter de hash do user-service.");
-  }
+  const verifyPassword = options.verifyPassword ?? defaultVerifyPassword;
   const user = await db.user.findFirst({
     where: { login: input.login.trim() },
     select: {
@@ -688,7 +767,7 @@ async function createOrganizationSession(
       },
     },
   });
-  const valid = await options.verifyPassword(input.password, String(user?.password ?? ""));
+  const valid = await verifyPassword(input.password, String(user?.password ?? ""));
   const organizationId = user ? activeOrganizationId(user) : undefined;
   if (!user || !valid || user.status !== "active" || !organizationId) {
     throw new ServiceError(401, "Login ou senha inválidos.");
@@ -734,9 +813,7 @@ async function createPlatformSession(
   options: UserWorkerOptions,
   env: UserWorkerEnv,
 ): Promise<{ identity: PlatformIdentity; token: string; csrfToken: string }> {
-  if (!options.verifyPassword) {
-    throw new ServiceError(501, "O login de plataforma requer o adapter de hash do user-service.");
-  }
+  const verifyPassword = options.verifyPassword ?? defaultVerifyPassword;
   const user = await db.platformUser.findFirst({
     where: { email: input.email.trim().toLowerCase() },
     select: {
@@ -749,7 +826,7 @@ async function createPlatformSession(
       session_version: true,
     },
   });
-  const valid = await options.verifyPassword(input.password, String(user?.password ?? ""));
+  const valid = await verifyPassword(input.password, String(user?.password ?? ""));
   if (!user || !valid || user.status !== "active" || user.platform_role !== "super_admin") {
     throw new ServiceError(401, "Login ou senha inválidos.");
   }
@@ -788,6 +865,135 @@ async function createPlatformSession(
   return { identity, token, csrfToken };
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
+async function createOrganizationUser(
+  db: UserPrismaClient,
+  organizationId: string,
+  input: Record<string, unknown>,
+  hashPassword: (password: string) => Promise<string>,
+): Promise<Row> {
+  const department = await requireDepartmentInOrganization(
+    db,
+    String(input.department_id),
+    organizationId,
+  );
+  if (!db.user.create || !db.permission.create) {
+    throw new ServiceError(503, "Criação de usuário não configurada.");
+  }
+  const type = input.type ?? null;
+  const requestedPermission = Number(input.permission);
+  const permission =
+    type === "owner" ? 2 : type === "admin" && requestedPermission >= 2 ? 1 : requestedPermission;
+  const modules = modulesForCreate(type, permission, department.name, input.modules);
+  const password = await hashPassword(String(input.password));
+
+  const run = async (transaction: UserPrismaClient): Promise<Row> => {
+    if (!transaction.user.create || !transaction.permission.create) {
+      throw new ServiceError(503, "Criação de usuário não configurada.");
+    }
+    const created = await transaction.user.create({
+      data: {
+        name: String(input.name),
+        login: String(input.login),
+        password,
+        department_id: String(input.department_id),
+        permission,
+        status: input.status ?? "active",
+        photo_url: input.photo_url,
+        invited_by: input.invited_by,
+        organization_id: organizationId,
+        type,
+        first_owner_flag: input.first_owner_flag ?? false,
+      },
+      select: userSelect(),
+    });
+    const createdPermission = await transaction.permission.create({
+      data: { user_id: created.id, organization_id: organizationId },
+      select: { id: true },
+    });
+    if (Object.keys(modules).length > 0) {
+      const updatedPermission = await transaction.permission.updateMany({
+        where: { id: createdPermission.id },
+        data: modules,
+      });
+      if (updatedPermission.count !== 1) {
+        throw new ServiceError(503, "Permissão não configurada.");
+      }
+    }
+    if (!transaction.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
+    await transaction.user.updateMany({
+      where: { id: created.id, organization_id: organizationId },
+      data: { permission_id: createdPermission.id },
+    });
+    return toUser({ ...created, permission_id: createdPermission.id }, organizationId);
+  };
+
+  try {
+    return await (db.$transaction ? db.$transaction(run) : run(db));
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new ServiceError(409, "Login já cadastrado.");
+    throw error;
+  }
+}
+
+async function createInitialUser(
+  db: UserPrismaClient,
+  env: UserWorkerEnv,
+  hashPassword: (password: string) => Promise<string>,
+): Promise<Row> {
+  if (await db.user.findFirst({})) throw new ServiceError(409, "Login já cadastrado.");
+  if (!env.ADMIN_PASSWORD) throw new ServiceError(503, "Senha inicial não configurada.");
+  const organization = await db.organization.findFirst({});
+  if (!organization?.id) {
+    throw new ServiceError(400, "Execute o seed do banco antes de usar o firstCreate.");
+  }
+  if (!db.department.findFirst) throw new ServiceError(400, "Departamento não configurado.");
+  const department = await db.department.findFirst({
+    where: { organization_id: organization.id },
+    select: { id: true, name: true, organization_id: true },
+  });
+  if (!department?.id) {
+    throw new ServiceError(400, "Execute o seed do banco antes de usar o firstCreate.");
+  }
+  if (!db.user.create) throw new ServiceError(503, "Criação de usuário não configurada.");
+  try {
+    const password = await hashPassword(env.ADMIN_PASSWORD);
+    const user = await db.user.create({
+      data: {
+        name: "Admin",
+        login: "Admin",
+        password,
+        permission: 2,
+        type: "owner",
+        status: "active",
+        department_id: department.id,
+        organization_id: null,
+        first_owner_flag: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        login: true,
+        permission: true,
+        department_id: true,
+        organization_id: true,
+      },
+    });
+    return user;
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new ServiceError(409, "Login já cadastrado.");
+    throw error;
+  }
+}
+
 async function requireUserDb(
   c: { req: { raw: Request }; env: UserWorkerEnv },
   options: UserWorkerOptions,
@@ -809,6 +1015,17 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
   );
   app.get("/ready", () =>
     Response.json(createSuccessResponse({ status: "ready", service: "user-service" })),
+  );
+
+  app.post("/user/start-config", async (c) =>
+    withDb(c, options, async (db) => {
+      const user = await createInitialUser(
+        db,
+        envOf(c, options),
+        options.hashPassword ?? defaultHashPassword,
+      );
+      return c.json(createSuccessResponse({ user, service: "user-service" }));
+    }),
   );
 
   app.post("/user/session", async (c) =>
@@ -882,8 +1099,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const input = parse(reportingAccessContextBodySchema, await jsonBody(c));
       const user = (await db.user.findFirst({
         where: {
-          id: input.userId,
-          organization_id: input.organizationId,
+          ...organizationUserWhere(input.userId, input.organizationId),
           department: { organization_id: input.organizationId },
         },
         select: {
@@ -944,7 +1160,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
     withDb(c, options, async (db) => {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
       const row = await db.user.findFirst({
-        where: { id: auth.userId, organization_id: auth.organizationId },
+        where: organizationUserWhere(auth.userId, auth.organizationId),
         select: userSelect(),
       });
       if (!row) throw new ServiceError(404, "Usuário não encontrado.");
@@ -972,12 +1188,46 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
       requireManageUsers(auth);
       const { skip, take } = parse(listUsersQuerySchema, c.req.query());
-      const where = { organization_id: auth.organizationId };
+      const where = organizationUsersWhere(auth.organizationId);
       const [users, total] = await Promise.all([
         db.user.findMany({ where, select: userSelect(), skip, take, orderBy: { name: "asc" } }),
         db.user.count({ where }),
       ]);
       return c.json(createSuccessResponse({ users, total, skip, take }));
+    }),
+  );
+
+  app.post("/user", async (c) =>
+    withDb(c, options, async (db) => {
+      const { auth } = await requireUserDb(c, { ...options, prisma: db });
+      requireManageUsers(auth);
+      await requireCsrf(c.req.raw, auth);
+      const input = parse(createUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
+      if (input.organization_id !== undefined && input.organization_id !== auth.organizationId) {
+        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+      }
+      if (isOwnerMutation(input)) requireOwner(auth);
+      let user: Row;
+      try {
+        user = await createOrganizationUser(
+          db,
+          auth.organizationId,
+          input,
+          options.hashPassword ?? defaultHashPassword,
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) throw new ServiceError(409, "Login já cadastrado.");
+        throw error;
+      }
+      await options.audit?.({
+        actorUserId: auth.userId,
+        organizationId: auth.organizationId,
+        action: "CREATE",
+        referring: "user",
+        referringId: String(user.id),
+        changes: { next: user },
+      });
+      return c.json(createSuccessResponse(user), 201);
     }),
   );
 
@@ -987,7 +1237,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       requireManageUsers(auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
       const row = await db.user.findFirst({
-        where: { id, organization_id: auth.organizationId },
+        where: organizationUserWhere(id, auth.organizationId),
         select: { photo_url: true },
       });
       const photoUrl = typeof row?.photo_url === "string" ? row.photo_url.trim() : "";
@@ -1014,6 +1264,14 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const user = await updateOrganizationUser(db, id, auth.organizationId, {
         photo_url: publicPhotoUrl(envOf(c, options), objectPath),
       });
+      await options.audit?.({
+        actorUserId: auth.userId,
+        organizationId: auth.organizationId,
+        action: "UPDATE_PHOTO",
+        referring: "user",
+        referringId: id,
+        changes: { photo_url: user.photo_url },
+      });
       return c.json(createSuccessResponse(user));
     }),
   );
@@ -1027,6 +1285,14 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
       await storage.remove(USER_PHOTO_BUCKET, id);
       const user = await updateOrganizationUser(db, id, auth.organizationId, { photo_url: null });
+      await options.audit?.({
+        actorUserId: auth.userId,
+        organizationId: auth.organizationId,
+        action: "REMOVE_PHOTO",
+        referring: "user",
+        referringId: id,
+        changes: { photo_url: null },
+      });
       return c.json(createSuccessResponse(user));
     }),
   );
@@ -1037,7 +1303,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       requireManageUsers(auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
       const row = await db.user.findFirst({
-        where: { id, organization_id: auth.organizationId },
+        where: organizationUserWhere(id, auth.organizationId),
         select: userSelect(),
       });
       if (!row) throw new ServiceError(404, "Usuário não encontrado.");
@@ -1055,7 +1321,21 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       if (!selfPasswordUpdate) requireManageUsers(auth);
       if (isOwnerMutation(body)) requireOwner(auth);
       await requireCsrf(c.req.raw, auth);
-      const user = await updateOrganizationUser(db, id, auth.organizationId, body);
+      const user = await updateOrganizationUser(
+        db,
+        id,
+        auth.organizationId,
+        body,
+        options.hashPassword ?? defaultHashPassword,
+      );
+      await options.audit?.({
+        actorUserId: auth.userId,
+        organizationId: auth.organizationId,
+        action: "UPDATE",
+        referring: "user",
+        referringId: id,
+        changes: { input: { ...body, password: body.password ? "[REDACTED]" : undefined } },
+      });
       return c.json(createSuccessResponse(user));
     }),
   );
@@ -1067,6 +1347,14 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       await requireCsrf(c.req.raw, auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
       await deactivateOrganizationUser(db, id, auth.organizationId);
+      await options.audit?.({
+        actorUserId: auth.userId,
+        organizationId: auth.organizationId,
+        action: "DEACTIVATE",
+        referring: "user",
+        referringId: id,
+        changes: { status: "inactive" },
+      });
       return c.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
     }),
   );
@@ -1102,12 +1390,20 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       });
       if (updated.count !== 1) throw new ServiceError(404, "Permissão não encontrada.");
       await db.user.updateMany?.({
-        where: { id: userId, organization_id: auth.organizationId },
+        where: organizationUserWhere(userId, auth.organizationId),
         data: { session_version: { increment: 1 } },
       });
       const permission = await db.permission.findFirst({
         where: { user_id: userId, organization_id: auth.organizationId },
         select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
+      });
+      await options.audit?.({
+        actorUserId: auth.userId,
+        organizationId: auth.organizationId,
+        action: "UPDATE",
+        referring: "Permission",
+        referringId: userId,
+        changes: { modules },
       });
       return c.json(createSuccessResponse(permission));
     }),
@@ -1144,12 +1440,20 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       if (updated.count !== 1) throw new ServiceError(404, "Permissão não encontrada.");
       if (!db.user.updateMany) throw new ServiceError(503, "Usuário não configurado.");
       await db.user.updateMany({
-        where: { id: userId, organization_id: organizationId },
+        where: organizationUserWhere(userId, organizationId),
         data: { session_version: { increment: 1 } },
       });
       const permission = await db.permission.findFirst({
         where: { user_id: userId, organization_id: organizationId },
         select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
+      });
+      await options.audit?.({
+        platformActorUserId: auth.userId,
+        organizationId,
+        action: "UPDATE",
+        referring: "Permission",
+        referringId: userId,
+        changes: { modules },
       });
       return c.json(createSuccessResponse(permission));
     }),
@@ -1160,7 +1464,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       await platformContext(c, options, db);
       const { organizationId, userId } = parse(platformOrganizationUserParamsSchema, c.req.param());
       const user = await db.user.findFirst({
-        where: { id: userId, organization_id: organizationId },
+        where: organizationUserWhere(userId, organizationId),
         select: userSelect(),
       });
       if (!user) throw new ServiceError(404, "Usuário não encontrado.");
@@ -1173,11 +1477,25 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { auth } = await platformContext(c, options, db);
       await requireCsrf(c.req.raw, auth);
       const { organizationId } = parse(platformOrganizationUsersParamsSchema, c.req.param());
-      parse(createUserBodySchema, await jsonBody(c));
-      throw new ServiceError(
-        501,
-        `A criação de usuário requer o adapter de hash do user-service para ${organizationId}.`,
+      const input = parse(createUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
+      if (input.organization_id !== undefined && input.organization_id !== organizationId) {
+        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+      }
+      const user = await createOrganizationUser(
+        db,
+        organizationId,
+        input,
+        options.hashPassword ?? defaultHashPassword,
       );
+      await options.audit?.({
+        platformActorUserId: auth.userId,
+        organizationId,
+        action: "CREATE",
+        referring: "user",
+        referringId: String(user.id),
+        changes: { next: user },
+      });
+      return c.json(createSuccessResponse(user), 201);
     }),
   );
 
@@ -1190,7 +1508,21 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         string,
         unknown
       >;
-      const user = await updateOrganizationUser(db, userId, organizationId, input);
+      const user = await updateOrganizationUser(
+        db,
+        userId,
+        organizationId,
+        input,
+        options.hashPassword ?? defaultHashPassword,
+      );
+      await options.audit?.({
+        platformActorUserId: auth.userId,
+        organizationId,
+        action: "UPDATE",
+        referring: "user",
+        referringId: userId,
+        changes: { input: { ...input, password: input.password ? "[REDACTED]" : undefined } },
+      });
       return c.json(createSuccessResponse(user));
     }),
   );
@@ -1201,10 +1533,18 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       await requireCsrf(c.req.raw, auth);
       const { organizationId, userId } = parse(platformOrganizationUserParamsSchema, c.req.param());
       const user = await db.user.findFirst({
-        where: { id: userId, organization_id: organizationId },
+        where: organizationUserWhere(userId, organizationId),
         select: userSelect(),
       });
       await deactivateOrganizationUser(db, userId, organizationId);
+      await options.audit?.({
+        platformActorUserId: auth.userId,
+        organizationId,
+        action: "DEACTIVATE",
+        referring: "user",
+        referringId: userId,
+        changes: { status: "inactive" },
+      });
       return c.json(
         createSuccessResponse({
           ...toUser(user as Row, organizationId),
@@ -1221,13 +1561,21 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       await requireCsrf(c.req.raw, auth);
       const { organizationId, userId } = parse(platformOrganizationUserParamsSchema, c.req.param());
       const current = await db.user.findFirst({
-        where: { id: userId, organization_id: organizationId },
+        where: organizationUserWhere(userId, organizationId),
         select: userSelect(),
       });
       if (!current) throw new ServiceError(404, "Usuário não encontrado.");
       const user = await updateOrganizationUser(db, userId, organizationId, {
         status: "active",
         expected_version: current.version ?? 1,
+      });
+      await options.audit?.({
+        platformActorUserId: auth.userId,
+        organizationId,
+        action: "REACTIVATE",
+        referring: "user",
+        referringId: userId,
+        changes: { status: "active" },
       });
       return c.json(createSuccessResponse(user));
     }),
@@ -1240,6 +1588,17 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { organizationId } = parse(platformOrganizationUsersParamsSchema, c.req.param());
       const input = parse(transferPlatformOwnershipBodySchema, await jsonBody(c));
       const result = await transferOwnership(db, organizationId, input);
+      await options.audit?.({
+        platformActorUserId: auth.userId,
+        organizationId,
+        action: "TRANSFER_OWNERSHIP",
+        referring: "user",
+        referringId: input.successorUserId,
+        changes: {
+          currentOwnerId: input.currentOwnerId,
+          previousOwnerAction: input.previousOwnerAction,
+        },
+      });
       return c.json(createSuccessResponse(result));
     }),
   );
@@ -1306,7 +1665,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const query = parse(listPlatformUsersQuerySchema, c.req.query());
       const search = query.search.trim();
       const where = {
-        organization_id: organizationId,
+        ...organizationUsersWhere(organizationId),
         ...(search
           ? {
               OR: [
