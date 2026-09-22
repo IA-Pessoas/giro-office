@@ -23,6 +23,8 @@ model Organization {
   triageUrgentRequests       TriageUrgentRequest[]
   triageCompetenceHistories  TriageCompetenceHistory[]
   triageOutboxEvents         TriageOutboxEvent[]
+
+  @@map("organizations")
 }
 
 model Client {
@@ -39,6 +41,8 @@ model Client {
   triageCompetences   TriageCompetence[]
   triageExternalLinks TriageExternalLink[]
   triageUrgentRequests TriageUrgentRequest[]
+
+  @@map("clients")
 }
 
 model User {
@@ -54,6 +58,8 @@ model User {
   triageUrgentRequestsRequested TriageUrgentRequest[] @relation("TriageUrgentRequestRequester")
   triageUrgentRequestsResponsible TriageUrgentRequest[] @relation("TriageUrgentRequestResponsible")
   triageCompetenceHistories   TriageCompetenceHistory[]
+
+  @@map("users")
 }
 
 model TriageCatalogItem {
