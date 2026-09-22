@@ -4,7 +4,7 @@ Levantamento com evidência executada, não leitura de código apenas. O smoke
 local rodou ponta a ponta contra Postgres real em container descartável
 (loopback, `run=cfsmoke-30e27ec5`): **19 de 20 checks passaram**.
 
-## 1. Prisma `runtime = "workerd"` — metade resolvida, metade bloqueada
+## 1. Prisma `runtime = "workerd"` — resolvido (ver §9 para a metade compartilhada)
 
 ### Contrato comprovado
 
@@ -306,18 +306,57 @@ Cobre: concorrência real, `SELECT ... FOR NO KEY UPDATE`, transação real
 **Continuam sem evidência**: deadlock e `P2028`. Ambos exigem forçar condições
 não determinísticas; não foram simulados e não se declara o contrário.
 
-## 9. Situação
+## 9. Bloqueio #1 fechado — clients compartilhados em workerd
+
+Decisão do usuário: **os services Node são aposentados** quando os Workers
+assumirem. Logo um runtime por generator basta, sem diretório duplicado.
+
+Aplicado em `5514a4d2`: `runtime = "workerd"` nos 18 generators de
+`infra/prisma/schema.prisma`, uma linha cada.
+
+O bloqueio deixou de ser suposição e virou reprodução. Rodando o smoke com o
+contorno do harness desligado (`generateServicePrismaClients` inerte):
+
+**Antes** — o runtime aborta antes de servir qualquer requisição:
+
+```
+service core:user:giro-triagem-service: Uncaught TypeError: The "path" argument
+  must be of type string or an instance of URL. Received undefined
+    at node-internal:internal_url:155:15 in fileURLToPath
+    at index.js:42105:36
+The Workers runtime failed to start.
+```
+
+`import.meta.url` é `undefined` dentro do bundle workerd, então o shim
+`fileURLToPath(import.meta.url)` do client Node estoura na carga do módulo.
+
+**Depois** — `ok 7 Workers no ar` e os 19 checks funcionais verdes, sem
+contorno nenhum.
+
+Efeito colateral necessário: o harness injetava `runtime = "workerd"` nos
+schemas dos Workers, que desde `2724caa6` já o declaram. A injeção passou a
+duplicar a chave e falhar com `P1012`; foi removida no mesmo commit.
+
+Custo medido da aposentadoria dos services Node: `@workspace/fiscal-service`
+mantém **82/82 testes** passando com o client wasm. Os testes dos services não
+dependiam do runtime Node.
+
+Gates após a mudança: 72/72, 17/17 `prisma validate`, 18/18 `wrangler dry-run`,
+`git diff --check` limpo.
+
+## 10. Situação
 
 A migração **não está finalizada**. Bloqueios reais abertos:
 
 | # | bloqueio | tipo | estado |
 |---|---|---|---|
-| 1 | Generators de `infra/prisma/schema.prisma` servindo Node e workerd ao mesmo tempo | arquitetura | **aberto** |
+| 1 | Generators de `infra/prisma/schema.prisma` em runtime nodejs | arquitetura | **fechado** (§9) |
 | 2 | Nenhum binding Hyperdrive apontando para o Supabase | infra | **aberto** |
 | 3 | 2 migrations não replayáveis do zero | dívida | rebaixado (§7) |
 | 4 | Transação/concorrência sem evidência real | teste | **fechado** (§8) |
 | 5 | Credenciais chegando aos 17 upstreams | produto | **aberto** (`gateway-session-forwarding.md`) |
 | 6 | Triagem reconcile sem mecanismo | produto | **aberto** |
 
-#1 e #2 bloqueiam deploy. Nenhum dos dois se resolve sem decisão de quem tem as
-credenciais e a palavra sobre arquitetura.
+Resta **#2 como único bloqueio de deploy**, e ele depende de credencial real:
+provisionar o Hyperdrive apontando para o Supabase. #5 e #6 são decisões de
+produto que não impedem subir.
