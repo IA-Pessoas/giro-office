@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Organization {
+  id           String         @id
+  name         String
+  auditRequest AuditRequest[]
+
+  @@map("organizations")
+}
+
+model PlatformUser {
+  id   String @id
+  name String
+
+  @@map("platform_users")
+}
+
+model AuditRequest {
+  id              String        @id @default(uuid())
+  request_id      String        @unique
+  organization_id String?
+  user_id         String?
+  permission      Int?
+  method          String
+  path            String
+  query_json      Json?
+  status_code     Int?
+  outcome         String
+  duration_ms     Int?
+  ip              String?
+  user_agent      String?
+  origin          String?
+  error_code      String?
+  error_message   String?
+  service_source  String
+  metadata_json   Json?
+  created_at      DateTime      @default(now())
+  finished_at     DateTime?
+  action          String?
+  referring       String?
+  referring_id    String?
+  changes_json    Json?
+  department      String?
+  organization    Organization? @relation(fields: [organization_id], references: [id])
+
+  @@map("audit_requests")
+}

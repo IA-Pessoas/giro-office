@@ -1,7 +1,4 @@
-import { error as logError, ServiceError } from "@workspace/shared";
-
-import * as departmentAudit from "../integrations/audit.js";
-import prismaClient from "../integrations/prisma.js";
+import { ServiceError } from "@workspace/shared/http";
 
 const DEPARTMENT_SELECT = {
   id: true,
@@ -39,6 +36,45 @@ export interface UpdateDepartmentRequest {
   solution?: boolean;
 }
 
+export interface DepartmentAuditCreateLogParams {
+  userId: string;
+  organizationId?: string | null;
+  permission?: number | null;
+  action: string;
+  referring: string;
+  referringId: string;
+  changes: Record<string, unknown> | string;
+}
+
+export interface DepartmentAuditUpdateParams {
+  userId: string;
+  organizationId?: string | null;
+  permission?: number | null;
+  action: string;
+  referring: string;
+  referringId: string;
+  oldData: Record<string, unknown> | null;
+  updatedData: Record<string, unknown>;
+}
+
+interface DepartmentModel {
+  findFirst(args: {
+    where: Record<string, unknown>;
+    select?: unknown;
+  }): Promise<DepartmentItem | null>;
+  findMany(args: {
+    where: Record<string, unknown>;
+    select?: unknown;
+    orderBy?: Record<string, string>;
+  }): Promise<DepartmentItem[]>;
+  create(args: { data: Record<string, unknown>; select?: unknown }): Promise<DepartmentItem>;
+  update(args: {
+    where: Record<string, unknown>;
+    data: Record<string, unknown>;
+    select?: unknown;
+  }): Promise<DepartmentItem>;
+}
+
 function normalizeStatusFilter(status?: string): DepartmentStatus | undefined {
   if (!status || status === "Todos") {
     return undefined;
@@ -63,19 +99,22 @@ function normalizeStatusValue(status?: string): DepartmentStatus | undefined {
   throw new ServiceError(400, "status deve ser Ativo ou Inativo.");
 }
 
-export type DepartmentPrismaDeps = Pick<typeof prismaClient, "department">;
-
-export interface DepartmentAuditDeps {
-  createLog: typeof departmentAudit.createLog;
-  logUpdateIfChanged: typeof departmentAudit.logUpdateIfChanged;
+export interface DepartmentPrismaDeps {
+  department: DepartmentModel;
 }
 
-const defaultAuditDeps: DepartmentAuditDeps = departmentAudit;
+export interface DepartmentAuditDeps {
+  createLog: (params: DepartmentAuditCreateLogParams) => Promise<void>;
+  logUpdateIfChanged: (params: DepartmentAuditUpdateParams) => Promise<void>;
+}
+
+export type DepartmentServiceLogger = (message: string, context: { err: unknown }) => void;
 
 export class DepartmentService {
   constructor(
-    private readonly prisma: DepartmentPrismaDeps = prismaClient,
-    private readonly audit: DepartmentAuditDeps = defaultAuditDeps,
+    private readonly prisma: DepartmentPrismaDeps,
+    private readonly audit: DepartmentAuditDeps,
+    private readonly logError: DepartmentServiceLogger = () => {},
   ) {}
 
   async create(data: CreateDepartmentRequest): Promise<{ dep: DepartmentItem }> {
@@ -113,7 +152,7 @@ export class DepartmentService {
 
       return { dep };
     } catch (err: unknown) {
-      logError("Erro ao cadastrar departamento", { err });
+      this.logError("Erro ao cadastrar departamento", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível cadastrar o departamento.", err);
     }
@@ -135,7 +174,7 @@ export class DepartmentService {
 
       return { dep };
     } catch (err: unknown) {
-      logError("Erro ao buscar departamento", { err });
+      this.logError("Erro ao buscar departamento", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível buscar o departamento.", err);
     }
@@ -190,13 +229,13 @@ export class DepartmentService {
         action: "Atualização",
         referring: "departments",
         referringId: data.dep_id,
-        oldData: current as Record<string, unknown>,
-        updatedData: updated as Record<string, unknown>,
+        oldData: current as unknown as Record<string, unknown>,
+        updatedData: updated as unknown as Record<string, unknown>,
       });
 
       return updated;
     } catch (err: unknown) {
-      logError("Erro ao atualizar departamento", { err });
+      this.logError("Erro ao atualizar departamento", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível atualizar o departamento.", err);
     }
@@ -217,7 +256,7 @@ export class DepartmentService {
         },
       });
     } catch (err: unknown) {
-      logError("Erro ao listar departamentos", { err });
+      this.logError("Erro ao listar departamentos", { err });
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Não foi possível listar os departamentos.", err);
     }

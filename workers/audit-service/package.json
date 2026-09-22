@@ -1,0 +1,32 @@
+{
+  "name": "@workspace/audit-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prebuild": "pnpm prisma:generate",
+    "build": "tsc -p tsconfig.json",
+    "pretest": "pnpm prisma:generate",
+    "test": "vitest run",
+    "typecheck": "pnpm prisma:generate && tsc -p tsconfig.json --noEmit",
+    "check": "biome check ."
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/client": "7.9.1",
+    "@workspace/runtime": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "hono": "4.12.25",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.5",
+    "@types/node": "^25.3.0",
+    "prisma": "7.9.1",
+    "typescript": "5.3.3",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum status {
+  trial
+  past_due
+  active
+  suspended
+  cancelled
+}
+
+enum PlatformRole {
+  super_admin
+}
+
+model Organization {
+  id              String            @id @default(uuid())
+  name            String
+  slug            String            @unique
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  cnpj            String            @unique
+  email_created_by String
+  logo_url        String?
+  subscription_plan String           @default("trial")
+  status          status             @default(active)
+  departments     Department[]
+  pessoalGroups   PessoalGroup[]
+  auditRequests   AuditRequest[]
+
+  @@map("organizations")
+}
+
+model Department {
+  id              String       @id @default(uuid())
+  name            String
+  color           String
+  status          String
+  solution        Boolean?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("departments")
+}
+
+model PessoalGroup {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name  String
+  policy          String       @default("NORMAL")
+  system_key      String?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("pessoal.group")
+}
+
+model PlatformUser {
+  id              String              @id @default(uuid())
+  name            String
+  email           String              @unique
+  platform_role   PlatformRole        @default(super_admin)
+  status          String              @default("active")
+  session_version Int                 @default(0)
+  authSessions    PlatformAuthSession[]
+
+  @@map("platform_users")
+}
+
+model PlatformAuthSession {
+  id              String       @id @default(uuid())
+  platform_user_id String
+  csrf_hash       String
+  expires_at      DateTime
+  revoked_at      DateTime?
+  platformUser    PlatformUser @relation(fields: [platform_user_id], references: [id], onDelete: Cascade)
+
+  @@map("platform_auth_sessions")
+}
+
+model AuditRequest {
+  id              String        @id @default(uuid())
+  request_id      String        @unique
+  organization_id String?
+  organization    Organization? @relation(fields: [organization_id], references: [id])
+
+  @@map("audit_requests")
+}
