@@ -82,3 +82,6 @@ ata-sample/
 *.zip
 *.dump
 *.sql.gz
+
+# Cache local do wrangler/miniflare (wrangler dev)
+.wrangler/
