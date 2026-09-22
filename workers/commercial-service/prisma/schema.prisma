@@ -1,0 +1,17 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ProposalConfig {
+  id              String @id @default(uuid())
+  name            String
+  contract_value  Float
+  organization_id String
+
+  @@map("proposal.config")
+}
