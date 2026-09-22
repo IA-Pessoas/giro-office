@@ -1,4 +1,9 @@
 import { createCsrfToken, hashCsrfToken } from "@workspace/runtime";
+import {
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
+  FORWARDED_AUTH_SESSION_VERSION_HEADER,
+} from "@workspace/shared/http";
 import { describe, expect, it, vi } from "vitest";
 import { createGatewayWorkerApp } from "./app.js";
 import type { GatewayWorkerEnv } from "./env.js";
@@ -22,15 +27,7 @@ function base64url(value: string | Uint8Array): string {
   return Buffer.from(value).toString("base64url");
 }
 
-async function jwt(csrfHash?: string): Promise<string> {
-  const payload = {
-    user_id: "user-1",
-    organization_id: "org-1",
-    auth_kind: "organization",
-    type: "owner",
-    modules: { contabil: 2 },
-    ...(csrfHash ? { csrf_hash: csrfHash } : {}),
-  };
+async function signJwt(payload: Record<string, unknown>): Promise<string> {
   const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const body = base64url(JSON.stringify(payload));
   const input = `${header}.${body}`;
@@ -43,6 +40,18 @@ async function jwt(csrfHash?: string): Promise<string> {
   );
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(input));
   return `${input}.${base64url(new Uint8Array(signature))}`;
+}
+
+async function jwt(csrfHash?: string, session?: Record<string, unknown>): Promise<string> {
+  return signJwt({
+    user_id: "user-1",
+    organization_id: "org-1",
+    auth_kind: "organization",
+    type: "owner",
+    modules: { contabil: 2 },
+    ...(csrfHash ? { csrf_hash: csrfHash } : {}),
+    ...session,
+  });
 }
 
 describe("gateway Worker", () => {
@@ -76,6 +85,33 @@ describe("gateway Worker", () => {
     const forwarded = binding.fetch.mock.calls[0]?.[0] as Request;
     expect(forwarded.headers.get("x-internal-service-token")).toBe(TOKEN);
     expect(forwarded.headers.get("x-auth-organization-id")).toBe("org-1");
+  });
+
+  it("forwards only authenticated session claims and overwrites spoofed headers", async () => {
+    const binding = {
+      fetch: vi.fn(async () => new Response("ok", { status: 200 })),
+    };
+    const csrfHash = "a".repeat(64);
+    const sessionToken = await jwt(csrfHash, {
+      session_id: "gateway-session",
+      session_version: 7,
+    });
+    const app = createGatewayWorkerApp({ env: env(undefined, { TI_SERVICE: binding }) });
+
+    const response = await app.request("https://gateway.test/ti", {
+      headers: {
+        cookie: `cw.session=${sessionToken}`,
+        [FORWARDED_AUTH_SESSION_ID_HEADER]: "spoofed-session",
+        [FORWARDED_AUTH_SESSION_VERSION_HEADER]: "999",
+        [FORWARDED_AUTH_CSRF_HASH_HEADER]: "f".repeat(64),
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request;
+    expect(forwarded.headers.get(FORWARDED_AUTH_SESSION_ID_HEADER)).toBe("gateway-session");
+    expect(forwarded.headers.get(FORWARDED_AUTH_SESSION_VERSION_HEADER)).toBe("7");
+    expect(forwarded.headers.get(FORWARDED_AUTH_CSRF_HASH_HEADER)).toBe(csrfHash);
   });
 
   it("routes the project and TI pilots through their bindings", async () => {

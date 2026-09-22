@@ -13,11 +13,14 @@ import {
 } from "@workspace/runtime";
 import { normalizeModulePermissions } from "@workspace/shared/auth";
 import {
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
+  FORWARDED_AUTH_SESSION_VERSION_HEADER,
   FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -55,9 +58,29 @@ function forwardedAuth(request: Request, env: TiWorkerEnv): WorkerAuthContext | 
   const type = value(request, FORWARDED_AUTH_TYPE_HEADER);
   const permissionHeader = value(request, FORWARDED_AUTH_PERMISSION_HEADER);
   const permission = permissionHeader === undefined ? undefined : Number(permissionHeader);
+  const sessionId = value(request, FORWARDED_AUTH_SESSION_ID_HEADER);
+  const sessionVersionHeader = value(request, FORWARDED_AUTH_SESSION_VERSION_HEADER);
+  const sessionVersion =
+    sessionVersionHeader === undefined ? undefined : Number(sessionVersionHeader);
+  const csrfHash = value(request, FORWARDED_AUTH_CSRF_HASH_HEADER);
+  const sessionClaims =
+    sessionId &&
+    /^[a-f0-9]{64}$/u.test(csrfHash ?? "") &&
+    Number.isSafeInteger(sessionVersion) &&
+    (sessionVersion as number) >= 0
+      ? {
+          session_id: sessionId,
+          session_version: sessionVersion as number,
+          csrf_hash: csrfHash as string,
+        }
+      : {};
+  const sessionToken = readCookie(
+    request.headers.get("cookie") ?? undefined,
+    AUTH_SESSION_COOKIE_NAME,
+  );
 
   return {
-    token: "forwarded-by-gateway",
+    token: sessionToken ?? "forwarded-by-gateway",
     userId,
     organizationId,
     actorKind,
@@ -68,6 +91,7 @@ function forwardedAuth(request: Request, env: TiWorkerEnv): WorkerAuthContext | 
       auth_kind: actorKind,
       modules: normalizeModulePermissions(modules) as WorkerAuthContext["claims"]["modules"],
       modulePermissionsPresent: modulesHeader !== undefined,
+      ...sessionClaims,
       ...(Number.isFinite(permission) ? { permission } : {}),
       ...(platformRole === "super_admin" ? { platform_role: "super_admin" as const } : {}),
       ...(type === "owner" || type === "admin" || type === "user" ? { type } : {}),

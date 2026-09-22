@@ -677,31 +677,36 @@ export function createTiWorkerApp(options: TiOptions = {}) {
           mimetype: file.type as "image/jpeg" | "image/png" | "image/webp",
         },
       });
-      if (!validImagePath(attachment, requestContext(c).organizationId, params.id))
-        throw new ServiceError(500, "Armazenamento da imagem retornou uma chave invalida.");
     }
-    let message: unknown;
     try {
-      message = await execute<unknown>(c, "requests", "createMessage", [
+      if (attachment && !validImagePath(attachment, requestContext(c).organizationId, params.id)) {
+        throw new ServiceError(500, "Armazenamento da imagem retornou uma chave invalida.");
+      }
+      const message = await execute<unknown>(c, "requests", "createMessage", [
         requestContext(c),
         params.id,
         { ...body, ...(attachment ? { attachment } : {}) },
       ]);
+      const storage =
+        uploadedStorage ??
+        options.requestImageStorage ??
+        createRequestImageStorage(options.env ?? c.env);
+      return c.json(
+        createSuccessResponse(
+          await withSignedRequestImage(
+            message,
+            storage,
+            requestContext(c).organizationId,
+            params.id,
+          ),
+        ),
+        201,
+      );
     } catch (error) {
       if (attachment && uploadedStorage)
         await uploadedStorage.remove(attachment).catch(() => undefined);
       throw error;
     }
-    const storage =
-      uploadedStorage ??
-      options.requestImageStorage ??
-      createRequestImageStorage(options.env ?? c.env);
-    return c.json(
-      createSuccessResponse(
-        await withSignedRequestImage(message, storage, requestContext(c).organizationId, params.id),
-      ),
-      201,
-    );
   });
 
   app.get("/ti/request-categories/list", async (c) => {

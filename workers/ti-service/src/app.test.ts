@@ -431,6 +431,77 @@ describe("ti Worker", () => {
     expect(response.status).toBe(500);
     expect(storage.remove).toHaveBeenCalledWith(attachment);
   });
+
+  it("removes an uploaded attachment when its returned path is invalid", async () => {
+    const attachment = "ti/invalid/path.png";
+    const storage = {
+      upload: vi.fn(async () => attachment),
+      remove: vi.fn().mockResolvedValue(undefined),
+      createSignedAccessUrl: vi.fn(),
+    };
+    const requests = { createMessage: vi.fn(async () => ({ id: CATEGORY_ID })) };
+    const form = new FormData();
+    form.set("message", "patho invalido");
+    form.set("type", "Message");
+    form.set(
+      "file",
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", {
+        type: "image/png",
+      }),
+    );
+    const app = createTiWorkerApp({
+      env: env(),
+      services: { requests } as never,
+      requestImageStorage: storage,
+    } as never);
+
+    const response = await app.request(`https://ti.test/ti/requests/${CATEGORY_ID}/messages`, {
+      method: "POST",
+      headers: headers("1"),
+      body: form,
+    });
+
+    expect(response.status).toBe(500);
+    expect(storage.remove).toHaveBeenCalledWith(attachment);
+    expect(requests.createMessage).not.toHaveBeenCalled();
+  });
+
+  it("removes an uploaded attachment when signing the saved message fails", async () => {
+    const attachment = `ti/organizations/${ORGANIZATION_ID}/requests/${CATEGORY_ID}/00000000-0000-4000-8000-000000000001.png`;
+    const storage = {
+      upload: vi.fn(async () => attachment),
+      remove: vi.fn().mockResolvedValue(undefined),
+      createSignedAccessUrl: vi.fn(async () => {
+        throw new Error("signing failed");
+      }),
+    };
+    const requests = {
+      createMessage: vi.fn(async () => ({ id: CATEGORY_ID, attachment })),
+    };
+    const form = new FormData();
+    form.set("message", "falha no link");
+    form.set("type", "Message");
+    form.set(
+      "file",
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "a.png", {
+        type: "image/png",
+      }),
+    );
+    const app = createTiWorkerApp({
+      env: env(),
+      services: { requests } as never,
+      requestImageStorage: storage,
+    } as never);
+
+    const response = await app.request(`https://ti.test/ti/requests/${CATEGORY_ID}/messages`, {
+      method: "POST",
+      headers: headers("1"),
+      body: form,
+    });
+
+    expect(response.status).toBe(500);
+    expect(storage.remove).toHaveBeenCalledWith(attachment);
+  });
 });
 
 async function appRequestWithoutAuth(url: string): Promise<Response> {
