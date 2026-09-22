@@ -42,6 +42,27 @@ test("ServiceError derives code and default message from the status code", () =>
   assert.equal(error.message, "Not Found");
 });
 
+test("ServiceError preserves Node-compatible metadata for less common client errors", () => {
+  assert.deepEqual(
+    [405, 411, 413].map((statusCode) => {
+      const error = new ServiceError(statusCode);
+      return { code: error.code, message: error.message };
+    }),
+    [
+      { code: "METHOD_NOT_ALLOWED", message: "Method Not Allowed" },
+      { code: "LENGTH_REQUIRED", message: "Length Required" },
+      { code: "PAYLOAD_TOO_LARGE", message: "Payload Too Large" },
+    ],
+  );
+});
+
+test("ServiceError falls back for a status absent from Node STATUS_CODES", () => {
+  const error = new ServiceError(499);
+
+  assert.equal(error.code, "HTTP_499_ERROR");
+  assert.equal(error.message, "HTTP 499 Error");
+});
+
 test("ServiceError validates status code", () => {
   assert.throws(
     () => new ServiceError(200, "ok"),
