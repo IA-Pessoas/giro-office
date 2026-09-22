@@ -85,7 +85,9 @@ export default function Users({
     }
   };
 
-  if (forbidden) {
+  // O SSR libera por canAccessAdministration; a tela exige canCreateUsers. Quem passa no
+  // primeiro e nao no segundo via uma pagina em branco.
+  if (forbidden || !hasAdminAccess) {
     return (
       <>
         <Head>
@@ -94,10 +96,6 @@ export default function Users({
         <AdminAccessDeniedState description="Você não possui permissão para acessar a área de usuários." />
       </>
     );
-  }
-
-  if (!hasAdminAccess) {
-    return null;
   }
 
   return (
