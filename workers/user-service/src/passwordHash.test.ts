@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { hashPassword, verifyPassword } from "./passwordHash.js";
 
 const ARGON2ID_HASH =
@@ -20,5 +20,31 @@ describe("Worker password hash adapter", () => {
 
   it("creates a canonical Argon2id hash", async () => {
     await expect(hashPassword("secret")).resolves.toMatch(/^\$argon2id\$v=19\$/u);
+  });
+
+  describe("where the runtime forbids compiling WebAssembly, like workerd", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    });
+
+    it("still verifies and creates hashes", async () => {
+      const forbidden = () => {
+        throw new Error("WebAssembly.compile(): Wasm code generation disallowed by embedder");
+      };
+      vi.stubGlobal("WebAssembly", {
+        ...WebAssembly,
+        compile: forbidden,
+        instantiate: forbidden,
+        Module: forbidden,
+      });
+      vi.resetModules();
+      const hashes = await import("./passwordHash.js");
+
+      await expect(hashes.verifyPassword("secret", ARGON2ID_HASH)).resolves.toBe(true);
+      await expect(hashes.verifyPassword("secret", BCRYPT_HASH)).resolves.toBe(true);
+      const created = await hashes.hashPassword("secret");
+      await expect(hashes.verifyPassword("secret", created)).resolves.toBe(true);
+    });
   });
 });
