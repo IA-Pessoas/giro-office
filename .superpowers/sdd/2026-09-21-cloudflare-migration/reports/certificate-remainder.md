@@ -36,7 +36,9 @@ A implementação usa Web Crypto, JSON canônico, HMAC, comparação em tempo co
 - `prisma validate`: aprovado;
 - `wrangler deploy --dry-run`: aprovado, sem deploy.
 
-O typecheck e o build do Worker ficaram bloqueados por estado pré-existente do Prisma do serviço Node: os tipos gerados de `services/certificate-service` não existem no worktree, e `prisma:generate` exige `DATABASE_URL`. A tentativa foi interrompida sem inventar valor de configuração e sem alterar `services/**`. Os erros apontam imports ausentes de `services/certificate-service/generated/prisma/client.js` nos serviços de notificação, PF e PJ.
+Na primeira execução, o typecheck e o build ficaram bloqueados porque os tipos gerados de `services/certificate-service` não existiam e a geração exigia `DATABASE_URL`. O bloqueio foi resolvido apenas para validação local reutilizando a `DATABASE_URL` já configurada no container local do Certificate, sem imprimir ou persistir o segredo e sem inventar valor. Foi gerado somente o client Prisma do Certificate e, depois, removido o artefato temporário fora do escopo versionado.
+
+Após isso, typecheck, build e check do Worker passaram. A dependência operacional permanece explícita: um ambiente limpo precisa fornecer `DATABASE_URL` para gerar o client Node antes do typecheck/build integrado.
 
 Graphify foi tentado antes da edição. Como o primeiro contexto não tinha grafo local, foi usado fallback manual com `rg`; a atualização de Graphify de `services` foi executada ao final.
 
