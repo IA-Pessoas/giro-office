@@ -224,20 +224,40 @@ describe("parcelamento Worker — paridade restante", () => {
     expect(await response.json()).toMatchObject({ requestId });
   });
 
-  it("rejeita query key repetida como o Express rejeita arrays no schema", async () => {
-    const installmentService = {
-      list: vi.fn(async () => ({ items: [], total: 0, page: 1, page_size: 50, has_more: false })),
-      getById: vi.fn(async () => ({})),
-    };
-    const app = createParcelamentoWorkerApp({ env: env(), installmentService });
+  // status/error/code exatos capturados do Express/qs do Node (supertest) em 2026-09-22.
+  // O Node não põe requestId no corpo; o Worker o acrescenta (aditivo, ver ba2aed71).
+  it.each([
+    ["/parcelamento/installments?page=1&page=2", "Expected number, received nan"],
+    ["/parcelamento/installments?page_size=10&page_size=10", "Expected number, received nan"],
+    ["/parcelamento/installments?status=A&status=B", "Expected string, received array"],
+    ["/parcelamento/installments?search=x&search=x", "Expected string, received array"],
+    [
+      `/parcelamento/installments/${INSTALLMENT}/competencies?page=1&page=2`,
+      "Expected number, received nan",
+    ],
+    [
+      "/parcelamento/panoramas?competence=2026-01&competence=2026-02",
+      "Expected string, received array",
+    ],
+    ["/parcelamento/panoramas?page=1&page=1", "Expected number, received nan"],
+  ])("rejeita chave repetida na query como o Express: %s", async (path, error) => {
+    const prisma = prismaMock();
+    const app = createParcelamentoWorkerApp({ env: env(), prisma: prisma as never });
 
-    const response = await app.request(
-      "https://parcelamento.test/parcelamento/installments?page=1&page=2",
-      { headers: headers() },
-    );
+    const response = await app.request(`https://parcelamento.test${path}`, {
+      headers: headers(),
+    });
 
     expect(response.status).toBe(400);
-    expect(installmentService.list).not.toHaveBeenCalled();
+    expect(await response.json()).toEqual({
+      success: false,
+      error,
+      code: "BAD_REQUEST",
+      requestId: "parcelamento-request",
+    });
+    expect(prisma.installment.findMany).not.toHaveBeenCalled();
+    expect(prisma.installmentCompetencies.findMany).not.toHaveBeenCalled();
+    expect(prisma.panoramaParcelameto.findMany).not.toHaveBeenCalled();
   });
 
   it("falha explícito com 503 sem HYPERDRIVE nem DATABASE_URL", async () => {
