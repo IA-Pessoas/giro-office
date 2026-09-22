@@ -44,6 +44,20 @@ model Client {
   @@map("clients")
 }
 
+model LddPessoal {
+  id                  String   @id @default(uuid())
+  client_id           String
+  type                String
+  period              String?
+  due_date            DateTime?
+  balance_amount      Float?
+  registration_status String?
+  status              String?
+  organization_id     String
+
+  @@map("pessoal.ldd")
+}
+
 model SituationsPessoal {
   id                String   @id @default(uuid())
   client_id         String

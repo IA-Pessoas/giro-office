@@ -3,6 +3,7 @@ import {
   createPessoalWorkerApp,
   type PessoalGroupPrisma,
   type PessoalGroupService,
+  type PessoalLddService,
   type PessoalSituationService,
   type PessoalUnionService,
   type PessoalWorkerEnv,
@@ -14,6 +15,7 @@ const GROUP_ID = "c0000000-0000-4000-8000-000000000001";
 const UNION_ID = "d0000000-0000-4000-8000-000000000001";
 const SITUATION_ID = "e0000000-0000-4000-8000-000000000001";
 const CLIENT_ID = "f0000000-0000-4000-8000-000000000001";
+const LDD_ID = "90000000-0000-4000-8000-000000000001";
 const TOKEN = "pessoal-gateway-token";
 
 function env(): PessoalWorkerEnv {
@@ -62,6 +64,15 @@ function situationService(): PessoalSituationService {
     create: vi.fn(async () => ({ id: SITUATION_ID, client_id: CLIENT_ID })),
     update: vi.fn(async () => ({ id: SITUATION_ID, status: "Finalizado" })),
     delete: vi.fn(async () => ({ id: SITUATION_ID, client_id: CLIENT_ID })),
+  };
+}
+
+function lddService(): PessoalLddService {
+  return {
+    list: vi.fn(async () => []),
+    create: vi.fn(async () => ({ id: LDD_ID, client_id: CLIENT_ID, type: "FGTS" })),
+    update: vi.fn(async () => ({ id: LDD_ID, status: "Regular" })),
+    delete: vi.fn(async () => ({ id: LDD_ID, client_id: CLIENT_ID })),
   };
 }
 
@@ -205,6 +216,46 @@ describe("pessoal Worker", () => {
     expect(situations.create).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
       { client_id: CLIENT_ID, title: "Pendência", description: "Detalhes" },
+    );
+  });
+
+  it("routes LDD operations with client and organization scope", async () => {
+    const ldd = lddService();
+    const app = createPessoalWorkerApp({ env: env(), lddService: ldd });
+    const authHeaders = headers();
+    const jsonHeaders = { ...authHeaders, "content-type": "application/json" };
+    const list = await app.request(`https://pessoal.test/pessoal/ldd?client_id=${CLIENT_ID}`, {
+      headers: authHeaders,
+    });
+    const created = await app.request("https://pessoal.test/pessoal/ldd", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ client_id: CLIENT_ID, type: "FGTS", balance_amount: 10 }),
+    });
+    const updated = await app.request(`https://pessoal.test/pessoal/ldd/${LDD_ID}`, {
+      method: "PATCH",
+      headers: jsonHeaders,
+      body: JSON.stringify({ status: "Regular" }),
+    });
+    const removed = await app.request(`https://pessoal.test/pessoal/ldd/${LDD_ID}`, {
+      method: "DELETE",
+      headers: authHeaders,
+    });
+
+    expect([list.status, created.status, updated.status, removed.status]).toEqual([
+      200, 201, 200, 200,
+    ]);
+    expect(ldd.list).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID },
+      { client_id: CLIENT_ID },
+    );
+    expect(ldd.create).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      { client_id: CLIENT_ID, type: "FGTS", balance_amount: 10 },
+    );
+    expect(ldd.delete).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      LDD_ID,
     );
   });
 });

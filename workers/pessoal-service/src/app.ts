@@ -4,6 +4,12 @@ import {
   updateGroupBodySchema,
 } from "@workspace/pessoal-service/src/schemas/group.schemas.js";
 import {
+  createLddBodySchema,
+  lddIdParamsSchema,
+  listLddQuerySchema,
+  updateLddBodySchema,
+} from "@workspace/pessoal-service/src/schemas/ldd.schemas.js";
+import {
   createSituationBodySchema,
   listSituationQuerySchema,
   situationIdParamsSchema,
@@ -77,6 +83,16 @@ export type PessoalSituationService = {
   ): Promise<unknown>;
   delete(context: Record<string, unknown>, id: string): Promise<unknown>;
 };
+export type PessoalLddService = {
+  list(context: { organizationId: string }, query: Record<string, unknown>): Promise<unknown>;
+  create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
+  update(
+    context: Record<string, unknown>,
+    id: string,
+    body: Record<string, unknown>,
+  ): Promise<unknown>;
+  delete(context: Record<string, unknown>, id: string): Promise<unknown>;
+};
 export type PessoalDomainPrisma = PessoalGroupPrisma & {
   unionPessoal: {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
@@ -95,6 +111,13 @@ export type PessoalDomainPrisma = PessoalGroupPrisma & {
     update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
     delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
   };
+  lddPessoal: {
+    findMany(args: Record<string, unknown>): Promise<unknown[]>;
+    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
 };
 type PessoalOptions = {
   env?: PessoalWorkerEnv;
@@ -102,6 +125,7 @@ type PessoalOptions = {
   groupService?: PessoalGroupService;
   unionService?: PessoalUnionService;
   situationService?: PessoalSituationService;
+  lddService?: PessoalLddService;
 };
 type PessoalWorkerContext = { Bindings: PessoalWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type PessoalContext = Context<PessoalWorkerContext>;
@@ -573,6 +597,119 @@ function localSituationService(
   };
 }
 
+function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): PessoalLddService {
+  const select = {
+    id: true,
+    client_id: true,
+    type: true,
+    period: true,
+    due_date: true,
+    balance_amount: true,
+    registration_status: true,
+    status: true,
+    organization_id: true,
+  };
+  return {
+    list: (context, query) =>
+      prisma.lddPessoal.findMany({
+        where: {
+          organization_id: context.organizationId,
+          ...(query.client_id ? { client_id: query.client_id } : {}),
+        },
+        select,
+        orderBy: { due_date: "asc" },
+      }),
+    async create(context, body) {
+      const organizationId = String(context.organizationId);
+      const client = await prisma.client.findFirst({
+        where: { id: body.client_id, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      const row = await prisma.lddPessoal.create({
+        data: {
+          client_id: body.client_id,
+          type: body.type,
+          period: body.period ?? null,
+          due_date: body.due_date ?? null,
+          balance_amount: body.balance_amount ?? null,
+          registration_status: body.registration_status ?? null,
+          status: body.status ?? null,
+          organization_id: organizationId,
+        },
+        select,
+      });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: "pessoal.ldd",
+        referringId: String(row.id),
+        department: "pessoal",
+      });
+      return row;
+    },
+    async update(context, id, body) {
+      const organizationId = String(context.organizationId);
+      const current = await prisma.lddPessoal.findFirst({
+        where: { id, organization_id: organizationId },
+        select,
+      });
+      if (!current) throw new ServiceError(404, "LDD nao encontrado.");
+      const data = {
+        ...(body.type !== undefined ? { type: body.type } : {}),
+        ...(body.period !== undefined ? { period: body.period } : {}),
+        ...(body.due_date !== undefined ? { due_date: body.due_date } : {}),
+        ...(body.balance_amount !== undefined ? { balance_amount: body.balance_amount } : {}),
+        ...(body.registration_status !== undefined
+          ? { registration_status: body.registration_status }
+          : {}),
+        ...(body.status !== undefined ? { status: body.status } : {}),
+      };
+      const row = await prisma.lddPessoal.update({ where: { id }, data, select });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Atualizacao",
+        referring: "pessoal.ldd",
+        referringId: id,
+        department: "pessoal",
+      });
+      return row;
+    },
+    async delete(context, id) {
+      const organizationId = String(context.organizationId);
+      const current = await prisma.lddPessoal.findFirst({
+        where: { id, organization_id: organizationId },
+        select,
+      });
+      if (!current) throw new ServiceError(404, "LDD nao encontrado.");
+      const row = await prisma.lddPessoal.delete({ where: { id }, select });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Exclusao",
+        referring: "pessoal.ldd",
+        referringId: id,
+        department: "pessoal",
+      });
+      return row;
+    },
+  };
+}
+
 export function createPessoalWorkerApp(options: PessoalOptions = {}) {
   const app = new Hono<PessoalWorkerContext>();
   app.get("/health", (c) =>
@@ -623,6 +760,15 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       callback(
         localSituationService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
       ),
+    );
+  };
+  const withLddService = async <T>(
+    c: PessoalContext,
+    callback: (service: PessoalLddService) => Promise<T>,
+  ) => {
+    if (options.lddService) return callback(options.lddService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(localLddService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
     );
   };
   app.get("/pessoal/groups", (c) =>
@@ -776,6 +922,39 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     withSituationService(c, async (service) => {
       requirePessoalPermission(c.get("auth"), 2);
       const { id } = parseWithZod(situationIdParamsSchema, { id: c.req.param("id") });
+      return c.json(createSuccessResponse(await service.delete(domainContext(c), id)));
+    }),
+  );
+  app.get("/pessoal/ldd", (c) =>
+    withLddService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const query = parseWithZod(listLddQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.list({ organizationId: c.get("auth").organizationId }, query),
+        ),
+      );
+    }),
+  );
+  app.post("/pessoal/ldd", (c) =>
+    withLddService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(createLddBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.create(domainContext(c), body)), 201);
+    }),
+  );
+  app.patch("/pessoal/ldd/:id", (c) =>
+    withLddService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const { id } = parseWithZod(lddIdParamsSchema, { id: c.req.param("id") });
+      const body = parseWithZod(updateLddBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.update(domainContext(c), id, body)));
+    }),
+  );
+  app.delete("/pessoal/ldd/:id", (c) =>
+    withLddService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const { id } = parseWithZod(lddIdParamsSchema, { id: c.req.param("id") });
       return c.json(createSuccessResponse(await service.delete(domainContext(c), id)));
     }),
   );
