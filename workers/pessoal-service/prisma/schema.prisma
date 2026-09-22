@@ -30,8 +30,27 @@ model UnionPessoal {
 }
 
 model Payroll {
-  id              String  @id @default(uuid())
+  id              String   @id @default(uuid())
+  client_id       String   @unique
+  responsible_id  String?
+  advance         Boolean
+  advance_type    String?
+  advance_amount  Float?
+  info            String
+  previous        Boolean
+  onvio           Boolean
+  group_id        String
+  vt              Boolean
+  vt_value        Float?
+  vt_type         String?
+  va              Boolean
+  assistance_fee  Boolean
   union_id        String?
+  bem_mais        Boolean
+  bsf             Boolean
+  reinf           Boolean
+  employees       Int
+  contact         String?
   organization_id String
 
   @@map("pessoal.payroll")

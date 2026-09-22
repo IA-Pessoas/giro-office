@@ -16,6 +16,11 @@ import {
   updatePasswordBodySchema,
 } from "@workspace/pessoal-service/src/schemas/password.schemas.js";
 import {
+  createPayrollBodySchema,
+  payrollClientParamsSchema,
+  updatePayrollBodySchema,
+} from "@workspace/pessoal-service/src/schemas/payroll.schemas.js";
+import {
   createSituationBodySchema,
   listSituationQuerySchema,
   situationIdParamsSchema,
@@ -114,6 +119,15 @@ export type PessoalPasswordService = {
   ): Promise<unknown>;
   delete(context: Record<string, unknown>, id: string): Promise<unknown>;
 };
+export type PessoalPayrollService = {
+  detail(context: { organizationId: string }, clientId: string): Promise<unknown>;
+  create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
+  update(
+    context: Record<string, unknown>,
+    clientId: string,
+    body: Record<string, unknown>,
+  ): Promise<unknown>;
+};
 export type PessoalDomainPrisma = PessoalGroupPrisma & {
   unionPessoal: {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
@@ -123,7 +137,12 @@ export type PessoalDomainPrisma = PessoalGroupPrisma & {
     delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
     count(args: Record<string, unknown>): Promise<number>;
   };
-  payroll: { count(args: Record<string, unknown>): Promise<number> };
+  payroll: {
+    count(args: Record<string, unknown>): Promise<number>;
+    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
   client: { findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null> };
   situationsPessoal: {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
@@ -159,6 +178,7 @@ type PessoalOptions = {
   situationService?: PessoalSituationService;
   lddService?: PessoalLddService;
   passwordService?: PessoalPasswordService;
+  payrollService?: PessoalPayrollService;
 };
 type PessoalWorkerContext = { Bindings: PessoalWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type PessoalContext = Context<PessoalWorkerContext>;
@@ -959,6 +979,152 @@ function localPasswordService(
   };
 }
 
+function localPayrollService(
+  prisma: PessoalDomainPrisma,
+  env?: PessoalWorkerEnv,
+): PessoalPayrollService {
+  const select = {
+    id: true,
+    client_id: true,
+    responsible_id: true,
+    advance: true,
+    advance_type: true,
+    advance_amount: true,
+    info: true,
+    previous: true,
+    onvio: true,
+    group_id: true,
+    vt: true,
+    vt_value: true,
+    vt_type: true,
+    va: true,
+    assistance_fee: true,
+    union_id: true,
+    bem_mais: true,
+    bsf: true,
+    reinf: true,
+    employees: true,
+    contact: true,
+    organization_id: true,
+  };
+  const withGroup = async (row: Record<string, unknown>) => ({
+    ...row,
+    group: await prisma.pessoalGroup.findFirst({
+      where: { id: row.group_id, organization_id: row.organization_id },
+      select: { id: true, name: true, archived_at: true },
+    }),
+  });
+  const ensureRelationships = async (organizationId: string, body: Record<string, unknown>) => {
+    const client = await prisma.client.findFirst({
+      where: { id: body.client_id, organization_id: organizationId },
+      select: { id: true },
+    });
+    if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+    if (body.responsible_id) {
+      const user = await prisma.user.findFirst({
+        where: { id: body.responsible_id, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (!user)
+        throw new ServiceError(404, "Responsavel nao encontrado ou inelegivel para Pessoal.");
+    }
+    if (body.union_id) {
+      const union = await prisma.unionPessoal.findFirst({
+        where: { id: body.union_id, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (!union) throw new ServiceError(404, "Sindicato nao encontrado para a organizacao.");
+    }
+    const group = await prisma.pessoalGroup.findFirst({
+      where: { id: body.group_id, organization_id: organizationId, archived_at: null },
+      select: { id: true },
+    });
+    if (!group) throw new ServiceError(409, "Grupo de pessoal inexistente ou arquivado.");
+    return String(group.id);
+  };
+
+  return {
+    async detail(context, clientId) {
+      const row = await prisma.payroll.findFirst({
+        where: { client_id: clientId, organization_id: context.organizationId },
+        select,
+      });
+      return row ? withGroup(row) : null;
+    },
+    async create(context, body) {
+      const organizationId = String(context.organizationId);
+      const existing = await prisma.payroll.findFirst({
+        where: { client_id: body.client_id, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (existing) throw new ServiceError(409, "Folha de pessoal ja cadastrada para o cliente.");
+      const groupId = await ensureRelationships(organizationId, body);
+      const row = await prisma.payroll.create({
+        data: {
+          ...body,
+          group_id: groupId,
+          responsible_id: body.responsible_id ?? null,
+          advance_type: body.advance_type ?? null,
+          advance_amount: body.advance_amount ?? null,
+          vt_value: body.vt_value ?? null,
+          vt_type: body.vt_type ?? null,
+          union_id: body.union_id ?? null,
+          contact: body.contact ?? null,
+          organization_id: organizationId,
+        },
+        select,
+      });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: "pessoal.payroll",
+        referringId: String(row.id),
+        department: "pessoal",
+      });
+      return withGroup(row);
+    },
+    async update(context, clientId, body) {
+      const organizationId = String(context.organizationId);
+      const existing = await prisma.payroll.findFirst({
+        where: { client_id: clientId, organization_id: organizationId },
+        select,
+      });
+      if (!existing) throw new ServiceError(404, "Folha de pessoal nao encontrada.");
+      const groupId = await ensureRelationships(organizationId, {
+        ...body,
+        client_id: clientId,
+      });
+      const data = {
+        ...body,
+        group_id: groupId,
+      };
+      const row = await prisma.payroll.update({
+        where: { client_id: clientId },
+        data,
+        select,
+      });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Atualizacao",
+        referring: "pessoal.payroll",
+        referringId: String(existing.id),
+        department: "pessoal",
+      });
+      return withGroup(row);
+    },
+  };
+}
+
 export function createPessoalWorkerApp(options: PessoalOptions = {}) {
   const app = new Hono<PessoalWorkerContext>();
   app.get("/health", (c) =>
@@ -1029,6 +1195,15 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       callback(
         localPasswordService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
       ),
+    );
+  };
+  const withPayrollService = async <T>(
+    c: PessoalContext,
+    callback: (service: PessoalPayrollService) => Promise<T>,
+  ) => {
+    if (options.payrollService) return callback(options.payrollService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(localPayrollService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
     );
   };
   app.get("/pessoal/groups", (c) =>
@@ -1256,6 +1431,36 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       requirePessoalPermission(c.get("auth"), 3);
       const { id } = parseWithZod(passwordIdParamsSchema, { id: c.req.param("id") });
       return c.json(createSuccessResponse(await service.delete(domainContext(c), id)));
+    }),
+  );
+  app.get("/pessoal/payroll/:client_id", (c) =>
+    withPayrollService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const { client_id: clientId } = parseWithZod(payrollClientParamsSchema, {
+        client_id: c.req.param("client_id"),
+      });
+      return c.json(
+        createSuccessResponse(
+          await service.detail({ organizationId: c.get("auth").organizationId }, clientId),
+        ),
+      );
+    }),
+  );
+  app.post("/pessoal/payroll", (c) =>
+    withPayrollService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(createPayrollBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.create(domainContext(c), body)), 201);
+    }),
+  );
+  app.patch("/pessoal/payroll/:client_id", (c) =>
+    withPayrollService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const { client_id: clientId } = parseWithZod(payrollClientParamsSchema, {
+        client_id: c.req.param("client_id"),
+      });
+      const body = parseWithZod(updatePayrollBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.update(domainContext(c), clientId, body)));
     }),
   );
   app.notFound((c) =>

@@ -5,6 +5,7 @@ import {
   type PessoalGroupService,
   type PessoalLddService,
   type PessoalPasswordService,
+  type PessoalPayrollService,
   type PessoalSituationService,
   type PessoalUnionService,
   type PessoalWorkerEnv,
@@ -18,6 +19,7 @@ const SITUATION_ID = "e0000000-0000-4000-8000-000000000001";
 const CLIENT_ID = "f0000000-0000-4000-8000-000000000001";
 const LDD_ID = "90000000-0000-4000-8000-000000000001";
 const PASSWORD_ID = "91000000-0000-4000-8000-000000000001";
+const PAYROLL_ID = "92000000-0000-4000-8000-000000000001";
 const TOKEN = "pessoal-gateway-token";
 
 function env(): PessoalWorkerEnv {
@@ -92,6 +94,14 @@ function passwordService(): PessoalPasswordService {
     create: vi.fn(async () => ({ id: PASSWORD_ID, client_id: CLIENT_ID })),
     update: vi.fn(async () => ({ id: PASSWORD_ID, service_name: "eSocial atualizado" })),
     delete: vi.fn(async () => ({ id: PASSWORD_ID, client_id: CLIENT_ID })),
+  };
+}
+
+function payrollService(): PessoalPayrollService {
+  return {
+    detail: vi.fn(async () => ({ id: PAYROLL_ID, client_id: CLIENT_ID, employees: 2 })),
+    create: vi.fn(async () => ({ id: PAYROLL_ID, client_id: CLIENT_ID, employees: 2 })),
+    update: vi.fn(async () => ({ id: PAYROLL_ID, client_id: CLIENT_ID, employees: 3 })),
   };
 }
 
@@ -317,6 +327,53 @@ describe("pessoal Worker", () => {
     expect(passwords.create).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 3 },
       { client_id: CLIENT_ID, service_name: "eSocial", senha_main: "segredo" },
+    );
+  });
+
+  it("routes payroll detail and mutations with organization scope", async () => {
+    const payroll = payrollService();
+    const app = createPessoalWorkerApp({ env: env(), payrollService: payroll });
+    const authHeaders = headers();
+    const jsonHeaders = { ...authHeaders, "content-type": "application/json" };
+    const body = {
+      client_id: CLIENT_ID,
+      advance: true,
+      info: "Folha mensal",
+      previous: false,
+      onvio: true,
+      group_id: GROUP_ID,
+      vt: false,
+      va: false,
+      assistance_fee: false,
+      bem_mais: false,
+      bsf: false,
+      reinf: false,
+      employees: 2,
+    };
+    const detail = await app.request(`https://pessoal.test/pessoal/payroll/${CLIENT_ID}`, {
+      headers: authHeaders,
+    });
+    const created = await app.request("https://pessoal.test/pessoal/payroll", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(body),
+    });
+    const updated = await app.request(`https://pessoal.test/pessoal/payroll/${CLIENT_ID}`, {
+      method: "PATCH",
+      headers: jsonHeaders,
+      body: JSON.stringify({ group_id: GROUP_ID, employees: 3 }),
+    });
+
+    expect([detail.status, created.status, updated.status]).toEqual([200, 201, 200]);
+    expect(payroll.detail).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID }, CLIENT_ID);
+    expect(payroll.create).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      body,
+    );
+    expect(payroll.update).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      CLIENT_ID,
+      { group_id: GROUP_ID, employees: 3 },
     );
   });
 });
