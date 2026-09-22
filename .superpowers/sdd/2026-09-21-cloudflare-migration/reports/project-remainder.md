@@ -1,64 +1,93 @@
-# Project-service remainder — paridade no Worker
+# Project-service — ciclo TDD de paridade restante
 
 Data: 2026-09-22
-Commit de código: `060c7998f` (`feat(project-worker): complete project-service parity`)
+Commit de código: `a1533e294` (`feat(project-worker): close remainder parity gaps`)
 
-## Escopo aplicado
+## Escopo e descoberta
 
-Foi lido o plano `docs/superpowers/plans/2026-09-21-cloudflare-migration.md` e o brief `.superpowers/sdd/2026-09-21-cloudflare-migration/task-service-remainder-brief.md`. O contexto Graphify de services foi gerado antes da implementação e atualizado depois (`9305` nós, `16952` arestas; visualização HTML omitida pelo limite do grafo).
+Foram lidos `docs/superpowers/plans/2026-09-21-cloudflare-migration.md`,
+`.superpowers/sdd/2026-09-21-cloudflare-migration/task-service-remainder-brief.md` e o
+contexto Graphify de services antes da implementação. O grafo foi atualizado depois;
+ficou com 9.305 nós e 16.952 arestas. A visualização HTML foi omitida pelo limite do
+Graphify, sem bloquear a análise.
 
 O commit de código contém somente:
 
 - `workers/project-service/prisma/schema.prisma`
 - `workers/project-service/src/app.ts`
 - `workers/project-service/src/app.test.ts`
-- `workers/project-service/src/auth.ts`
-- `workers/project-service/src/env.ts`
+- `workers/project-service/src/projectReporting.ts`
 - `workers/project-service/wrangler.jsonc`
 
-Não houve deploy nem push. Alterações paralelas em `workers/client-service/**` e `app/next-env.d.ts` permaneceram fora do commit.
+Não houve deploy nem push. `app/next-env.d.ts` permaneceu como alteração preexistente
+fora do escopo.
 
-## Paridade entregue
+## Paridade coberta
 
-| Contrato | Implementação Worker |
+| Contrato | Resultado no Worker |
 | --- | --- |
-| Disponibilidade | `GET /health` e `GET /ready` |
-| CRUD | `POST/GET/PUT/DELETE /project` e `GET /project/list`, com schemas Zod, datas, sponsor, isolamento por `organization_id`, duplicidade, dependências e envelopes de sucesso/erro |
-| Métricas | `GET /project/metrics`, com os mesmos agrupamentos de status de projeto/tarefa e escopo por organização |
-| Progresso | `POST /project/progress`, agrupamento de tarefas, arredondamento, transação em 100%, inativação de cliente `service_unique` e auditoria |
-| Reporting interno | `GET /internal/reporting/catalog` e `POST /internal/reporting/extract`, grants canônicos assinados por HMAC, hash do body, TTL, campos publicados, filtros, snapshot Repeatable Read e paginação `limit + 1` |
-| Auth e claims | headers encaminhados pelo Gateway, bearer JWT HS256, `user_id`, organização, tipo, permission, módulos e claims de sessão; `integracao` aplica a matriz existente, com owner/admin conforme o contrato |
-| Sessão/CSRF | cookie `cw.session`, cookie/header CSRF, hash encaminhado e validação via binding `USER_SERVICE`; falha de configuração retorna `503`, sessão inválida preserva `401/409` |
-| Tenant | CRUD, métricas, tarefas, cliente, progresso e reporting filtram pela organização autenticada; autorização de recurso ocorre depois da busca escopada para preservar `404` de isolamento |
-| Transações/auditoria | Prisma request-scoped via `withWorkerPrisma`/`PrismaPg`; criação e conclusão de progresso usam `$transaction`; auditoria usa `AUDIT_SERVICE` best-effort |
-| Erros | JSON inválido `400`, autenticação `401`, autorização/grant `403`, recurso `404`, dependência `409`, sessão/binding indisponível `503`, com envelope compartilhado |
-| Persistência | PostgreSQL/Supabase preservado; schema Worker inclui `Project`, `Client` e `Task` mínimos para os contratos; nenhum D1 ou URL de banco foi introduzido |
+| Disponibilidade | `GET /health` e `GET /ready` preservados. |
+| CRUD | `GET /project/list`, `GET/POST/PUT/DELETE /project`, com schemas Zod, datas, sponsor, escopo de organização e envelopes de erro/sucesso. DELETE aceita `project_id` na query quando o corpo JSON está vazio. |
+| Criação concorrente | Precheck e insert ficam no mesmo `$transaction` `Serializable`; `P2002` e `P2034` viram `409`. O audit só ocorre após o commit. |
+| Métricas | `GET /project/metrics` mantém agrupamentos de status e filtros de tenant. |
+| Progresso | `POST /project/progress` lê projeto e `groupBy` de tarefas, calcula percentual e executa todas as mutações derivadas no mesmo snapshot `RepeatableRead`; cliente `service_unique` e auditoria permanecem pós-commit. |
+| Detalhe/UI | `DETAIL_SELECT` inclui `Client.name/company_name/fantasy_name/cpf_cnpj`, `Task.name/observations`, `department` e `taskModel` com departamento; a resposta expõe também `task.model` compatível com a UI. |
+| Reporting | `GET /internal/reporting/catalog` e `POST /internal/reporting/extract` preservam grants HMAC, hash/TTL, paginação e snapshot. O Worker usa allowlist local do catálogo incluindo `client_id` e `sponsor_id`, com filtros e campos verificados no handler. |
+| Auth/CSRF/sessão | Fluxo existente de headers encaminhados, JWT, claims de módulo/owner, cookie `cw.session`, CSRF e validação via `USER_SERVICE` foi preservado. |
+| Tenant/erros | Consultas usam `organization_id`; autorização de recurso ocorre após escopo. JSON inválido, auth, autorização, inexistência, dependência, conflito e indisponibilidade de banco mantêm códigos HTTP/envelopes esperados. |
+| Persistência/bindings | PostgreSQL/Supabase e `@prisma/adapter-pg` permanecem. Não foi introduzido D1, URL de banco ou credencial Hyperdrive. |
+
+## Schema Prisma
+
+`workers/project-service/prisma/schema.prisma` foi alinhado ao schema canônico para o
+fluxo de detalhe: `Client` usa `clients.pf` e inclui `name` e os campos de resumo;
+`Task` inclui `name`, `model_id`, `department_id`, `observations` e as relações
+`department`/`taskModel`; `Department` e `TaskModel` têm as relações necessárias para
+os selects aninhados. O Worker e `infra/prisma/schema.prisma` passaram `prisma validate`.
+
+O schema canônico não declara uma unique física para
+`(organization_id, name, client_id)` em `Project`. Nenhuma migration foi criada sem
+autorização. A proteção implementada é a transação serializável e o mapeamento de
+conflitos; a criação de uma constraint/index físico continua sendo um gap de schema a
+ser decidido/provisionado separadamente.
 
 ## TDD
 
-Antes da implementação, a suíte ampliada foi executada em RED: 8 testes, 6 falhas, cobrindo as rotas CRUD completas, autorização de módulo, JSON/CSRF, sessão, métricas/progresso e reporting ainda ausentes.
+Antes da implementação, o ciclo RED foi observado com 19 testes: 13 passando e 6
+falhando nos contratos novos de 503 sem banco, schema/relações canônicas, conflito de
+criação, DELETE JSON vazio, progresso transacional e reporting com `client_id`.
 
-Depois da implementação, a suíte do Worker ficou GREEN com 13 testes passando, incluindo a validação de que a sessão downstream recebe o token do cookie e a autorização do recurso só ocorre após o escopo da organização.
+Depois das fatias verticais e da regressão de detalhe/UI (incluindo `sponsor_id`), a
+suíte do Worker ficou GREEN: 20/20 testes.
 
-## Validação
+## Validação executada
 
-- `pnpm --filter @workspace/project-worker test` — PASS, 13/13.
+- `pnpm --filter @workspace/project-worker test` — PASS, 20/20.
 - `pnpm --filter @workspace/project-worker typecheck` — PASS.
 - `pnpm --filter @workspace/project-worker build` — PASS.
 - `pnpm --filter @workspace/project-worker check` — PASS.
 - `pnpm --filter @workspace/project-worker exec prisma validate --schema prisma/schema.prisma` — PASS.
-- `pnpm graphify:update:services` — PASS; grafo atualizado sem gerar HTML por exceder o limite de nós.
+- `pnpm exec prisma validate --schema infra/prisma/schema.prisma` — PASS.
+- `pnpm graphify:update:services` — PASS; grafo atualizado, HTML omitido pelo limite de nós.
+- `pnpm exec wrangler deploy --dry-run` em `workers/project-service` — PASS, sem publicação.
 - `git diff --check` — PASS.
-- `pnpm exec wrangler deploy --dry-run` em `workers/project-service` — PASS; upload calculado, sem publicação.
-- Hook de commit — PASS, incluindo supply-chain scan sem findings.
+- Hook do commit — PASS; supply-chain scan sem findings.
 
-O `pnpm check` raiz terminou com exit 0, mas exibiu warnings existentes/fora do escopo, incluindo fixtures de `${{ secrets.* }}`, o JSON de 4 MiB e arquivos alterados em `workers/client-service/**`.
-
-Os gates raiz `pnpm test`, `pnpm typecheck` e `pnpm build` não completaram: o pipeline parou ao executar geração Prisma por `PrismaConfigEnvError` (`DATABASE_URL` ausente), respectivamente durante `@workspace/regularize-service#prisma:generate`, o pre-typecheck raiz e `@workspace/department-service#build`. Nenhum placeholder/credencial foi inventado para mascarar essa dependência.
+O Wrangler dry-run mostrou somente `AUDIT_SERVICE` e `USER_SERVICE`. Não foi feito
+deploy ou push.
 
 ## Gaps operacionais reais
 
-- **Hyperdrive ausente:** o `wrangler.jsonc` não declara binding `HYPERDRIVE`; o dry-run mostrou apenas `AUDIT_SERVICE` e `USER_SERVICE`. O runtime aceita `HYPERDRIVE` ou `DATABASE_URL`, mas a configuração de produção ainda precisa de um binding Hyperdrive provisionado e autorizado antes de executar PostgreSQL no Worker.
-- **Queue:** não há gap aplicável neste serviço. O contrato restante do project-service é síncrono; nenhuma rota ou job exige Queue.
-- **Secrets:** `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, `REPORTS_INTERNAL_TOKEN`, `REPORTS_GRANT_SECRET`, `AUDIT_SERVICE_TOKEN` e `USER_SERVICE_INTERNAL_TOKEN` precisam ser provisionados pelo ambiente. Eles não foram embutidos no código nem no `wrangler.jsonc`.
-- **Storage:** não há operação de Storage no contrato do project-service comparado; nenhuma integração foi removida ou substituída.
+- **Hyperdrive não configurado:** `wrangler.jsonc` não contém binding, pois nenhum ID ou
+  credencial foi inventado. O Worker mantém fallback explícito para `DATABASE_URL` e
+  responde `503` quando não existe `HYPERDRIVE.connectionString` nem `DATABASE_URL`.
+  Produção/CI ainda precisam provisionar o binding Hyperdrive ou o secret autorizado
+  antes de executar PostgreSQL no Worker.
+- **Constraint de projeto:** o schema canônico não fornece unique física para a
+  identidade de projeto; a transação `Serializable` cobre a corrida no código, mas a
+  constraint/index definitivo permanece dependência operacional sem migration neste
+  ciclo.
+- **Queue:** não há rota, job ou contrato do project-service que exija Queue; portanto
+  nenhum binding Queue foi inventado e não há gap aplicável nesta paridade.
+- **Secrets:** `JWT_SECRET`, tokens internos, grants e tokens dos Service Bindings
+  continuam dependências de ambiente; não foram embutidos no código ou no Wrangler.
