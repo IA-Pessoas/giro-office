@@ -122,6 +122,10 @@ export async function authenticateDepartmentRequest(
 }
 
 export function authorizeDepartmentRequest(request: Request, auth: WorkerAuthContext): void {
+  if (auth.actorKind === "organization" && !auth.organizationId) {
+    throw new ServiceError(401, "Organização não informada.");
+  }
+
   const minimum =
     request.method.toUpperCase() === "GET"
       ? MODULE_PERMISSION_MINIMUM.read

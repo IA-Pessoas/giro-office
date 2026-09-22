@@ -191,6 +191,23 @@ describe("department Worker", () => {
     expect(service.list).not.toHaveBeenCalled();
   });
 
+  it("returns 401 when organization authentication has no organization scope", async () => {
+    const service = createDepartmentServiceMock();
+    const token = await signToken({
+      user_id: USER_ID,
+      auth_kind: "organization",
+      modules: { ti: 2 },
+    });
+    const app = createDepartmentWorkerApp({ env: env(), departmentService: service });
+
+    const response = await app.request("http://department.test/department/list", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(401);
+    expect(service.list).not.toHaveBeenCalled();
+  });
+
   it("returns 400 for invalid query and body", async () => {
     const service = createDepartmentServiceMock();
     const app = createDepartmentWorkerApp({ env: env(), departmentService: service });
