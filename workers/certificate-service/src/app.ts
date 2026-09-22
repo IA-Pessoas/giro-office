@@ -1,4 +1,8 @@
 import {
+  certificateNotificationListQuerySchema,
+  certificateNotificationRunBodySchema,
+} from "@workspace/certificate-service/src/schemas/certificateNotification.schemas.js";
+import {
   certificatePfIdParamSchema,
   certificatePfListQuerySchema,
   createCertificatePfSchema,
@@ -16,6 +20,7 @@ import {
   type CertificateUploadFile,
   validateCertificateUploadFile,
 } from "@workspace/certificate-service/src/services/certificateFileValidation.js";
+import { CertificateNotificationService } from "@workspace/certificate-service/src/services/certificateNotificationService.js";
 import { createCertificatePasswordCrypto } from "@workspace/certificate-service/src/services/certificatePasswordCrypto.js";
 import { CertificatePfService } from "@workspace/certificate-service/src/services/certificatePfService.js";
 import type { CertificatePjFileDeps } from "@workspace/certificate-service/src/services/certificatePjService.js";
@@ -28,6 +33,7 @@ import {
 import { parseWithZod } from "@workspace/shared";
 import {
   createSuccessResponse,
+  INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
   ServiceError,
   serializeError,
@@ -64,11 +70,16 @@ type CertificatePfServiceLike = Pick<
   | "downloadCertificatePfFile"
   | "deleteCertificatePfFile"
 >;
+type CertificateNotificationServiceLike = Pick<
+  CertificateNotificationService,
+  "listCertificateNotifications" | "runCertificateNotificationReconciliation"
+>;
 
 interface CertificateWorkerOptions {
   env: CertificateWorkerEnv;
   service?: CertificatePjServiceLike;
   pfService?: CertificatePfServiceLike;
+  notificationService?: CertificateNotificationServiceLike;
 }
 
 type CertificateVariables = { auth: WorkerAuthContext };
@@ -194,6 +205,20 @@ async function withCertificatePfService<T>(
   });
 }
 
+async function withCertificateNotificationService<T>(
+  options: CertificateWorkerOptions,
+  callback: (service: CertificateNotificationServiceLike) => Promise<T>,
+): Promise<T> {
+  if (options.notificationService) return callback(options.notificationService);
+
+  return withWorkerPrisma(options.env, PrismaClient, async (client) => {
+    const service = new CertificateNotificationService(
+      client as unknown as ConstructorParameters<typeof CertificateNotificationService>[0],
+    );
+    return callback(service);
+  });
+}
+
 export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
   const app = new Hono<CertificateHonoEnv>();
 
@@ -217,6 +242,37 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
   app.use("/certificate/*", async (c, next) => {
     c.set("auth", await authenticate(c.req.raw));
     await next();
+  });
+
+  app.get("/certificate/notifications", async (c) => {
+    const query = parseWithZod(certificateNotificationListQuerySchema, c.req.query());
+    const auth = c.get("auth");
+    return c.json(
+      createSuccessResponse(
+        await withCertificateNotificationService(options, (service) =>
+          service.listCertificateNotifications({
+            organizationId: auth.organizationId,
+            query,
+          }),
+        ),
+      ),
+    );
+  });
+
+  app.post("/internal/notifications/run", async (c) => {
+    if (c.req.header(INTERNAL_SERVICE_TOKEN_HEADER) !== options.env.INTERNAL_SERVICE_TOKEN) {
+      throw new ServiceError(401, "Token interno do certificate-service invalido.");
+    }
+    parseWithZod(certificateNotificationRunBodySchema, await readJson(c));
+    return c.json(
+      createSuccessResponse(
+        await withCertificateNotificationService(options, (service) =>
+          service.runCertificateNotificationReconciliation({
+            windowDays: options.env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30,
+          }),
+        ),
+      ),
+    );
   });
 
   app.get("/certificate/pj/list", async (c) => {

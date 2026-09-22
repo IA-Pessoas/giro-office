@@ -9,6 +9,7 @@ export interface CertificateWorkerEnv extends WorkerEnv {
   CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION?: string;
   CERTIFICATE_STORAGE_BUCKET?: string;
   CERTIFICATE_FILE_MAX_SIZE_BYTES?: number;
+  CERTIFICATE_NOTIFICATION_WINDOW_DAYS?: number;
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   AUDIT_SERVICE?: ServiceBinding;

@@ -111,6 +111,23 @@ function pfService() {
   };
 }
 
+function notificationService() {
+  return {
+    listCertificateNotifications: vi.fn(async () => ({
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 50,
+      has_more: false,
+    })),
+    runCertificateNotificationReconciliation: vi.fn(async () => ({
+      evaluated: 2,
+      created: 1,
+      updated: 1,
+    })),
+  };
+}
+
 function env(): CertificateWorkerEnv {
   return {
     JWT_SECRET: "certificate-worker-test-secret-which-is-long-enough",
@@ -176,6 +193,39 @@ describe("certificate Worker PJ slice", () => {
 
     expect(response.status).toBe(401);
     expect(certificateService.listCertificatePj).not.toHaveBeenCalled();
+  });
+
+  it("routes notifications by organization and protects internal reconciliation", async () => {
+    const certificateNotificationService = notificationService();
+    const app = createCertificateWorkerApp({
+      env: env(),
+      notificationService: certificateNotificationService,
+    });
+    const list = await app.request("https://certificate.test/certificate/notifications?page=2", {
+      headers: gatewayHeaders(1),
+    });
+    const denied = await app.request("https://certificate.test/internal/notifications/run", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-internal-service-token": "wrong" },
+      body: "{}",
+    });
+    const run = await app.request("https://certificate.test/internal/notifications/run", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-service-token": INTERNAL_TOKEN,
+      },
+      body: "{}",
+    });
+
+    expect([list.status, denied.status, run.status]).toEqual([200, 401, 200]);
+    expect(certificateNotificationService.listCertificateNotifications).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      query: { page: 2 },
+    });
+    expect(
+      certificateNotificationService.runCertificateNotificationReconciliation,
+    ).toHaveBeenCalledWith({ windowDays: 30 });
   });
 
   it("keeps the authenticated organization on the PJ CRUD flow", async () => {

@@ -48,6 +48,7 @@ Esta matriz documenta nomes e escopo. Ela não contém valores, tokens ou URLs p
 | `CERTIFICATE_FILE_ENCRYPTION_KEY` | Secret | certificate-service | chave AES-256-GCM dos arquivos; preservar durante a transição |
 | `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION` | var | certificate-service | versão da chave usada nos metadados; default `v1` |
 | `CERTIFICATE_FILE_MAX_SIZE_BYTES` | var | certificate-service | limite de upload; default legado 5 MiB |
+| `CERTIFICATE_NOTIFICATION_WINDOW_DAYS` | var | certificate-service | janela da reconciliação interna; default legado 30 dias |
 | `AUDIT_SERVICE_TOKEN` | Secret | integrações de auditoria | substituir por binding quando o fluxo estiver portado |
 | chaves de criptografia | Secret | certificados, TI/RH/Pessoal | rotação e versão devem permanecer compatíveis |
 
