@@ -66,6 +66,10 @@ function forwardedAuth(request: Request, env: FiscalWorkerEnv): WorkerAuthContex
   const sessionVersionHeader = header(request, FORWARDED_AUTH_SESSION_VERSION_HEADER);
   const sessionVersion = sessionVersionHeader === undefined ? NaN : Number(sessionVersionHeader);
   const csrfHash = header(request, FORWARDED_AUTH_CSRF_HASH_HEADER);
+  const sessionToken = readCookie(
+    request.headers.get("cookie") ?? undefined,
+    AUTH_SESSION_COOKIE_NAME,
+  );
   const sessionClaims =
     sessionId &&
     csrfHash &&
@@ -76,7 +80,7 @@ function forwardedAuth(request: Request, env: FiscalWorkerEnv): WorkerAuthContex
       : {};
 
   return {
-    token: "forwarded-by-gateway",
+    token: sessionToken ?? "forwarded-by-gateway",
     userId,
     organizationId,
     actorKind,
@@ -137,18 +141,22 @@ export async function authenticateFiscalRequest(
   env: FiscalWorkerEnv,
 ): Promise<WorkerAuthContext> {
   const forwarded = forwardedAuth(request, env);
-  if (forwarded) return forwarded;
-
   let auth: WorkerAuthContext;
-  try {
-    auth = await authenticateWorkerRequest(request, {
-      jwtSecret: env.JWT_SECRET,
-      allowBearer: true,
-    });
-  } catch (error) {
-    if (error instanceof WorkerAuthenticationError) throw new ServiceError(401, "Não autenticado.");
-    throw error;
+  if (forwarded) {
+    auth = forwarded;
+  } else {
+    try {
+      auth = await authenticateWorkerRequest(request, {
+        jwtSecret: env.JWT_SECRET,
+        allowBearer: true,
+      });
+    } catch (error) {
+      if (error instanceof WorkerAuthenticationError)
+        throw new ServiceError(401, "Não autenticado.");
+      throw error;
+    }
   }
+
   await requireCookieSession(request, auth, env);
   return auth;
 }

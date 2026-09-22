@@ -322,6 +322,47 @@ describe("fiscal Worker — autorização", () => {
     expect(cookieWithoutSessionValidator.status).toBe(503);
     expect(deps.ipiService.create).not.toHaveBeenCalled();
   });
+
+  it("valida sessão e CSRF quando o gateway encaminha identidade com cookie", async () => {
+    const csrf = "csrf-cookie-token";
+    const token = await signJwt({
+      user_id: USER_ID,
+      organization_id: ORG,
+      permission: 3,
+      modules: { fiscal: 3 },
+      session_id: "session-1",
+      session_version: 1,
+      csrf_hash: await hashCsrfToken(csrf),
+    });
+    const deps = services();
+    const userService = {
+      fetch: vi.fn(async () =>
+        Response.json({ success: true, data: { valid: true, state: "active" } }),
+      ),
+    };
+    const app = createFiscalWorkerApp({
+      env: env({ USER_SERVICE: userService, USER_SERVICE_INTERNAL_TOKEN: "user-token" }),
+      ...deps,
+    });
+    const forwarded = { ...headers(), cookie: `cw.session=${token}` };
+
+    const read = await app.request("https://fiscal.test/fiscal/ipi/list", {
+      headers: forwarded,
+    });
+    const mutation = await app.request("https://fiscal.test/fiscal/ipi", {
+      method: "POST",
+      headers: { ...forwarded, "content-type": "application/json" },
+      body: JSON.stringify({ ncm: "0101" }),
+    });
+
+    expect(read.status).toBe(200);
+    expect(userService.fetch).toHaveBeenCalledOnce();
+    expect((userService.fetch.mock.calls[0]?.[0] as Request).headers.get("authorization")).toBe(
+      `Bearer ${token}`,
+    );
+    expect(mutation.status).toBe(403);
+    expect(deps.ipiService.create).not.toHaveBeenCalled();
+  });
 });
 
 describe("fiscal Worker — bindings e infraestrutura", () => {
