@@ -7,12 +7,14 @@ import {
   tiInventoryReportingCatalog,
   tiRequestsReportingCatalog,
   tiStockReportingCatalog,
+  withReportingSnapshot,
 } from "@workspace/shared";
 
 export type TiAuthContext = {
   organizationId: string;
   userId: string;
   permission: number;
+  isOrganizationOwner?: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -27,7 +29,10 @@ type Delegate = {
 
 export type TiDatabase = {
   [model: string]: unknown;
-  $transaction<T>(callback: (database: TiDatabase) => Promise<T>): Promise<T>;
+  $transaction<T>(
+    callback: (database: TiDatabase) => Promise<T>,
+    options?: { isolationLevel?: "RepeatableRead"; maxWait?: number; timeout?: number },
+  ): Promise<T>;
 };
 
 export type TiService = {
@@ -670,7 +675,11 @@ function requestServices(database: TiDatabase): TiServices {
           select: { assigned_to_id: true },
         });
         if (!current) throw new ServiceError(404, "Chamado de TI nao encontrado.");
-        if (row(current).assigned_to_id !== auth.userId && auth.permission < 3)
+        if (
+          row(current).assigned_to_id !== auth.userId &&
+          auth.permission < 3 &&
+          !auth.isOrganizationOwner
+        )
           throw new ServiceError(403, "Permissao insuficiente para transferir chamado.");
         const destination = await userInOrganization(
           database,
@@ -682,7 +691,15 @@ function requestServices(database: TiDatabase): TiServices {
         if (destination.status !== "active" || destination.department_id !== departmentId)
           throw new ServiceError(400, "Responsavel deve pertencer ao departamento Tecnologia.");
         const changed = await requests.updateMany({
-          where: { id, organization_id: auth.organizationId },
+          where: {
+            id,
+            organization_id: auth.organizationId,
+            ...(row(current).assigned_to_id === auth.userId &&
+            auth.permission < 3 &&
+            !auth.isOrganizationOwner
+              ? { assigned_to_id: row(current).assigned_to_id }
+              : {}),
+          },
           data: { assigned_to_id: row(body).assigned_to_id },
         });
         if (changed.count === 0)
@@ -696,7 +713,11 @@ function requestServices(database: TiDatabase): TiServices {
           select: { assigned_to_id: true },
         });
         if (!current) throw new ServiceError(404, "Chamado de TI nao encontrado.");
-        if (row(current).assigned_to_id !== auth.userId && auth.permission < 3)
+        if (
+          row(current).assigned_to_id !== auth.userId &&
+          auth.permission < 3 &&
+          !auth.isOrganizationOwner
+        )
           throw new ServiceError(403, "Permissao insuficiente para transferir chamado.");
         const departmentId = await technologyDepartment(database, auth.organizationId);
         return delegate(database, "user").findMany({
@@ -1360,15 +1381,24 @@ function stockServices(database: TiDatabase): TiServices {
             409,
             "Ja existe uma categoria de estoque de TI ativa com este nome.",
           );
-        return categories.create({
-          data: {
-            ...input,
-            name,
-            department_id: departmentId,
-            organization_id: auth.organizationId,
-            status: true,
-          },
-        });
+        try {
+          return await categories.create({
+            data: {
+              ...input,
+              name,
+              department_id: departmentId,
+              organization_id: auth.organizationId,
+              status: true,
+            },
+          });
+        } catch (error) {
+          if (uniqueError(error))
+            throw new ServiceError(
+              409,
+              "Ja existe uma categoria de estoque de TI ativa com este nome.",
+            );
+          throw error;
+        }
       },
       updateCategory: async (value, id, body) => {
         const auth = context(value);
@@ -1379,7 +1409,16 @@ function stockServices(database: TiDatabase): TiServices {
           }))
         )
           throw new ServiceError(404, "Categoria de estoque nao encontrada.");
-        return categories.update({ where: { id }, data: row(body) });
+        try {
+          return await categories.update({ where: { id }, data: row(body) });
+        } catch (error) {
+          if (uniqueError(error))
+            throw new ServiceError(
+              409,
+              "Ja existe uma categoria de estoque de TI ativa com este nome.",
+            );
+          throw error;
+        }
       },
       listLocations: async (value) => {
         const auth = context(value);
@@ -1601,7 +1640,7 @@ function reportingServices(database: TiDatabase, inSnapshot = false): TiServices
         }
 
         if (input.query && !inSnapshot) {
-          return database.$transaction((transaction) => {
+          return withReportingSnapshot(database, (transaction) => {
             const transactionReporting = reportingServices(transaction, true).reporting;
             if (!transactionReporting?.extract) {
               throw new ServiceError(500, "Serviço de relatórios indisponível.");

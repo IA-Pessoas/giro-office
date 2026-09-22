@@ -1,7 +1,15 @@
 import {
+  AUTH_SESSION_COOKIE_NAME,
   authenticateWorkerRequest,
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
+  hashCsrfToken,
+  readCookie,
+  validateWorkerSession,
+  verifyCsrfToken,
   type WorkerAuthContext,
   WorkerAuthenticationError,
+  WorkerSessionValidationError,
 } from "@workspace/runtime";
 import { normalizeModulePermissions } from "@workspace/shared/auth";
 import {
@@ -86,7 +94,45 @@ export async function authenticateTiRequest(
 }
 
 export function requireTiPermission(auth: WorkerAuthContext, minimum: number): void {
-  if (typeof auth.claims.permission !== "number" || auth.claims.permission < minimum) {
+  if ((auth.claims.modules?.ti ?? 0) < minimum) {
     throw new ServiceError(403, "Permissão insuficiente para acessar o ti-service.");
+  }
+}
+
+export async function guardTiSession(
+  request: Request,
+  env: TiWorkerEnv,
+  auth: WorkerAuthContext,
+): Promise<void> {
+  const cookies = request.headers.get("cookie") ?? undefined;
+  if (!readCookie(cookies, AUTH_SESSION_COOKIE_NAME)) return;
+
+  if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+    const csrfCookie = readCookie(cookies, CSRF_COOKIE_NAME);
+    const csrfHeader = request.headers.get(CSRF_HEADER_NAME);
+    const expectedHash = auth.claims.csrf_hash;
+    if (
+      !csrfCookie ||
+      !csrfHeader ||
+      !expectedHash ||
+      !(await verifyCsrfToken(csrfHeader, await hashCsrfToken(csrfCookie))) ||
+      !(await verifyCsrfToken(csrfHeader, expectedHash))
+    ) {
+      throw new ServiceError(403, "Token CSRF inválido.");
+    }
+  }
+
+  if (!env.USER_SERVICE || !env.USER_SERVICE_INTERNAL_TOKEN) {
+    throw new ServiceError(503, "Validação de sessão indisponível para cookie.");
+  }
+  try {
+    await validateWorkerSession(auth, env.USER_SERVICE, "cookie", {
+      internalServiceToken: env.USER_SERVICE_INTERNAL_TOKEN,
+    });
+  } catch (error) {
+    if (error instanceof WorkerSessionValidationError) {
+      throw new ServiceError(error.statusCode, error.message);
+    }
+    throw error;
   }
 }

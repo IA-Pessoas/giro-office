@@ -87,7 +87,7 @@ model Permission {
 }
 
 model LocationStock {
-  id              String         @id
+  id              String         @id @default(uuid())
   name            String
   floor           Int?
   department_id   String
@@ -102,7 +102,7 @@ model LocationStock {
 }
 
 model CategoryStock {
-  id              String         @id
+  id              String         @id @default(uuid())
   name            String
   department_id   String
   status          Boolean        @default(true)
@@ -112,6 +112,16 @@ model CategoryStock {
   organization    Organization   @relation(fields: [organization_id], references: [id])
 
   @@map("stock.categories")
+}
+
+model ReportGrantUse {
+  id         String   @id @default(uuid())
+  grant_hash String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([expires_at])
+  @@map("reports.grant_uses")
 }
 
 model Stock {

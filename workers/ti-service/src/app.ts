@@ -96,7 +96,7 @@ import {
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { authenticateTiRequest, requireTiPermission } from "./auth.js";
+import { authenticateTiRequest, guardTiSession, requireTiPermission } from "./auth.js";
 import {
   createTiDomainServices,
   type TiAuthContext,
@@ -115,6 +115,10 @@ export type CategoryPrisma = {
     findFirst(args: Record<string, unknown>): Promise<CategoryRow | null>;
     create(args: Record<string, unknown>): Promise<CategoryRow>;
     update(args: Record<string, unknown>): Promise<CategoryRow>;
+  };
+  reportGrantUse?: {
+    deleteMany(args: { where: { expires_at: { lte: Date } } }): Promise<unknown>;
+    create(args: { data: { grant_hash: string; expires_at: Date } }): Promise<unknown>;
   };
 };
 
@@ -143,6 +147,7 @@ type TiRequestImageStorage = {
     requestId: string;
     file: { body: File; bytes: Uint8Array; mimetype: "image/jpeg" | "image/png" | "image/webp" };
   }): Promise<string>;
+  remove(objectPath: string): Promise<void>;
   createSignedAccessUrl(objectPath: string): Promise<string>;
 };
 
@@ -172,8 +177,13 @@ function requestContext(c: TiContext): TiAuthContext {
   return {
     organizationId: auth.organizationId,
     userId: auth.userId,
-    permission: Number(auth.claims.permission ?? 0),
+    permission: Number(auth.claims.modules?.ti ?? auth.claims.permission ?? 0),
+    isOrganizationOwner: auth.claims.type === "owner",
   };
+}
+
+function requireTiTransferPermission(auth: WorkerAuthContext): void {
+  requireTiPermission(auth, auth.claims.type === "owner" ? 1 : 2);
 }
 
 function invoke(service: TiService, method: string, args: unknown[]): Promise<unknown> {
@@ -201,6 +211,9 @@ function createRequestImageStorage(env: TiWorkerEnv): TiRequestImageStorage | un
         upsert: false,
       });
       return path;
+    },
+    remove(path) {
+      return storage.remove(env.TI_REQUEST_IMAGE_BUCKET as string, path);
     },
     createSignedAccessUrl(path) {
       return storage.createSignedUrl(env.TI_REQUEST_IMAGE_BUCKET as string, path, 300);
@@ -245,8 +258,6 @@ async function withSignedRequestImage(
   item.attachment = await storage.createSignedAccessUrl(attachment);
   return item;
 }
-
-const usedReportingGrants = new Map<string, number>();
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -299,6 +310,31 @@ async function sha256Hex(value: string): Promise<string> {
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function uniquePrismaError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
+}
+
+async function consumeReportingGrant(
+  prisma: CategoryPrisma,
+  grantValue: string,
+  expiresAt: number,
+): Promise<void> {
+  const grantUse = prisma.reportGrantUse;
+  if (!grantUse) throw new ServiceError(503, "Controle de replay de relatórios indisponível.");
+  await grantUse.deleteMany({ where: { expires_at: { lte: new Date() } } });
+  try {
+    await grantUse.create({
+      data: {
+        grant_hash: await sha256Hex(grantValue),
+        expires_at: new Date(expiresAt * 1000),
+      },
+    });
+  } catch (error) {
+    if (uniquePrismaError(error)) throw new ServiceError(403, "Grant de relatórios inválido.");
+    throw error;
+  }
+}
+
 async function verifyReportingGrant(
   c: TiContext,
   input: {
@@ -308,6 +344,7 @@ async function verifyReportingGrant(
     body: unknown;
   },
   configuredEnv?: TiWorkerEnv,
+  configuredPrisma?: CategoryPrisma,
 ): Promise<InternalReportingGrant> {
   const env = configuredEnv ?? (c.env as TiWorkerEnv | undefined);
   const token = c.req.header(INTERNAL_SERVICE_TOKEN_HEADER);
@@ -348,11 +385,13 @@ async function verifyReportingGrant(
     grant.expires_at <= grant.issued_at
   )
     throw new ServiceError(403, "Grant de relatórios inválido.");
-  for (const [cachedGrant, expiresAt] of usedReportingGrants)
-    if (expiresAt <= now) usedReportingGrants.delete(cachedGrant);
-  if (usedReportingGrants.has(grantValue))
-    throw new ServiceError(403, "Grant de relatórios inválido.");
-  usedReportingGrants.set(grantValue, grant.expires_at);
+  if (configuredPrisma) {
+    await consumeReportingGrant(configuredPrisma, grantValue, grant.expires_at);
+  } else {
+    await withWorkerPrisma(env, PrismaClient, (client) =>
+      consumeReportingGrant(client as unknown as CategoryPrisma, grantValue, grant.expires_at),
+    );
+  }
   return grant;
 }
 
@@ -390,11 +429,17 @@ export function createTiWorkerApp(options: TiOptions = {}) {
   });
 
   app.use("/ti/*", async (c, next) => {
-    c.set("auth", await authenticateTiRequest(c.req.raw, options.env ?? c.env));
+    const env = options.env ?? c.env;
+    const auth = await authenticateTiRequest(c.req.raw, env);
+    await guardTiSession(c.req.raw, env, auth);
+    c.set("auth", auth);
     await next();
   });
   app.use("/ti", async (c, next) => {
-    c.set("auth", await authenticateTiRequest(c.req.raw, options.env ?? c.env));
+    const env = options.env ?? c.env;
+    const auth = await authenticateTiRequest(c.req.raw, env);
+    await guardTiSession(c.req.raw, env, auth);
+    c.set("auth", auth);
     await next();
   });
 
@@ -565,13 +610,13 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     return respond(c, "requests", "update", [requestContext(c), params.id, body]);
   });
   app.patch("/ti/requests/:id/assign", async (c) => {
-    requireTiPermission(c.get("auth"), 2);
+    requireTiTransferPermission(c.get("auth"));
     const params = parseWithZod(tiRequestIdParamsSchema, { id: c.req.param("id") });
     const body = parseWithZod(assignTiRequestBodySchema, await c.req.json());
     return respond(c, "requests", "assign", [requestContext(c), params.id, body]);
   });
   app.get("/ti/requests/:id/transfer-candidates", async (c) => {
-    requireTiPermission(c.get("auth"), 2);
+    requireTiTransferPermission(c.get("auth"));
     const params = parseWithZod(tiRequestIdParamsSchema, { id: c.req.param("id") });
     return respond(c, "requests", "listTransferCandidates", [requestContext(c), params.id]);
   });
@@ -610,6 +655,7 @@ export function createTiWorkerApp(options: TiOptions = {}) {
       type: form.type,
     });
     let attachment: string | undefined;
+    let uploadedStorage: TiRequestImageStorage | undefined;
     const file = form.file instanceof File ? form.file : undefined;
     if (file) {
       if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
@@ -621,6 +667,7 @@ export function createTiWorkerApp(options: TiOptions = {}) {
       const storage =
         options.requestImageStorage ?? createRequestImageStorage(options.env ?? c.env);
       if (!storage) throw new ServiceError(500, "Storage de imagens de TI não configurado.");
+      uploadedStorage = storage;
       attachment = await storage.upload({
         organizationId: requestContext(c).organizationId,
         requestId: params.id,
@@ -633,12 +680,22 @@ export function createTiWorkerApp(options: TiOptions = {}) {
       if (!validImagePath(attachment, requestContext(c).organizationId, params.id))
         throw new ServiceError(500, "Armazenamento da imagem retornou uma chave invalida.");
     }
-    const message = await execute<unknown>(c, "requests", "createMessage", [
-      requestContext(c),
-      params.id,
-      { ...body, ...(attachment ? { attachment } : {}) },
-    ]);
-    const storage = options.requestImageStorage ?? createRequestImageStorage(options.env ?? c.env);
+    let message: unknown;
+    try {
+      message = await execute<unknown>(c, "requests", "createMessage", [
+        requestContext(c),
+        params.id,
+        { ...body, ...(attachment ? { attachment } : {}) },
+      ]);
+    } catch (error) {
+      if (attachment && uploadedStorage)
+        await uploadedStorage.remove(attachment).catch(() => undefined);
+      throw error;
+    }
+    const storage =
+      uploadedStorage ??
+      options.requestImageStorage ??
+      createRequestImageStorage(options.env ?? c.env);
     return c.json(
       createSuccessResponse(
         await withSignedRequestImage(message, storage, requestContext(c).organizationId, params.id),
@@ -815,6 +872,7 @@ export function createTiWorkerApp(options: TiOptions = {}) {
         body: {},
       },
       options.env,
+      options.prisma,
     );
     const catalog = await execute<unknown>(c, "reporting", "catalog", []);
     return c.json(createSuccessResponse(catalog));
@@ -831,6 +889,7 @@ export function createTiWorkerApp(options: TiOptions = {}) {
         body,
       },
       options.env,
+      options.prisma,
     );
     const result = await execute<unknown>(c, "reporting", "extract", [
       { organizationId: grant.organization_id, ...body },
