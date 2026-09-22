@@ -1,4 +1,5 @@
 import type { AuditOutcome, AuditQuery, CreateAuditRequestPayload } from "@workspace/shared/audit";
+import { type AuthPolicy, canAccessRoute } from "@workspace/shared/auth";
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -13,12 +14,42 @@ import type { GatewayWorkerEnv } from "./env.js";
 
 type GatewayBindings = { Bindings: GatewayWorkerEnv; Variables: { requestId: string } };
 type GatewayOptions = { env?: GatewayWorkerEnv };
-type Route = { prefix: string; binding: keyof GatewayWorkerEnv };
+/** Espelha `services/gateway`: `module` = `permissionModule`, `policy` = [GET, demais métodos]. */
+type Route = {
+  prefix: string;
+  binding: keyof GatewayWorkerEnv;
+  module?: string;
+  policy?: readonly [AuthPolicy, AuthPolicy];
+};
 type FetchBinding = { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> };
 
 const AUDIT_REQUEST_URL = "https://audit-service.internal/internal/audit/requests";
 const SENSITIVE_QUERY_KEY =
   /(?:authorization|cookie|token|secret|password|passwd|jwt|api[_-]?key)/iu;
+
+function modulePolicy(module: string): readonly [AuthPolicy, AuthPolicy] {
+  return [
+    { modulePermission: { module, minPermission: 1 } },
+    { modulePermission: { module, minPermission: 2 } },
+  ];
+}
+const triagemAccess: AuthPolicy = {
+  anyModulePermission: { modules: ["contabil", "triagem"], minPermission: 1 },
+};
+const triagemPolicy = [triagemAccess, triagemAccess] as const;
+// Mesma ordem do Node: estes subpaths vão ao triagem-service; o resto de /triagem ao contabil.
+const triagemServiceRoutes: Route[] = [
+  "overview",
+  "competencies",
+  "catalogs",
+  "external-links",
+  "urgent-requests",
+].map((path) => ({
+  prefix: `/triagem/${path}`,
+  binding: "TRIAGEM_SERVICE",
+  module: "triagem",
+  policy: triagemPolicy,
+}));
 
 const routes: Route[] = [
   { prefix: "/audit", binding: "AUDIT_SERVICE" },
@@ -26,16 +57,33 @@ const routes: Route[] = [
   { prefix: "/organizations", binding: "ORGANIZATION_SERVICE" },
   { prefix: "/user", binding: "USER_SERVICE" },
   { prefix: "/client", binding: "CLIENT_SERVICE" },
-  { prefix: "/fiscal", binding: "FISCAL_SERVICE" },
+  {
+    prefix: "/fiscal",
+    binding: "FISCAL_SERVICE",
+    module: "fiscal",
+    policy: modulePolicy("fiscal"),
+  },
   { prefix: "/certificate", binding: "CERTIFICATE_SERVICE" },
   { prefix: "/reports", binding: "REPORTS_SERVICE" },
-  { prefix: "/parcelamento", binding: "PARCELAMENTO_SERVICE" },
-  { prefix: "/contabil", binding: "CONTABIL_SERVICE" },
+  {
+    prefix: "/parcelamento",
+    binding: "PARCELAMENTO_SERVICE",
+    module: "parcelamento",
+    policy: modulePolicy("parcelamento"),
+  },
+  {
+    prefix: "/contabil",
+    binding: "CONTABIL_SERVICE",
+    module: "contabil",
+    policy: modulePolicy("contabil"),
+  },
   { prefix: "/project", binding: "PROJECT_SERVICE" },
   { prefix: "/ti", binding: "TI_SERVICE" },
   { prefix: "/rh", binding: "RH_SERVICE" },
   { prefix: "/commercial", binding: "COMMERCIAL_SERVICE" },
-  { prefix: "/triagem", binding: "TRIAGEM_SERVICE" },
+  ...triagemServiceRoutes,
+  // triagem-legacy-service do Node: sem permissionModule, encaminha a permissão global.
+  { prefix: "/triagem", binding: "CONTABIL_SERVICE", policy: triagemPolicy },
   { prefix: "/pessoal", binding: "PESSOAL_SERVICE" },
   { prefix: "/regularize", binding: "REGULARIZE_SERVICE" },
 ];
@@ -177,7 +225,9 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
       createSuccessResponse({
         status: "ready",
         service: "gateway",
-        services: routes.filter(({ binding }) => Boolean((options.env ?? c.env)[binding])).length,
+        services: [...new Set(routes.map(({ binding }) => binding))].filter((binding) =>
+          Boolean((options.env ?? c.env)[binding]),
+        ).length,
       }),
     ),
   );
@@ -195,9 +245,13 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     await requireCsrfForMutation(c.req.raw, auth);
     const requestId = requestIdFor(c.req.raw);
     c.set("requestId", requestId);
+    const policy = route.policy?.[c.req.method === "GET" ? 0 : 1];
+    if (policy && !canAccessRoute({ ...auth, claims: { ...auth.claims } }, policy)) {
+      throw new ServiceError(403, "Acesso negado para esta rota.");
+    }
     const headers = new Headers(c.req.raw.headers);
     headers.set(REQUEST_ID_HEADER, requestId);
-    forwardIdentity(headers, auth, env);
+    forwardIdentity(headers, auth, env, route.module);
     const forwardedRequest = new Request(c.req.raw, { headers });
 
     if (route.prefix === "/audit")

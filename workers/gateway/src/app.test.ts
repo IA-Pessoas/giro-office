@@ -477,7 +477,7 @@ describe("gateway Worker", () => {
     const commercial = await app.request("https://gateway.test/commercial", {
       headers: { authorization: `Bearer ${await jwt()}` },
     });
-    const triagem = await app.request("https://gateway.test/triagem", {
+    const triagem = await app.request("https://gateway.test/triagem/overview", {
       headers: { authorization: `Bearer ${await jwt()}` },
     });
     const pessoal = await app.request("https://gateway.test/pessoal", {

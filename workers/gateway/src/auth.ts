@@ -3,6 +3,7 @@ import {
   authenticateWorkerRequest,
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
+  hashCsrfToken,
   readCookie,
   verifyCsrfToken,
   type WorkerAuthContext,
@@ -60,22 +61,42 @@ export async function requireCsrfForMutation(
   const cookies = request.headers.get("cookie") ?? undefined;
   const session = readCookie(cookies, AUTH_SESSION_COOKIE_NAME);
   if (!session) return;
-  const token = request.headers.get(CSRF_HEADER_NAME) ?? readCookie(cookies, CSRF_COOKIE_NAME);
-  if (!token || !auth.claims.csrf_hash || !(await verifyCsrfToken(token, auth.claims.csrf_hash))) {
-    throw new ServiceError(403, "Token CSRF inválido.");
+  // Paridade com o csrfProtection do Node: header e cookie CSRF, iguais e presos à sessão.
+  const token = request.headers.get(CSRF_HEADER_NAME);
+  const cookieToken = readCookie(cookies, CSRF_COOKIE_NAME);
+  if (
+    !token ||
+    !cookieToken ||
+    !auth.claims.csrf_hash ||
+    !(await verifyCsrfToken(token, await hashCsrfToken(cookieToken))) ||
+    !(await verifyCsrfToken(token, auth.claims.csrf_hash))
+  ) {
+    throw new ServiceError(403, "Requisição não autorizada.");
   }
 }
 
-export function forwardIdentity(headers: Headers, auth: WorkerAuthContext, env: GatewayWorkerEnv) {
+/** Com `module`, segue o `resolveForwardedPermission` do Node: owner=3, sem claim modules=0. */
+function forwardedPermission(auth: WorkerAuthContext, module?: string): number | undefined {
+  if (!module) return auth.claims.permission;
+  if (auth.claims.type === "owner") return 3;
+  if (!auth.claims.modulePermissionsPresent) return 0;
+  return auth.claims.modules[module as keyof WorkerAuthContext["claims"]["modules"]];
+}
+
+export function forwardIdentity(
+  headers: Headers,
+  auth: WorkerAuthContext,
+  env: GatewayWorkerEnv,
+  module?: string,
+) {
   for (const header of FORWARDED_IDENTITY_HEADERS) headers.delete(header);
   headers.set(INTERNAL_SERVICE_TOKEN_HEADER, env.INTERNAL_SERVICE_TOKEN);
   headers.set(FORWARDED_AUTH_USER_ID_HEADER, auth.userId);
   headers.set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, auth.organizationId);
   headers.set(FORWARDED_AUTH_KIND_HEADER, auth.actorKind);
   headers.set(FORWARDED_AUTH_MODULES_HEADER, JSON.stringify(auth.claims.modules));
-  if (auth.claims.permission !== undefined) {
-    headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(auth.claims.permission));
-  }
+  const permission = forwardedPermission(auth, module);
+  if (permission !== undefined) headers.set(FORWARDED_AUTH_PERMISSION_HEADER, String(permission));
   if (auth.claims.platform_role) {
     headers.set(FORWARDED_AUTH_PLATFORM_ROLE_HEADER, auth.claims.platform_role);
   }
