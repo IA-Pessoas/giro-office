@@ -5,6 +5,7 @@ import {
   type PessoalGroupService,
   type PessoalLddService,
   type PessoalObligationService,
+  type PessoalOverviewService,
   type PessoalPasswordService,
   type PessoalPayrollService,
   type PessoalSituationService,
@@ -126,6 +127,15 @@ function obligationService(): PessoalObligationService {
       skippedNoObligations: 0,
       skippedNoGroup: 0,
       skippedNoPayroll: 0,
+    })),
+  };
+}
+
+function overviewService(): PessoalOverviewService {
+  return {
+    getSummary: vi.fn(async () => ({
+      unions: { total: 1, withBaseDate: 1, withoutBaseDate: 0, withCnpj: 1 },
+      ldd: { total: 1, open: 1, overdue: 0, paid: 0 },
     })),
   };
 }
@@ -441,5 +451,16 @@ describe("pessoal Worker", () => {
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
       "2026-09",
     );
+  });
+
+  it("returns the Pessoal overview scoped to the organization", async () => {
+    const overview = overviewService();
+    const app = createPessoalWorkerApp({ env: env(), overviewService: overview });
+    const response = await app.request("https://pessoal.test/pessoal/overview", {
+      headers: headers("1"),
+    });
+
+    expect(response.status).toBe(200);
+    expect(overview.getSummary).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID });
   });
 });

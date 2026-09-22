@@ -148,6 +148,9 @@ export type PessoalObligationService = {
   ): Promise<unknown>;
   generateForCompetence(context: Record<string, unknown>, competence: string): Promise<unknown>;
 };
+export type PessoalOverviewService = {
+  getSummary(context: { organizationId: string }): Promise<unknown>;
+};
 export type PessoalDomainPrisma = PessoalGroupPrisma & {
   unionPessoal: {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
@@ -211,6 +214,7 @@ type PessoalOptions = {
   passwordService?: PessoalPasswordService;
   payrollService?: PessoalPayrollService;
   obligationService?: PessoalObligationService;
+  overviewService?: PessoalOverviewService;
 };
 type PessoalWorkerContext = { Bindings: PessoalWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type PessoalContext = Context<PessoalWorkerContext>;
@@ -1427,6 +1431,45 @@ function localObligationService(
   };
 }
 
+function localOverviewService(prisma: PessoalDomainPrisma): PessoalOverviewService {
+  return {
+    async getSummary(context) {
+      const organizationWhere = { organization_id: context.organizationId };
+      const [unions, ldd] = await Promise.all([
+        prisma.unionPessoal.findMany({
+          where: organizationWhere,
+          select: { base_date: true, cnpj: true },
+        }),
+        prisma.lddPessoal.findMany({
+          where: organizationWhere,
+          select: { status: true },
+        }),
+      ]);
+      const lddCounts = { total: ldd.length, open: 0, overdue: 0, paid: 0 };
+      for (const row of ldd as Record<string, unknown>[]) {
+        const status = String(row.status ?? "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/gu, "")
+          .toLowerCase();
+        if (status === "pago") lddCounts.paid += 1;
+        else if (status === "vencido") lddCounts.overdue += 1;
+        else lddCounts.open += 1;
+      }
+      const unionRows = unions as Record<string, unknown>[];
+      const withBaseDate = unionRows.filter((row) => row.base_date !== null).length;
+      return {
+        unions: {
+          total: unionRows.length,
+          withBaseDate,
+          withoutBaseDate: unionRows.length - withBaseDate,
+          withCnpj: unionRows.filter((row) => row.cnpj !== "").length,
+        },
+        ldd: lddCounts,
+      };
+    },
+  };
+}
+
 export function createPessoalWorkerApp(options: PessoalOptions = {}) {
   const app = new Hono<PessoalWorkerContext>();
   app.get("/health", (c) =>
@@ -1517,6 +1560,15 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       callback(
         localObligationService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
       ),
+    );
+  };
+  const withOverviewService = async <T>(
+    c: PessoalContext,
+    callback: (service: PessoalOverviewService) => Promise<T>,
+  ) => {
+    if (options.overviewService) return callback(options.overviewService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(localOverviewService(client as unknown as PessoalDomainPrisma)),
     );
   };
   app.get("/pessoal/groups", (c) =>
@@ -1812,6 +1864,16 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       const { id } = parseWithZod(obligationIdParamsSchema, { id: c.req.param("id") });
       const body = parseWithZod(updateObligationFieldBodySchema, await c.req.json());
       return c.json(createSuccessResponse(await service.updateField(domainContext(c), id, body)));
+    }),
+  );
+  app.get("/pessoal/overview", (c) =>
+    withOverviewService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      return c.json(
+        createSuccessResponse(
+          await service.getSummary({ organizationId: c.get("auth").organizationId }),
+        ),
+      );
     }),
   );
   app.notFound((c) =>
