@@ -1,0 +1,17 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model RhCategory {
+  id              String  @id @default(uuid())
+  name            String
+  active          Boolean @default(true)
+  organization_id String
+
+  @@map("rh.request_categories")
+}
