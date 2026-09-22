@@ -31,3 +31,70 @@ model RhNotification {
   @@index([organization_id, user_id, read, created_at], map: "idx_rh_notifications_user_state")
   @@map("rh.notifications")
 }
+
+enum ScoreQuestionType {
+  behavioral
+  technical
+  tech
+  leadership
+}
+
+model ScoreQuestion {
+  id              String            @id @default(uuid())
+  question        String
+  type            ScoreQuestionType
+  active          Boolean           @default(true)
+  question_id     String
+  organization_id String
+
+  @@map("rh.score_questions")
+}
+
+model Holidays {
+  id              String   @id @default(uuid())
+  name            String
+  date            DateTime
+  organization_id String
+
+  @@index([organization_id, date])
+  @@map("rh.holidays")
+}
+
+model PointsConfig {
+  id              String   @id @default(uuid())
+  user_id         String   @unique
+  start_time      DateTime
+  lunch_break     DateTime
+  lunch_return    DateTime
+  end_time        DateTime
+  signature       String?
+  bank_balance    Int      @default(0)
+  work_days       String   @default("1,2,3,4,5")
+  organization_id String
+
+  @@map("rh.pointConfig")
+}
+
+model User {
+  id              String  @id @default(uuid())
+  name            String
+  permission      Int
+  status          String
+  organization_id String?
+  department_id   String
+
+  @@map("users")
+}
+
+model TimeBankReleases {
+  id               String   @id @default(uuid())
+  user_id          String
+  date             DateTime
+  minutes          Int
+  reason           String
+  is_approved      Boolean
+  added_by_user_id String
+  organization_id  String
+
+  @@map("rh.timeBankReleases")
+}
