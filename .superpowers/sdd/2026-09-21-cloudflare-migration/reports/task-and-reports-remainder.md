@@ -4,50 +4,84 @@ Branch `cf/task-service` sobre `24363061`. Commits:
 
 | commit | o quê |
 |---|---|
-| `b4f4633f` | Worker do task-service |
+| `b4f4633f` | Worker do task-service (versão Express, substituída) |
 | `b3dcf1ad` | gateway: `/task` → `TASK_SERVICE` |
 | `03b59115` | commercial: binding `TASK_SERVICE` reposto |
 | `227a5626` | smoke: task-service |
 | `d43ce81b` | reports: fila de jobs por cron e origens por Service Binding |
 | `c72bc246` | smoke: preview e cron do reports |
+| `94486932` | task-service Node: serviços com injeção |
+| `19e0dce3` | task-service Node: integração HTTP sem env |
+| `27d98563` | task Worker em Hono, no padrão dos outros |
+| `25443c34` | smoke: remove o repasse de alias |
 
 Nenhum deploy e nenhum push.
 
 ## task-service
 
-Não é porte. O Worker roda o `createTaskApp` do Node no workerd, via
-`httpServerHandler` de `cloudflare:node`. As 55 rotas, a validação e os
-envelopes de erro são os do Node. O `alias` do wrangler (espelhado no
-`vitest.config.ts`) troca só estes módulos:
+Primeira versão (`b4f4633f`): o app Express do Node rodando no workerd, com
+os módulos trocados por alias. A pedido do usuário foi substituída para seguir
+o padrão dos outros 17 Workers (`94486932`, `19e0dce3`, `27d98563`).
 
-| módulo Node | no Worker |
+Padrão seguido:
+
+| peça | como |
 |---|---|
-| `prisma/index` | client por requisição via AsyncLocalStorage (I/O não atravessa requisições no workerd) |
-| `config/env` | bindings do Worker, com as mesmas recusas de produção do Node |
-| `middlewares/isAuthenticated` | auth dos Workers: contexto encaminhado com `INTERNAL_SERVICE_TOKEN`, Bearer, cookie + CSRF + validação de sessão |
-| `integrations/audit` | binding `AUDIT_SERVICE` |
-| `integrations/projectProgress` | binding `PROJECT_SERVICE`, token interno |
-| `iconv-lite` | 0.7 (a 0.4 do body-parser 1.x derruba o workerd no load) |
+| app | Hono, com as 55 rotas no `app.ts` e handlers espelhando os do Node |
+| validação | schemas zod importados de `services/task-service/src/schemas` |
+| regra de negócio | as classes de `services/task-service/src/services`, instanciadas por requisição (variante do reports, regularize, certificate e triagem) |
+| banco | schema próprio `workers/task-service/prisma/schema.prisma`, com 31 dos 141 models, e `withWorkerPrisma` por requisição |
+| auth | `auth.ts` copiado dos outros Workers |
+| audit, project, storage | binding `AUDIT_SERVICE`, binding `PROJECT_SERVICE` e o client de Storage do `runtime` |
 
-A `integrations/projectWizard` não entra no bundle: o wizard cria o projeto
-na própria transação (`createProjectInTransaction`), e esse módulo é
-importado só como tipo.
+Mudança no Node, sem mudança de comportamento: os serviços recebem Prisma,
+audit e a integração de progresso pelo construtor, e o processo Node monta
+os singletons uma vez em `nodeDeps.ts`. Um teste estrutural impede que um
+serviço volte a importar singleton. A classe HTTP de progresso foi para
+`projectProgressHttp.ts`, sem `config/env`, porque importar `config/env` no
+Worker executa `dotenv` e `fileURLToPath` no load.
 
-Diferenças deliberadas em relação ao Node:
+Suíte Node: 499/499 com `--maxWorkers=2`. A execução paralela padrão dá
+timeout em alguns testes sob carga (load average de 129 na máquina). Isso
+também acontece no commit base `24363061`: 1 de 3 rodadas falhou.
 
-- Token do gateway: o Node aceitava o contexto encaminhado com o
-  `AUDIT_SERVICE_TOKEN`. O Worker usa o `INTERNAL_SERVICE_TOKEN`, como os
-  outros 17.
-- Chamada ao project-service: o Node enviava o `AUDIT_SERVICE_TOKEN`. O
-  Worker envia o `INTERNAL_SERVICE_TOKEN`, que é o que o project Worker
-  valida.
-- Auditoria best-effort: o recorder Node reenfileira falhas em background,
-  o que o Worker perderia ao responder. Aqui a falha só é registrada, como
-  nos outros Workers. A auditoria `required` continua falhando a operação.
-- Rate limit de upload e de extração por IA: em memória, então vale por
-  isolate e não é global.
+### Prova de paridade
 
-Tamanho: 8,96 MB, 2,26 MB gzip (schema canônico inteiro).
+`app.parity.test.ts` usa o app Express do Node como oráculo. São 123 casos
+cobrindo as 57 combinações de método e path, incluindo multipart, grant
+HMAC e Idempotency-Key. Os dois apps recebem os mesmos mocks de serviço, e o
+teste exige o mesmo status, o mesmo body e os mesmos argumentos passados a
+cada serviço.
+
+`prisma.test.ts` garante que todo model acessado pelos serviços existe no
+schema próprio. A falha foi observada ao remover `TaskPostponement` de
+propósito.
+
+### Diferenças deliberadas (padrão dos Workers)
+
+- JSON inválido: 400 "JSON inválido." (o Node dá 500, porque o erro do
+  body-parser cai no fallback).
+- Mensagem do 401: "Não autenticado." (o Node diz "Token de autenticação
+  não informado.").
+- Token do gateway e do project-service: `INTERNAL_SERVICE_TOKEN`, onde o
+  Node usava o `AUDIT_SERVICE_TOKEN`.
+- Auditoria best-effort: sem fila de retry em background.
+- Sem rate limit em memória no upload e na extração (nenhum Worker tem) e
+  sem a rota de OpenAPI.
+- Extração por IA: sem `OPENAI_API_KEY`, a rota responde 503. O Node
+  recusava subir.
+- Algumas mensagens de erro do Node vêm com acentuação corrompida
+  (`obrigatÃ³rio`). Foram copiadas iguais para manter a paridade, e a
+  correção deve ser feita nos dois lados ao mesmo tempo.
+
+Tamanho: 7,5 MB, 1,93 MB gzip. O `multer` e o busboy entram pelo barrel de
+`@workspace/shared/upload`, mas não são usados.
+
+### Observação de histórico
+
+`19e0dce3` levou junto as remoções staged da versão Express. O Worker fica
+sem `index.ts` nesse commit até `27d98563`. Não foi reescrito, porque as
+regras proíbem amend.
 
 ## reports-service
 
@@ -69,7 +103,7 @@ user-service pelo banco, como no Node.
 
 ## Validação
 
-- task-worker: 24 testes, typecheck, build, check, dry-run.
+- task-worker: 136 testes (123 de paridade), typecheck, build, check, dry-run.
 - reports-worker: 30 testes, typecheck, build, check, dry-run (1,80 MB gzip).
 - gateway: 92 testes. commercial: 18 testes.
 - Smoke local contra Postgres real, 9 Workers: **26/27**. A única falha é
