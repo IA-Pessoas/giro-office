@@ -1,4 +1,4 @@
-import { formatCnpjInput, normalizeDigits } from "../../../shared/utils/inputFormatting.ts";
+import { formatCnpjInput, normalizeCnpjInput } from "../../../shared/utils/inputFormatting.ts";
 
 import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
 
@@ -25,7 +25,7 @@ export function formatPessoalUnionCnpjInput(value: string): string {
 }
 
 export function normalizePessoalUnionCnpjValue(value: string): string {
-  return normalizeDigits(value).slice(0, 14);
+  return normalizeCnpjInput(value);
 }
 
 export function buildPessoalUnionFormValues(union: PessoalUnion | null): {
