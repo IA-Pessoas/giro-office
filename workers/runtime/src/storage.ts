@@ -74,9 +74,10 @@ export function createSupabaseStorageClient(
     },
 
     async remove(bucket, path) {
-      await request(objectUrl(bucket, path), {
+      await request(`${baseUrl}/storage/v1/object/${encodeURIComponent(bucket)}`, {
         method: "DELETE",
-        headers: headers(),
+        headers: headers("application/json"),
+        body: JSON.stringify({ prefixes: [path] }),
       });
     },
 

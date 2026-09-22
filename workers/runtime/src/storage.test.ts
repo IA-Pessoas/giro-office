@@ -81,7 +81,7 @@ describe("Supabase Storage REST adapter", () => {
     );
   });
 
-  it("removes one object while preserving its bucket/path", async () => {
+  it("removes one object through the bucket endpoint with the path in the body", async () => {
     const fake = makeFetch([new Response(null, { status: 200 })]);
     const client = createSupabaseStorageClient(environment, fake.fetch);
 
@@ -89,13 +89,13 @@ describe("Supabase Storage REST adapter", () => {
 
     const request = getRequest(fake.calls[0]);
     expect(request.method).toBe("DELETE");
-    expect(request.url).toBe(
-      "https://project.supabase.co/storage/v1/object/private/folder/file%20name.txt",
-    );
+    expect(request.url).toBe("https://project.supabase.co/storage/v1/object/private");
     expect(request.headers.get("apikey")).toBe(environment.SUPABASE_SERVICE_ROLE_KEY);
     expect(request.headers.get("authorization")).toBe(
       `Bearer ${environment.SUPABASE_SERVICE_ROLE_KEY}`,
     );
+    expect(request.headers.get("content-type")).toBe("application/json");
+    await expect(request.json()).resolves.toEqual({ prefixes: ["folder/file name.txt"] });
   });
 
   it("resolves a relative signed URL and preserves an absolute signed URL", async () => {
