@@ -105,6 +105,28 @@ function isEnabled(value: string | undefined): boolean {
   return value === "true" || value === "1";
 }
 
+// Equivalente ao `mountOpenApiDocs` do Node (swagger-ui-express): mesma versão do
+// swagger-ui-dist do lockfile, servida por CDN com SRI porque o Worker não empacota os assets.
+// ponytail: HTML duplicado nos Workers contabil/fiscal/triagem/parcelamento; mover para
+// @workspace/runtime quando outro Worker também servir /docs.
+const SWAGGER_UI_CDN = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.2";
+
+function swaggerUiHtml(title: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <link rel="stylesheet" href="${SWAGGER_UI_CDN}/swagger-ui.css" integrity="sha384-F7uqyyVZgBbuOv+8gNy6ZGJB8Rf12CczPWm130Pxrau0cyZlj1Dl18cDOWpQSrGh" crossorigin="anonymous">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="${SWAGGER_UI_CDN}/swagger-ui-bundle.js" integrity="sha384-phexB4pLDnmX1PhMxW3Ojwp92jIrirblcgNHltMum/KEQzYuBelzyulhx5ALflmy" crossorigin="anonymous"></script>
+  <script>window.ui = SwaggerUIBundle({ url: "/openapi.json", dom_id: "#swagger-ui" });</script>
+</body>
+</html>`;
+}
+
 export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
   const { env } = options;
   const app = new Hono<FiscalContext>();
@@ -150,6 +172,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         >[0]),
       ),
     );
+    app.get("/docs", (c) => c.html(swaggerUiHtml("fiscal-service — OpenAPI")));
   }
 
   const authenticate: MiddlewareHandler<FiscalContext> = async (c, next) => {

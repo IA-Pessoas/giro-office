@@ -415,6 +415,25 @@ describe("fiscal Worker — bindings e infraestrutura", () => {
     );
     expect(prodSpec.status).toBe(404);
   });
+
+  it("publica /docs (Swagger UI) fora de produção e oculta em produção ou sem a flag", async () => {
+    const dev = createFiscalWorkerApp({ env: env({ ENABLE_API_DOCS: "true" }), ...services() });
+    const prod = createFiscalWorkerApp({
+      env: env({ ENABLE_API_DOCS: "true", NODE_ENV: "production" }),
+      ...services(),
+    });
+    const off = createFiscalWorkerApp({ env: env(), ...services() });
+
+    const docs = await dev.request("https://fiscal.test/docs");
+    expect(docs.status).toBe(200);
+    expect(docs.headers.get("content-type")).toContain("text/html");
+    const html = await docs.text();
+    expect(html).toContain("<title>fiscal-service — OpenAPI</title>");
+    expect(html).toContain('url: "/openapi.json"');
+    expect((await prod.request("https://fiscal.test/docs")).status).toBe(404);
+    expect((await off.request("https://fiscal.test/docs")).status).toBe(404);
+    expect((await off.request("https://fiscal.test/openapi.json")).status).toBe(404);
+  });
 });
 
 describe("fiscal Worker — reporting interno", () => {
