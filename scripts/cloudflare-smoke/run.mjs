@@ -1087,6 +1087,70 @@ async function runChecks({ db, sql, baseUrls, secrets, runId, mode, migrationWor
     return "403 com token errado; token do commercial aceito (400 no corpo vazio)";
   });
 
+  const ncmReport = {
+    sources: ["fiscal.ncm"],
+    columns: [
+      { source: "fiscal.ncm", field: "ncm_code", alias: "ncm_code" },
+      { source: "fiscal.ncm", field: "description", alias: "description" },
+    ],
+  };
+
+  await check("reports.preview_busca_origem_por_binding", async () => {
+    const preview = expectStatus(
+      await http(baseUrls.gateway, "/reports/preview", {
+        method: "POST",
+        token: tokenA,
+        body: { definition: ncmReport },
+      }),
+      200,
+      "POST /reports/preview",
+    );
+    assert(
+      JSON.stringify(preview.data).includes(`${runId} ncm`),
+      `preview não trouxe o NCM da org A: ${JSON.stringify(preview.data).slice(0, 300)}`,
+    );
+    return "reports -> fiscal pelo Service Binding, com o NCM da org A";
+  });
+
+  await check("reports.job_processado_pelo_cron", async () => {
+    // O job revalida o acesso no user-service pelo banco (não pelas claims do JWT).
+    await sql(
+      `insert into permissions (id, user_id, organization_id, fiscal) values ($1, $2, $3, 3)
+       on conflict (user_id, organization_id) do update set fiscal = 3`,
+      [randomUUID(), fixtures.userA, fixtures.orgA],
+    );
+    const job = expectStatus(
+      await http(baseUrls.gateway, "/reports/jobs", {
+        method: "POST",
+        token: tokenA,
+        body: { definition: ncmReport, format: "json" },
+      }),
+      201,
+      "POST /reports/jobs",
+    );
+    const jobId = job.data.id;
+    assert(job.data.status === "queued", `job nasceu em ${job.data.status}`);
+    const cron = await fetch(
+      `${baseUrls.reports}/__scheduled?cron=${encodeURIComponent("*/1 * * * *")}`,
+    );
+    assert(cron.ok, `disparo do cron falhou: ${cron.status}`);
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const current = expectStatus(
+        await http(baseUrls.gateway, `/reports/jobs/${jobId}`, { token: tokenA }),
+        200,
+        "GET /reports/jobs/:id",
+      );
+      if (current.data.status === "completed")
+        return `job ${jobId.slice(0, 8)} queued -> completed pelo cron`;
+      assert(
+        !["failed", "expired", "cancelled"].includes(current.data.status),
+        `job terminou em ${current.data.status}: ${JSON.stringify(current.data).slice(0, 300)}`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    throw new Error("o cron não levou o job a completed");
+  });
+
   return fixtures;
 }
 
