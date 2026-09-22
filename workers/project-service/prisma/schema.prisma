@@ -37,7 +37,7 @@ model Client {
   projects        Project[]
   tasks           Task[]
 
-  @@map("clients.pf")
+  @@map("clients")
 }
 
 model Task {

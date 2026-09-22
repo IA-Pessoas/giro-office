@@ -157,14 +157,25 @@ describe("project Worker", () => {
       resolve(process.cwd(), "../../infra/prisma/schema.prisma"),
       "utf8",
     );
+    const canonicalClient = canonicalSchema.slice(
+      canonicalSchema.indexOf("model Client {"),
+      canonicalSchema.indexOf("model ClientPF {"),
+    );
+    const workerClient = workerSchema.slice(
+      workerSchema.indexOf("model Client {"),
+      workerSchema.indexOf("model Task {"),
+    );
 
     expect(canonicalSchema).toContain("name             String");
     expect(canonicalSchema).toContain("taskModel           TaskModel");
+    expect(canonicalClient).toContain('@@map("clients")');
     expect(workerSchema).toContain("name");
     expect(workerSchema).toContain("company_name");
     expect(workerSchema).toContain("fantasy_name");
     expect(workerSchema).toContain("taskModel");
     expect(workerSchema).toContain("department");
+    expect(workerClient).toContain('@@map("clients")');
+    expect(workerClient).not.toContain("clients.pf");
   });
 
   it("returns canonical client and task relations in project detail", async () => {
@@ -288,6 +299,68 @@ describe("project Worker", () => {
     expect(projectService.delete).toHaveBeenCalledWith(
       expect.objectContaining({ project_id: PROJECT_ID, organizationId: ORG, integracaoLevel: 3 }),
     );
+  });
+
+  it.each([
+    ["P2002", { code: "P2002" }],
+    ["P2034", { code: "P2034" }],
+    ["P2025", { code: "P2025" }],
+    ["serialization conflict", new Error("could not serialize access due to concurrent update")],
+  ])("maps PUT %s to 409", async (_label, updateError) => {
+    const findFirst = vi.fn(async () => ({ id: PROJECT_ID, organization_id: ORG }));
+    const update = vi.fn(async () => {
+      throw updateError;
+    });
+    const app = createProjectWorkerApp({
+      env: env(),
+      prisma: {
+        project: { findFirst, update },
+        client: { findFirst: vi.fn(), update: vi.fn() },
+        task: { findMany: vi.fn(), groupBy: vi.fn() },
+        $transaction: vi.fn(),
+        $disconnect: vi.fn(async () => undefined),
+      } as never,
+    });
+
+    const response = await app.request(`https://project.test/project?project_id=${PROJECT_ID}`, {
+      method: "PUT",
+      headers: jsonHeaders(),
+      body: JSON.stringify({
+        project_id: PROJECT_ID,
+        name: "Implantação atualizada",
+        start_date: "2026-04-02T00:00:00.000Z",
+        end_date: "2026-05-10T00:00:00.000Z",
+        objective: "Concluir rollout",
+      }),
+    });
+
+    expect(response.status).toBe(409);
+  });
+
+  it("treats a DELETE P2025 after the existence check as idempotent success", async () => {
+    const findFirst = vi.fn(async () => ({ id: PROJECT_ID, organization_id: ORG }));
+    const deleteProject = vi.fn(async () => {
+      throw { code: "P2025" };
+    });
+    const app = createProjectWorkerApp({
+      env: env(),
+      prisma: {
+        project: { findFirst, delete: deleteProject },
+        client: { findFirst: vi.fn(), update: vi.fn() },
+        task: { findMany: vi.fn(), groupBy: vi.fn() },
+        $transaction: vi.fn(),
+        $disconnect: vi.fn(async () => undefined),
+      } as never,
+    });
+
+    const response = await app.request(`https://project.test/project?project_id=${PROJECT_ID}`, {
+      method: "DELETE",
+      headers: jsonHeaders(),
+      body: JSON.stringify({ project_id: PROJECT_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.response).toBeNull();
   });
 
   it("maps a concurrent project creation conflict to 409", async () => {

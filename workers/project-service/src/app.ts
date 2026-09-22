@@ -260,6 +260,18 @@ function isPrismaError(error: unknown, ...codes: string[]): boolean {
   );
 }
 
+function isSerializationConflict(error: unknown): boolean {
+  const message =
+    typeof error === "object" && error !== null && "message" in error
+      ? String(error.message)
+      : String(error);
+  return /could not serialize access|serialization failure|deadlock detected/iu.test(message);
+}
+
+function isProjectConflict(error: unknown): boolean {
+  return isPrismaError(error, "P2002", "P2025", "P2034") || isSerializationConflict(error);
+}
+
 function projectDetailForUi(detail: ProjectRow): ProjectRow {
   const tasks = detail.tasks;
   if (!Array.isArray(tasks)) return detail;
@@ -438,6 +450,9 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
         return updated;
       } catch (error) {
         if (error instanceof ServiceError) throw error;
+        if (isProjectConflict(error)) {
+          throw new ServiceError(409, "Conflito ao atualizar o projeto. Tente novamente.", error);
+        }
         throw new ServiceError(500, "Erro ao atualizar", error);
       }
     },
@@ -465,13 +480,12 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
         });
         return { response };
       } catch (error) {
-        if (
-          typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          error.code === "P2003"
-        ) {
+        if (isPrismaError(error, "P2003")) {
           throw new ServiceError(409, "Não é possível excluir projeto com dependências.");
+        }
+        if (isPrismaError(error, "P2025")) return { response: null };
+        if (isProjectConflict(error)) {
+          throw new ServiceError(409, "Conflito ao excluir o projeto. Tente novamente.", error);
         }
         throw error;
       }
