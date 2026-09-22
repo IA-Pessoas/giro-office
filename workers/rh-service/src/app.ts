@@ -35,6 +35,13 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { authenticateRhRequest, requireRhPermission } from "./auth.js";
 import type { RhWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
+import { registerOperationalUserRoutes } from "./routes/operationalUsers.js";
+import { registerPointRoutes } from "./routes/point.js";
+import { registerProfileRoutes } from "./routes/profile.js";
+import { registerRequestRoutes } from "./routes/requests.js";
+import { registerScoreRoutes } from "./routes/score.js";
+import type { RhDb, RhRouteDeps } from "./routes/shared.js";
+import { registerTimeSheetRoutes } from "./routes/timesheets.js";
 
 export type RhCategoryPrisma = {
   $queryRaw: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
@@ -123,6 +130,8 @@ type RhTimeBankService = {
 type RhOptions = {
   env?: RhWorkerEnv;
   prisma?: RhCategoryPrisma;
+  /** Client usado pelas rotas portadas do serviço Node (ponto, solicitações, avaliações...). */
+  db?: RhDb;
   categoryService?: RhCategoryService;
   notificationService?: RhNotificationService;
   scoreQuestionService?: RhScoreQuestionService;
@@ -945,6 +954,19 @@ export function createRhWorkerApp(options: RhOptions = {}) {
       );
     }),
   );
+  const deps: RhRouteDeps = {
+    env: (c) => options.env ?? c.env,
+    withDb: (c, callback) =>
+      options.db
+        ? callback(options.db)
+        : withWorkerPrisma(options.env ?? c.env, PrismaClient, callback),
+  };
+  registerPointRoutes(app, deps);
+  registerProfileRoutes(app, deps);
+  registerOperationalUserRoutes(app, deps);
+  registerRequestRoutes(app, deps);
+  registerScoreRoutes(app, deps);
+  registerTimeSheetRoutes(app, deps);
   app.notFound((c) =>
     c.json({ success: false, error: "Recurso não encontrado.", code: "NOT_FOUND" }, 404),
   );
