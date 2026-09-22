@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createTriagemWorkerApp,
+  type TriagemAuditService,
   type TriagemCatalogPrisma,
   type TriagemCatalogService,
+  type TriagemCompetenceService,
+  type TriagemExternalLinkService,
+  type TriagemOverviewService,
+  type TriagemUrgentRequestService,
   type TriagemWorkerEnv,
 } from "./app.js";
 
@@ -35,6 +40,46 @@ function service(): TriagemCatalogService {
     create: vi.fn(async () => ({ id: ITEM_ID, kind: "LINK_TYPE", code: "gov", label: "Governo" })),
     update: vi.fn(async () => ({ id: ITEM_ID, kind: "LINK_TYPE", code: "gov", label: "Governo" })),
     archive: vi.fn(async () => ({ id: ITEM_ID, archived_at: new Date().toISOString() })),
+  };
+}
+
+function overviewService(): TriagemOverviewService {
+  return {
+    list: vi.fn(async () => ({ items: [], total: 0, page: 1, page_size: 20, indicators: {} })),
+  };
+}
+
+function externalLinkService(): TriagemExternalLinkService {
+  return {
+    list: vi.fn(async () => []),
+    create: vi.fn(async () => ({ id: ITEM_ID })),
+    update: vi.fn(async () => ({ id: ITEM_ID })),
+    archive: vi.fn(async () => ({ id: ITEM_ID, archived_at: new Date().toISOString() })),
+  };
+}
+
+function competenceService(): TriagemCompetenceService {
+  return {
+    list: vi.fn(async () => []),
+    create: vi.fn(async () => ({ id: ITEM_ID, competence: "2026-09" })),
+    archive: vi.fn(async () => ({ id: ITEM_ID, archived_at: new Date().toISOString() })),
+  };
+}
+
+function urgentRequestService(): TriagemUrgentRequestService {
+  return {
+    list: vi.fn(async () => []),
+    create: vi.fn(async () => ({ id: ITEM_ID, status: "OPEN" })),
+    update: vi.fn(async () => ({ id: ITEM_ID, status: "OPEN" })),
+    close: vi.fn(async () => ({ id: ITEM_ID, status: "CLOSED" })),
+    reopen: vi.fn(async () => ({ id: ITEM_ID, status: "OPEN" })),
+  };
+}
+
+function auditService(): TriagemAuditService {
+  return {
+    listTimeline: vi.fn(async () => ({ items: [], total: 0, page: 1, page_size: 20 })),
+    reconcile: vi.fn(async () => ({ reconciled: 0, dispatched: 0, pending: 0 })),
   };
 }
 
@@ -94,5 +139,117 @@ describe("triagem Worker", () => {
       label: "Governo Federal",
     });
     expect(catalogService.archive).toHaveBeenCalledWith(ORGANIZATION_ID, ITEM_ID);
+  });
+
+  it("routes the remaining triagem contracts through scoped services", async () => {
+    const overview = overviewService();
+    const externalLinks = externalLinkService();
+    const competencies = competenceService();
+    const urgentRequests = urgentRequestService();
+    const audit = auditService();
+    const app = createTriagemWorkerApp({
+      env: env(),
+      catalogService: service(),
+      overviewService: overview,
+      externalLinkService: externalLinks,
+      competenceService: competencies,
+      urgentRequestService: urgentRequests,
+      auditService: audit,
+    });
+    const bodyHeaders = { ...headers(), "content-type": "application/json" };
+    const externalBody = {
+      client_id: ORGANIZATION_ID,
+      competence: "2026-09",
+      type: "gov",
+      url: "https://example.com/portal",
+      description: "Portal oficial",
+    };
+    const urgentBody = {
+      client_id: ORGANIZATION_ID,
+      competence: "2026-09",
+      urgency_code: "HIGH",
+      description: "Solicitação urgente",
+      responsible_id: USER_ID,
+    };
+    const responses = await Promise.all([
+      app.request("https://triagem.test/triagem/overview?page=1&page_size=20", {
+        headers: headers(),
+      }),
+      app.request(
+        `https://triagem.test/triagem/external-links?client_id=${ORGANIZATION_ID}&competence=2026-09`,
+        { headers: headers() },
+      ),
+      app.request("https://triagem.test/triagem/external-links", {
+        method: "POST",
+        headers: bodyHeaders,
+        body: JSON.stringify(externalBody),
+      }),
+      app.request(`https://triagem.test/triagem/external-links/${ITEM_ID}`, {
+        method: "PUT",
+        headers: bodyHeaders,
+        body: JSON.stringify({ type: "gov", url: externalBody.url }),
+      }),
+      app.request(`https://triagem.test/triagem/external-links/${ITEM_ID}/archive`, {
+        method: "PATCH",
+        headers: headers(),
+      }),
+      app.request("https://triagem.test/triagem/competencies", { headers: headers() }),
+      app.request("https://triagem.test/triagem/competencies", {
+        method: "POST",
+        headers: bodyHeaders,
+        body: JSON.stringify({ client_id: ORGANIZATION_ID, competence: "2026-09" }),
+      }),
+      app.request(`https://triagem.test/triagem/competencies/${ITEM_ID}/archive`, {
+        method: "PATCH",
+        headers: headers(),
+      }),
+      app.request(
+        `https://triagem.test/triagem/urgent-requests?client_id=${ORGANIZATION_ID}&competence=2026-09`,
+        { headers: headers() },
+      ),
+      app.request("https://triagem.test/triagem/urgent-requests", {
+        method: "POST",
+        headers: bodyHeaders,
+        body: JSON.stringify(urgentBody),
+      }),
+      app.request(`https://triagem.test/triagem/urgent-requests/${ITEM_ID}`, {
+        method: "PUT",
+        headers: bodyHeaders,
+        body: JSON.stringify({ description: "Atualizada" }),
+      }),
+      app.request(`https://triagem.test/triagem/urgent-requests/${ITEM_ID}/close`, {
+        method: "PATCH",
+        headers: bodyHeaders,
+        body: JSON.stringify({ resolution_note: "Resolvida" }),
+      }),
+      app.request(`https://triagem.test/triagem/urgent-requests/${ITEM_ID}/reopen`, {
+        method: "PATCH",
+        headers: headers(),
+      }),
+      app.request(
+        `https://triagem.test/triagem/competencies/${ITEM_ID}/history?page=1&page_size=20`,
+        { headers: headers() },
+      ),
+      app.request("https://triagem.test/internal/triagem/audit/reconcile", {
+        method: "POST",
+        headers: headers(),
+      }),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([
+      200, 200, 201, 200, 200, 200, 201, 200, 200, 201, 200, 200, 200, 200, 200,
+    ]);
+    expect(overview.list).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 1, pageSize: 20 }),
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+    expect(externalLinks.create).toHaveBeenCalled();
+    expect(competencies.create).toHaveBeenCalled();
+    expect(urgentRequests.close).toHaveBeenCalledWith(
+      ITEM_ID,
+      "Resolvida",
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+    expect(audit.reconcile).toHaveBeenCalled();
   });
 });
