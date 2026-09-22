@@ -28,4 +28,19 @@ describe("reports worker bindings", () => {
 
     expect(normalized.sourceTimeoutMs).toBe(10_000);
   });
+
+  it("aponta a origem para o Service Binding quando ele existe", () => {
+    const binding = { fetch: async () => new Response() };
+    const normalized = toReportsServiceEnv({
+      TASK_SERVICE: binding,
+      USER_SERVICE: binding,
+      FISCAL_SERVICE_URL: "https://fiscal.explicito",
+    } as never);
+
+    expect(normalized.taskServiceUrl).toBe("https://task-service.binding");
+    expect(normalized.userServiceUrl).toBe("https://user-service.binding");
+    // URL explícita continua vencendo; sem binding nem URL, o default local.
+    expect(normalized.fiscalServiceUrl).toBe("https://fiscal.explicito");
+    expect(normalized.rhServiceUrl).toBe("http://127.0.0.1:9");
+  });
 });

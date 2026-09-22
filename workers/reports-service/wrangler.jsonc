@@ -7,8 +7,21 @@
   "compatibility_flags": ["nodejs_compat"],
   "services": [
     { "binding": "USER_SERVICE", "service": "giro-user-service" },
-    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }
+    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" },
+    { "binding": "PARCELAMENTO_SERVICE", "service": "giro-parcelamento-service" },
+    { "binding": "CLIENT_SERVICE", "service": "giro-client-service" },
+    { "binding": "CONTABIL_SERVICE", "service": "giro-contabil-service" },
+    { "binding": "TASK_SERVICE", "service": "giro-task-service" },
+    { "binding": "PROJECT_SERVICE", "service": "giro-project-service" },
+    { "binding": "CERTIFICATE_SERVICE", "service": "giro-certificate-service" },
+    { "binding": "FISCAL_SERVICE", "service": "giro-fiscal-service" },
+    { "binding": "PESSOAL_SERVICE", "service": "giro-pessoal-service" },
+    { "binding": "REGULARIZE_SERVICE", "service": "giro-regularize-service" },
+    { "binding": "TI_SERVICE", "service": "giro-ti-service" },
+    { "binding": "RH_SERVICE", "service": "giro-rh-service" }
   ],
+  // Substitui o processo worker.ts do Node (polling da fila de jobs de relatório).
+  "triggers": { "crons": ["*/1 * * * *"] },
   "vars": {
     "NODE_ENV": "development",
     "ENABLE_API_DOCS": "false"
