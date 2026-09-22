@@ -78,3 +78,10 @@ export async function authenticateRegularizeRequest(
     throw error;
   }
 }
+
+export function assertRegularizeInternalToken(request: Request, env: RegularizeWorkerEnv): void {
+  const token = request.headers.get(INTERNAL_SERVICE_TOKEN_HEADER);
+  if (!env.INTERNAL_SERVICE_TOKEN) throw new ServiceError(503, "Endpoint interno não configurado.");
+  if (!token) throw new ServiceError(401, "Token interno não informado.");
+  if (token !== env.INTERNAL_SERVICE_TOKEN) throw new ServiceError(403, "Acesso negado.");
+}

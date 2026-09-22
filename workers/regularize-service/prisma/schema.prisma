@@ -31,6 +31,7 @@ model License {
   protocol_file_size_bytes          Int?
   protocol_file_uploaded_at         DateTime?
   protocol_file_uploaded_by_user_id String?
+  client                            Client? @relation(fields: [client_id], references: [id])
 
   @@map("regularize.license")
 }
@@ -66,6 +67,7 @@ model Client {
   partners        Partners[] @relation("partnerClientPJ")
   passwordsRegularize PasswordRegularize[]
   proceduralGuidances ProceduralGuidance[] @relation("proceduralGuidanceClientPJ")
+  licenses        License[]
 
   @@map("clients")
 }

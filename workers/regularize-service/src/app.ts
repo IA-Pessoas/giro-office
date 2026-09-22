@@ -67,7 +67,10 @@ import {
   RegularizeDashboardService as RegularizeDashboardServiceImpl,
   type RegularizeDashboardService as RegularizeDashboardServiceType,
 } from "@workspace/regularize-service/src/services/regularizeDashboardService.js";
-import { RegularizeReconciliationService } from "@workspace/regularize-service/src/services/regularizeReconciliationService.js";
+import {
+  RegularizeReconciliationService as RegularizeReconciliationServiceImpl,
+  type RegularizeReconciliationService as RegularizeReconciliationServiceType,
+} from "@workspace/regularize-service/src/services/regularizeReconciliationService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
 import {
@@ -79,7 +82,7 @@ import {
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { authenticateRegularizeRequest } from "./auth.js";
+import { assertRegularizeInternalToken, authenticateRegularizeRequest } from "./auth.js";
 import type { RegularizeWorkerEnv } from "./env.js";
 import {
   createLicenseMutationService,
@@ -145,6 +148,13 @@ export type RegularizeGuidanceService = Pick<
   | "removePartner"
 >;
 export type RegularizeDashboardService = Pick<RegularizeDashboardServiceType, "getDashboard">;
+export type RegularizeReconciliationService = Pick<
+  RegularizeReconciliationServiceType,
+  | "runFullReconciliation"
+  | "runLicenseNotificationReconciliation"
+  | "runInactiveClientPfStatusReconciliation"
+  | "runClientPfDocumentNotificationReconciliation"
+>;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
@@ -156,6 +166,7 @@ type RegularizeOptions = {
   passwordService?: RegularizePasswordService;
   guidanceService?: RegularizeGuidanceService;
   dashboardService?: RegularizeDashboardService;
+  reconciliationService?: RegularizeReconciliationService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -311,7 +322,7 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
     if (options.clientPfService) return callback(options.clientPfService);
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) => {
       const prisma = client as never;
-      return callback(new ClientPfService(prisma, new RegularizeReconciliationService(prisma)));
+      return callback(new ClientPfService(prisma, new RegularizeReconciliationServiceImpl(prisma)));
     });
   };
   const withPartnersService = async <T>(
@@ -321,7 +332,7 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
     if (options.partnersService) return callback(options.partnersService);
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) => {
       const prisma = client as never;
-      return callback(new PartnersService(prisma, new RegularizeReconciliationService(prisma)));
+      return callback(new PartnersService(prisma, new RegularizeReconciliationServiceImpl(prisma)));
     });
   };
   const withPasswordService = async <T>(
@@ -355,11 +366,46 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new RegularizeDashboardServiceImpl(client as never)),
     );
   };
+  const withReconciliationService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeReconciliationService) => Promise<T>,
+  ) => {
+    if (options.reconciliationService) return callback(options.reconciliationService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new RegularizeReconciliationServiceImpl(client as never)),
+    );
+  };
   const requirePasswordReveal = (c: RegularizeContext): void => {
     if (Number(c.get("auth").claims.permission ?? 0) < 2) {
       throw new ServiceError(403, "Permissao insuficiente para revelar credencial.");
     }
   };
+  const requireInternal = (c: RegularizeContext): void =>
+    assertRegularizeInternalToken(c.req.raw, options.env ?? c.env);
+  app.post("/internal/reconciliation/run", async (c) => {
+    requireInternal(c);
+    return withReconciliationService(c, async (service) =>
+      c.json(createSuccessResponse(await service.runFullReconciliation())),
+    );
+  });
+  app.post("/internal/reconciliation/license-notifications/run", async (c) => {
+    requireInternal(c);
+    return withReconciliationService(c, async (service) =>
+      c.json(createSuccessResponse(await service.runLicenseNotificationReconciliation())),
+    );
+  });
+  app.post("/internal/reconciliation/client-pf-status/run", async (c) => {
+    requireInternal(c);
+    return withReconciliationService(c, async (service) =>
+      c.json(createSuccessResponse(await service.runInactiveClientPfStatusReconciliation())),
+    );
+  });
+  app.post("/internal/reconciliation/client-pf-documents/run", async (c) => {
+    requireInternal(c);
+    return withReconciliationService(c, async (service) =>
+      c.json(createSuccessResponse(await service.runClientPfDocumentNotificationReconciliation())),
+    );
+  });
   app.get("/regularize/dashboard", async (c) =>
     withDashboardService(c, async (service) => {
       const { year } = parseWithZod(regularizeDashboardQuerySchema, c.req.query());

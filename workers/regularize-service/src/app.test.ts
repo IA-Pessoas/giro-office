@@ -10,6 +10,7 @@ import {
   type RegularizePartnersService,
   type RegularizePasswordService,
   type RegularizeProcessService,
+  type RegularizeReconciliationService,
   type RegularizeWorkerEnv,
 } from "./app.js";
 
@@ -137,6 +138,15 @@ function dashboardService(): RegularizeDashboardService {
       recentProcesses: [],
       trackedLicenses: [],
     })),
+  };
+}
+
+function reconciliationService(): RegularizeReconciliationService {
+  return {
+    runFullReconciliation: vi.fn(async () => ({ processed: 4 })),
+    runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 1 })),
+    runInactiveClientPfStatusReconciliation: vi.fn(async () => ({ updated: 2 })),
+    runClientPfDocumentNotificationReconciliation: vi.fn(async () => ({ created: 3 })),
   };
 }
 
@@ -654,5 +664,36 @@ describe("regularize Worker", () => {
     expect(response.status).toBe(200);
     expect(dashboard.getDashboard).toHaveBeenCalledWith(ORGANIZATION_ID, 2026);
     expect((await response.json()).data.year).toBe(2026);
+  });
+
+  it("keeps reconciliation endpoints internal and delegates each operation", async () => {
+    const reconciliation = reconciliationService();
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      reconciliationService: reconciliation,
+    });
+    const paths = [
+      "/internal/reconciliation/run",
+      "/internal/reconciliation/license-notifications/run",
+      "/internal/reconciliation/client-pf-status/run",
+      "/internal/reconciliation/client-pf-documents/run",
+    ];
+    const missing = await app.request(`https://regularize.test${paths[0]}`, { method: "POST" });
+    const responses = await Promise.all(
+      paths.map((path) =>
+        app.request(`https://regularize.test${path}`, {
+          method: "POST",
+          headers: { "x-internal-service-token": TOKEN },
+        }),
+      ),
+    );
+
+    expect(missing.status).toBe(401);
+    expect(responses.map((response) => response.status)).toEqual([200, 200, 200, 200]);
+    expect(reconciliation.runFullReconciliation).toHaveBeenCalledOnce();
+    expect(reconciliation.runLicenseNotificationReconciliation).toHaveBeenCalledOnce();
+    expect(reconciliation.runInactiveClientPfStatusReconciliation).toHaveBeenCalledOnce();
+    expect(reconciliation.runClientPfDocumentNotificationReconciliation).toHaveBeenCalledOnce();
   });
 });
