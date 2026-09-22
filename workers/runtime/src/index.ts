@@ -31,6 +31,11 @@ export {
   verifyCsrfToken,
 } from "./session.js";
 export {
+  type ValidateWorkerSessionOptions,
+  validateWorkerSession,
+  WorkerSessionValidationError,
+} from "./sessionValidation.js";
+export {
   createSupabaseStorageClient,
   type SupabaseStorageClient,
   type SupabaseStorageEnvironment,
