@@ -2,6 +2,14 @@
 
 Data: 2026-09-22
 
+## Revalidação desta execução
+
+As rotas do Node foram comparadas novamente com o Worker: configurações de proposta, prospecção de clientes, tarefas de faturamento e estado do outbox estão presentes com os contratos de autenticação, tenant, permissões, paginação, envelopes e erros. A paridade de código já estava fechada nos commits `31d7f5eb`, `f9b2196a` e `4c09ed5c`; não houve alteração de código Commercial nesta rodada.
+
+Validações: testes completos com 9 arquivos e 26 testes, typecheck, build, check, `prisma validate` e `wrangler deploy --dry-run` aprovados. Este arquivo é a atualização separada do relatório.
+
+A lacuna permanece explícita: não há binding Queue configurado para entrega do outbox e não se deve simular sucesso. Cron, retry, lease, idempotência, auditoria e os guards existentes foram revalidados localmente; Hyperdrive/DATABASE_URL, adaptador de email e smoke autenticado em staging/produção ainda precisam de configuração e validação reais.
+
 ## Terceiro ciclo TDD — re-review
 
 O RED foi executado antes das correções do re-review:
