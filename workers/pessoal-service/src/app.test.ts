@@ -4,6 +4,7 @@ import {
   type PessoalGroupPrisma,
   type PessoalGroupService,
   type PessoalLddService,
+  type PessoalObligationService,
   type PessoalPasswordService,
   type PessoalPayrollService,
   type PessoalSituationService,
@@ -20,6 +21,7 @@ const CLIENT_ID = "f0000000-0000-4000-8000-000000000001";
 const LDD_ID = "90000000-0000-4000-8000-000000000001";
 const PASSWORD_ID = "91000000-0000-4000-8000-000000000001";
 const PAYROLL_ID = "92000000-0000-4000-8000-000000000001";
+const OBLIGATION_ID = "93000000-0000-4000-8000-000000000001";
 const TOKEN = "pessoal-gateway-token";
 
 function env(): PessoalWorkerEnv {
@@ -102,6 +104,29 @@ function payrollService(): PessoalPayrollService {
     detail: vi.fn(async () => ({ id: PAYROLL_ID, client_id: CLIENT_ID, employees: 2 })),
     create: vi.fn(async () => ({ id: PAYROLL_ID, client_id: CLIENT_ID, employees: 2 })),
     update: vi.fn(async () => ({ id: PAYROLL_ID, client_id: CLIENT_ID, employees: 3 })),
+  };
+}
+
+function obligationService(): PessoalObligationService {
+  return {
+    detail: vi.fn(async () => ({ id: OBLIGATION_ID, client_id: CLIENT_ID, competence: "2026-09" })),
+    create: vi.fn(async () => ({
+      created: true,
+      obligation: { id: OBLIGATION_ID, client_id: CLIENT_ID },
+      skippedNoObligations: false,
+    })),
+    updateField: vi.fn(async () => ({ id: OBLIGATION_ID, payroll: true })),
+    generateForCompetence: vi.fn(async () => ({
+      clients: 1,
+      payrollRows: 1,
+      existing: 0,
+      created: 1,
+      skippedExisting: 0,
+      skippedArchivedGroup: 0,
+      skippedNoObligations: 0,
+      skippedNoGroup: 0,
+      skippedNoPayroll: 0,
+    })),
   };
 }
 
@@ -374,6 +399,47 @@ describe("pessoal Worker", () => {
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
       CLIENT_ID,
       { group_id: GROUP_ID, employees: 3 },
+    );
+  });
+
+  it("routes obligation detail, create, update and competence generation", async () => {
+    const obligations = obligationService();
+    const app = createPessoalWorkerApp({ env: env(), obligationService: obligations });
+    const authHeaders = headers();
+    const jsonHeaders = { ...authHeaders, "content-type": "application/json" };
+    const detail = await app.request(
+      `https://pessoal.test/pessoal/obrigations?client_id=${CLIENT_ID}&competence=2026-09`,
+      { headers: authHeaders },
+    );
+    const created = await app.request("https://pessoal.test/pessoal/obrigations", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ client_id: CLIENT_ID, competence: "2026-09" }),
+    });
+    const generated = await app.request(
+      "https://pessoal.test/pessoal/obrigations/competences/2026-09/generate",
+      { method: "POST", headers: authHeaders },
+    );
+    const updated = await app.request(`https://pessoal.test/pessoal/obrigations/${OBLIGATION_ID}`, {
+      method: "PATCH",
+      headers: jsonHeaders,
+      body: JSON.stringify({ payroll: true }),
+    });
+
+    expect([detail.status, created.status, generated.status, updated.status]).toEqual([
+      200, 201, 200, 200,
+    ]);
+    expect(obligations.detail).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID },
+      { client_id: CLIENT_ID, competence: "2026-09" },
+    );
+    expect(obligations.create).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      { client_id: CLIENT_ID, competence: "2026-09" },
+    );
+    expect(obligations.generateForCompetence).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      "2026-09",
     );
   });
 });

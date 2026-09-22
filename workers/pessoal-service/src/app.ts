@@ -10,6 +10,13 @@ import {
   updateLddBodySchema,
 } from "@workspace/pessoal-service/src/schemas/ldd.schemas.js";
 import {
+  createObligationBodySchema,
+  detailObligationQuerySchema,
+  generateObligationsParamsSchema,
+  obligationIdParamsSchema,
+  updateObligationFieldBodySchema,
+} from "@workspace/pessoal-service/src/schemas/obligation.schemas.js";
+import {
   createPasswordBodySchema,
   listPasswordsQuerySchema,
   passwordIdParamsSchema,
@@ -32,7 +39,10 @@ import {
   unionIdParamsSchema,
   updateUnionBodySchema,
 } from "@workspace/pessoal-service/src/schemas/union.schemas.js";
-import { NORMAL_GROUP_POLICY } from "@workspace/pessoal-service/src/services/pessoalGroupPolicy.js";
+import {
+  NO_OBLIGATIONS_GROUP_POLICY,
+  NORMAL_GROUP_POLICY,
+} from "@workspace/pessoal-service/src/services/pessoalGroupPolicy.js";
 import {
   createPessoalPasswordCrypto,
   isPessoalPasswordEncrypted,
@@ -128,6 +138,16 @@ export type PessoalPayrollService = {
     body: Record<string, unknown>,
   ): Promise<unknown>;
 };
+export type PessoalObligationService = {
+  detail(context: { organizationId: string }, query: Record<string, unknown>): Promise<unknown>;
+  create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
+  updateField(
+    context: Record<string, unknown>,
+    id: string,
+    body: Record<string, unknown>,
+  ): Promise<unknown>;
+  generateForCompetence(context: Record<string, unknown>, competence: string): Promise<unknown>;
+};
 export type PessoalDomainPrisma = PessoalGroupPrisma & {
   unionPessoal: {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
@@ -139,11 +159,15 @@ export type PessoalDomainPrisma = PessoalGroupPrisma & {
   };
   payroll: {
     count(args: Record<string, unknown>): Promise<number>;
+    findMany(args: Record<string, unknown>): Promise<unknown[]>;
     findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
     create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
     update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
   };
-  client: { findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null> };
+  client: {
+    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+    findMany(args: Record<string, unknown>): Promise<unknown[]>;
+  };
   situationsPessoal: {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
     findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
@@ -169,6 +193,13 @@ export type PessoalDomainPrisma = PessoalGroupPrisma & {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
     findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
   };
+  obrigationsPessoal: {
+    findMany(args: Record<string, unknown>): Promise<unknown[]>;
+    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    createMany(args: Record<string, unknown>): Promise<{ count: number }>;
+  };
 };
 type PessoalOptions = {
   env?: PessoalWorkerEnv;
@@ -179,6 +210,7 @@ type PessoalOptions = {
   lddService?: PessoalLddService;
   passwordService?: PessoalPasswordService;
   payrollService?: PessoalPayrollService;
+  obligationService?: PessoalObligationService;
 };
 type PessoalWorkerContext = { Bindings: PessoalWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type PessoalContext = Context<PessoalWorkerContext>;
@@ -1125,6 +1157,276 @@ function localPayrollService(
   };
 }
 
+function localObligationService(
+  prisma: PessoalDomainPrisma,
+  env?: PessoalWorkerEnv,
+): PessoalObligationService {
+  const select = {
+    id: true,
+    client_id: true,
+    competence: true,
+    responsavel_id: true,
+    advance: true,
+    payroll: true,
+    charges: true,
+    assistance_fee: true,
+    bem_mais: true,
+    bsf: true,
+    va: true,
+    vt: true,
+    group_snapshot_id: true,
+    group_snapshot_name: true,
+    group_snapshot_policy: true,
+    organization_id: true,
+  };
+  const payrollSelect = {
+    client_id: true,
+    responsible_id: true,
+    advance: true,
+    assistance_fee: true,
+    bem_mais: true,
+    bsf: true,
+    va: true,
+    vt: true,
+    group_id: true,
+  };
+  const groupSelect = {
+    id: true,
+    name: true,
+    policy: true,
+    archived_at: true,
+    organization_id: true,
+  };
+  const ensureClient = async (organizationId: string, clientId: unknown) => {
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, organization_id: organizationId },
+      select: { id: true },
+    });
+    if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+  };
+  const buildData = (
+    organizationId: string,
+    competence: string,
+    payroll: Record<string, unknown>,
+    group: Record<string, unknown>,
+  ) => ({
+    client_id: payroll.client_id,
+    competence,
+    responsavel_id: payroll.responsible_id ?? null,
+    advance: payroll.advance ? false : null,
+    payroll: false,
+    charges: false,
+    assistance_fee: payroll.assistance_fee ? false : null,
+    bem_mais: payroll.bem_mais ? false : null,
+    bsf: payroll.bsf ? false : null,
+    va: payroll.va ? false : null,
+    vt: payroll.vt ? false : null,
+    group_snapshot_id: group.id,
+    group_snapshot_name: group.name,
+    group_snapshot_policy: group.policy,
+    organization_id: organizationId,
+  });
+  const validGroup = (group: Record<string, unknown> | null) => {
+    if (!group)
+      throw new ServiceError(409, "Folha de pessoal sem grupo canonico para gerar obrigacao.");
+    if (group.archived_at)
+      throw new ServiceError(409, "Grupo de pessoal arquivado nao gera novas obrigacoes.");
+    if (group.policy === NO_OBLIGATIONS_GROUP_POLICY) return false;
+    if (group.policy !== NORMAL_GROUP_POLICY)
+      throw new ServiceError(409, "Politica de grupo de pessoal invalida.");
+    return true;
+  };
+
+  return {
+    async detail(context, query) {
+      return prisma.obrigationsPessoal.findFirst({
+        where: {
+          organization_id: context.organizationId,
+          client_id: query.client_id,
+          competence: query.competence,
+        },
+        select,
+      });
+    },
+    async create(context, body) {
+      const organizationId = String(context.organizationId);
+      await ensureClient(organizationId, body.client_id);
+      const existing = await prisma.obrigationsPessoal.findFirst({
+        where: {
+          organization_id: organizationId,
+          client_id: body.client_id,
+          competence: body.competence,
+        },
+        select,
+      });
+      if (existing) return { created: false, obligation: existing, skippedNoObligations: false };
+      const payroll = (await prisma.payroll.findFirst({
+        where: { organization_id: organizationId, client_id: body.client_id },
+        select: payrollSelect,
+      })) as Record<string, unknown> | null;
+      if (!payroll) throw new ServiceError(404, "Folha de pessoal nao encontrada para o cliente.");
+      const group = payroll.group_id
+        ? await prisma.pessoalGroup.findFirst({
+            where: { id: payroll.group_id, organization_id: organizationId },
+            select: groupSelect,
+          })
+        : null;
+      if (!validGroup(group))
+        return { created: false, obligation: null, skippedNoObligations: true };
+      const obligation = await prisma.obrigationsPessoal.create({
+        data: buildData(
+          organizationId,
+          String(body.competence),
+          payroll,
+          group as Record<string, unknown>,
+        ),
+        select,
+      });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: "pessoal.obrigations",
+        referringId: String(obligation.id),
+        department: "pessoal",
+      });
+      return { created: true, obligation, skippedNoObligations: false };
+    },
+    async updateField(context, id, body) {
+      const organizationId = String(context.organizationId);
+      const existing = await prisma.obrigationsPessoal.findFirst({
+        where: { id, organization_id: organizationId },
+        select,
+      });
+      if (!existing) throw new ServiceError(404, "Obrigacao de pessoal nao encontrada.");
+      if (body.responsavel_id) {
+        const user = await prisma.user.findFirst({
+          where: { id: body.responsavel_id, organization_id: organizationId },
+          select: { id: true },
+        });
+        if (!user)
+          throw new ServiceError(404, "Responsavel nao encontrado ou inelegivel para Pessoal.");
+      }
+      const updated = await prisma.obrigationsPessoal.update({ where: { id }, data: body, select });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Atualizacao",
+        referring: "pessoal.obligations",
+        referringId: id,
+        department: "pessoal",
+      });
+      return updated;
+    },
+    async generateForCompetence(context, competence) {
+      const organizationId = String(context.organizationId);
+      const clients = (await prisma.client.findMany({
+        where: { organization_id: organizationId, status: "Ativo", pessoal: true },
+        select: { id: true },
+      })) as Record<string, unknown>[];
+      if (clients.length === 0) {
+        return {
+          clients: 0,
+          payrollRows: 0,
+          existing: 0,
+          created: 0,
+          skippedExisting: 0,
+          skippedArchivedGroup: 0,
+          skippedNoObligations: 0,
+          skippedNoGroup: 0,
+          skippedNoPayroll: 0,
+        };
+      }
+      const ids = clients.map((client) => client.id);
+      const payrollRows = (await prisma.payroll.findMany({
+        where: { organization_id: organizationId, client_id: { in: ids } },
+        select: payrollSelect,
+      })) as Record<string, unknown>[];
+      const existingRows = (await prisma.obrigationsPessoal.findMany({
+        where: { organization_id: organizationId, competence, client_id: { in: ids } },
+        select: { client_id: true },
+      })) as Record<string, unknown>[];
+      const groups = (await prisma.pessoalGroup.findMany({
+        where: {
+          organization_id: organizationId,
+          id: { in: payrollRows.map((row) => row.group_id) },
+        },
+        select: groupSelect,
+      })) as Record<string, unknown>[];
+      const groupsById = new Map(groups.map((group) => [String(group.id), group]));
+      const existingIds = new Set(existingRows.map((row) => String(row.client_id)));
+      const data: Record<string, unknown>[] = [];
+      let skippedArchivedGroup = 0;
+      let skippedNoObligations = 0;
+      let skippedNoGroup = 0;
+      let skippedNoPayroll = 0;
+      for (const client of clients) {
+        const clientId = String(client.id);
+        if (existingIds.has(clientId)) continue;
+        const payroll = payrollRows.find((row) => String(row.client_id) === clientId);
+        if (!payroll) {
+          skippedNoPayroll += 1;
+          continue;
+        }
+        const group = groupsById.get(String(payroll.group_id));
+        if (!group) {
+          skippedNoGroup += 1;
+          continue;
+        }
+        if (group.archived_at) {
+          skippedArchivedGroup += 1;
+          continue;
+        }
+        if (group.policy === NO_OBLIGATIONS_GROUP_POLICY) {
+          skippedNoObligations += 1;
+          continue;
+        }
+        if (group.policy !== NORMAL_GROUP_POLICY) {
+          throw new ServiceError(409, "Politica de grupo de pessoal invalida.");
+        }
+        data.push(buildData(organizationId, competence, payroll, group));
+      }
+      const result = await prisma.obrigationsPessoal.createMany({
+        data,
+        skipDuplicates: true,
+      });
+      if (result.count > 0) {
+        await audit(env, {
+          organizationId,
+          userId: String(context.userId),
+          method: "ENTITY_CHANGE",
+          statusCode: 200,
+          outcome: "success",
+          serviceSource: "pessoal-service",
+          action: "Geracao",
+          referring: "pessoal.obligations",
+          referringId: competence,
+          department: "pessoal",
+        });
+      }
+      return {
+        clients: clients.length,
+        payrollRows: payrollRows.length,
+        existing: existingRows.length,
+        created: result.count,
+        skippedExisting: existingRows.length + data.length - result.count,
+        skippedArchivedGroup,
+        skippedNoObligations,
+        skippedNoGroup,
+        skippedNoPayroll,
+      };
+    },
+  };
+}
+
 export function createPessoalWorkerApp(options: PessoalOptions = {}) {
   const app = new Hono<PessoalWorkerContext>();
   app.get("/health", (c) =>
@@ -1204,6 +1506,17 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     if (options.payrollService) return callback(options.payrollService);
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
       callback(localPayrollService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
+    );
+  };
+  const withObligationService = async <T>(
+    c: PessoalContext,
+    callback: (service: PessoalObligationService) => Promise<T>,
+  ) => {
+    if (options.obligationService) return callback(options.obligationService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(
+        localObligationService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
+      ),
     );
   };
   app.get("/pessoal/groups", (c) =>
@@ -1461,6 +1774,44 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
       });
       const body = parseWithZod(updatePayrollBodySchema, await c.req.json());
       return c.json(createSuccessResponse(await service.update(domainContext(c), clientId, body)));
+    }),
+  );
+  app.get("/pessoal/obrigations", (c) =>
+    withObligationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const query = parseWithZod(detailObligationQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.detail({ organizationId: c.get("auth").organizationId }, query),
+        ),
+      );
+    }),
+  );
+  app.post("/pessoal/obrigations", (c) =>
+    withObligationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const body = parseWithZod(createObligationBodySchema, await c.req.json());
+      const result = (await service.create(domainContext(c), body)) as { created: boolean };
+      return c.json(createSuccessResponse(result), result.created ? 201 : 200);
+    }),
+  );
+  app.post("/pessoal/obrigations/competences/:competence/generate", (c) =>
+    withObligationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const { competence } = parseWithZod(generateObligationsParamsSchema, {
+        competence: c.req.param("competence"),
+      });
+      return c.json(
+        createSuccessResponse(await service.generateForCompetence(domainContext(c), competence)),
+      );
+    }),
+  );
+  app.patch("/pessoal/obrigations/:id", (c) =>
+    withObligationService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 2);
+      const { id } = parseWithZod(obligationIdParamsSchema, { id: c.req.param("id") });
+      const body = parseWithZod(updateObligationFieldBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.updateField(domainContext(c), id, body)));
     }),
   );
   app.notFound((c) =>

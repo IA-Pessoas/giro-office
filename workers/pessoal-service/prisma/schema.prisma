@@ -58,6 +58,8 @@ model Payroll {
 
 model Client {
   id              String @id @default(uuid())
+  status          String
+  pessoal         Boolean
   organization_id String
 
   @@map("clients")
@@ -99,6 +101,29 @@ model PasswordPessoal {
   organization_id String
 
   @@map("pessoal.passwords")
+}
+
+model ObrigationsPessoal {
+  id                    String   @id @default(uuid())
+  client_id             String
+  competence            String
+  responsavel_id        String?
+  advance               Boolean?
+  payroll               Boolean?
+  charges               Boolean?
+  assistance_fee        Boolean?
+  bem_mais              Boolean?
+  bsf                   Boolean?
+  va                    Boolean?
+  vt                    Boolean?
+  group_snapshot_id     String?
+  group_snapshot_name   String?
+  group_snapshot_policy String?
+  organization_id       String
+
+  @@unique([organization_id, client_id, competence], map: "uq_pessoal_obligations_org_client_competence")
+  @@index([organization_id, competence], map: "idx_pessoal_obligations_org_competence")
+  @@map("pessoal.obrigations")
 }
 
 model SituationsPessoal {
