@@ -6,6 +6,43 @@ Implementação limitada ao restante de RH definido no brief da migração Cloud
 
 Foram preservados o envelope de resposta, autenticação, permissões mínimas, escopo por `organization_id`, validações Zod e os nomes das tabelas canônicas PostgreSQL/Supabase. O Worker usa mappings Prisma locais para os modelos necessários, sem criar campos fora do schema canônico.
 
+## Correções da revisão
+
+O commit local `963555fd` (`fix(rh-worker): harden category and auth boundaries`) corrigiu:
+
+- `DELETE /rh/categories`: removeu o delegate inexistente `prisma.rhRequest.count`; a regra de segurança agora consulta a tabela canônica `rh.requests` com `SELECT EXISTS` parametrizado via `$queryRaw`, sem inventar delegate ou modelo no Prisma mínimo do Worker.
+- Exclusão de categoria: preserva o resultado legado `{ message: "Categoria removida com sucesso" }` dentro do envelope compartilhado e continua recusando categorias com solicitações vinculadas.
+- Banco de horas: normaliza `date_from` para `00:00:00.000Z` e `date_to` para `23:59:59.999Z`, usando `TimeUtils.getUtcDayBounds`, como no serviço canônico.
+- Autorização: exige simultaneamente `claims.permission` e `claims.modules.rh` no nível mínimo da rota.
+- Fronteira: `workers_dev:false` e autenticação binding-only por `INTERNAL_SERVICE_TOKEN`; JWT Bearer e sessão cookie diretos são rejeitados pelo Worker. O gateway continua sendo a fronteira que valida CSRF antes do encaminhamento.
+- Entrada/logs: JSON malformado retorna 400; o `onError` serializa a resposta compartilhada e registra somente método, path, status, nome do erro e request-id, sem body, headers, tokens ou mensagem bruta.
+
+## TDD e validação da correção
+
+Os RED observados antes da implementação foram:
+
+- exclusão de categoria retornava 500 ao usar um mock Prisma fiel sem `rhRequest`;
+- `permission=3` com `modules.rh=0` retornava 200;
+- JWT Bearer e `cw.session` válidos acessavam o Worker diretamente;
+- datas intradiárias eram encaminhadas sem limites UTC;
+- JSON malformado retornava 500.
+
+Após as implementações mínimas, o Worker ficou GREEN com 15/15 testes, cobrindo também vínculo existente, envelope legado, escopo de organização e respostas de erro serializadas.
+
+Gates executados:
+
+- `pnpm --filter @workspace/rh-worker test`: **passou, 15/15**;
+- `pnpm --filter @workspace/rh-worker typecheck`: **passou**;
+- `pnpm --filter @workspace/rh-worker build`: **passou**;
+- `pnpm --filter @workspace/rh-worker check`: **passou**;
+- `pnpm --filter @workspace/rh-worker exec prisma validate --schema prisma/schema.prisma`: **passou**;
+- `pnpm graphify:update:services`: **passou**; grafo atualizado para 9305 nós e 16952 arestas, sem visualização HTML por exceder o limite local;
+- `pnpm exec wrangler deploy --dry-run` em `workers/rh-service`: **passou**, sem bindings encontrados, sem publicação;
+- `git diff --check`: **passou**;
+- hooks do commit: **passaram**, supply-chain com 0 findings.
+
+A suíte do serviço canônico foi iniciada para comparação: sem o client Prisma gerado, 19 suítes falharam no import e 23 passaram (110 testes). A tentativa autorizada de gerar o client canônico foi bloqueada por `PrismaConfigEnvError: Cannot resolve environment variable: DATABASE_URL`; nenhuma credencial ou placeholder foi inventado. Portanto, o resultado canônico completo permanece não confirmado por falta de configuração local.
+
 ## Rotas migradas
 
 - `DELETE /rh/categories`, incluindo bloqueio de remoção quando há solicitações vinculadas e bloqueio de nomes duplicados na atualização.
@@ -57,6 +94,7 @@ Essas rotas dependem de relações e contratos adicionais do serviço Node, do a
 
 ## Commits e estado do workspace
 
+- `963555fd fix(rh-worker): harden category and auth boundaries` — commit local das correções desta revisão; não houve push ou deploy.
 - `81f0a73f3 feat(rh-worker): migrate remaining RH routes` — commit RH-only contendo schema local mínimo, implementação e testes.
 - Commits concorrentes de Pessoal já existentes no branch (`a0f0ec042` e `052d53523`) não foram reescritos nem modificados.
 - Alterações preexistentes de `app/next-env.d.ts`, TI e User continuam fora do índice e foram preservadas.
