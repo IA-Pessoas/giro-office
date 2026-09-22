@@ -25,6 +25,7 @@ function headers(): HeadersInit {
     "x-auth-user-id": USER_ID,
     "x-auth-organization-id": ORGANIZATION_ID,
     "x-auth-kind": "organization",
+    "x-auth-modules": JSON.stringify({ comercial: 2 }),
   };
 }
 
@@ -44,6 +45,17 @@ describe("commercial Worker", () => {
     const app = createCommercialWorkerApp({ env: env(), prisma, proposalService: service() });
     expect((await app.request("https://commercial.test/health")).status).toBe(200);
     expect((await app.request("https://commercial.test/ready")).status).toBe(200);
+  });
+
+  it("reports missing PostgreSQL runtime configuration as unavailable", async () => {
+    const app = createCommercialWorkerApp({
+      env: {
+        JWT_SECRET: env().JWT_SECRET,
+        INTERNAL_SERVICE_TOKEN: TOKEN,
+      },
+    });
+
+    expect((await app.request("https://commercial.test/ready")).status).toBe(503);
   });
 
   it("requires authentication for proposal configuration routes", async () => {
@@ -78,13 +90,16 @@ describe("commercial Worker", () => {
     expect(created.status).toBe(201);
     expect(updated.status).toBe(200);
     expect(proposalService.list).toHaveBeenCalledWith(ORGANIZATION_ID);
-    expect(proposalService.create).toHaveBeenCalledWith(ORGANIZATION_ID, {
-      name: "Mensal",
-      contract_value: 100,
-    });
-    expect(proposalService.update).toHaveBeenCalledWith(ORGANIZATION_ID, CONFIG_ID, {
-      name: "Anual",
-      contract_value: 1200,
-    });
+    expect(proposalService.create).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      { name: "Mensal", contract_value: 100 },
+      expect.objectContaining({ userId: USER_ID }),
+    );
+    expect(proposalService.update).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      CONFIG_ID,
+      { name: "Anual", contract_value: 1200 },
+      expect.objectContaining({ userId: USER_ID }),
+    );
   });
 });

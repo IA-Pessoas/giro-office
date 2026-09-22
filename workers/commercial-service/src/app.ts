@@ -3,6 +3,15 @@ import {
   proposalConfigIdParamSchema,
   updateProposalConfigBodySchema,
 } from "@workspace/commercial-service/src/schemas/proposalConfig.schemas.js";
+import {
+  createProspectingBodySchema,
+  prospectingIdParamSchema,
+  updateProspectingBodySchema,
+} from "@workspace/commercial-service/src/schemas/prospecting.schemas.js";
+import {
+  taskBillingIdParamSchema,
+  updateTaskBillingBodySchema,
+} from "@workspace/commercial-service/src/schemas/taskBilling.schemas.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
 import {
@@ -14,9 +23,28 @@ import {
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { authenticateCommercialRequest } from "./auth.js";
+import {
+  authenticateCommercialRequest,
+  requireCommercialModule,
+  requireOrganization,
+} from "./auth.js";
+import {
+  type BillingService,
+  CommercialOutboxStatusService,
+  type CommercialPrisma,
+  CommercialProposalConfigService,
+  CommercialProspectingService,
+  CommercialTaskBillingService,
+  createCommercialServices,
+  type OutboxStatusService,
+  type ProposalService,
+  type ProspectingService,
+} from "./commercialService.js";
 import type { CommercialWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
+
+export type { CommercialPrisma } from "./commercialService.js";
+export type { CommercialWorkerEnv } from "./env.js";
 
 export type ProposalPrisma = {
   $queryRaw: (query: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
@@ -28,136 +56,301 @@ export type ProposalPrisma = {
     deleteMany(args: Record<string, unknown>): Promise<{ count: number }>;
   };
 };
-export type ProposalService = {
-  list(organizationId: string): Promise<unknown>;
-  detail(id: string, organizationId: string): Promise<unknown>;
-  create(organizationId: string, input: Record<string, unknown>): Promise<unknown>;
-  update(organizationId: string, id: string, input: Record<string, unknown>): Promise<unknown>;
-  delete(organizationId: string, id: string): Promise<unknown>;
+
+export type CommercialWorkerServices = {
+  proposal: ProposalService;
+  prospecting: ProspectingService;
+  billing: BillingService;
+  outbox: OutboxStatusService;
 };
-type CommercialOptions = {
-  env?: CommercialWorkerEnv;
-  prisma?: ProposalPrisma;
-  proposalService?: ProposalService;
-};
+
 type CommercialWorkerContext = {
   Bindings: CommercialWorkerEnv;
   Variables: { auth: WorkerAuthContext };
 };
 type CommercialContext = Context<CommercialWorkerContext>;
 
-function localService(prisma: ProposalPrisma): ProposalService {
+type CommercialWorkerOptions = {
+  env?: CommercialWorkerEnv;
+  prisma?: ProposalPrisma | CommercialPrisma;
+  services?: CommercialWorkerServices;
+  proposalService?: ProposalService;
+  prospectingService?: ProspectingService;
+  taskBillingService?: BillingService;
+  outboxStatusService?: OutboxStatusService;
+};
+
+function organization(c: CommercialContext): string {
+  const auth = c.get("auth");
+  requireOrganization(auth);
+  return auth.organizationId;
+}
+
+function user(c: CommercialContext): string {
+  return c.get("auth").userId;
+}
+
+async function jsonBody(c: CommercialContext): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch {
+    throw new ServiceError(400, "JSON inválido.");
+  }
+}
+
+function idParam(
+  c: CommercialContext,
+  schema:
+    | typeof proposalConfigIdParamSchema
+    | typeof prospectingIdParamSchema
+    | typeof taskBillingIdParamSchema,
+  name: string,
+): string {
+  const parsed = parseWithZod(schema, { [name]: c.req.param(name) }) as Record<string, string>;
+  return parsed[name];
+}
+
+function requireRead(c: CommercialContext): void {
+  requireOrganization(c.get("auth"));
+  requireCommercialModule(c.get("auth"), 1);
+}
+
+function requireWrite(c: CommercialContext): void {
+  requireOrganization(c.get("auth"));
+  requireCommercialModule(c.get("auth"), 2);
+}
+
+function proposalAuditContext(c: CommercialContext) {
   return {
-    list: (organizationId) =>
-      prisma.proposalConfig.findMany({
-        where: { organization_id: organizationId },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, contract_value: true },
-      }),
-    async detail(id, organizationId) {
-      const row = await prisma.proposalConfig.findFirst({
-        where: { id, organization_id: organizationId },
-        select: { id: true, name: true, contract_value: true },
-      });
-      if (!row) throw new ServiceError(404, "Configuração comercial não encontrada.");
-      return row;
-    },
-    async create(organizationId, input) {
-      const duplicate = await prisma.proposalConfig.findFirst({
-        where: { name: input.name, organization_id: organizationId },
-      });
-      if (duplicate) throw new ServiceError(409, "Já existe uma configuração com esse nome.");
-      return prisma.proposalConfig.create({
-        data: { ...input, organization_id: organizationId },
-        select: { id: true, name: true, contract_value: true },
-      });
-    },
-    async update(organizationId, id, input) {
-      const current = (await this.detail(id, organizationId)) as Record<string, unknown>;
-      const count = await prisma.proposalConfig.updateMany({
-        where: { id, organization_id: organizationId },
-        data: { ...input },
-      });
-      if (count.count !== 1) throw new ServiceError(404, "Configuração comercial não encontrada.");
-      return { ...current, ...input, id };
-    },
-    async delete(organizationId, id) {
-      const result = await prisma.proposalConfig.deleteMany({
-        where: { id, organization_id: organizationId },
-      });
-      if (result.count !== 1) throw new ServiceError(404, "Configuração comercial não encontrada.");
-      return { id, deleted: true };
-    },
+    userId: c.get("auth").userId,
+    auditCorrelationId: c.req.header(REQUEST_ID_HEADER),
   };
 }
 
-export function createCommercialWorkerApp(options: CommercialOptions = {}) {
+function requireDatabase(env: CommercialWorkerEnv): void {
+  if (!env.HYPERDRIVE?.connectionString && !env.DATABASE_URL) {
+    throw new ServiceError(
+      503,
+      "Banco de dados indisponível: configure o binding HYPERDRIVE ou o secret DATABASE_URL.",
+    );
+  }
+}
+
+function injectedServices(options: CommercialWorkerOptions): CommercialWorkerServices | undefined {
+  if (options.services) return options.services;
+  if (
+    options.proposalService ||
+    options.prospectingService ||
+    options.taskBillingService ||
+    options.outboxStatusService
+  ) {
+    return {
+      proposal: options.proposalService as ProposalService,
+      prospecting: options.prospectingService as ProspectingService,
+      billing: options.taskBillingService as BillingService,
+      outbox: options.outboxStatusService as OutboxStatusService,
+    };
+  }
+  return undefined;
+}
+
+export function createCommercialWorkerApp(options: CommercialWorkerOptions = {}) {
   const app = new Hono<CommercialWorkerContext>();
+  const configuredEnv = options.env;
+
+  app.use("*", async (c, next) => {
+    c.header(REQUEST_ID_HEADER, c.req.header(REQUEST_ID_HEADER) ?? crypto.randomUUID());
+    await next();
+  });
   app.get("/health", (c) =>
     c.json(createSuccessResponse({ status: "ok", service: "commercial-service" })),
   );
   app.get("/ready", async (c) => {
-    if (options.prisma) await options.prisma.$queryRaw`SELECT 1`;
-    else
-      await withWorkerPrisma(
-        options.env ?? c.env,
-        PrismaClient,
-        async (client) => client.$queryRaw`SELECT 1`,
-      );
+    const env = configuredEnv ?? c.env;
+    if (options.prisma) {
+      await (options.prisma as ProposalPrisma).$queryRaw`SELECT 1`;
+    } else {
+      requireDatabase(env);
+      await withWorkerPrisma(env, PrismaClient, (client) => client.$queryRaw`SELECT 1`);
+    }
     return c.json(createSuccessResponse({ status: "ready", service: "commercial-service" }));
   });
-  app.use("/commercial/*", async (c, next) => {
-    c.set("auth", await authenticateCommercialRequest(c.req.raw, options.env ?? c.env));
+
+  const authenticate = async (c: CommercialContext, next: () => Promise<void>) => {
+    c.set("auth", await authenticateCommercialRequest(c.req.raw, configuredEnv ?? c.env));
     await next();
-  });
-  app.use("/commercial", async (c, next) => {
-    c.set("auth", await authenticateCommercialRequest(c.req.raw, options.env ?? c.env));
-    await next();
-  });
-  const withService = async <T>(
+  };
+  app.use("/commercial", authenticate);
+  app.use("/commercial/*", authenticate);
+
+  const withServices = async <T>(
     c: CommercialContext,
-    callback: (service: ProposalService) => Promise<T>,
-  ) => {
-    if (options.proposalService) return callback(options.proposalService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
-      callback(localService(client as unknown as ProposalPrisma)),
+    callback: (services: CommercialWorkerServices) => Promise<T>,
+  ): Promise<T> => {
+    const injected = injectedServices(options);
+    if (injected) return callback(injected);
+    const env = configuredEnv ?? c.env;
+    if (options.prisma) {
+      return callback(createCommercialServices(options.prisma as CommercialPrisma, env, c.req.url));
+    }
+    requireDatabase(env);
+    return withWorkerPrisma(env, PrismaClient, (client) =>
+      callback(createCommercialServices(client as unknown as CommercialPrisma, env, c.req.url)),
     );
   };
-  app.get("/commercial/proposal-configs", (c) =>
-    withService(c, async (service) =>
-      c.json(createSuccessResponse(await service.list(c.get("auth").organizationId))),
-    ),
-  );
-  app.get("/commercial/proposal-configs/:id", (c) =>
-    withService(c, async (service) => {
-      const { id } = parseWithZod(proposalConfigIdParamSchema, { id: c.req.param("id") });
-      return c.json(createSuccessResponse(await service.detail(id, c.get("auth").organizationId)));
-    }),
-  );
-  app.post("/commercial/proposal-configs", (c) =>
-    withService(c, async (service) => {
-      const body = parseWithZod(createProposalConfigBodySchema, await c.req.json());
-      return c.json(
-        createSuccessResponse(await service.create(c.get("auth").organizationId, body)),
+
+  app.get("/commercial/proposal-configs", async (c) => {
+    requireRead(c);
+    return withServices(c, async (services) =>
+      c.json(createSuccessResponse(await services.proposal.list(organization(c)))),
+    );
+  });
+  app.get("/commercial/proposal-configs/:id", async (c) => {
+    requireRead(c);
+    const id = idParam(c, proposalConfigIdParamSchema, "id");
+    return withServices(c, async (services) =>
+      c.json(createSuccessResponse(await services.proposal.detail(id, organization(c)))),
+    );
+  });
+  app.post("/commercial/proposal-configs", async (c) => {
+    requireWrite(c);
+    const body = parseWithZod(createProposalConfigBodySchema, await jsonBody(c));
+    return withServices(c, async (services) =>
+      c.json(
+        createSuccessResponse(
+          await services.proposal.create(organization(c), body, proposalAuditContext(c)),
+        ),
         201,
-      );
-    }),
-  );
-  app.patch("/commercial/proposal-configs/:id", (c) =>
-    withService(c, async (service) => {
-      const { id } = parseWithZod(proposalConfigIdParamSchema, { id: c.req.param("id") });
-      const body = parseWithZod(updateProposalConfigBodySchema, await c.req.json());
-      return c.json(
-        createSuccessResponse(await service.update(c.get("auth").organizationId, id, body)),
-      );
-    }),
-  );
-  app.delete("/commercial/proposal-configs/:id", (c) =>
-    withService(c, async (service) => {
-      const { id } = parseWithZod(proposalConfigIdParamSchema, { id: c.req.param("id") });
-      return c.json(createSuccessResponse(await service.delete(c.get("auth").organizationId, id)));
-    }),
-  );
+      ),
+    );
+  });
+  app.patch("/commercial/proposal-configs/:id", async (c) => {
+    requireWrite(c);
+    const id = idParam(c, proposalConfigIdParamSchema, "id");
+    const body = parseWithZod(updateProposalConfigBodySchema, await jsonBody(c));
+    return withServices(c, async (services) =>
+      c.json(
+        createSuccessResponse(
+          await services.proposal.update(organization(c), id, body, proposalAuditContext(c)),
+        ),
+      ),
+    );
+  });
+  app.delete("/commercial/proposal-configs/:id", async (c) => {
+    requireWrite(c);
+    const id = idParam(c, proposalConfigIdParamSchema, "id");
+    return withServices(c, async (services) =>
+      c.json(
+        createSuccessResponse(
+          await services.proposal.delete(organization(c), id, proposalAuditContext(c)),
+        ),
+      ),
+    );
+  });
+
+  app.get("/commercial/prospecting/clients", async (c) => {
+    requireRead(c);
+    return withServices(c, async (services) =>
+      c.json(createSuccessResponse(await services.prospecting.listClients(organization(c)))),
+    );
+  });
+  app.get("/commercial/prospecting", async (c) => {
+    requireRead(c);
+    return withServices(c, async (services) =>
+      c.json(createSuccessResponse(await services.prospecting.list(organization(c)))),
+    );
+  });
+  app.get("/commercial/prospecting/:id", async (c) => {
+    requireRead(c);
+    const id = idParam(c, prospectingIdParamSchema, "id");
+    return withServices(c, async (services) =>
+      c.json(createSuccessResponse(await services.prospecting.detail(id, organization(c)))),
+    );
+  });
+  app.post("/commercial/prospecting", async (c) => {
+    requireWrite(c);
+    const body = parseWithZod(createProspectingBodySchema, await jsonBody(c));
+    return withServices(c, async (services) =>
+      c.json(
+        createSuccessResponse(
+          await services.prospecting.create({
+            user_id: user(c),
+            organization_id: organization(c),
+            ...body,
+            audit_correlation_id: c.req.header(REQUEST_ID_HEADER),
+          }),
+        ),
+        201,
+      ),
+    );
+  });
+  app.patch("/commercial/prospecting/:id", async (c) => {
+    requireWrite(c);
+    const id = idParam(c, prospectingIdParamSchema, "id");
+    const body = parseWithZod(updateProspectingBodySchema, await jsonBody(c));
+    return withServices(c, async (services) =>
+      c.json(
+        createSuccessResponse(
+          await services.prospecting.update({
+            user_id: user(c),
+            organization_id: organization(c),
+            prospecting_id: id,
+            ...body,
+            audit_correlation_id: c.req.header(REQUEST_ID_HEADER),
+          }),
+        ),
+      ),
+    );
+  });
+  app.delete("/commercial/prospecting/:id", async (c) => {
+    requireWrite(c);
+    const id = idParam(c, prospectingIdParamSchema, "id");
+    return withServices(c, async (services) =>
+      c.json(
+        createSuccessResponse(
+          await services.prospecting.archive({
+            user_id: user(c),
+            organization_id: organization(c),
+            prospecting_id: id,
+            audit_correlation_id: c.req.header(REQUEST_ID_HEADER),
+          }),
+        ),
+      ),
+    );
+  });
+
+  app.get("/commercial/task-billing", async (c) => {
+    requireRead(c);
+    return withServices(c, async (services) =>
+      c.json(createSuccessResponse(await services.billing.list(organization(c)))),
+    );
+  });
+  app.put("/commercial/task-billing/:taskId", async (c) => {
+    requireWrite(c);
+    const taskId = idParam(c, taskBillingIdParamSchema, "taskId");
+    const body = parseWithZod(updateTaskBillingBodySchema, await jsonBody(c));
+    return withServices(c, async (services) =>
+      c.json(
+        createSuccessResponse(
+          await services.billing.update({
+            user_id: user(c),
+            organization_id: organization(c),
+            task_id: taskId,
+            ...body,
+            audit_correlation_id: c.req.header(REQUEST_ID_HEADER),
+          }),
+        ),
+      ),
+    );
+  });
+
+  app.get("/commercial/outbox/status", async (c) => {
+    requireRead(c);
+    return withServices(c, async (services) =>
+      c.json(createSuccessResponse(await services.outbox.status(organization(c)))),
+    );
+  });
+
   app.notFound((c) =>
     c.json({ success: false, error: "Recurso não encontrado.", code: "NOT_FOUND" }, 404),
   );
@@ -171,4 +364,9 @@ export function createCommercialWorkerApp(options: CommercialOptions = {}) {
   return app;
 }
 
-export type { CommercialWorkerEnv } from "./env.js";
+export {
+  CommercialOutboxStatusService,
+  CommercialProposalConfigService,
+  CommercialProspectingService,
+  CommercialTaskBillingService,
+};
