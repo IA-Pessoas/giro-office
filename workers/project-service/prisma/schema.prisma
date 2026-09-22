@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id              String   @id @default(uuid())
+  name            String
+  client_id       String
+  status          String
+  start_date      DateTime?
+  end_date        DateTime?
+  objective       String?
+  sponsor_id      String?
+  porcentage      Float
+  organization_id String
+
+  @@map("integracao.projects")
+}
