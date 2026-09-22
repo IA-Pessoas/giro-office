@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { ServiceError, serializeError } from "../../src/http/errors.js";
+
+test("errors module does not depend on node:http", async () => {
+  const source = await readFile(new URL("../../src/http/errors.ts", import.meta.url), "utf8");
+
+  assert.doesNotMatch(source, /(?:from\s+|require\(\s*)["']node:http["']/);
+});
 
 test("serializeError preserves service errors", () => {
   const result = serializeError(new ServiceError(401, "Não autenticado."), {

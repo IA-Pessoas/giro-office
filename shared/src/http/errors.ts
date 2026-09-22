@@ -1,5 +1,3 @@
-import { STATUS_CODES } from "node:http";
-
 export interface ErrorResponseBody {
   success: false;
   error: string;
@@ -17,39 +15,26 @@ interface SerializeErrorOptions {
   fallbackMessage: string;
 }
 
-const ERROR_CODE_BY_STATUS = new Map<number, string>([
-  [400, "BAD_REQUEST"],
-  [401, "UNAUTHORIZED"],
-  [403, "FORBIDDEN"],
-  [404, "NOT_FOUND"],
-  [409, "CONFLICT"],
-  [422, "UNPROCESSABLE_ENTITY"],
-  [429, "TOO_MANY_REQUESTS"],
-  [500, "INTERNAL_ERROR"],
-  [502, "BAD_GATEWAY"],
-  [503, "SERVICE_UNAVAILABLE"],
-  [504, "GATEWAY_TIMEOUT"],
+const STATUS_METADATA = new Map<number, { code: string; message: string }>([
+  [400, { code: "BAD_REQUEST", message: "Bad Request" }],
+  [401, { code: "UNAUTHORIZED", message: "Unauthorized" }],
+  [403, { code: "FORBIDDEN", message: "Forbidden" }],
+  [404, { code: "NOT_FOUND", message: "Not Found" }],
+  [409, { code: "CONFLICT", message: "Conflict" }],
+  [422, { code: "UNPROCESSABLE_ENTITY", message: "Unprocessable Entity" }],
+  [429, { code: "TOO_MANY_REQUESTS", message: "Too Many Requests" }],
+  [500, { code: "INTERNAL_ERROR", message: "Internal Server Error" }],
+  [502, { code: "BAD_GATEWAY", message: "Bad Gateway" }],
+  [503, { code: "SERVICE_UNAVAILABLE", message: "Service Unavailable" }],
+  [504, { code: "GATEWAY_TIMEOUT", message: "Gateway Timeout" }],
 ]);
 
 function getErrorCodeForStatusCode(statusCode: number): string {
-  const explicitCode = ERROR_CODE_BY_STATUS.get(statusCode);
-  if (explicitCode) {
-    return explicitCode;
-  }
-
-  const statusText = STATUS_CODES[statusCode];
-  if (!statusText) {
-    return `HTTP_${statusCode}_ERROR`;
-  }
-
-  return statusText
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  return STATUS_METADATA.get(statusCode)?.code ?? `HTTP_${statusCode}_ERROR`;
 }
 
 function getDefaultMessageForStatusCode(statusCode: number): string {
-  return STATUS_CODES[statusCode] ?? `HTTP ${statusCode} Error`;
+  return STATUS_METADATA.get(statusCode)?.message ?? `HTTP ${statusCode} Error`;
 }
 
 export class ServiceError extends Error {
