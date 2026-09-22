@@ -169,8 +169,9 @@ export function applyMigrations(databaseUrl, { strict = false } = {}) {
 }
 
 /**
- * Regenera o Prisma Client de cada Worker com `runtime = "workerd"`.
- * Sem isso o client gerado usa `import.meta.url`/__dirname e o Worker nem inicia.
+ * Regenera o Prisma Client de cada Worker a partir do schema do próprio Worker.
+ * O `runtime = "workerd"` agora vem declarado no schema; injetá-lo aqui duplicaria
+ * a chave (P1012). Só o `output` é reescrito, para caminho absoluto fora do cwd.
  * O diretório de saída é ignorado pelo git; nenhum arquivo versionado é alterado.
  */
 export function generateWorkerPrismaClients(tmpDir) {
@@ -187,7 +188,7 @@ export function generateWorkerPrismaClients(tmpDir) {
     const outputDir = join(workerDir, "src", "generated", "prisma");
     const patched = schema.replace(
       /output\s*=\s*"[^"]*"/u,
-      `output = ${JSON.stringify(outputDir)}\n  runtime = "workerd"`,
+      `output = ${JSON.stringify(outputDir)}`,
     );
     const patchedPath = join(tmpDir, `${worker.key}.prisma`);
     writeFileSync(patchedPath, patched);

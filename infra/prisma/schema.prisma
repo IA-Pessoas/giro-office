@@ -1,106 +1,124 @@
 generator infraClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator userServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/user-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator taskServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/task-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator projectServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/project-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator clientServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/client-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator organizationClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/organization-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 generator audit_service_client {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/audit-service/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator rh_service_client {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/rh-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator regularize_service_client {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/regularize-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator department_service_client {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/department-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator fiscalServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/fiscal-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator contabilServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/contabil-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator tiServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/ti-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator certificateServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/certificate-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator pessoalServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/pessoal-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator parcelamentoServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/parcelamento-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator reportsServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/reports-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator commercialServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/commercial-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
