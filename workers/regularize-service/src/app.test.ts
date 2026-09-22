@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createRegularizeWorkerApp,
   type RegularizeClientPfService,
+  type RegularizeGuidanceService,
   type RegularizeLicensePrisma,
   type RegularizeLicenseService,
   type RegularizeMunicipalTaxesService,
@@ -101,6 +102,21 @@ function passwordService(): RegularizePasswordService {
     updateSite: vi.fn(async () => ({ id: "site-1" })),
     listSites: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
     detailSite: vi.fn(async () => ({ id: "site-1", password: "secret" })),
+  };
+}
+
+function guidanceService(): RegularizeGuidanceService {
+  return {
+    create: vi.fn(async () => ({ id: "guidance-1", status: "Em andamento" })),
+    update: vi.fn(async () => ({ id: "guidance-1", status: "Em andamento" })),
+    detail: vi.fn(async () => ({ id: "guidance-1", checklist_items: [] })),
+    listByProcess: vi.fn(async () => []),
+    addEconomicActivity: vi.fn(async () => ({ id: "guidance-1" })),
+    updateEconomicActivity: vi.fn(async () => ({ id: "guidance-1" })),
+    removeEconomicActivity: vi.fn(async () => ({ id: "guidance-1" })),
+    addPartner: vi.fn(async () => ({ id: "guidance-1" })),
+    updatePartner: vi.fn(async () => ({ id: "guidance-1" })),
+    removePartner: vi.fn(async () => ({ id: "guidance-1" })),
   };
 }
 
@@ -501,5 +517,106 @@ describe("regularize Worker", () => {
       expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
     );
     expect(passwords.detail).toHaveBeenCalledWith(ORGANIZATION_ID, LICENSE_ID);
+  });
+
+  it("routes the complete guidance contract through the scoped service", async () => {
+    const guidance = guidanceService();
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      guidanceService: guidance,
+    });
+    const guidanceId = "d0000000-0000-4000-8000-000000000001";
+    const body = {
+      target_type: "SEM_CLIENTE",
+      target_snapshot: { version: 1, source: "manual", name: "Alvo" },
+      checklist: Array.from({ length: 17 }, (_, index) => ({
+        code: [
+          "type",
+          "request",
+          "framework_obs",
+          "legal_nature",
+          "company_name",
+          "trade_name",
+          "cpf_cnpj",
+          "share_capital",
+          "iptu",
+          "address",
+          "comporate_purpose",
+          "carryng",
+          "regime",
+          "legal_representative",
+          "economic_activities",
+          "partners",
+          "branch",
+        ][index],
+        status: "Pendente",
+      })),
+      status: "Em andamento",
+    };
+    const activity = { code: "1", description: "Atividade", type: "Principal" };
+    const partner = { name: "Sócio", cpf: "12345678901" };
+    const requests = [
+      app.request("https://regularize.test/regularize/guidance", {
+        method: "POST",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      app.request("https://regularize.test/regularize/guidance", {
+        method: "PUT",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ id: guidanceId, status: "Em andamento" }),
+      }),
+      app.request(`https://regularize.test/regularize/guidance/detail?id=${guidanceId}`, {
+        headers: headers(),
+      }),
+      app.request("https://regularize.test/regularize/guidance/list?target_type=SEM_CLIENTE", {
+        headers: headers(),
+      }),
+      app.request("https://regularize.test/regularize/guidance/activity/add", {
+        method: "POST",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ guidance_id: guidanceId, activity }),
+      }),
+      app.request("https://regularize.test/regularize/guidance/activity/remove", {
+        method: "POST",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ guidance_id: guidanceId, item_id: guidanceId }),
+      }),
+      app.request("https://regularize.test/regularize/guidance/activity", {
+        method: "PUT",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({
+          guidance_id: guidanceId,
+          activity: { ...activity, id: guidanceId },
+        }),
+      }),
+      app.request("https://regularize.test/regularize/guidance/partner/add", {
+        method: "POST",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ guidance_id: guidanceId, partner }),
+      }),
+      app.request("https://regularize.test/regularize/guidance/partner/remove", {
+        method: "POST",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ guidance_id: guidanceId, item_id: guidanceId }),
+      }),
+      app.request("https://regularize.test/regularize/guidance/partner", {
+        method: "PUT",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ guidance_id: guidanceId, partner: { ...partner, id: guidanceId } }),
+      }),
+    ];
+
+    expect((await Promise.all(requests)).map((response) => response.status)).toEqual([
+      201, 200, 200, 200, 200, 200, 200, 200, 200, 200,
+    ]);
+    expect(guidance.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+    expect(guidance.listByProcess).toHaveBeenCalledWith(ORGANIZATION_ID, undefined, "SEM_CLIENTE");
+    expect(guidance.updatePartner).toHaveBeenCalledWith(
+      expect.objectContaining({ guidanceId, organizationId: ORGANIZATION_ID }),
+    );
   });
 });
