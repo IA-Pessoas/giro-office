@@ -5,15 +5,9 @@
   "workers_dev": false,
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat"],
-  // DÍVIDA: o binding TASK_SERVICE sai daqui porque giro-task-service ainda não
-  // existe — services/task-service tem 223 arquivos e não foi migrado. Com ele
-  // declarado o deploy falha com code 10143 e derruba junto o gateway, que faz
-  // binding neste Worker. A API HTTP funciona sem ele; o que para é o cron do
-  // outbox: assertScheduledDependencies (src/index.ts:25) lança sem TASK_SERVICE,
-  // então a entrega de task-billing e prospecting-close fica parada, ruidosa e
-  // visível nos logs. Reponha esta linha assim que giro-task-service subir.
   "services": [
     { "binding": "CLIENT_SERVICE", "service": "giro-client-service" },
+    { "binding": "TASK_SERVICE", "service": "giro-task-service" },
     { "binding": "USER_SERVICE", "service": "giro-user-service" },
     { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }
   ],
