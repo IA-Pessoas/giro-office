@@ -3,6 +3,8 @@ import {
   FORWARDED_AUTH_CSRF_HASH_HEADER,
   FORWARDED_AUTH_SESSION_ID_HEADER,
   FORWARDED_AUTH_SESSION_VERSION_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+  REQUEST_ID_HEADER,
 } from "@workspace/shared/http";
 import { describe, expect, it, vi } from "vitest";
 import { createGatewayWorkerApp } from "./app.js";
@@ -10,6 +12,7 @@ import type { GatewayWorkerEnv } from "./env.js";
 
 const SECRET = "gateway-worker-test-secret-with-enough-length";
 const TOKEN = "gateway-internal-token";
+const AUDIT_TOKEN = "gateway-audit-token";
 
 function env(
   binding?: { fetch: ReturnType<typeof vi.fn> },
@@ -85,6 +88,226 @@ describe("gateway Worker", () => {
     const forwarded = binding.fetch.mock.calls[0]?.[0] as Request;
     expect(forwarded.headers.get("x-internal-service-token")).toBe(TOKEN);
     expect(forwarded.headers.get("x-auth-organization-id")).toBe("org-1");
+  });
+
+  it("audits authenticated proxy responses with a dedicated token and safe request data", async () => {
+    const binding = {
+      fetch: vi.fn(async () => new Response("ok", { status: 200 })),
+    };
+    const auditBinding = {
+      fetch: vi.fn(async () => new Response(null, { status: 201 })),
+    };
+    const app = createGatewayWorkerApp({
+      env: env(binding, { AUDIT_SERVICE: auditBinding, AUDIT_SERVICE_TOKEN: AUDIT_TOKEN }),
+    });
+
+    const response = await app.request(
+      "https://gateway.test/department?view=summary&access_token=jwt-value&tag=one&tag=two",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${await jwt(undefined, { permission: 3 })}`,
+          [REQUEST_ID_HEADER]: "request-123",
+          cookie: "analytics=jwt-cookie-value",
+        },
+        body: "request-body-secret",
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(auditBinding.fetch).toHaveBeenCalledOnce();
+
+    const forwarded = binding.fetch.mock.calls[0]?.[0] as Request;
+    expect(forwarded.headers.get(REQUEST_ID_HEADER)).toBe("request-123");
+    const auditRequest = auditBinding.fetch.mock.calls[0]?.[0] as Request;
+    expect(auditRequest.url).toBe("https://audit-service.internal/internal/audit/requests");
+    expect(auditRequest.headers.get(INTERNAL_SERVICE_TOKEN_HEADER)).toBe(AUDIT_TOKEN);
+    expect(auditRequest.headers.get(INTERNAL_SERVICE_TOKEN_HEADER)).not.toBe(TOKEN);
+
+    const payload = (await auditRequest.json()) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      requestId: "request-123",
+      organizationId: "org-1",
+      userId: "user-1",
+      permission: 3,
+      method: "POST",
+      path: "/department",
+      query: {
+        view: "summary",
+        access_token: "[REDACTED]",
+        tag: ["one", "two"],
+      },
+      statusCode: 200,
+      outcome: "success",
+      serviceSource: "gateway-worker",
+      metadata: {
+        actorKind: "organization",
+        routeTarget: "DEPARTMENT_SERVICE",
+        routePrefix: "/department",
+      },
+    });
+    expect(payload).not.toHaveProperty("body");
+    expect(JSON.stringify(payload)).not.toContain("jwt-cookie-value");
+    expect(JSON.stringify(payload)).not.toContain("jwt-value");
+    expect(Date.parse(String(payload.createdAt))).not.toBeNaN();
+    expect(Date.parse(String(payload.finishedAt))).not.toBeNaN();
+    expect(payload.durationMs).toEqual(expect.any(Number));
+  });
+
+  it("generates and forwards a request id when the caller did not provide one", async () => {
+    const binding = {
+      fetch: vi.fn(async () => new Response("ok", { status: 200 })),
+    };
+    const auditBinding = {
+      fetch: vi.fn(async () => new Response(null, { status: 201 })),
+    };
+    const app = createGatewayWorkerApp({
+      env: env(binding, { AUDIT_SERVICE: auditBinding, AUDIT_SERVICE_TOKEN: AUDIT_TOKEN }),
+    });
+
+    const response = await app.request("https://gateway.test/department", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+
+    const requestId = response.headers.get(REQUEST_ID_HEADER);
+    expect(requestId).toEqual(expect.any(String));
+    expect(requestId).toMatch(/^[0-9a-f-]{36}$/u);
+    expect((binding.fetch.mock.calls[0]?.[0] as Request).headers.get(REQUEST_ID_HEADER)).toBe(
+      requestId,
+    );
+    expect((await (auditBinding.fetch.mock.calls[0]?.[0] as Request).json()).requestId).toBe(
+      requestId,
+    );
+  });
+
+  it.each([
+    [201, "success"],
+    [404, "error"],
+    [500, "error"],
+  ] as const)("records the upstream outcome for HTTP %s", async (status, outcome) => {
+    const binding = {
+      fetch: vi.fn(async () => new Response(null, { status })),
+    };
+    const auditBinding = {
+      fetch: vi.fn(async () => new Response(null, { status: 201 })),
+    };
+    const app = createGatewayWorkerApp({
+      env: env(binding, { AUDIT_SERVICE: auditBinding, AUDIT_SERVICE_TOKEN: AUDIT_TOKEN }),
+    });
+
+    const response = await app.request("https://gateway.test/department", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+
+    expect(response.status).toBe(status);
+    expect((await (auditBinding.fetch.mock.calls[0]?.[0] as Request).json()).outcome).toBe(outcome);
+  });
+
+  it("records an aborted outcome when the upstream binding throws", async () => {
+    const binding = {
+      fetch: vi.fn(async () => {
+        throw new Error("upstream-secret");
+      }),
+    };
+    const auditBinding = {
+      fetch: vi.fn(async () => new Response(null, { status: 201 })),
+    };
+    const app = createGatewayWorkerApp({
+      env: env(binding, { AUDIT_SERVICE: auditBinding, AUDIT_SERVICE_TOKEN: AUDIT_TOKEN }),
+    });
+
+    const response = await app.request("https://gateway.test/department", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      code: "BAD_GATEWAY",
+      requestId: expect.any(String),
+    });
+    expect(await (auditBinding.fetch.mock.calls[0]?.[0] as Request).json()).toMatchObject({
+      outcome: "aborted",
+      statusCode: 502,
+      errorCode: "UPSTREAM_EXCEPTION",
+    });
+  });
+
+  it("surfaces audit delivery failures for mutations", async () => {
+    const binding = {
+      fetch: vi.fn(async () => new Response(null, { status: 204 })),
+    };
+    const auditBinding = {
+      fetch: vi.fn(async () => new Response(null, { status: 503 })),
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const app = createGatewayWorkerApp({
+      env: env(binding, { AUDIT_SERVICE: auditBinding, AUDIT_SERVICE_TOKEN: AUDIT_TOKEN }),
+    });
+
+    const response = await app.request("https://gateway.test/department", {
+      method: "POST",
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+
+    expect(response.status).toBe(503);
+    expect(binding.fetch).toHaveBeenCalledOnce();
+    expect(auditBinding.fetch).toHaveBeenCalledOnce();
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[gateway-worker] falha ao enviar auditoria",
+      expect.objectContaining({ statusCode: 204, outcome: "success" }),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("does not proxy mutations without audit configuration and never audits audit routes", async () => {
+    const mutationBinding = { fetch: vi.fn(async () => new Response("changed", { status: 200 })) };
+    const auditRouteBinding = {
+      fetch: vi.fn(async () => new Response("audit", { status: 200 })),
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const app = createGatewayWorkerApp({
+      env: env(mutationBinding, { AUDIT_SERVICE: auditRouteBinding }),
+    });
+
+    const mutation = await app.request("https://gateway.test/department", {
+      method: "POST",
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+    const auditRoute = await app.request("https://gateway.test/audit/requests", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+
+    expect(mutation.status).toBe(503);
+    expect(mutationBinding.fetch).not.toHaveBeenCalled();
+    expect(auditRoute.status).toBe(200);
+    expect(auditRouteBinding.fetch).toHaveBeenCalledOnce();
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[gateway-worker] AUDIT_SERVICE_TOKEN ausente; auditoria não será enviada.",
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("rejects reusing the internal token for audit", async () => {
+    const binding = { fetch: vi.fn(async () => new Response("ok", { status: 200 })) };
+    const auditBinding = { fetch: vi.fn(async () => new Response(null, { status: 201 })) };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const app = createGatewayWorkerApp({
+      env: env(binding, { AUDIT_SERVICE: auditBinding, AUDIT_SERVICE_TOKEN: TOKEN }),
+    });
+
+    const response = await app.request("https://gateway.test/department", {
+      method: "POST",
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
+
+    expect(response.status).toBe(503);
+    expect(binding.fetch).not.toHaveBeenCalled();
+    expect(auditBinding.fetch).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[gateway-worker] AUDIT_SERVICE_TOKEN deve ser distinto de INTERNAL_SERVICE_TOKEN.",
+    );
+    errorSpy.mockRestore();
   });
 
   it("forwards only authenticated session claims and overwrites spoofed headers", async () => {

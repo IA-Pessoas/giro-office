@@ -3,6 +3,7 @@ import type { ServiceBinding, WorkerEnv } from "@workspace/runtime";
 export interface GatewayWorkerEnv extends WorkerEnv {
   JWT_SECRET: string;
   INTERNAL_SERVICE_TOKEN: string;
+  AUDIT_SERVICE_TOKEN?: string;
   AUDIT_SERVICE?: ServiceBinding;
   DEPARTMENT_SERVICE?: ServiceBinding;
   ORGANIZATION_SERVICE?: ServiceBinding;
