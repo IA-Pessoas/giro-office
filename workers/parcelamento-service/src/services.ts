@@ -36,6 +36,11 @@ import type { PrismaClient } from "./prisma.js";
 
 export type ParcelamentoPrisma = PrismaClient;
 type InstallmentRepository = Pick<ParcelamentoPrisma, "installment">;
+/** Cliente raiz ou de transação interativa: o que o recálculo e as competências usam. */
+type ParcelamentoDb = Pick<
+  ParcelamentoPrisma,
+  "installment" | "installmentCompetencies" | "$queryRaw"
+>;
 type Row = Record<string, unknown>;
 
 export interface ParcelamentoRequestContext {
@@ -207,6 +212,15 @@ async function recordAudit(
   }
 }
 
+/**
+ * Recálculo e a escrita que o motivou rodam na mesma transação READ COMMITTED, com lock
+ * `FOR NO KEY UPDATE` na linha do parcelamento. O próximo escritor espera o commit e, como
+ * em READ COMMITTED cada comando lê um snapshot novo, soma as competências já gravadas.
+ * NO KEY (e não FOR UPDATE) para não conflitar com o FOR KEY SHARE de FKs. Diverge do Node,
+ * que recalcula fora de transação e pode gravar totais de uma leitura antiga.
+ */
+const RECALC_TRANSACTION = { isolationLevel: "ReadCommitted" } as const;
+
 async function ensureClient(prisma: ParcelamentoPrisma, organizationId: string, clientId: string) {
   const client = await prisma.client.findFirst({
     where: { id: clientId, organization_id: organizationId },
@@ -219,8 +233,12 @@ export function createInstallmentService(
   audit: ParcelamentoAudit,
   clock: () => Date = () => new Date(),
 ) {
-  const findByIdOrThrow = async (organizationId: string, id: string) => {
-    const installment = await prisma.installment.findFirst({
+  const findByIdOrThrow = async (
+    organizationId: string,
+    id: string,
+    db: ParcelamentoDb = prisma,
+  ) => {
+    const installment = await db.installment.findFirst({
       where: { id, organization_id: organizationId },
       select: installmentSelect,
     });
@@ -272,13 +290,19 @@ export function createInstallmentService(
     }
   };
 
-  const recalculateAggregates = (context: ParcelamentoRequestContext, installmentId: string) =>
+  /** Precisa rodar dentro de `$transaction(..., RECALC_TRANSACTION)`: `db` é o cliente dela. */
+  const recalculateAggregates = (
+    context: ParcelamentoRequestContext,
+    installmentId: string,
+    db: ParcelamentoDb,
+  ) =>
     guard(
       "Erro ao recalcular agregados do parcelamento.",
       async () => {
         const { organizationId } = context;
-        const installment = await findByIdOrThrow(organizationId, installmentId);
-        const competencies = await prisma.installmentCompetencies.findMany({
+        await db.$queryRaw`SELECT "id" FROM "parcelamento.installments" WHERE "id" = ${installmentId} AND "organization_id" = ${organizationId} FOR NO KEY UPDATE`;
+        const installment = await findByIdOrThrow(organizationId, installmentId, db);
+        const competencies = await db.installmentCompetencies.findMany({
           where: { installment_id: installmentId, organization_id: organizationId },
         });
         const paid = competencies.reduce((sum, item) => sum + item.how_many_paid, 0);
@@ -291,7 +315,7 @@ export function createInstallmentService(
               ? { status: ACTIVE_STATUS, completion_date: null }
               : {};
 
-        await prisma.installment.updateMany({
+        await db.installment.updateMany({
           where: { id: installmentId, organization_id: organizationId },
           data: {
             paid_installments_count: paid,
@@ -301,7 +325,7 @@ export function createInstallmentService(
             ...statusData,
           },
         });
-        return withoutOrganizationId(await findByIdOrThrow(organizationId, installmentId));
+        return withoutOrganizationId(await findByIdOrThrow(organizationId, installmentId, db));
       },
       "Ja existe parcelamento com este numero de acordo.",
     );
@@ -472,7 +496,10 @@ export function createInstallmentService(
             hasOwn(input, "consolidated_total_amount") ||
             hasOwn(input, "current_month_installment_amount")
           ) {
-            return recalculateAggregates(context, id);
+            return prisma.$transaction(
+              (tx) => recalculateAggregates(context, id, tx),
+              RECALC_TRANSACTION,
+            );
           }
           return withoutOrganizationId(await findByIdOrThrow(organizationId, id));
         },
@@ -488,14 +515,22 @@ export function createInstallmentCompetencyService(
   audit: ParcelamentoAudit,
   installments: Pick<InstallmentService, "recalculateAggregates">,
 ) {
-  const ensureParent = async (organizationId: string, installmentId: string) => {
-    const installment = await prisma.installment.findFirst({
+  const ensureParent = async (
+    organizationId: string,
+    installmentId: string,
+    db: ParcelamentoDb = prisma,
+  ) => {
+    const installment = await db.installment.findFirst({
       where: { id: installmentId, organization_id: organizationId },
     });
     if (!installment) throw new ServiceError(404, "Parcelamento nao encontrado.");
   };
-  const findByIdOrThrow = async (organizationId: string, id: string) => {
-    const competency = await prisma.installmentCompetencies.findFirst({
+  const findByIdOrThrow = async (
+    organizationId: string,
+    id: string,
+    db: ParcelamentoDb = prisma,
+  ) => {
+    const competency = await db.installmentCompetencies.findFirst({
       where: { id, organization_id: organizationId },
       select: competencySelect,
     });
@@ -536,34 +571,37 @@ export function createInstallmentCompetencyService(
         "Erro ao criar competencia de parcelamento.",
         async () => {
           const { organizationId } = context;
-          await ensureParent(organizationId, installmentId);
-          const existing = await prisma.installmentCompetencies.findFirst({
-            where: {
-              organization_id: organizationId,
-              installment_id: installmentId,
-              competence: input.competence,
-            },
-          });
-          if (existing) throw new ServiceError(409, conflict);
+          const created = await prisma.$transaction(async (tx) => {
+            await ensureParent(organizationId, installmentId, tx);
+            const existing = await tx.installmentCompetencies.findFirst({
+              where: {
+                organization_id: organizationId,
+                installment_id: installmentId,
+                competence: input.competence,
+              },
+            });
+            if (existing) throw new ServiceError(409, conflict);
 
-          const created = await prisma.installmentCompetencies.create({
-            data: {
-              installment_id: installmentId,
-              competence: input.competence,
-              how_many_paid: input.how_many_paid,
-              how_many_overdue: input.how_many_overdue,
-              download: input.download,
-              download_notes: input.download_notes,
-              upload_file: input.upload_file,
-              is_sent: input.is_sent,
-              submission_type: input.submission_type,
-              notes: input.notes,
-              installment_amount: input.installment_amount,
-              organization_id: organizationId,
-            },
-            select: competencySelect,
-          });
-          await installments.recalculateAggregates(context, installmentId);
+            const row = await tx.installmentCompetencies.create({
+              data: {
+                installment_id: installmentId,
+                competence: input.competence,
+                how_many_paid: input.how_many_paid,
+                how_many_overdue: input.how_many_overdue,
+                download: input.download,
+                download_notes: input.download_notes,
+                upload_file: input.upload_file,
+                is_sent: input.is_sent,
+                submission_type: input.submission_type,
+                notes: input.notes,
+                installment_amount: input.installment_amount,
+                organization_id: organizationId,
+              },
+              select: competencySelect,
+            });
+            await installments.recalculateAggregates(context, installmentId, tx);
+            return row;
+          }, RECALC_TRANSACTION);
           const dto = withoutOrganizationId(created);
           await recordAudit(
             audit,
@@ -597,18 +635,21 @@ export function createInstallmentCompetencyService(
           notes: hasOwn(input, "notes") ? input.notes : undefined,
           installment_amount: input.installment_amount,
         });
-        await prisma.installmentCompetencies.updateMany({
-          where: { id, organization_id: organizationId },
-          data,
-        });
-        const updated = await findByIdOrThrow(organizationId, id);
-        if (
-          hasOwn(input, "how_many_paid") ||
-          hasOwn(input, "how_many_overdue") ||
-          hasOwn(input, "installment_amount")
-        ) {
-          await installments.recalculateAggregates(context, existing.installment_id);
-        }
+        const updated = await prisma.$transaction(async (tx) => {
+          await tx.installmentCompetencies.updateMany({
+            where: { id, organization_id: organizationId },
+            data,
+          });
+          const row = await findByIdOrThrow(organizationId, id, tx);
+          if (
+            hasOwn(input, "how_many_paid") ||
+            hasOwn(input, "how_many_overdue") ||
+            hasOwn(input, "installment_amount")
+          ) {
+            await installments.recalculateAggregates(context, existing.installment_id, tx);
+          }
+          return row;
+        }, RECALC_TRANSACTION);
         await recordAudit(
           audit,
           context,
