@@ -654,6 +654,97 @@ async function runChecks({ db, sql, baseUrls, secrets, runId, mode, migrationWor
     return "POST/GET/PATCH/LIST em parcelamento.installments";
   });
 
+  // O recálculo de agregados roda em `$transaction({ isolationLevel: "ReadCommitted" })` com
+  // `SELECT ... FOR NO KEY UPDATE` na linha do parcelamento (workers/parcelamento-service/src/
+  // services.ts:222,303). Sem esse lock, escritas simultâneas leem o mesmo snapshot e a última
+  // sobrescreve o total da primeira — lost update. Só concorrência real contra o Postgres prova
+  // que não acontece; o teste unitário da corrida usa um Prisma falso.
+  await check("transacao.parcelamento_lock_concorrente", async () => {
+    const parallel = 6;
+    const created = expectStatus(
+      await http(baseUrls.parcelamento, "/parcelamento/installments", {
+        method: "POST",
+        token: tokenA,
+        body: {
+          client_id: fixtures.clientA,
+          agreement_number: `${runId}-acordo-lock`,
+          type: "Ordinário",
+          legal_nature: "Tributário",
+          jurisdiction: "Federal",
+          is_automatic_debit: false,
+          first_installment_amount: 100,
+          current_month_installment_amount: 100,
+          agreed_installments_count: 24,
+        },
+      }),
+      [200, 201],
+      "POST /parcelamento/installments (lock)",
+    );
+    const lockId = created.data?.id ?? created.data?.create?.id;
+    assert(lockId, `resposta sem id: ${JSON.stringify(created).slice(0, 200)}`);
+    fixtures.created.push({ table: "parcelamento.installments", id: lockId });
+
+    const competency = (competence) => ({
+      competence,
+      how_many_paid: 1,
+      how_many_overdue: 0,
+      download: false,
+      installment_amount: 100,
+    });
+    const post = (competence) =>
+      http(baseUrls.parcelamento, `/parcelamento/installments/${lockId}/competencies`, {
+        method: "POST",
+        token: tokenA,
+        body: competency(competence),
+      });
+
+    // Disparadas de uma vez: as transações se sobrepõem de verdade no banco.
+    const responses = await Promise.all(
+      Array.from({ length: parallel }, (_, index) =>
+        post(`2026-${String(index + 1).padStart(2, "0")}`),
+      ),
+    );
+    for (const [index, response] of responses.entries()) {
+      expectStatus(response, 201, `POST competencies paralelo #${index + 1}`);
+    }
+
+    const after = expectStatus(
+      await http(baseUrls.parcelamento, `/parcelamento/installments/${lockId}`, { token: tokenA }),
+      200,
+      "GET /parcelamento/installments/:id (lock)",
+    );
+    const paid = after.data?.paid_installments_count;
+    assert(
+      paid === parallel,
+      `lost update: paid_installments_count=${paid}, esperado ${parallel} (o lock FOR NO KEY UPDATE não segurou)`,
+    );
+    const remaining = after.data?.remaining_installments_count;
+    assert(
+      remaining === 24 - parallel,
+      `agregado derivado inconsistente: remaining_installments_count=${remaining}, esperado ${24 - parallel}`,
+    );
+
+    // Mesma competência em paralelo: exatamente uma vence, a outra recebe 409 e não altera o total.
+    const duplicated = await Promise.all([post("2026-12"), post("2026-12")]);
+    const statuses = duplicated.map((response) => response.status).sort();
+    assert(
+      statuses[0] === 201 && statuses[1] === 409,
+      `esperado um 201 e um 409 na competência duplicada, recebido ${statuses.join("/")}`,
+    );
+
+    const settled = expectStatus(
+      await http(baseUrls.parcelamento, `/parcelamento/installments/${lockId}`, { token: tokenA }),
+      200,
+      "GET /parcelamento/installments/:id (pós-409)",
+    );
+    assert(
+      settled.data?.paid_installments_count === parallel + 1,
+      `o 409 não fez rollback: paid_installments_count=${settled.data?.paid_installments_count}, esperado ${parallel + 1}`,
+    );
+
+    return `${parallel} escritas concorrentes somadas sem perda, 409 na duplicada com rollback`;
+  });
+
   await check("tenant.org_b_nao_ve_org_a", async () => {
     const catalogs = expectStatus(
       await http(baseUrls.triagem, "/triagem/catalogs?kind=LINK_TYPE", { token: tokenB }),
