@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Client {
+  id                 String           @id @default(uuid())
+  name               String
+  company_name       String?
+  competence_entry   DateTime?
+  competence_output  DateTime?
+  contabil           Boolean?
+  organization_id    String
+  controlContabil    ControlContabil[]
+  triageClosings     TriageClosing[]
+
+  @@map("clients")
+}
+
+model ControlContabil {
+  id                               String   @id @default(uuid())
+  competence                       String
+  client_id                        String
+  regenerate_accounting_entries    Boolean
+  check_summary_by_accumulator     Boolean
+  post_accounting_transaction      Boolean
+  import_bank_statements           Boolean
+  reconcile_bank_statements        Boolean
+  reconcile_vendors                Boolean
+  integrate_taxes                  Boolean
+  settle_federal_taxes_via_ecac    Boolean
+  settle_state_taxes_via_sefaz_ba  Boolean
+  integrate_payroll                 Boolean
+  suspense_accounts                Boolean
+  check_overdrawn_accounts          Boolean
+  general_account_reconciliation    Boolean
+  check_loan_and_interest_accounts  Boolean
+  monthly_closing                   Boolean
+  reconcile_icms_pis_cofins         Boolean
+  depreciation                     Boolean
+  notes                            String
+  archived_at                      DateTime?
+  organization_id                  String
+  client                           Client   @relation(fields: [client_id], references: [id])
+
+  @@map("contabil.control")
+}
+
+model TriageClosing {
+  id              String   @id @default(uuid())
+  client_id       String
+  competence      String
+  status          String
+  archived_at     DateTime?
+  organization_id String
+  client          Client   @relation(fields: [client_id], references: [id])
+
+  @@map("triagem.closings")
+}
