@@ -73,3 +73,33 @@ describe("contabil Worker", () => {
     expect(response.status).toBe(503);
   });
 });
+
+describe("contabil Worker — OpenAPI docs", () => {
+  const app = (extra: Partial<ContabilWorkerEnv>) =>
+    createContabilWorkerApp({ env: { ...env(), ...extra } });
+
+  it("serve /openapi.json e /docs com ENABLE_API_DOCS fora de produção", async () => {
+    const docsApp = app({ ENABLE_API_DOCS: "true" });
+    const spec = await docsApp.request("https://contabil.test/openapi.json");
+    expect(spec.status).toBe(200);
+    expect(((await spec.json()) as { paths: Record<string, unknown> }).paths).toHaveProperty(
+      "/contabil/controls/list",
+    );
+    const docs = await docsApp.request("https://contabil.test/docs");
+    expect(docs.status).toBe(200);
+    expect(docs.headers.get("content-type")).toContain("text/html");
+    const html = await docs.text();
+    expect(html).toContain("<title>contabil-service — OpenAPI</title>");
+    expect(html).toContain('url: "/openapi.json"');
+  });
+
+  it.each([
+    {},
+    { ENABLE_API_DOCS: "false" },
+    { ENABLE_API_DOCS: "true", NODE_ENV: "production" },
+  ])("oculta /openapi.json e /docs com %o", async (extra) => {
+    const docsApp = app(extra);
+    expect((await docsApp.request("https://contabil.test/openapi.json")).status).toBe(404);
+    expect((await docsApp.request("https://contabil.test/docs")).status).toBe(404);
+  });
+});
