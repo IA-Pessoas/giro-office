@@ -15,3 +15,19 @@ model RhCategory {
 
   @@map("rh.request_categories")
 }
+
+model RhNotification {
+  id              String   @id @default(uuid())
+  user_id         String
+  request_id      String
+  event_key       String
+  title           String
+  message         String
+  read            Boolean  @default(false)
+  created_at      DateTime @default(now())
+  organization_id String
+
+  @@unique([organization_id, user_id, request_id, event_key], map: "uq_rh_notifications_event")
+  @@index([organization_id, user_id, read, created_at], map: "idx_rh_notifications_user_state")
+  @@map("rh.notifications")
+}

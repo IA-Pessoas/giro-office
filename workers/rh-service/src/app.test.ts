@@ -3,6 +3,7 @@ import {
   createRhWorkerApp,
   type RhCategoryPrisma,
   type RhCategoryService,
+  type RhNotificationService,
   type RhWorkerEnv,
 } from "./app.js";
 
@@ -34,6 +35,13 @@ function service(): RhCategoryService {
     list: vi.fn(async () => [{ id: CATEGORY_ID, name: "Férias", active: true }]),
     create: vi.fn(async () => ({ id: CATEGORY_ID, name: "Férias", active: true })),
     update: vi.fn(async () => ({ id: CATEGORY_ID, name: "Folga", active: true })),
+  };
+}
+
+function notificationService(): RhNotificationService {
+  return {
+    list: vi.fn(async () => [{ id: "notification-1", read: false }]),
+    markRead: vi.fn(async () => ({ count: 1 })),
   };
 }
 
@@ -82,6 +90,25 @@ describe("rh Worker", () => {
     expect(categoryService.update).toHaveBeenCalledWith(ORGANIZATION_ID, {
       id: CATEGORY_ID,
       active: false,
+    });
+  });
+
+  it("lists and marks RH notifications for the authenticated user", async () => {
+    const rhNotificationService = notificationService();
+    const app = createRhWorkerApp({ env: env(), notificationService: rhNotificationService });
+    const list = await app.request("https://rh.test/rh/notifications", { headers: headers("1") });
+    const read = await app.request("https://rh.test/rh/notifications/read", {
+      method: "PUT",
+      headers: { ...headers("1"), "content-type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    });
+
+    expect([list.status, read.status]).toEqual([200, 200]);
+    expect(rhNotificationService.list).toHaveBeenCalledWith(ORGANIZATION_ID, USER_ID);
+    expect(rhNotificationService.markRead).toHaveBeenCalledWith({
+      organization_id: ORGANIZATION_ID,
+      user_id: USER_ID,
+      all: true,
     });
   });
 });

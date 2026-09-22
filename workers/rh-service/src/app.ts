@@ -2,6 +2,7 @@ import {
   createCategoryBodySchema,
   updateCategoryBodySchema,
 } from "@workspace/rh-service/src/schemas/category.schemas.js";
+import { markRhNotificationReadBodySchema } from "@workspace/rh-service/src/schemas/notification.schemas.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
 import {
@@ -25,16 +26,31 @@ export type RhCategoryPrisma = {
     create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
     update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
   };
+  rhNotification: {
+    findMany(args: Record<string, unknown>): Promise<unknown[]>;
+    updateMany(args: Record<string, unknown>): Promise<{ count: number }>;
+  };
 };
 export type RhCategoryService = {
   list(organizationId: string, activeOnly: boolean): Promise<unknown>;
   create(organizationId: string, input: Record<string, unknown>): Promise<unknown>;
   update(organizationId: string, input: Record<string, unknown>): Promise<unknown>;
 };
+export type RhNotificationService = {
+  list(organizationId: string, userId: string): Promise<unknown>;
+  markRead(input: {
+    organization_id: string;
+    user_id: string;
+    id?: string;
+    request_id?: string;
+    all?: boolean;
+  }): Promise<unknown>;
+};
 type RhOptions = {
   env?: RhWorkerEnv;
   prisma?: RhCategoryPrisma;
   categoryService?: RhCategoryService;
+  notificationService?: RhNotificationService;
 };
 type RhWorkerContext = { Bindings: RhWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type RhContext = Context<RhWorkerContext>;
@@ -60,6 +76,28 @@ function localService(prisma: RhCategoryPrisma): RhCategoryService {
       if (!existing) throw new ServiceError(404, "Categoria não encontrada.");
       return prisma.rhCategory.update({ where: { id: input.id }, data: input });
     },
+  };
+}
+
+function localNotificationService(prisma: RhCategoryPrisma): RhNotificationService {
+  return {
+    list: (organizationId, userId) =>
+      prisma.rhNotification.findMany({
+        where: { organization_id: organizationId, user_id: userId },
+        orderBy: { created_at: "desc" },
+        take: 50,
+      }),
+    markRead: ({ organization_id, user_id, id, request_id }) =>
+      prisma.rhNotification.updateMany({
+        where: {
+          organization_id,
+          user_id,
+          read: false,
+          ...(id ? { id } : {}),
+          ...(request_id ? { request_id } : {}),
+        },
+        data: { read: true },
+      }),
   };
 }
 
@@ -93,6 +131,15 @@ export function createRhWorkerApp(options: RhOptions = {}) {
       callback(localService(client as unknown as RhCategoryPrisma)),
     );
   };
+  const withNotificationService = async <T>(
+    c: RhContext,
+    callback: (service: RhNotificationService) => Promise<T>,
+  ) => {
+    if (options.notificationService) return callback(options.notificationService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(localNotificationService(client as unknown as RhCategoryPrisma)),
+    );
+  };
   app.get("/rh/categories", (c) =>
     withService(c, async (service) => {
       requireRhPermission(c.get("auth"), 1);
@@ -118,6 +165,31 @@ export function createRhWorkerApp(options: RhOptions = {}) {
       const body = parseWithZod(updateCategoryBodySchema, await c.req.json());
       return c.json(
         createSuccessResponse(await service.update(c.get("auth").organizationId, body)),
+      );
+    }),
+  );
+  app.get("/rh/notifications", (c) =>
+    withNotificationService(c, async (service) => {
+      requireRhPermission(c.get("auth"), 1);
+      return c.json(
+        createSuccessResponse(
+          await service.list(c.get("auth").organizationId, c.get("auth").userId),
+        ),
+      );
+    }),
+  );
+  app.put("/rh/notifications/read", (c) =>
+    withNotificationService(c, async (service) => {
+      requireRhPermission(c.get("auth"), 1);
+      const body = parseWithZod(markRhNotificationReadBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.markRead({
+            organization_id: c.get("auth").organizationId,
+            user_id: c.get("auth").userId,
+            ...body,
+          }),
+        ),
       );
     }),
   );
