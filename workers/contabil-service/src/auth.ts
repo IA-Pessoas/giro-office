@@ -143,14 +143,30 @@ export async function authenticateContabilRequest(
   return auth;
 }
 
+/**
+ * Permissão contábil efetiva, como o gateway Node encaminhava (`permissionModule: "contabil"`):
+ * owner vale 3, ator de plataforma não acessa, demais usam `modules.contabil`.
+ */
+export function contabilPermission(auth: WorkerAuthContext): number {
+  if (auth.actorKind === "platform") return 0;
+  if (auth.claims.type === "owner") return 3;
+  return Number(auth.claims.modules?.contabil ?? 0);
+}
+
 export function requireContabilWrite(auth: WorkerAuthContext): void {
-  if (Number(auth.claims.permission ?? 0) < 2 || Number(auth.claims.modules?.contabil ?? 0) < 2) {
+  if (contabilPermission(auth) < 2) {
     throw new ServiceError(403, "Permissao insuficiente para alterar dados contabeis.");
   }
 }
 
 export function requireContabilModule(auth: WorkerAuthContext, minimum = 1): void {
-  if (Number(auth.claims.modules?.contabil ?? 0) < minimum) {
+  if (contabilPermission(auth) < minimum) {
     throw new ServiceError(403, "Usuário não possui permissão para este domínio.");
   }
+}
+
+/** Policy `/triagem` do gateway Node: owner ou `contabil`/`triagem` >= 1. */
+export function requireTriagemModule(auth: WorkerAuthContext): void {
+  if (contabilPermission(auth) >= 1 || Number(auth.claims.modules?.triagem ?? 0) >= 1) return;
+  throw new ServiceError(403, "Usuário não possui permissão para este domínio.");
 }

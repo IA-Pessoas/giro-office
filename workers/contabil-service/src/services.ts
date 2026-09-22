@@ -309,7 +309,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
       const auth = authData(input);
       if (input.confirmed !== true)
         throw new ServiceError(400, "Confirmação explícita é obrigatória para criar o ano.");
-      if (Number(auth.permission ?? 0) < 2 || Number(auth.modules?.contabil ?? 0) < 2)
+      if (Number(auth.permission ?? 0) < 2)
         throw new ServiceError(403, "Permissão insuficiente para criar controles contábeis.");
       const year = Number(input.year);
       if (!Number.isInteger(year) || year < 2000 || year > 2100)
@@ -405,7 +405,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
       }
     },
     async completeAll(id, auth) {
-      if (Number(auth.permission ?? 0) < 2 || Number(auth.modules?.contabil ?? 0) < 2)
+      if (Number(auth.permission ?? 0) < 2)
         throw new ServiceError(403, "Permissão insuficiente para atualizar controles contábeis.");
       const current = await prisma.controlContabil.findFirst({
         where: { id, organization_id: auth.organizationId, archived_at: null },
@@ -429,7 +429,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
     },
     async archiveCompetence(input) {
       const auth = authData(input);
-      if (Number(auth.permission ?? 0) < 2 || Number(auth.modules?.contabil ?? 0) < 2)
+      if (Number(auth.permission ?? 0) < 2)
         throw new ServiceError(403, "Permissão insuficiente para arquivar controles contábeis.");
       const identity = {
         client_id: String(input.clientId),
@@ -479,7 +479,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
     },
     async restoreCompetence(input) {
       const auth = authData(input);
-      if (Number(auth.permission ?? 0) < 2 || Number(auth.modules?.contabil ?? 0) < 2)
+      if (Number(auth.permission ?? 0) < 2)
         throw new ServiceError(403, "Permissão insuficiente para restaurar controles contábeis.");
       const identity = {
         client_id: String(input.clientId),

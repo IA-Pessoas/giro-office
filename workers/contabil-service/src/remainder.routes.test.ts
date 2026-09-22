@@ -362,4 +362,107 @@ describe("contabil Worker remainder routes", () => {
       data: { rows: [], reachedLimit: false },
     });
   });
+
+  it("usa a permissão efetiva do módulo contábil como o gateway Node encaminha", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const post = (extra: Record<string, string>) =>
+      app.request("https://contabil.test/contabil/controls", {
+        method: "POST",
+        headers: { ...headers("1"), ...extra, "content-type": "application/json" },
+        body: JSON.stringify({ client_id: CLIENT, competence: "2026-09" }),
+      });
+
+    const moduleEditor = await post({ "x-auth-modules": JSON.stringify({ contabil: 2 }) });
+    const owner = await post({
+      "x-auth-type": "owner",
+      "x-auth-modules": JSON.stringify({ contabil: 0 }),
+    });
+    const ownerRead = await app.request(
+      "https://contabil.test/contabil/controls/list?competence=2026-09",
+      { headers: { ...headers("1"), "x-auth-type": "owner", "x-auth-modules": "{}" } },
+    );
+
+    expect(moduleEditor.status).toBe(201);
+    expect(owner.status).toBe(201);
+    expect(ownerRead.status).toBe(200);
+    expect(deps.controlService.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ permission: 2 }),
+    );
+    expect(deps.controlService.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ permission: 3 }),
+    );
+  });
+
+  it("exige módulo contabil ou triagem nas rotas /triagem como a policy do gateway Node", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const monthly = (modules: Record<string, number>, extra: Record<string, string> = {}) =>
+      app.request(`https://contabil.test/triagem/monthly?client_id=${CLIENT}&competence=2026-09`, {
+        headers: { ...headers("3"), "x-auth-modules": JSON.stringify(modules), ...extra },
+      });
+
+    const denied = await monthly({ contabil: 0, triagem: 0, fiscal: 2 });
+    const triagem = await monthly({ triagem: 1 });
+    const owner = await monthly({}, { "x-auth-type": "owner" });
+
+    expect(denied.status).toBe(403);
+    expect(triagem.status).toBe(200);
+    expect(owner.status).toBe(200);
+    expect(deps.triageDocumentsService.getMonthly).toHaveBeenCalledTimes(2);
+  });
+
+  it("mantém as mensagens de validação da triagem do serviço Node", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, path: string, body: Record<string, unknown>) =>
+      app.request(`https://contabil.test${path}`, {
+        method,
+        headers: { ...headers("2"), "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const closing = await send("PUT", "/triagem/closing", {
+      client_id: CLIENT,
+      competence: "2026-09",
+      status: "INVALID",
+    });
+    const statement = await send("PUT", "/triagem/statements", {
+      client_id: CLIENT,
+      competence: "2026-09",
+      bank_id: " ",
+      status: "PENDING",
+    });
+    const item = await send("PATCH", `/triagem/monthly/${ID}/item`, {
+      field: "card_statements",
+      status: "PENDING",
+      justification: "",
+    });
+
+    await expect(closing.json()).resolves.toMatchObject({
+      error: "status de fechamento inválido.",
+    });
+    await expect(statement.json()).resolves.toMatchObject({ error: "bank_id é obrigatório." });
+    expect(item.status).toBe(200);
+    expect(deps.triageDocumentsService.updateItem).toHaveBeenCalledWith(
+      ID,
+      expect.objectContaining({ justification: "" }),
+      expect.anything(),
+    );
+  });
+
+  it.each([
+    "REPORTS_INTERNAL_TOKEN",
+    "REPORTS_GRANT_SECRET",
+  ] as const)("falha explícita com 503 quando %s não está configurado", async (secret) => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: { ...env(), [secret]: undefined }, ...deps });
+    const response = await app.request("https://contabil.test/internal/reporting/catalog", {
+      headers: { "x-internal-service-token": "reports-token", "x-request-id": "report-request" },
+    });
+
+    expect(response.status).toBe(503);
+  });
 });

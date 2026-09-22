@@ -75,10 +75,16 @@ export async function verifyReportingGrant(input: {
   fields: readonly string[];
   body: unknown;
 }): Promise<InternalReportingGrant> {
-  if (!equalText(input.token, input.env.REPORTS_INTERNAL_TOKEN ?? "")) {
+  if (!input.env.REPORTS_INTERNAL_TOKEN || !input.env.REPORTS_GRANT_SECRET) {
+    throw new ServiceError(
+      503,
+      "Reporting interno indisponível: configure REPORTS_INTERNAL_TOKEN e REPORTS_GRANT_SECRET.",
+    );
+  }
+  if (!equalText(input.token, input.env.REPORTS_INTERNAL_TOKEN)) {
     throw new ServiceError(403, "Acesso negado.");
   }
-  if (!input.grant || !input.env.REPORTS_GRANT_SECRET) {
+  if (!input.grant) {
     throw new ServiceError(403, "Grant de relatórios inválido.");
   }
   let grant: InternalReportingGrant;

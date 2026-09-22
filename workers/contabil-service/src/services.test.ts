@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createClosingService, createDocumentsService } from "./services.js";
+import { createClosingService, createControlService, createDocumentsService } from "./services.js";
 
 const ORG = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -153,5 +153,17 @@ describe("contabil services tenant and catalog seams", () => {
     );
     expect(events[0]).toBe("rls");
     expect(events.indexOf("rls")).toBeLessThan(events.indexOf("competence"));
+  });
+
+  it("autoriza escrita de controles pela permissão contábil efetiva, sem exigir claims.modules", async () => {
+    const database = { controlContabil: { findFirst: vi.fn().mockResolvedValue(null) } };
+    const service = createControlService(database as never, audit());
+
+    await expect(
+      service.completeAll(MONTHLY, { ...auth, permission: 3, modules: { contabil: 0 } }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      service.completeAll(MONTHLY, { ...auth, permission: 1, modules: { contabil: 2 } }),
+    ).rejects.toMatchObject({ statusCode: 403 });
   });
 });

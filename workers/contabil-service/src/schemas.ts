@@ -8,7 +8,9 @@ const uuid = (name: string) => z.string().uuid({ message: `${name} inválido.` }
 export const closingQuerySchema = z.object({ client_id: uuid("client_id"), competence }).strict();
 export const closingUpdateSchema = closingQuerySchema
   .extend({
-    status: z.enum(["NOT_RECEIVED", "RECEIVED", "UNDER_REVIEW", "CLOSED", "REOPENED"] as const),
+    status: z.enum(["NOT_RECEIVED", "RECEIVED", "UNDER_REVIEW", "CLOSED", "REOPENED"] as const, {
+      message: "status de fechamento inválido.",
+    }),
   })
   .strict();
 
@@ -68,7 +70,7 @@ export const documentItemSchema = z
     status: z.enum(triageDocumentStatuses).optional(),
     value: z.string().trim().max(2_000).nullable().optional(),
     note: z.string().trim().max(2_000).nullable().optional(),
-    justification: z.string().trim().min(1).max(100).nullable().optional(),
+    justification: z.string().trim().max(100).nullable().optional(),
     delivery_method: z.string().trim().min(1).max(100).nullable().optional(),
     state_site: z.string().trim().min(1).max(100).nullable().optional(),
   })
@@ -109,12 +111,16 @@ export const statementSchema = z
   .object({
     client_id: uuid("client_id"),
     competence,
-    bank_id: z.string().trim().min(1).max(100),
+    bank_id: z.string().trim().min(1, "bank_id é obrigatório.").max(100),
     status: z.enum(triageDocumentStatuses),
   })
   .strict();
 export const statementArchiveSchema = z
-  .object({ client_id: uuid("client_id"), competence, bank_id: z.string().trim().min(1).max(100) })
+  .object({
+    client_id: uuid("client_id"),
+    competence,
+    bank_id: z.string().trim().min(1, "bank_id é obrigatório.").max(100),
+  })
   .strict();
 
 export type TriageDocumentStatus = (typeof triageDocumentStatuses)[number];

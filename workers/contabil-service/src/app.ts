@@ -32,8 +32,10 @@ import {
 import { createContabilAudit } from "./audit.js";
 import {
   authenticateContabilRequest,
+  contabilPermission,
   requireContabilModule,
   requireContabilWrite,
+  requireTriagemModule,
 } from "./auth.js";
 import type { ContabilWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
@@ -108,6 +110,10 @@ function authContext(auth: WorkerAuthContext): AuthContext {
   };
 }
 
+function contabilAuthContext(auth: WorkerAuthContext): AuthContext {
+  return { ...authContext(auth), permission: contabilPermission(auth) };
+}
+
 async function readJson(c: { req: { json<T>(): Promise<T> } }): Promise<unknown> {
   try {
     return await c.req.json<unknown>();
@@ -167,11 +173,15 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     await next();
   });
   app.use("/triagem/*", async (c, next) => {
-    c.set("auth", await authenticateContabilRequest(c.req.raw, options.env ?? c.env));
+    const auth = await authenticateContabilRequest(c.req.raw, options.env ?? c.env);
+    requireTriagemModule(auth);
+    c.set("auth", auth);
     await next();
   });
   app.use("/triagem", async (c, next) => {
-    c.set("auth", await authenticateContabilRequest(c.req.raw, options.env ?? c.env));
+    const auth = await authenticateContabilRequest(c.req.raw, options.env ?? c.env);
+    requireTriagemModule(auth);
+    c.set("auth", auth);
     await next();
   });
 
@@ -197,7 +207,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       confirmed: body.confirmed,
       userId: auth.userId,
       organizationId: auth.organizationId,
-      permission: auth.claims.permission,
+      permission: contabilPermission(auth),
       modules: auth.claims.modules,
     };
     const invoke = (service: ControlService) => service.createYear(input);
@@ -218,7 +228,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       competence: body.competence,
       userId: auth.userId,
       organizationId: auth.organizationId,
-      permission: auth.claims.permission,
+      permission: contabilPermission(auth),
       modules: auth.claims.modules,
     };
     const invoke = (service: ControlService) => service.archiveCompetence(input);
@@ -239,7 +249,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       competence: body.competence,
       userId: auth.userId,
       organizationId: auth.organizationId,
-      permission: auth.claims.permission,
+      permission: contabilPermission(auth),
       modules: auth.claims.modules,
     };
     const invoke = (service: ControlService) => service.restoreCompetence(input);
@@ -260,7 +270,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       competence: body.competence,
       userId: auth.userId,
       organizationId: auth.organizationId,
-      permission: auth.claims.permission,
+      permission: contabilPermission(auth),
       modules: auth.claims.modules,
     };
     const invoke = (service: ControlService) => service.create(input);
@@ -289,7 +299,8 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     executeAuthWrite(c);
     const params = parseWithZod(controlIdParamsSchema, { id: c.req.param("id") });
     const auth = c.get("auth");
-    const invoke = (service: ControlService) => service.completeAll(params.id, authContext(auth));
+    const invoke = (service: ControlService) =>
+      service.completeAll(params.id, contabilAuthContext(auth));
     const data = options.controlService
       ? await invoke(options.controlService)
       : await withPrisma(c, options, (prisma) =>
@@ -304,7 +315,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const body = parseWithZod(updateControlFieldBodySchema, await readJson(c));
     const auth = c.get("auth");
     const invoke = (service: ControlService) =>
-      service.updateField(params.id, body.field, body.value, authContext(auth));
+      service.updateField(params.id, body.field, body.value, contabilAuthContext(auth));
     const data = options.controlService
       ? await invoke(options.controlService)
       : await withPrisma(c, options, (prisma) =>
@@ -316,7 +327,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
   app.post("/contabil/relationships", async (c) => {
     executeAuthWrite(c);
     const body = parseWithZod(createRelationshipBodySchema, await readJson(c));
-    const auth = authContext(c.get("auth"));
+    const auth = contabilAuthContext(c.get("auth"));
     const invoke = (service: RelationshipService) => service.create(body, auth);
     const data = options.relationshipService
       ? await invoke(options.relationshipService)
@@ -329,7 +340,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     executeAuthWrite(c);
     const params = parseWithZod(relationshipIdParamsSchema, { id: c.req.param("id") });
     const body = parseWithZod(updateRelationshipBodySchema, await readJson(c));
-    const auth = authContext(c.get("auth"));
+    const auth = contabilAuthContext(c.get("auth"));
     const invoke = (service: RelationshipService) => service.update(params.id, body, auth);
     const data = options.relationshipService
       ? await invoke(options.relationshipService)
@@ -368,7 +379,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
   app.post("/contabil/responsibles", async (c) => {
     executeAuthWrite(c);
     const body = parseWithZod(createResponsibleBodySchema, await readJson(c));
-    const auth = authContext(c.get("auth"));
+    const auth = contabilAuthContext(c.get("auth"));
     const invoke = (service: ResponsibleService) => service.create(body, auth);
     const data = options.responsibleService
       ? await invoke(options.responsibleService)
@@ -381,7 +392,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     executeAuthWrite(c);
     const params = parseWithZod(responsibleIdParamsSchema, { id: c.req.param("id") });
     const body = parseWithZod(updateResponsibleBodySchema, await readJson(c));
-    const auth = authContext(c.get("auth"));
+    const auth = contabilAuthContext(c.get("auth"));
     const invoke = (service: ResponsibleService) => service.update(params.id, body, auth);
     const data = options.responsibleService
       ? await invoke(options.responsibleService)
