@@ -59,5 +59,7 @@ GREEN observado:
 
 - `ade440f4 feat(user-worker): migrate remaining user routes`
 - `ad4cf112 fix(user-worker): preserve organization auth checks`
+- `c3d0eab4 fix(user-worker): close auth and onboarding gaps`
+- `620cfbc7 docs(user-worker): record critical fix validation`
 
 Nenhum deploy ou push foi executado.
