@@ -1,6 +1,4 @@
 {
-  // BLOCKED: declare HYPERDRIVE only after an authorized production ID is provisioned.
-  // The Worker rejects database traffic without this binding; no URL fallback is used.
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
   "name": "giro-user-service",
   "main": "src/index.ts",
@@ -8,5 +6,6 @@
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat"],
   "services": [{ "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }],
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
   "observability": { "enabled": true }
 }

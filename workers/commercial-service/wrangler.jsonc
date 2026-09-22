@@ -1,7 +1,4 @@
 {
-  // BLOCKED: declare HYPERDRIVE here once an authorized production ID exists.
-  // Without it the Worker falls back to DATABASE_URL, and neither is configured,
-  // so createWorkerPrismaClient throws on the first query.
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
   "name": "giro-commercial-service",
   "main": "src/index.ts",
@@ -14,5 +11,6 @@
     { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }
   ],
   "triggers": { "crons": ["*/1 * * * *"] },
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
   "observability": { "enabled": true }
 }

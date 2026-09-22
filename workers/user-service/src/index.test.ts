@@ -85,14 +85,19 @@ describe("user Worker entrypoint dependencies", () => {
     warning.mockRestore();
   });
 
-  it("keeps the explicit deploy guard until an authorized Hyperdrive exists", async () => {
-    const config = await (await import("node:fs/promises")).readFile(
-      new URL("../wrangler.jsonc", import.meta.url),
-      "utf8",
-    );
+  it("binds Hyperdrive and never offers a DATABASE_URL fallback", async () => {
+    const config = JSON.parse(
+      (
+        await (
+          await import("node:fs/promises")
+        ).readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+      ).replace(/^\s*\/\/.*$/gm, ""),
+    ) as { hyperdrive?: Array<{ binding: string; id: string }> };
 
-    expect(config).toContain("BLOCKED");
-    expect(config).toContain("HYPERDRIVE");
-    expect(config).not.toMatch(/DATABASE_URL/iu);
+    // O Worker recusa tráfego de banco sem este binding (app.ts:100), então a
+    // ausência dele é 503 em produção, não degradação silenciosa.
+    expect(config.hyperdrive?.map((entry) => entry.binding)).toContain("HYPERDRIVE");
+    expect(config.hyperdrive?.[0]?.id).toMatch(/^[0-9a-f]{32}$/u);
+    expect(JSON.stringify(config)).not.toMatch(/DATABASE_URL/iu);
   });
 });
