@@ -121,8 +121,9 @@ user-service pelo banco, como no Node.
 `USER_SERVICE_INTERNAL_TOKEN` e `COMMERCIAL_SERVICE_TOKEN` (os dois
 últimos com o valor do token interno), mais `OPENAI_API_KEY`,
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e
-`TASK_ATTACHMENT_STORAGE_BUCKET`. Sem esses quatro últimos o Worker recusa
-servir, como o Node em produção.
+`TASK_ATTACHMENT_STORAGE_BUCKET`. Sem a chave da OpenAI, a extração da Ata
+responde 503. Sem o Supabase, os anexos respondem 503. O resto do Worker
+funciona.
 
 `giro-commercial-service`: faltam `TASK_SERVICE_INTERNAL_TOKEN` e
 `INTERNAL_REQUEST_ORIGIN`. Sem eles o cron do outbox continua parado mesmo
