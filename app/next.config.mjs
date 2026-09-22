@@ -40,6 +40,8 @@ const nextConfig = {
   reactStrictMode: true,
   allowedDevOrigins: ["localhost", "127.0.0.1"],
   transpilePackages: ["@workspace/api"],
+  // Os logos ja sao webp pequenos; servir direto evita depender de /_next/image no Worker.
+  images: { unoptimized: true },
   async headers() {
     return [
       {
