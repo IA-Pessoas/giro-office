@@ -1,6 +1,25 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { registerHooks } from "node:module";
+import { fileURLToPath } from "node:url";
 
 import worker, { toGatewayRequest } from "../../worker.ts";
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (
+      context.parentURL?.endsWith("/shared/services/api.ts") &&
+      (specifier === "./errors/AuthTokenError" || specifier === "./serverErrorToast")
+    ) {
+      return nextResolve(`${specifier}.ts`, context);
+    }
+
+    return nextResolve(specifier, context);
+  },
+});
+
+const { setupAPIClient } = await import(new URL("./services/api.ts", import.meta.url));
+const cloudflareContextSymbol = Symbol.for("__cloudflare-context__");
 
 async function runTest(name, fn) {
   try {
@@ -47,4 +66,47 @@ await runTest("api requests keep method, cookies, csrf header and body", async (
   assert.equal(seen.headers.get("cookie"), "cw.session=s; cw.csrf=c");
   assert.equal(seen.headers.get("x-csrf-token"), "c");
   assert.equal(await seen.text(), "{}");
+});
+
+await runTest("adapter still exposes the worker env under the symbol api.ts reads", async () => {
+  const adapterContext = await readFile(
+    fileURLToPath(import.meta.resolve("@opennextjs/cloudflare/cloudflare-context")),
+    "utf8",
+  );
+
+  assert.match(adapterContext, /Symbol\.for\("__cloudflare-context__"\)/);
+});
+
+await runTest("ssr api calls go through the GATEWAY binding inside the worker", async () => {
+  let seen;
+  globalThis[cloudflareContextSymbol] = {
+    env: {
+      GATEWAY: {
+        fetch: async (request) => {
+          seen = request;
+          return Response.json({ data: { id: "u1" } });
+        },
+      },
+    },
+  };
+
+  try {
+    const response = await setupAPIClient({ req: { headers: { cookie: "cw.session=s" } } }).get(
+      "/user/me",
+    );
+
+    assert.deepEqual(response.data, { data: { id: "u1" } });
+    assert.equal(new URL(seen.url).pathname, "/user/me");
+    assert.equal(seen.headers.get("cookie"), "cw.session=s");
+    assert.equal(setupAPIClient().defaults.baseURL, "/api");
+  } finally {
+    delete globalThis[cloudflareContextSymbol];
+  }
+});
+
+await runTest("ssr outside the worker keeps API_INTERNAL_URL", async () => {
+  const api = setupAPIClient({ req: { headers: {} } });
+
+  assert.equal(api.defaults.baseURL, process.env.API_INTERNAL_URL || "http://127.0.0.1:3010");
+  assert.notEqual(api.defaults.adapter, "fetch");
 });
