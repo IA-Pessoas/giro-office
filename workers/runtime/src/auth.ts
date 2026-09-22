@@ -156,7 +156,7 @@ export async function authenticateWorkerRequest(
     const isPlatformAdmin =
       claims.auth_kind === "platform" && claims.platform_role === "super_admin";
 
-    if (transport === "bearer" && isPlatformAdmin) {
+    if (transport === "bearer" && claims.auth_kind === "platform") {
       throw new WorkerAuthenticationError();
     }
 

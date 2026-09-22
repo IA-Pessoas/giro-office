@@ -202,6 +202,20 @@ describe("authenticateWorkerRequest", () => {
     ).rejects.toMatchObject({ statusCode: 401, message: "Não autenticado." });
   });
 
+  it("rejeita plataforma no transporte Bearer sem platform_role", async () => {
+    const token = await signToken({
+      user_id: "platform-user",
+      auth_kind: "platform",
+    });
+
+    await expect(
+      authenticateWorkerRequest(request({ authorization: `Bearer ${token}` }), {
+        jwtSecret: SECRET,
+        allowBearer: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 401, message: "Não autenticado." });
+  });
+
   it("aceita Bearer quando o cookie cw.session tem percent-encoding inválido", async () => {
     const token = await signToken({ user_id: "bearer-user", organization_id: "org-1" });
 
