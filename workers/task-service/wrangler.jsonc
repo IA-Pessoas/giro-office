@@ -1,17 +1,15 @@
 {
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
-  "name": "giro-commercial-service",
+  "name": "giro-task-service",
   "main": "src/index.ts",
   "workers_dev": false,
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat"],
   "services": [
-    { "binding": "CLIENT_SERVICE", "service": "giro-client-service" },
-    { "binding": "TASK_SERVICE", "service": "giro-task-service" },
+    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" },
     { "binding": "USER_SERVICE", "service": "giro-user-service" },
-    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }
+    { "binding": "PROJECT_SERVICE", "service": "giro-project-service" }
   ],
-  "triggers": { "crons": ["*/1 * * * *"] },
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
   "observability": { "enabled": true }
 }

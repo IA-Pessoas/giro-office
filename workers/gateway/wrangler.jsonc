@@ -16,6 +16,7 @@
     { "binding": "PARCELAMENTO_SERVICE", "service": "giro-parcelamento-service" },
     { "binding": "CONTABIL_SERVICE", "service": "giro-contabil-service" },
     { "binding": "PROJECT_SERVICE", "service": "giro-project-service" },
+    { "binding": "TASK_SERVICE", "service": "giro-task-service" },
     { "binding": "TI_SERVICE", "service": "giro-ti-service" },
     { "binding": "RH_SERVICE", "service": "giro-rh-service" },
     { "binding": "COMMERCIAL_SERVICE", "service": "giro-commercial-service" },
