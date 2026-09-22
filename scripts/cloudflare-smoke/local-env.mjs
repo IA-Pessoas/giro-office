@@ -22,6 +22,7 @@ export const WORKERS = [
     service: "giro-parcelamento-service",
   },
   { key: "task", dir: "workers/task-service", service: "giro-task-service" },
+  { key: "reports", dir: "workers/reports-service", service: "giro-reports-service" },
   { key: "gateway", dir: "workers/gateway", service: "giro-gateway" },
 ];
 
@@ -271,6 +272,7 @@ function writeWorkerConfig(worker, { tmpDir, databaseUrl, vars }) {
     compatibility_flags: original.compatibility_flags ?? [],
     ...(original.services ? { services: original.services } : {}),
     ...(original.vars ? { vars: original.vars } : {}),
+    ...(original.triggers ? { triggers: original.triggers } : {}),
     // O task Worker roda o app Node trocando módulos por alias; caminhos relativos à config.
     ...(original.alias
       ? {
@@ -376,6 +378,8 @@ export async function startWorkers({ tmpDir, databaseUrl, secrets, portBase }) {
         // Cada processo precisa do seu inspector; o default (9229) colide entre Workers.
         "--inspector-port",
         String(port + 100),
+        // Expõe /__scheduled para o smoke disparar o cron (fila de relatórios).
+        "--test-scheduled",
       ],
       { cwd: workerDir, stdio: ["ignore", logFd, logFd], detached: true },
     );
