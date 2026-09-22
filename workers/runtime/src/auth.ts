@@ -4,10 +4,31 @@ import { AUTH_SESSION_COOKIE_NAME, readCookie } from "./session.js";
 export type WorkerAuthKind = "organization" | "platform";
 export type WorkerAuthUserType = "owner" | "admin" | "user";
 
+const ACTIVE_MODULE_KEYS = [
+  "certificado",
+  "comercial",
+  "contabil",
+  "financeiro",
+  "fiscal",
+  "integracao",
+  "marketing",
+  "parcelamento",
+  "pessoal",
+  "regularize",
+  "rh",
+  "ti",
+  "triagem",
+] as const;
+
+type ModulePermission = 0 | 1 | 2 | 3;
+type ModulePermissions = Record<(typeof ACTIVE_MODULE_KEYS)[number], ModulePermission>;
+
 export interface WorkerAuthClaims {
   user_id: string;
   organization_id?: string;
   permission?: number;
+  modules: ModulePermissions;
+  modulePermissionsPresent: boolean;
   auth_kind: WorkerAuthKind;
   platform_role?: "super_admin";
   session_version?: number;
@@ -47,6 +68,21 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
+function normalizeModulePermission(value: unknown): ModulePermission {
+  return value === 0 || value === 1 || value === 2 || value === 3 ? value : 0;
+}
+
+function normalizeModulePermissions(value: unknown): ModulePermissions {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const modules = {} as ModulePermissions;
+
+  for (const moduleKey of ACTIVE_MODULE_KEYS) {
+    modules[moduleKey] = normalizeModulePermission((source as Record<string, unknown>)[moduleKey]);
+  }
+
+  return modules;
+}
+
 function normalizeClaims(payload: Record<string, unknown>): WorkerAuthClaims {
   const userId = isNonEmptyString(payload.user_id)
     ? payload.user_id
@@ -58,6 +94,8 @@ function normalizeClaims(payload: Record<string, unknown>): WorkerAuthClaims {
 
   const claims: WorkerAuthClaims = {
     user_id: userId,
+    modules: normalizeModulePermissions(payload.modules),
+    modulePermissionsPresent: Object.hasOwn(payload, "modules"),
     auth_kind: payload.auth_kind === "platform" ? "platform" : "organization",
   };
 
@@ -88,19 +126,11 @@ function normalizeClaims(payload: Record<string, unknown>): WorkerAuthClaims {
 
 function bearerToken(authorization: string | null): string | undefined {
   if (!authorization) return undefined;
-  const parts = authorization.trim().split(/\s+/u);
-  if (parts.length !== 2 || parts[0]?.toLowerCase() !== "bearer" || !parts[1]) {
+  const [scheme, token] = authorization.split(" ");
+  if (!scheme || !token || scheme.toLowerCase() !== "bearer") {
     throw new WorkerAuthenticationError();
   }
-  return parts[1];
-}
-
-function hasSessionCookie(cookieHeader: string | undefined): boolean {
-  return (
-    cookieHeader
-      ?.split(";")
-      .some((part) => part.trim().split("=", 1)[0]?.trim() === AUTH_SESSION_COOKIE_NAME) ?? false
-  );
+  return token;
 }
 
 export async function authenticateWorkerRequest(
@@ -110,19 +140,25 @@ export async function authenticateWorkerRequest(
   const cookieHeader = request.headers.get("cookie") ?? undefined;
   const cookieToken = readCookie(cookieHeader, AUTH_SESSION_COOKIE_NAME);
   let token = cookieToken;
+  let transport: "cookie" | "bearer" = "cookie";
 
-  if (!token) {
-    if (hasSessionCookie(cookieHeader) || !options.allowBearer) {
+  if (token === undefined) {
+    if (!options.allowBearer) {
       throw new WorkerAuthenticationError();
     }
     token = bearerToken(request.headers.get("authorization"));
     if (!token) throw new WorkerAuthenticationError();
+    transport = "bearer";
   }
 
   try {
     const claims = normalizeClaims(await verifyHs256Jwt(token, options.jwtSecret));
     const isPlatformAdmin =
       claims.auth_kind === "platform" && claims.platform_role === "super_admin";
+
+    if (transport === "bearer" && isPlatformAdmin) {
+      throw new WorkerAuthenticationError();
+    }
 
     return {
       token,

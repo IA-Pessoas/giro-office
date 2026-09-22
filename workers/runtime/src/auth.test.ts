@@ -71,6 +71,22 @@ describe("authenticateWorkerRequest", () => {
         user_id: "user-1",
         organization_id: "org-1",
         permission: 2,
+        modules: {
+          certificado: 0,
+          comercial: 0,
+          contabil: 0,
+          financeiro: 0,
+          fiscal: 0,
+          integracao: 0,
+          marketing: 0,
+          parcelamento: 0,
+          pessoal: 0,
+          regularize: 0,
+          rh: 0,
+          ti: 0,
+          triagem: 0,
+        },
+        modulePermissionsPresent: false,
         session_version: 3,
         session_id: "session-1",
         csrf_hash: "a".repeat(64),
@@ -109,6 +125,35 @@ describe("authenticateWorkerRequest", () => {
     });
   });
 
+  it("normaliza todos os módulos ativos e preserva a presença do claim", async () => {
+    const token = await signToken({
+      user_id: "user-1",
+      modules: { certificado: 3, comercial: 1, aposentado: 2, contabil: "invalid" },
+    });
+
+    const auth = await authenticateWorkerRequest(request({ authorization: `Bearer ${token}` }), {
+      jwtSecret: SECRET,
+      allowBearer: true,
+    });
+
+    expect(auth.claims.modules).toEqual({
+      certificado: 3,
+      comercial: 1,
+      contabil: 0,
+      financeiro: 0,
+      fiscal: 0,
+      integracao: 0,
+      marketing: 0,
+      parcelamento: 0,
+      pessoal: 0,
+      regularize: 0,
+      rh: 0,
+      ti: 0,
+      triagem: 0,
+    });
+    expect(auth.claims.modulePermissionsPresent).toBe(true);
+  });
+
   it("normaliza plataforma super_admin sem organização", async () => {
     const token = await signToken({
       user_id: "platform-user",
@@ -142,6 +187,46 @@ describe("authenticateWorkerRequest", () => {
     });
   });
 
+  it("rejeita plataforma super_admin no transporte Bearer", async () => {
+    const token = await signToken({
+      user_id: "platform-user",
+      auth_kind: "platform",
+      platform_role: "super_admin",
+    });
+
+    await expect(
+      authenticateWorkerRequest(request({ authorization: `Bearer ${token}` }), {
+        jwtSecret: SECRET,
+        allowBearer: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 401, message: "Não autenticado." });
+  });
+
+  it("aceita Bearer quando o cookie cw.session tem percent-encoding inválido", async () => {
+    const token = await signToken({ user_id: "bearer-user", organization_id: "org-1" });
+
+    await expect(
+      authenticateWorkerRequest(
+        request({
+          cookie: "cw.session=%E0%A4%A",
+          authorization: `Bearer ${token}`,
+        }),
+        { jwtSecret: SECRET, allowBearer: true },
+      ),
+    ).resolves.toMatchObject({ token, userId: "bearer-user", actorKind: "organization" });
+  });
+
+  it("rejeita Authorization com separação diferente de um espaço literal", async () => {
+    const token = await signToken({ user_id: "user-1" });
+
+    await expect(
+      authenticateWorkerRequest(request({ authorization: `Bearer  ${token}` }), {
+        jwtSecret: SECRET,
+        allowBearer: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 401, message: "Não autenticado." });
+  });
+
   it("rejeita cookie ou bearer inválido com erro genérico 401", async () => {
     await expect(
       authenticateWorkerRequest(request({ cookie: "cw.session=invalid" }), {
@@ -155,6 +240,14 @@ describe("authenticateWorkerRequest", () => {
         jwtSecret: SECRET,
         allowBearer: true,
       }),
+    ).rejects.toMatchObject({ statusCode: 401, message: "Não autenticado." });
+
+    const bearerToken = await signToken({ user_id: "bearer-user" });
+    await expect(
+      authenticateWorkerRequest(
+        request({ cookie: "cw.session=", authorization: `Bearer ${bearerToken}` }),
+        { jwtSecret: SECRET, allowBearer: true },
+      ),
     ).rejects.toMatchObject({ statusCode: 401, message: "Não autenticado." });
   });
 });
