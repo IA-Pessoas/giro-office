@@ -260,7 +260,7 @@ runTest("group payload trims input and preserves its policy before sending the c
   });
 });
 
-runTest("union cnpj helper formats progressively and keeps the 14-digit cap", () => {
+runTest("union cnpj helper formats progressively and keeps the 14-character cap", () => {
   assert.equal(formatPessoalUnionCnpjInput("1"), "1");
   assert.equal(formatPessoalUnionCnpjInput("12"), "12");
   assert.equal(formatPessoalUnionCnpjInput("123"), "12.3");
@@ -273,13 +273,14 @@ runTest("union cnpj helper formats progressively and keeps the 14-digit cap", ()
   assert.equal(formatPessoalUnionCnpjInput("123456789012"), "12.345.678/9012");
   assert.equal(formatPessoalUnionCnpjInput("1234567890123"), "12.345.678/9012-3");
   assert.equal(formatPessoalUnionCnpjInput("12345678901234"), "12.345.678/9012-34");
-  assert.equal(formatPessoalUnionCnpjInput("12a3456b7890c1234"), "12.345.678/9012-34");
+  assert.equal(formatPessoalUnionCnpjInput("12a3456b7890c1234"), "12.A34.56B/7890-C1");
   assert.equal(formatPessoalUnionCnpjInput("12345678901234567890"), "12.345.678/9012-34");
 });
 
 runTest("union cnpj payload normalization strips formatting before submit", () => {
   assert.equal(normalizePessoalUnionCnpjValue("12.345.678/0001-90"), "12345678000190");
-  assert.equal(normalizePessoalUnionCnpjValue("12a3456b7890c1d2e3"), "1234567890123");
+  assert.equal(normalizePessoalUnionCnpjValue("12.abc.345/0001-90"), "12ABC345000190");
+  assert.equal(normalizePessoalUnionCnpjValue("12a3456b7890c1d2e3"), "12A3456B7890C1");
   assert.deepEqual(
     buildPessoalUnionFormValues({
       id: "union-1",
