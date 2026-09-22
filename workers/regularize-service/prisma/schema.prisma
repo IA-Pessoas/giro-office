@@ -44,6 +44,9 @@ model Organization {
   processes Process[]
   logs      Logs[]
   municipalTaxes MunicipalTaxes[]
+  partners  Partners[]
+  permissions Permission[]
+  regularizeNotifications RegularizeNotification[]
 }
 
 model Client {
@@ -57,17 +60,41 @@ model Client {
   organization    Organization @relation(fields: [organization_id], references: [id])
   processes       Process[] @relation("processClientPJ")
   municipalTaxes  MunicipalTaxes[]
+  partners        Partners[] @relation("partnerClientPJ")
 
   @@map("clients")
 }
 
 model ClientPF {
   id              String    @id
+  code            String
   name            String
+  sex             String
+  address         String
+  city            String
+  zip_code        String
+  state           String
+  profession      String
+  father          String
+  mother          String
+  marital_status  String
+  date_of_birth   DateTime
   cpf             String?
+  rg              String
+  rg_expedition   DateTime?
+  rg_validity     DateTime?
+  military_certificate String
+  ctps            String
+  cnh             String
+  cnh_expedition  DateTime?
+  cnh_validity    DateTime?
+  spouse          String
+  status          String
+  notes           String
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
   processes       Process[] @relation("processClientPF")
+  partners        Partners[]
 
   @@map("clients.pf")
 }
@@ -75,12 +102,15 @@ model ClientPF {
 model User {
   id              String    @id
   name            String
+  status          String
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
   responsible1    Process[] @relation("responsible1")
   responsible2    Process[] @relation("responsible2")
   responsible3    Process[] @relation("responsible3")
   logs            Logs[]
+  permissions     Permission[]
+  regularizeNotifications RegularizeNotification[]
 
   @@map("users")
 }
@@ -139,6 +169,49 @@ model Process {
   task              Task? @relation(fields: [task_id], references: [id])
 
   @@map("regularize.process")
+}
+
+model Permission {
+  id              String @id @default(uuid())
+  user_id         String
+  regularize      Int @default(0)
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User @relation(fields: [user_id], references: [id])
+
+  @@map("permissions")
+}
+
+model Partners {
+  id              String @id @default(uuid())
+  pj_id           String
+  pf_id           String
+  part            Float
+  entry           DateTime
+  exit            DateTime?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  clientPF        ClientPF @relation(fields: [pf_id], references: [id])
+  clientPJ        Client @relation("partnerClientPJ", fields: [pj_id], references: [id])
+
+  @@map("regularize.partners")
+}
+
+model RegularizeNotification {
+  id              String @id @default(uuid())
+  user_id         String
+  regarding       String
+  regarding_id    String
+  title           String
+  message         String
+  reference_date  DateTime @default(now())
+  read            Boolean @default(false)
+  create_at       DateTime @default(now())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User @relation(fields: [user_id], references: [id])
+
+  @@map("notification.regularize")
 }
 
 model MunicipalTaxes {

@@ -1,4 +1,10 @@
 import {
+  clientPfDetailQuerySchema,
+  createClientPfBodySchema,
+  listClientPfQuerySchema,
+  updateClientPfBodySchema,
+} from "@workspace/regularize-service/src/schemas/clientPf.schemas.js";
+import {
   createLicenseBodySchema,
   licenseDetailQuerySchema,
   listLicensesQuerySchema,
@@ -11,6 +17,13 @@ import {
   updateMunicipalTaxesBodySchema,
 } from "@workspace/regularize-service/src/schemas/municipalTaxes.schemas.js";
 import {
+  createPartnerBodySchema,
+  listPartnersQuerySchema,
+  partnerDetailQuerySchema,
+  partnerIdParamsSchema,
+  updatePartnerBodySchema,
+} from "@workspace/regularize-service/src/schemas/partners.schemas.js";
+import {
   createProcessBodySchema,
   listProcessesQuerySchema,
   processActionBodySchema,
@@ -18,8 +31,11 @@ import {
   updateProcessBodySchema,
 } from "@workspace/regularize-service/src/schemas/process.schemas.js";
 import { buildLicenseStatusFilter } from "@workspace/regularize-service/src/schemas/status.schemas.js";
+import { ClientPfService } from "@workspace/regularize-service/src/services/clientPfService.js";
 import { MunicipalTaxesService } from "@workspace/regularize-service/src/services/municipalTaxesService.js";
+import { PartnersService } from "@workspace/regularize-service/src/services/partnersService.js";
 import { ProcessService } from "@workspace/regularize-service/src/services/processService.js";
+import { RegularizeReconciliationService } from "@workspace/regularize-service/src/services/regularizeReconciliationService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
 import {
@@ -71,12 +87,22 @@ export type RegularizeMunicipalTaxesService = Pick<
   MunicipalTaxesService,
   "create" | "update" | "detail" | "list"
 >;
+export type RegularizeClientPfService = Pick<
+  ClientPfService,
+  "create" | "update" | "detail" | "list"
+>;
+export type RegularizePartnersService = Pick<
+  PartnersService,
+  "create" | "update" | "detail" | "list" | "remove"
+>;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
   licenseService?: RegularizeLicenseService;
   processService?: RegularizeProcessService;
   municipalTaxesService?: RegularizeMunicipalTaxesService;
+  clientPfService?: RegularizeClientPfService;
+  partnersService?: RegularizePartnersService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -225,6 +251,26 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new MunicipalTaxesService(client as never)),
     );
   };
+  const withClientPfService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeClientPfService) => Promise<T>,
+  ) => {
+    if (options.clientPfService) return callback(options.clientPfService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) => {
+      const prisma = client as never;
+      return callback(new ClientPfService(prisma, new RegularizeReconciliationService(prisma)));
+    });
+  };
+  const withPartnersService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizePartnersService) => Promise<T>,
+  ) => {
+    if (options.partnersService) return callback(options.partnersService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) => {
+      const prisma = client as never;
+      return callback(new PartnersService(prisma, new RegularizeReconciliationService(prisma)));
+    });
+  };
   app.post("/regularize/process", async (c) =>
     withProcessService(c, async (service) => {
       const body = parseWithZod(createProcessBodySchema, await c.req.json());
@@ -344,6 +390,110 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       return c.json(
         createSuccessResponse(
           await service.list({ organizationId: c.get("auth").organizationId, ...query }),
+        ),
+      );
+    }),
+  );
+  app.post("/regularize/pf", async (c) =>
+    withClientPfService(c, async (service) => {
+      const body = parseWithZod(createClientPfBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.create({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+        201,
+      );
+    }),
+  );
+  app.put("/regularize/pf", async (c) =>
+    withClientPfService(c, async (service) => {
+      const body = parseWithZod(updateClientPfBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.update({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/pf", async (c) =>
+    withClientPfService(c, async (service) => {
+      const { id } = parseWithZod(clientPfDetailQuerySchema, c.req.query());
+      return c.json(createSuccessResponse(await service.detail(c.get("auth").organizationId, id)));
+    }),
+  );
+  app.get("/regularize/pfs", async (c) =>
+    withClientPfService(c, async (service) => {
+      const query = parseWithZod(listClientPfQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.list({ organizationId: c.get("auth").organizationId, ...query }),
+        ),
+      );
+    }),
+  );
+  app.post("/regularize/partners", async (c) =>
+    withPartnersService(c, async (service) => {
+      const body = parseWithZod(createPartnerBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.create({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+        201,
+      );
+    }),
+  );
+  app.put("/regularize/partners", async (c) =>
+    withPartnersService(c, async (service) => {
+      const body = parseWithZod(updatePartnerBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.update({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/partner", async (c) =>
+    withPartnersService(c, async (service) => {
+      const { id } = parseWithZod(partnerDetailQuerySchema, c.req.query());
+      return c.json(createSuccessResponse(await service.detail(c.get("auth").organizationId, id)));
+    }),
+  );
+  app.get("/regularize/partners", async (c) =>
+    withPartnersService(c, async (service) => {
+      const query = parseWithZod(listPartnersQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.list(c.get("auth").organizationId, query.type, query.client_id),
+        ),
+      );
+    }),
+  );
+  app.delete("/regularize/partners/:id", async (c) =>
+    withPartnersService(c, async (service) => {
+      const { id } = parseWithZod(partnerIdParamsSchema, { id: c.req.param("id") });
+      return c.json(
+        createSuccessResponse(
+          await service.remove({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            id,
+          }),
         ),
       );
     }),

@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createRegularizeWorkerApp,
+  type RegularizeClientPfService,
   type RegularizeLicensePrisma,
   type RegularizeLicenseService,
   type RegularizeMunicipalTaxesService,
+  type RegularizePartnersService,
   type RegularizeProcessService,
   type RegularizeWorkerEnv,
 } from "./app.js";
@@ -66,6 +68,25 @@ function municipalTaxesService(): RegularizeMunicipalTaxesService {
     update: vi.fn(async () => ({ id: "municipal-1" })),
     detail: vi.fn(async () => ({ detail: { id: "municipal-1" } })),
     list: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
+  };
+}
+
+function clientPfService(): RegularizeClientPfService {
+  return {
+    create: vi.fn(async () => ({ create: { id: "client-pf-1" } })),
+    update: vi.fn(async () => ({ id: "client-pf-1" })),
+    detail: vi.fn(async () => ({ detail: { id: "client-pf-1" } })),
+    list: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
+  };
+}
+
+function partnersService(): RegularizePartnersService {
+  return {
+    create: vi.fn(async () => ({ create: { id: "partner-1" } })),
+    update: vi.fn(async () => ({ id: "partner-1" })),
+    detail: vi.fn(async () => ({ detail: { id: "partner-1" } })),
+    list: vi.fn(async () => []),
+    remove: vi.fn(async () => ({ ok: true })),
   };
 }
 
@@ -301,6 +322,101 @@ describe("regularize Worker", () => {
       type: "TFF",
       page: 1,
       limit: 20,
+    });
+  });
+
+  it("routes PF clients and partners through their scoped services", async () => {
+    const clientPf = clientPfService();
+    const partners = partnersService();
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      clientPfService: clientPf,
+      partnersService: partners,
+    });
+    const pfBody = {
+      code: "PF-1",
+      name: "Pessoa Teste",
+      sex: "F",
+      address: "Rua A",
+      city: "São Paulo",
+      zip_code: "01000000",
+      state: "SP",
+      profession: "Analista",
+      father: "Pai",
+      mother: "Mãe",
+      marital_status: "Solteiro",
+      date_of_birth: "1990-01-01",
+      cpf: "12345678901",
+      rg: "1234567",
+      status: "Ativo",
+    };
+    const createdPf = await app.request("https://regularize.test/regularize/pf", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify(pfBody),
+    });
+    const updatedPf = await app.request("https://regularize.test/regularize/pf", {
+      method: "PUT",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ ...pfBody, id: LICENSE_ID }),
+    });
+    const detailPf = await app.request(`https://regularize.test/regularize/pf?id=${LICENSE_ID}`, {
+      headers: headers(),
+    });
+    const listPf = await app.request(
+      "https://regularize.test/regularize/pfs?status=Todos&search=Pessoa&page=1&limit=20",
+      { headers: headers() },
+    );
+    const partnerBody = {
+      pj_id: ORGANIZATION_ID,
+      pf_id: LICENSE_ID,
+      part: 50,
+      entry: "2026-01-01",
+    };
+    const createdPartner = await app.request("https://regularize.test/regularize/partners", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify(partnerBody),
+    });
+    const updatedPartner = await app.request("https://regularize.test/regularize/partners", {
+      method: "PUT",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ ...partnerBody, id: LICENSE_ID }),
+    });
+    const detailPartner = await app.request(
+      `https://regularize.test/regularize/partner?id=${LICENSE_ID}`,
+      { headers: headers() },
+    );
+    const listPartners = await app.request(
+      `https://regularize.test/regularize/partners?type=pf&client_id=${LICENSE_ID}`,
+      { headers: headers() },
+    );
+    const removedPartner = await app.request(
+      `https://regularize.test/regularize/partners/${LICENSE_ID}`,
+      { method: "DELETE", headers: headers() },
+    );
+
+    expect(
+      [
+        createdPf,
+        updatedPf,
+        detailPf,
+        listPf,
+        createdPartner,
+        updatedPartner,
+        detailPartner,
+        listPartners,
+        removedPartner,
+      ].map((response) => response.status),
+    ).toEqual([201, 200, 200, 200, 201, 200, 200, 200, 200]);
+    expect(clientPf.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+    expect(partners.remove).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      id: LICENSE_ID,
     });
   });
 });
