@@ -10,10 +10,21 @@ import {
   createCertificatePjSchema,
   updateCertificatePjSchema,
 } from "@workspace/certificate-service/src/schemas/certificatePj.schemas.js";
+import { createCertificateFileCrypto } from "@workspace/certificate-service/src/services/certificateFileCrypto.js";
+import type { CertificateFileStorage } from "@workspace/certificate-service/src/services/certificateFileStorage.js";
+import {
+  type CertificateUploadFile,
+  validateCertificateUploadFile,
+} from "@workspace/certificate-service/src/services/certificateFileValidation.js";
 import { createCertificatePasswordCrypto } from "@workspace/certificate-service/src/services/certificatePasswordCrypto.js";
 import { CertificatePfService } from "@workspace/certificate-service/src/services/certificatePfService.js";
+import type { CertificatePjFileDeps } from "@workspace/certificate-service/src/services/certificatePjService.js";
 import { CertificatePjService } from "@workspace/certificate-service/src/services/certificatePjService.js";
-import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
+import {
+  createSupabaseStorageClient,
+  type WorkerAuthContext,
+  withWorkerPrisma,
+} from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
 import {
   createSuccessResponse,
@@ -38,6 +49,9 @@ type CertificatePjServiceLike = Pick<
   | "createCertificatePj"
   | "updateCertificatePj"
   | "deleteCertificatePj"
+  | "uploadCertificatePjFile"
+  | "downloadCertificatePjFile"
+  | "deleteCertificatePjFile"
 >;
 type CertificatePfServiceLike = Pick<
   CertificatePfService,
@@ -46,6 +60,9 @@ type CertificatePfServiceLike = Pick<
   | "createCertificatePf"
   | "updateCertificatePf"
   | "deleteCertificatePf"
+  | "uploadCertificatePfFile"
+  | "downloadCertificatePfFile"
+  | "deleteCertificatePfFile"
 >;
 
 interface CertificateWorkerOptions {
@@ -65,6 +82,78 @@ async function readJson(c: { req: { json: <T>() => Promise<T> } }): Promise<unkn
   }
 }
 
+function createCertificateFileDeps(env: CertificateWorkerEnv): CertificatePjFileDeps | undefined {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.CERTIFICATE_FILE_ENCRYPTION_KEY) {
+    return undefined;
+  }
+
+  const storage = createSupabaseStorageClient({
+    SUPABASE_URL: env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+  });
+  const bucket = env.CERTIFICATE_STORAGE_BUCKET ?? "Certificados";
+  const fileStorage: CertificateFileStorage = {
+    async putObject(input) {
+      try {
+        await storage.upload(bucket, input.path, input.buffer, {
+          contentType: input.contentType,
+          upsert: true,
+        });
+      } catch (error) {
+        throw new ServiceError(500, "Erro ao armazenar arquivo de certificado.", error);
+      }
+    },
+    async getObject(path) {
+      try {
+        const response = await storage.download(bucket, path);
+        return Buffer.from(await response.arrayBuffer());
+      } catch (error) {
+        throw new ServiceError(404, "Arquivo de certificado nao encontrado no storage.", error);
+      }
+    },
+    async deleteObject(path) {
+      try {
+        await storage.remove(bucket, path);
+      } catch (error) {
+        throw new ServiceError(500, "Erro ao remover arquivo de certificado.", error);
+      }
+    },
+  };
+
+  return {
+    fileStorage,
+    fileCrypto: createCertificateFileCrypto({
+      keyBase64: env.CERTIFICATE_FILE_ENCRYPTION_KEY,
+      keyVersion: env.CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION ?? "v1",
+    }),
+    storageProvider: "supabase",
+    storageBucket: bucket,
+  };
+}
+
+async function readCertificateUpload(
+  c: { req: { parseBody: () => Promise<Record<string, unknown>> } },
+  env: CertificateWorkerEnv,
+): Promise<CertificateUploadFile> {
+  const body = await c.req.parseBody();
+  const file = body.file instanceof File ? body.file : undefined;
+  return validateCertificateUploadFile(
+    file
+      ? {
+          buffer: Buffer.from(await file.arrayBuffer()),
+          mimetype: file.type || "application/octet-stream",
+          originalname: file.name,
+          size: file.size,
+        }
+      : undefined,
+    env.CERTIFICATE_FILE_MAX_SIZE_BYTES ?? 5 * 1024 * 1024,
+  );
+}
+
+function attachmentFileName(originalName: string): string {
+  return originalName.replace(/[^a-zA-Z0-9._-]/g, "_") || "certificate.p12";
+}
+
 async function withCertificateService<T>(
   options: CertificateWorkerOptions,
   callback: (service: CertificatePjServiceLike) => Promise<T>,
@@ -78,7 +167,7 @@ async function withCertificateService<T>(
     });
     const service = new CertificatePjService(
       client as unknown as ConstructorParameters<typeof CertificatePjService>[0],
-      undefined,
+      createCertificateFileDeps(options.env),
       passwordCrypto,
     );
     return callback(service);
@@ -98,7 +187,7 @@ async function withCertificatePfService<T>(
     });
     const service = new CertificatePfService(
       client as unknown as ConstructorParameters<typeof CertificatePfService>[0],
-      undefined,
+      createCertificateFileDeps(options.env),
       passwordCrypto,
     );
     return callback(service);
@@ -152,6 +241,58 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
             id: params.id,
             organizationId: auth.organizationId,
             canViewPassword: certificatePermission(auth) >= 2,
+          }),
+        ),
+      ),
+    );
+  });
+
+  app.post("/certificate/pj/:id/file", async (c) => {
+    const params = parseWithZod(certificatePjIdParamSchema, c.req.param());
+    const auth = c.get("auth");
+    const file = await readCertificateUpload(c, options.env);
+    return c.json(
+      createSuccessResponse(
+        await withCertificateService(options, (service) =>
+          service.uploadCertificatePjFile({
+            id: params.id,
+            organizationId: auth.organizationId,
+            userId: auth.userId,
+            file,
+          }),
+        ),
+      ),
+      201,
+    );
+  });
+
+  app.get("/certificate/pj/:id/file", async (c) => {
+    const params = parseWithZod(certificatePjIdParamSchema, c.req.param());
+    const auth = c.get("auth");
+    const result = await withCertificateService(options, (service) =>
+      service.downloadCertificatePjFile({
+        id: params.id,
+        organizationId: auth.organizationId,
+      }),
+    );
+    return new Response(result.buffer, {
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Disposition": `attachment; filename="${attachmentFileName(result.originalName)}"`,
+        "Content-Type": result.mimeType,
+      },
+    });
+  });
+
+  app.delete("/certificate/pj/:id/file", async (c) => {
+    const params = parseWithZod(certificatePjIdParamSchema, c.req.param());
+    const auth = c.get("auth");
+    return c.json(
+      createSuccessResponse(
+        await withCertificateService(options, (service) =>
+          service.deleteCertificatePjFile({
+            id: params.id,
+            organizationId: auth.organizationId,
           }),
         ),
       ),
@@ -218,6 +359,58 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
             id: params.id,
             organizationId: auth.organizationId,
             canViewPassword: certificatePermission(auth) >= 2,
+          }),
+        ),
+      ),
+    );
+  });
+
+  app.post("/certificate/pf/:id/file", async (c) => {
+    const params = parseWithZod(certificatePfIdParamSchema, c.req.param());
+    const auth = c.get("auth");
+    const file = await readCertificateUpload(c, options.env);
+    return c.json(
+      createSuccessResponse(
+        await withCertificatePfService(options, (service) =>
+          service.uploadCertificatePfFile({
+            id: params.id,
+            organizationId: auth.organizationId,
+            userId: auth.userId,
+            file,
+          }),
+        ),
+      ),
+      201,
+    );
+  });
+
+  app.get("/certificate/pf/:id/file", async (c) => {
+    const params = parseWithZod(certificatePfIdParamSchema, c.req.param());
+    const auth = c.get("auth");
+    const result = await withCertificatePfService(options, (service) =>
+      service.downloadCertificatePfFile({
+        id: params.id,
+        organizationId: auth.organizationId,
+      }),
+    );
+    return new Response(result.buffer, {
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Disposition": `attachment; filename="${attachmentFileName(result.originalName)}"`,
+        "Content-Type": result.mimeType,
+      },
+    });
+  });
+
+  app.delete("/certificate/pf/:id/file", async (c) => {
+    const params = parseWithZod(certificatePfIdParamSchema, c.req.param());
+    const auth = c.get("auth");
+    return c.json(
+      createSuccessResponse(
+        await withCertificatePfService(options, (service) =>
+          service.deleteCertificatePfFile({
+            id: params.id,
+            organizationId: auth.organizationId,
           }),
         ),
       ),

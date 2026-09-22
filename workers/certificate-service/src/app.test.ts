@@ -29,6 +29,9 @@ type CertificatePjServiceMock = {
   createCertificatePj: ReturnType<typeof vi.fn>;
   updateCertificatePj: ReturnType<typeof vi.fn>;
   deleteCertificatePj: ReturnType<typeof vi.fn>;
+  uploadCertificatePjFile: ReturnType<typeof vi.fn>;
+  downloadCertificatePjFile: ReturnType<typeof vi.fn>;
+  deleteCertificatePjFile: ReturnType<typeof vi.fn>;
 };
 
 function certificate(): CertificatePj {
@@ -61,6 +64,20 @@ function service(): CertificatePjServiceMock {
     createCertificatePj: vi.fn(async () => certificate()),
     updateCertificatePj: vi.fn(async () => certificate()),
     deleteCertificatePj: vi.fn(async () => ({ ok: true })),
+    uploadCertificatePjFile: vi.fn(async () => ({
+      file_original_name: "cert.p12",
+      file_mime_type: "application/x-pkcs12",
+      file_size_bytes: 3,
+      file_uploaded_at: new Date("2026-09-22T00:00:00.000Z"),
+      file_uploaded_by_user_id: USER_ID,
+      has_certificate: true,
+    })),
+    downloadCertificatePjFile: vi.fn(async () => ({
+      buffer: Buffer.from("p12"),
+      originalName: "empresa final.p12",
+      mimeType: "application/x-pkcs12",
+    })),
+    deleteCertificatePjFile: vi.fn(async () => ({ ok: true })),
   };
 }
 
@@ -77,6 +94,20 @@ function pfService() {
     createCertificatePf: vi.fn(async () => ({ id: CERTIFICATE_ID })),
     updateCertificatePf: vi.fn(async () => ({ id: CERTIFICATE_ID })),
     deleteCertificatePf: vi.fn(async () => ({ ok: true })),
+    uploadCertificatePfFile: vi.fn(async () => ({
+      file_original_name: "cert.p12",
+      file_mime_type: "application/x-pkcs12",
+      file_size_bytes: 3,
+      file_uploaded_at: new Date("2026-09-22T00:00:00.000Z"),
+      file_uploaded_by_user_id: USER_ID,
+      has_certificate: true,
+    })),
+    downloadCertificatePfFile: vi.fn(async () => ({
+      buffer: Buffer.from("p12"),
+      originalName: "pessoa final.p12",
+      mimeType: "application/x-pkcs12",
+    })),
+    deleteCertificatePfFile: vi.fn(async () => ({ ok: true })),
   };
 }
 
@@ -218,6 +249,51 @@ describe("certificate Worker PJ slice", () => {
     expect(certificateService.createCertificatePj).not.toHaveBeenCalled();
   });
 
+  it("routes PJ file upload, download and deletion with the authenticated user", async () => {
+    const certificateService = service();
+    const app = createCertificateWorkerApp({ env: env(), service: certificateService });
+    const headers = gatewayHeaders();
+    const form = new FormData();
+    form.set("file", new File(["p12"], "cert.p12", { type: "application/x-pkcs12" }));
+
+    const upload = await app.request(
+      `https://certificate.test/certificate/pj/${CERTIFICATE_ID}/file`,
+      {
+        method: "POST",
+        headers,
+        body: form,
+      },
+    );
+    const download = await app.request(
+      `https://certificate.test/certificate/pj/${CERTIFICATE_ID}/file`,
+      { headers },
+    );
+    const remove = await app.request(
+      `https://certificate.test/certificate/pj/${CERTIFICATE_ID}/file`,
+      { method: "DELETE", headers },
+    );
+
+    expect([upload.status, download.status, remove.status]).toEqual([201, 200, 200]);
+    expect(certificateService.uploadCertificatePjFile).toHaveBeenCalledWith({
+      id: CERTIFICATE_ID,
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      file: expect.objectContaining({
+        originalname: "cert.p12",
+        mimetype: "application/x-pkcs12",
+        size: 3,
+      }),
+    });
+    expect(download.headers.get("content-disposition")).toBe(
+      'attachment; filename="empresa_final.p12"',
+    );
+    expect(await download.text()).toBe("p12");
+    expect(certificateService.deleteCertificatePjFile).toHaveBeenCalledWith({
+      id: CERTIFICATE_ID,
+      organizationId: ORGANIZATION_ID,
+    });
+  });
+
   it("surfaces service errors without changing the organization scope", async () => {
     const certificateService = service();
     certificateService.getCertificatePj.mockRejectedValueOnce(
@@ -293,6 +369,45 @@ describe("certificate Worker PJ slice", () => {
       data: { name: "Pessoa Atualizada" },
     });
     expect(certificatePfService.deleteCertificatePf).toHaveBeenCalledWith({
+      id: CERTIFICATE_ID,
+      organizationId: ORGANIZATION_ID,
+    });
+  });
+
+  it("routes PF file upload, download and deletion", async () => {
+    const certificatePfService = pfService();
+    const app = createCertificateWorkerApp({ env: env(), pfService: certificatePfService });
+    const headers = gatewayHeaders();
+    const form = new FormData();
+    form.set("file", new File(["p12"], "cert.p12", { type: "application/x-pkcs12" }));
+
+    const upload = await app.request(
+      `https://certificate.test/certificate/pf/${CERTIFICATE_ID}/file`,
+      {
+        method: "POST",
+        headers,
+        body: form,
+      },
+    );
+    const download = await app.request(
+      `https://certificate.test/certificate/pf/${CERTIFICATE_ID}/file`,
+      { headers },
+    );
+    const remove = await app.request(
+      `https://certificate.test/certificate/pf/${CERTIFICATE_ID}/file`,
+      { method: "DELETE", headers },
+    );
+
+    expect([upload.status, download.status, remove.status]).toEqual([201, 200, 200]);
+    expect(certificatePfService.uploadCertificatePfFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: CERTIFICATE_ID,
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+      }),
+    );
+    expect(await download.text()).toBe("p12");
+    expect(certificatePfService.deleteCertificatePfFile).toHaveBeenCalledWith({
       id: CERTIFICATE_ID,
       organizationId: ORGANIZATION_ID,
     });

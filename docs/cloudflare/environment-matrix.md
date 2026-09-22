@@ -44,6 +44,10 @@ Esta matriz documenta nomes e escopo. Ela não contém valores, tokens ou URLs p
 | `MTK_ENCRYPTION_KEY` | Secret | regularize-service | mesma chave AES-256-GCM legada; nunca expor no Pages |
 | `REGULARIZE_REPORTING_TOKEN` | Secret | regularize-service/reports | token do endpoint interno de catálogo/extração |
 | `REGULARIZE_REPORTING_GRANT_SECRET` | Secret | regularize-service/reports | assinatura HMAC dos grants de reporting; TTL máximo 60s |
+| `CERTIFICATE_STORAGE_BUCKET` | var | certificate-service | bucket privado de certificados; default legado `Certificados` |
+| `CERTIFICATE_FILE_ENCRYPTION_KEY` | Secret | certificate-service | chave AES-256-GCM dos arquivos; preservar durante a transição |
+| `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION` | var | certificate-service | versão da chave usada nos metadados; default `v1` |
+| `CERTIFICATE_FILE_MAX_SIZE_BYTES` | var | certificate-service | limite de upload; default legado 5 MiB |
 | `AUDIT_SERVICE_TOKEN` | Secret | integrações de auditoria | substituir por binding quando o fluxo estiver portado |
 | chaves de criptografia | Secret | certificados, TI/RH/Pessoal | rotação e versão devem permanecer compatíveis |
 
