@@ -68,7 +68,10 @@ function forwarded(request: Request, env: ContabilWorkerEnv): WorkerAuthContext 
         }
       : {};
   return {
-    token: "forwarded-by-gateway",
+    // O JWT do cookie vai junto para a revalidacao no user-service; o placeholder nao e verificavel.
+    token:
+      readCookie(request.headers.get("cookie") ?? undefined, AUTH_SESSION_COOKIE_NAME) ??
+      "forwarded-by-gateway",
     userId,
     organizationId,
     actorKind,
