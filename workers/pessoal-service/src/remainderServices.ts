@@ -5,7 +5,7 @@ import type {
   GroupAssignmentPreviewQuery,
 } from "@workspace/pessoal-service/src/schemas/groupAssignment.schemas.js";
 import type { ServiceBinding } from "@workspace/runtime";
-import { ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError } from "@workspace/shared";
 import { INTERNAL_SERVICE_TOKEN_HEADER } from "@workspace/shared/http";
 
 import type { PessoalWorkerEnv } from "./env.js";
@@ -85,6 +85,7 @@ export type PessoalAuditChangeInput = {
   referringId: string;
   changes?: Record<string, unknown> | null;
   path?: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type PessoalAuditRecorder = (input: PessoalAuditChangeInput) => Promise<boolean>;
@@ -160,12 +161,43 @@ function toAuditPayload(input: PessoalAuditChangeInput, now: Date): Record<strin
     serviceSource: "pessoal-service",
     createdAt: timestamp,
     finishedAt: timestamp,
-    metadata: { routeTarget: "pessoal-service" },
+    metadata: { ...(input.metadata ?? {}), routeTarget: "pessoal-service" },
     action: input.action,
     referring: input.referring,
     referringId: input.referringId,
     changes: input.changes ?? {},
     department: "pessoal",
+  };
+}
+
+function auditErrorContext(error: unknown): Record<string, unknown> {
+  if (error instanceof ServiceError) {
+    return {
+      name: error.name,
+      code: error.code,
+      statusCode: error.statusCode,
+      message: error.message,
+    };
+  }
+  if (error instanceof Error) return { name: error.name, message: error.message };
+  return { message: String(error) };
+}
+
+function pendingAuditPayload(
+  payload: PessoalAuditChangeInput,
+  error: unknown,
+  failedAt: Date,
+): PessoalAuditChangeInput {
+  return {
+    ...payload,
+    metadata: {
+      ...(payload.metadata ?? {}),
+      auditDelivery: {
+        status: PENDING_AUDIT_OUTBOX_STATUS,
+        failedAt: failedAt.toISOString(),
+        error: auditErrorContext(error),
+      },
+    },
   };
 }
 
@@ -569,12 +601,34 @@ export class GroupAssignmentService {
     if (!result.auditPayload || !result.outboxId) {
       throw new ServiceError(500, "Resultado de auditoria da atribuicao em lote invalido.");
     }
-    const auditRecorded = await this.audit(result.auditPayload);
-    if (auditRecorded) {
-      await this.prisma.pessoalAuditOutboxEvent.update({
-        where: { id: result.outboxId },
-        data: { status: PROCESSED_AUDIT_OUTBOX_STATUS, processed_at: this.now() },
+    try {
+      const auditRecorded = await this.audit(result.auditPayload);
+      if (auditRecorded) {
+        await this.prisma.pessoalAuditOutboxEvent.update({
+          where: { id: result.outboxId },
+          data: { status: PROCESSED_AUDIT_OUTBOX_STATUS, processed_at: this.now() },
+        });
+      }
+    } catch (error) {
+      logError("Falha ao registrar auditoria pós-commit de atribuição em lote", {
+        error,
+        outboxId: result.outboxId,
       });
+      try {
+        await this.prisma.pessoalAuditOutboxEvent.update({
+          where: { id: result.outboxId },
+          data: {
+            status: PENDING_AUDIT_OUTBOX_STATUS,
+            processed_at: null,
+            payload: pendingAuditPayload(result.auditPayload, error, this.now()),
+          },
+        });
+      } catch (outboxError) {
+        logError("Falha ao registrar contexto da falha de auditoria na outbox", {
+          error: outboxError,
+          outboxId: result.outboxId,
+        });
+      }
     }
     return { ...result.response, idempotent: false };
   }

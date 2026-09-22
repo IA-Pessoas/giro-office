@@ -183,6 +183,63 @@ describe("GroupAssignmentService do Worker", () => {
     expect(prisma.tx.payroll.updateMany).not.toHaveBeenCalled();
   });
 
+  it("mantém sucesso após falha pós-commit e não duplica mutação em retry", async () => {
+    const prisma = assignmentPrisma();
+    const response = { preview_id: PREVIEW_ID, changed: 1, no_op: 1, skipped: 0 };
+    const commandHash = createHash("sha256")
+      .update(JSON.stringify({ preview_id: PREVIEW_ID, fingerprint: FINGERPRINT }))
+      .digest("hex");
+    prisma.tx.pessoalGroupAssignmentConfirmation.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ command_hash: commandHash, response_snapshot: response });
+    const binding = {
+      fetch: vi.fn(async () => new Response(null, { status: 503 })),
+    };
+    const audit = createPessoalAuditRecorder({
+      INTERNAL_SERVICE_TOKEN: "audit-test-token",
+      AUDIT_SERVICE: binding,
+    } as unknown as PessoalWorkerEnv);
+    const service = new GroupAssignmentService(prisma, audit, () => FIXED_NOW);
+
+    await expect(
+      service.apply(
+        { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+        { preview_id: PREVIEW_ID, fingerprint: FINGERPRINT },
+        "audit-failure-key",
+      ),
+    ).resolves.toEqual({ ...response, idempotent: false });
+    await expect(
+      service.apply(
+        { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+        { preview_id: PREVIEW_ID, fingerprint: FINGERPRINT },
+        "audit-failure-key",
+      ),
+    ).resolves.toEqual({ ...response, idempotent: true });
+
+    expect(prisma.tx.payroll.updateMany).toHaveBeenCalledTimes(1);
+    expect(binding.fetch).toHaveBeenCalledTimes(1);
+    expect(prisma.pessoalAuditOutboxEvent.update).toHaveBeenCalledWith({
+      where: { id: "outbox-1" },
+      data: {
+        status: "pending",
+        processed_at: null,
+        payload: expect.objectContaining({
+          metadata: expect.objectContaining({
+            auditDelivery: expect.objectContaining({
+              status: "pending",
+              error: expect.objectContaining({ statusCode: 502 }),
+            }),
+          }),
+        }),
+      },
+    });
+    expect(prisma.pessoalAuditOutboxEvent.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "processed" }),
+      }),
+    );
+  });
+
   it("reconcilia apenas auditoria pendente e não altera folha", async () => {
     const prisma = assignmentPrisma();
     prisma.pessoalAuditOutboxEvent.findMany.mockResolvedValueOnce([
