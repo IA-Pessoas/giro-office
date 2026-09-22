@@ -68,5 +68,16 @@ O `prisma generate` executado pelos scripts também passou. O `git diff
 ## Isolamento de mudanças
 
 Não foram alterados `services/ti-service`, gateway, `shared`, app ou outros
-Workers. Havia mudanças concorrentes/preexistentes em `app/next-env.d.ts` e
-em `workers/user-service/**`; elas não foram tocadas nem incluídas no commit.
+Workers. Havia mudanças concorrentes/preexistentes em `app/next-env.d.ts`, em
+`workers/pessoal-service/**` e no relatório de User; elas foram preservadas
+fora do escopo TI e não fazem parte do estado final do Worker TI.
+
+## Commits
+
+- `adce9ba0 feat(workers): migrate remaining ti routes` — código, testes,
+  schema, ambiente e relatório TI.
+- `0cedea54 chore: remove concurrent report from ti commit` — correção aditiva
+  para retirar do tip a alteração concorrente de User que estava staged antes
+  do commit TI.
+
+Não houve deploy nem push.

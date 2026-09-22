@@ -39,7 +39,10 @@ type AssignmentTransaction = {
   pessoalGroupAssignmentPreviewDetail: Model;
   client: Model;
   payroll: Model & { updateMany(args: Record<string, unknown>): Promise<{ count: number }> };
-  pessoalAuditOutboxEvent: { create(args: Record<string, unknown>): Promise<Row> };
+  pessoalAuditOutboxEvent: {
+    create(args: Record<string, unknown>): Promise<Row>;
+    updateMany(args: Record<string, unknown>): Promise<{ count: number }>;
+  };
 };
 
 export type PessoalAssignmentPrisma = {
@@ -92,8 +95,10 @@ const OUTCOME_CHANGED = "CHANGED";
 const OUTCOME_NO_OP = "NO_OP";
 const OUTCOME_SKIPPED = "SKIPPED";
 const PENDING_AUDIT_OUTBOX_STATUS = "pending";
+const PROCESSING_AUDIT_OUTBOX_STATUS = "processing";
 const PROCESSED_AUDIT_OUTBOX_STATUS = "processed";
 const AUDIT_OUTBOX_RECONCILIATION_LIMIT = 100;
+const AUDIT_SERVICE_TIMEOUT_MS = 5_000;
 const UNION_REGARDING = "union";
 const NOTIFICATION_CREATE_CHUNK_SIZE = 100;
 
@@ -164,26 +169,44 @@ function toAuditPayload(input: PessoalAuditChangeInput, now: Date): Record<strin
   };
 }
 
-export function createPessoalAuditRecorder(env?: PessoalWorkerEnv): PessoalAuditRecorder {
-  return async (input) => {
-    if (!env?.AUDIT_SERVICE) return false;
-    const binding: ServiceBinding = env.AUDIT_SERVICE;
-    try {
-      const response = await binding.fetch(
-        new Request("https://audit.internal/internal/audit/requests", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            [INTERNAL_SERVICE_TOKEN_HEADER]: env.INTERNAL_SERVICE_TOKEN,
-          },
-          body: JSON.stringify(toAuditPayload(input, new Date())),
-        }),
-      );
-      return response.ok;
-    } catch {
-      return false;
+export async function sendPessoalAudit(
+  env: PessoalWorkerEnv | undefined,
+  input: Record<string, unknown>,
+): Promise<boolean> {
+  if (!env?.AUDIT_SERVICE) return false;
+  const binding: ServiceBinding = env.AUDIT_SERVICE;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AUDIT_SERVICE_TIMEOUT_MS);
+
+  try {
+    const response = await binding.fetch(
+      new Request("https://audit.internal/internal/audit/requests", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [INTERNAL_SERVICE_TOKEN_HEADER]: env.INTERNAL_SERVICE_TOKEN,
+        },
+        body: JSON.stringify(input),
+      }),
+      { signal: controller.signal },
+    );
+    if (!response.ok) {
+      throw new ServiceError(502, `AUDIT_SERVICE respondeu com HTTP ${response.status}.`);
     }
-  };
+    return true;
+  } catch (error) {
+    if (error instanceof ServiceError) throw error;
+    if (controller.signal.aborted) {
+      throw new ServiceError(504, "Tempo esgotado ao chamar AUDIT_SERVICE.", error);
+    }
+    throw new ServiceError(502, "Falha ao chamar AUDIT_SERVICE.", error);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export function createPessoalAuditRecorder(env?: PessoalWorkerEnv): PessoalAuditRecorder {
+  return (input) => sendPessoalAudit(env, toAuditPayload(input, new Date()));
 }
 
 export class GroupAssignmentService {
@@ -565,13 +588,38 @@ export class GroupAssignmentService {
     });
     let processed = 0;
     for (const event of events) {
-      const payload = event.payload;
-      if (!isAuditChangeInput(payload) || !(await this.audit(payload))) continue;
-      const updated = await this.prisma.pessoalAuditOutboxEvent.updateMany({
-        where: { id: event.id, status: PENDING_AUDIT_OUTBOX_STATUS },
-        data: { status: PROCESSED_AUDIT_OUTBOX_STATUS, processed_at: this.now() },
+      const wasProcessed = await this.prisma.$transaction(async (tx) => {
+        const claimed = await tx.$executeRaw`
+          UPDATE "pessoal.audit_outbox_events"
+          SET "status" = ${PROCESSING_AUDIT_OUTBOX_STATUS}
+          WHERE "id" = ${event.id} AND "status" = ${PENDING_AUDIT_OUTBOX_STATUS}
+        `;
+        if (claimed !== 1) return false;
+
+        const payload = event.payload;
+        if (!isAuditChangeInput(payload)) {
+          await tx.pessoalAuditOutboxEvent.updateMany({
+            where: { id: event.id, status: PROCESSING_AUDIT_OUTBOX_STATUS },
+            data: { status: PENDING_AUDIT_OUTBOX_STATUS },
+          });
+          return false;
+        }
+
+        if (!(await this.audit(payload))) {
+          await tx.pessoalAuditOutboxEvent.updateMany({
+            where: { id: event.id, status: PROCESSING_AUDIT_OUTBOX_STATUS },
+            data: { status: PENDING_AUDIT_OUTBOX_STATUS },
+          });
+          return false;
+        }
+
+        const updated = await tx.pessoalAuditOutboxEvent.updateMany({
+          where: { id: event.id, status: PROCESSING_AUDIT_OUTBOX_STATUS },
+          data: { status: PROCESSED_AUDIT_OUTBOX_STATUS, processed_at: this.now() },
+        });
+        return updated.count === 1;
       });
-      processed += updated.count;
+      processed += wasProcessed ? 1 : 0;
     }
     return {
       processed,

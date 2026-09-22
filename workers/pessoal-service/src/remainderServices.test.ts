@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-
+import type { PessoalWorkerEnv } from "./env.js";
 import {
+  createPessoalAuditRecorder,
   GroupAssignmentService,
   type PessoalAssignmentPrisma,
   type PessoalNotificationPrisma,
@@ -72,7 +73,10 @@ function assignmentPrisma() {
       ]),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
-    pessoalAuditOutboxEvent: { create: vi.fn(async () => ({ id: "outbox-1" })) },
+    pessoalAuditOutboxEvent: {
+      create: vi.fn(async () => ({ id: "outbox-1" })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
   };
   return {
     tx,
@@ -202,11 +206,136 @@ describe("GroupAssignmentService do Worker", () => {
       pending: 0,
     });
     expect(audit).toHaveBeenCalledOnce();
-    expect(prisma.pessoalAuditOutboxEvent.updateMany).toHaveBeenCalledWith({
-      where: { id: "outbox-pending", status: "pending" },
+    expect(prisma.tx.pessoalAuditOutboxEvent.updateMany).toHaveBeenCalledWith({
+      where: { id: "outbox-pending", status: "processing" },
       data: { status: "processed", processed_at: FIXED_NOW },
     });
     expect(prisma.tx.payroll.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("reivindica atomicamente cada evento antes de chamar a auditoria", async () => {
+    const event = {
+      id: "outbox-concurrent",
+      payload: {
+        requestId: "audit-request-concurrent",
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        action: "Atualizacao",
+        referring: "pessoal.group-assignment",
+        referringId: PREVIEW_ID,
+      },
+    };
+    let status = "pending";
+    let reads = 0;
+    let releaseReads!: () => void;
+    const bothReadersLoaded = new Promise<void>((resolve) => {
+      releaseReads = resolve;
+    });
+    const updateEvent = vi.fn(
+      async ({ where, data }: { where: Record<string, string>; data: Record<string, unknown> }) => {
+        if (where.id !== event.id || where.status !== status) return { count: 0 };
+        status = String(data.status);
+        return { count: 1 };
+      },
+    );
+    const tx = {
+      $executeRaw: vi.fn(async () => {
+        if (status !== "pending") return 0;
+        status = "processing";
+        return 1;
+      }),
+      pessoalAuditOutboxEvent: { updateMany: updateEvent },
+    };
+    const prisma = {
+      $queryRaw: vi.fn(async () => []),
+      $transaction: vi.fn(async (callback: (transaction: typeof tx) => Promise<unknown>) =>
+        callback(tx),
+      ),
+      pessoalGroup: {},
+      client: {},
+      payroll: {},
+      pessoalGroupAssignmentPreview: {},
+      pessoalGroupAssignmentPreviewDetail: {},
+      pessoalAuditOutboxEvent: {
+        findMany: vi.fn(async () => {
+          reads += 1;
+          if (reads === 2) releaseReads();
+          return status === "pending" ? [event] : [];
+        }),
+        count: vi.fn(async () => (status === "pending" ? 1 : 0)),
+        update: vi.fn(),
+        updateMany: updateEvent,
+      },
+    } as unknown as PessoalAssignmentPrisma;
+    const audit = vi.fn(async () => true);
+    const service = new GroupAssignmentService(prisma, audit, () => FIXED_NOW);
+
+    const first = service.reconcilePendingAuditEvents();
+    const second = service.reconcilePendingAuditEvents();
+    await bothReadersLoaded;
+    const results = await Promise.all([first, second]);
+
+    expect(audit).toHaveBeenCalledOnce();
+    expect(results.map((result) => result.processed).sort()).toEqual([0, 1]);
+  });
+
+  it("propaga erro HTTP do AUDIT_SERVICE sem concluir o evento", async () => {
+    const binding = {
+      fetch: vi.fn(async () => new Response(null, { status: 503 })),
+    };
+    const recorder = createPessoalAuditRecorder({
+      INTERNAL_SERVICE_TOKEN: "audit-test-token",
+      AUDIT_SERVICE: binding,
+    } as unknown as PessoalWorkerEnv);
+
+    await expect(
+      recorder({
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        action: "Atualizacao",
+        referring: "pessoal.group-assignment",
+        referringId: PREVIEW_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 502 });
+  });
+
+  it("aborta e propaga timeout do AUDIT_SERVICE", async () => {
+    vi.useFakeTimers();
+    try {
+      const binding = {
+        fetch: vi.fn(
+          async (_request: RequestInfo | URL, init?: RequestInit) =>
+            new Promise<Response>((_resolve, reject) => {
+              if (!init?.signal) {
+                reject(new Error("AUDIT_SERVICE sem timeout"));
+                return;
+              }
+              init.signal.addEventListener(
+                "abort",
+                () => reject(new DOMException("aborted", "AbortError")),
+                { once: true },
+              );
+            }),
+        ),
+      };
+      const recorder = createPessoalAuditRecorder({
+        INTERNAL_SERVICE_TOKEN: "audit-test-token",
+        AUDIT_SERVICE: binding,
+      } as unknown as PessoalWorkerEnv);
+      const pending = recorder({
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        action: "Atualizacao",
+        referring: "pessoal.group-assignment",
+        referringId: PREVIEW_ID,
+      });
+      const rejected = expect(pending).rejects.toMatchObject({ statusCode: 504 });
+
+      await vi.advanceTimersByTimeAsync(5_001);
+      await rejected;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

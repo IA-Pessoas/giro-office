@@ -75,6 +75,7 @@ import {
   GroupAssignmentService,
   type PessoalAssignmentPrisma,
   type PessoalNotificationPrisma,
+  sendPessoalAudit,
   UnionNotificationService,
 } from "./remainderServices.js";
 
@@ -275,21 +276,7 @@ async function audit(
   env: PessoalWorkerEnv | undefined,
   input: Record<string, unknown>,
 ): Promise<void> {
-  if (!env?.AUDIT_SERVICE) return;
-  try {
-    await env.AUDIT_SERVICE.fetch(
-      new Request("https://audit.internal/internal/audit/requests", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [INTERNAL_SERVICE_TOKEN_HEADER]: env.INTERNAL_SERVICE_TOKEN,
-        },
-        body: JSON.stringify(input),
-      }),
-    );
-  } catch {
-    // Audit is best-effort here, matching the existing PessoalAuditService contract.
-  }
+  await sendPessoalAudit(env, input);
 }
 
 function localService(prisma: PessoalGroupPrisma, env?: PessoalWorkerEnv): PessoalGroupService {
