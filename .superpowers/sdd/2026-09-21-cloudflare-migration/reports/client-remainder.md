@@ -54,4 +54,4 @@ Depois da implementação, a suíte do Worker ficou verde: 3 arquivos, 13 testes
 
 O código do client foi efetivamente incorporado no commit `7013c6ec` durante uma corrida concorrente de commits; esse commit também contém um relatório de `project-worker` criado pelo outro fluxo. O relatório deste serviço é separado neste commit posterior. Não houve deploy nem push.
 
-Permanece uma alteração preexistente do usuário em `app/next-env.d.ts`, sem edição. Alterações externas em `project-worker` e o relatório de outro serviço foram preservadas e não foram tratados como parte desta entrega.
+Permanece uma alteração preexistente do usuário em `app/next-env.d.ts`, sem edição. Alterações externas em `project-worker`, `gateway` e o relatório de outro serviço foram preservadas e não foram tratados como parte desta entrega.
