@@ -1,0 +1,18 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model InventoryCategoryTecnologia {
+  id              String  @id @default(uuid())
+  name            String
+  tag             String?
+  active          Boolean @default(true)
+  organization_id String
+
+  @@map("tecnologia.inventoryCategories")
+}
