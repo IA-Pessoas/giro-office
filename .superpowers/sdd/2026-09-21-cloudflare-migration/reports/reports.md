@@ -66,6 +66,15 @@ O endereço usado acima é somente um valor local não funcional para permitir a
 - REPORTS_SOURCE_TIMEOUT_MS ficou limitado a 100..60000 ms no parser Node e na normalização Worker; valores inválidos ou fora da faixa não escapam para AbortSignal.timeout.
 - Queue, consumidor assíncrono, PDF/Browser Run, staging, deploy e publicação continuam fora desta rodada.
 
+## Fix report — novo ciclo TDD pós-review
+
+- A validação de sessão por cookie no Reports Worker agora exige o binding `USER_SERVICE` e o env `USER_SERVICE_INTERNAL_TOKEN`, enviando esse segredo ao `/user/session/validate` do User Worker. O binding `USER_SERVICE` já declarado no Wrangler foi preservado; nenhum valor de segredo foi inventado ou versionado.
+- `REPORTS_INTERNAL_TOKEN` continua separado e inalterado para o cliente do endpoint `/internal/reporting/access-context`; não há fallback ou mistura entre os dois tokens.
+- Teste realista com tokens distintos cobre GET e HEAD: o mock do User Worker aceita somente `USER_SERVICE_INTERNAL_TOKEN`, reproduzindo o bloqueio anterior com 503 e passando após a correção; o teste de sessão revogada permanece coberto.
+- RED focado: os dois casos GET/HEAD falharam antes da implementação. GREEN: `@workspace/reports-worker` passou com 20 testes em 3 arquivos.
+- Typecheck, build, check, Prisma validate, Wrangler dry-run e `git diff --check` passaram. O dry-run confirmou os bindings `USER_SERVICE` e `AUDIT_SERVICE`; não publica o Worker.
+- Nenhuma alteração em `services/**`, Queue, PDF/Browser, staging, deploy ou push foi feita nesta rodada.
+
 ## Fix report — revisão de bloqueadores
 
 Esta rodada ficou restrita ao Worker/serviço de Reports, seus schemas/migration e testes. Queue, consumidor assíncrono, PDF/Browser Run, staging e deploy continuam fora do escopo e permanecem como gaps.

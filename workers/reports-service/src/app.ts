@@ -168,12 +168,12 @@ function requireOrganizationAuth(
           throw new ServiceError(403, "Token CSRF inválido.");
         }
       }
-      if (!env.USER_SERVICE || !env.REPORTS_INTERNAL_TOKEN) {
+      if (!env.USER_SERVICE || !env.USER_SERVICE_INTERNAL_TOKEN) {
         throw new ServiceError(503, "Validação de sessão indisponível para cookie.");
       }
       try {
         await validateWorkerSession(auth, env.USER_SERVICE, "cookie", {
-          internalServiceToken: env.REPORTS_INTERNAL_TOKEN,
+          internalServiceToken: env.USER_SERVICE_INTERNAL_TOKEN,
         });
       } catch (error) {
         if (error instanceof WorkerSessionValidationError) {

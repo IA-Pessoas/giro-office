@@ -5,6 +5,7 @@ export interface ReportsWorkerEnv extends WorkerEnv {
   JWT_SECRET: string;
   NODE_ENV?: string;
   USER_SERVICE_URL?: string;
+  USER_SERVICE_INTERNAL_TOKEN?: string;
   REPORTS_INTERNAL_TOKEN?: string;
   REPORTS_GRANT_SECRET?: string;
   CERTIFICATE_REPORTING_TOKEN?: string;

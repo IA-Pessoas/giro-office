@@ -8,6 +8,9 @@ const env: ReportsWorkerEnv = {
   NODE_ENV: "test",
 };
 
+const REPORTS_INTERNAL_TOKEN = "reports-internal-token";
+const USER_SERVICE_INTERNAL_TOKEN = "user-service-internal-token";
+
 function encode(value: string | Uint8Array): string {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
   let binary = "";
@@ -82,7 +85,11 @@ describe("reports-service Worker", () => {
     });
     const cancel = vi.fn();
     const app = createReportsWorkerApp({
-      env: { ...env, REPORTS_INTERNAL_TOKEN: "reports-internal-token" },
+      env: {
+        ...env,
+        REPORTS_INTERNAL_TOKEN,
+        USER_SERVICE_INTERNAL_TOKEN,
+      },
       services: { jobService: { cancel } } as never,
     });
 
@@ -114,7 +121,8 @@ describe("reports-service Worker", () => {
     const app = createReportsWorkerApp({
       env: {
         ...env,
-        REPORTS_INTERNAL_TOKEN: "reports-internal-token",
+        REPORTS_INTERNAL_TOKEN,
+        USER_SERVICE_INTERNAL_TOKEN,
         USER_SERVICE: userService,
       } as never,
       services: { jobService: { cancel } } as never,
@@ -140,6 +148,50 @@ describe("reports-service Worker", () => {
     });
   });
 
+  it.each([
+    "GET",
+    "HEAD",
+  ] as const)("usa o token do User Worker na validação de sessão por cookie em %s", async (method) => {
+    const token = await sign({
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_id: "session-1",
+      session_version: 1,
+      csrf_hash: await hashCsrfToken("B".repeat(43)),
+    });
+    const userService = {
+      fetch: vi.fn((request: Request) =>
+        Promise.resolve(
+          new Response(null, {
+            status:
+              request.headers.get("x-internal-service-token") === USER_SERVICE_INTERNAL_TOKEN
+                ? 204
+                : 403,
+          }),
+        ),
+      ),
+    };
+    const app = createReportsWorkerApp({
+      env: {
+        ...env,
+        REPORTS_INTERNAL_TOKEN,
+        USER_SERVICE_INTERNAL_TOKEN,
+        USER_SERVICE: userService,
+      } as never,
+    });
+
+    const response = await app.request("https://reports.test/reports/catalog", {
+      method,
+      headers: { cookie: `cw.session=${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(userService.fetch).toHaveBeenCalledOnce();
+    const [request] = userService.fetch.mock.calls[0] as [Request];
+    expect(request.headers.get("x-internal-service-token")).toBe(USER_SERVICE_INTERNAL_TOKEN);
+    expect(request.headers.get("x-internal-service-token")).not.toBe(REPORTS_INTERNAL_TOKEN);
+  });
+
   it("valida a sessão por cookie também em GET e recusa sessão revogada", async () => {
     const token = await sign({
       user_id: "user-1",
@@ -154,7 +206,8 @@ describe("reports-service Worker", () => {
     const app = createReportsWorkerApp({
       env: {
         ...env,
-        REPORTS_INTERNAL_TOKEN: "reports-internal-token",
+        REPORTS_INTERNAL_TOKEN,
+        USER_SERVICE_INTERNAL_TOKEN,
         USER_SERVICE: userService,
       } as never,
     });
