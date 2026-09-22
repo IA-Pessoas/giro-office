@@ -70,15 +70,24 @@ export class CommercialEmailHttpAdapter implements CommercialEmailAdapter {
 }
 
 export function createCommercialEmailAdapter(env: CommercialWorkerEnv): CommercialEmailAdapter {
-  if (
-    !env.COMMERCIAL_EMAIL_ADAPTER_URL ||
-    !env.COMMERCIAL_EMAIL_ADAPTER_TOKEN ||
-    !env.COMMERCIAL_EMAIL_FROM
-  ) {
+  if (!env.COMMERCIAL_EMAIL_ADAPTER_URL) {
+    return new MissingCommercialEmailAdapter();
+  }
+  let adapterUrl: URL;
+  try {
+    adapterUrl = new URL(env.COMMERCIAL_EMAIL_ADAPTER_URL);
+  } catch {
+    throw new Error("COMMERCIAL_EMAIL_ADAPTER_URL inválida.");
+  }
+  const localEnvironment = env.NODE_ENV === "test" || env.NODE_ENV === "development";
+  if (adapterUrl.protocol !== "https:" && !localEnvironment) {
+    throw new Error("COMMERCIAL_EMAIL_ADAPTER_URL deve usar HTTPS fora de test/dev.");
+  }
+  if (!env.COMMERCIAL_EMAIL_ADAPTER_TOKEN || !env.COMMERCIAL_EMAIL_FROM) {
     return new MissingCommercialEmailAdapter();
   }
   return new CommercialEmailHttpAdapter(
-    env.COMMERCIAL_EMAIL_ADAPTER_URL,
+    adapterUrl.toString(),
     env.COMMERCIAL_EMAIL_ADAPTER_TOKEN,
     env.COMMERCIAL_EMAIL_FROM,
   );
@@ -186,6 +195,7 @@ export class CommercialEmailNotificationService {
         where: {
           id: existing.id,
           event_id: event.event_id,
+          attempts: existing.attempts,
           OR: [{ status: "failed" }, { status: "processing", locked_at: { lt: staleBefore } }],
         },
         data: {

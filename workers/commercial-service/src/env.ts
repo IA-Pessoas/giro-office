@@ -1,6 +1,7 @@
 import type { ServiceBinding, WorkerEnv } from "@workspace/runtime";
 
 export interface CommercialWorkerEnv extends WorkerEnv {
+  NODE_ENV?: string;
   JWT_SECRET: string;
   INTERNAL_SERVICE_TOKEN: string;
   INTERNAL_REQUEST_ORIGIN?: string;

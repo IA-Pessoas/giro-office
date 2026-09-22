@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 import {
   CommercialEmailHttpAdapter,
   CommercialEmailNotificationService,
+  createCommercialEmailAdapter,
   MissingCommercialEmailAdapter,
 } from "./commercialEmail.js";
 
@@ -90,4 +91,88 @@ it("envia pelo adapter configurado com idempotência do evento", async () => {
       }),
     }),
   );
+});
+
+it("faz claim com fencing atômico e envia apenas uma vez em concorrência", async () => {
+  const initial = {
+    id: "notification-concurrent",
+    status: "failed",
+    attempts: 3,
+    locked_at: new Date("2026-09-22T00:00:00.000Z"),
+  };
+  const state = { ...initial };
+  let findCalls = 0;
+  const updateMany = vi.fn(
+    async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      if (data.status === "processing") {
+        if (where.attempts !== initial.attempts || state.status !== "failed") return { count: 0 };
+        state.status = "processing";
+        state.attempts += Number((data.attempts as { increment: number }).increment);
+        state.locked_at = data.locked_at as Date;
+        return { count: 1 };
+      }
+      if (
+        where.status === "processing" &&
+        where.attempts === state.attempts &&
+        state.status === "processing"
+      ) {
+        state.status = data.status as string;
+        state.locked_at = null;
+        return { count: 1 };
+      }
+      return { count: 0 };
+    },
+  );
+  const sends = vi.fn().mockResolvedValue(undefined);
+  const prisma = {
+    emails: {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([{ email: "commercial@example.test", responsible: "Equipe" }]),
+    },
+    commercialEmailNotification: {
+      findUnique: vi.fn(async () => {
+        findCalls += 1;
+        return findCalls <= 2 ? { ...initial } : { ...state };
+      }),
+      updateMany,
+      create: vi.fn(),
+    },
+  };
+  const service = new CommercialEmailNotificationService(prisma as never, { send: sends });
+
+  await Promise.all([
+    service.notify(EVENT, CLIENT, "2026-09"),
+    service.notify(EVENT, CLIENT, "2026-09"),
+  ]);
+
+  expect(sends).toHaveBeenCalledOnce();
+  expect(updateMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({ id: initial.id, attempts: initial.attempts }),
+    }),
+  );
+});
+
+it("aceita HTTP somente fora de produção e exige HTTPS em produção", () => {
+  const base = {
+    COMMERCIAL_EMAIL_ADAPTER_TOKEN: "email-token",
+    COMMERCIAL_EMAIL_FROM: "from@example.test",
+  };
+
+  expect(() =>
+    createCommercialEmailAdapter({
+      ...base,
+      NODE_ENV: "production",
+      COMMERCIAL_EMAIL_ADAPTER_URL: "http://email.example.test/send",
+    } as never),
+  ).toThrow("HTTPS");
+
+  expect(
+    createCommercialEmailAdapter({
+      ...base,
+      NODE_ENV: "test",
+      COMMERCIAL_EMAIL_ADAPTER_URL: "http://email.example.test/send",
+    } as never),
+  ).toBeInstanceOf(CommercialEmailHttpAdapter);
 });

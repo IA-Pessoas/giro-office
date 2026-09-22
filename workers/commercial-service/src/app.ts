@@ -66,7 +66,7 @@ export type CommercialWorkerServices = {
 
 type CommercialWorkerContext = {
   Bindings: CommercialWorkerEnv;
-  Variables: { auth: WorkerAuthContext };
+  Variables: { auth: WorkerAuthContext; requestId: string };
 };
 type CommercialContext = Context<CommercialWorkerContext>;
 
@@ -88,6 +88,10 @@ function organization(c: CommercialContext): string {
 
 function user(c: CommercialContext): string {
   return c.get("auth").userId;
+}
+
+function requestId(c: CommercialContext): string {
+  return c.get("requestId");
 }
 
 async function jsonBody(c: CommercialContext): Promise<unknown> {
@@ -123,7 +127,7 @@ function requireWrite(c: CommercialContext): void {
 function proposalAuditContext(c: CommercialContext) {
   return {
     userId: c.get("auth").userId,
-    auditCorrelationId: c.req.header(REQUEST_ID_HEADER),
+    auditCorrelationId: requestId(c),
   };
 }
 
@@ -159,7 +163,9 @@ export function createCommercialWorkerApp(options: CommercialWorkerOptions = {})
   const configuredEnv = options.env;
 
   app.use("*", async (c, next) => {
-    c.header(REQUEST_ID_HEADER, c.req.header(REQUEST_ID_HEADER) ?? crypto.randomUUID());
+    const normalizedRequestId = c.req.header(REQUEST_ID_HEADER)?.trim() || crypto.randomUUID();
+    c.set("requestId", normalizedRequestId);
+    c.header(REQUEST_ID_HEADER, normalizedRequestId);
     await next();
   });
   app.get("/health", (c) =>
@@ -277,7 +283,7 @@ export function createCommercialWorkerApp(options: CommercialWorkerOptions = {})
             user_id: user(c),
             organization_id: organization(c),
             ...body,
-            audit_correlation_id: c.req.header(REQUEST_ID_HEADER),
+            audit_correlation_id: requestId(c),
           }),
         ),
         201,
@@ -296,7 +302,7 @@ export function createCommercialWorkerApp(options: CommercialWorkerOptions = {})
             organization_id: organization(c),
             prospecting_id: id,
             ...body,
-            audit_correlation_id: c.req.header(REQUEST_ID_HEADER),
+            audit_correlation_id: requestId(c),
           }),
         ),
       ),
@@ -312,7 +318,7 @@ export function createCommercialWorkerApp(options: CommercialWorkerOptions = {})
             user_id: user(c),
             organization_id: organization(c),
             prospecting_id: id,
-            audit_correlation_id: c.req.header(REQUEST_ID_HEADER),
+            audit_correlation_id: requestId(c),
           }),
         ),
       ),
@@ -337,7 +343,7 @@ export function createCommercialWorkerApp(options: CommercialWorkerOptions = {})
             organization_id: organization(c),
             task_id: taskId,
             ...body,
-            audit_correlation_id: c.req.header(REQUEST_ID_HEADER),
+            audit_correlation_id: requestId(c),
           }),
         ),
       ),
@@ -356,7 +362,7 @@ export function createCommercialWorkerApp(options: CommercialWorkerOptions = {})
   );
   app.onError((error, c) => {
     const serialized = serializeError(error, {
-      requestId: c.req.header(REQUEST_ID_HEADER),
+      requestId: c.get("requestId"),
       fallbackMessage: "Erro interno no commercial-service.",
     });
     return c.json(serialized.body, serialized.statusCode as ContentfulStatusCode);

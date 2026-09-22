@@ -2,6 +2,29 @@
 
 Data: 2026-09-22
 
+## Terceiro ciclo TDD — re-review
+
+O RED foi executado antes das correções do re-review:
+
+```text
+pnpm --filter @workspace/commercial-worker exec vitest run \
+  src/commercialEmail.test.ts src/app.test.ts
+```
+
+Falhou em três pontos: claim concorrente sem CAS explícito por geração, URL HTTP
+aceita em produção e request-id gerado apenas no header de resposta. O GREEN passou
+com 9 testes focados e a suíte completa passou com 9 arquivos e 26 testes.
+
+- O claim existente agora inclui `attempts` no compare-and-set por `id/event_id` e
+  lease; o complete/fail já exige o mesmo token. O teste concorrente usa dois
+  `notify()` e prova `sends=1`.
+- `createCommercialEmailAdapter()` rejeita URL não-HTTPS por padrão e só permite
+  HTTP explícito em `NODE_ENV=test|development`. Nenhum secret ou endpoint foi
+  inventado.
+- O middleware normaliza `x-request-id` uma vez no início, guarda o valor no
+  contexto, usa-o nas mutações/eventos outbox e devolve o mesmo header; auditoria,
+  bindings e email continuam recebendo a mesma correlação.
+
 ## Segundo ciclo TDD — correções dos achados
 
 O RED deste ciclo foi executado antes da implementação:
@@ -48,7 +71,7 @@ nem push.
 
 O plano de migração e `task-service-remainder-brief.md` foram lidos antes da edição.
 Graphify foi usado primeiro com `pnpm graphify:context:services`; depois da edição,
-`pnpm graphify:update:services` terminou com 9.305 nós, 16.952 arestas e 381
+`pnpm graphify:update:services` terminou com 9.305 nós, 16.952 arestas e 370
 comunidades. A visualização HTML foi omitida pelo limite de 5.000 nós. O grafo serviu
 como navegação; a comparação final foi feita contra os arquivos canônicos reais.
 
@@ -132,7 +155,7 @@ Worker falha fechado com `503`.
 Passaram:
 
 ```text
-pnpm --filter @workspace/commercial-worker test                 # 9 files, 23 tests
+pnpm --filter @workspace/commercial-worker test                 # 9 files, 26 tests
 pnpm --filter @workspace/commercial-worker typecheck
 pnpm --filter @workspace/commercial-worker check
 pnpm --filter @workspace/commercial-worker build

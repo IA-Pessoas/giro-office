@@ -16,6 +16,11 @@ O cron é apenas configuração local/versionada. Provisionamento de Hyperdrive,
 bindings reais e aceite de entrega continuam externos; não há Queue ID nem secret
 inventado neste Worker.
 
+O adapter de email aceita HTTP apenas quando `NODE_ENV` é `test` ou `development`;
+fora desses ambientes exige endpoint HTTPS. O `x-request-id` é normalizado no início
+de cada request, reutilizado no payload das mutações/outbox e propagado às bindings;
+a resposta devolve o mesmo valor.
+
 ## Desenvolvimento
 
 ```text

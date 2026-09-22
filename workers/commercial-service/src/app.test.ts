@@ -102,4 +102,19 @@ describe("commercial Worker", () => {
       expect.objectContaining({ userId: USER_ID }),
     );
   });
+
+  it("normaliza request id no início e reutiliza o mesmo valor na mutação e na resposta", async () => {
+    const proposalService = service();
+    const app = createCommercialWorkerApp({ env: env(), proposalService });
+    const response = await app.request("https://commercial.test/commercial/proposal-configs", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ name: "Mensal", contract_value: 100 }),
+    });
+
+    const responseRequestId = response.headers.get("x-request-id");
+    const requestContext = vi.mocked(proposalService.create).mock.calls[0]?.[2];
+    expect(responseRequestId).toBeTruthy();
+    expect(requestContext?.auditCorrelationId).toBe(responseRequestId);
+  });
 });
