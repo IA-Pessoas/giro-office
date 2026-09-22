@@ -58,6 +58,30 @@ model LddPessoal {
   @@map("pessoal.ldd")
 }
 
+model User {
+  id              String  @id @default(uuid())
+  name            String
+  full_name       String?
+  organization_id String?
+
+  @@map("users")
+}
+
+model PasswordPessoal {
+  id              String   @id @default(uuid())
+  client_id       String
+  service_name    String
+  login_main      String?
+  senha_main      String?
+  login_secondary String?
+  senha_secondary String?
+  responsavel_id  String?
+  notes           String?
+  organization_id String
+
+  @@map("pessoal.passwords")
+}
+
 model SituationsPessoal {
   id                String   @id @default(uuid())
   client_id         String

@@ -10,6 +10,12 @@ import {
   updateLddBodySchema,
 } from "@workspace/pessoal-service/src/schemas/ldd.schemas.js";
 import {
+  createPasswordBodySchema,
+  listPasswordsQuerySchema,
+  passwordIdParamsSchema,
+  updatePasswordBodySchema,
+} from "@workspace/pessoal-service/src/schemas/password.schemas.js";
+import {
   createSituationBodySchema,
   listSituationQuerySchema,
   situationIdParamsSchema,
@@ -22,6 +28,10 @@ import {
   updateUnionBodySchema,
 } from "@workspace/pessoal-service/src/schemas/union.schemas.js";
 import { NORMAL_GROUP_POLICY } from "@workspace/pessoal-service/src/services/pessoalGroupPolicy.js";
+import {
+  createPessoalPasswordCrypto,
+  isPessoalPasswordEncrypted,
+} from "@workspace/pessoal-service/src/services/pessoalPasswordCrypto.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
 import {
@@ -93,6 +103,17 @@ export type PessoalLddService = {
   ): Promise<unknown>;
   delete(context: Record<string, unknown>, id: string): Promise<unknown>;
 };
+export type PessoalPasswordService = {
+  list(context: { organizationId: string }, query: Record<string, unknown>): Promise<unknown>;
+  detail(context: Record<string, unknown>, id: string): Promise<unknown>;
+  create(context: Record<string, unknown>, body: Record<string, unknown>): Promise<unknown>;
+  update(
+    context: Record<string, unknown>,
+    id: string,
+    body: Record<string, unknown>,
+  ): Promise<unknown>;
+  delete(context: Record<string, unknown>, id: string): Promise<unknown>;
+};
 export type PessoalDomainPrisma = PessoalGroupPrisma & {
   unionPessoal: {
     findMany(args: Record<string, unknown>): Promise<unknown[]>;
@@ -118,6 +139,17 @@ export type PessoalDomainPrisma = PessoalGroupPrisma & {
     update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
     delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
   };
+  passwordPessoal: {
+    findMany(args: Record<string, unknown>): Promise<unknown[]>;
+    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
+  user: {
+    findMany(args: Record<string, unknown>): Promise<unknown[]>;
+    findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+  };
 };
 type PessoalOptions = {
   env?: PessoalWorkerEnv;
@@ -126,6 +158,7 @@ type PessoalOptions = {
   unionService?: PessoalUnionService;
   situationService?: PessoalSituationService;
   lddService?: PessoalLddService;
+  passwordService?: PessoalPasswordService;
 };
 type PessoalWorkerContext = { Bindings: PessoalWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type PessoalContext = Context<PessoalWorkerContext>;
@@ -710,6 +743,222 @@ function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): P
   };
 }
 
+function localPasswordService(
+  prisma: PessoalDomainPrisma,
+  env?: PessoalWorkerEnv,
+): PessoalPasswordService {
+  const secretFields = ["login_main", "senha_main", "login_secondary", "senha_secondary"] as const;
+  const listSelect = {
+    id: true,
+    client_id: true,
+    service_name: true,
+    responsavel_id: true,
+  };
+  const detailSelect = {
+    ...listSelect,
+    login_main: true,
+    senha_main: true,
+    login_secondary: true,
+    senha_secondary: true,
+    notes: true,
+    organization_id: true,
+  };
+  const crypto = env?.PESSOAL_PASSWORD_ENCRYPTION_KEY
+    ? createPessoalPasswordCrypto({
+        keyBase64: env.PESSOAL_PASSWORD_ENCRYPTION_KEY,
+        keyVersion: env.PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
+      })
+    : undefined;
+  const requireCrypto = () => {
+    if (!crypto) throw new ServiceError(500, "Criptografia de senha de pessoal nao configurada.");
+    return crypto;
+  };
+  const secretValue = (value: unknown): string | null =>
+    value === null || value === undefined ? null : String(value);
+  const responsible = async (id: unknown) => {
+    if (!id) return null;
+    const row = await prisma.user.findFirst({
+      where: { id: String(id) },
+      select: { id: true, name: true, full_name: true },
+    });
+    return row ?? null;
+  };
+  const listRecord = async (row: Record<string, unknown>) => ({
+    id: row.id,
+    client_id: row.client_id,
+    service_name: row.service_name,
+    responsavel_id: row.responsavel_id ?? null,
+    responsavel: await responsible(row.responsavel_id),
+  });
+
+  return {
+    async list(context, query) {
+      const rows = (await prisma.passwordPessoal.findMany({
+        where: { organization_id: context.organizationId, client_id: query.client_id },
+        select: listSelect,
+        orderBy: { service_name: "asc" },
+      })) as Record<string, unknown>[];
+      return Promise.all(rows.map(listRecord));
+    },
+    async detail(context, id) {
+      let row = await prisma.passwordPessoal.findFirst({
+        where: { id, organization_id: context.organizationId },
+        select: detailSelect,
+      });
+      if (!row) throw new ServiceError(404, "Senha de pessoal nao encontrada.");
+      if (Number(context.permission ?? 0) < 3) return listRecord(row);
+
+      const passwordCrypto = requireCrypto();
+      const legacyData: Record<string, string | null> = {};
+      for (const field of secretFields) {
+        const value = secretValue(row[field]);
+        if (value !== null && !isPessoalPasswordEncrypted(value)) {
+          legacyData[field] = passwordCrypto.encrypt(value);
+        }
+      }
+      if (Object.keys(legacyData).length > 0) {
+        row = await prisma.passwordPessoal.update({
+          where: { id },
+          data: legacyData,
+          select: detailSelect,
+        });
+      }
+      const output: Record<string, unknown> = {
+        ...(await listRecord(row)),
+        notes: row.notes ?? null,
+        organization_id: row.organization_id,
+      };
+      for (const field of secretFields) {
+        output[field] = passwordCrypto.decrypt(secretValue(row[field]));
+      }
+      await audit(env, {
+        organizationId: String(context.organizationId),
+        userId: String(context.userId),
+        method: "ENTITY_READ",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Visualizacao",
+        referring: "pessoal.passwords",
+        referringId: id,
+        changes: { revealedSecretFields: secretFields.filter((field) => output[field] !== null) },
+        department: "pessoal",
+      });
+      return output;
+    },
+    async create(context, body) {
+      const passwordCrypto = requireCrypto();
+      const organizationId = String(context.organizationId);
+      const client = await prisma.client.findFirst({
+        where: { id: body.client_id, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      if (body.responsavel_id) {
+        const user = await prisma.user.findFirst({
+          where: { id: body.responsavel_id, organization_id: organizationId },
+          select: { id: true },
+        });
+        if (!user)
+          throw new ServiceError(404, "Responsavel nao encontrado ou inelegivel para Pessoal.");
+      }
+      const data = {
+        client_id: body.client_id,
+        service_name: body.service_name,
+        login_main: passwordCrypto.encrypt(secretValue(body.login_main)),
+        senha_main: passwordCrypto.encrypt(secretValue(body.senha_main)),
+        login_secondary: passwordCrypto.encrypt(secretValue(body.login_secondary)),
+        senha_secondary: passwordCrypto.encrypt(secretValue(body.senha_secondary)),
+        responsavel_id: body.responsavel_id ?? null,
+        notes: body.notes ?? null,
+        organization_id: organizationId,
+      };
+      const row = await prisma.passwordPessoal.create({
+        data,
+        select: listSelect,
+      });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: "pessoal.passwords",
+        referringId: String(row.id),
+        department: "pessoal",
+      });
+      return listRecord(row);
+    },
+    async update(context, id, body) {
+      const passwordCrypto = requireCrypto();
+      const organizationId = String(context.organizationId);
+      const current = await prisma.passwordPessoal.findFirst({
+        where: { id, organization_id: organizationId },
+        select: detailSelect,
+      });
+      if (!current) throw new ServiceError(404, "Senha de pessoal nao encontrada.");
+      if (body.responsavel_id) {
+        const user = await prisma.user.findFirst({
+          where: { id: body.responsavel_id, organization_id: organizationId },
+          select: { id: true },
+        });
+        if (!user)
+          throw new ServiceError(404, "Responsavel nao encontrado ou inelegivel para Pessoal.");
+      }
+      const data: Record<string, unknown> = {};
+      for (const field of ["service_name", "responsavel_id", "notes"] as const) {
+        if (body[field] !== undefined) data[field] = body[field];
+      }
+      for (const field of secretFields) {
+        if (body[field] !== undefined)
+          data[field] = passwordCrypto.encrypt(secretValue(body[field]));
+      }
+      const row = await prisma.passwordPessoal.update({
+        where: { id },
+        data,
+        select: listSelect,
+      });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Atualizacao",
+        referring: "pessoal.passwords",
+        referringId: id,
+        department: "pessoal",
+      });
+      return listRecord(row);
+    },
+    async delete(context, id) {
+      const organizationId = String(context.organizationId);
+      const current = await prisma.passwordPessoal.findFirst({
+        where: { id, organization_id: organizationId },
+        select: detailSelect,
+      });
+      if (!current) throw new ServiceError(404, "Senha de pessoal nao encontrada.");
+      const row = await prisma.passwordPessoal.delete({ where: { id }, select: listSelect });
+      await audit(env, {
+        organizationId,
+        userId: String(context.userId),
+        method: "ENTITY_CHANGE",
+        statusCode: 200,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Exclusao",
+        referring: "pessoal.passwords",
+        referringId: id,
+        department: "pessoal",
+      });
+      return listRecord(row);
+    },
+  };
+}
+
 export function createPessoalWorkerApp(options: PessoalOptions = {}) {
   const app = new Hono<PessoalWorkerContext>();
   app.get("/health", (c) =>
@@ -769,6 +1018,17 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     if (options.lddService) return callback(options.lddService);
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
       callback(localLddService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
+    );
+  };
+  const withPasswordService = async <T>(
+    c: PessoalContext,
+    callback: (service: PessoalPasswordService) => Promise<T>,
+  ) => {
+    if (options.passwordService) return callback(options.passwordService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(
+        localPasswordService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
+      ),
     );
   };
   app.get("/pessoal/groups", (c) =>
@@ -955,6 +1215,46 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     withLddService(c, async (service) => {
       requirePessoalPermission(c.get("auth"), 2);
       const { id } = parseWithZod(lddIdParamsSchema, { id: c.req.param("id") });
+      return c.json(createSuccessResponse(await service.delete(domainContext(c), id)));
+    }),
+  );
+  app.get("/pessoal/passwords", (c) =>
+    withPasswordService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const query = parseWithZod(listPasswordsQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.list({ organizationId: c.get("auth").organizationId }, query),
+        ),
+      );
+    }),
+  );
+  app.get("/pessoal/passwords/:id", (c) =>
+    withPasswordService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 1);
+      const { id } = parseWithZod(passwordIdParamsSchema, { id: c.req.param("id") });
+      return c.json(createSuccessResponse(await service.detail(domainContext(c), id)));
+    }),
+  );
+  app.post("/pessoal/passwords", (c) =>
+    withPasswordService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 3);
+      const body = parseWithZod(createPasswordBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.create(domainContext(c), body)), 201);
+    }),
+  );
+  app.patch("/pessoal/passwords/:id", (c) =>
+    withPasswordService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 3);
+      const { id } = parseWithZod(passwordIdParamsSchema, { id: c.req.param("id") });
+      const body = parseWithZod(updatePasswordBodySchema, await c.req.json());
+      return c.json(createSuccessResponse(await service.update(domainContext(c), id, body)));
+    }),
+  );
+  app.delete("/pessoal/passwords/:id", (c) =>
+    withPasswordService(c, async (service) => {
+      requirePessoalPermission(c.get("auth"), 3);
+      const { id } = parseWithZod(passwordIdParamsSchema, { id: c.req.param("id") });
       return c.json(createSuccessResponse(await service.delete(domainContext(c), id)));
     }),
   );

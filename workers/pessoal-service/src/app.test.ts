@@ -4,6 +4,7 @@ import {
   type PessoalGroupPrisma,
   type PessoalGroupService,
   type PessoalLddService,
+  type PessoalPasswordService,
   type PessoalSituationService,
   type PessoalUnionService,
   type PessoalWorkerEnv,
@@ -16,12 +17,15 @@ const UNION_ID = "d0000000-0000-4000-8000-000000000001";
 const SITUATION_ID = "e0000000-0000-4000-8000-000000000001";
 const CLIENT_ID = "f0000000-0000-4000-8000-000000000001";
 const LDD_ID = "90000000-0000-4000-8000-000000000001";
+const PASSWORD_ID = "91000000-0000-4000-8000-000000000001";
 const TOKEN = "pessoal-gateway-token";
 
 function env(): PessoalWorkerEnv {
   return {
     JWT_SECRET: "pessoal-worker-test-secret-which-is-long-enough",
     INTERNAL_SERVICE_TOKEN: TOKEN,
+    PESSOAL_PASSWORD_ENCRYPTION_KEY: Buffer.alloc(32, 8).toString("base64"),
+    PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION: "v1",
     HYPERDRIVE: { connectionString: "postgresql://worker:test@db.example/giro" },
   };
 }
@@ -73,6 +77,21 @@ function lddService(): PessoalLddService {
     create: vi.fn(async () => ({ id: LDD_ID, client_id: CLIENT_ID, type: "FGTS" })),
     update: vi.fn(async () => ({ id: LDD_ID, status: "Regular" })),
     delete: vi.fn(async () => ({ id: LDD_ID, client_id: CLIENT_ID })),
+  };
+}
+
+function passwordService(): PessoalPasswordService {
+  return {
+    list: vi.fn(async () => [{ id: PASSWORD_ID, client_id: CLIENT_ID, service_name: "eSocial" }]),
+    detail: vi.fn(async () => ({
+      id: PASSWORD_ID,
+      client_id: CLIENT_ID,
+      service_name: "eSocial",
+      senha_main: "segredo",
+    })),
+    create: vi.fn(async () => ({ id: PASSWORD_ID, client_id: CLIENT_ID })),
+    update: vi.fn(async () => ({ id: PASSWORD_ID, service_name: "eSocial atualizado" })),
+    delete: vi.fn(async () => ({ id: PASSWORD_ID, client_id: CLIENT_ID })),
   };
 }
 
@@ -256,6 +275,48 @@ describe("pessoal Worker", () => {
     expect(ldd.delete).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
       LDD_ID,
+    );
+  });
+
+  it("keeps Pessoal password mutations behind permission 3", async () => {
+    const passwords = passwordService();
+    const app = createPessoalWorkerApp({ env: env(), passwordService: passwords });
+    const read = await app.request(`https://pessoal.test/pessoal/passwords/${PASSWORD_ID}`, {
+      headers: headers("2"),
+    });
+    const list = await app.request(
+      `https://pessoal.test/pessoal/passwords?client_id=${CLIENT_ID}`,
+      {
+        headers: headers("1"),
+      },
+    );
+    const denied = await app.request("https://pessoal.test/pessoal/passwords", {
+      method: "POST",
+      headers: { ...headers("2"), "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: CLIENT_ID,
+        service_name: "eSocial",
+        senha_main: "segredo",
+      }),
+    });
+    const created = await app.request("https://pessoal.test/pessoal/passwords", {
+      method: "POST",
+      headers: { ...headers("3"), "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: CLIENT_ID,
+        service_name: "eSocial",
+        senha_main: "segredo",
+      }),
+    });
+
+    expect([read.status, list.status, denied.status, created.status]).toEqual([200, 200, 403, 201]);
+    expect(passwords.detail).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      PASSWORD_ID,
+    );
+    expect(passwords.create).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 3 },
+      { client_id: CLIENT_ID, service_name: "eSocial", senha_main: "segredo" },
     );
   });
 });
