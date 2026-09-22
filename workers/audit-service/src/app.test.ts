@@ -96,6 +96,58 @@ describe("audit worker", () => {
     expect(repo.create).toHaveBeenCalledWith(payload);
   });
 
+  it("preserves special own query keys from the real audit payload", async () => {
+    const repo = repository();
+    const app = createAuditWorkerApp({ env: env(), repository: repo });
+    const payload = JSON.parse(
+      '{"requestId":"request-special-query","method":"GET","path":"/users","query":{"toString":"text-value","constructor":["first","second"],"__proto__":["prototype-value"]},"headers":{"authorization":"secret"},"body":{"password":"secret"},"secret":"secret","outcome":"success","serviceSource":"gateway","createdAt":"2026-09-22T00:00:00.000Z"}',
+    );
+
+    const response = await app.request("http://audit.test/internal/audit/requests", {
+      method: "POST",
+      headers: { ...internalHeaders(), "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    expect(response.status).toBe(201);
+    const created = vi.mocked(repo.create).mock.calls[0]?.[0];
+    expect(created).toBeDefined();
+    if (!created?.query) throw new Error("Audit query was not persisted");
+
+    expect(Object.keys(created.query)).toEqual(["toString", "constructor", "__proto__"]);
+    expect(created.query.toString).toBe("text-value");
+    expect(created.query.constructor).toEqual(["first", "second"]);
+    expect(Object.getOwnPropertyDescriptor(created.query, "__proto__")?.value).toEqual([
+      "prototype-value",
+    ]);
+    expect(Object.getPrototypeOf(created.query)).toBeNull();
+    expect(created).not.toHaveProperty("headers");
+    expect(created).not.toHaveProperty("body");
+    expect(created).not.toHaveProperty("secret");
+  });
+
+  it("rejects non-string audit query values", async () => {
+    const repo = repository();
+    const app = createAuditWorkerApp({ env: env(), repository: repo });
+
+    const response = await app.request("http://audit.test/internal/audit/requests", {
+      method: "POST",
+      headers: { ...internalHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        requestId: "request-invalid-query",
+        method: "GET",
+        path: "/users",
+        query: { number: 1, mixed: ["valid", 2] },
+        outcome: "success",
+        serviceSource: "gateway",
+        createdAt: "2026-09-22T00:00:00.000Z",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
   it("scopes organization search and detail to the forwarded organization", async () => {
     const repo = repository();
     const record = {

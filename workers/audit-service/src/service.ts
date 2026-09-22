@@ -1,4 +1,6 @@
 import type {
+  AuditQuery,
+  AuditQueryValue,
   AuditRequestRecord,
   AuditSearchFilters,
   AuditSearchResult,
@@ -37,7 +39,10 @@ const payloadSchema = z.object({
   permission: z.number().int().optional().nullable(),
   method: z.string().min(1).default("ENTITY_CHANGE"),
   path: z.string().min(1).default("/"),
-  query: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional(),
+  query: z
+    .custom<AuditQuery>(isAuditQuery, "Query de auditoria inválida.")
+    .transform(cloneAuditQuery)
+    .optional(),
   statusCode: z.number().int().optional().nullable(),
   outcome: z.enum(["success", "error", "aborted"]).default("success"),
   durationMs: z.number().int().optional().nullable(),
@@ -59,6 +64,37 @@ const payloadSchema = z.object({
     .nullable(),
   department: z.string().optional().nullable(),
 });
+
+function isAuditQueryValue(value: unknown): value is AuditQueryValue {
+  return (
+    typeof value === "string" ||
+    (Array.isArray(value) && value.every((item) => typeof item === "string"))
+  );
+}
+
+function isAuditQuery(value: unknown): value is AuditQuery {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).every((key) =>
+      isAuditQueryValue(Object.getOwnPropertyDescriptor(value, key)?.value),
+    )
+  );
+}
+
+function cloneAuditQuery(value: AuditQuery): AuditQuery {
+  const query = Object.create(null) as AuditQuery;
+  for (const key of Object.keys(value)) {
+    Object.defineProperty(query, key, {
+      configurable: true,
+      enumerable: true,
+      value: Object.getOwnPropertyDescriptor(value, key)?.value,
+      writable: true,
+    });
+  }
+  return query;
+}
 
 function ownValue(query: Record<string, unknown>, key: string): unknown {
   return Object.hasOwn(query, key) ? query[key] : undefined;
