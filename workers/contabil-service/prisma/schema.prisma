@@ -55,6 +55,8 @@ model TriageClosing {
   client_id       String
   competence      String
   status          String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
   archived_at     DateTime?
   organization_id String
   client          Client   @relation(fields: [client_id], references: [id])
@@ -108,6 +110,8 @@ model TriageMonthly {
   checklist       Json
   item_notes      Json     @default("{}")
   billing_amount  String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
   archived_at     DateTime?
   organization_id String
 
@@ -121,6 +125,8 @@ model TriageBankStatement {
   competence      String
   bank_id         String
   status          String   @default("PENDING")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
   archived_at     DateTime?
   organization_id String
 

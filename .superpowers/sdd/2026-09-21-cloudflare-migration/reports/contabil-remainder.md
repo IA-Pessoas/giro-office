@@ -1,65 +1,75 @@
-# Paridade restante do contabil-service
+# Ciclo TDD — paridade restante do contabil-service
 
 Data: 2026-09-22
-Escopo: `workers/contabil-service/**` e este relatório
-Base: plano `docs/superpowers/plans/2026-09-21-cloudflare-migration.md` e `task-service-remainder-brief.md`
+Escopo autorizado: `workers/contabil-service/**` e este relatório
+Referências: plano `docs/superpowers/plans/2026-09-21-cloudflare-migration.md` e o brief de service remainder disponível no workspace.
 
-## Limites respeitados
+## Limites e método
 
-- Nenhum arquivo em `services/**`, gateway, UI, outro Worker, lockfile ou `app/next-env.d.ts` foi alterado por esta entrega.
-- Não houve deploy, push, force-push, alteração de histórico publicado ou migração executada.
-- A alteração suja preexistente em `app/next-env.d.ts` foi preservada fora do commit.
-- O grafo de `services/` foi somente atualizado como artefato local do Graphify; não faz parte do commit.
+- Graphify foi usado primeiro: `pnpm graphify:context:services -- "...paridade restante do contabil-service..."`, seguido de atualização do grafo após a edição.
+- O serviço canônico em `services/contabil-service` foi usado somente como referência de contrato/comportamento; nenhum arquivo em `services/**` foi alterado.
+- Não foram tocados Commercial, gateway, UI/app-next, outros Workers, lockfile ou `app/next-env.d.ts`.
+- A alteração preexistente em `app/next-env.d.ts` e alterações preexistentes fora do escopo foram preservadas; não houve deploy, push, force-push, migração ou alteração remota.
 
-## Paridade implementada
+## Correções TDD
 
-O Worker Hono agora cobre os mesmos caminhos públicos e internos do serviço contábil:
+Cada achado novo teve teste RED antes da implementação mínima GREEN.
 
-| Área | Rotas entregues | Garantias principais |
-| --- | --- | --- |
-| Controles | ano, arquivar/restaurar competência, criar, listar, detalhe, atualizar campo e concluir itens | filtro de carteira por competência e tenant, ordenação por nome legal, restauração e transação de arquivamento/restauração |
-| Relacionamento/responsáveis | CRUD completo | isolamento por `organization_id`, duplicidade como `409`, auditoria e envelopes/status HTTP preservados |
-| Fechamento | GET/PUT/DELETE de `/triagem/closing` | claims de módulo contábil, estados permitidos, tenant e arquivamento |
-| Triagem documental | editabilidade, mensal, item, atualização em lote e extratos | claims de módulo ou atribuição, validação de campos/status, cliente no tenant, catálogo/snapshot, advisory lock PostgreSQL e `Serializable` nas mutações concorrentes |
-| Reporting | catálogo e extração interna | token interno, grant HMAC canônico, hash do corpo, request id, TTL, campos publicados, filtros/paginação e snapshot `RepeatableRead` |
-| Integrações | auditoria, resumo da Triagem e sessão do User Worker | Service Bindings sem URL de serviço configurável, propagação de identidade/tenant/claims e degradação explícita quando o resumo/auditoria não está disponível |
+### Timestamps e dados físicos
 
-O schema local do Worker inclui os modelos contábeis e de triagem usados por esses caminhos, com índices únicos de tenant/cliente/competência para suportar concorrência e idempotência.
+- Os modelos Worker `TriageMonthly`, `TriageBankStatement` e `TriageClosing` agora declaram `created_at` com `@default(now())` e `updated_at` com `@updatedAt`, alinhados ao schema/migrations físicas PostgreSQL, onde ambos são `NOT NULL`.
+- Os creates/upserts enviam argumentos reais com os dois timestamps; updates e archive/restore também atualizam `updated_at` explicitamente.
+- O teste `envia timestamps obrigatórios nos creates e upserts físicos da triagem` inspeciona os argumentos dos mocks de Prisma, não apenas o resultado serializado.
 
-## TDD
+### Reporting
 
-1. RED inicial: `remainder.routes.test.ts` encontrou `404` nas rotas ainda não montadas (4 casos).
-2. GREEN inicial: as rotas foram montadas com serviços injetáveis; os 7 testes existentes passaram.
-3. RED de reporting: o teste assinado mostrou que a rota paginava fora do serviço e não abria o snapshot transacional.
-4. GREEN de reporting: a query passou a entrar no serviço; o teste valida grant, tenant e `RepeatableRead`.
-5. RED de serviço: dois testes reproduziram aceite de cliente fora do tenant e justificativa fora do catálogo.
-6. GREEN final: validação de tenant, catálogo/snapshot, locks e normalização foram adicionados.
+- A implementação Worker foi alinhada ao `InternalReportingService` canônico: query passa por `executeReportingQuery`, com allowlist de fonte/campos, filtros, grupos, ordenação, agregações, limites e paginação.
+- A carga é buscada sempre com `where.organization_id`, e query usa snapshot `RepeatableRead` antes da execução.
+- O teste `aplica filtro impossível no reporting em vez de devolver a página bruta` comprova que uma competência inexistente retorna `rows: []`, em vez de ignorar o filtro. O contrato de campos publicados e aliases continua validado pelo schema/grant HMAC.
 
-Resultado final: 3 arquivos de teste, 11 testes passando.
+### Autorização
 
-## Validações executadas
+- Bearer, cookie e auth encaminhada continuam passando pelo mesmo autenticador/CSRF/sessão; as rotas `/contabil` agora exigem `claims.modules.contabil` compatível antes de executar o serviço.
+- `requireContabilWrite` exige simultaneamente permissão global de escrita e módulo contábil `>= 2`; permissão global alta não concede bypass quando `contabil = 0`.
+- Os services de controles e fechamento também aplicam a proteção de módulo nas operações de escrita, evitando bypass por chamada direta.
+- O teste parametrizado cobre os três transportes com `permission = 3` e `modules.contabil = 0`, esperando `403` sem invocar o service.
 
-- `pnpm --filter @workspace/contabil-worker test` — passou, 3 arquivos / 11 testes.
-- `pnpm --filter @workspace/contabil-worker typecheck` — passou.
-- `pnpm --filter @workspace/contabil-worker check` — passou.
-- `pnpm --filter @workspace/contabil-worker build` — passou.
-- `pnpm --filter @workspace/contabil-worker exec prisma validate --schema prisma/schema.prisma` — passou.
-- `pnpm exec prisma validate --schema infra/prisma/schema.prisma` — passou.
-- `pnpm graphify:context:services -- "...paridade restante do contabil-service..."` — executado antes da edição.
-- `pnpm graphify:update:services` — passou; grafo de services atualizado localmente.
-- `pnpm exec wrangler deploy --dry-run --config workers/contabil-service/wrangler.jsonc` — passou; bundle de 6353,86 KiB / 1988,23 KiB gzip.
-- `git diff --check -- workers/contabil-service` — passou.
-- `git diff --check -- app/next-env.d.ts` — passou; arquivo não foi incluído.
+### RLS, tenant e concorrência
 
-Os comandos exibem apenas o warning preexistente de `resolutions` em `services/src/package.json`; não alterei esse arquivo.
+- A criação de mensal fiscal/triagem abre transação `Serializable`, executa `SET LOCAL ROLE "giro_user_runtime"` e `set_config('app.organization_id', ..., true)` antes de qualquer consulta a `triageCompetence`/configuração.
+- Leitura, catálogo/snapshot, lock e create usam o mesmo transaction client e `organization_id`; reconsulta de corrida também restabelece o contexto RLS antes da leitura.
+- O teste `estabelece RLS antes de consultar a competência fiscal na mesma transação` verifica ordem dos eventos e opção `Serializable`.
 
-## Gaps operacionais declarados
+### Auditoria
 
-- O dry-run confirmou apenas os bindings `AUDIT_SERVICE`, `TRIAGEM_SERVICE` e `USER_SERVICE`. Não há `HYPERDRIVE` declarado no `wrangler.jsonc`; em produção o binding precisa ser provisionado e o Worker exige `HYPERDRIVE.connectionString`. `DATABASE_URL` fica apenas como fallback explícito para desenvolvimento/CI.
-- Os secrets não estão no arquivo de configuração: `JWT_SECRET`, `INTERNAL_SERVICE_TOKEN`, `AUDIT_SERVICE_TOKEN`, `TRIAGEM_INTERNAL_TOKEN`, `USER_SERVICE_INTERNAL_TOKEN`, `REPORTS_INTERNAL_TOKEN` e `REPORTS_GRANT_SECRET`. Devem ser provisionados pelo ambiente/secret manager antes da publicação.
-- Não foi feita validação contra PostgreSQL/Supabase real, Hyperdrive real ou bindings remotos. Os testes usam doubles de Hono/Prisma/Service Binding.
-- Não foi feita validação de produção, smoke autenticado, migração ou deploy. Portanto, a entrega comprova contrato e comportamento local do Worker, não disponibilidade operacional dos bindings.
+- O recorder Worker deixou de ser best-effort silencioso. Binding/token ausentes resultam em `503`; HTTP não-2xx, falha de transporte e timeout produzem erro observável.
+- Há timeout via `AbortSignal.timeout`, retry limitado para falhas transitórias (`408/425/429/5xx` e transporte), backoff injetável nos testes, `504` para timeout e logs estruturados de retry/falha.
+- Os quatro testes de `audit.test.ts` cobrem retry HTTP, exaustão `503`, timeout `504` e configuração ausente.
+
+### Guard de banco
+
+O guard existente foi preservado: sem binding `HYPERDRIVE.connectionString` e sem `DATABASE_URL`, o Worker responde `503` explícito antes de criar Prisma; nenhum DSN, ID de produção ou secret foi inventado. Há teste de rota para esse caso.
+
+## Validações
+
+- `pnpm --filter @workspace/contabil-worker test` — GREEN, 4 arquivos e 22 testes.
+- `pnpm --filter @workspace/contabil-worker typecheck` — GREEN.
+- `pnpm --filter @workspace/contabil-worker build` — GREEN.
+- `pnpm --filter @workspace/contabil-worker check` — GREEN.
+- `pnpm --filter @workspace/contabil-worker exec prisma validate --schema prisma/schema.prisma` — GREEN.
+- `pnpm exec prisma validate --schema infra/prisma/schema.prisma` — GREEN.
+- `pnpm graphify:update:services` — GREEN; grafo local atualizado sem versionar `services/graphify-out/`.
+- `pnpm exec wrangler deploy --dry-run --config workers/contabil-service/wrangler.jsonc` — GREEN, bundle 6368.01 KiB / 1991.34 KiB gzip; nenhum deploy executado.
+- `git diff --check` — executado no gate final sobre o escopo Worker/relatório e verificação separada do arquivo preexistente app-next.
+
+Warnings de `resolutions` em `services/src/package.json` e aviso de atualização do Prisma são externos a este escopo e não foram alterados.
+
+## Gaps operacionais
+
+- `workers/contabil-service/wrangler.jsonc` declara `AUDIT_SERVICE`, `TRIAGEM_SERVICE` e `USER_SERVICE`, mas não declara `HYPERDRIVE`. O runtime mantém o guard 503; Hyperdrive precisa ser provisionado antes de qualquer execução real com PostgreSQL.
+- `DATABASE_URL`, `JWT_SECRET`, tokens de service bindings, tokens de auditoria e secrets de reporting não são configurados no arquivo Wrangler. Devem ser provisionados pelo ambiente/secret manager, sem valores fictícios.
+- Não houve validação contra PostgreSQL/Supabase/Hyperdrive/bindings remotos, smoke autenticado de preview ou deploy. Os testes usam doubles locais de Hono/Prisma/Service Binding.
 
 ## Commit
 
-O código do Worker e este relatório são registrados em commits locais, sem push ou deploy.
+O código e este relatório estão registrados no commit local desta entrega, sem push e sem deploy.

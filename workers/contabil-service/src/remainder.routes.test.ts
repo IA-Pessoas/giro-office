@@ -168,7 +168,7 @@ describe("contabil Worker remainder routes", () => {
     });
     const responsible = await app.request(
       `https://contabil.test/contabil/responsibles/client/${CLIENT}`,
-      { headers: headers("0") },
+      { headers: headers("1") },
     );
     const closing = await app.request(
       `https://contabil.test/triagem/closing?client_id=${CLIENT}&competence=2026-09`,
@@ -224,6 +224,7 @@ describe("contabil Worker remainder routes", () => {
       user_id: USER,
       organization_id: ORG,
       permission: 2,
+      modules: { contabil: 2 },
       session_id: "session-1",
       session_version: 1,
       csrf_hash: await hashCsrfToken(csrf),
@@ -257,6 +258,38 @@ describe("contabil Worker remainder routes", () => {
     });
     expect(accepted.status).toBe(201);
     expect(userService.fetch).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    "forwarded",
+    "bearer",
+    "cookie",
+  ] as const)("não permite permission global alto sem claims.modules.contabil em %s", async (transport) => {
+    const deps = services();
+    const userService = { fetch: vi.fn().mockResolvedValue(new Response(null, { status: 204 })) };
+    const app = createContabilWorkerApp({
+      env: { ...env(), USER_SERVICE: userService, USER_SERVICE_INTERNAL_TOKEN: "user-token" },
+      ...deps,
+    });
+    const token = await signJwt({
+      user_id: USER,
+      organization_id: ORG,
+      permission: 3,
+      modules: { contabil: 0 },
+    });
+    const requestHeaders: HeadersInit =
+      transport === "forwarded"
+        ? { ...headers("3"), "x-auth-modules": JSON.stringify({ contabil: 0 }) }
+        : transport === "bearer"
+          ? { authorization: `Bearer ${token}` }
+          : { cookie: `cw.session=${token}` };
+    const response = await app.request(
+      "https://contabil.test/contabil/controls/list?competence=2026-09",
+      { headers: requestHeaders },
+    );
+
+    expect(response.status).toBe(403);
+    expect(deps.controlService.list).not.toHaveBeenCalled();
   });
 
   it("executa reporting com grant assinado e snapshot RepeatableRead", async () => {
@@ -294,5 +327,39 @@ describe("contabil Worker remainder routes", () => {
       expect.any(Function),
       expect.objectContaining({ isolationLevel: "RepeatableRead" }),
     );
+  });
+
+  it("aplica filtro impossível no reporting em vez de devolver a página bruta", async () => {
+    const delegate = { findMany: vi.fn().mockResolvedValue([{ competence: "2026-09" }]) };
+    const prisma = {
+      controlContabil: delegate,
+      responsibleContabil: { findMany: vi.fn() },
+      relationshipContabil: { findMany: vi.fn() },
+      $transaction: vi.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      async (callback: (transaction: unknown) => Promise<unknown>) => callback(prisma),
+    );
+    const body = {
+      source: "contabil.control",
+      fields: ["competence"],
+      limit: 1,
+      query: {
+        filters: [
+          { field: "competence", operator: "eq", parameter: "competence_filter", value: "2099-01" },
+        ],
+      },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const response = await app.request("https://contabil.test/internal/reporting/extract", {
+      method: "POST",
+      headers: { ...(await signedReportingHeaders(body)), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { rows: [], reachedLimit: false },
+    });
   });
 });

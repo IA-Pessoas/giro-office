@@ -62,4 +62,14 @@ describe("contabil Worker", () => {
     expect(response.status).toBe(400);
     expect(controlService.list).not.toHaveBeenCalled();
   });
+
+  it("mantém o guard 503 quando não há Hyperdrive nem DATABASE_URL", async () => {
+    const app = createContabilWorkerApp({ env: { ...env(), HYPERDRIVE: undefined } });
+    const response = await app.request(
+      "https://contabil.test/contabil/controls/list?competence=2026-09",
+      { headers: headers() },
+    );
+
+    expect(response.status).toBe(503);
+  });
 });

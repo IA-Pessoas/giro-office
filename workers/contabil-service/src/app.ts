@@ -30,7 +30,11 @@ import {
   updateResponsibleBodySchema,
 } from "../../../services/contabil-service/src/schemas/responsible.schemas.js";
 import { createContabilAudit } from "./audit.js";
-import { authenticateContabilRequest, requireContabilWrite } from "./auth.js";
+import {
+  authenticateContabilRequest,
+  requireContabilModule,
+  requireContabilWrite,
+} from "./auth.js";
 import type { ContabilWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
 import {
@@ -151,11 +155,15 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
   });
 
   app.use("/contabil/*", async (c, next) => {
-    c.set("auth", await authenticateContabilRequest(c.req.raw, options.env ?? c.env));
+    const auth = await authenticateContabilRequest(c.req.raw, options.env ?? c.env);
+    requireContabilModule(auth);
+    c.set("auth", auth);
     await next();
   });
   app.use("/contabil", async (c, next) => {
-    c.set("auth", await authenticateContabilRequest(c.req.raw, options.env ?? c.env));
+    const auth = await authenticateContabilRequest(c.req.raw, options.env ?? c.env);
+    requireContabilModule(auth);
+    c.set("auth", auth);
     await next();
   });
   app.use("/triagem/*", async (c, next) => {
@@ -190,6 +198,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       userId: auth.userId,
       organizationId: auth.organizationId,
       permission: auth.claims.permission,
+      modules: auth.claims.modules,
     };
     const invoke = (service: ControlService) => service.createYear(input);
     const data = options.controlService
@@ -210,6 +219,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       userId: auth.userId,
       organizationId: auth.organizationId,
       permission: auth.claims.permission,
+      modules: auth.claims.modules,
     };
     const invoke = (service: ControlService) => service.archiveCompetence(input);
     const data = options.controlService
@@ -230,6 +240,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       userId: auth.userId,
       organizationId: auth.organizationId,
       permission: auth.claims.permission,
+      modules: auth.claims.modules,
     };
     const invoke = (service: ControlService) => service.restoreCompetence(input);
     const data = options.controlService
@@ -250,6 +261,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       userId: auth.userId,
       organizationId: auth.organizationId,
       permission: auth.claims.permission,
+      modules: auth.claims.modules,
     };
     const invoke = (service: ControlService) => service.create(input);
     const data = options.controlService

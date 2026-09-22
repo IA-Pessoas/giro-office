@@ -1,4 +1,5 @@
 import {
+  executeReportingQuery,
   getContabilReportingFields,
   type ReportingQuery,
   ServiceError,
@@ -308,7 +309,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
       const auth = authData(input);
       if (input.confirmed !== true)
         throw new ServiceError(400, "Confirmação explícita é obrigatória para criar o ano.");
-      if (Number(auth.permission ?? 0) < 2)
+      if (Number(auth.permission ?? 0) < 2 || Number(auth.modules?.contabil ?? 0) < 2)
         throw new ServiceError(403, "Permissão insuficiente para criar controles contábeis.");
       const year = Number(input.year);
       if (!Number.isInteger(year) || year < 2000 || year > 2100)
@@ -404,7 +405,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
       }
     },
     async completeAll(id, auth) {
-      if (Number(auth.permission ?? 0) < 2)
+      if (Number(auth.permission ?? 0) < 2 || Number(auth.modules?.contabil ?? 0) < 2)
         throw new ServiceError(403, "Permissão insuficiente para atualizar controles contábeis.");
       const current = await prisma.controlContabil.findFirst({
         where: { id, organization_id: auth.organizationId, archived_at: null },
@@ -428,7 +429,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
     },
     async archiveCompetence(input) {
       const auth = authData(input);
-      if (Number(auth.permission ?? 0) < 2)
+      if (Number(auth.permission ?? 0) < 2 || Number(auth.modules?.contabil ?? 0) < 2)
         throw new ServiceError(403, "Permissão insuficiente para arquivar controles contábeis.");
       const identity = {
         client_id: String(input.clientId),
@@ -447,15 +448,15 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         }),
         prisma.triageMonthly.updateMany({
           where: { ...identity, type: "CONTABIL", archived_at: null },
-          data: { archived_at: archivedAt },
+          data: { archived_at: archivedAt, updated_at: archivedAt },
         }),
         prisma.triageBankStatement.updateMany({
           where: { ...identity, archived_at: null },
-          data: { archived_at: archivedAt },
+          data: { archived_at: archivedAt, updated_at: archivedAt },
         }),
         prisma.triageClosing.updateMany({
           where: { ...identity, archived_at: null },
-          data: { archived_at: archivedAt },
+          data: { archived_at: archivedAt, updated_at: archivedAt },
         }),
       ])) as Array<{ count: number }>;
       const counts = {
@@ -478,13 +479,14 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
     },
     async restoreCompetence(input) {
       const auth = authData(input);
-      if (Number(auth.permission ?? 0) < 2)
+      if (Number(auth.permission ?? 0) < 2 || Number(auth.modules?.contabil ?? 0) < 2)
         throw new ServiceError(403, "Permissão insuficiente para restaurar controles contábeis.");
       const identity = {
         client_id: String(input.clientId),
         competence: String(input.competence),
         organization_id: auth.organizationId,
       };
+      const restoredAt = new Date();
       const result = (await prisma.$transaction([
         prisma.controlContabil.updateMany({
           where: { ...identity, archived_at: { not: null } },
@@ -492,15 +494,15 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         }),
         prisma.triageMonthly.updateMany({
           where: { ...identity, type: "CONTABIL", archived_at: { not: null } },
-          data: { archived_at: null },
+          data: { archived_at: null, updated_at: restoredAt },
         }),
         prisma.triageBankStatement.updateMany({
           where: { ...identity, archived_at: { not: null } },
-          data: { archived_at: null },
+          data: { archived_at: null, updated_at: restoredAt },
         }),
         prisma.triageClosing.updateMany({
           where: { ...identity, archived_at: { not: null } },
-          data: { archived_at: null },
+          data: { archived_at: null, updated_at: restoredAt },
         }),
       ])) as Array<{ count: number }>;
       if (result[0].count === 0)
@@ -640,10 +642,11 @@ export function createClosingService(prisma: ContabilPrisma, audit: Audit): Clos
       const current = await prisma.triageClosing.findFirst({
         where: { ...identity, archived_at: null },
       });
+      const now = new Date();
       const closing = await prisma.triageClosing.upsert({
         where: { organization_id_client_id_competence: identity },
-        create: { ...identity, status: input.status },
-        update: { status: input.status, archived_at: null },
+        create: { ...identity, status: input.status, created_at: now, updated_at: now },
+        update: { status: input.status, archived_at: null, updated_at: now },
       });
       await audit.logUpdateIfChanged({
         userId: auth.userId,
@@ -666,7 +669,7 @@ export function createClosingService(prisma: ContabilPrisma, audit: Audit): Clos
       if (!current) throw new ServiceError(404, "Fechamento recebido não encontrado.");
       const archived = await prisma.triageClosing.update({
         where: { id: current.id },
-        data: { archived_at: new Date() },
+        data: { archived_at: new Date(), updated_at: new Date() },
       });
       await audit.logUpdateIfChanged({
         userId: auth.userId,
@@ -878,8 +881,7 @@ async function assertActiveCatalogItems(
     ...new Set(codes.map((code) => code?.trim()).filter((code): code is string => Boolean(code))),
   ].sort();
   if (uniqueCodes.length === 0) return;
-  await transaction.$executeRaw`SET LOCAL ROLE "giro_user_runtime"`;
-  await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
+  await setRlsContext(transaction, organizationId);
   for (const code of uniqueCodes) {
     await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`triage.catalog.item:${organizationId}:${kind}:${code}`}, 0))`;
   }
@@ -933,6 +935,11 @@ async function assertClientInOrganization(
 
 async function lock(transaction: ContabilPrisma, key: string) {
   await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+}
+
+async function setRlsContext(transaction: ContabilPrisma, organizationId: string): Promise<void> {
+  await transaction.$executeRaw`SET LOCAL ROLE "giro_user_runtime"`;
+  await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
 }
 
 export function createDocumentsService(
@@ -991,94 +998,112 @@ export function createDocumentsService(
         type,
         archived_at: null,
       };
-      const existing = await prisma.triageMonthly.findFirst({ where: identity });
-      if (existing) return monthlyDto(existing, type);
-      await canEdit(prisma, String(input.client_id), auth, type);
-      let configured: JsonRecord = {};
-      if (type === "FISCAL") {
-        const competence = await prisma.triageCompetence.findFirst({
-          where: {
-            client_id: input.client_id,
-            competence: input.competence,
-            organization_id: auth.organizationId,
-            archived_at: null,
-          },
-          select: { configuration_snapshot: true },
-        });
-        if (!competence)
-          throw new ServiceError(
-            409,
-            "Crie a competência fiscal antes de iniciar a rotina mensal.",
-          );
-        const snapshot = competence.configuration_snapshot;
-        const configs =
-          snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)
-            ? (snapshot as JsonRecord).configs
-            : undefined;
-        const fiscal = Array.isArray(configs)
-          ? (configs.find(
-              (item) => item && typeof item === "object" && (item as JsonRecord).type === "FISCAL",
-            ) as JsonRecord | undefined)
-          : undefined;
-        configured = initialItems(fiscal?.active_items);
-      } else {
-        const config = await prisma.triageConfig.findFirst({
-          where: { client_id: input.client_id, organization_id: auth.organizationId, type },
-          select: { active_items: true },
-        });
-        configured = initialItems(config?.active_items);
-      }
-      const fields = type === "FISCAL" ? triageFiscalFields : triageDocumentFields;
-      const checklistValue = Object.fromEntries(
-        fields.map((field) => {
-          const value = configured[field];
-          const required =
-            value && typeof value === "object" && !Array.isArray(value)
-              ? (value as JsonRecord).required === true
-              : false;
-          return [field, required ? "PENDING" : "NOT_APPLICABLE"];
-        }),
-      );
-      const notes = Object.fromEntries(
-        fields.map((field) => [field, configured[field] ?? { note: null, justification: null }]),
-      );
-      await prisma.$transaction(async (transaction) => {
-        const values = Object.values(notes) as JsonRecord[];
-        await assertActiveCatalogItems(
-          transaction,
-          "JUSTIFICATION",
-          values.map((value) => value.justification as string | undefined),
-          auth.organizationId,
-          String(input.client_id),
-          String(input.competence),
-        );
-        await assertActiveCatalogItems(
-          transaction,
-          "DELIVERY_METHOD",
-          values.map((value) => value.delivery_method as string | undefined),
-          auth.organizationId,
-          String(input.client_id),
-          String(input.competence),
-        );
-        await assertActiveCatalogItems(
-          transaction,
-          "STATE_SITE",
-          values.map((value) => value.state_site as string | undefined),
-          auth.organizationId,
-          String(input.client_id),
-          String(input.competence),
-        );
-      });
       try {
-        const created = await prisma.triageMonthly.create({
-          data: { ...identity, checklist: checklistValue, item_notes: notes },
-        });
-        return monthlyDto(created, type);
+        const monthly = await prisma.$transaction(
+          async (transaction) => {
+            await setRlsContext(transaction, auth.organizationId);
+            const existing = await transaction.triageMonthly.findFirst({ where: identity });
+            if (existing) return existing;
+            await canEdit(transaction, String(input.client_id), auth, type);
+            let configured: JsonRecord = {};
+            if (type === "FISCAL") {
+              const competence = await transaction.triageCompetence.findFirst({
+                where: {
+                  client_id: input.client_id,
+                  competence: input.competence,
+                  organization_id: auth.organizationId,
+                  archived_at: null,
+                },
+                select: { configuration_snapshot: true },
+              });
+              if (!competence)
+                throw new ServiceError(
+                  409,
+                  "Crie a competência fiscal antes de iniciar a rotina mensal.",
+                );
+              const snapshot = competence.configuration_snapshot;
+              const configs =
+                snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)
+                  ? (snapshot as JsonRecord).configs
+                  : undefined;
+              const fiscal = Array.isArray(configs)
+                ? (configs.find(
+                    (item) =>
+                      item && typeof item === "object" && (item as JsonRecord).type === "FISCAL",
+                  ) as JsonRecord | undefined)
+                : undefined;
+              configured = initialItems(fiscal?.active_items);
+            } else {
+              const config = await transaction.triageConfig.findFirst({
+                where: { client_id: input.client_id, organization_id: auth.organizationId, type },
+                select: { active_items: true },
+              });
+              configured = initialItems(config?.active_items);
+            }
+            const fields = type === "FISCAL" ? triageFiscalFields : triageDocumentFields;
+            const checklistValue = Object.fromEntries(
+              fields.map((field) => {
+                const value = configured[field];
+                const required =
+                  value && typeof value === "object" && !Array.isArray(value)
+                    ? (value as JsonRecord).required === true
+                    : false;
+                return [field, required ? "PENDING" : "NOT_APPLICABLE"];
+              }),
+            );
+            const notes = Object.fromEntries(
+              fields.map((field) => [
+                field,
+                configured[field] ?? { note: null, justification: null },
+              ]),
+            );
+            const values = Object.values(notes) as JsonRecord[];
+            await assertActiveCatalogItems(
+              transaction,
+              "JUSTIFICATION",
+              values.map((value) => value.justification as string | undefined),
+              auth.organizationId,
+              String(input.client_id),
+              String(input.competence),
+            );
+            await assertActiveCatalogItems(
+              transaction,
+              "DELIVERY_METHOD",
+              values.map((value) => value.delivery_method as string | undefined),
+              auth.organizationId,
+              String(input.client_id),
+              String(input.competence),
+            );
+            await assertActiveCatalogItems(
+              transaction,
+              "STATE_SITE",
+              values.map((value) => value.state_site as string | undefined),
+              auth.organizationId,
+              String(input.client_id),
+              String(input.competence),
+            );
+            const now = new Date();
+            return transaction.triageMonthly.create({
+              data: {
+                ...identity,
+                checklist: checklistValue,
+                item_notes: notes,
+                created_at: now,
+                updated_at: now,
+              },
+            });
+          },
+          { isolationLevel: "Serializable" },
+        );
+        return monthlyDto(monthly as JsonRecord, type);
       } catch (error) {
         if (!isUniqueViolation(error))
           throw serviceError(error, "Erro ao criar pendência documental mensal.");
-        const concurrent = await prisma.triageMonthly.findFirst({ where: identity });
-        if (concurrent) return monthlyDto(concurrent, type);
+        const concurrent = await prisma.$transaction(async (transaction) => {
+          await setRlsContext(transaction, auth.organizationId);
+          return transaction.triageMonthly.findFirst({ where: identity });
+        });
+        if (concurrent) return monthlyDto(concurrent as JsonRecord, type);
         throw new ServiceError(409, "Não foi possível criar a pendência documental mensal.", error);
       }
     },
@@ -1157,7 +1182,10 @@ export function createDocumentsService(
           const data: JsonRecord = billing
             ? { billing_amount: value }
             : { checklist: { ...currentChecklist, [field]: input.status }, item_notes: nextNotes };
-          const updated = await transaction.triageMonthly.update({ where: { id }, data });
+          const updated = await transaction.triageMonthly.update({
+            where: { id },
+            data: { ...data, updated_at: new Date() },
+          });
           return { current, updated };
         },
         { isolationLevel: "Serializable" },
@@ -1197,6 +1225,7 @@ export function createDocumentsService(
                   values[field] === "NOT_APPLICABLE" ? values[field] : input.status,
                 ]),
               ),
+              updated_at: new Date(),
             },
           });
           return { current, updated };
@@ -1238,6 +1267,7 @@ export function createDocumentsService(
         competence: input.competence,
         bank_id: input.bank_id,
       };
+      const now = new Date();
       const result = await prisma.$transaction(async (transaction) => {
         await lock(transaction, `triagem.statement:${JSON.stringify(identity)}`);
         const current = await transaction.triageBankStatement.findFirst({
@@ -1245,8 +1275,8 @@ export function createDocumentsService(
         });
         const statement = await transaction.triageBankStatement.upsert({
           where: { organization_id_client_id_competence_bank_id: identity },
-          create: { ...identity, status: input.status },
-          update: { status: input.status, archived_at: null },
+          create: { ...identity, status: input.status, created_at: now, updated_at: now },
+          update: { status: input.status, archived_at: null, updated_at: now },
         });
         return { current, statement };
       });
@@ -1280,7 +1310,7 @@ export function createDocumentsService(
         if (!current) throw new ServiceError(404, "Marcador de extrato bancário não encontrado.");
         const archived = await transaction.triageBankStatement.update({
           where: { id: current.id },
-          data: { archived_at: new Date() },
+          data: { archived_at: new Date(), updated_at: new Date() },
         });
         return { current, archived };
       });
@@ -1338,6 +1368,20 @@ export function createReportingService(
       if (input.query && !inSnapshot) {
         return withReportingSnapshot(prisma, (transaction) =>
           createReportingService(transaction, true).extract({ ...input, query: input.query }),
+        );
+      }
+      if (input.query) {
+        return executeReportingQuery(
+          { source: input.source, fields: input.fields, limit: input.limit, query: input.query },
+          (fields, limit, offset) =>
+            extractPage({
+              prisma,
+              source: input.source,
+              organizationId: input.organizationId,
+              fields,
+              limit,
+              offset,
+            }),
         );
       }
       return extractPage({
