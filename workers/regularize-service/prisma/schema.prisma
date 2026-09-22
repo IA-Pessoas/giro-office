@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model License {
+  id                                String   @id @default(uuid())
+  client_id                         String?
+  has                               Boolean
+  type_license                      String
+  entry_date                        DateTime
+  protocol                          String
+  responsible_id                    String?
+  status                            String
+  date_last_consultation            DateTime?
+  current_situation                 String
+  contact                           String
+  observation                       String?
+  urgency                           String
+  type                              String
+  due_date                          DateTime?
+  task_id                           String?
+  organization_id                   String
+  protocol_file_path                String?
+  protocol_file_original_name       String?
+  protocol_file_mime_type           String?
+  protocol_file_size_bytes          Int?
+  protocol_file_uploaded_at         DateTime?
+
+  @@map("regularize.license")
+}
