@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createTriagemWorkerApp,
   type TriagemAuditService,
-  type TriagemCatalogPrisma,
   type TriagemCatalogService,
   type TriagemCompetenceService,
   type TriagemExternalLinkService,
   type TriagemOverviewService,
+  type TriagemPrisma,
   type TriagemUrgentRequestService,
   type TriagemWorkerEnv,
 } from "./app.js";
@@ -85,20 +85,17 @@ function auditService(): TriagemAuditService {
 
 describe("triagem Worker", () => {
   it("serves health and readiness", async () => {
-    const prisma = { $queryRaw: vi.fn(async () => []) } as unknown as TriagemCatalogPrisma;
+    const prisma = { $queryRaw: vi.fn(async () => []) } as unknown as TriagemPrisma;
     const app = createTriagemWorkerApp({ env: env(), prisma, catalogService: service() });
     expect((await app.request("https://triagem.test/health")).status).toBe(200);
     expect((await app.request("https://triagem.test/ready")).status).toBe(200);
   });
 
-  it("requires authentication and module permission", async () => {
+  // A permissão de módulo fica no service canônico, como no Node (ver remainder.routes.test.ts).
+  it("requires authentication", async () => {
     const catalogService = service();
     const app = createTriagemWorkerApp({ env: env(), catalogService });
     expect((await app.request("https://triagem.test/triagem/catalogs")).status).toBe(401);
-    expect(
-      (await app.request("https://triagem.test/triagem/catalogs", { headers: headers("0") }))
-        .status,
-    ).toBe(403);
     expect(catalogService.list).not.toHaveBeenCalled();
   });
 
@@ -126,19 +123,21 @@ describe("triagem Worker", () => {
     expect(created.status).toBe(201);
     expect(updated.status).toBe(200);
     expect(archived.status).toBe(200);
-    expect(catalogService.list).toHaveBeenCalledWith(ORGANIZATION_ID, {
-      kind: "LINK_TYPE",
-      include_archived: false,
-    });
-    expect(catalogService.create).toHaveBeenCalledWith(ORGANIZATION_ID, {
-      kind: "LINK_TYPE",
-      code: "gov",
-      label: "Governo",
-    });
-    expect(catalogService.update).toHaveBeenCalledWith(ORGANIZATION_ID, ITEM_ID, {
-      label: "Governo Federal",
-    });
-    expect(catalogService.archive).toHaveBeenCalledWith(ORGANIZATION_ID, ITEM_ID);
+    const scoped = expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID });
+    expect(catalogService.list).toHaveBeenCalledWith(
+      { kind: "LINK_TYPE", includeArchived: false, clientId: undefined, competence: undefined },
+      scoped,
+    );
+    expect(catalogService.create).toHaveBeenCalledWith(
+      { kind: "LINK_TYPE", code: "gov", label: "Governo" },
+      scoped,
+    );
+    expect(catalogService.update).toHaveBeenCalledWith(
+      ITEM_ID,
+      { label: "Governo Federal" },
+      scoped,
+    );
+    expect(catalogService.archive).toHaveBeenCalledWith(ITEM_ID, scoped);
   });
 
   it("routes the remaining triagem contracts through scoped services", async () => {

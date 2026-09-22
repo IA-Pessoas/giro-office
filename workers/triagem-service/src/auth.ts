@@ -17,6 +17,8 @@ import {
 } from "@workspace/shared/http";
 import type { TriagemWorkerEnv } from "./env.js";
 
+const FORWARDED_TOKEN = "forwarded-by-gateway";
+
 function value(request: Request, name: string): string | undefined {
   const header = request.headers.get(name);
   return header && header.length > 0 ? header : undefined;
@@ -32,7 +34,8 @@ function forwardedAuth(request: Request, env: TriagemWorkerEnv): WorkerAuthConte
   let modules: unknown;
   if (modulesHeader) {
     try {
-      modules = JSON.parse(modulesHeader);
+      const parsed: unknown = JSON.parse(modulesHeader);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) modules = parsed;
     } catch {
       modules = undefined;
     }
@@ -44,7 +47,7 @@ function forwardedAuth(request: Request, env: TriagemWorkerEnv): WorkerAuthConte
   const permissionHeader = value(request, FORWARDED_AUTH_PERMISSION_HEADER);
   const permission = permissionHeader === undefined ? undefined : Number(permissionHeader);
   return {
-    token: "forwarded-by-gateway",
+    token: FORWARDED_TOKEN,
     userId,
     organizationId,
     actorKind,
@@ -54,7 +57,7 @@ function forwardedAuth(request: Request, env: TriagemWorkerEnv): WorkerAuthConte
       organization_id: organizationId,
       auth_kind: actorKind,
       modules: normalizeModulePermissions(modules) as WorkerAuthContext["claims"]["modules"],
-      modulePermissionsPresent: modulesHeader !== undefined,
+      modulePermissionsPresent: modules !== undefined,
       ...(Number.isFinite(permission) ? { permission } : {}),
       ...(platformRole === "super_admin" ? { platform_role: "super_admin" as const } : {}),
       ...(type === "owner" || type === "admin" || type === "user" ? { type } : {}),
@@ -62,26 +65,36 @@ function forwardedAuth(request: Request, env: TriagemWorkerEnv): WorkerAuthConte
   };
 }
 
+// Paridade com o isAuthenticated do Node: aceita só auth encaminhada pelo gateway ou Bearer.
+// Cookie de sessão é ignorado, porque o serviço Node não aceita cookie nem valida CSRF.
 export async function authenticateTriagemRequest(
   request: Request,
   env: TriagemWorkerEnv,
 ): Promise<WorkerAuthContext> {
   const forwarded = forwardedAuth(request, env);
   if (forwarded) return forwarded;
+  const authorization = value(request, "authorization");
+  if (!authorization) throw new ServiceError(401, "Token de autenticação não informado.");
   try {
-    return await authenticateWorkerRequest(request, {
-      jwtSecret: env.JWT_SECRET,
-      allowBearer: true,
-    });
+    return await authenticateWorkerRequest(
+      new Request(request.url, { headers: { authorization } }),
+      { jwtSecret: env.JWT_SECRET, allowBearer: true },
+    );
   } catch (error) {
     if (error instanceof WorkerAuthenticationError) throw new ServiceError(401, "Não autenticado.");
     throw error;
   }
 }
 
-export function requireTriagemPermission(auth: WorkerAuthContext, minimum: number): void {
-  const modulePermission = auth.claims.modules.triagem ?? auth.claims.permission ?? 0;
-  if (modulePermission < minimum) {
-    throw new ServiceError(403, "Permissão insuficiente para consultar a Triagem.");
-  }
+// Contexto no formato dos services Node. Sem cabeçalho de módulos encaminhado, `modules`
+// fica ausente e o service cai para a permissão global, como no requestContext do Node.
+export function triagemAuthContext(auth: WorkerAuthContext) {
+  const forwardedWithoutModules =
+    auth.token === FORWARDED_TOKEN && !auth.claims.modulePermissionsPresent;
+  return {
+    userId: auth.userId,
+    organizationId: auth.organizationId,
+    permission: auth.claims.permission,
+    modules: forwardedWithoutModules ? undefined : (auth.claims.modules as Record<string, number>),
+  };
 }
