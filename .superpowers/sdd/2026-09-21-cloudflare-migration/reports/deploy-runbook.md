@@ -1,16 +1,16 @@
 # Runbook de deploy — o que falta e como executar
 
-Estado da branch candidata `cf/integracao-consolidada` em `628e7233`:
+Estado da branch candidata `cf/integracao-consolidada` em `fcf4d4c3`:
 108 gates OK, 0 falhas; smoke real verde, incluindo transação concorrente
-provada contra Postgres. O que impede o deploy não é código — são credenciais
-e uma decisão de topologia da UI.
+provada contra Postgres. O Hyperdrive já está ligado; o que ainda impede o
+deploy são os secrets, mais uma decisão de topologia da UI.
 
 Verificado na conta Cloudflare autenticada (só leitura, nenhum deploy):
 
 | checagem | resultado |
 |---|---|
 | `wrangler whoami` | autenticado, permissões de escrita |
-| `wrangler hyperdrive list` | **nenhuma config** |
+| `wrangler hyperdrive list` | **resolvido** — ver §2 |
 | `wrangler deployments list --name giro-gateway` | Worker não existe |
 | `wrangler pages project list` | 4 projetos, nenhum desta UI |
 
@@ -27,34 +27,54 @@ Deployar a config atual expõe **apenas o gateway**. Virar `workers_dev` para
 `true` nos backends contornaria autenticação, CSRF e a negação por padrão do
 gateway (`d44b06a7`) — não fazer.
 
-## 2. Hyperdrive — bloqueio de conexão
+## 2. Hyperdrive — RESOLVIDO
 
-`workers/runtime/src/prisma.ts:15` lê
-`env.HYPERDRIVE?.connectionString || env.DATABASE_URL` e lança
-`"Prisma connection string is not configured"` sem os dois. Nenhum dos 18
-`wrangler.jsonc` declara `hyperdrive` nem `DATABASE_URL`.
-
-O `user-service` recusa o fallback de propósito: `app.ts:100` devolve 503, e
-`index.test.ts:96` trava a config para **não** conter `DATABASE_URL`.
-
-Para que serve: Worker abre conexão por isolate; o Postgres do Supabase tem
-teto de conexões. O Hyperdrive faz pool na borda e mantém as conexões quentes.
-Ele **não move nem copia o banco** — o dado continua no Supabase.
-
-Passos (executar com a connection string real do Supabase; não versionar):
+Provisionado pelo usuário e ligado em `fcf4d4c3`.
 
 ```
-pnpm exec wrangler hyperdrive create giro-supabase \
-  --connection-string "postgresql://<user>:<senha>@<host>.supabase.co:5432/postgres"
+id:     da08299aa9604daaa985fc2ba12fce04
+name:   giro-postgres-prod
+origin: db.lfhrkztuqnokijdekjsc.supabase.co:5432/postgres
+limite: 60 conexões na origem
+mtls:   sslmode=require
 ```
 
-O comando devolve um `id`. Adicionar a cada `wrangler.jsonc` que acessa banco:
+Binding declarado nos 17 Workers que acessam banco:
 
 ```jsonc
-"hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<id devolvido>" }]
+"hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }]
 ```
 
-No `user-service`, remover também o comentário `// BLOCKED:` do topo.
+Os marcadores `// BLOCKED` foram removidos, por terem se tornado falsos. O teste
+do `user-service` que exigia a string `BLOCKED` passou a exigir o que importa:
+binding declarado e nenhum fallback de `DATABASE_URL`
+(`workers/user-service/src/index.test.ts`). Verificado removendo o binding —
+o teste falha.
+
+Por que importa: cada isolate de Worker abre a própria conexão e a origem
+aceita 60. O Hyperdrive faz pool na borda. Ele **não move nem copia o banco**;
+o dado continua no Supabase.
+
+### Pendente: cache de query
+
+A config subiu com `"caching": { "disabled": false }`.
+
+O isolamento multi-tenant deste sistema depende de **estado de sessão** —
+`SET LOCAL ROLE "giro_user_runtime"` mais
+`set_config('app.organization_id', …)` — com RLS em 9 tabelas
+(`workers/contabil-service/src/services.ts:941-942`). O Hyperdrive não enxerga
+`SET LOCAL`, então em tese uma mesma query com os mesmos parâmetros poderia
+servir linhas de outra organização.
+
+Atenuante honesto: essas queries rodam dentro de `$transaction`, e o Hyperdrive
+não cacheia dentro de transação; as que rodam fora levam `organization_id` nos
+parâmetros, o que já diferencia a chave de cache. O risco é baixo, não nulo.
+
+Recomendação: desligar, porque custa um comando e elimina a classe de dúvida.
+
+```
+pnpm exec wrangler hyperdrive update da08299aa9604daaa985fc2ba12fce04 --caching-disabled
+```
 
 ## 3. Secrets — 8 valores, nenhum inventável
 
@@ -136,8 +156,8 @@ builtin do Node no código empacotado, socket.io desligado
 
 ## 5. Ordem de execução
 
-1. Provisionar Hyperdrive e adicionar o binding (§2).
-2. Gerar e subir os 8 secrets (§3).
+1. ~~Provisionar Hyperdrive e adicionar o binding~~ — feito em `fcf4d4c3` (§2).
+2. Gerar e subir os 8 secrets (§3). **Único impedimento restante.**
 3. `pnpm exec wrangler deploy` nos 17 backends, depois no gateway — os
    bindings exigem que os serviços existam primeiro.
 4. Conferir: `/health` e `/ready` no gateway; um GET autenticado ponta a ponta.
@@ -147,10 +167,11 @@ builtin do Node no código empacotado, socket.io desligado
 
 | # | item | quem decide |
 |---|---|---|
-| 1 | ID do Hyperdrive | usuário (credencial) |
+| 1 | ~~ID do Hyperdrive~~ | **resolvido** |
 | 2 | 8 secrets | usuário (credencial) |
+| 2b | desligar o cache do Hyperdrive | usuário (§2) |
 | 3 | Worker-com-assets vs Pages para a UI | usuário (topologia) |
 | 4 | Credenciais aos 17 upstreams | produto (`gateway-session-forwarding.md`) |
 | 5 | Mecanismo do triagem reconcile | produto |
 
-Os itens 4 e 5 não impedem subir. Os itens 1 a 3 impedem.
+Os itens 4 e 5 não impedem subir. Restam o 2 e a decisão do 2b.

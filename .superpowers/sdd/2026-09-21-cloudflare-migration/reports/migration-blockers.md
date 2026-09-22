@@ -1,4 +1,5 @@
-# Bloqueios remanescentes da migração Cloudflare
+| 2 | Binding Hyperdrive apontando para o Supabase | infra | **fechado** (`fcf4d4c3`) |
+| 2b | 8 secrets não provisionados | credencial | **aberto** |# Bloqueios remanescentes da migração Cloudflare
 
 Levantamento com evidência executada, não leitura de código apenas. O smoke
 local rodou ponta a ponta contra Postgres real em container descartável
@@ -351,12 +352,18 @@ A migração **não está finalizada**. Bloqueios reais abertos:
 | # | bloqueio | tipo | estado |
 |---|---|---|---|
 | 1 | Generators de `infra/prisma/schema.prisma` em runtime nodejs | arquitetura | **fechado** (§9) |
-| 2 | Nenhum binding Hyperdrive apontando para o Supabase | infra | **aberto** |
+| 2 | Binding Hyperdrive apontando para o Supabase | infra | **fechado** (`fcf4d4c3`) |
+| 2b | 8 secrets não provisionados | credencial | **aberto** |
 | 3 | 2 migrations não replayáveis do zero | dívida | rebaixado (§7) |
 | 4 | Transação/concorrência sem evidência real | teste | **fechado** (§8) |
 | 5 | Credenciais chegando aos 17 upstreams | produto | **aberto** (`gateway-session-forwarding.md`) |
 | 6 | Triagem reconcile sem mecanismo | produto | **aberto** |
 
-Resta **#2 como único bloqueio de deploy**, e ele depende de credencial real:
-provisionar o Hyperdrive apontando para o Supabase. #5 e #6 são decisões de
+O Hyperdrive `giro-postgres-prod` foi provisionado pelo usuário e ligado nos 17
+Workers em `fcf4d4c3`. Resta **#2b como único bloqueio de deploy**: nenhum dos 8
+secrets está na conta, e dois deles (`SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`) só o usuário possui. #5 e #6 são decisões de
 produto que não impedem subir.
+
+Pendente de decisão, não de código: o cache de query do Hyperdrive subiu
+habilitado. Ver `deploy-runbook.md` §2 para o risco e o atenuante.
