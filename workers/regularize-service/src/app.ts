@@ -5,6 +5,12 @@ import {
   updateLicenseBodySchema,
 } from "@workspace/regularize-service/src/schemas/license.schemas.js";
 import {
+  createMunicipalTaxesBodySchema,
+  listMunicipalTaxesQuerySchema,
+  municipalTaxesDetailQuerySchema,
+  updateMunicipalTaxesBodySchema,
+} from "@workspace/regularize-service/src/schemas/municipalTaxes.schemas.js";
+import {
   createProcessBodySchema,
   listProcessesQuerySchema,
   processActionBodySchema,
@@ -12,6 +18,7 @@ import {
   updateProcessBodySchema,
 } from "@workspace/regularize-service/src/schemas/process.schemas.js";
 import { buildLicenseStatusFilter } from "@workspace/regularize-service/src/schemas/status.schemas.js";
+import { MunicipalTaxesService } from "@workspace/regularize-service/src/services/municipalTaxesService.js";
 import { ProcessService } from "@workspace/regularize-service/src/services/processService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
@@ -60,11 +67,16 @@ export type RegularizeProcessService = Pick<
   ProcessService,
   "create" | "update" | "detail" | "list" | "sendToFiscal" | "returnFromFiscal"
 >;
+export type RegularizeMunicipalTaxesService = Pick<
+  MunicipalTaxesService,
+  "create" | "update" | "detail" | "list"
+>;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
   licenseService?: RegularizeLicenseService;
   processService?: RegularizeProcessService;
+  municipalTaxesService?: RegularizeMunicipalTaxesService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -204,6 +216,15 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new ProcessService(client as never)),
     );
   };
+  const withMunicipalTaxesService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeMunicipalTaxesService) => Promise<T>,
+  ) => {
+    if (options.municipalTaxesService) return callback(options.municipalTaxesService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new MunicipalTaxesService(client as never)),
+    );
+  };
   app.post("/regularize/process", async (c) =>
     withProcessService(c, async (service) => {
       const body = parseWithZod(createProcessBodySchema, await c.req.json());
@@ -278,6 +299,51 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
             ...query,
             paginationRequested: url.searchParams.has("page") || url.searchParams.has("limit"),
           }),
+        ),
+      );
+    }),
+  );
+  app.post("/regularize/municipal-taxes", async (c) =>
+    withMunicipalTaxesService(c, async (service) => {
+      const body = parseWithZod(createMunicipalTaxesBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.create({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+        201,
+      );
+    }),
+  );
+  app.put("/regularize/municipal-taxes", async (c) =>
+    withMunicipalTaxesService(c, async (service) => {
+      const body = parseWithZod(updateMunicipalTaxesBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.update({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/municipal-taxes-detail", async (c) =>
+    withMunicipalTaxesService(c, async (service) => {
+      const { id } = parseWithZod(municipalTaxesDetailQuerySchema, c.req.query());
+      return c.json(createSuccessResponse(await service.detail(c.get("auth").organizationId, id)));
+    }),
+  );
+  app.get("/regularize/municipal-taxes", async (c) =>
+    withMunicipalTaxesService(c, async (service) => {
+      const query = parseWithZod(listMunicipalTaxesQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.list({ organizationId: c.get("auth").organizationId, ...query }),
         ),
       );
     }),

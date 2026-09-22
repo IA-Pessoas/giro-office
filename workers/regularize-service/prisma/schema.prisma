@@ -43,15 +43,20 @@ model Organization {
   tasks     Task[]
   processes Process[]
   logs      Logs[]
+  municipalTaxes MunicipalTaxes[]
 }
 
 model Client {
   id              String    @id
   name            String
+  dominio_code    String?
   cpf_cnpj        String?
+  status          String
+  city            String?
   organization_id String
   organization    Organization @relation(fields: [organization_id], references: [id])
   processes       Process[] @relation("processClientPJ")
+  municipalTaxes  MunicipalTaxes[]
 
   @@map("clients")
 }
@@ -134,4 +139,37 @@ model Process {
   task              Task? @relation(fields: [task_id], references: [id])
 
   @@map("regularize.process")
+}
+
+model MunicipalTaxes {
+  id                   String   @id @default(uuid())
+  client_id            String
+  year                 Int
+  tff_is_applicable    Boolean
+  tff_amount           Float
+  tff_notes            String?
+  tff_analysis_is_done Boolean
+  tff_analysis_notes   String?
+  tff_sent_date        DateTime?
+  tff_due_date         DateTime?
+  tlp_is_applicable    Boolean
+  tlp_amount           Float
+  tlp_notes            String?
+  tlp_is_sent          String
+  tlp_sent_date        DateTime?
+  tlp_due_date         DateTime?
+  tlp_not_email        Boolean
+  tll_is_applicable    Boolean
+  tll_amount           Float
+  tll_notes            String?
+  tll_is_sent          String
+  tll_sent_date        DateTime?
+  tll_due_date         DateTime?
+  tll_analysis_is_done Boolean
+  tll_analysis_notes   String?
+  organization_id      String
+  client               Client @relation(fields: [client_id], references: [id])
+  organization         Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("regularize.municipalTaxes")
 }

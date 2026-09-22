@@ -3,6 +3,7 @@ import {
   createRegularizeWorkerApp,
   type RegularizeLicensePrisma,
   type RegularizeLicenseService,
+  type RegularizeMunicipalTaxesService,
   type RegularizeProcessService,
   type RegularizeWorkerEnv,
 } from "./app.js";
@@ -56,6 +57,15 @@ function processService(): RegularizeProcessService {
     list: vi.fn(async () => ({ data: [{ id: "process-1" }], total: 1 })),
     sendToFiscal: vi.fn(async () => ({ action: "Envio ao Fiscal" })),
     returnFromFiscal: vi.fn(async () => ({ action: "Retorno do Fiscal" })),
+  };
+}
+
+function municipalTaxesService(): RegularizeMunicipalTaxesService {
+  return {
+    create: vi.fn(async () => ({ create: { id: "municipal-1" } })),
+    update: vi.fn(async () => ({ id: "municipal-1" })),
+    detail: vi.fn(async () => ({ detail: { id: "municipal-1" } })),
+    list: vi.fn(async () => ({ data: [], total: 0, page: 1, limit: 20, hasMore: false })),
   };
 }
 
@@ -233,6 +243,64 @@ describe("regularize Worker", () => {
       organizationId: ORGANIZATION_ID,
       userId: USER_ID,
       processId: LICENSE_ID,
+    });
+  });
+
+  it("routes municipal taxes CRUD, detail and filtered listing", async () => {
+    const municipal = municipalTaxesService();
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      municipalTaxesService: municipal,
+    });
+    const body = {
+      client_id: ORGANIZATION_ID,
+      year: 2026,
+      tff_is_applicable: true,
+      tff_amount: 10,
+      tff_analysis_is_done: false,
+      tlp_is_applicable: true,
+      tlp_amount: 20,
+      tlp_is_sent: "Não",
+      tlp_not_email: false,
+      tll_is_applicable: false,
+      tll_amount: 0,
+      tll_is_sent: "Não se aplica",
+      tll_analysis_is_done: false,
+    };
+    const created = await app.request("https://regularize.test/regularize/municipal-taxes", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const updated = await app.request("https://regularize.test/regularize/municipal-taxes", {
+      method: "PUT",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ ...body, id: LICENSE_ID }),
+    });
+    const detail = await app.request(
+      `https://regularize.test/regularize/municipal-taxes-detail?id=${LICENSE_ID}`,
+      { headers: headers() },
+    );
+    const list = await app.request(
+      "https://regularize.test/regularize/municipal-taxes?year=2026&status=Criado&type=TFF&page=1&limit=20",
+      { headers: headers() },
+    );
+
+    expect([created, updated, detail, list].map((response) => response.status)).toEqual([
+      201, 200, 200, 200,
+    ]);
+    expect(municipal.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+    expect(municipal.list).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      year: 2026,
+      search: "",
+      status: "Criado",
+      type: "TFF",
+      page: 1,
+      limit: 20,
     });
   });
 });
