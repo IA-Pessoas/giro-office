@@ -14,6 +14,7 @@ import {
   createCertificatePjSchema,
   updateCertificatePjSchema,
 } from "@workspace/certificate-service/src/schemas/certificatePj.schemas.js";
+import { internalReportingExtractBodySchema } from "@workspace/certificate-service/src/schemas/internalReporting.schemas.js";
 import { createCertificateFileCrypto } from "@workspace/certificate-service/src/services/certificateFileCrypto.js";
 import type { CertificateFileStorage } from "@workspace/certificate-service/src/services/certificateFileStorage.js";
 import {
@@ -47,6 +48,13 @@ import {
 } from "./auth.js";
 import type { CertificateWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
+import {
+  type CertificateReportingPrisma,
+  CertificateReportingService,
+  certificatePfReportingCatalog,
+  certificatePjReportingCatalog,
+  verifyCertificateReportingGrant,
+} from "./reporting.js";
 
 type CertificatePjServiceLike = Pick<
   CertificatePjService,
@@ -74,12 +82,17 @@ type CertificateNotificationServiceLike = Pick<
   CertificateNotificationService,
   "listCertificateNotifications" | "runCertificateNotificationReconciliation"
 >;
+type CertificateReportingServiceLike = Pick<
+  CertificateReportingService,
+  "consumeGrant" | "extract"
+>;
 
 interface CertificateWorkerOptions {
   env: CertificateWorkerEnv;
   service?: CertificatePjServiceLike;
   pfService?: CertificatePfServiceLike;
   notificationService?: CertificateNotificationServiceLike;
+  reportingService?: CertificateReportingServiceLike;
 }
 
 type CertificateVariables = { auth: WorkerAuthContext };
@@ -219,6 +232,16 @@ async function withCertificateNotificationService<T>(
   });
 }
 
+async function withCertificateReportingService<T>(
+  options: CertificateWorkerOptions,
+  callback: (service: CertificateReportingServiceLike) => Promise<T>,
+): Promise<T> {
+  if (options.reportingService) return callback(options.reportingService);
+  return withWorkerPrisma(options.env, PrismaClient, (client) =>
+    callback(new CertificateReportingService(client as unknown as CertificateReportingPrisma)),
+  );
+}
+
 export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
   const app = new Hono<CertificateHonoEnv>();
 
@@ -271,6 +294,55 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
             windowDays: options.env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30,
           }),
         ),
+      ),
+    );
+  });
+
+  app.get("/internal/reporting/catalog", async (c) => {
+    const verified = await verifyCertificateReportingGrant({
+      env: options.env,
+      request: c.req.raw,
+      operation: "catalog",
+      source: "certificado.catalog",
+      fields: [],
+      body: {},
+    });
+    await withCertificateReportingService(options, (service) =>
+      service.consumeGrant(verified.value, verified.grant.expires_at),
+    );
+    return c.json(
+      createSuccessResponse({
+        sources: [
+          ...certificatePfReportingCatalog.sources,
+          ...certificatePjReportingCatalog.sources,
+        ],
+        relations: [],
+      }),
+    );
+  });
+
+  app.post("/internal/reporting/extract", async (c) => {
+    const body = parseWithZod(internalReportingExtractBodySchema, await readJson(c));
+    const verified = await verifyCertificateReportingGrant({
+      env: options.env,
+      request: c.req.raw,
+      operation: "extract",
+      source: body.source,
+      fields: body.fields,
+      body,
+    });
+    return c.json(
+      createSuccessResponse(
+        await withCertificateReportingService(options, async (service) => {
+          await service.consumeGrant(verified.value, verified.grant.expires_at);
+          return service.extract({
+            organizationId: verified.grant.organization_id,
+            source: body.source,
+            fields: body.fields,
+            limit: body.limit,
+            ...(body.query ? { query: body.query } : {}),
+          });
+        }),
       ),
     );
   });

@@ -91,3 +91,13 @@ model CertificateNotification {
   @@index([organization_id, date, client_name], map: "idx_cert_not_org_date_name")
   @@map("notification.certificate")
 }
+
+model ReportGrantUse {
+  id         String   @id @default(uuid())
+  grant_hash String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([expires_at])
+  @@map("reports.grant_uses")
+}
