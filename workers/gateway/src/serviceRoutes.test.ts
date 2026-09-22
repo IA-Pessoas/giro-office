@@ -18,6 +18,9 @@ const SERVICES = [
   "CONTABIL_SERVICE",
   "TRIAGEM_SERVICE",
   "PARCELAMENTO_SERVICE",
+  "CERTIFICATE_SERVICE",
+  "PESSOAL_SERVICE",
+  "REGULARIZE_SERVICE",
 ] as const;
 type ServiceName = (typeof SERVICES)[number];
 
@@ -175,6 +178,13 @@ describe("gateway Worker: rotas de contabil, fiscal, triagem e parcelamento", ()
     ["GET", "/triagem/overview", { fiscal: 3 }],
     ["POST", "/triagem/closing", { fiscal: 3 }],
     ["GET", "/fiscal", undefined],
+    // Permissão global 3 não pode valer como permissão de módulo: o Node nega estes casos
+    // encaminhando x-auth-permission 0, e os Workers abaixo autorizam lendo esse valor.
+    ["GET", "/certificate", { certificado: 0 }],
+    ["DELETE", "/certificate/c-1", { certificado: 1 }],
+    ["GET", "/pessoal", { pessoal: 0 }],
+    ["GET", "/regularize/credentials", { regularize: 0 }],
+    ["POST", "/regularize/credentials/reveal", { regularize: 1 }],
   ] as const)("%s %s nega com 403 e envelope do Node sem chamar o upstream", async (method, path, modules) => {
     const { app, bindings } = setup();
     const response = await app.request(

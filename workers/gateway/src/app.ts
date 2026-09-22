@@ -63,7 +63,12 @@ const routes: Route[] = [
     module: "fiscal",
     policy: modulePolicy("fiscal"),
   },
-  { prefix: "/certificate", binding: "CERTIFICATE_SERVICE" },
+  {
+    prefix: "/certificate",
+    binding: "CERTIFICATE_SERVICE",
+    module: "certificado",
+    policy: modulePolicy("certificado"),
+  },
   { prefix: "/reports", binding: "REPORTS_SERVICE" },
   {
     prefix: "/parcelamento",
@@ -84,8 +89,18 @@ const routes: Route[] = [
   ...triagemServiceRoutes,
   // triagem-legacy-service do Node: sem permissionModule, encaminha a permissão global.
   { prefix: "/triagem", binding: "CONTABIL_SERVICE", policy: triagemPolicy },
-  { prefix: "/pessoal", binding: "PESSOAL_SERVICE" },
-  { prefix: "/regularize", binding: "REGULARIZE_SERVICE" },
+  {
+    prefix: "/pessoal",
+    binding: "PESSOAL_SERVICE",
+    module: "pessoal",
+    policy: modulePolicy("pessoal"),
+  },
+  {
+    prefix: "/regularize",
+    binding: "REGULARIZE_SERVICE",
+    module: "regularize",
+    policy: modulePolicy("regularize"),
+  },
 ];
 
 function routeFor(path: string): Route | undefined {
