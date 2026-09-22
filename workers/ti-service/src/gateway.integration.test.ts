@@ -12,6 +12,7 @@ import { createTiWorkerApp, type TiCategoryService, type TiWorkerEnv } from "./a
 const GATEWAY_SECRET = "gateway-secret-for-ti-integration";
 const TI_SECRET = "different-ti-secret-for-forwarded-auth";
 const INTERNAL_TOKEN = "gateway-ti-internal-token";
+const AUDIT_TOKEN = "gateway-ti-audit-token";
 const USER_ID = "b0000000-0000-4000-8000-000000000001";
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
 const CATEGORY_ID = "c0000000-0000-4000-8000-000000000001";
@@ -64,6 +65,9 @@ function gatewayEnv(ti: {
   return {
     JWT_SECRET: GATEWAY_SECRET,
     INTERNAL_SERVICE_TOKEN: INTERNAL_TOKEN,
+    // O gateway recusa com 503 sem auditoria, e exige token distinto do interno.
+    AUDIT_SERVICE_TOKEN: AUDIT_TOKEN,
+    AUDIT_SERVICE: { fetch: vi.fn(async () => new Response(null, { status: 201 })) },
     TI_SERVICE: ti,
   } as GatewayWorkerEnv;
 }
