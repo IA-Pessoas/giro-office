@@ -85,8 +85,15 @@ describe("gateway Worker", () => {
     const tiBinding = {
       fetch: vi.fn(async () => new Response("ti", { status: 200 })),
     };
+    const rhBinding = {
+      fetch: vi.fn(async () => new Response("rh", { status: 200 })),
+    };
     const app = createGatewayWorkerApp({
-      env: env(undefined, { PROJECT_SERVICE: projectBinding, TI_SERVICE: tiBinding }),
+      env: env(undefined, {
+        PROJECT_SERVICE: projectBinding,
+        TI_SERVICE: tiBinding,
+        RH_SERVICE: rhBinding,
+      }),
     });
 
     const project = await app.request("https://gateway.test/project", {
@@ -95,11 +102,16 @@ describe("gateway Worker", () => {
     const ti = await app.request("https://gateway.test/ti", {
       headers: { authorization: `Bearer ${await jwt()}` },
     });
+    const rh = await app.request("https://gateway.test/rh", {
+      headers: { authorization: `Bearer ${await jwt()}` },
+    });
 
     expect(project.status).toBe(200);
     expect(ti.status).toBe(200);
+    expect(rh.status).toBe(200);
     expect(projectBinding.fetch).toHaveBeenCalledOnce();
     expect(tiBinding.fetch).toHaveBeenCalledOnce();
+    expect(rhBinding.fetch).toHaveBeenCalledOnce();
   });
 
   it("requires CSRF for cookie mutations", async () => {
