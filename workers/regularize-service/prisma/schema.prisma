@@ -30,6 +30,108 @@ model License {
   protocol_file_mime_type           String?
   protocol_file_size_bytes          Int?
   protocol_file_uploaded_at         DateTime?
+  protocol_file_uploaded_by_user_id String?
 
   @@map("regularize.license")
+}
+
+model Organization {
+  id        String    @id
+  clients   Client[]
+  clientsPF ClientPF[]
+  users     User[]
+  tasks     Task[]
+  processes Process[]
+  logs      Logs[]
+}
+
+model Client {
+  id              String    @id
+  name            String
+  cpf_cnpj        String?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  processes       Process[] @relation("processClientPJ")
+
+  @@map("clients")
+}
+
+model ClientPF {
+  id              String    @id
+  name            String
+  cpf             String?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  processes       Process[] @relation("processClientPF")
+
+  @@map("clients.pf")
+}
+
+model User {
+  id              String    @id
+  name            String
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  responsible1    Process[] @relation("responsible1")
+  responsible2    Process[] @relation("responsible2")
+  responsible3    Process[] @relation("responsible3")
+  logs            Logs[]
+
+  @@map("users")
+}
+
+model Task {
+  id              String    @id
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  processes       Process[]
+
+  @@map("integracao.tasks")
+}
+
+model Logs {
+  id              String    @id
+  user_id         String
+  action          String
+  referring       String
+  referring_id    String
+  changes         Json
+  date            DateTime  @default(now())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User @relation(fields: [user_id], references: [id])
+
+  @@map("logs")
+}
+
+model Process {
+  id                String    @id @default(uuid())
+  client_pj_id      String?
+  client_pf_id      String?
+  cpf_cnpj          String
+  process_type      String
+  description       String
+  entry_date        DateTime?
+  completion_date   DateTime?
+  expected_date     DateTime?
+  client_notice_date DateTime?
+  status            String
+  financial_status  String @default("Pendente")
+  observation       String?
+  responsible1_id   String?
+  responsible2_id   String?
+  responsible3_id   String?
+  locking_type      String?
+  urgency           String?
+  task_id           String?
+  organization_id   String
+  clientPJ          Client? @relation("processClientPJ", fields: [client_pj_id], references: [id])
+  clientPF          ClientPF? @relation("processClientPF", fields: [client_pf_id], references: [id])
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  responsible1      User? @relation("responsible1", fields: [responsible1_id], references: [id])
+  responsible2      User? @relation("responsible2", fields: [responsible2_id], references: [id])
+  responsible3      User? @relation("responsible3", fields: [responsible3_id], references: [id])
+  task              Task? @relation(fields: [task_id], references: [id])
+
+  @@map("regularize.process")
 }

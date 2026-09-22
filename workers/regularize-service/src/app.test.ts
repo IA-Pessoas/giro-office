@@ -3,6 +3,7 @@ import {
   createRegularizeWorkerApp,
   type RegularizeLicensePrisma,
   type RegularizeLicenseService,
+  type RegularizeProcessService,
   type RegularizeWorkerEnv,
 } from "./app.js";
 
@@ -44,6 +45,17 @@ function service(): RegularizeLicenseService {
       url: "https://storage.example/signed/protocolo.pdf",
       expires_in_seconds: 300,
     })),
+  };
+}
+
+function processService(): RegularizeProcessService {
+  return {
+    create: vi.fn(async () => ({ create: { id: "process-1", status: "Pendente" } })),
+    update: vi.fn(async () => ({ id: "process-1", status: "Andamento" })),
+    detail: vi.fn(async () => ({ detail: { id: "process-1" } })),
+    list: vi.fn(async () => ({ data: [{ id: "process-1" }], total: 1 })),
+    sendToFiscal: vi.fn(async () => ({ action: "Envio ao Fiscal" })),
+    returnFromFiscal: vi.fn(async () => ({ action: "Retorno do Fiscal" })),
   };
 }
 
@@ -161,6 +173,66 @@ describe("regularize Worker", () => {
     expect(licenseService.createProtocolAccess).toHaveBeenCalledWith({
       organizationId: ORGANIZATION_ID,
       licenseId: LICENSE_ID,
+    });
+  });
+
+  it("routes process CRUD, listing and fiscal actions through the process service", async () => {
+    const regularizeProcess = processService();
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      processService: regularizeProcess,
+    });
+    const body = {
+      client_pj_id: ORGANIZATION_ID,
+      cpf_cnpj: "12345678000199",
+      process_type: "Abertura",
+      description: "Processo de teste",
+      status: "Pendente",
+    };
+
+    const created = await app.request("https://regularize.test/regularize/process", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const updated = await app.request("https://regularize.test/regularize/process", {
+      method: "PUT",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ ...body, id: LICENSE_ID, status: "Andamento" }),
+    });
+    const list = await app.request(
+      "https://regularize.test/regularize/processes?status=Todos&page=1&limit=10",
+      { headers: headers() },
+    );
+    const detail = await app.request(
+      `https://regularize.test/regularize/process?id=${LICENSE_ID}`,
+      { headers: headers() },
+    );
+    const sent = await app.request("https://regularize.test/regularize/process/send-to-fiscal", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ id: LICENSE_ID }),
+    });
+    const returned = await app.request(
+      "https://regularize.test/regularize/process/return-from-fiscal",
+      {
+        method: "POST",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ id: LICENSE_ID }),
+      },
+    );
+
+    expect(
+      [created, updated, list, detail, sent, returned].map((response) => response.status),
+    ).toEqual([201, 200, 200, 200, 200, 200]);
+    expect(regularizeProcess.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+    expect(regularizeProcess.sendToFiscal).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      processId: LICENSE_ID,
     });
   });
 });

@@ -4,7 +4,15 @@ import {
   listLicensesQuerySchema,
   updateLicenseBodySchema,
 } from "@workspace/regularize-service/src/schemas/license.schemas.js";
+import {
+  createProcessBodySchema,
+  listProcessesQuerySchema,
+  processActionBodySchema,
+  processDetailQuerySchema,
+  updateProcessBodySchema,
+} from "@workspace/regularize-service/src/schemas/process.schemas.js";
 import { buildLicenseStatusFilter } from "@workspace/regularize-service/src/schemas/status.schemas.js";
+import { ProcessService } from "@workspace/regularize-service/src/services/processService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
 import {
@@ -48,10 +56,15 @@ export type RegularizeLicenseService = LicenseMutationService & {
   ): Promise<unknown>;
   detail(organizationId: string, id: string): Promise<unknown>;
 };
+export type RegularizeProcessService = Pick<
+  ProcessService,
+  "create" | "update" | "detail" | "list" | "sendToFiscal" | "returnFromFiscal"
+>;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
   licenseService?: RegularizeLicenseService;
+  processService?: RegularizeProcessService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -182,6 +195,93 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       ),
     );
   };
+  const withProcessService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeProcessService) => Promise<T>,
+  ) => {
+    if (options.processService) return callback(options.processService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new ProcessService(client as never)),
+    );
+  };
+  app.post("/regularize/process", async (c) =>
+    withProcessService(c, async (service) => {
+      const body = parseWithZod(createProcessBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.create({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+        201,
+      );
+    }),
+  );
+  app.put("/regularize/process", async (c) =>
+    withProcessService(c, async (service) => {
+      const body = parseWithZod(updateProcessBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.update({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+      );
+    }),
+  );
+  app.post("/regularize/process/send-to-fiscal", async (c) =>
+    withProcessService(c, async (service) => {
+      const { id } = parseWithZod(processActionBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.sendToFiscal({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            processId: id,
+          }),
+        ),
+      );
+    }),
+  );
+  app.post("/regularize/process/return-from-fiscal", async (c) =>
+    withProcessService(c, async (service) => {
+      const { id } = parseWithZod(processActionBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.returnFromFiscal({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            processId: id,
+          }),
+        ),
+      );
+    }),
+  );
+  app.get("/regularize/process", async (c) =>
+    withProcessService(c, async (service) => {
+      const { id } = parseWithZod(processDetailQuerySchema, c.req.query());
+      return c.json(createSuccessResponse(await service.detail(c.get("auth").organizationId, id)));
+    }),
+  );
+  app.get("/regularize/processes", async (c) =>
+    withProcessService(c, async (service) => {
+      const query = parseWithZod(listProcessesQuerySchema, c.req.query());
+      const url = new URL(c.req.url);
+      return c.json(
+        createSuccessResponse(
+          await service.list({
+            organizationId: c.get("auth").organizationId,
+            ...query,
+            paginationRequested: url.searchParams.has("page") || url.searchParams.has("limit"),
+          }),
+        ),
+      );
+    }),
+  );
   app.post("/regularize/license", async (c) =>
     withService(c, async (service) => {
       const body = parseWithZod(createLicenseBodySchema, await c.req.json());
