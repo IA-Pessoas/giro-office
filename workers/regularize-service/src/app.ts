@@ -1,4 +1,12 @@
 import {
+  RegularizeLicenseReportingService as RegularizeLicenseReportingServiceImpl,
+  type RegularizeLicenseReportingService as RegularizeLicenseReportingServiceType,
+  RegularizeMunicipalTaxesReportingService as RegularizeMunicipalTaxesReportingServiceImpl,
+  type RegularizeMunicipalTaxesReportingService as RegularizeMunicipalTaxesReportingServiceType,
+} from "@workspace/regularize-service/src/reporting/internalReportingService.js";
+import { regularizeMunicipalTaxesReportingCatalog } from "@workspace/regularize-service/src/reporting/regularizeMunicipalTaxesReportingCatalog.js";
+import { regularizeReportingCatalog } from "@workspace/regularize-service/src/reporting/regularizeReportingCatalog.js";
+import {
   clientPfDetailQuerySchema,
   createClientPfBodySchema,
   listClientPfQuerySchema,
@@ -17,6 +25,10 @@ import {
   updateGuidanceBodySchema,
   updateGuidancePartnerBodySchema,
 } from "@workspace/regularize-service/src/schemas/guidance.schemas.js";
+import {
+  internalReportingExtractBodySchema,
+  internalReportingGrantSchema,
+} from "@workspace/regularize-service/src/schemas/internalReporting.schemas.js";
 import {
   createLicenseBodySchema,
   licenseDetailQuerySchema,
@@ -72,7 +84,11 @@ import {
   type RegularizeReconciliationService as RegularizeReconciliationServiceType,
 } from "@workspace/regularize-service/src/services/regularizeReconciliationService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
-import { parseWithZod } from "@workspace/shared";
+import {
+  parseWithZod,
+  REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE,
+  reportingQueryFields,
+} from "@workspace/shared";
 import {
   createSuccessResponse,
   REQUEST_ID_HEADER,
@@ -155,6 +171,14 @@ export type RegularizeReconciliationService = Pick<
   | "runInactiveClientPfStatusReconciliation"
   | "runClientPfDocumentNotificationReconciliation"
 >;
+export type RegularizeLicenseReportingService = Pick<
+  RegularizeLicenseReportingServiceType,
+  "extract"
+>;
+export type RegularizeMunicipalTaxesReportingService = Pick<
+  RegularizeMunicipalTaxesReportingServiceType,
+  "extract"
+>;
 type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
@@ -167,6 +191,8 @@ type RegularizeOptions = {
   guidanceService?: RegularizeGuidanceService;
   dashboardService?: RegularizeDashboardService;
   reconciliationService?: RegularizeReconciliationService;
+  reportingService?: RegularizeLicenseReportingService;
+  municipalTaxesReportingService?: RegularizeMunicipalTaxesReportingService;
   protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
@@ -198,6 +224,114 @@ const select = {
   protocol_file_size_bytes: true,
   protocol_file_uploaded_at: true,
 };
+
+const internalReportingCatalog = {
+  sources: [
+    ...regularizeReportingCatalog.sources,
+    ...regularizeMunicipalTaxesReportingCatalog.sources,
+  ],
+  relations: [],
+} as const;
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
+function base64UrlToBytes(value: string): Uint8Array {
+  const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = `${base64}${"=".repeat((4 - (base64.length % 4)) % 4)}`;
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  return bytesToHex(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))),
+  );
+}
+
+async function hmacSha256Hex(secret: string, value: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return bytesToHex(
+    new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value))),
+  );
+}
+
+async function verifyReportingGrant(input: {
+  env: RegularizeWorkerEnv;
+  request: Request;
+  operation: "catalog" | "extract";
+  source: string;
+  fields: readonly string[];
+  body: unknown;
+}): Promise<{ organization_id: string }> {
+  const reportingToken = input.env.REGULARIZE_REPORTING_TOKEN;
+  const grantSecret = input.env.REGULARIZE_REPORTING_GRANT_SECRET;
+  if (!reportingToken || !grantSecret) {
+    throw new ServiceError(503, "Reporting interno não configurado.");
+  }
+  if (input.request.headers.get("x-internal-service-token") !== reportingToken) {
+    throw new ServiceError(403, "Acesso negado.");
+  }
+
+  const grantValue = input.request.headers.get("x-reports-grant");
+  const signature = input.request.headers.get("x-reports-grant-signature");
+  if (!grantValue || !signature) throw new ServiceError(403, "Grant de relatórios inválido.");
+
+  let grant: ReturnType<typeof internalReportingGrantSchema.parse>;
+  try {
+    grant = internalReportingGrantSchema.parse(
+      JSON.parse(new TextDecoder().decode(base64UrlToBytes(grantValue))),
+    );
+    if (bytesToBase64Url(new TextEncoder().encode(canonicalJson(grant))) !== grantValue) {
+      throw new Error("grant canonical mismatch");
+    }
+  } catch {
+    throw new ServiceError(403, "Grant de relatórios inválido.");
+  }
+
+  const expectedSignature = await hmacSha256Hex(grantSecret, grantValue);
+  const now = Math.floor(Date.now() / 1000);
+  const fieldsMatch =
+    grant.fields.length === input.fields.length &&
+    grant.fields.every((field, index) => field === input.fields[index]);
+  if (
+    signature !== expectedSignature ||
+    grant.operation !== input.operation ||
+    grant.source !== input.source ||
+    !fieldsMatch ||
+    grant.request_id !== (input.request.headers.get(REQUEST_ID_HEADER) ?? "") ||
+    grant.body_sha256 !== (await sha256Hex(canonicalJson(input.body))) ||
+    grant.issued_at > now ||
+    grant.expires_at <= now
+  ) {
+    throw new ServiceError(403, "Grant de relatórios inválido.");
+  }
+  return grant;
+}
 
 function publicLicense(row: LicenseRow): Record<string, unknown> {
   const {
@@ -375,6 +509,25 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       callback(new RegularizeReconciliationServiceImpl(client as never)),
     );
   };
+  const withReportingService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeLicenseReportingService) => Promise<T>,
+  ) => {
+    if (options.reportingService) return callback(options.reportingService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new RegularizeLicenseReportingServiceImpl(client as never)),
+    );
+  };
+  const withMunicipalTaxesReportingService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeMunicipalTaxesReportingService) => Promise<T>,
+  ) => {
+    if (options.municipalTaxesReportingService)
+      return callback(options.municipalTaxesReportingService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new RegularizeMunicipalTaxesReportingServiceImpl(client as never)),
+    );
+  };
   const requirePasswordReveal = (c: RegularizeContext): void => {
     if (Number(c.get("auth").claims.permission ?? 0) < 2) {
       throw new ServiceError(403, "Permissao insuficiente para revelar credencial.");
@@ -382,6 +535,57 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
   };
   const requireInternal = (c: RegularizeContext): void =>
     assertRegularizeInternalToken(c.req.raw, options.env ?? c.env);
+  app.get("/internal/reporting/catalog", async (c) => {
+    const body = {};
+    await verifyReportingGrant({
+      env: options.env ?? c.env,
+      request: c.req.raw,
+      operation: "catalog",
+      source: "regularize.catalog",
+      fields: [],
+      body,
+    });
+    return c.json(createSuccessResponse(internalReportingCatalog));
+  });
+  app.post("/internal/reporting/extract", async (c) => {
+    const body = parseWithZod(internalReportingExtractBodySchema, await c.req.json());
+    const grant = await verifyReportingGrant({
+      env: options.env ?? c.env,
+      request: c.req.raw,
+      operation: "extract",
+      source: body.source,
+      fields: reportingQueryFields(body.fields, body.query),
+      body,
+    });
+    if (body.source === REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE) {
+      return withMunicipalTaxesReportingService(c, async (service) =>
+        c.json(
+          createSuccessResponse(
+            await service.extract({
+              organizationId: grant.organization_id,
+              source: REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE,
+              fields: body.fields,
+              limit: body.limit,
+              ...(body.query ? { query: body.query } : {}),
+            }),
+          ),
+        ),
+      );
+    }
+    return withReportingService(c, async (service) =>
+      c.json(
+        createSuccessResponse(
+          await service.extract({
+            organizationId: grant.organization_id,
+            source: body.source as "regularize.licenses" | "regularize.processes",
+            fields: body.fields,
+            limit: body.limit,
+            ...(body.query ? { query: body.query } : {}),
+          }),
+        ),
+      ),
+    );
+  });
   app.post("/internal/reconciliation/run", async (c) => {
     requireInternal(c);
     return withReconciliationService(c, async (service) =>

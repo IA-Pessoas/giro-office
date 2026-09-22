@@ -1,3 +1,4 @@
+import { createHash, createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
   createRegularizeWorkerApp,
@@ -5,7 +6,9 @@ import {
   type RegularizeDashboardService,
   type RegularizeGuidanceService,
   type RegularizeLicensePrisma,
+  type RegularizeLicenseReportingService,
   type RegularizeLicenseService,
+  type RegularizeMunicipalTaxesReportingService,
   type RegularizeMunicipalTaxesService,
   type RegularizePartnersService,
   type RegularizePasswordService,
@@ -23,6 +26,8 @@ function env(): RegularizeWorkerEnv {
   return {
     JWT_SECRET: "regularize-worker-test-secret-which-is-long-enough",
     INTERNAL_SERVICE_TOKEN: TOKEN,
+    REGULARIZE_REPORTING_TOKEN: "reporting-token",
+    REGULARIZE_REPORTING_GRANT_SECRET: "reporting-secret",
     HYPERDRIVE: { connectionString: "postgresql://worker:test@db.example/giro" },
   };
 }
@@ -147,6 +152,59 @@ function reconciliationService(): RegularizeReconciliationService {
     runLicenseNotificationReconciliation: vi.fn(async () => ({ created: 1 })),
     runInactiveClientPfStatusReconciliation: vi.fn(async () => ({ updated: 2 })),
     runClientPfDocumentNotificationReconciliation: vi.fn(async () => ({ created: 3 })),
+  };
+}
+
+function reportingService(): RegularizeLicenseReportingService {
+  return {
+    extract: vi.fn(async () => ({ rows: [{ id: LICENSE_ID }], reachedLimit: false })),
+  };
+}
+
+function municipalTaxesReportingService(): RegularizeMunicipalTaxesReportingService {
+  return {
+    extract: vi.fn(async () => ({ rows: [{ id: "municipal-1" }], reachedLimit: false })),
+  };
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function reportingHeaders(input: {
+  operation: "catalog" | "extract";
+  source: string;
+  fields: string[];
+  body: unknown;
+  requestId: string;
+}): HeadersInit {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = {
+    version: 1,
+    audience: "regularize-service",
+    operation: input.operation,
+    source: input.source,
+    organization_id: ORGANIZATION_ID,
+    fields: input.fields,
+    request_id: input.requestId,
+    issued_at: issuedAt,
+    expires_at: issuedAt + 60,
+    body_sha256: createHash("sha256").update(canonicalJson(input.body)).digest("hex"),
+  };
+  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
+  const signature = createHmac("sha256", "reporting-secret").update(grant).digest("hex");
+  return {
+    "x-internal-service-token": "reporting-token",
+    "x-request-id": input.requestId,
+    "x-reports-grant": grant,
+    "x-reports-grant-signature": signature,
   };
 }
 
@@ -695,5 +753,82 @@ describe("regularize Worker", () => {
     expect(reconciliation.runLicenseNotificationReconciliation).toHaveBeenCalledOnce();
     expect(reconciliation.runInactiveClientPfStatusReconciliation).toHaveBeenCalledOnce();
     expect(reconciliation.runClientPfDocumentNotificationReconciliation).toHaveBeenCalledOnce();
+  });
+
+  it("verifies signed reporting grants before catalog and extraction", async () => {
+    const reporting = reportingService();
+    const municipalReporting = municipalTaxesReportingService();
+    const app = createRegularizeWorkerApp({
+      env: env(),
+      licenseService: service(),
+      reportingService: reporting,
+      municipalTaxesReportingService: municipalReporting,
+    });
+    const extractBody = { source: "regularize.licenses", fields: ["id"], limit: 10 };
+    const catalog = await app.request("https://regularize.test/internal/reporting/catalog", {
+      headers: reportingHeaders({
+        operation: "catalog",
+        source: "regularize.catalog",
+        fields: [],
+        body: {},
+        requestId: "reporting-catalog",
+      }),
+    });
+    const extract = await app.request("https://regularize.test/internal/reporting/extract", {
+      method: "POST",
+      headers: {
+        ...reportingHeaders({
+          operation: "extract",
+          source: extractBody.source,
+          fields: extractBody.fields,
+          body: extractBody,
+          requestId: "reporting-extract",
+        }),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(extractBody),
+    });
+    const municipalBody = {
+      source: "regularize.municipal_taxes",
+      fields: ["id"],
+      limit: 10,
+    };
+    const municipalExtract = await app.request(
+      "https://regularize.test/internal/reporting/extract",
+      {
+        method: "POST",
+        headers: {
+          ...reportingHeaders({
+            operation: "extract",
+            source: municipalBody.source,
+            fields: municipalBody.fields,
+            body: municipalBody,
+            requestId: "reporting-municipal",
+          }),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(municipalBody),
+      },
+    );
+    const unauthorized = await app.request("https://regularize.test/internal/reporting/catalog", {
+      headers: { "x-internal-service-token": "wrong" },
+    });
+
+    expect(catalog.status).toBe(200);
+    expect(extract.status).toBe(200);
+    expect(municipalExtract.status).toBe(200);
+    expect(unauthorized.status).toBe(403);
+    expect(reporting.extract).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      source: "regularize.licenses",
+      fields: ["id"],
+      limit: 10,
+    });
+    expect(municipalReporting.extract).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      source: "regularize.municipal_taxes",
+      fields: ["id"],
+      limit: 10,
+    });
   });
 });
