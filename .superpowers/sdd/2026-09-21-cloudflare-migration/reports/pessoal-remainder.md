@@ -138,3 +138,30 @@ O retry com o mesmo `Idempotency-Key` devolve o snapshot confirmado sem repetir 
 
 - Alterados somente `workers/pessoal-service/**` e este relatório solicitado; `workers/user-service/**`, TI, Reports e `app/next-env.d.ts` permaneceram fora do escopo.
 - Nenhum deploy ou push foi executado.
+
+## Fix report — terceira correção focada: requestId canônico da outbox
+
+### Finding corrigido
+
+O `apply` agora gera um `requestId` canônico depois de confirmar que a `Idempotency-Key` ainda não foi concluída e antes de persistir a confirmação e o evento de outbox. O valor recebido no contexto é preservado quando não está vazio; sem ele, o Worker gera um UUID uma única vez e o armazena no payload persistido.
+
+O mesmo payload é usado pela entrega imediata e pela reconciliação. Portanto, `toAuditPayload` não precisa gerar outro UUID para o evento pendente: o `AUDIT_SERVICE` recebe o mesmo `requestId` em apply, reconcile e novas tentativas, sem alterar a resposta primária nem o contrato de idempotência.
+
+### TDD
+
+- RED: `pnpm exec vitest run src/remainderServices.test.ts -t "persiste e reutiliza o mesmo requestId"` — 1 falha; o payload persistido não tinha `requestId`.
+- GREEN: o mesmo comando — 1 teste passou; o teste cobre falha HTTP pós-persistência, payload da outbox, entrega inicial e reconciliação com o mesmo `requestId`.
+
+### Validação
+
+- `pnpm test` — PASS, 3 arquivos e 22 testes.
+- `pnpm typecheck` — PASS.
+- `pnpm build` — PASS.
+- `pnpm check` — PASS, 13 arquivos; sem fixes do Biome.
+- `pnpm exec wrangler deploy --dry-run` — PASS, 6395.25 KiB (1994.11 KiB gzip); binding `AUDIT_SERVICE` detectado, sem publicação.
+- Permaneceu apenas o warning preexistente de `resolutions` em `services/src/package.json`.
+
+### Limites
+
+- Alterados somente `workers/pessoal-service/**` e este relatório; alterações preexistentes em User, TI, Reports, Prisma, `pnpm-lock.yaml` e `app/next-env.d.ts` permaneceram fora do commit.
+- Nenhum deploy ou push foi executado.

@@ -240,6 +240,59 @@ describe("GroupAssignmentService do Worker", () => {
     );
   });
 
+  it("persiste e reutiliza o mesmo requestId na entrega e na reconciliação", async () => {
+    const prisma = assignmentPrisma();
+    const response = { preview_id: PREVIEW_ID, changed: 1, no_op: 1, skipped: 0 };
+    prisma.tx.pessoalGroupAssignmentConfirmation.findUnique.mockResolvedValueOnce(null);
+    let storedPayload: Record<string, unknown> | undefined;
+    prisma.tx.pessoalAuditOutboxEvent.create.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => {
+        storedPayload = data.payload as Record<string, unknown>;
+        return { id: "outbox-1" };
+      },
+    );
+    prisma.pessoalAuditOutboxEvent.update.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => {
+        if (data.payload) storedPayload = data.payload as Record<string, unknown>;
+        return {};
+      },
+    );
+    prisma.pessoalAuditOutboxEvent.findMany.mockImplementation(async () => [
+      { id: "outbox-1", payload: storedPayload },
+    ]);
+    const requestIds: string[] = [];
+    const binding = {
+      fetch: vi.fn(async (input: RequestInfo) => {
+        const request = input instanceof Request ? input : new Request(input);
+        const payload = (await request.json()) as { requestId?: string };
+        requestIds.push(String(payload.requestId));
+        return new Response(null, { status: requestIds.length === 1 ? 503 : 200 });
+      }),
+    };
+    const audit = createPessoalAuditRecorder({
+      INTERNAL_SERVICE_TOKEN: "audit-test-token",
+      AUDIT_SERVICE: binding,
+    } as unknown as PessoalWorkerEnv);
+    const service = new GroupAssignmentService(prisma, audit, () => FIXED_NOW);
+
+    await expect(
+      service.apply(
+        { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+        { preview_id: PREVIEW_ID, fingerprint: FINGERPRINT },
+        "canonical-request-id-key",
+      ),
+    ).resolves.toEqual({ ...response, idempotent: false });
+    await expect(service.reconcilePendingAuditEvents()).resolves.toEqual({
+      processed: 1,
+      pending: 0,
+    });
+
+    expect(storedPayload?.requestId).toEqual(expect.any(String));
+    expect(requestIds).toHaveLength(2);
+    expect(requestIds[0]).toBe(storedPayload?.requestId);
+    expect(requestIds[1]).toBe(requestIds[0]);
+  });
+
   it("reconcilia apenas auditoria pendente e não altera folha", async () => {
     const prisma = assignmentPrisma();
     prisma.pessoalAuditOutboxEvent.findMany.mockResolvedValueOnce([

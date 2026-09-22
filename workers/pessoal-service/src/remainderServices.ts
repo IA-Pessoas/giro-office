@@ -475,6 +475,7 @@ export class GroupAssignmentService {
           idempotent: true,
         };
       }
+      const requestId = context.requestId?.trim() || crypto.randomUUID();
       const preview = await tx.pessoalGroupAssignmentPreview.findFirst({
         where: { id: body.preview_id, organization_id: context.organizationId },
         select: {
@@ -558,7 +559,7 @@ export class GroupAssignmentService {
         skipped: preview.totals.skipped,
       };
       const auditPayload: PessoalAuditChangeInput = {
-        requestId: context.requestId,
+        requestId,
         organizationId: context.organizationId,
         userId,
         permission: context.permission,
