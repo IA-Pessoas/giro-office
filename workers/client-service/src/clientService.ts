@@ -1,4 +1,3 @@
-import type { ServiceBinding } from "@workspace/runtime";
 import {
   clientIntegrationReportingCatalog,
   executeReportingQuery,
@@ -6,6 +5,7 @@ import {
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
+import { lookupOfficialCnpj } from "./cnpjLookup.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import type { WorkerHistoryStorageLike } from "./historyStorage.js";
 
@@ -352,8 +352,8 @@ function toPublic(row: ClientRow, organization: ClientRow): ClientRow {
 export class ClientService implements ClientWorkerService {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly cnpjService?: ServiceBinding,
-    private readonly cnpjServiceUrl?: string,
+    private readonly cnpjLookupApiUrl?: string,
+    private readonly cnpjLookupApiToken?: string,
     private readonly historyStorage?: WorkerHistoryStorageLike,
     private readonly inReportingSnapshot = false,
   ) {}
@@ -496,23 +496,7 @@ export class ClientService implements ClientWorkerService {
   }
 
   async lookupCnpj(cnpj: string, _organizationId: string): Promise<unknown> {
-    if (!this.cnpjService || !this.cnpjServiceUrl) {
-      throw new ServiceError(503, "Consulta oficial de CNPJ indisponível.");
-    }
-    let response: Response;
-    try {
-      const baseUrl = this.cnpjServiceUrl.endsWith("/")
-        ? this.cnpjServiceUrl
-        : `${this.cnpjServiceUrl}/`;
-      const url = new URL("lookup", baseUrl);
-      url.searchParams.set("cnpj", cnpj);
-      response = await this.cnpjService.fetch(new Request(url));
-    } catch {
-      throw new ServiceError(502, "O provedor oficial de CNPJ não respondeu corretamente.");
-    }
-    if (!response.ok)
-      throw new ServiceError(502, "O provedor oficial de CNPJ não respondeu corretamente.");
-    return response.json();
+    return lookupOfficialCnpj(cnpj, this.cnpjLookupApiUrl, this.cnpjLookupApiToken);
   }
 
   async createIntegration(
@@ -1017,8 +1001,8 @@ export class ClientService implements ClientWorkerService {
       return withReportingSnapshot(this.prisma, (transaction) =>
         new ClientService(
           transaction as PrismaClient,
-          this.cnpjService,
-          this.cnpjServiceUrl,
+          this.cnpjLookupApiUrl,
+          this.cnpjLookupApiToken,
           this.historyStorage,
           true,
         ).extractReporting(input),

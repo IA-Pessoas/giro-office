@@ -194,7 +194,14 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
     const env = options.env ?? c.env;
     const historyStorage = options.historyStorage ?? WorkerHistoryStorage.fromEnv(env);
     return withWorkerPrisma(env, PrismaClient, async (client) =>
-      callback(new ClientService(client, env.CNPJ_SERVICE, env.CNPJ_SERVICE_URL, historyStorage)),
+      callback(
+        new ClientService(
+          client,
+          env.CNPJ_LOOKUP_API_URL,
+          env.CNPJ_LOOKUP_API_TOKEN,
+          historyStorage,
+        ),
+      ),
     );
   };
 

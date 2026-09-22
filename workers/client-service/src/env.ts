@@ -7,8 +7,8 @@ export interface ClientWorkerEnv extends WorkerEnv {
   AUDIT_SERVICE?: ServiceBinding;
   USER_SERVICE?: ServiceBinding;
   USER_SERVICE_INTERNAL_TOKEN?: string;
-  CNPJ_SERVICE?: ServiceBinding;
-  CNPJ_SERVICE_URL?: string;
+  CNPJ_LOOKUP_API_URL?: string;
+  CNPJ_LOOKUP_API_TOKEN?: string;
   REPORTS_INTERNAL_TOKEN?: string;
   REPORTS_GRANT_SECRET?: string;
   SUPABASE_URL?: string;
