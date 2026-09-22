@@ -23,3 +23,37 @@ model Icms {
 
   @@map("fiscal.icms")
 }
+
+model Ncm {
+  id                    String    @id @default(uuid())
+  tax_regime            String
+  ncm_code              String
+  federal_taxation_type String
+  ncm_notes             String?
+  cst_pis_outgoing      String?
+  cst_cofins_outgoing   String?
+  product_group         String?
+  description           String
+  validity_start_date   DateTime
+  information_source    String?
+  reference_legislation String?
+  validity_end_date     DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  organization_id       String
+
+  @@map("fiscal.ncm")
+}
+
+model Ipi {
+  id              String   @id @default(uuid())
+  ncm             String
+  ex              String?
+  description     String?
+  aliquot         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  organization_id String
+
+  @@map("fiscal.ipi")
+}

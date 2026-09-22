@@ -1,6 +1,7 @@
+import { ServiceError } from "@workspace/shared/http";
 import type { FiscalWorkerEnv } from "./env.js";
 
-type AuditParams = {
+export type AuditParams = {
   userId: string;
   organizationId?: string | null;
   permission?: number | null;
@@ -10,10 +11,24 @@ type AuditParams = {
   changes: Record<string, unknown> | string;
 };
 
-type AuditUpdateParams = Omit<AuditParams, "changes"> & {
+export type AuditUpdateParams = Omit<AuditParams, "changes"> & {
   oldData: Record<string, unknown> | null;
   updatedData: Record<string, unknown>;
 };
+
+export type FiscalAudit = {
+  createLog(params: AuditParams): Promise<void>;
+  logUpdateIfChanged(params: AuditUpdateParams): Promise<void>;
+};
+
+const AUDIT_TIMEOUT_MS = 5_000;
+
+/** Binding ausente falha explícito antes de qualquer escrita, em vez de perder a auditoria. */
+export function requireAuditConfigured(env: FiscalWorkerEnv): void {
+  if (!env.AUDIT_SERVICE || !env.AUDIT_SERVICE_TOKEN) {
+    throw new ServiceError(503, "Auditoria externa não configurada.");
+  }
+}
 
 function payload(params: AuditParams): Record<string, unknown> {
   const now = new Date().toISOString();
@@ -35,46 +50,52 @@ function payload(params: AuditParams): Record<string, unknown> {
   };
 }
 
+// ponytail: tentativa única com timeout; o recorder Node faz retry em background.
+// Adicionar fila/waitUntil se a perda de auditoria por falha transitória virar problema.
 async function sendAudit(env: FiscalWorkerEnv, data: Record<string, unknown>): Promise<void> {
-  if (!env.AUDIT_SERVICE) return;
+  const binding = env.AUDIT_SERVICE;
+  const token = env.AUDIT_SERVICE_TOKEN;
+  if (!binding || !token) throw new ServiceError(503, "Auditoria externa não configurada.");
   try {
-    await env.AUDIT_SERVICE.fetch(
+    const response = await binding.fetch(
       new Request("https://audit-service/internal/audit/requests", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-internal-service-token": env.AUDIT_SERVICE_TOKEN,
-        },
+        headers: { "content-type": "application/json", "x-internal-service-token": token },
         body: JSON.stringify(data),
+        signal: AbortSignal.timeout(AUDIT_TIMEOUT_MS),
       }),
     );
-  } catch {
-    // Auditoria segue best-effort, como no adapter Express atual.
+    if (!response.ok) {
+      console.error({
+        event: "fiscal.audit.failed",
+        status: response.status,
+        requestId: data.requestId,
+      });
+    }
+  } catch (error) {
+    // Paridade com o recorder público do Node: a entidade já foi persistida; registra e segue.
+    console.error({
+      event: "fiscal.audit.failed",
+      requestId: data.requestId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
-export function createFiscalAudit(env: FiscalWorkerEnv) {
+export function createFiscalAudit(env: FiscalWorkerEnv): FiscalAudit {
   return {
-    createLog: async (params: AuditParams) => sendAudit(env, payload(params)),
-    logUpdateIfChanged: async (params: AuditUpdateParams) => {
+    createLog: async (params) => sendAudit(env, payload(params)),
+    logUpdateIfChanged: async (params) => {
       const changes: Record<string, { from: unknown; to: unknown }> = {};
-      for (const key of Object.keys(params.updatedData)) {
-        const from = params.oldData?.[key];
-        const to = params.updatedData[key];
-        if (from !== to) changes[key] = { from, to };
+      if (params.oldData) {
+        for (const key of Object.keys(params.updatedData)) {
+          const from = params.oldData[key];
+          const to = params.updatedData[key];
+          if (from !== to) changes[key] = { from, to };
+        }
       }
-      await sendAudit(
-        env,
-        payload({
-          userId: params.userId,
-          organizationId: params.organizationId,
-          permission: params.permission,
-          action: params.action,
-          referring: params.referring,
-          referringId: params.referringId,
-          changes,
-        }),
-      );
+      const { oldData: _old, updatedData: _updated, ...rest } = params;
+      await sendAudit(env, payload({ ...rest, changes }));
     },
   };
 }

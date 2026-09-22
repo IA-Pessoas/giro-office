@@ -122,6 +122,7 @@ describe("fiscal Worker", () => {
       success: false,
       error: "ICMS não encontrado.",
       code: "NOT_FOUND",
+      requestId: missing.headers.get("x-request-id"),
     });
   });
 
