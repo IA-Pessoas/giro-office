@@ -36,22 +36,35 @@ function payload(params: UserAuditParams): Record<string, unknown> {
 
 export function createUserAudit(env: UserWorkerEnv): UserAuditRecorder {
   return async (params) => {
-    if (!env.AUDIT_SERVICE) return;
+    if (!env.AUDIT_SERVICE) {
+      console.warn("[user-service] AUDIT_SERVICE binding ausente; auditoria não foi enviada.");
+      return;
+    }
+    if (!env.AUDIT_SERVICE_TOKEN) {
+      console.warn("[user-service] AUDIT_SERVICE_TOKEN ausente; auditoria não foi enviada.");
+      return;
+    }
     try {
-      await env.AUDIT_SERVICE.fetch(
+      const response = await env.AUDIT_SERVICE.fetch(
         new Request("https://audit-service/internal/audit/requests", {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            ...(env.AUDIT_SERVICE_TOKEN
-              ? { "x-internal-service-token": env.AUDIT_SERVICE_TOKEN }
-              : {}),
+            "x-internal-service-token": env.AUDIT_SERVICE_TOKEN,
           },
           body: JSON.stringify(payload(params)),
         }),
       );
-    } catch {
-      // Auditoria permanece best-effort, como no serviço Node legado.
+      if (!response.ok) {
+        console.warn(
+          `[user-service] AUDIT_SERVICE respondeu ${response.status}; auditoria best-effort falhou.`,
+        );
+      }
+    } catch (error) {
+      console.warn(
+        "[user-service] falha ao comunicar com AUDIT_SERVICE; auditoria best-effort falhou.",
+        error,
+      );
     }
   };
 }

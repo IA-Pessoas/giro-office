@@ -624,6 +624,36 @@ describe("user Worker", () => {
     expect(response.status).toBe(200);
   });
 
+  it("rehashes bcrypt legado depois de um login válido sem invalidar sessões existentes", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({
+      ...user(),
+      password: "$2a$08$I6U8jb5KFT/FiqzpOrDcc.ofpgiWNATR.eS0WEruVrmYuyF.UwhUu",
+      organization: { id: ORGANIZATION_ID, status: "active" },
+      department: {
+        organization_id: ORGANIZATION_ID,
+        organization: { id: ORGANIZATION_ID, status: "active" },
+      },
+    });
+    const hashPassword = vi.fn(async () => "rehash-argon2id");
+    const app = createUserWorkerApp({ env: env(), prisma: db, hashPassword } as never);
+
+    const response = await app.request("https://user.test/user/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ login: "usuario@example.com", password: "secret" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(hashPassword).toHaveBeenCalledWith("secret");
+    expect(db.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: USER_ID }),
+        data: { password: "rehash-argon2id" },
+      }),
+    );
+  });
+
   it("hashes password mutations instead of returning 501", async () => {
     const db = prisma();
     const hashPassword = vi.fn(async () => "new-argon2id-hash");
@@ -642,8 +672,69 @@ describe("user Worker", () => {
     expect(response.status).toBe(200);
     expect(hashPassword).toHaveBeenCalledWith("new-secret");
     expect(db.user.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ password: "new-argon2id-hash" }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          password: "new-argon2id-hash",
+          session_version: { increment: 1 },
+        }),
+      }),
     );
+  });
+
+  it("normaliza permissões e invalida a sessão ao fazer downgrade de type", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({
+      ...user(),
+      type: "admin",
+      first_owner_flag: false,
+      permission: 2,
+    });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request(`https://user.test/user/${USER_ID}`, {
+      method: "PUT",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ type: "user", expected_version: 1 }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(db.permission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { user_id: USER_ID, organization_id: ORGANIZATION_ID },
+        data: expect.objectContaining({ rh: 1, ti: 1 }),
+      }),
+    );
+    expect(db.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          permission: 1,
+          session_version: { increment: 1 },
+        }),
+      }),
+    );
+  });
+
+  it("rejeita downgrade ou remoção do último owner ativo", async () => {
+    const db = prisma();
+    db.user.count.mockResolvedValue(1);
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    const response = await app.request(`https://user.test/user/${USER_ID}`, {
+      method: "PUT",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ type: "admin", expected_version: 1 }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(db.user.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          type: "owner",
+          status: "active",
+        }),
+      }),
+    );
+    expect(db.user.updateMany).not.toHaveBeenCalled();
   });
 
   it("does not create an organization session for a suspended organization", async () => {
@@ -814,24 +905,38 @@ describe("user Worker", () => {
     expect(response.status).toBe(401);
   });
 
-  it("reads a public user photo through the worker", async () => {
+  it("reads a private user photo through a signed URL", async () => {
     const db = prisma();
-    db.user.findFirst.mockResolvedValue({ ...user(), photo_url: "https://cdn.example/avatar.png" });
-    const app = createUserWorkerApp({ env: env(), prisma: db });
+    db.user.findFirst.mockResolvedValue({ ...user(), photo_url: `${USER_ID}/photo.png` });
+    const storage = {
+      getBucket: vi.fn(async () => ({ public: false })),
+      upload: vi.fn(async () => {}),
+      download: vi.fn(async () => new Response(null)),
+      remove: vi.fn(async () => {}),
+      createSignedUrl: vi.fn(async () => "https://storage.example/object/sign/Fotos/photo?token=1"),
+    };
+    const app = createUserWorkerApp({ env: env(), prisma: db, storage } as never);
 
     const response = await app.request(`https://user.test/user/${USER_ID}/photo`, {
       headers: forwardedHeaders(),
     });
 
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toEqual({ url: "https://cdn.example/avatar.png" });
+    expect((await response.json()).data).toEqual({
+      url: "https://storage.example/object/sign/Fotos/photo?token=1",
+    });
+    expect(storage.getBucket).toHaveBeenCalledWith("Fotos");
+    expect(storage.createSignedUrl).toHaveBeenCalledWith("Fotos", `${USER_ID}/photo.png`, 3600);
   });
 
   it("uploads and removes a user photo with the Fotos storage contract", async () => {
     const db = prisma();
     const storage = {
+      getBucket: vi.fn(async () => ({ public: false })),
       upload: vi.fn(async () => {}),
+      download: vi.fn(async () => new Response(null)),
       remove: vi.fn(async () => {}),
+      createSignedUrl: vi.fn(async () => "https://storage.example/object/sign/Fotos/photo?token=1"),
     };
     const app = createUserWorkerApp({
       env: { ...env(), SUPABASE_URL: "https://storage.example" },
@@ -860,10 +965,11 @@ describe("user Worker", () => {
     expect(db.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          photo_url: `https://storage.example/storage/v1/object/public/Fotos/${USER_ID}/photo.png`,
+          photo_url: `${USER_ID}/photo.png`,
         }),
       }),
     );
+    expect((await uploaded.json()).data.photo_url).not.toContain("/public/");
 
     const removed = await app.request(`https://user.test/user/${USER_ID}/photo`, {
       method: "DELETE",
@@ -872,6 +978,34 @@ describe("user Worker", () => {
 
     expect(removed.status).toBe(200);
     expect(storage.remove).toHaveBeenCalledWith("Fotos", USER_ID);
+  });
+
+  it("falha de forma explícita quando Fotos não é privado", async () => {
+    const db = prisma();
+    const storage = {
+      getBucket: vi.fn(async () => ({ public: true })),
+      upload: vi.fn(async () => {}),
+      download: vi.fn(async () => new Response(null)),
+      remove: vi.fn(async () => {}),
+      createSignedUrl: vi.fn(async () => "https://storage.example/public/Fotos/photo.png"),
+    };
+    const app = createUserWorkerApp({ env: env(), prisma: db, storage } as never);
+    const form = new FormData();
+    form.set(
+      "file",
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "avatar.png", {
+        type: "image/png",
+      }),
+    );
+
+    const response = await app.request(`https://user.test/user/${USER_ID}/photo`, {
+      method: "POST",
+      headers: forwardedHeaders(),
+      body: form,
+    });
+
+    expect(response.status).toBe(503);
+    expect(storage.upload).not.toHaveBeenCalled();
   });
 
   it("rejects forwarded platform identity without a database-bound session", async () => {

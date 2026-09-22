@@ -1,4 +1,6 @@
 {
+  // BLOCKED: declare HYPERDRIVE only after an authorized production ID is provisioned.
+  // The Worker rejects database traffic without this binding; no URL fallback is used.
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
   "name": "giro-user-service",
   "main": "src/index.ts",

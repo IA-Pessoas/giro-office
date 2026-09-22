@@ -61,6 +61,7 @@ import { PrismaClient } from "./generated/prisma/client.js";
 import {
   hashPassword as defaultHashPassword,
   verifyPassword as defaultVerifyPassword,
+  isLegacyBcryptHash,
 } from "./passwordHash.js";
 import type { Row, UserPrismaClient } from "./types.js";
 
@@ -96,6 +97,9 @@ async function withDb<T>(
   callback: (db: UserPrismaClient) => Promise<T>,
 ): Promise<T> {
   if (options.prisma) return callback(options.prisma);
+  if (!envOf(c, options).HYPERDRIVE) {
+    throw new ServiceError(503, "Hyperdrive não configurado para o runtime Worker.");
+  }
   return withWorkerPrisma(
     envOf(c, options),
     PrismaClient as unknown as new (options: {
@@ -304,13 +308,75 @@ function userPhotoStorage(
   });
 }
 
-function publicPhotoUrl(env: UserWorkerEnv, objectPath: string): string {
-  if (!env.SUPABASE_URL) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
-  const path = objectPath
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-  return `${env.SUPABASE_URL.replace(/\/+$/u, "")}/storage/v1/object/public/${USER_PHOTO_BUCKET}/${path}`;
+const SIGNED_PHOTO_URL_TTL_SECONDS = 3600;
+const DEFAULT_NON_OWNER_PERMISSION = 1;
+const OWNER_GLOBAL_PERMISSION = 2;
+const MAX_MODULE_PERMISSION = 3;
+
+const EMPTY_MODULES = Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, 0])) as Record<
+  string,
+  number
+>;
+
+const MAX_MODULES = Object.fromEntries(
+  ACTIVE_MODULE_KEYS.map((key) => [key, MAX_MODULE_PERMISSION]),
+) as Record<string, number>;
+
+function normalizePermissionForType(type: unknown, permission: number): number {
+  if (type === "owner") return OWNER_GLOBAL_PERMISSION;
+  if (type === "admin" && permission >= OWNER_GLOBAL_PERMISSION) {
+    return DEFAULT_NON_OWNER_PERMISSION;
+  }
+  return permission;
+}
+
+function withDefaultSelfServiceModules(
+  modules: Record<string, number>,
+  permission: number,
+): Record<string, number> {
+  if (permission < DEFAULT_NON_OWNER_PERMISSION) return modules;
+  return {
+    ...modules,
+    rh: Math.max(Number(modules.rh ?? 0), DEFAULT_NON_OWNER_PERMISSION),
+    ti: Math.max(Number(modules.ti ?? 0), DEFAULT_NON_OWNER_PERMISSION),
+  };
+}
+
+function photoObjectPath(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const publicMarker = `/storage/v1/object/public/${USER_PHOTO_BUCKET}/`;
+  const markerIndex = trimmed.indexOf(publicMarker);
+  if (markerIndex >= 0) {
+    return trimmed
+      .slice(markerIndex + publicMarker.length)
+      .split("/")
+      .map((segment) => {
+        try {
+          return decodeURIComponent(segment);
+        } catch {
+          return segment;
+        }
+      })
+      .join("/");
+  }
+
+  if (/^https?:\/\//iu.test(trimmed)) return null;
+  return trimmed.replace(/^\/+|\.+$/gu, "") || null;
+}
+
+async function requirePrivatePhotoBucket(storage: SupabaseStorageClient): Promise<void> {
+  const bucket = await storage.getBucket(USER_PHOTO_BUCKET);
+  if (bucket.public) {
+    throw new ServiceError(503, "O bucket Fotos deve ser privado para servir URLs assinadas.");
+  }
+}
+
+async function signedPhotoUrl(storage: SupabaseStorageClient, objectPath: string): Promise<string> {
+  await requirePrivatePhotoBucket(storage);
+  return storage.createSignedUrl(USER_PHOTO_BUCKET, objectPath, SIGNED_PHOTO_URL_TTL_SECONDS);
 }
 
 async function parseUserPhoto(c: {
@@ -539,11 +605,25 @@ async function updateOrganizationUser(
   for (const field of USER_MUTABLE_FIELDS) {
     if (input[field] !== undefined) data[field] = input[field];
   }
+  const requestedType = input.type !== undefined ? input.type : existing.type;
+  if (input.permission !== undefined) {
+    data.permission = normalizePermissionForType(requestedType, Number(input.permission));
+  }
   if (input.type !== undefined && input.type !== null) {
-    if (input.permission !== undefined) data.permission = input.permission;
-    else if (input.type === "owner") data.permission = 2;
+    if (input.permission === undefined && input.type === "owner") data.permission = 2;
+    else if (
+      input.permission === undefined &&
+      (input.type === "admin" || input.type === "user") &&
+      Number(existing.permission ?? 0) >= OWNER_GLOBAL_PERMISSION
+    ) {
+      data.permission = DEFAULT_NON_OWNER_PERMISSION;
+    }
+    if (input.type !== "owner" && existing.first_owner_flag === true) {
+      data.first_owner_flag = false;
+    }
   }
   const modules = input.modules as Record<string, number> | undefined;
+  let modulesToApply: Record<string, number> | null = null;
   const modulePatch = modules
     ? Object.fromEntries(
         ACTIVE_MODULE_KEYS.filter((key) => modules[key] !== undefined).map((key) => [
@@ -552,19 +632,77 @@ async function updateOrganizationUser(
         ]),
       )
     : undefined;
+  if (input.type === "owner" && (input.type === "owner" || input.first_owner_flag === true)) {
+    modulesToApply = MAX_MODULES;
+  } else if (modulePatch) {
+    modulesToApply = modulePatch;
+  }
+  if (input.type === "user" && input.modules === undefined) {
+    modulesToApply = EMPTY_MODULES;
+  }
+  if (
+    input.permission !== undefined &&
+    Number(input.permission) <= DEFAULT_NON_OWNER_PERMISSION &&
+    requestedType !== "admin" &&
+    input.modules === undefined
+  ) {
+    modulesToApply = EMPTY_MODULES;
+  }
+  if (
+    input.type === "admin" &&
+    (input.type !== undefined ||
+      input.permission !== undefined ||
+      input.department_id !== undefined)
+  ) {
+    const department = await requireDepartmentInOrganization(
+      db,
+      String(input.department_id ?? existing.department_id),
+      organizationId,
+    );
+    const module = departmentModule(department.name);
+    if (module) modulesToApply = { ...(modulesToApply ?? {}), [module]: MAX_MODULE_PERMISSION };
+  }
   if (input.password !== undefined) {
     data.password = await hashPassword(String(input.password));
   }
 
   const run = async (transaction: UserPrismaClient): Promise<Row> => {
-    if (modulePatch && Object.keys(modulePatch).length > 0) {
+    const currentType = existing.type;
+    const removesActiveOwner =
+      currentType === "owner" &&
+      existing.status === "active" &&
+      ((input.type !== undefined && input.type !== "owner") || input.status === "inactive");
+    if (removesActiveOwner) {
+      const activeOwners = await transaction.user.count({
+        where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
+      });
+      if (activeOwners <= 1) {
+        throw new ServiceError(
+          409,
+          "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+        );
+      }
+    }
+
+    const effectivePermission =
+      typeof data.permission === "number"
+        ? data.permission
+        : normalizePermissionForType(
+            String(input.type ?? existing.type),
+            Number(existing.permission ?? 0),
+          );
+    if (modulesToApply && effectivePermission >= DEFAULT_NON_OWNER_PERMISSION) {
+      modulesToApply = withDefaultSelfServiceModules(modulesToApply, effectivePermission);
+    }
+    if (modulesToApply && Object.keys(modulesToApply).length > 0) {
       const permissionUpdate = await transaction.permission.updateMany({
         where: { user_id: userId, organization_id: organizationId },
-        data: modulePatch,
+        data: modulesToApply,
       });
       if (permissionUpdate.count !== 1) throw new ServiceError(404, "Permissão não encontrada.");
     }
     const sessionInvalidation =
+      input.password !== undefined ||
       input.status === "inactive" ||
       input.permission !== undefined ||
       input.type !== undefined ||
@@ -594,7 +732,7 @@ async function updateOrganizationUser(
     );
   };
 
-  return db.$transaction ? db.$transaction(run) : run(db);
+  return db.$transaction ? db.$transaction(run, { isolationLevel: "Serializable" }) : run(db);
 }
 
 async function deactivateOrganizationUser(
@@ -771,6 +909,13 @@ async function createOrganizationSession(
   const organizationId = user ? activeOrganizationId(user) : undefined;
   if (!user || !valid || user.status !== "active" || !organizationId) {
     throw new ServiceError(401, "Login ou senha inválidos.");
+  }
+  if (isLegacyBcryptHash(String(user.password ?? "")) && db.user.updateMany) {
+    const rehashedPassword = await (options.hashPassword ?? defaultHashPassword)(input.password);
+    await db.user.updateMany({
+      where: { ...organizationUserWhere(String(user.id), organizationId), password: user.password },
+      data: { password: rehashedPassword },
+    });
   }
   const permission = await db.permission.findFirst({
     where: { user_id: user.id, organization_id: organizationId },
@@ -1240,11 +1385,13 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         where: organizationUserWhere(id, auth.organizationId),
         select: { photo_url: true },
       });
-      const photoUrl = typeof row?.photo_url === "string" ? row.photo_url.trim() : "";
-      if (!photoUrl || !/^https?:\/\//iu.test(photoUrl)) {
+      const objectPath = photoObjectPath(row?.photo_url);
+      if (!objectPath || !objectPath.startsWith(`${id}/`) || objectPath.includes("..")) {
         throw new ServiceError(404, "Foto nao encontrada.");
       }
-      return c.json(createSuccessResponse({ url: photoUrl }));
+      const storage = userPhotoStorage(envOf(c, options), options);
+      if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
+      return c.json(createSuccessResponse({ url: await signedPhotoUrl(storage, objectPath) }));
     }),
   );
 
@@ -1257,12 +1404,13 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const storage = userPhotoStorage(envOf(c, options), options);
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
       const objectPath = `${id}/photo.${extension}`;
+      await requirePrivatePhotoBucket(storage);
       await storage.upload(USER_PHOTO_BUCKET, objectPath, file, {
         contentType: file.type,
         upsert: true,
       });
       const user = await updateOrganizationUser(db, id, auth.organizationId, {
-        photo_url: publicPhotoUrl(envOf(c, options), objectPath),
+        photo_url: objectPath,
       });
       await options.audit?.({
         actorUserId: auth.userId,
@@ -1270,9 +1418,14 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         action: "UPDATE_PHOTO",
         referring: "user",
         referringId: id,
-        changes: { photo_url: user.photo_url },
+        changes: { photo_url: objectPath },
       });
-      return c.json(createSuccessResponse(user));
+      return c.json(
+        createSuccessResponse({
+          ...user,
+          photo_url: await signedPhotoUrl(storage, objectPath),
+        }),
+      );
     }),
   );
 
@@ -1283,6 +1436,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { id } = parse(userIdParamsSchema, c.req.param());
       const storage = userPhotoStorage(envOf(c, options), options);
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
+      await requirePrivatePhotoBucket(storage);
       await storage.remove(USER_PHOTO_BUCKET, id);
       const user = await updateOrganizationUser(db, id, auth.organizationId, { photo_url: null });
       await options.audit?.({
