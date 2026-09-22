@@ -320,3 +320,38 @@ describe("gateway Worker: rotas de contabil, fiscal, triagem e parcelamento", ()
     });
   });
 });
+
+describe("gateway Worker: task-service", () => {
+  it.each([
+    ["GET", "/task/list"],
+    ["POST", "/task"],
+    ["POST", "/task/t-1/attachments"],
+    ["GET", "/task/project-plan"],
+  ] as const)("%s %s vai para TASK_SERVICE com a identidade e a permissão global", async (method, path) => {
+    const task = upstream("TASK_SERVICE");
+    const { app } = setup({ TASK_SERVICE: task });
+    const response = await app.request(
+      `https://gateway.test${path}?q=1`,
+      await bearer(member({ integracao: 2 }), { method }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(task.fetch).toHaveBeenCalledTimes(1);
+    const request = task.fetch.mock.calls[0]?.[0] as Request;
+    expect(new URL(request.url).pathname).toBe(path);
+    expect(new URL(request.url).search).toBe("?q=1");
+    expect(request.headers.get(INTERNAL_SERVICE_TOKEN_HEADER)).toBe(TOKEN);
+    expect(request.headers.get(FORWARDED_AUTH_USER_ID_HEADER)).toBe("user-1");
+    expect(request.headers.get(FORWARDED_AUTH_ORGANIZATION_ID_HEADER)).toBe("org-1");
+    // Sem permissionModule no Node: a permissão global segue.
+    expect(request.headers.get(FORWARDED_AUTH_PERMISSION_HEADER)).toBe("3");
+  });
+
+  it("não confunde prefixo: /tasks não vai ao task-service", async () => {
+    const task = upstream("TASK_SERVICE");
+    const { app } = setup({ TASK_SERVICE: task });
+    const response = await app.request("https://gateway.test/tasks", await bearer(owner()));
+    expect(response.status).toBe(404);
+    expect(task.fetch).not.toHaveBeenCalled();
+  });
+});

@@ -67,6 +67,7 @@ const routes: Route[] = [
   { prefix: "/parcelamento", binding: "PARCELAMENTO_SERVICE", module: "parcelamento" },
   { prefix: "/contabil", binding: "CONTABIL_SERVICE", module: "contabil" },
   { prefix: "/project", binding: "PROJECT_SERVICE" },
+  { prefix: "/task", binding: "TASK_SERVICE" },
   { prefix: "/ti", binding: "TI_SERVICE", module: "ti" },
   { prefix: "/rh", binding: "RH_SERVICE", module: "rh" },
   { prefix: "/commercial", binding: "COMMERCIAL_SERVICE", module: "comercial" },

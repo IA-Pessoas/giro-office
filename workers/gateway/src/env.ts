@@ -15,6 +15,7 @@ export interface GatewayWorkerEnv extends WorkerEnv {
   PARCELAMENTO_SERVICE?: ServiceBinding;
   CONTABIL_SERVICE?: ServiceBinding;
   PROJECT_SERVICE?: ServiceBinding;
+  TASK_SERVICE?: ServiceBinding;
   TI_SERVICE?: ServiceBinding;
   RH_SERVICE?: ServiceBinding;
   COMMERCIAL_SERVICE?: ServiceBinding;
