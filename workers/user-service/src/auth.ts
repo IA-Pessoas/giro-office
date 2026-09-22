@@ -155,6 +155,7 @@ export async function authenticateUserRequest(
     };
   } catch (error) {
     if (error instanceof WorkerAuthenticationError) {
+      console.warn("Token recusado", { event: "auth.token.rejected", message: error.message });
       throw new ServiceError(401, "Não autenticado.");
     }
     throw error;
@@ -255,13 +256,24 @@ export async function validateUserSession(
     },
   });
   const user = (session?.user ?? null) as Row | null;
-  if (
-    !session ||
-    session.csrf_hash !== csrfHash ||
-    user?.status !== "active" ||
-    !hasActiveOrganization(user, auth.organizationId) ||
-    user.session_version !== sessionVersion
-  ) {
+  const reason = !session
+    ? "session_not_found"
+    : session.csrf_hash !== csrfHash
+      ? "csrf_mismatch"
+      : user?.status !== "active"
+        ? "inactive_user"
+        : !hasActiveOrganization(user, auth.organizationId)
+          ? "inactive_organization"
+          : user.session_version !== sessionVersion
+            ? "session_version_mismatch"
+            : undefined;
+  if (reason) {
+    // Paridade com o auth.session.rejected do Node: o motivo fica no log, a resposta segue generica.
+    console.warn("Sessao recusada", {
+      event: "auth.session.rejected",
+      reason,
+      transport: auth.transport,
+    });
     throw new ServiceError(401, "Sessão inválida.");
   }
 }
