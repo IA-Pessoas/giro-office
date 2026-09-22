@@ -61,7 +61,10 @@ function forwardedAuth(request: Request, env: CommercialWorkerEnv): WorkerAuthCo
   const csrfHash = header(request, FORWARDED_AUTH_CSRF_HASH_HEADER);
 
   return {
-    token: "forwarded-by-gateway",
+    // O JWT do cookie vai junto para a revalidacao no user-service; o placeholder nao e verificavel.
+    token:
+      readCookie(request.headers.get("cookie") ?? undefined, AUTH_SESSION_COOKIE_NAME) ??
+      "forwarded-by-gateway",
     userId,
     organizationId,
     actorKind,
