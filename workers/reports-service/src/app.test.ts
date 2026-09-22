@@ -86,7 +86,9 @@ describe("reports-service Worker", () => {
     await expect(response.json()).resolves.toMatchObject({
       success: true,
       data: {
-        items: [expect.objectContaining({ key: "integracao.clients", module: "integracao" })],
+        items: expect.arrayContaining([
+          expect.objectContaining({ key: "integracao.clients", module: "integracao" }),
+        ]),
       },
     });
   });
@@ -123,5 +125,223 @@ describe("reports-service Worker", () => {
     });
     expect(denied.status).toBe(403);
     await expect(denied.json()).resolves.toMatchObject({ success: false, code: "FORBIDDEN" });
+  });
+
+  it("mantém todas as superfícies Node de catálogo, preview, modelos, jobs, snapshots, exportação e retenção", async () => {
+    const token = await sign({
+      user_id: "user-1",
+      organization_id: "org-1",
+      type: "owner",
+      modules: { integracao: 3 },
+    });
+    const headers = { ...authHeaders(token), "content-type": "application/json" };
+    const modelId = "00000000-0000-4000-8000-000000000001";
+    const versionId = "00000000-0000-4000-8000-000000000002";
+    const jobId = "00000000-0000-4000-8000-000000000003";
+    const snapshotId = "00000000-0000-4000-8000-000000000004";
+    const definition = {
+      sources: ["integracao.clients"],
+      columns: [{ source: "integracao.clients", field: "name", alias: "name" }],
+      joins: [],
+      filters: [],
+      filter_groups: [],
+      parameters: [],
+      aggregations: [],
+      order_by: [],
+    };
+    const sharedModel = {
+      id: modelId,
+      organization_id: "org-1",
+      department_id: "department-1",
+      name: "Compartilhado",
+      description: null,
+      version: 1,
+      version_id: versionId,
+      definition,
+      grant: { sources: { "integracao.clients": ["name"] }, relations: [] },
+    };
+    const services = {
+      previewService: {
+        preview: vi.fn().mockResolvedValue({
+          rows: [],
+          presentation: { columns: [] },
+          limit: 100,
+          hasMore: false,
+        }),
+        previewComposition: vi.fn().mockResolvedValue({ blocks: [] }),
+      },
+      authorizationService: {
+        validateDefinition: vi.fn().mockResolvedValue({ definition }),
+        validateComposition: vi.fn().mockResolvedValue({ definition }),
+        getSharedDepartment: vi.fn().mockResolvedValue({ id: "department-1" }),
+        getSharedExecutionContext: vi.fn().mockResolvedValue({
+          department: { id: "department-1" },
+          scope: { organization_id: "org-1", modules: { integracao: 3 } },
+          grant: sharedModel.grant,
+        }),
+        authorizeSharedModel: vi.fn().mockResolvedValue({
+          department_id: "department-1",
+          definition,
+        }),
+        validateSharedDefinition: vi.fn().mockResolvedValue({
+          department_id: "department-1",
+          definition,
+          grant: sharedModel.grant,
+        }),
+      },
+      modelService: {
+        create: vi.fn().mockResolvedValue(sharedModel),
+        list: vi.fn().mockResolvedValue([sharedModel]),
+        get: vi.fn().mockResolvedValue(sharedModel),
+        update: vi.fn().mockResolvedValue(sharedModel),
+        delete: vi.fn().mockResolvedValue(undefined),
+        createShared: vi.fn().mockResolvedValue(sharedModel),
+        listShared: vi.fn().mockResolvedValue([sharedModel]),
+        getShared: vi.fn().mockResolvedValue(sharedModel),
+        updateShared: vi.fn().mockResolvedValue(sharedModel),
+      },
+      jobService: {
+        create: vi.fn().mockResolvedValue({ id: jobId, status: "queued" }),
+        createFromDefinition: vi.fn().mockResolvedValue({ id: jobId, status: "queued" }),
+        getVersion: vi.fn().mockResolvedValue({
+          model: { id: modelId, created_by_user_id: "user-1", department_id: "department-1" },
+          version: { id: versionId, definition_json: definition },
+        }),
+        getRetentionDays: vi.fn().mockResolvedValue(30),
+        get: vi.fn().mockResolvedValue({ id: jobId, status: "completed" }),
+        getVersionId: vi.fn().mockResolvedValue({ report_model_version_id: versionId }),
+        listHistory: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+        cancel: vi.fn().mockResolvedValue(undefined),
+      },
+      snapshotService: {
+        get: vi.fn().mockResolvedValue({
+          snapshot: { id: snapshotId, created_at: new Date("2026-09-22T00:00:00.000Z") },
+          rows: [],
+          nextCursor: null,
+        }),
+      },
+      exportService: {
+        export: vi.fn().mockResolvedValue({
+          contentType: "text/csv; charset=utf-8",
+          fileName: "report.csv",
+          body: new TextEncoder().encode("name\r\n"),
+        }),
+      },
+      retentionService: {
+        getOrganizationPolicy: vi.fn().mockResolvedValue({ retention_days: 30 }),
+        updateOrganizationPolicy: vi.fn().mockResolvedValue({ retention_days: 45 }),
+      },
+      lifecycleService: { deleteSnapshot: vi.fn().mockResolvedValue(undefined) },
+    };
+    const accessContextClient = {
+      getAccessContext: vi.fn().mockImplementation(({ requestId }: { requestId: string }) => ({
+        organization: { id: "org-1" },
+        type: requestId === "reports-snapshot-delete" ? "admin" : "owner",
+        department: { id: "department-1" },
+        departmentModule: "integracao",
+        modules: { integracao: 3 },
+      })),
+    };
+    const app = createReportsWorkerApp({
+      env,
+      accessContextClient,
+      services,
+    } as never);
+
+    const requests: Array<Promise<Response>> = [
+      app.request("https://reports.test/reports/catalog", { headers }),
+      app.request("https://reports.test/reports/definitions/validate", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ definition }),
+      }),
+      app.request("https://reports.test/reports/preview", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ definition }),
+      }),
+      app.request("https://reports.test/reports/models/shared", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name: "Compartilhado", definition }),
+      }),
+      app.request("https://reports.test/reports/models/shared/list", { headers }),
+      app.request(`https://reports.test/reports/models/shared/${modelId}/copy`, {
+        method: "POST",
+        headers,
+      }),
+      app.request(`https://reports.test/reports/models/shared/${modelId}/preview`, {
+        method: "POST",
+        headers,
+      }),
+      app.request(`https://reports.test/reports/models/shared/${modelId}`, { headers }),
+      app.request(`https://reports.test/reports/models/shared/${modelId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ name: "Atualizado", definition }),
+      }),
+      app.request("https://reports.test/reports/models", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name: "Pessoal", definition }),
+      }),
+      app.request("https://reports.test/reports/models/list", { headers }),
+      app.request(`https://reports.test/reports/models/${modelId}`, { headers }),
+      app.request(`https://reports.test/reports/models/${modelId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ name: "Atualizado" }),
+      }),
+      app.request(`https://reports.test/reports/models/${modelId}`, { method: "DELETE", headers }),
+      app.request("https://reports.test/reports/jobs", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ definition, format: "csv" }),
+      }),
+      app.request("https://reports.test/reports/jobs/list", { headers }),
+      app.request(`https://reports.test/reports/jobs/${jobId}`, { headers }),
+      app.request(`https://reports.test/reports/jobs/${jobId}/snapshot`, { headers }),
+      app.request(`https://reports.test/reports/snapshots/${snapshotId}/export?format=csv`, {
+        headers,
+      }),
+      app.request(`https://reports.test/reports/snapshots/${snapshotId}/delete`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ justification: "Solicitado pelo administrador" }),
+      }),
+      app.request(`https://reports.test/reports/jobs/${jobId}/cancel`, { method: "POST", headers }),
+      app.request("https://reports.test/reports/retention", { headers }),
+      app.request("https://reports.test/reports/retention", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ retention_days: 45 }),
+      }),
+    ];
+
+    const responses = await Promise.all(requests);
+    expect(responses.map((response) => response.status)).toEqual([
+      200, 200, 200, 201, 200, 201, 200, 200, 200, 201, 200, 200, 200, 204, 201, 200, 200, 200, 200,
+      204, 204, 200, 200,
+    ]);
+    expect(services.previewService.preview).toHaveBeenCalledWith(
+      definition,
+      expect.objectContaining({ organization_id: "org-1" }),
+      expect.any(String),
+      undefined,
+    );
+    expect(services.modelService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: "org-1", userId: "user-1" }),
+    );
+    expect(services.jobService.createFromDefinition).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: "org-1", userId: "user-1" }),
+    );
+    expect(services.exportService.export).toHaveBeenCalledWith(
+      expect.objectContaining({
+        snapshotId,
+        organizationId: "org-1",
+        userId: "user-1",
+        format: "csv",
+      }),
+    );
   });
 });

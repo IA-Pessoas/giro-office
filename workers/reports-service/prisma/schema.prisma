@@ -12,3 +12,117 @@ model Organization {
 
   @@map("organizations")
 }
+
+model ReportModel {
+  id                 String   @id @default(uuid())
+  organization_id    String
+  created_by_user_id String?
+  department_id      String?
+  name               String
+  description        String?
+  active             Boolean  @default(true)
+  is_ephemeral       Boolean  @default(false)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@map("reports.models")
+}
+
+model ReportModelVersion {
+  id              String   @id @default(uuid())
+  organization_id String
+  report_model_id String
+  version         Int
+  definition_json Json
+  created_at      DateTime @default(now())
+
+  @@unique([report_model_id, version])
+  @@map("reports.model_versions")
+}
+
+model ReportJob {
+  id                      String   @id @default(uuid())
+  organization_id         String
+  requester_id            String
+  report_model_version_id String
+  status                  String   @default("queued")
+  payload_json            Json?
+  requested_at            DateTime @default(now())
+  started_at              DateTime?
+  finished_at             DateTime?
+  lease_token             String?
+  lease_expires_at        DateTime?
+  cancel_requested_at     DateTime?
+  materialization_token   String?
+  error_message           String?
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  @@index([organization_id, requester_id, requested_at])
+  @@map("reports.jobs")
+}
+
+model ReportSnapshot {
+  id                      String    @id @default(uuid())
+  organization_id         String
+  report_model_version_id String
+  report_job_id           String
+  created_at              DateTime  @default(now())
+  expires_at              DateTime?
+
+  @@unique([report_job_id])
+  @@map("reports.snapshots")
+}
+
+model ReportSnapshotBlock {
+  id              String   @id @default(uuid())
+  organization_id String
+  snapshot_id     String
+  position        Int
+  source          String
+  label           String
+  columns_json    Json
+  row_count       Int      @default(0)
+  created_at      DateTime @default(now())
+
+  @@unique([snapshot_id, position])
+  @@index([snapshot_id, position])
+  @@map("reports.snapshot_blocks")
+}
+
+model ReportSnapshotRow {
+  id              String   @id @default(uuid())
+  organization_id String
+  snapshot_id     String
+  block_id        String?
+  row_number      Int
+  data_json       Json
+  created_at      DateTime @default(now())
+
+  @@index([snapshot_id, row_number])
+  @@index([snapshot_id, block_id, row_number])
+  @@map("reports.snapshot_rows")
+}
+
+model ReportRetentionPolicy {
+  id              String   @id @default(uuid())
+  organization_id String
+  report_model_id String?
+  retention_days  Int
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("reports.retention_policies")
+}
+
+model ReportAuditEvent {
+  id              String   @id @default(uuid())
+  organization_id String
+  report_job_id   String?
+  actor_id        String?
+  event_type      String
+  payload_json    Json?
+  created_at      DateTime @default(now())
+
+  @@map("reports.audit_events")
+}
