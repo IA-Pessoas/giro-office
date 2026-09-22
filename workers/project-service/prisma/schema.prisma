@@ -18,6 +18,32 @@ model Project {
   sponsor_id      String?
   porcentage      Float
   organization_id String
+  client          Client   @relation(fields: [client_id], references: [id])
+  tasks           Task[]
 
   @@map("integracao.projects")
+}
+
+model Client {
+  id              String    @id @default(uuid())
+  organization_id String
+  status          String
+  service_unique  Boolean?
+  deletion_date   DateTime?
+  projects        Project[]
+  tasks           Task[]
+
+  @@map("clients")
+}
+
+model Task {
+  id              String  @id @default(uuid())
+  project_id      String
+  client_id       String
+  status          String
+  organization_id String
+  project         Project @relation(fields: [project_id], references: [id])
+  client          Client  @relation(fields: [client_id], references: [id])
+
+  @@map("integracao.tasks")
 }
