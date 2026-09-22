@@ -11,11 +11,12 @@ const payload = {
 };
 
 describe("reports worker audit", () => {
-  it("não chama loopback nem outro destino sem endpoint ou binding explícito", async () => {
+  it("falha explicitamente sem endpoint ou binding configurado", () => {
     const fetchImpl = vi.fn();
 
-    await createReportsAuditRecorder({ fetchImpl })(payload);
-
+    expect(() => createReportsAuditRecorder({ fetchImpl })).toThrow(
+      "Auditoria externa não configurada.",
+    );
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -27,6 +28,32 @@ describe("reports worker audit", () => {
     });
 
     await expect(recorder(payload)).rejects.toMatchObject({ statusCode: 503 });
+  });
+
+  it("usa o binding interno e envia o token do contrato", async () => {
+    const service = {
+      fetch: vi.fn().mockResolvedValue(new Response(null, { status: 201 })),
+    };
+    const recorder = createReportsAuditRecorder({
+      service,
+      serviceToken: "audit-token",
+    });
+
+    await expect(recorder(payload)).resolves.toBeUndefined();
+
+    const [input, init] = service.fetch.mock.calls[0] as [string, RequestInit];
+    expect(new URL(input).pathname).toBe("/internal/audit/requests");
+    expect(init.method).toBe("POST");
+    expect(new Headers(init.headers).get("x-internal-service-token")).toBe("audit-token");
+  });
+
+  it("falha explicitamente com endpoint inválido", () => {
+    expect(() =>
+      createReportsAuditRecorder({
+        serviceUrl: "not-a-url",
+        serviceToken: "audit-token",
+      }),
+    ).toThrow("Endpoint da auditoria externa inválido.");
   });
 
   it("expõe falha de transporte e timeout sem retry silencioso", async () => {

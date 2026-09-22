@@ -140,6 +140,55 @@ describe("reports-service Worker", () => {
     });
   });
 
+  it("valida a sessão por cookie também em GET e recusa sessão revogada", async () => {
+    const token = await sign({
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_id: "session-1",
+      session_version: 1,
+      csrf_hash: await hashCsrfToken("C".repeat(43)),
+    });
+    const userService = {
+      fetch: vi.fn().mockResolvedValue(new Response(null, { status: 401 })),
+    };
+    const app = createReportsWorkerApp({
+      env: {
+        ...env,
+        REPORTS_INTERNAL_TOKEN: "reports-internal-token",
+        USER_SERVICE: userService,
+      } as never,
+    });
+
+    const response = await app.request("https://reports.test/reports/catalog", {
+      headers: { cookie: `cw.session=${token}` },
+    });
+
+    expect(response.status).toBe(401);
+    expect(userService.fetch).toHaveBeenCalledOnce();
+    const [request] = userService.fetch.mock.calls[0] as [Request];
+    expect(request.method).toBe("GET");
+    expect(new URL(request.url).pathname).toBe("/user/session/validate");
+  });
+
+  it("mantém Bearer sem validação de sessão pelo binding do usuário", async () => {
+    const token = await sign({
+      user_id: "user-1",
+      organization_id: "org-1",
+      modules: { integracao: 1 },
+    });
+    const userService = { fetch: vi.fn() };
+    const app = createReportsWorkerApp({
+      env: { ...env, USER_SERVICE: userService } as never,
+    });
+
+    const response = await app.request("https://reports.test/reports/catalog", {
+      headers: authHeaders(token),
+    });
+
+    expect(response.status).toBe(200);
+    expect(userService.fetch).not.toHaveBeenCalled();
+  });
+
   it("repassa a chave de idempotência do POST de jobs ao serviço", async () => {
     const token = await sign({
       user_id: "user-1",

@@ -16,10 +16,16 @@ describe("reports worker bindings", () => {
   it("usa defaults para bindings numéricos inválidos", () => {
     const normalized = toReportsServiceEnv({
       REPORTS_PREVIEW_ROW_LIMIT: "not-a-number",
-      REPORTS_SOURCE_TIMEOUT_MS: "0",
+      REPORTS_SOURCE_TIMEOUT_MS: "50",
     } as never);
 
     expect(normalized.previewRowLimit).toBe(100);
+    expect(normalized.sourceTimeoutMs).toBe(10_000);
+  });
+
+  it("usa default para timeout acima do limite seguro", () => {
+    const normalized = toReportsServiceEnv({ REPORTS_SOURCE_TIMEOUT_MS: "60001" } as never);
+
     expect(normalized.sourceTimeoutMs).toBe(10_000);
   });
 });

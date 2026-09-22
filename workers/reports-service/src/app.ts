@@ -151,10 +151,10 @@ function requireOrganizationAuth(
     if (auth.actorKind !== "organization" || !auth.organizationId) {
       throw new ServiceError(403, "A organização do relatório não está autorizada.");
     }
-    if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) {
-      const cookies = c.req.header("cookie") ?? undefined;
-      const sessionToken = readCookie(cookies, AUTH_SESSION_COOKIE_NAME);
-      if (sessionToken) {
+    const cookies = c.req.header("cookie") ?? undefined;
+    const sessionToken = readCookie(cookies, AUTH_SESSION_COOKIE_NAME);
+    if (sessionToken) {
+      if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) {
         const csrfCookie = readCookie(cookies, CSRF_COOKIE_NAME);
         const csrfHeader = c.req.header(CSRF_HEADER_NAME);
         const expectedHash = auth.claims.csrf_hash;
@@ -167,19 +167,19 @@ function requireOrganizationAuth(
         ) {
           throw new ServiceError(403, "Token CSRF inválido.");
         }
-        if (!env.USER_SERVICE || !env.REPORTS_INTERNAL_TOKEN) {
-          throw new ServiceError(503, "Validação de sessão indisponível para mutação por cookie.");
+      }
+      if (!env.USER_SERVICE || !env.REPORTS_INTERNAL_TOKEN) {
+        throw new ServiceError(503, "Validação de sessão indisponível para cookie.");
+      }
+      try {
+        await validateWorkerSession(auth, env.USER_SERVICE, "cookie", {
+          internalServiceToken: env.REPORTS_INTERNAL_TOKEN,
+        });
+      } catch (error) {
+        if (error instanceof WorkerSessionValidationError) {
+          throw new ServiceError(error.statusCode, error.message);
         }
-        try {
-          await validateWorkerSession(auth, env.USER_SERVICE, "cookie", {
-            internalServiceToken: env.REPORTS_INTERNAL_TOKEN,
-          });
-        } catch (error) {
-          if (error instanceof WorkerSessionValidationError) {
-            throw new ServiceError(error.statusCode, error.message);
-          }
-          throw error;
-        }
+        throw error;
       }
     }
     c.set("auth", auth);

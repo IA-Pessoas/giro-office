@@ -32,10 +32,20 @@ export interface ReportsWorkerEnv extends WorkerEnv {
 }
 
 const localServiceUrl = "http://127.0.0.1:9";
+const DEFAULT_SOURCE_TIMEOUT_MS = 10_000;
+const MIN_SOURCE_TIMEOUT_MS = 100;
+const MAX_SOURCE_TIMEOUT_MS = 60_000;
 
-function positiveInteger(value: string | number | undefined, fallback: number, maximum?: number) {
+function positiveInteger(
+  value: string | number | undefined,
+  fallback: number,
+  maximum?: number,
+  minimum = 1,
+) {
   const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 && (maximum === undefined || parsed <= maximum)
+  return Number.isSafeInteger(parsed) &&
+    parsed >= minimum &&
+    (maximum === undefined || parsed <= maximum)
     ? parsed
     : fallback;
 }
@@ -66,7 +76,12 @@ export function toReportsServiceEnv(env: Partial<ReportsWorkerEnv>): ReportsServ
     regularizeReportingToken: env.REGULARIZE_REPORTING_TOKEN ?? "",
     regularizeReportingGrantSecret: env.REGULARIZE_REPORTING_GRANT_SECRET ?? "",
     rhServiceUrl: env.RH_SERVICE_URL ?? localServiceUrl,
-    sourceTimeoutMs: positiveInteger(env.REPORTS_SOURCE_TIMEOUT_MS, 10_000),
+    sourceTimeoutMs: positiveInteger(
+      env.REPORTS_SOURCE_TIMEOUT_MS,
+      DEFAULT_SOURCE_TIMEOUT_MS,
+      MAX_SOURCE_TIMEOUT_MS,
+      MIN_SOURCE_TIMEOUT_MS,
+    ),
     previewRowLimit: positiveInteger(env.REPORTS_PREVIEW_ROW_LIMIT, 100, 1000),
   } as ReportsServiceEnv;
 }

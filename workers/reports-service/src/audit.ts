@@ -27,14 +27,18 @@ function isTimeout(error: unknown): boolean {
 function endpoint(options: ReportsAuditRecorderOptions): string | undefined {
   if (options.service) return "https://audit-service.internal/internal/audit/requests";
   if (!options.serviceUrl?.trim()) return undefined;
-  return new URL("/internal/audit/requests", options.serviceUrl).toString();
+  try {
+    return new URL("/internal/audit/requests", options.serviceUrl).toString();
+  } catch (error) {
+    throw new ServiceError(503, "Endpoint da auditoria externa inválido.", error);
+  }
 }
 
 export function createReportsAuditRecorder(options: ReportsAuditRecorderOptions): AuditRecorder {
   if (options.enabled === false) return async () => {};
 
   const url = endpoint(options);
-  if (!url) return async () => {};
+  if (!url) throw new ServiceError(503, "Auditoria externa não configurada.");
 
   const send = options.service
     ? options.service.fetch.bind(options.service)

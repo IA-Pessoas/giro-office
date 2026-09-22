@@ -59,6 +59,13 @@ O endereço usado acima é somente um valor local não funcional para permitir a
 - Implementação: `df0cf7ef` (`feat(workers): migrate reports service routes`).
 - Relatório: commit separado após esta revisão.
 
+## Fix report — segunda rodada pós-review
+
+- Todos os endpoints /reports continuam aceitando Bearer e o fluxo interno via gateway; requests com cw.session, inclusive GET/HEAD, agora validam a sessão pelo binding USER_SERVICE e pelo validateWorkerSession do runtime antes de executar a rota. Sessão revogada é recusada; mutações mantêm a proteção CSRF.
+- createReportsAuditRecorder não cria mais no-op quando AUDIT_SERVICE/AUDIT_SERVICE_URL está ausente ou inválido: com auditoria habilitada, a configuração falha explicitamente. Binding, HTTP não-2xx, transporte e timeout continuam observáveis; AUDIT_ENABLED=false permanece a desativação explícita.
+- REPORTS_SOURCE_TIMEOUT_MS ficou limitado a 100..60000 ms no parser Node e na normalização Worker; valores inválidos ou fora da faixa não escapam para AbortSignal.timeout.
+- Queue, consumidor assíncrono, PDF/Browser Run, staging, deploy e publicação continuam fora desta rodada.
+
 ## Fix report — revisão de bloqueadores
 
 Esta rodada ficou restrita ao Worker/serviço de Reports, seus schemas/migration e testes. Queue, consumidor assíncrono, PDF/Browser Run, staging e deploy continuam fora do escopo e permanecem como gaps.
