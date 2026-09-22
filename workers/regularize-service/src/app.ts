@@ -1,6 +1,8 @@
 import {
+  createLicenseBodySchema,
   licenseDetailQuerySchema,
   listLicensesQuerySchema,
+  updateLicenseBodySchema,
 } from "@workspace/regularize-service/src/schemas/license.schemas.js";
 import { buildLicenseStatusFilter } from "@workspace/regularize-service/src/schemas/status.schemas.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
@@ -16,18 +18,27 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { authenticateRegularizeRequest } from "./auth.js";
 import type { RegularizeWorkerEnv } from "./env.js";
+import {
+  createLicenseMutationService,
+  type LicenseMutationPrisma,
+  type LicenseMutationService,
+  type LicenseRow,
+} from "./licenseMutationService.js";
+import {
+  parseLicenseProtocolUpload,
+  type WorkerLicenseProtocolStorageLike,
+} from "./licenseProtocolStorage.js";
 import { PrismaClient } from "./prisma.js";
 
-type LicenseRow = Record<string, unknown> & { organization_id: string };
-export type RegularizeLicensePrisma = {
-  $queryRaw: (query: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
+export type RegularizeLicensePrisma = LicenseMutationPrisma & {
+  $queryRaw: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
   license: {
     findMany(args: Record<string, unknown>): Promise<LicenseRow[]>;
     findFirst(args: Record<string, unknown>): Promise<LicenseRow | null>;
     count(args: Record<string, unknown>): Promise<number>;
   };
 };
-export type RegularizeLicenseService = {
+export type RegularizeLicenseService = LicenseMutationService & {
   list(
     organizationId: string,
     status: string,
@@ -41,6 +52,7 @@ type RegularizeOptions = {
   env?: RegularizeWorkerEnv;
   prisma?: RegularizeLicensePrisma;
   licenseService?: RegularizeLicenseService;
+  protocolStorage?: WorkerLicenseProtocolStorageLike;
 };
 type RegularizeWorkerContext = {
   Bindings: RegularizeWorkerEnv;
@@ -95,8 +107,13 @@ function publicLicense(row: LicenseRow): Record<string, unknown> {
     : license;
 }
 
-function localService(prisma: RegularizeLicensePrisma): RegularizeLicenseService {
+function localService(
+  prisma: RegularizeLicensePrisma,
+  env: RegularizeWorkerEnv,
+  protocolStorage?: WorkerLicenseProtocolStorageLike,
+): RegularizeLicenseService {
   return {
+    ...createLicenseMutationService(prisma, env, protocolStorage),
     async list(organizationId, status, page, limit, paginated) {
       const where = { organization_id: organizationId, ...buildLicenseStatusFilter(status) };
       const args = {
@@ -156,9 +173,74 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
   ) => {
     if (options.licenseService) return callback(options.licenseService);
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
-      callback(localService(client as unknown as RegularizeLicensePrisma)),
+      callback(
+        localService(
+          client as unknown as RegularizeLicensePrisma,
+          options.env ?? c.env,
+          options.protocolStorage,
+        ),
+      ),
     );
   };
+  app.post("/regularize/license", async (c) =>
+    withService(c, async (service) => {
+      const body = parseWithZod(createLicenseBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.create({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+        201,
+      );
+    }),
+  );
+  app.put("/regularize/license", async (c) =>
+    withService(c, async (service) => {
+      const body = parseWithZod(updateLicenseBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.update({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            body,
+          }),
+        ),
+      );
+    }),
+  );
+  app.post("/regularize/license/:id/protocol", async (c) =>
+    withService(c, async (service) => {
+      const body = await c.req.parseBody();
+      const file = body.file instanceof File ? body.file : undefined;
+      const parsed = await parseLicenseProtocolUpload(file);
+      return c.json(
+        createSuccessResponse(
+          await service.replaceProtocol({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            licenseId: c.req.param("id"),
+            file: parsed,
+          }),
+        ),
+        201,
+      );
+    }),
+  );
+  app.get("/regularize/license/:id/protocol", async (c) =>
+    withService(c, async (service) =>
+      c.json(
+        createSuccessResponse(
+          await service.createProtocolAccess({
+            organizationId: c.get("auth").organizationId,
+            licenseId: c.req.param("id"),
+          }),
+        ),
+      ),
+    ),
+  );
   app.get("/regularize/licenses", (c) =>
     withService(c, async (service) => {
       const query = parseWithZod(listLicensesQuerySchema, c.req.query());

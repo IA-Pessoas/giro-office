@@ -36,7 +36,19 @@ describe("Supabase Storage REST adapter", () => {
       download: SupabaseStorageClient["download"];
       remove: SupabaseStorageClient["remove"];
       createSignedUrl: SupabaseStorageClient["createSignedUrl"];
+      getBucket: SupabaseStorageClient["getBucket"];
     }>();
+  });
+
+  it("reads bucket visibility through the authenticated bucket endpoint", async () => {
+    const fake = makeFetch([Response.json({ public: false })]);
+    const client = createSupabaseStorageClient(environment, fake.fetch);
+
+    await expect(client.getBucket("private bucket")).resolves.toEqual({ public: false });
+
+    const request = getRequest(fake.calls[0]);
+    expect(request.method).toBe("GET");
+    expect(request.url).toBe("https://project.supabase.co/storage/v1/bucket/private%20bucket");
   });
 
   it("uploads with encoded bucket/path, auth headers, content type and upsert", async () => {

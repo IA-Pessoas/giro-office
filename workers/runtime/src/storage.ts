@@ -9,6 +9,7 @@ export interface SupabaseStorageUploadOptions {
 }
 
 export interface SupabaseStorageClient {
+  getBucket(bucket: string): Promise<{ public: boolean }>;
   upload(
     bucket: string,
     path: string,
@@ -55,6 +56,18 @@ export function createSupabaseStorageClient(
   };
 
   return {
+    async getBucket(bucket) {
+      const response = await request(`${baseUrl}/storage/v1/bucket/${encodeURIComponent(bucket)}`, {
+        method: "GET",
+        headers: headers(),
+      });
+      const payload = (await response.json()) as { public?: unknown };
+      if (typeof payload.public !== "boolean") {
+        throw new Error("Supabase Storage bucket response was invalid");
+      }
+      return { public: payload.public };
+    },
+
     async upload(bucket, path, body, options = {}) {
       const requestHeaders = headers(options.contentType);
       if (options.upsert !== undefined) requestHeaders.set("x-upsert", String(options.upsert));

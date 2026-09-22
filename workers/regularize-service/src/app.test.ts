@@ -32,6 +32,18 @@ function service(): RegularizeLicenseService {
   return {
     list: vi.fn(async () => ({ data: [{ id: LICENSE_ID, status: "Em Andamento" }], total: 1 })),
     detail: vi.fn(async () => ({ id: LICENSE_ID, status: "Em Andamento" })),
+    create: vi.fn(async (_input) => ({ id: LICENSE_ID, status: "Em Andamento" })),
+    update: vi.fn(async (_input) => ({ id: LICENSE_ID, status: "Finalizado" })),
+    replaceProtocol: vi.fn(async (_input) => ({
+      original_name: "protocolo.pdf",
+      mime_type: "application/pdf",
+      size_bytes: 9,
+      uploaded_at: new Date("2026-09-22T00:00:00.000Z"),
+    })),
+    createProtocolAccess: vi.fn(async (_input) => ({
+      url: "https://storage.example/signed/protocolo.pdf",
+      expires_in_seconds: 300,
+    })),
   };
 }
 
@@ -71,5 +83,84 @@ describe("regularize Worker", () => {
     expect(detail.status).toBe(200);
     expect(licenseService.list).toHaveBeenCalledWith(ORGANIZATION_ID, "Todos", 2, 10, true);
     expect(licenseService.detail).toHaveBeenCalledWith(ORGANIZATION_ID, LICENSE_ID);
+  });
+
+  it("creates and updates licenses with the forwarded identity", async () => {
+    const licenseService = service();
+    const app = createRegularizeWorkerApp({ env: env(), licenseService });
+    const body = {
+      has: true,
+      type_license: "Alvará sanitário",
+      entry_date: "2026-09-22T00:00:00.000Z",
+      protocol: "PROTO-1",
+      status: "Em Andamento",
+      current_situation: "Em análise",
+      contact: "contato@example.com",
+      urgency: "Normal",
+      type: "Municipal",
+    };
+
+    const created = await app.request("https://regularize.test/regularize/license", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const updated = await app.request("https://regularize.test/regularize/license", {
+      method: "PUT",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ ...body, id: LICENSE_ID, status: "Finalizado" }),
+    });
+
+    expect(created.status).toBe(201);
+    expect(updated.status).toBe(200);
+    expect(licenseService.create).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      body: expect.objectContaining({ protocol: "PROTO-1" }),
+    });
+    expect(licenseService.update).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      body: expect.objectContaining({ id: LICENSE_ID, status: "Finalizado" }),
+    });
+  });
+
+  it("accepts a validated protocol upload and creates signed access", async () => {
+    const licenseService = service();
+    const app = createRegularizeWorkerApp({ env: env(), licenseService });
+    const form = new FormData();
+    form.set(
+      "file",
+      new File(["%PDF-1.7 protocol"], "protocolo.pdf", {
+        type: "application/pdf",
+      }),
+    );
+
+    const uploaded = await app.request(
+      `https://regularize.test/regularize/license/${LICENSE_ID}/protocol`,
+      { method: "POST", headers: headers(), body: form },
+    );
+    const access = await app.request(
+      `https://regularize.test/regularize/license/${LICENSE_ID}/protocol`,
+      { headers: headers() },
+    );
+
+    expect(uploaded.status).toBe(201);
+    expect(access.status).toBe(200);
+    expect(licenseService.replaceProtocol).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        licenseId: LICENSE_ID,
+        file: expect.objectContaining({
+          mimetype: "application/pdf",
+          originalname: "protocolo.pdf",
+        }),
+      }),
+    );
+    expect(licenseService.createProtocolAccess).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      licenseId: LICENSE_ID,
+    });
   });
 });
