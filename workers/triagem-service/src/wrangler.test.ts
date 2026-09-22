@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 
 describe("triagem Worker wrangler", () => {
   it("declara o binding do audit-service usado pela reconciliação da outbox", () => {
+    // `.jsonc` aceita comentários e o arquivo tem um; `JSON.parse` não.
     const config = JSON.parse(
-      readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
+      readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8").replace(
+        /^\s*\/\/.*$/gm,
+        "",
+      ),
     ) as { services?: Array<{ binding: string; service: string }> };
 
     expect(config.services).toContainEqual({

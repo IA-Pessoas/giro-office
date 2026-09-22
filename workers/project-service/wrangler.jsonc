@@ -1,4 +1,7 @@
 {
+  // BLOCKED: declare HYPERDRIVE here once an authorized production ID exists.
+  // Without it the Worker falls back to DATABASE_URL, and neither is configured,
+  // so createWorkerPrismaClient throws on the first query.
   // Production supplies HYPERDRIVE out-of-band; local/CI uses DATABASE_URL.
   // Never commit a Hyperdrive id or credential. DB routes return 503 if neither exists.
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
