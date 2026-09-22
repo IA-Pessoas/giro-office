@@ -2,6 +2,43 @@
 
 Data: 2026-09-22
 
+## Segundo ciclo TDD — correções dos achados
+
+O RED deste ciclo foi executado antes da implementação:
+
+```text
+pnpm --filter @workspace/commercial-worker exec vitest run \
+  src/outbox.fencing.test.ts src/commercialEmail.test.ts src/outboxDelivery.test.ts \
+  src/commercialServices.test.ts src/wrangler.test.ts src/index.test.ts
+```
+
+Ele falhou pelos contratos ainda ausentes: módulo de email, cron, guard do
+scheduler, fencing, envelope/headers de binding e mapeamento P2002/P2034. Depois
+das correções, o GREEN ficou em 9 arquivos e 23 testes aprovados.
+
+Foram implementados, somente no Worker Commercial:
+
+- cron `*/1 * * * *` em `wrangler.jsonc`, handler `scheduled`, README e guards
+  explícitos para HYPERDRIVE/DATABASE_URL, origem interna e bindings/tokens de
+  client/task; não foi inventado Queue ID, secret ou URL;
+- modelo `CommercialEmailNotification` no schema do Worker, já previsto no schema
+  canônico, sem migration nova; adapter HTTP configurável e fluxo persistente
+  `processing/sent/skipped/failed` com `attempts`, `message` e `last_error`;
+- fechamento canônico condicionado a `service_unique === false` e cadastro não
+  `Existente`; adapter ausente persiste `failed`, audita quando possível e relança
+  erro observável; o status aparece em `/commercial/outbox/status`;
+- fencing usando a coluna persistente existente `commercial.outbox_events.attempts`
+  como geração do claim; conclusão/falha exigem `id + status + attempts`, e o teste
+  concorrente prova que lease estale não sobrescreve o worker atual;
+- P2002/P2034 e serialização/deadlock PostgreSQL como 409 em proposta, prospecção e
+  billing;
+- envelope de prospecção sem `organization_id`, validação estrita de
+  `success === true`/`data` nas bindings e `x-request-id` propagado para
+  client/task/audit/email.
+
+O cron não mascara gaps externos: sem configuração de email o envio não é alegado;
+sem Hyperdrive/Database o scheduler falha fechado; Queue continua sem binding.
+
 ## Escopo e limites
 
 O código alterado ficou restrito a `workers/commercial-service/**`. O relatório é o
@@ -11,11 +48,11 @@ nem push.
 
 O plano de migração e `task-service-remainder-brief.md` foram lidos antes da edição.
 Graphify foi usado primeiro com `pnpm graphify:context:services`; depois da edição,
-`pnpm graphify:update:services` terminou com 9.305 nós, 16.952 arestas e 375
+`pnpm graphify:update:services` terminou com 9.305 nós, 16.952 arestas e 381
 comunidades. A visualização HTML foi omitida pelo limite de 5.000 nós. O grafo serviu
 como navegação; a comparação final foi feita contra os arquivos canônicos reais.
 
-## TDD e implementação
+## TDD e implementação do ciclo anterior
 
 O RED foi executado antes dos módulos de implementação:
 
@@ -29,7 +66,9 @@ rotas de paridade retornando `404` no Worker que só possuía a pilotagem de
 `proposal-configs`. Depois foram adicionados os testes de entrega por binding e a
 implementação mínima.
 
-O GREEN final do pacote é 5 arquivos, 10 testes aprovados, cobrindo:
+O baseline anterior do pacote era 5 arquivos e 10 testes; o segundo ciclo acima
+adicionou os testes de regressão e elevou o resultado para 9 arquivos e 23 testes.
+O conjunto cobre:
 
 - todas as rotas comerciais canônicas e o contexto de organização;
 - claims `comercial` para leitura nível 1 e escrita nível 2;
@@ -53,8 +92,9 @@ status HTTP e escopo por `organization_id` para:
 - `GET /commercial/outbox/status`.
 
 O schema Prisma do Worker mapeia PostgreSQL para `proposal.config`, `clients`,
-`commercial.prospecting`, `integracao.tasks`, `commercial.task_billing`,
-`commercial.outbox_events` e `emails`, sem D1 ou migration nova.
+  `commercial.prospecting`, `integracao.tasks`, `commercial.task_billing`,
+`commercial.outbox_events`, `emails` e `commercial.email_notifications`, sem D1 ou
+migration nova.
 
 Prospecção mantém cliente no mesmo tenant, unicidade por organização/cliente,
 transições válidas, terminal `Fechado`, arquivamento idempotente e auditoria. Billing
@@ -84,16 +124,15 @@ Worker falha fechado com `503`.
 - **Paginação:** as listas canônicas são não paginadas; esse contrato foi preservado.
 - **Erros:** parsing, autenticação, CSRF, tenant, conflitos, referências, payload
   inválido e indisponibilidade do banco passam pelo envelope compartilhado de erro.
-- **Email:** o adapter de email do serviço legado não é uma rota comercial e não foi
-  falsificado no Worker. O adapter, `COMMERCIAL_EMAIL_ADAPTER_TOKEN/FROM` e a fila de
-  notificações continuam dependências operacionais a provisionar.
+- **Email:** o adapter mínimo preserva o registro canônico e não finge envio. URL,
+  token e from continuam dependências operacionais a provisionar.
 
 ## Validação
 
 Passaram:
 
 ```text
-pnpm --filter @workspace/commercial-worker test                 # 5 files, 10 tests
+pnpm --filter @workspace/commercial-worker test                 # 9 files, 23 tests
 pnpm --filter @workspace/commercial-worker typecheck
 pnpm --filter @workspace/commercial-worker check
 pnpm --filter @workspace/commercial-worker build
@@ -111,19 +150,22 @@ workspace:
 
 - `pnpm test`: 127/127 testes de scripts passaram; o Turbo parou na geração Prisma
   por `PrismaConfigEnvError: Cannot resolve environment variable: DATABASE_URL`.
-- `pnpm typecheck`: bloqueado pelo mesmo `DATABASE_URL` ausente antes do compilador.
-- `pnpm build`: bloqueado pelo mesmo prebuild de Prisma em `fiscal-service`.
+- `pnpm typecheck`: não chegou ao compilador; o gerador Prisma raiz ficou bloqueado
+  pelo lock local durante a tentativa sem configuração de banco. Após verificar que
+  não havia processo gerador ativo, o lock órfão gerado em `.turbo` foi removido; não
+  houve alteração em arquivo versionado.
+- `pnpm build`: bloqueado pelo mesmo prebuild de Prisma em `organization-service`.
 - `pnpm check`: falhou em arquivo de transformação grande, fixtures de política de
-  credenciais e alterações já presentes em `workers/contabil-service/**`; o check
-  específico do commercial Worker passou.
+  credenciais, `any` preexistente em client-service e formatação já presente em
+  `workers/contabil-service/**`; o check específico do commercial Worker passou.
 
 Não foi usado placeholder de credencial, `--no-verify`, D1, deploy ou push.
 
 ## Gaps operacionais declarados
 
-- **Queue:** não há binding Queue nem consumidor configurado. Existe handler
-  `scheduled`, mas o `wrangler.jsonc` não declara cron; processamento automático em
-  produção ainda precisa de Queue/cron autorizado.
+- **Queue:** não há binding Queue, Queue ID ou consumidor configurado. O caminho
+  automático desta entrega é o cron `*/1 * * * *` no handler `scheduled`; Queue
+  permanece gap de provisionamento.
 - **Origem do scheduler:** entregas disparadas pelo handler `scheduled` exigem
   `INTERNAL_REQUEST_ORIGIN` configurada; nenhuma origem foi inventada no código.
 - **Secrets:** tokens de gateway, sessão, client/task/audit e adapter de email estão
@@ -133,5 +175,6 @@ Não foi usado placeholder de credencial, `--no-verify`, D1, deploy ou push.
 - **Bindings e QA externo:** os nomes de Service Binding foram validados pelo dry-run,
   mas entrega real, idempotência nos Workers destino, sessão autenticada e smoke de
   produção dependem de ambientes provisionados.
-- **Reporting/Storage/email:** permanecem fora do contrato de rotas canônico ou
-  dependentes de infraestrutura não provisionada, conforme indicado acima.
+- **Reporting/Storage/email:** reporting e Storage permanecem fora do contrato de
+  rotas canônico; email tem adapter observável, mas depende de infraestrutura externa
+  não provisionada.

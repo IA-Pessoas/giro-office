@@ -9,5 +9,6 @@
     { "binding": "TASK_SERVICE", "service": "giro-task-service" },
     { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }
   ],
+  "triggers": { "crons": ["*/1 * * * *"] },
   "observability": { "enabled": true }
 }

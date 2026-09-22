@@ -80,7 +80,7 @@ export class CommercialOutboxWorkerService {
       if (!validPayload(event.payload)) throw new Error("Payload de evento comercial inválido.");
       await this.delivery.deliver(event.payload);
       await this.prisma.commercialOutboxEvent.updateMany({
-        where: { id: event.id, status: "processing" },
+        where: { id: event.id, status: "processing", attempts: event.attempts },
         data: {
           status: "delivered",
           processed_at: this.now(),
@@ -131,7 +131,7 @@ export class CommercialOutboxWorkerService {
     const terminal = event.attempts >= this.maxAttempts;
     const delay = this.retryBaseMs * 2 ** Math.max(0, event.attempts - 1);
     await this.prisma.commercialOutboxEvent.updateMany({
-      where: { id: event.id, status: "processing" },
+      where: { id: event.id, status: "processing", attempts: event.attempts },
       data: {
         status: terminal ? "failed" : "pending",
         available_at: new Date(this.now().getTime() + Math.min(delay, 60_000)),
