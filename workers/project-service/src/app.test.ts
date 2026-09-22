@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { hashCsrfToken } from "@workspace/runtime";
 import {
   FORWARDED_AUTH_CSRF_HASH_HEADER,
@@ -137,6 +139,94 @@ describe("project Worker", () => {
     expect(projectService.list).toHaveBeenCalledWith("client", USER_ID, ORG, expect.any(Object));
   });
 
+  it("returns 503 when no Hyperdrive binding or DATABASE_URL is configured", async () => {
+    const { HYPERDRIVE: _hyperdrive, ...withoutDatabase } = env();
+    const app = createProjectWorkerApp({ env: withoutDatabase });
+
+    const response = await app.request(
+      `https://project.test/project/list?ref=client&id=${CLIENT_ID}`,
+      { headers: headers() },
+    );
+
+    expect(response.status).toBe(503);
+  });
+
+  it("keeps the Worker schema aligned with canonical project detail fields and relations", () => {
+    const workerSchema = readFileSync(resolve(process.cwd(), "prisma/schema.prisma"), "utf8");
+    const canonicalSchema = readFileSync(
+      resolve(process.cwd(), "../../infra/prisma/schema.prisma"),
+      "utf8",
+    );
+
+    expect(canonicalSchema).toContain("name             String");
+    expect(canonicalSchema).toContain("taskModel           TaskModel");
+    expect(workerSchema).toContain("name");
+    expect(workerSchema).toContain("company_name");
+    expect(workerSchema).toContain("fantasy_name");
+    expect(workerSchema).toContain("taskModel");
+    expect(workerSchema).toContain("department");
+  });
+
+  it("returns canonical client and task relations in project detail", async () => {
+    const findFirst = vi.fn(async () => ({
+      id: PROJECT_ID,
+      name: "Implantação",
+      client_id: CLIENT_ID,
+      status: "Em andamento",
+      start_date: null,
+      end_date: null,
+      objective: "Automatizar fluxo",
+      sponsor_id: null,
+      porcentage: 0,
+      client: { id: CLIENT_ID, name: "Cliente A", company_name: null, fantasy_name: null },
+      tasks: [
+        {
+          id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+          name: "Tarefa A",
+          status: "A Realizar",
+          observations: null,
+          model_id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+          client_id: CLIENT_ID,
+          project_id: PROJECT_ID,
+          department: { id: "11111111-1111-4111-8111-111111111111", name: "Operações" },
+          taskModel: {
+            id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+            name: "Modelo A",
+            department: { id: "11111111-1111-4111-8111-111111111111", name: "Operações" },
+          },
+        },
+      ],
+    }));
+    const app = createProjectWorkerApp({
+      env: env(),
+      prisma: {
+        project: { findFirst },
+        client: { findFirst: vi.fn(), update: vi.fn() },
+        task: { findMany: vi.fn(), groupBy: vi.fn() },
+        $transaction: vi.fn(),
+        $disconnect: vi.fn(async () => undefined),
+      } as never,
+    });
+
+    const response = await app.request(`https://project.test/project?project_id=${PROJECT_ID}`, {
+      headers: headers(),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.detail).toMatchObject({
+      client: { name: "Cliente A" },
+      tasks: [{ name: "Tarefa A", model: { name: "Modelo A" } }],
+    });
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          client: expect.objectContaining({ select: expect.objectContaining({ name: true }) }),
+          tasks: expect.objectContaining({ select: expect.objectContaining({ name: true }) }),
+        }),
+      }),
+    );
+  });
+
   it("preserves the complete CRUD contract and auth claims", async () => {
     const projectService = service();
     const app = createProjectWorkerApp({ env: env(), projectService });
@@ -198,6 +288,40 @@ describe("project Worker", () => {
     expect(projectService.delete).toHaveBeenCalledWith(
       expect.objectContaining({ project_id: PROJECT_ID, organizationId: ORG, integracaoLevel: 3 }),
     );
+  });
+
+  it("maps a concurrent project creation conflict to 409", async () => {
+    const project = {
+      findFirst: vi.fn(async () => null),
+      create: vi.fn(async () => ({ id: PROJECT_ID })),
+    };
+    const client = { findFirst: vi.fn(async () => ({ id: CLIENT_ID })) };
+    const prisma = {
+      project: { ...project, findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
+      client: { ...client, update: vi.fn() },
+      task: { findMany: vi.fn(), groupBy: vi.fn() },
+      $transaction: vi.fn(async () => {
+        throw { code: "P2034" };
+      }),
+      $disconnect: vi.fn(async () => undefined),
+    };
+    const app = createProjectWorkerApp({ env: env(), prisma: prisma as never });
+
+    const response = await app.request("https://project.test/project", {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify({
+        name: "Implantação",
+        client_id: CLIENT_ID,
+        start_date: "2026-04-02T00:00:00.000Z",
+        objective: "Automatizar fluxo",
+      }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    });
   });
 
   it("enforces module permission before dispatching project reads", async () => {
@@ -305,6 +429,20 @@ describe("project Worker", () => {
 
     expect(response.status).toBe(201);
     expect(userService.fetch).toHaveBeenCalledOnce();
+  });
+
+  it("accepts DELETE project_id from the query with an empty JSON body", async () => {
+    const projectService = service();
+    const app = createProjectWorkerApp({ env: env(), projectService });
+    const response = await app.request(`https://project.test/project?project_id=${PROJECT_ID}`, {
+      method: "DELETE",
+      headers: { ...headers(), "content-type": "application/json" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(projectService.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ project_id: PROJECT_ID }),
+    );
   });
 
   it("exposes metrics and progress with organization and module claims", async () => {
@@ -482,7 +620,7 @@ describe("project Worker", () => {
         groupBy: vi.fn(async () => [{ status: "Concluída", _count: { status: 1 } }]),
       },
       $transaction: vi.fn(async (callback: (transaction: unknown) => Promise<unknown>) =>
-        callback({ project, client }),
+        callback({ project, client, task: prisma.task }),
       ),
       $disconnect: vi.fn(async () => undefined),
     };
@@ -498,6 +636,46 @@ describe("project Worker", () => {
       where: { id: CLIENT_ID },
       data: { status: "Inativo", deletion_date: expect.any(Date) },
     });
+  });
+
+  it("reads tasks and writes derived progress inside one RepeatableRead transaction", async () => {
+    const transactionProject = {
+      findFirst: vi.fn(async () => ({ id: PROJECT_ID, client_id: CLIENT_ID })),
+      update: vi.fn(async () => ({
+        id: PROJECT_ID,
+        status: "Em andamento",
+        porcentage: 0,
+        client_id: CLIENT_ID,
+      })),
+    };
+    const transactionTask = { groupBy: vi.fn(async () => []) };
+    const prisma = {
+      project: { findFirst: vi.fn(), update: vi.fn() },
+      client: { findFirst: vi.fn(), update: vi.fn() },
+      task: { findMany: vi.fn(), groupBy: vi.fn() },
+      $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>, options: unknown) => {
+        expect(options).toEqual({ isolationLevel: "RepeatableRead" });
+        return callback({
+          project: transactionProject,
+          task: transactionTask,
+          client: { findFirst: vi.fn(), update: vi.fn() },
+        });
+      }),
+      $disconnect: vi.fn(async () => undefined),
+    };
+    const app = createProjectWorkerApp({ env: env(), prisma: prisma as never });
+
+    const response = await app.request("https://project.test/project/progress", {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify({ project_id: PROJECT_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(transactionProject.findFirst).toHaveBeenCalledOnce();
+    expect(transactionTask.groupBy).toHaveBeenCalledOnce();
+    expect(prisma.project.findFirst).not.toHaveBeenCalled();
+    expect(prisma.task.groupBy).not.toHaveBeenCalled();
   });
 
   it("keeps internal reporting reads paginated and snapshot-capable", async () => {
@@ -525,6 +703,50 @@ describe("project Worker", () => {
     expect((await response.json()).data).toEqual({ rows: [{ name: "A" }], reachedLimit: true });
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({ take: 2, where: { organization_id: ORG } }),
+    );
+  });
+
+  it("accepts legacy key fields and filters through the reporting handler", async () => {
+    const findMany = vi.fn(async () => [
+      { name: "Implantação", client_id: CLIENT_ID, sponsor_id: USER_ID },
+    ]);
+    const prisma = {
+      project: { findMany },
+      $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma)),
+      $disconnect: vi.fn(async () => undefined),
+    };
+    const app = createProjectWorkerApp({ env: env(), prisma: prisma as never });
+    const body = {
+      source: "integracao.projects",
+      fields: ["name", "sponsor_id"],
+      limit: 10,
+      query: {
+        filters: [{ field: "client_id", operator: "eq", parameter: "client", value: CLIENT_ID }],
+      },
+    };
+    const responseHeaders = await reportHeaders("extract", body, [
+      "name",
+      "sponsor_id",
+      "client_id",
+    ]);
+    const response = await app.request("https://project.test/internal/reporting/extract", {
+      method: "POST",
+      headers: new Headers({
+        ...Object.fromEntries(responseHeaders),
+        "content-type": "application/json",
+      }),
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.rows).toEqual([
+      { name: "Implantação", sponsor_id: USER_ID },
+    ]);
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG },
+        select: { name: true, sponsor_id: true, client_id: true },
+      }),
     );
   });
 });

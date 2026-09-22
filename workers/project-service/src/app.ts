@@ -14,8 +14,6 @@ import { integracaoProjectProgressBodySchema } from "@workspace/project-service/
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   createProjectInTransaction,
-  executeReportingQuery,
-  getProjectReportingFields,
   type ProjectCrudAuthContext,
   type ProjectReportingSource,
   parseWithZod,
@@ -41,6 +39,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { authenticateProjectRequest } from "./auth.js";
 import type { ProjectWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
+import { executeProjectReportingQuery, getProjectReportingFields } from "./projectReporting.js";
 
 export type { ProjectWorkerEnv } from "./env.js";
 
@@ -55,7 +54,7 @@ type ProjectRow = Record<string, unknown> & {
   sponsor_id: string | null;
 };
 type TaskRow = { project_id: string; client_id: string; status: string };
-type ProjectTransaction = Pick<ProjectPrisma, "client" | "project">;
+type ProjectTransaction = Pick<ProjectPrisma, "client" | "project" | "task">;
 type ProjectPrisma = {
   $disconnect(): Promise<void>;
   $transaction<T>(
@@ -201,8 +200,34 @@ const DETAIL_SELECT = {
   objective: true,
   sponsor_id: true,
   porcentage: true,
-  client: true,
-  tasks: true,
+  client: {
+    select: {
+      id: true,
+      name: true,
+      company_name: true,
+      fantasy_name: true,
+      cpf_cnpj: true,
+    },
+  },
+  tasks: {
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      observations: true,
+      model_id: true,
+      client_id: true,
+      project_id: true,
+      department: { select: { id: true, name: true } },
+      taskModel: {
+        select: {
+          id: true,
+          name: true,
+          department: { select: { id: true, name: true } },
+        },
+      },
+    },
+  },
 } as const;
 const TASK_STATUSES_FOR_PROGRESS = [
   "Em andamento",
@@ -222,6 +247,29 @@ function authorization(auth: WorkerAuthContext): ProjectAuthorization {
     permission: auth.claims.permission,
     integracaoLevel: auth.claims.modules.integracao,
     isOwner: auth.claims.type === "owner",
+  };
+}
+
+function isPrismaError(error: unknown, ...codes: string[]): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    codes.includes(error.code)
+  );
+}
+
+function projectDetailForUi(detail: ProjectRow): ProjectRow {
+  const tasks = detail.tasks;
+  if (!Array.isArray(tasks)) return detail;
+  return {
+    ...detail,
+    tasks: tasks.map((task) => {
+      if (!task || typeof task !== "object") return task;
+      const row = task as Record<string, unknown>;
+      return { ...row, model: row.taskModel ?? null };
+    }),
   };
 }
 
@@ -300,19 +348,29 @@ function createProjectAudit(env: ProjectWorkerEnv): ProjectAudit {
 function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCrudService {
   return {
     async create(data) {
-      const result = await prisma.$transaction((transaction) =>
-        createProjectInTransaction(data, transaction),
-      );
-      await audit.createLog({
-        userId: data.userId,
-        organizationId: data.organizationId,
-        permission: data.permission ?? null,
-        action: "Cadastro",
-        referring: "integracao.projects",
-        referringId: result.create.id,
-        changes: "{}",
-      });
-      return result;
+      try {
+        // O schema canônico não tem unique físico para a identidade do projeto;
+        // o precheck e o insert permanecem no mesmo snapshot serializável.
+        const result = await prisma.$transaction(
+          (transaction) => createProjectInTransaction(data, transaction),
+          { isolationLevel: "Serializable" },
+        );
+        await audit.createLog({
+          userId: data.userId,
+          organizationId: data.organizationId,
+          permission: data.permission ?? null,
+          action: "Cadastro",
+          referring: "integracao.projects",
+          referringId: result.create.id,
+          changes: "{}",
+        });
+        return result;
+      } catch (error) {
+        if (isPrismaError(error, "P2002", "P2034")) {
+          throw new ServiceError(409, "Um objetivo com esse nome nesse cliente já foi cadastrado.");
+        }
+        throw error;
+      }
     },
     async list(ref, id, organizationId, auth) {
       requireIntegracaoRouteAccess("GET", "/project/list", {
@@ -340,7 +398,7 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
         resourceOrganizationId: organizationId,
         isOwner: auth.isOwner,
       });
-      return { detail };
+      return { detail: projectDetailForUi(detail) };
     },
     async update(data) {
       try {
@@ -524,90 +582,86 @@ function localProgressService(prisma: ProjectPrisma, audit: ProjectAudit): Progr
   return {
     async recalculateFromTasks(projectId, organizationId, auth) {
       try {
-        const exists = await prisma.project.findFirst({
-          where: { id: projectId, organization_id: organizationId },
-          select: { id: true, client_id: true },
-        });
-        if (!exists) throw new ServiceError(404, "Projeto não existe");
-        requireIntegracaoRouteAccess("POST", "/project/progress", {
-          userId: auth.userId,
-          level: auth.integracaoLevel,
-          organizationId,
-          resourceOrganizationId: organizationId,
-          isOwner: auth.isOwner,
-          requestedFields: ["project_id"],
-        });
-        const statusCounts = await prisma.task.groupBy({
-          by: ["status"],
-          where: {
-            project_id: projectId,
-            organization_id: organizationId,
-            status: { in: [...TASK_STATUSES_FOR_PROGRESS] },
-          },
-          _count: { status: true },
-        });
-        if (statusCounts.length === 0) {
-          const project = await prisma.project.update({
-            where: { id: projectId },
-            data: { porcentage: 0 },
-            select: { id: true, status: true, porcentage: true, client_id: true },
-          });
-          await audit.createLog({
-            userId: auth.userId,
-            organizationId,
-            action: "Atualização de progresso",
-            referring: "integracao.projects",
-            referringId: projectId,
-            changes: { porcentage: 0 },
-          });
-          return { project };
-        }
-        const totalTasks = statusCounts.reduce((sum, group) => sum + group._count.status, 0);
-        const completedTasks =
-          statusCounts.find((group) => group.status === "Concluída")?._count.status ?? 0;
-        const percentage = Math.round((completedTasks / totalTasks) * 100 * 100) / 100;
-        const newStatus = percentage === 100 ? "Concluído" : "Em andamento";
-        if (
-          percentage === 100 &&
-          auth.integracaoLevel !== INTEGRACAO_PERMISSION_LEVEL.ADMIN &&
-          !auth.isOwner
-        ) {
-          throw new ServiceError(403, "Acesso negado para inativar o cliente pelo progresso.");
-        }
-        const project =
-          percentage === 100
-            ? await prisma.$transaction(async (transaction) => {
-                const updated = await transaction.project.update({
+        const outcome = await prisma.$transaction(
+          async (transaction) => {
+            const exists = await transaction.project.findFirst({
+              where: { id: projectId, organization_id: organizationId },
+              select: { id: true, client_id: true },
+            });
+            if (!exists) throw new ServiceError(404, "Projeto não existe");
+            requireIntegracaoRouteAccess("POST", "/project/progress", {
+              userId: auth.userId,
+              level: auth.integracaoLevel,
+              organizationId,
+              resourceOrganizationId: organizationId,
+              isOwner: auth.isOwner,
+              requestedFields: ["project_id"],
+            });
+            const statusCounts = await transaction.task.groupBy({
+              by: ["status"],
+              where: {
+                project_id: projectId,
+                organization_id: organizationId,
+                status: { in: [...TASK_STATUSES_FOR_PROGRESS] },
+              },
+              _count: { status: true },
+            });
+            if (statusCounts.length === 0) {
+              return {
+                project: await transaction.project.update({
                   where: { id: projectId },
-                  data: { status: newStatus, porcentage: percentage },
+                  data: { porcentage: 0 },
                   select: { id: true, status: true, porcentage: true, client_id: true },
-                });
-                const client = await transaction.client.findFirst({
-                  where: { id: exists.client_id, organization_id: organizationId },
-                });
-                if (!client) throw new ServiceError(404, "Cliente não existe");
-                if (client.service_unique === true) {
-                  await transaction.client.update({
-                    where: { id: exists.client_id },
-                    data: { status: "Inativo", deletion_date: new Date() },
-                  });
-                }
-                return updated;
-              })
-            : await prisma.project.update({
-                where: { id: projectId },
-                data: { status: newStatus, porcentage: percentage },
-                select: { id: true, status: true, porcentage: true, client_id: true },
+                }),
+                status: null,
+                percentage: 0,
+              };
+            }
+            const totalTasks = statusCounts.reduce((sum, group) => sum + group._count.status, 0);
+            const completedTasks =
+              statusCounts.find((group) => group.status === "Concluída")?._count.status ?? 0;
+            const percentage = Math.round((completedTasks / totalTasks) * 100 * 100) / 100;
+            const newStatus = percentage === 100 ? "Concluído" : "Em andamento";
+            if (
+              percentage === 100 &&
+              auth.integracaoLevel !== INTEGRACAO_PERMISSION_LEVEL.ADMIN &&
+              !auth.isOwner
+            ) {
+              throw new ServiceError(403, "Acesso negado para inativar o cliente pelo progresso.");
+            }
+            const updated = await transaction.project.update({
+              where: { id: projectId },
+              data: { status: newStatus, porcentage: percentage },
+              select: { id: true, status: true, porcentage: true, client_id: true },
+            });
+            if (percentage === 100) {
+              const client = await transaction.client.findFirst({
+                where: { id: exists.client_id, organization_id: organizationId },
               });
+              if (!client) throw new ServiceError(404, "Cliente não existe");
+              if (client.service_unique === true) {
+                await transaction.client.update({
+                  where: { id: exists.client_id },
+                  data: { status: "Inativo", deletion_date: new Date() },
+                });
+              }
+            }
+            return { project: updated, status: newStatus, percentage };
+          },
+          { isolationLevel: "RepeatableRead" },
+        );
         await audit.createLog({
           userId: auth.userId,
           organizationId,
           action: "Atualização de progresso",
           referring: "integracao.projects",
           referringId: projectId,
-          changes: { status: newStatus, porcentage: percentage },
+          changes: {
+            ...(outcome.status ? { status: outcome.status } : {}),
+            porcentage: outcome.percentage,
+          },
         });
-        return { project };
+        return { project: outcome.project };
       } catch (error) {
         if (error instanceof ServiceError) throw error;
         throw new ServiceError(500, "Erro ao recalcular progresso do projeto.", error);
@@ -650,7 +704,7 @@ async function extractReporting(
     );
   }
   if (input.query) {
-    return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
+    return executeProjectReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
       extractReporting(prisma, { ...input, query: undefined, fields, limit, offset }, true),
     );
   }
@@ -781,12 +835,12 @@ async function jsonBody(c: { req: { json<T>(): Promise<T> } }): Promise<unknown>
 }
 
 async function optionalJsonBody(c: {
-  req: { header(name: string): string | undefined; json<T>(): Promise<T> };
+  req: { header(name: string): string | undefined; json<T>(): Promise<T>; raw: Request };
 }): Promise<Record<string, unknown>> {
   const contentType = c.req.header("content-type") ?? "";
   if (!contentType.includes("application/json")) return {};
   const contentLength = c.req.header("content-length");
-  if (contentLength === "0") return {};
+  if (contentLength === "0" || !c.req.raw.body) return {};
   const body = await jsonBody(c);
   return body && typeof body === "object" && !Array.isArray(body)
     ? (body as Record<string, unknown>)
@@ -799,7 +853,14 @@ function runWithPrisma<T>(
   callback: (prisma: ProjectPrisma) => Promise<T> | T,
 ): Promise<T> {
   if (options.prisma) return Promise.resolve(callback(options.prisma));
-  return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+  const env = options.env ?? c.env;
+  if (!env.HYPERDRIVE?.connectionString && !env.DATABASE_URL) {
+    throw new ServiceError(
+      503,
+      "Banco de dados indisponível: configure o binding HYPERDRIVE ou o secret DATABASE_URL.",
+    );
+  }
+  return withWorkerPrisma(env, PrismaClient, (client) =>
     callback(client as unknown as ProjectPrisma),
   );
 }

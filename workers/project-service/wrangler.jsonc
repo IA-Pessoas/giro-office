@@ -1,4 +1,6 @@
 {
+  // Production supplies HYPERDRIVE out-of-band; local/CI uses DATABASE_URL.
+  // Never commit a Hyperdrive id or credential. DB routes return 503 if neither exists.
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
   "name": "giro-project-service",
   "main": "src/index.ts",
