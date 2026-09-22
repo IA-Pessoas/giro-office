@@ -87,4 +87,91 @@ describe("ti Worker", () => {
       active: false,
     });
   });
+
+  it("routes inventory listing with the forwarded organization and pagination", async () => {
+    const inventory = { list: vi.fn(async () => [{ id: "asset-1" }]) };
+    const app = createTiWorkerApp({
+      env: env(),
+      services: { inventory },
+    } as never);
+
+    const response = await app.request(
+      "https://ti.test/ti/inventory/list?page=2&page_size=10&status=available",
+      { headers: headers("2") },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: [{ id: "asset-1" }] });
+    expect(inventory.list).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      { page: 2, page_size: 10, status: "available" },
+    );
+  });
+
+  it("keeps password retrieval behind the admin TI permission", async () => {
+    const passwords = { getById: vi.fn(async () => ({ id: CATEGORY_ID, password: "clear" })) };
+    const app = createTiWorkerApp({
+      env: env(),
+      services: { passwords },
+    } as never);
+
+    expect(
+      (await app.request(`https://ti.test/ti/passwords/${CATEGORY_ID}`, { headers: headers("2") }))
+        .status,
+    ).toBe(403);
+
+    const response = await app.request(`https://ti.test/ti/passwords/${CATEGORY_ID}`, {
+      headers: headers("3"),
+    });
+    expect(response.status).toBe(200);
+    expect(passwords.getById).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 3 },
+      CATEGORY_ID,
+    );
+  });
+
+  it("routes request messages through the organization-scoped request service", async () => {
+    const requests = { list: vi.fn(async () => [{ id: CATEGORY_ID }]) };
+    const app = createTiWorkerApp({
+      env: env(),
+      services: { requests },
+    } as never);
+
+    const response = await app.request("https://ti.test/ti/requests/list?status=New", {
+      headers: headers("2"),
+    });
+
+    expect(response.status).toBe(200);
+    expect(requests.list).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
+      { status: "New" },
+    );
+  });
+
+  it("keeps request listing available to TI viewers", async () => {
+    const requests = { list: vi.fn(async () => []) };
+    const app = createTiWorkerApp({
+      env: env(),
+      services: { requests },
+    } as never);
+
+    const response = await app.request("https://ti.test/ti/requests/list", {
+      headers: headers("1"),
+    });
+
+    expect(response.status).toBe(200);
+    expect(requests.list).toHaveBeenCalledWith(
+      { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 1 },
+      {},
+    );
+  });
+
+  it("does not expose internal reporting without a valid grant", async () => {
+    const response = await appRequestWithoutAuth("https://ti.test/internal/reporting/catalog");
+    expect(response.status).toBe(403);
+  });
 });
+
+async function appRequestWithoutAuth(url: string): Promise<Response> {
+  return createTiWorkerApp({ env: env() }).request(url);
+}

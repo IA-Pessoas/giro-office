@@ -7,12 +7,345 @@ datasource db {
   provider = "postgresql"
 }
 
+model Organization {
+  id                             String                        @id
+  departments                    Department[]
+  users                          User[]                        @relation("UserOrganization")
+  permissions                    Permission[]
+  stocks                         Stock[]
+  categorysStock                 CategoryStock[]
+  entrysStock                    EntryStock[]
+  exitsStock                     ExitStock[]
+  locationsStock                 LocationStock[]
+  extensionsTecnologia           ExtensionsTecnologia[]
+  inventoryTecnologia            InventoryTecnologia[]
+  inventoryCategoriesTecnologia  InventoryCategoryTecnologia[]
+  inventoryLocationsTecnologia   InventoryLocationTecnologia[]
+  passwordsTecnologia            PasswordTecnologia[]
+  tiCategories                   TICategoryRequest[]
+  tiMessages                     TIMessage[]
+  tiRequests                     TIRequest[]
+  tiRobotRuns                    TIRobotRun[]
+  tiRobots                       TIRobot[]
+  termsTecnologia                TermTecnologia[]
+}
+
+model Department {
+  id              String          @id
+  name            String
+  color           String
+  status          String
+  solution        Boolean?
+  organization_id String
+  organization    Organization    @relation(fields: [organization_id], references: [id])
+  users           User[]
+  stocks          Stock[]
+  categorysStock  CategoryStock[]
+  locationsStock  LocationStock[]
+
+  @@map("departments")
+}
+
+model User {
+  id                  String                    @id
+  name                String
+  login               String
+  password            String
+  permission          Int
+  status              String
+  organization_id     String?
+  department_id       String
+  full_name           String?
+  cpf                 String?
+  organization        Organization?             @relation("UserOrganization", fields: [organization_id], references: [id])
+  department          Department                @relation(fields: [department_id], references: [id])
+  entrys              EntryStock[]
+  approversExists     ExitStock[]               @relation("approver")
+  operatorsExists     ExitStock[]               @relation("operator")
+  requestsExits       ExitStock[]               @relation("requester")
+  extensions          ExtensionsTecnologia[]
+  staffInventory      InventoryTecnologia[]     @relation("staff")
+  myInventory         InventoryTecnologia[]     @relation("user")
+  passwords           PasswordTecnologia[]
+  senderMsgTI         TIMessage[]
+  assigneerRequestsTI TIRequest[]               @relation("TiAssignee")
+  requestsTI          TIRequest[]               @relation("TiRequester")
+  terms               TermTecnologia[]
+  permissions         Permission[]
+}
+
+model Permission {
+  id              String       @id @default(uuid())
+  user_id         String
+  ti              Int          @default(0)
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, organization_id], map: "uq_permissions_user_org")
+  @@map("permissions")
+}
+
+model LocationStock {
+  id              String         @id
+  name            String
+  floor           Int?
+  department_id   String
+  status          Boolean        @default(true)
+  organization_id String
+  stocks          Stock[]
+  exits           ExitStock[]
+  department      Department     @relation(fields: [department_id], references: [id])
+  organization    Organization   @relation(fields: [organization_id], references: [id])
+
+  @@map("stock.locations")
+}
+
+model CategoryStock {
+  id              String         @id
+  name            String
+  department_id   String
+  status          Boolean        @default(true)
+  organization_id String
+  stocks          Stock[]
+  department      Department     @relation(fields: [department_id], references: [id])
+  organization    Organization   @relation(fields: [organization_id], references: [id])
+
+  @@map("stock.categories")
+}
+
+model Stock {
+  id              String         @id @default(uuid())
+  department_id   String
+  name            String
+  category_id     String
+  location_id     String
+  quantity        Int
+  description     String?
+  status          Boolean        @default(true)
+  organization_id String
+  category        CategoryStock  @relation(fields: [category_id], references: [id])
+  department      Department     @relation(fields: [department_id], references: [id])
+  location        LocationStock  @relation(fields: [location_id], references: [id])
+  organization    Organization   @relation(fields: [organization_id], references: [id])
+  entries         EntryStock[]
+  exits           ExitStock[]
+
+  @@map("stock")
+}
+
+model EntryStock {
+  id               String       @id @default(uuid())
+  stock_id         String
+  quantity         Int
+  entry_date       DateTime
+  entry_by_user_id String
+  organization_id  String
+  entry_by_user    User         @relation(fields: [entry_by_user_id], references: [id])
+  organization     Organization @relation(fields: [organization_id], references: [id])
+  stock            Stock        @relation(fields: [stock_id], references: [id])
+
+  @@map("stock.entries")
+}
+
+model ExitStock {
+  id                      String         @id @default(uuid())
+  stock_id                String
+  quantity                Int
+  destination             String?
+  exit_date               DateTime
+  requester_id            String
+  approver_id             String?
+  operator_id             String?
+  location_destination_id String?
+  organization_id         String
+  approver                User?          @relation("approver", fields: [approver_id], references: [id])
+  loc_dest                LocationStock? @relation(fields: [location_destination_id], references: [id])
+  operator                User?          @relation("operator", fields: [operator_id], references: [id])
+  organization            Organization   @relation(fields: [organization_id], references: [id])
+  requester               User           @relation("requester", fields: [requester_id], references: [id])
+  stock                   Stock          @relation(fields: [stock_id], references: [id])
+
+  @@map("stock.exits")
+}
+
+model PasswordTecnologia {
+  id                     String       @id @default(uuid())
+  local                  String
+  user_id                String
+  password               String
+  notes                  String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  organization_id        String
+  active                 Boolean      @default(true)
+  deactivated_at         DateTime?
+  deactivated_by_user_id String?
+  deactivation_reason    String?
+  organization           Organization @relation(fields: [organization_id], references: [id])
+  user                   User         @relation(fields: [user_id], references: [id])
+
+  @@map("tecnologia.passwords_users")
+}
+
+model ExtensionsTecnologia {
+  id              String       @id @default(uuid())
+  user_id         String
+  number          String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+
+  @@unique([organization_id, number])
+  @@map("tecnologia.extensions")
+}
+
 model InventoryCategoryTecnologia {
-  id              String  @id @default(uuid())
+  id              String                       @id @default(uuid())
   name            String
   tag             String?
-  active          Boolean @default(true)
+  active          Boolean                      @default(true)
   organization_id String
+  inventory       InventoryTecnologia[]
+  organization    Organization                 @relation(fields: [organization_id], references: [id])
 
   @@map("tecnologia.inventoryCategories")
+}
+
+model InventoryLocationTecnologia {
+  id              String                       @id @default(uuid())
+  name            String
+  active          Boolean                      @default(true)
+  organization_id String
+  inventory       InventoryTecnologia[]
+  organization    Organization                 @relation(fields: [organization_id], references: [id])
+
+  @@map("tecnologia.inventoryLocations")
+}
+
+model InventoryTecnologia {
+  id                      String                       @id @default(uuid())
+  user_id                 String?
+  location_id             String?
+  category_id             String
+  asset_code              String
+  notes                   String?
+  delivery_date           DateTime?
+  return_date             DateTime?
+  responsible_it_staff_id String?
+  created_at              DateTime                     @default(now())
+  updated_at              DateTime                     @updatedAt
+  organization_id         String
+  category                InventoryCategoryTecnologia  @relation(fields: [category_id], references: [id])
+  location                InventoryLocationTecnologia? @relation(fields: [location_id], references: [id])
+  organization            Organization                 @relation(fields: [organization_id], references: [id])
+  responsible_it_staff    User?                        @relation("staff", fields: [responsible_it_staff_id], references: [id])
+  user                    User?                        @relation("user", fields: [user_id], references: [id])
+
+  @@unique([organization_id, asset_code])
+  @@map("tecnologia.inventory")
+}
+
+model TermTecnologia {
+  id              String       @id @default(uuid())
+  user_id         String?
+  date            DateTime
+  user_name       String
+  user_cpf        String
+  department_id   String?
+  address         String?
+  reason          String?
+  signed_at       DateTime?
+  equipament_list String?
+  brand           String?
+  asset_code      String?
+  imei            String?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User?        @relation(fields: [user_id], references: [id])
+
+  @@map("tecnologia.terms")
+}
+
+model TIRequest {
+  id              String            @id @default(uuid())
+  title           String
+  description     String
+  requester_id    String
+  category_id     String
+  assigned_to_id  String?
+  urgency         String
+  status          String
+  attachment      String?
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  organization_id String
+  messages        TIMessage[]
+  assigned_to     User?             @relation("TiAssignee", fields: [assigned_to_id], references: [id])
+  category        TICategoryRequest @relation(fields: [category_id], references: [id])
+  organization    Organization      @relation(fields: [organization_id], references: [id])
+  requester       User              @relation("TiRequester", fields: [requester_id], references: [id])
+
+  @@map("tecnologia.requests")
+}
+
+model TICategoryRequest {
+  id              String       @id @default(uuid())
+  name            String
+  active          Boolean      @default(true)
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  requests        TIRequest[]
+
+  @@map("tecnologia.request_categories")
+}
+
+model TIMessage {
+  id              String       @id @default(uuid())
+  request_id      String
+  sender_id       String
+  message         String
+  attachment      String?
+  type            String
+  created_at      DateTime     @default(now())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  request         TIRequest    @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  sender          User         @relation(fields: [sender_id], references: [id])
+
+  @@map("tecnologia.request_messages")
+}
+
+model TIRobot {
+  id              String       @id @default(uuid())
+  name            String
+  description     String?
+  type            String
+  schedule        String?
+  status          String
+  active          Boolean      @default(true)
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  runs            TIRobotRun[]
+
+  @@map("tecnologia.robots")
+}
+
+model TIRobotRun {
+  id              String       @id @default(uuid())
+  robot_id        String
+  status          String
+  started_at      DateTime     @default(now())
+  finished_at     DateTime?
+  message         String?
+  metadata_json   Json?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  robot           TIRobot      @relation(fields: [robot_id], references: [id], onDelete: Cascade)
+
+  @@map("tecnologia.robot_runs")
 }
