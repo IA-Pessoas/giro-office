@@ -64,6 +64,22 @@ function service(): CertificatePjServiceMock {
   };
 }
 
+function pfService() {
+  return {
+    listCertificatePf: vi.fn(async () => ({
+      items: [{ id: CERTIFICATE_ID, cpf: "12345678901" }],
+      total: 1,
+      page: 1,
+      page_size: 50,
+      has_more: false,
+    })),
+    getCertificatePf: vi.fn(async () => ({ id: CERTIFICATE_ID, cpf: "12345678901" })),
+    createCertificatePf: vi.fn(async () => ({ id: CERTIFICATE_ID })),
+    updateCertificatePf: vi.fn(async () => ({ id: CERTIFICATE_ID })),
+    deleteCertificatePf: vi.fn(async () => ({ ok: true })),
+  };
+}
+
 function env(): CertificateWorkerEnv {
   return {
     JWT_SECRET: "certificate-worker-test-secret-which-is-long-enough",
@@ -90,6 +106,17 @@ const jsonBody = {
   responsible: "Maria Silva",
   model: "A1",
   legal_nature: "LTDA",
+  password: "secret-password",
+  expiration_date: "2026-12-31T00:00:00.000Z",
+  was_paid: true,
+};
+
+const pfJsonBody = {
+  client_castelo_status: true,
+  client_focus_status: false,
+  name: "Pessoa Castelo",
+  cpf: "12345678901",
+  model: "A1",
   password: "secret-password",
   expiration_date: "2026-12-31T00:00:00.000Z",
   was_paid: true,
@@ -214,6 +241,60 @@ describe("certificate Worker PJ slice", () => {
       id: CERTIFICATE_ID,
       organizationId: OTHER_ORGANIZATION_ID,
       canViewPassword: false,
+    });
+  });
+
+  it("routes PF CRUD through the same organization and permission boundary", async () => {
+    const certificatePfService = pfService();
+    const app = createCertificateWorkerApp({ env: env(), pfService: certificatePfService });
+    const headers = gatewayHeaders();
+    const jsonHeaders = { ...headers, "content-type": "application/json" };
+
+    const list = await app.request("https://certificate.test/certificate/pf/list?page=2", {
+      headers,
+    });
+    const detail = await app.request(`https://certificate.test/certificate/pf/${CERTIFICATE_ID}`, {
+      headers,
+    });
+    const create = await app.request("https://certificate.test/certificate/pf", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify(pfJsonBody),
+    });
+    const update = await app.request(`https://certificate.test/certificate/pf/${CERTIFICATE_ID}`, {
+      method: "PATCH",
+      headers: jsonHeaders,
+      body: JSON.stringify({ name: "Pessoa Atualizada" }),
+    });
+    const remove = await app.request(`https://certificate.test/certificate/pf/${CERTIFICATE_ID}`, {
+      method: "DELETE",
+      headers,
+    });
+
+    expect([list.status, detail.status, create.status, update.status, remove.status]).toEqual([
+      200, 200, 201, 200, 200,
+    ]);
+    expect(certificatePfService.listCertificatePf).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      query: { page: 2 },
+    });
+    expect(certificatePfService.getCertificatePf).toHaveBeenCalledWith({
+      id: CERTIFICATE_ID,
+      organizationId: ORGANIZATION_ID,
+      canViewPassword: true,
+    });
+    expect(certificatePfService.createCertificatePf).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      data: expect.objectContaining({ cpf: pfJsonBody.cpf }),
+    });
+    expect(certificatePfService.updateCertificatePf).toHaveBeenCalledWith({
+      id: CERTIFICATE_ID,
+      organizationId: ORGANIZATION_ID,
+      data: { name: "Pessoa Atualizada" },
+    });
+    expect(certificatePfService.deleteCertificatePf).toHaveBeenCalledWith({
+      id: CERTIFICATE_ID,
+      organizationId: ORGANIZATION_ID,
     });
   });
 });

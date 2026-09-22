@@ -1,10 +1,17 @@
 import {
+  certificatePfIdParamSchema,
+  certificatePfListQuerySchema,
+  createCertificatePfSchema,
+  updateCertificatePfSchema,
+} from "@workspace/certificate-service/src/schemas/certificatePf.schemas.js";
+import {
   certificatePjIdParamSchema,
   certificatePjListQuerySchema,
   createCertificatePjSchema,
   updateCertificatePjSchema,
 } from "@workspace/certificate-service/src/schemas/certificatePj.schemas.js";
 import { createCertificatePasswordCrypto } from "@workspace/certificate-service/src/services/certificatePasswordCrypto.js";
+import { CertificatePfService } from "@workspace/certificate-service/src/services/certificatePfService.js";
 import { CertificatePjService } from "@workspace/certificate-service/src/services/certificatePjService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import { parseWithZod } from "@workspace/shared";
@@ -32,10 +39,19 @@ type CertificatePjServiceLike = Pick<
   | "updateCertificatePj"
   | "deleteCertificatePj"
 >;
+type CertificatePfServiceLike = Pick<
+  CertificatePfService,
+  | "listCertificatePf"
+  | "getCertificatePf"
+  | "createCertificatePf"
+  | "updateCertificatePf"
+  | "deleteCertificatePf"
+>;
 
 interface CertificateWorkerOptions {
   env: CertificateWorkerEnv;
   service?: CertificatePjServiceLike;
+  pfService?: CertificatePfServiceLike;
 }
 
 type CertificateVariables = { auth: WorkerAuthContext };
@@ -62,6 +78,26 @@ async function withCertificateService<T>(
     });
     const service = new CertificatePjService(
       client as unknown as ConstructorParameters<typeof CertificatePjService>[0],
+      undefined,
+      passwordCrypto,
+    );
+    return callback(service);
+  });
+}
+
+async function withCertificatePfService<T>(
+  options: CertificateWorkerOptions,
+  callback: (service: CertificatePfServiceLike) => Promise<T>,
+): Promise<T> {
+  if (options.pfService) return callback(options.pfService);
+
+  return withWorkerPrisma(options.env, PrismaClient, async (client) => {
+    const passwordCrypto = createCertificatePasswordCrypto({
+      keyBase64: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
+      keyVersion: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
+    });
+    const service = new CertificatePfService(
+      client as unknown as ConstructorParameters<typeof CertificatePfService>[0],
       undefined,
       passwordCrypto,
     );
@@ -155,6 +191,72 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
       createSuccessResponse(
         await withCertificateService(options, (service) =>
           service.deleteCertificatePj({ id: params.id, organizationId: auth.organizationId }),
+        ),
+      ),
+    );
+  });
+
+  app.get("/certificate/pf/list", async (c) => {
+    const query = parseWithZod(certificatePfListQuerySchema, c.req.query());
+    const auth = c.get("auth");
+    return c.json(
+      createSuccessResponse(
+        await withCertificatePfService(options, (service) =>
+          service.listCertificatePf({ organizationId: auth.organizationId, query }),
+        ),
+      ),
+    );
+  });
+
+  app.get("/certificate/pf/:id", async (c) => {
+    const params = parseWithZod(certificatePfIdParamSchema, c.req.param());
+    const auth = c.get("auth");
+    return c.json(
+      createSuccessResponse(
+        await withCertificatePfService(options, (service) =>
+          service.getCertificatePf({
+            id: params.id,
+            organizationId: auth.organizationId,
+            canViewPassword: certificatePermission(auth) >= 2,
+          }),
+        ),
+      ),
+    );
+  });
+
+  app.post("/certificate/pf", async (c) => {
+    const auth = c.get("auth");
+    const data = parseWithZod(createCertificatePfSchema, await readJson(c));
+    return c.json(
+      createSuccessResponse(
+        await withCertificatePfService(options, (service) =>
+          service.createCertificatePf({ organizationId: auth.organizationId, data }),
+        ),
+      ),
+      201,
+    );
+  });
+
+  app.patch("/certificate/pf/:id", async (c) => {
+    const params = parseWithZod(certificatePfIdParamSchema, c.req.param());
+    const auth = c.get("auth");
+    const data = parseWithZod(updateCertificatePfSchema, await readJson(c));
+    return c.json(
+      createSuccessResponse(
+        await withCertificatePfService(options, (service) =>
+          service.updateCertificatePf({ id: params.id, organizationId: auth.organizationId, data }),
+        ),
+      ),
+    );
+  });
+
+  app.delete("/certificate/pf/:id", async (c) => {
+    const params = parseWithZod(certificatePfIdParamSchema, c.req.param());
+    const auth = c.get("auth");
+    return c.json(
+      createSuccessResponse(
+        await withCertificatePfService(options, (service) =>
+          service.deleteCertificatePf({ id: params.id, organizationId: auth.organizationId }),
         ),
       ),
     );
