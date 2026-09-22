@@ -273,17 +273,6 @@ function writeWorkerConfig(worker, { tmpDir, databaseUrl, vars }) {
     ...(original.services ? { services: original.services } : {}),
     ...(original.vars ? { vars: original.vars } : {}),
     ...(original.triggers ? { triggers: original.triggers } : {}),
-    // O task Worker roda o app Node trocando módulos por alias; caminhos relativos à config.
-    ...(original.alias
-      ? {
-          alias: Object.fromEntries(
-            Object.entries(original.alias).map(([from, to]) => [
-              from,
-              to.startsWith(".") ? join(workerDir, to) : to,
-            ]),
-          ),
-        }
-      : {}),
     hyperdrive: [
       {
         binding: "HYPERDRIVE",
