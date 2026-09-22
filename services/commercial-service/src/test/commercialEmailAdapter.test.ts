@@ -33,7 +33,12 @@ describe("CommercialEmailHttpAdapter", () => {
       }),
     );
     const [, request] = fetchImpl.mock.calls[0];
-    expect(request.body).toContain("destino@example.test");
+    expect(JSON.parse(request.body)).toEqual({
+      from: "comercial@example.test",
+      recipients: [{ email: "destino@example.test", name: "Destino" }],
+      subject: "CLIENTE NOVO - Empresa",
+      html: "<p>2026-10</p>",
+    });
     expect(request.body).not.toContain("secret-token");
   });
 
