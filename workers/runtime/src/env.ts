@@ -8,6 +8,7 @@ export interface ServiceBinding {
 
 export interface WorkerEnv {
   HYPERDRIVE?: HyperdriveBinding;
+  DATABASE_URL?: string;
 }
 
 export type WorkerBindings<
