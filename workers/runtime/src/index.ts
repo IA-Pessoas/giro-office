@@ -7,6 +7,12 @@ export {
   type WorkerPrismaClientConstructor,
   withWorkerPrisma,
 } from "./prisma.js";
+export {
+  createSupabaseStorageClient,
+  type SupabaseStorageClient,
+  type SupabaseStorageEnvironment,
+  type SupabaseStorageUploadOptions,
+} from "./storage.js";
 
 import type { ServiceBinding, WorkerEnv } from "./env.js";
 
