@@ -1,0 +1,20 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "giro-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "services": [
+    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" },
+    { "binding": "DEPARTMENT_SERVICE", "service": "giro-department-service" },
+    { "binding": "ORGANIZATION_SERVICE", "service": "giro-organization-service" },
+    { "binding": "USER_SERVICE", "service": "giro-user-service" },
+    { "binding": "CLIENT_SERVICE", "service": "giro-client-service" },
+    { "binding": "FISCAL_SERVICE", "service": "giro-fiscal-service" },
+    { "binding": "CERTIFICATE_SERVICE", "service": "giro-certificate-service" },
+    { "binding": "REPORTS_SERVICE", "service": "giro-reports-service" },
+    { "binding": "PARCELAMENTO_SERVICE", "service": "giro-parcelamento-service" },
+    { "binding": "CONTABIL_SERVICE", "service": "giro-contabil-service" }
+  ],
+  "observability": { "enabled": true }
+}

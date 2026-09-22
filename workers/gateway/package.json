@@ -1,0 +1,25 @@
+{
+  "name": "@workspace/gateway-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "check": "biome check ."
+  },
+  "dependencies": {
+    "@workspace/runtime": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "hono": "4.12.25"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.5",
+    "@types/node": "^25.3.0",
+    "typescript": "5.3.3",
+    "vitest": "^4.1.11"
+  }
+}
