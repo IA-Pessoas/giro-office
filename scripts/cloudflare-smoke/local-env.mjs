@@ -21,6 +21,7 @@ export const WORKERS = [
     dir: "workers/parcelamento-service",
     service: "giro-parcelamento-service",
   },
+  { key: "task", dir: "workers/task-service", service: "giro-task-service" },
   { key: "gateway", dir: "workers/gateway", service: "giro-gateway" },
 ];
 
@@ -205,6 +206,7 @@ const SERVICE_CLIENT_DIRS = [
   "services/fiscal-service/src/generated/prisma",
   "services/triagem-service/src/generated/prisma",
   "services/parcelamento-service/src/generated/prisma",
+  "services/task-service/src/generated/prisma",
 ];
 
 /**
@@ -269,6 +271,17 @@ function writeWorkerConfig(worker, { tmpDir, databaseUrl, vars }) {
     compatibility_flags: original.compatibility_flags ?? [],
     ...(original.services ? { services: original.services } : {}),
     ...(original.vars ? { vars: original.vars } : {}),
+    // O task Worker roda o app Node trocando módulos por alias; caminhos relativos à config.
+    ...(original.alias
+      ? {
+          alias: Object.fromEntries(
+            Object.entries(original.alias).map(([from, to]) => [
+              from,
+              to.startsWith(".") ? join(workerDir, to) : to,
+            ]),
+          ),
+        }
+      : {}),
     hyperdrive: [
       {
         binding: "HYPERDRIVE",
@@ -318,13 +331,24 @@ export async function startWorkers({ tmpDir, databaseUrl, secrets, portBase }) {
     };
     if (key === "gateway") return base;
     if (key === "user") return { ...base, REPORTS_INTERNAL_TOKEN: secrets.reportsToken };
-    return {
+    const service = {
       ...base,
       AUDIT_ENABLED: "true",
       USER_SERVICE_INTERNAL_TOKEN: secrets.internalToken,
       TRIAGEM_INTERNAL_TOKEN: secrets.internalToken,
       REPORTS_INTERNAL_TOKEN: secrets.reportsToken,
       REPORTS_GRANT_SECRET: secrets.grantSecret,
+    };
+    if (key !== "task") return service;
+    // Valores descartáveis: o smoke não exercita anexos (Supabase) nem extração por IA,
+    // mas o task-service recusa subir em produção sem eles, como no Node.
+    return {
+      ...service,
+      COMMERCIAL_SERVICE_TOKEN: secrets.internalToken,
+      SUPABASE_URL: "http://127.0.0.1:9",
+      SUPABASE_SERVICE_ROLE_KEY: "smoke-local-only",
+      TASK_ATTACHMENT_STORAGE_BUCKET: "smoke-local-only",
+      OPENAI_API_KEY: "smoke-local-only",
     };
   };
 

@@ -51,6 +51,9 @@ const CLEANUP_TABLES = [
   "triagem.competences",
   "triagem.catalog_items",
   "fiscal.ncm",
+  "integracao.tasks",
+  "integracao.tasksModel",
+  "integracao.projects",
   "contabil.relationship",
   "parcelamento.installmentsCompetencies",
   "parcelamento.installments",
@@ -838,7 +841,8 @@ async function runChecks({ db, sql, baseUrls, secrets, runId, mode, migrationWor
         headers: {
           "x-internal-service-token": secrets.reportsToken,
           "x-reports-grant": grant,
-          "x-reports-grant-signature": `${signature.slice(0, -1)}0`,
+          // Sempre diferente do original: trocar por "0" não adultera assinatura que já termina em "0".
+          "x-reports-grant-signature": `${signature.slice(0, -1)}${signature.endsWith("0") ? "1" : "0"}`,
         },
       });
       expectStatus(invalid, 403, `${service.key} catalog com assinatura inválida`);
@@ -973,6 +977,114 @@ async function runChecks({ db, sql, baseUrls, secrets, runId, mode, migrationWor
       `reconcile não despachou eventos: ${JSON.stringify(reconcile.data)}`,
     );
     return `outbox com ${pending.rows[0].total} evento(s), ${reconcile.data.dispatched} despachado(s)`;
+  });
+
+  let taskId;
+  await check("crud.task_via_gateway", async () => {
+    const departmentId = randomUUID();
+    const modelId = randomUUID();
+    const projectId = randomUUID();
+    await sql(
+      `insert into departments (id, name, color, status, organization_id)
+       values ($1, $2, '#000000', 'Ativo', $3)`,
+      [departmentId, `${runId}-dept-task`, fixtures.orgA],
+    );
+    await sql(
+      `insert into "integracao.tasksModel" (id, name, department_id, responsible_id, billing, prevision, type, organization_id)
+       values ($1, $2, $3, $4, 'Não Realizar', 1, 'Projeto', $5)`,
+      [modelId, `${runId}-modelo`, departmentId, fixtures.userA, fixtures.orgA],
+    );
+    await sql(
+      `insert into "integracao.projects" (id, name, client_id, status, porcentage, organization_id)
+       values ($1, $2, $3, 'Em Andamento', 0, $4)`,
+      [projectId, `${runId}-projeto`, fixtures.clientA, fixtures.orgA],
+    );
+    const created = expectStatus(
+      await http(baseUrls.gateway, "/task", {
+        method: "POST",
+        token: tokenA,
+        body: {
+          model_id: modelId,
+          project_id: projectId,
+          client_id: fixtures.clientA,
+          prospecting_status: "Análise/Agendamento",
+          department_id: departmentId,
+          urgency: "Normal",
+        },
+      }),
+      201,
+      "POST /task",
+    );
+    taskId = created.data.create.id;
+    const detail = expectStatus(
+      await http(baseUrls.gateway, `/task?task_id=${taskId}`, { token: tokenA }),
+      200,
+      "GET /task",
+    );
+    assert(JSON.stringify(detail.data).includes(taskId), "GET não retornou a tarefa criada");
+    expectStatus(
+      await http(baseUrls.gateway, "/task", {
+        method: "PUT",
+        token: tokenA,
+        body: { task_id: taskId, name: `${runId} tarefa alterada` },
+      }),
+      200,
+      "PUT /task",
+    );
+    const list = expectStatus(
+      await http(baseUrls.gateway, `/task/list?client_id=${fixtures.clientA}&limit=100`, {
+        token: tokenA,
+      }),
+      200,
+      "GET /task/list",
+    );
+    assert(JSON.stringify(list.data).includes("tarefa alterada"), "lista não trouxe a alteração");
+    return "POST/GET/PUT/LIST de integracao.tasks pelo gateway";
+  });
+
+  await check("tenant.task_org_b_nao_ve_org_a", async () => {
+    assert(taskId, "sem tarefa criada no check anterior");
+    expectStatus(
+      await http(baseUrls.gateway, `/task?task_id=${taskId}`, { token: tokenB }),
+      404,
+      "GET /task da org A com token da org B",
+    );
+    return "org B recebe 404 para a tarefa da org A";
+  });
+
+  await check("auditoria.entity_change_do_task", async () => {
+    assert(taskId, "sem tarefa criada no check anterior");
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const { rows } = await sql(
+        "select action from audit_requests where organization_id = $1 and method = 'ENTITY_CHANGE' and referring = 'integracao.tasks' and referring_id = $2",
+        [fixtures.orgA, taskId],
+      );
+      if (rows.length > 0) return `ENTITY_CHANGE integracao.tasks (action=${rows[0].action})`;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    throw new Error("a criação da tarefa não gerou ENTITY_CHANGE em audit_requests");
+  });
+
+  await check("task.internal_commercial_exige_token", async () => {
+    expectStatus(
+      await http(baseUrls.task, "/internal/commercial/task-billing", {
+        method: "POST",
+        body: {},
+        headers: { "x-internal-service-token": "token-errado" },
+      }),
+      403,
+      "token errado",
+    );
+    expectStatus(
+      await http(baseUrls.task, "/internal/commercial/task-billing", {
+        method: "POST",
+        body: {},
+        headers: { "x-internal-service-token": secrets.internalToken },
+      }),
+      400,
+      "token certo e corpo inválido",
+    );
+    return "403 com token errado; token do commercial aceito (400 no corpo vazio)";
   });
 
   return fixtures;
