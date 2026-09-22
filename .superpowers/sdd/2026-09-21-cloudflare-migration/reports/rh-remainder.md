@@ -1,5 +1,54 @@
 # Relatório — restante de RH no Worker
 
+## Atualização 2026-09-22 — branch `cf/rh-worker-remainder`
+
+Esta rodada fechou as lacunas de rota listadas mais abaixo. Não houve deploy nem push.
+
+### Rotas migradas nesta rodada
+
+Mesmos paths, métodos, status, Zod (importado de `@workspace/rh-service/src/schemas`), envelope `createSuccessResponse` e níveis de permissão do Node. `requireRhPermission` do Worker exige `claims.permission` e `claims.modules.rh`. Onde o Node usa `canManageRh`/`getRhPermissionLevel`, o Worker usa o nível RH repassado pelo gateway. Todas as consultas são escopadas por `organization_id` da identidade repassada.
+
+| Área | Rotas |
+|---|---|
+| Ponto | `GET /rh/point`, `GET /rh/point/me/today`, `GET /rh/point/summary`, `POST /rh/point/register`, `POST /rh/point/recalculate`, `POST /rh/point/:pointId/calculate` |
+| Ajustes de ponto | `GET /rh/point/adjustment/requests`, `POST /rh/point/adjustment/request` (201), `PUT /rh/point/adjustment/approve`, `PUT .../reject`, `PUT .../approve-bulk`, `POST /rh/point/adjustment/retroactive` (201), `POST /rh/point/adjustment/:requestId/attachment` (multipart) |
+| Perfil | `GET/PUT /rh/profile/colaborator`, `GET /rh/profile/colaborator/list`, `GET/POST/PUT/DELETE /rh/profile/contact`, `GET/PUT /rh/profile/allergy` |
+| Usuários operacionais | `GET /rh/operational-users` (RH 3 ou qualquer módulo do catálogo ≥ 1, como no Node) |
+| Solicitações | `POST/GET/PUT/DELETE /rh/requests`, `GET /rh/requests/:id` |
+| Mensagens | `POST /rh/messages` (JSON ou multipart com anexo), `GET /rh/messages?requestId=` (URL assinada de 300 s) |
+| Score | `GET /rh/score/evaluations/pending`, `POST /rh/score/evaluations/submit`, `POST /rh/score/quarters/generate`, `PATCH /rh/score/quarters/nitro`, `GET /rh/score/quarters/me`, `GET /rh/score/quarters/:id`, `PUT /rh/score/nitro/update` |
+| Folhas de ponto | `POST /rh/timesheets`, `PUT /rh/timesheets/rebuild`, `PUT .../reopen`, `PUT .../sign`, `GET /rh/timesheets`, `GET /rh/timesheets/:id`, `GET /rh/timesheets/:id/pdf` |
+
+Conferido com `rg "/rh/" app/src`: todo path que a UI chama existe no Worker, inclusive os quatro que davam 404 (`/rh/requests`, `/rh/score/evaluations/pending`, `/rh/timesheets`, `/rh/operational-users?module=...&department_id=...`).
+
+### Como foi portado
+
+- Os services do Node foram copiados para `workers/rh-service/src/services/` com a lógica e as mensagens intactas. A única mudança estrutural: o singleton `prismaClient` virou dependência de construtor, com um client por requisição via Hyperdrive (`withWorkerPrisma`). Importar os services do Node direto não funciona, porque `integrations/prisma.ts` e `config/env.ts` leem `process.env` e `import.meta.url` no import.
+- O schema Prisma do Worker agora copia do canônico os modelos usados (User, Permission, Department, pontos, solicitações, mensagens, leituras, notificações, score, folhas), mantendo só as relações entre modelos incluídos. `src/schemaParity.test.ts` (cópia do user-service) garante as colunas `@updatedAt`.
+- Fuso da organização: o Worker não carrega o modelo `Organization`, então `pointService` e `timeSheetService` leem `organizations.timezone` com `$queryRaw` parametrizado, com o mesmo 404 e o mesmo fallback do Node.
+- Anexos: `@supabase/supabase-js` saiu, e os anexos usam `createSupabaseStorageClient` de `@workspace/runtime`. Paths de objeto, validação de path, expiração e mensagens são as mesmas do Node. Sem `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`, a resposta é 503, como no Node.
+- PDF: `pdfkit` 0.19.1 (já estava no lockfile) pelo build `pdfkit/js/pdfkit.standalone.js`. Ele não compila WASM nem usa eval no caminho usado e traz as fontes embutidas. Verificado no workerd com `wrangler dev --local`: gera `%PDF-1.3` com texto acentuado, linhas e imagem PNG. Armadilha: o bundle tem um shim próprio de `Buffer`, então a imagem da assinatura vai como ArrayBuffer exato. Passar um Buffer do Node cai em `fs.readFileSync` e quebra.
+
+### Validação
+
+- `pnpm --filter @workspace/rh-worker test`: **98/98** em 8 arquivos. Toda rota nova tem um caso de sucesso e um de erro ou permissão, e o RED foi observado antes de cada implementação (404 no stub).
+- `typecheck`, `check` (biome), `build` e `prisma validate`: **passaram**.
+- `pnpm exec wrangler deploy --dry-run --outdir <tmp>`: **passou**. Upload de 7947.33 KiB (2011.99 KiB gzip), binding `HYPERDRIVE`, sem publicação.
+- Smoke local com `wrangler dev --local`: o bundle sobe no workerd. `/health` responde 200, identidade com RH 0 recebe 403, e uma rota com banco chega ao Prisma (falha de conexão esperada, sem banco local).
+
+### Secrets e vars novos (só nomes)
+
+- Secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. São necessários para os anexos de ajuste de ponto e de mensagens; sem eles, essas rotas respondem 503.
+- Vars opcionais: `RH_POINT_ADJUSTMENT_BUCKET` (padrão `rh-point-adjustments`), `RH_REQUEST_MESSAGE_BUCKET` (padrão `rh-request-messages`), `POINT_MIN_INTERVAL_MINUTES` (padrão 30).
+- Nenhum binding novo, e o gateway não mudou.
+
+### Pendências
+
+- `/internal/reporting/*` não foi migrado, porque estava fora do escopo desta rodada. Depende do catálogo de relatórios e do grant HMAC (`REPORTS_INTERNAL_TOKEN`/`REPORTS_GRANT_SECRET`).
+- Jobs/Queue de notificações continuam pendentes, pelo mesmo motivo de antes.
+- Pequeno desvio no multipart: um campo de arquivo inesperado não gera o 400 "Campo de arquivo inesperado." do multer. Os demais erros de upload (tipo, tamanho, assinatura) mantêm status e mensagem.
+- O PDF completo de várias páginas foi testado no vitest (Node). No workerd, o smoke cobriu os primitivos que o layout usa (texto, linhas, imagem), mas não a rota com banco real.
+
 ## Escopo
 
 Implementação limitada ao restante de RH definido no brief da migração Cloudflare. O código RH foi mantido em `workers/rh-service/**`; este relatório é o artefato obrigatório fora do Worker. Não houve deploy real e não foram alterados schemas globais, gateways, serviços de TI, User ou Pessoal.
@@ -78,7 +127,7 @@ Cada comportamento novo teve teste escrito antes da implementação e RED observ
 
 O workspace emitiu apenas o warning preexistente de `resolutions` em `services/src/package.json`; ele não impediu os gates.
 
-## Lacunas registradas
+## Lacunas registradas (rodada anterior — fechadas em `cf/rh-worker-remainder`, exceto relatórios internos e jobs)
 
 As partes abaixo não foram mascaradas com mocks, respostas 200 ou schema inventado:
 
