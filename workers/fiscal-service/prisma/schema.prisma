@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Icms {
+  id                   String   @id @default(uuid())
+  state                String
+  item_number          String?
+  cest_code            String?
+  description          String
+  interstate_agreement String?
+  applied_original_mva String?
+  adjusted_mva         String?
+  original_mva         String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  organization_id      String
+
+  @@map("fiscal.icms")
+}

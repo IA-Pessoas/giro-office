@@ -1,0 +1,329 @@
+import {
+  authenticateWorkerRequest,
+  verifyHs256Jwt,
+  type WorkerAuthClaims,
+  type WorkerAuthContext,
+  WorkerAuthenticationError,
+} from "@workspace/runtime";
+import {
+  ACTIVE_MODULE_KEYS,
+  type ModulePermissions,
+  normalizeModulePermissions,
+} from "@workspace/shared/auth";
+import {
+  AUTH_SESSION_COOKIE_NAME,
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_KIND_HEADER,
+  FORWARDED_AUTH_MODULES_HEADER,
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
+  FORWARDED_AUTH_SESSION_VERSION_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  hashCsrfToken,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+  readCookie,
+  ServiceError,
+  verifyCsrfToken,
+} from "@workspace/shared/http";
+
+import type { UserWorkerEnv } from "./env.js";
+import type { Row, UserPrismaClient } from "./types.js";
+
+export type AuthTransport = "cookie" | "bearer" | "forwarded";
+
+export interface UserAuthContext extends WorkerAuthContext {
+  transport: AuthTransport;
+}
+
+export interface PlatformIdentity {
+  id: string;
+  name: string;
+  email: string;
+  auth_kind: "platform";
+  platform_role: "super_admin";
+}
+
+function header(request: Request, name: string): string | undefined {
+  const value = request.headers.get(name);
+  return value && value.length > 0 ? value : undefined;
+}
+
+function modulePermissions(request: Request): ModulePermissions | undefined {
+  const value = header(request, FORWARDED_AUTH_MODULES_HEADER);
+  if (!value) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    return normalizeModulePermissions(parsed);
+  } catch {
+    return undefined;
+  }
+}
+
+function forwardedAuth(request: Request, env: UserWorkerEnv): UserAuthContext | undefined {
+  if (header(request, INTERNAL_SERVICE_TOKEN_HEADER) !== env.INTERNAL_SERVICE_TOKEN)
+    return undefined;
+
+  const userId = header(request, FORWARDED_AUTH_USER_ID_HEADER);
+  const kind =
+    header(request, FORWARDED_AUTH_KIND_HEADER) === "platform" ? "platform" : "organization";
+  const organizationId = header(request, FORWARDED_AUTH_ORGANIZATION_ID_HEADER);
+  if (!userId || (kind === "organization" && !organizationId)) return undefined;
+
+  const modules = (modulePermissions(request) ??
+    normalizeModulePermissions(undefined)) as WorkerAuthClaims["modules"];
+  const permissionHeader = header(request, FORWARDED_AUTH_PERMISSION_HEADER);
+  const permission = permissionHeader === undefined ? undefined : Number(permissionHeader);
+  const type = header(request, FORWARDED_AUTH_TYPE_HEADER);
+  const platformRole = header(request, FORWARDED_AUTH_PLATFORM_ROLE_HEADER);
+  const sessionVersion = Number(header(request, FORWARDED_AUTH_SESSION_VERSION_HEADER));
+  const csrfHash = header(request, FORWARDED_AUTH_CSRF_HASH_HEADER);
+  const claims: WorkerAuthClaims = {
+    user_id: userId,
+    ...(organizationId ? { organization_id: organizationId } : {}),
+    auth_kind: kind,
+    modules,
+    modulePermissionsPresent: modulePermissions(request) !== undefined,
+    ...(Number.isSafeInteger(permission) ? { permission } : {}),
+    ...(type === "owner" || type === "admin" || type === "user" ? { type } : {}),
+    ...(platformRole === "super_admin" ? { platform_role: "super_admin" as const } : {}),
+    ...(Number.isSafeInteger(sessionVersion) && sessionVersion >= 0
+      ? { session_version: sessionVersion }
+      : {}),
+    ...(header(request, FORWARDED_AUTH_SESSION_ID_HEADER)
+      ? { session_id: header(request, FORWARDED_AUTH_SESSION_ID_HEADER) }
+      : {}),
+    ...(csrfHash ? { csrf_hash: csrfHash } : {}),
+  };
+
+  return {
+    token: "forwarded-by-gateway",
+    userId,
+    organizationId: kind === "platform" ? "" : (organizationId ?? ""),
+    actorKind: kind,
+    isPlatformAdmin: kind === "platform" && platformRole === "super_admin",
+    claims,
+    transport: "forwarded",
+  };
+}
+
+export async function authenticateUserRequest(
+  request: Request,
+  env: UserWorkerEnv,
+): Promise<UserAuthContext> {
+  const forwarded = forwardedAuth(request, env);
+  if (forwarded) return forwarded;
+
+  try {
+    const auth = await authenticateWorkerRequest(request, {
+      jwtSecret: env.JWT_SECRET,
+      allowBearer: true,
+    });
+    return {
+      ...auth,
+      transport: readCookie(request.headers.get("cookie") ?? undefined, AUTH_SESSION_COOKIE_NAME)
+        ? "cookie"
+        : "bearer",
+    };
+  } catch (error) {
+    if (error instanceof WorkerAuthenticationError) {
+      throw new ServiceError(401, "Não autenticado.");
+    }
+    throw error;
+  }
+}
+
+function sessionClaims(auth: UserAuthContext): {
+  sessionId: string;
+  sessionVersion: number;
+  csrfHash: string;
+} {
+  const sessionId = auth.claims.session_id;
+  const sessionVersion = auth.claims.session_version;
+  const csrfHash = auth.claims.csrf_hash;
+  if (!sessionId || !Number.isSafeInteger(sessionVersion) || !csrfHash) {
+    throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+  }
+  return { sessionId, sessionVersion: sessionVersion as number, csrfHash };
+}
+
+export async function validateUserSession(
+  auth: UserAuthContext,
+  prisma: UserPrismaClient,
+): Promise<void> {
+  if (auth.transport === "forwarded") return;
+  const { sessionId, sessionVersion, csrfHash } = sessionClaims(auth);
+  const session = await prisma.authSession.findFirst({
+    where: {
+      id: sessionId,
+      user_id: auth.userId,
+      revoked_at: null,
+      expires_at: { gt: new Date() },
+    },
+    select: {
+      csrf_hash: true,
+      user: { select: { organization_id: true, session_version: true, status: true } },
+    },
+  });
+  const user = (session?.user ?? null) as Row | null;
+  if (
+    !session ||
+    session.csrf_hash !== csrfHash ||
+    user?.status !== "active" ||
+    user.organization_id !== auth.organizationId ||
+    user.session_version !== sessionVersion
+  ) {
+    throw new ServiceError(401, "Sessão inválida.");
+  }
+}
+
+function platformClaims(payload: Record<string, unknown>): UserAuthContext {
+  if (
+    payload.auth_kind !== "platform" ||
+    payload.platform_role !== "super_admin" ||
+    typeof payload.user_id !== "string" ||
+    typeof payload.session_id !== "string" ||
+    !Number.isSafeInteger(payload.session_version) ||
+    typeof payload.csrf_hash !== "string"
+  ) {
+    throw new ServiceError(401, "Não autenticado.");
+  }
+  const userId = payload.user_id as string;
+  const sessionId = payload.session_id as string;
+  const sessionVersion = payload.session_version as number;
+  const csrfHash = payload.csrf_hash as string;
+  const claims = {
+    user_id: userId,
+    auth_kind: "platform" as const,
+    platform_role: "super_admin" as const,
+    session_id: sessionId,
+    session_version: sessionVersion,
+    csrf_hash: csrfHash,
+    modules: normalizeModulePermissions(undefined) as WorkerAuthClaims["modules"],
+    modulePermissionsPresent: false,
+  } satisfies WorkerAuthClaims;
+  return {
+    token: "platform-validation",
+    userId,
+    organizationId: "",
+    actorKind: "platform",
+    isPlatformAdmin: true,
+    claims,
+    transport: "bearer",
+  };
+}
+
+export async function authenticatePlatformValidationRequest(
+  request: Request,
+  env: UserWorkerEnv,
+): Promise<UserAuthContext> {
+  if (header(request, INTERNAL_SERVICE_TOKEN_HEADER) !== env.INTERNAL_SERVICE_TOKEN) {
+    throw new ServiceError(403, "Acesso negado.");
+  }
+  const authorization = header(request, "authorization");
+  const token = authorization?.split(" ")[1];
+  if (!token) throw new ServiceError(401, "Não autenticado.");
+  try {
+    const payload = await verifyHs256Jwt(token, env.JWT_SECRET);
+    return { ...platformClaims(payload), token };
+  } catch {
+    throw new ServiceError(401, "Não autenticado.");
+  }
+}
+
+export async function validatePlatformSession(
+  auth: UserAuthContext,
+  prisma: UserPrismaClient,
+): Promise<PlatformIdentity> {
+  if (!auth.isPlatformAdmin) throw new ServiceError(403, "Acesso negado.");
+  if (auth.transport === "forwarded") {
+    return {
+      id: auth.userId,
+      name: auth.claims.name ?? "",
+      email: auth.claims.login ?? "",
+      auth_kind: "platform",
+      platform_role: "super_admin",
+    };
+  }
+  const { sessionId, sessionVersion, csrfHash } = sessionClaims(auth);
+  const session = await prisma.platformAuthSession.findFirst({
+    where: {
+      id: sessionId,
+      platform_user_id: auth.userId,
+      revoked_at: null,
+      expires_at: { gt: new Date() },
+    },
+    select: {
+      csrf_hash: true,
+      platformUser: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          platform_role: true,
+          status: true,
+          session_version: true,
+        },
+      },
+    },
+  });
+  const user = (session?.platformUser ?? null) as Row | null;
+  if (
+    !session ||
+    session.csrf_hash !== csrfHash ||
+    user?.id !== auth.userId ||
+    user.platform_role !== "super_admin" ||
+    user.status !== "active" ||
+    user.session_version !== sessionVersion
+  ) {
+    throw new ServiceError(401, "Não autenticado.");
+  }
+  return {
+    id: String(user.id),
+    name: String(user.name),
+    email: String(user.email),
+    auth_kind: "platform",
+    platform_role: "super_admin",
+  };
+}
+
+export async function requireCsrf(request: Request, auth: UserAuthContext): Promise<void> {
+  if (auth.transport === "forwarded") return;
+  const cookieToken = readCookie(request.headers.get("cookie") ?? undefined, CSRF_COOKIE_NAME);
+  const submittedToken = request.headers.get(CSRF_HEADER_NAME);
+  const expectedHash = auth.claims.csrf_hash;
+  if (
+    !cookieToken ||
+    !submittedToken ||
+    !expectedHash ||
+    !(await verifyCsrfToken(submittedToken, await hashCsrfToken(cookieToken))) ||
+    !(await verifyCsrfToken(submittedToken, expectedHash))
+  ) {
+    throw new ServiceError(403, "Requisição não autorizada.");
+  }
+}
+
+export function requireOrganizationAuth(auth: UserAuthContext): void {
+  if (auth.actorKind !== "organization" || !auth.organizationId) {
+    throw new ServiceError(403, "Acesso negado.");
+  }
+}
+
+export function requireManageUsers(auth: UserAuthContext): void {
+  requireOrganizationAuth(auth);
+  if (auth.claims.type !== "owner" && (auth.claims.modules.rh ?? 0) < 3) {
+    throw new ServiceError(403, "Usuário não tem permissão.");
+  }
+}
+
+export function requireOwner(auth: UserAuthContext): void {
+  requireOrganizationAuth(auth);
+  if (auth.claims.type !== "owner") throw new ServiceError(403, "Usuário não tem permissão.");
+}
+
+export { ACTIVE_MODULE_KEYS };

@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Organization {
+  id                String            @id
+  name              String
+  slug              String
+  logo_url          String?
+  status            String
+  subscription_plan String
+  clients           Client[]
+  histories         ClientHistory[]
+  pendingHistories  ClientHistoryPending[]
+
+  @@map("organizations")
+}
+
+model Client {
+  id              String                  @id @default(uuid())
+  name            String
+  organization_id String
+  status          String
+  cpf_cnpj        String                  @default("")
+  company_name    String?
+  fantasy_name    String?
+  service_unique  Boolean?
+  deletion_date   DateTime?
+  dominio_code    String?
+  address         String?
+  cep             String?
+  neighborhood    String?
+  state           String?
+  city            String?
+  customer_since  DateTime?
+  opening_date    DateTime?
+  responsible     String?
+  email           String?
+  type            String                  @default("PJ")
+  type_registration String               @default("Novo")
+  prospecting_status String
+  organization    Organization            @relation(fields: [organization_id], references: [id])
+  histories       ClientHistory[]
+  pendingHistories ClientHistoryPending[]
+
+  @@map("clients")
+}
+
+model User {
+  id        String           @id
+  name      String
+  histories ClientHistory[]
+  pendingHistories ClientHistoryPending[]
+
+  @@map("users")
+}
+
+model ClientHistory {
+  id              String       @id @default(uuid())
+  client_id       String
+  date            DateTime
+  history         String
+  file            String?
+  user_id         String
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+
+  @@map("clients.history")
+}
+
+model ClientHistoryPending {
+  id              String       @id @default(uuid())
+  user_id         String
+  client_id       String
+  reason          String
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+
+  @@map("clients.historyPending")
+}

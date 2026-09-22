@@ -1,0 +1,202 @@
+import { describe, expect, it, vi } from "vitest";
+import { type ClientWorkerEnv, type ClientWorkerService, createClientWorkerApp } from "./app.js";
+
+const USER_ID = "c0000000-0000-4000-8000-000000000001";
+const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
+const OTHER_ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000002";
+const CLIENT_ID = "b0000000-0000-4000-8000-000000000001";
+const HISTORY_ID = "d0000000-0000-4000-8000-000000000001";
+const PENDING_ID = "e0000000-0000-4000-8000-000000000001";
+const INTERNAL_TOKEN = "client-gateway-internal-token";
+
+function env(): ClientWorkerEnv {
+  return {
+    JWT_SECRET: "client-worker-test-secret-which-is-long-enough",
+    INTERNAL_SERVICE_TOKEN: INTERNAL_TOKEN,
+    HYPERDRIVE: { connectionString: "postgresql://worker:test@db.example/giro" },
+  };
+}
+
+function headers(overrides: Record<string, string> = {}): HeadersInit {
+  return {
+    "x-internal-service-token": INTERNAL_TOKEN,
+    "x-auth-user-id": USER_ID,
+    "x-auth-organization-id": ORGANIZATION_ID,
+    "x-auth-kind": "organization",
+    "x-auth-type": "owner",
+    "x-auth-modules": JSON.stringify({ integracao: 3 }),
+    ...overrides,
+  };
+}
+
+function client() {
+  return {
+    id: CLIENT_ID,
+    name: "Acme",
+    organization_id: ORGANIZATION_ID,
+    status: "Ativo",
+    cpf_cnpj: "",
+    company_name: null,
+    fantasy_name: null,
+    service_unique: false,
+    deletion_date: null,
+    organization: {
+      id: ORGANIZATION_ID,
+      name: "Acme Org",
+      slug: "acme-org",
+      logo_url: null,
+      status: "active",
+      subscription_plan: "trial",
+    },
+  };
+}
+
+function service(): ClientWorkerService {
+  return {
+    listByOrganization: vi.fn(async () => ({
+      items: [client()],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+      hasMore: false,
+    })),
+    getById: vi.fn(async () => client()),
+    create: vi.fn(async () => client()),
+    update: vi.fn(async () => client()),
+    deactivate: vi.fn(async () => client()),
+    activate: vi.fn(async () => client()),
+    lookupCnpj: vi.fn(async () => ({ cnpj: "12345678000195", name: "Acme" })),
+    createIntegration: vi.fn(async () => client()),
+    updateIntegration: vi.fn(async () => client()),
+    listHistories: vi.fn(async () => ({ list: [] })),
+    createHistory: vi.fn(async () => ({
+      id: HISTORY_ID,
+      client_id: CLIENT_ID,
+      history: "Contato",
+    })),
+    getHistory: vi.fn(async () => ({ detail: { id: HISTORY_ID, client_id: CLIENT_ID } })),
+    updateHistory: vi.fn(async () => ({ id: HISTORY_ID, history: "Atualizado" })),
+    createPending: vi.fn(async () => ({ id: PENDING_ID, client_id: CLIENT_ID, reason: "Retorno" })),
+    listPending: vi.fn(async () => ({ list: [] })),
+    deletePending: vi.fn(async () => undefined),
+  };
+}
+
+describe("client Worker", () => {
+  it("returns success envelopes for health and readiness", async () => {
+    const app = createClientWorkerApp({ env: env(), clientService: service() });
+
+    const health = await app.request("https://client.test/health");
+    const ready = await app.request("https://client.test/ready");
+
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({
+      success: true,
+      data: { status: "ok", service: "client-service" },
+    });
+    expect(ready.status).toBe(200);
+    expect(await ready.json()).toEqual({
+      success: true,
+      data: { status: "ready", service: "client-service" },
+    });
+  });
+
+  it("rejects client routes without authentication", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+
+    const response = await app.request("https://client.test/client/list");
+
+    expect(response.status).toBe(401);
+    expect(clientService.listByOrganization).not.toHaveBeenCalled();
+  });
+
+  it("uses the authenticated organization for list and rejects cross-organization create", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+
+    const list = await app.request("https://client.test/client/list", { headers: headers() });
+    const create = await app.request("https://client.test/client", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({
+        organization_id: OTHER_ORGANIZATION_ID,
+        name: "Forbidden",
+        status: "Ativo",
+      }),
+    });
+
+    expect(list.status).toBe(200);
+    expect(clientService.listByOrganization).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      expect.objectContaining({ page: 1, pageSize: 20 }),
+      expect.anything(),
+    );
+    expect(create.status).toBe(403);
+    expect(clientService.create).not.toHaveBeenCalled();
+  });
+
+  it("preserves representative CRUD and validation behavior", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+
+    const created = await app.request("https://client.test/client", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ name: "Acme", status: "Ativo" }),
+    });
+    const detail = await app.request(`https://client.test/client/${CLIENT_ID}`, {
+      headers: headers(),
+    });
+    const invalid = await app.request("https://client.test/client", {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ status: "Ativo" }),
+    });
+
+    expect(created.status).toBe(201);
+    expect(detail.status).toBe(200);
+    expect(invalid.status).toBe(400);
+    expect(clientService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organization_id: ORGANIZATION_ID, name: "Acme" }),
+      expect.anything(),
+    );
+    expect(clientService.getById).toHaveBeenCalledWith(
+      CLIENT_ID,
+      ORGANIZATION_ID,
+      expect.anything(),
+    );
+  });
+
+  it("keeps integration and history flows under the same organization", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+
+    const integration = await app.request(
+      "https://client.test/client/integration?cnpj=12.345.678/0001-95",
+      {
+        headers: headers(),
+      },
+    );
+    const history = await app.request(`https://client.test/client/${CLIENT_ID}/histories`, {
+      headers: headers(),
+    });
+    const pending = await app.request(`https://client.test/client/${CLIENT_ID}/histories/pending`, {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({ reason: "Retorno" }),
+    });
+
+    expect(integration.status).toBe(200);
+    expect(history.status).toBe(200);
+    expect(pending.status).toBe(201);
+    expect(clientService.lookupCnpj).toHaveBeenCalledWith("12345678000195", ORGANIZATION_ID);
+    expect(clientService.listHistories).toHaveBeenCalledWith(CLIENT_ID, ORGANIZATION_ID);
+    expect(clientService.createPending).toHaveBeenCalledWith(
+      CLIENT_ID,
+      ORGANIZATION_ID,
+      USER_ID,
+      "Retorno",
+    );
+  });
+});
