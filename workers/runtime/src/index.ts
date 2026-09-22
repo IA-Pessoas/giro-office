@@ -1,4 +1,13 @@
 export { createWorkerApp } from "./app.js";
+export {
+  type AuthenticateWorkerRequestOptions,
+  authenticateWorkerRequest,
+  type WorkerAuthClaims,
+  type WorkerAuthContext,
+  WorkerAuthenticationError,
+  type WorkerAuthKind,
+  type WorkerAuthUserType,
+} from "./auth.js";
 export type { HyperdriveBinding, ServiceBinding, WorkerBindings, WorkerEnv } from "./env.js";
 export { verifyHs256Jwt } from "./jwt.js";
 export {
