@@ -30,7 +30,7 @@ describe("TaskOperationalNotificationService", () => {
     prismaMock.taskOperationalNotification.count.mockResolvedValue(0);
 
     await expect(
-      new TaskOperationalNotificationService().list({
+      new TaskOperationalNotificationService(prismaMock as never).list({
         user_id: "user-1",
         organization_id: "org-1",
       }),
@@ -50,7 +50,7 @@ describe("TaskOperationalNotificationService", () => {
     prismaMock.taskOperationalNotification.findFirst.mockResolvedValue(null);
 
     await expect(
-      new TaskOperationalNotificationService().markRead({
+      new TaskOperationalNotificationService(prismaMock as never).markRead({
         user_id: "user-1",
         organization_id: "org-1",
         notification_id: "notification-2",

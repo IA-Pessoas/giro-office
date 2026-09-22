@@ -9,6 +9,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import {
   integracaoTaskPostponementBodySchema,
   integracaoTaskPostponementListQuerySchema,
@@ -16,7 +17,7 @@ import {
 import { TaskPostponementService } from "../services/taskPostponementService.js";
 
 const router: ReturnType<typeof Router> = Router();
-const taskPostponementService = new TaskPostponementService();
+const taskPostponementService = new TaskPostponementService(nodeDeps.prisma, nodeDeps.audit);
 
 router.post(
   "/postponement",

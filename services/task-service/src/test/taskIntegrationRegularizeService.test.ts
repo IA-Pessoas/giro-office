@@ -32,7 +32,7 @@ describe("TaskIntegrationRegularizeService", () => {
 
   it("createLink lança 404 quando modelo não existe", async () => {
     prismaMock.taskModel.findFirst.mockResolvedValue(null);
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.createLink({
@@ -48,7 +48,7 @@ describe("TaskIntegrationRegularizeService", () => {
 
   it("removeLink lança 404 quando vínculo não existe", async () => {
     prismaMock.tasksIntegrationRegularize.deleteMany.mockResolvedValue({ count: 0 });
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.removeLink({
@@ -65,7 +65,7 @@ describe("TaskIntegrationRegularizeService", () => {
     prismaMock.tasksIntegrationRegularize.findFirst.mockResolvedValue(null);
     prismaMock.process.findFirst.mockResolvedValue({ id: "process-1" });
     prismaMock.tasksIntegrationRegularize.create.mockResolvedValue({ id: "link-1" });
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.createLink({
@@ -115,7 +115,7 @@ describe("TaskIntegrationRegularizeService", () => {
   it("rejeita destino Regularize de outra organização sem criar vínculo", async () => {
     prismaMock.taskModel.findFirst.mockResolvedValue({ name: "Modelo" });
     prismaMock.process.findFirst.mockResolvedValue(null);
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.createLink({
@@ -135,7 +135,7 @@ describe("TaskIntegrationRegularizeService", () => {
     prismaMock.process.findFirst.mockResolvedValue({ id: "process-1" });
     prismaMock.tasksIntegrationRegularize.findFirst.mockResolvedValue(null);
     prismaMock.tasksIntegrationRegularize.create.mockRejectedValue({ code: "P2002" });
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.createLink({
@@ -151,7 +151,7 @@ describe("TaskIntegrationRegularizeService", () => {
 
   it("rejeita listagem de modelo de outra organização", async () => {
     prismaMock.taskModel.findFirst.mockResolvedValue(null);
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.list("org-1", "model-org-2", { userId: "user-1", integracaoLevel: 1 }),
@@ -161,7 +161,7 @@ describe("TaskIntegrationRegularizeService", () => {
   });
 
   it("rejeita listagem sem permissão de Integração", async () => {
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.list("org-1", "model-1", { userId: "user-1", integracaoLevel: 0 }),
@@ -174,7 +174,7 @@ describe("TaskIntegrationRegularizeService", () => {
     ]);
     prismaMock.process.findMany.mockResolvedValue([]);
     prismaMock.license.findMany.mockResolvedValue([]);
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.list("org-1", "model-1", {
@@ -190,7 +190,7 @@ describe("TaskIntegrationRegularizeService", () => {
     ]);
     prismaMock.process.findMany.mockResolvedValue([]);
     prismaMock.license.findMany.mockResolvedValue([{ id: "same-id" }]);
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.list("org-1", "model-1", {
@@ -207,7 +207,7 @@ describe("TaskIntegrationRegularizeService", () => {
       referring_type: "process",
     });
     prismaMock.tasksIntegrationRegularize.deleteMany.mockResolvedValue({ count: 1 });
-    const service = new TaskIntegrationRegularizeService();
+    const service = new TaskIntegrationRegularizeService(prismaMock as never, auditMock as never);
 
     await expect(
       service.removeLink({

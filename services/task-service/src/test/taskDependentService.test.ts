@@ -28,7 +28,7 @@ describe("TaskDependentService", () => {
   });
 
   it("addDependent lança 400 quando a tarefa depende de si mesma", async () => {
-    const service = new TaskDependentService();
+    const service = new TaskDependentService(prismaMock as never, auditMock as never);
 
     await expect(
       service.addDependent({
@@ -44,7 +44,7 @@ describe("TaskDependentService", () => {
 
   it("deleteDependent lança 404 quando dependência não existe", async () => {
     prismaMock.taskDependent.findFirst.mockResolvedValue(null);
-    const service = new TaskDependentService();
+    const service = new TaskDependentService(prismaMock as never, auditMock as never);
 
     await expect(
       service.deleteDependent({
