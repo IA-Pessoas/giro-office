@@ -17,7 +17,6 @@ import {
 import { useModuleAccess } from "@modules/auth";
 import { cn } from "@shared/ui/newLayout/utils";
 
-import { useNewTiRequestAlerts } from "../hooks";
 import { TiDashboardTab } from "./TiDashboardTab";
 import { TiExtensionsTab } from "./TiExtensionsTab";
 import { TiInventoryTab } from "./TiInventoryTab";
@@ -155,7 +154,6 @@ export function TiPage() {
   const [activeTab, setActiveTab] = useState<TiTabId>("dashboard");
 
   const canManageTi = access.isAdmin;
-  useNewTiRequestAlerts(canManageTi);
   const visibleTabs = canManageTi ? TI_TABS : SELF_SERVICE_TI_TABS;
   const visibleActiveTab = visibleTabs.some((tab) => tab.id === activeTab)
     ? activeTab

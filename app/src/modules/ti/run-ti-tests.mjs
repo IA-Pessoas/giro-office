@@ -1440,15 +1440,18 @@ await runTest("ti requests queue splits open and closed tickets and detects unse
   assert.deepEqual(findUnseenTiRequestIds(new Set(["1"]), [{ id: "1" }, { id: "2" }]), ["2"]);
 });
 
-await runTest("ti requests tab requires AnyDesk and the TI page polls new tickets with sound", async () => {
+await runTest("ti requests tab requires AnyDesk and the app shell polls new tickets with sound", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
-  const pageSource = await readModuleSource("components/TiPage.tsx");
+  const shellSource = await readAppSource("src/shared/components/newLayout/AppShell.tsx");
   const alertSource = await readModuleSource("hooks/useNewTiRequestAlerts.ts");
 
   assert.match(tabSource, /Código AnyDesk/);
   assert.match(tabSource, /anydesk_code: requestDraft\.anydesk_code\.trim\(\)/);
   assert.match(tabSource, /Informe o código AnyDesk para criar o chamado\./);
-  assert.match(pageSource, /useNewTiRequestAlerts\(canManageTi\)/);
+  assert.match(
+    shellSource,
+    /useNewTiRequestAlerts\(!isPlatformSuperAdmin && moduleAccessMap\.ti\?\.isAdmin === true\)/,
+  );
   assert.match(alertSource, /refetchInterval: NEW_REQUESTS_POLL_INTERVAL_MS/);
   assert.match(alertSource, /playNewTiRequestSound\(\)/);
   assert.match(tabSource, /renderRequestsTable\(requestQueues\.open/);
