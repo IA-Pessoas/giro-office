@@ -633,7 +633,7 @@ await (async () => {
 
       assert.equal(commercialPageSource.includes("CommercialCatalog"), true);
       assert.equal(commercialPageSource.includes("notFound: true"), false);
-      assert.match(clientCommercialPageSource, /notFound:\s*true/);
+      assert.match(clientCommercialPageSource, /redirect:.*destination: id \? `\/clients\/\$\{id\}`/);
       assert.equal(clientCommercialPageSource.includes("ClientCommercialForm"), false);
       assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
       assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);

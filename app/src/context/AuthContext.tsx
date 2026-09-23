@@ -365,12 +365,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 throw error;
             }
 
+            // Credencial invalida: a pagina de login ja mostra a mensagem no formulario.
             if (error.response?.status === 401 || error.response?.status === 400) {
-                const errorMessage =
-                    error.response?.data?.error ||
-                    error.response?.data?.message ||
-                    "Usuário e/ou senha incorretos!";
-                toast.error(errorMessage);
                 logAuthError("Erro de autenticacao:", error.response?.data);
                 throw error;
             }

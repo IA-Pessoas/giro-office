@@ -49,4 +49,18 @@ describe("lookupOfficialCnpj", () => {
       lookupOfficialCnpj("12345678000195", "https://cnpj.example", "secret", failing),
     ).rejects.toMatchObject({ statusCode: 502 });
   });
+
+  it("names the provider status so the failure is actionable", async () => {
+    const answering = (status: number) =>
+      (async () => new Response("", { status })) as typeof fetch;
+    await expect(
+      lookupOfficialCnpj("12345678000195", "https://cnpj.example", "secret", answering(404)),
+    ).rejects.toMatchObject({ statusCode: 404, message: "CNPJ não encontrado na base oficial." });
+    await expect(
+      lookupOfficialCnpj("12345678000195", "https://cnpj.example", "secret", answering(401)),
+    ).rejects.toMatchObject({ statusCode: 502, message: expect.stringContaining("credencial") });
+    await expect(
+      lookupOfficialCnpj("12345678000195", "https://cnpj.example", "secret", answering(500)),
+    ).rejects.toMatchObject({ statusCode: 502, message: expect.stringContaining("HTTP 500") });
+  });
 });

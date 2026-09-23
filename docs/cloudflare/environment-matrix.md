@@ -9,7 +9,7 @@ Esta matriz documenta nomes e escopo. Ela não contém valores, tokens ou URLs p
 | `DATABASE_URL` | Secret/CI | geração Prisma e migration job | URL do PostgreSQL; não é lida pelo request quando `HYPERDRIVE` está disponível. |
 | `JWT_SECRET` | Secret | cada Worker autenticado | Mesmo contrato de assinatura da aplicação atual. |
 | `INTERNAL_SERVICE_TOKEN` | Secret | Gateway e Workers de domínio | Header interno; nunca expor em `NEXT_PUBLIC_*`. |
-| `HYPERDRIVE` | Binding | Workers com Prisma | Conexão PostgreSQL por request; substituir a URL direta no runtime. |
+| `HYPERDRIVE` | Binding | Workers com Prisma | Conexão PostgreSQL por request; substituir a URL direta no runtime. O config `giro-postgres-prod` precisa de **cache de query desligado** (`caching.disabled=true`): com cache, leituras logo após PATCH/POST voltam o valor antigo e a UI parece não persistir (QA 2026-09-22, BUG-003/004/005). |
 
 ## Service Bindings atuais
 
