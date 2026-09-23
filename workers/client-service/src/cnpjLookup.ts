@@ -56,11 +56,25 @@ export async function lookupOfficialCnpj(
     response = await fetchImpl(url, {
       headers: { Accept: "application/json", Authorization: `Bearer ${apiToken}` },
     });
-  } catch {
-    throw new ServiceError(502, "O provedor oficial de CNPJ não respondeu corretamente.");
+  } catch (error) {
+    console.error("cnpj lookup: provider unreachable", error);
+    throw new ServiceError(502, "O provedor oficial de CNPJ não respondeu (falha de rede).");
   }
   if (!response.ok) {
-    throw new ServiceError(502, "O provedor oficial de CNPJ não respondeu corretamente.");
+    console.error("cnpj lookup: provider answered", response.status);
+    if (response.status === 404) {
+      throw new ServiceError(404, "CNPJ não encontrado na base oficial.");
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw new ServiceError(
+        502,
+        `O provedor oficial de CNPJ recusou a credencial (HTTP ${response.status}).`,
+      );
+    }
+    throw new ServiceError(
+      502,
+      `O provedor oficial de CNPJ não respondeu corretamente (HTTP ${response.status}).`,
+    );
   }
   return mapProviderResponse(await response.json(), cnpj);
 }
