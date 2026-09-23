@@ -1,3 +1,4 @@
+import { MAX_REPORTING_QUERY_LIMIT } from "@workspace/shared";
 import { describe, expect, it } from "vitest";
 
 import { buildTiServiceOpenApiSpec } from "../openapi/spec.js";
@@ -29,7 +30,11 @@ describe("ti internal reporting OpenAPI", () => {
         post: {
           requestBody: {
             content: {
-              "application/json": { schema: { properties: { source: { enum: string[] } } } };
+              "application/json": {
+                schema: {
+                  properties: { source: { enum: string[] }; limit: { maximum: number } };
+                };
+              };
             };
           };
         };
@@ -41,6 +46,7 @@ describe("ti internal reporting OpenAPI", () => {
       "ti.requests",
       "ti.stock",
     ]);
+    expect(bodySchema.properties.limit.maximum).toBe(MAX_REPORTING_QUERY_LIMIT);
     expect(spec.paths["/ti/stock"]).toBeDefined();
   });
 });

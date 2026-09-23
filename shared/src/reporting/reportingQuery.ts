@@ -1,3 +1,5 @@
+import { Buffer } from "node:buffer";
+
 import { z } from "zod";
 import { ServiceError } from "../http/errors.js";
 import { reportingAggregations } from "./reportingCapabilities.js";
@@ -112,7 +114,62 @@ type ReportingQueryCursorLoader = {
 
 export const MAX_REPORTING_QUERY_ROWS = 50_000;
 export const MAX_REPORTING_QUERY_LIMIT = MAX_REPORTING_QUERY_ROWS + 1;
+export const MAX_REPORTING_QUERY_BYTES = 20 * 1024 * 1024;
+export const REPORTING_QUERY_PAGE_SIZE = 100;
 export const REPORTING_QUERY_ROW_LIMIT_CODE = "REPORTING_QUERY_ROW_LIMIT_EXCEEDED";
+export const REPORTING_QUERY_BYTE_LIMIT_CODE = "REPORTING_QUERY_BYTE_LIMIT_EXCEEDED";
+export const REPORTING_QUERY_BYTE_LIMIT_MESSAGE =
+  "O conjunto excede o limite global de bytes do relatório. Reduza os filtros ou as colunas e tente novamente.";
+
+export async function collectReportingRows(
+  loadPage: (limit: number, cursor?: string) => Promise<ReportingQueryCursorPage>,
+  stopAfterRows?: number,
+): Promise<ReportingResult> {
+  const rows: Record<string, unknown>[] = [];
+  let cursor: string | undefined;
+  let reachedLimit = false;
+  let bytes = 2;
+
+  while (stopAfterRows === undefined || rows.length < stopAfterRows) {
+    const pageLimit =
+      stopAfterRows === undefined
+        ? REPORTING_QUERY_PAGE_SIZE
+        : Math.min(REPORTING_QUERY_PAGE_SIZE, stopAfterRows - rows.length);
+    const page = await loadPage(pageLimit, cursor);
+    if (!page.rows.length && page.reachedLimit) {
+      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
+    }
+    for (const row of page.rows) {
+      bytes += (rows.length ? 1 : 0) + Buffer.byteLength(JSON.stringify(row), "utf8");
+      if (bytes > MAX_REPORTING_QUERY_BYTES) {
+        throw new ServiceError(
+          422,
+          REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
+          undefined,
+          REPORTING_QUERY_BYTE_LIMIT_CODE,
+        );
+      }
+      if (rows.length >= MAX_REPORTING_QUERY_ROWS) {
+        throw new ServiceError(
+          422,
+          "O conjunto excede a capacidade de consulta do relatório.",
+          undefined,
+          REPORTING_QUERY_ROW_LIMIT_CODE,
+        );
+      }
+      rows.push(row);
+    }
+
+    reachedLimit = page.reachedLimit;
+    if (!page.reachedLimit || (stopAfterRows !== undefined && rows.length >= stopAfterRows)) break;
+    if (!page.nextCursor || page.nextCursor === cursor) {
+      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
+    }
+    cursor = page.nextCursor;
+  }
+
+  return { rows, reachedLimit };
+}
 
 export function reportingQueryFields(fields: readonly string[], query?: ReportingQuery): string[] {
   return [
@@ -242,40 +299,18 @@ export async function executeReportingQuery(
   ) {
     throw new ServiceError(400, "Ordene o resumo somente pelos campos agrupados.");
   }
-  const completeRows: Record<string, unknown>[] = [];
-  let bytes = 0;
   let offset = 0;
-  let cursor: string | undefined;
-  for (;;) {
-    const page: ReportingQueryCursorPage =
-      typeof load === "function"
-        ? await load(fields, 100, offset)
-        : await load.loadPage(fields, 100, cursor);
-    if (!page.rows.length && page.reachedLimit)
-      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
-    for (const row of page.rows) {
-      bytes += Buffer.byteLength(JSON.stringify(row));
-      if (bytes > 20 * 1024 * 1024)
-        throw new ServiceError(422, "O conjunto excede a capacidade de consulta do relatório.");
-      if (completeRows.length >= MAX_REPORTING_QUERY_ROWS) {
-        throw new ServiceError(
-          422,
-          "O conjunto excede a capacidade de consulta do relatório.",
-          undefined,
-          REPORTING_QUERY_ROW_LIMIT_CODE,
-        );
-      }
-      completeRows.push(row);
-    }
-    if (!page.reachedLimit) break;
+  const { rows: completeRows } = await collectReportingRows(async (limit, cursor) => {
     if (typeof load === "function") {
-      offset += 100;
-      continue;
+      const page = await load(fields, limit, offset);
+      if (page.reachedLimit) offset += REPORTING_QUERY_PAGE_SIZE;
+      return {
+        ...page,
+        ...(page.reachedLimit ? { nextCursor: String(offset) } : {}),
+      };
     }
-    if (!page.nextCursor || page.nextCursor === cursor)
-      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
-    cursor = page.nextCursor;
-  }
+    return load.loadPage(fields, limit, cursor);
+  });
   const groups = input.query.filter_groups ?? [];
   const grouped = new Set(groups.flatMap((group) => group.filters));
   let rows = completeRows.filter((row) => {

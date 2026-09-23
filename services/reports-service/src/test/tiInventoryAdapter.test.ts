@@ -68,7 +68,7 @@ describe("TiInventoryAdapter", () => {
           order_by: [],
         },
         organization_id: "10000000-0000-4000-8000-000000000001",
-        limit: 10,
+        limit: 102,
         request_id: "request-853",
       }),
     ).resolves.toEqual({
@@ -77,7 +77,7 @@ describe("TiInventoryAdapter", () => {
     });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "ti.inventory", fields: ["asset_code", "category"], limit: 10 };
+    const body = { source: "ti.inventory", fields: ["asset_code", "category"], limit: 102 };
     const grant = String((request.headers as Record<string, string>)["x-reports-grant"]);
 
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(

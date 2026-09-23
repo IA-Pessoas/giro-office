@@ -1,6 +1,10 @@
 import { createHash, createHmac } from "node:crypto";
 
-import { regularizeProcessReportingCatalog } from "@workspace/shared";
+import {
+  MAX_REPORTING_QUERY_LIMIT,
+  REPORTING_QUERY_ROW_LIMIT_CODE,
+  regularizeProcessReportingCatalog,
+} from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { RegularizeProcessAdapter } from "../integrations/regularizeProcessAdapter.js";
@@ -67,7 +71,7 @@ describe("RegularizeProcessAdapter", () => {
     const body = {
       source: "regularize.processes",
       fields: ["process_type", "status"],
-      limit: 10,
+      limit: 202,
     };
     await expect(
       adapter.preview({
@@ -85,7 +89,7 @@ describe("RegularizeProcessAdapter", () => {
           order_by: [],
         },
         organization_id: "10000000-0000-4000-8000-000000000001",
-        limit: 10,
+        limit: 202,
         request_id: "request-848",
       }),
     ).resolves.toEqual({
@@ -109,6 +113,47 @@ describe("RegularizeProcessAdapter", () => {
     expect(JSON.parse(Buffer.from(grant, "base64url").toString("utf8")).body_sha256).toBe(
       createHash("sha256").update(canonicalJson(body)).digest("hex"),
     );
+    expect(JSON.parse((request as RequestInit).body as string)).toEqual(body);
+  });
+
+  it("encaminha o limite global interno e traduz excesso do snapshot em erro acionável", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: vi.fn().mockResolvedValue({ code: REPORTING_QUERY_ROW_LIMIT_CODE }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const adapter = new RegularizeProcessAdapter({
+      regularizeServiceUrl: "http://regularize.test",
+      regularizeReportingToken: "regularize-reporting-token",
+      regularizeReportingGrantSecret: "regularize-reporting-secret",
+      sourceTimeoutMs: 100,
+    });
+
+    await expect(
+      adapter.preview({
+        definition: {
+          sources: ["regularize.processes"],
+          columns: [{ source: "regularize.processes", field: "status", alias: "status" }],
+          joins: [],
+          filters: [],
+          filter_groups: [],
+          parameters: [],
+          aggregations: [],
+          order_by: [],
+        },
+        organization_id: "10000000-0000-4000-8000-000000000001",
+        limit: MAX_REPORTING_QUERY_LIMIT + 1,
+        request_id: "request-848",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      message: expect.stringContaining("50.000 linhas"),
+    });
+
+    expect(JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string)).toMatchObject({
+      limit: MAX_REPORTING_QUERY_LIMIT,
+    });
   });
 
   it("converte resposta upstream inválida em erro seguro", async () => {

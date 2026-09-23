@@ -49,8 +49,10 @@ describe("InternalReportingService", () => {
         status: true,
         created_at: true,
         updated_at: true,
+        id: true,
       },
-      take: 2,
+      orderBy: { id: "asc" },
+      take: 3,
     });
   });
 

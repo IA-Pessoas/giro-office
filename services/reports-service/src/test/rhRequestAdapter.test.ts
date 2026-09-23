@@ -1,6 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 
-import { rhRequestReportingCatalog } from "@workspace/shared";
+import { MAX_REPORTING_QUERY_LIMIT, rhRequestReportingCatalog } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { RhRequestAdapter } from "../integrations/rhRequestAdapter.js";
@@ -142,7 +142,7 @@ describe("RhRequestAdapter", () => {
     ).resolves.toEqual({ rows: [{ title: "Férias" }], reachedLimit: true });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    expect(JSON.parse(String(request.body)).limit).toBe(101);
+    expect(JSON.parse(String(request.body)).limit).toBe(MAX_REPORTING_QUERY_LIMIT);
 
     vi.stubGlobal(
       "fetch",
