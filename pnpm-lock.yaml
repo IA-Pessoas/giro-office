@@ -298,7 +298,7 @@ importers:
         version: 3.1.1(express@4.22.1)
       multer:
         specifier: ^2.3.0
-        version: 2.3.0
+        version: 2.4.0
       prisma:
         specifier: 7.9.1
         version: 7.9.1(@types/node@25.5.2)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.3.3)
@@ -365,7 +365,7 @@ importers:
         version: 3.1.1(express@4.22.1)
       multer:
         specifier: ^2.3.0
-        version: 2.3.0
+        version: 2.4.0
       pg:
         specifier: ^8.13.0
         version: 8.20.0
@@ -1218,7 +1218,7 @@ importers:
         version: 9.0.3
       multer:
         specifier: ^2.3.0
-        version: 2.3.0
+        version: 2.4.0
       node-cron:
         specifier: 4.6.0
         version: 4.6.0
@@ -1303,7 +1303,7 @@ importers:
         version: 3.1.1(express@4.22.1)
       multer:
         specifier: ^2.3.0
-        version: 2.3.0
+        version: 2.4.0
       pg:
         specifier: ^8.13.0
         version: 8.20.0
@@ -1562,7 +1562,7 @@ importers:
         version: 9.0.3
       multer:
         specifier: ^2.3.0
-        version: 2.3.0
+        version: 2.4.0
       pino:
         specifier: 9.13.1
         version: 9.13.1
@@ -5112,10 +5112,6 @@ packages:
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
 
-  concat-stream@2.0.0:
-    resolution: {integrity: sha512-MWufYdFw53ccGjCA+Ol7XJYpAlW6/prSMzuPOTRnJGcGzuhLn4Scrz7qf6o8bROZ514ltazcIFJZevcfbo0x7A==}
-    engines: {'0': node >= 6.0}
-
   confbox@0.2.4:
     resolution: {integrity: sha512-ysOGlgTFbN2/Y6Cg3Iye8YKulHw+R2fNXHrgSmXISQdMnomY6eNDprVdW9R5xBguEqI954+S6709UyiO7B+6OQ==}
 
@@ -6349,8 +6345,8 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  multer@2.3.0:
-    resolution: {integrity: sha512-cjNbm3sttszgZeGfJR124D+jFEfkXCVAsoPBmFn9X7UxmDSFHWqE2CoEj0vrmSpuAFnqWR1Szcm9QTsiHr60Xw==}
+  multer@2.4.0:
+    resolution: {integrity: sha512-7dqa0ZcFfzbefdTuIkzOSMvZWC0J7FLqBOjJUZvDCXShIURWKxAyTT1wHhnE5q19c7jOJf43IYYKjBmZVZmvhg==}
     engines: {node: '>= 10.16.0'}
 
   mysql2@3.23.1:
@@ -7314,9 +7310,6 @@ packages:
 
   typed-query-selector@2.12.2:
     resolution: {integrity: sha512-EOPFbyIub4ngnEdqi2yOcNeDLaX/0jcE1JoAXQDDMIthap7FoN795lc/SHfIq2d416VufXpM8z/lD+WRm2gfOQ==}
-
-  typedarray@0.0.6:
-    resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
 
   typescript@5.3.3:
     resolution: {integrity: sha512-pXWcraxM0uxAS+tN0AG/BF2TyqmHO014Z070UsJ+pFvYuRSq8KH8DmWpnbXe0pEPDHXZV3FcAbJkijJ5oNEnWw==}
@@ -10828,13 +10821,6 @@ snapshots:
 
   concat-map@0.0.1: {}
 
-  concat-stream@2.0.0:
-    dependencies:
-      buffer-from: 1.1.2
-      inherits: 2.0.4
-      readable-stream: 3.6.2
-      typedarray: 0.0.6
-
   confbox@0.2.4: {}
 
   content-disposition@0.5.4:
@@ -12185,11 +12171,10 @@ snapshots:
 
   ms@2.1.3: {}
 
-  multer@2.3.0:
+  multer@2.4.0:
     dependencies:
       append-field: 1.0.0
       busboy: 1.6.0
-      concat-stream: 2.0.0
       type-is: 1.6.18
 
   mysql2@3.23.1(@types/node@25.5.2):
@@ -13311,8 +13296,6 @@ snapshots:
       mime-types: 3.0.2
 
   typed-query-selector@2.12.2: {}
-
-  typedarray@0.0.6: {}
 
   typescript@5.3.3: {}
 

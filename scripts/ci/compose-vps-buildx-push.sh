@@ -41,9 +41,10 @@ selected_services() {
 
 service_build_command() {
   local service="$1"
-  local image_ref cache_ref
+  local image_ref cache_ref deploy_slot
   image_ref="$(bash "$REF_HELPER" "$DOCKER_REGISTRY_URL" "$service" "$STAGING_DOCKER_TAG")"
   cache_ref="$(bash "$REF_HELPER" "$DOCKER_REGISTRY_URL" "buildcache-$service" "buildcache")"
+  deploy_slot="${DEPLOY_SLOT:-${GITHUB_REF_NAME:-production}}"
 
   case "$service" in
     web)
@@ -53,6 +54,7 @@ service_build_command() {
         --file docker/app.Dockerfile
         --build-arg "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}"
         --build-arg "API_INTERNAL_URL=${API_INTERNAL_URL:-http://gateway:3010}"
+        --build-arg "DEPLOY_SLOT=$deploy_slot"
         --cache-from "type=registry,ref=$cache_ref"
         --cache-to "type=registry,ref=$cache_ref,mode=max"
         --tag "$image_ref"
