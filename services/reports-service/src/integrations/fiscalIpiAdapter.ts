@@ -16,7 +16,7 @@ import type {
 import type { ReportsServiceEnv } from "../config/env.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import {
-  assertReportSourceResponse,
+  readReportSourcePayload,
   reportCriteria,
   reportingQueryFields,
   reportResultFields,
@@ -151,8 +151,7 @@ export class FiscalIpiAdapter implements ReportSourceAdapter {
           signal: AbortSignal.timeout(this.env.sourceTimeoutMs),
         },
       );
-      assertReportSourceResponse(response);
-      const payload: unknown = await response.json();
+      const payload: unknown = await readReportSourcePayload(response);
       if (!response.ok || !isExtractResponse(payload)) {
         throw new Error("Resposta interna inválida.");
       }

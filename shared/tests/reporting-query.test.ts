@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { executeReportingQuery } from "../src/reporting/reportingQuery.js";
+import {
+  executeReportingQuery,
+  REPORTING_QUERY_BYTE_LIMIT_CODE,
+} from "../src/reporting/reportingQuery.js";
 
 test("combines an AND group with ungrouped criteria before limiting", async () => {
   const result = await executeReportingQuery(
@@ -237,7 +240,11 @@ test("stops loading pages as soon as the byte budget is exceeded", async () => {
         };
       },
     ),
-    { statusCode: 422 },
+    (error: unknown) =>
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === REPORTING_QUERY_BYTE_LIMIT_CODE,
   );
   assert.equal(calls, 2);
 });

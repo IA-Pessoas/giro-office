@@ -112,7 +112,11 @@ type ReportingQueryCursorLoader = {
 
 export const MAX_REPORTING_QUERY_ROWS = 50_000;
 export const MAX_REPORTING_QUERY_LIMIT = MAX_REPORTING_QUERY_ROWS + 1;
+export const MAX_REPORTING_QUERY_BYTES = 20 * 1024 * 1024;
 export const REPORTING_QUERY_ROW_LIMIT_CODE = "REPORTING_QUERY_ROW_LIMIT_EXCEEDED";
+export const REPORTING_QUERY_BYTE_LIMIT_CODE = "REPORTING_QUERY_BYTE_LIMIT_EXCEEDED";
+export const REPORTING_QUERY_BYTE_LIMIT_MESSAGE =
+  "O conjunto excede o limite global de bytes do relatório. Reduza os filtros ou as colunas e tente novamente.";
 
 export function reportingQueryFields(fields: readonly string[], query?: ReportingQuery): string[] {
   return [
@@ -255,8 +259,14 @@ export async function executeReportingQuery(
       throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
     for (const row of page.rows) {
       bytes += Buffer.byteLength(JSON.stringify(row));
-      if (bytes > 20 * 1024 * 1024)
-        throw new ServiceError(422, "O conjunto excede a capacidade de consulta do relatório.");
+      if (bytes > MAX_REPORTING_QUERY_BYTES) {
+        throw new ServiceError(
+          422,
+          REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
+          undefined,
+          REPORTING_QUERY_BYTE_LIMIT_CODE,
+        );
+      }
       if (completeRows.length >= MAX_REPORTING_QUERY_ROWS) {
         throw new ServiceError(
           422,
