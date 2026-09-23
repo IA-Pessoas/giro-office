@@ -268,6 +268,7 @@ export class TiPasswordService {
         password: this.encryption.decrypt(password),
       };
     } catch {
+      logError("Erro ao descriptografar senha de TI");
       throw new ServiceError(
         500,
         "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.",

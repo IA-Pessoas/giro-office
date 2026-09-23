@@ -2087,9 +2087,20 @@ await runTest("ti password reveal errors give safe recovery guidance", async () 
 
   assert.equal(
     getTiPasswordRevealErrorMessage({
-      response: { status: 500, data: { error: "internal error with ciphertext" } },
+      response: {
+        status: 500,
+        data: {
+          error: "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.",
+        },
+      },
     }),
     failureMessage,
+  );
+  assert.equal(
+    getTiPasswordRevealErrorMessage({
+      response: { status: 500, data: { error: "Falha de banco de dados." } },
+    }),
+    "Não foi possível revelar esta senha. Tente novamente mais tarde.",
   );
   assert.equal(
     getTiPasswordRevealErrorMessage({ response: { status: 403 } }),
