@@ -19,12 +19,82 @@ import {
 type ReportingDelegate = {
   findMany(input: {
     where: { organization_id: string };
-    select: Record<string, true>;
+    select: Record<string, unknown>;
     take: number;
+    cursor?: { id: string };
     skip?: number;
     orderBy?: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
+
+type ReportingPage = {
+  take: number;
+  offset?: number;
+  cursorId?: string;
+  includeCursor: boolean;
+};
+
+type ReportingReadOptions = {
+  offset?: number;
+  cursorId?: string;
+  includeCursor?: boolean;
+};
+
+const REPORTING_DB_PAGE_SIZE = 1000;
+
+function reportingPageOptions(page: ReportingPage) {
+  if (page.offset !== undefined) {
+    return { skip: page.offset, orderBy: { id: "asc" as const }, take: page.take };
+  }
+  if (!page.includeCursor) return { take: page.take };
+  return {
+    ...(page.cursorId === undefined ? {} : { cursor: { id: page.cursorId }, skip: 1 }),
+    orderBy: { id: "asc" as const },
+    take: page.take,
+  };
+}
+
+async function readReportingRows(
+  limit: number,
+  options: ReportingReadOptions,
+  fetchPage: (page: ReportingPage) => Promise<readonly Record<string, unknown>[]>,
+): Promise<readonly Record<string, unknown>[]> {
+  const requested = limit + 1;
+  if (options.offset !== undefined) {
+    return fetchPage({ take: requested, offset: options.offset, includeCursor: false });
+  }
+  if (options.includeCursor) {
+    return fetchPage({
+      take: requested,
+      ...(options.cursorId === undefined ? {} : { cursorId: options.cursorId }),
+      includeCursor: true,
+    });
+  }
+  if (requested <= REPORTING_DB_PAGE_SIZE) {
+    return fetchPage({ take: requested, includeCursor: false });
+  }
+
+  const rows: Record<string, unknown>[] = [];
+  let cursorId: string | undefined;
+  while (rows.length < requested) {
+    const take = Math.min(REPORTING_DB_PAGE_SIZE, requested - rows.length);
+    const page = await fetchPage({
+      take,
+      ...(cursorId === undefined ? {} : { cursorId }),
+      includeCursor: true,
+    });
+    if (page.length === 0) break;
+    rows.push(...page.slice(0, requested - rows.length));
+    if (page.length < take || rows.length >= requested) break;
+
+    const nextCursorId = page[page.length - 1]?.id;
+    if (typeof nextCursorId !== "string" || nextCursorId === cursorId) {
+      throw new ServiceError(500, "Falha ao continuar a extração do relatório.");
+    }
+    cursorId = nextCursorId;
+  }
+  return rows;
+}
 
 const PAYROLL_SCALAR_FIELDS = new Set([
   "advance",
@@ -96,7 +166,9 @@ function projectRows(
   rows: readonly Record<string, unknown>[],
   fields: readonly string[],
   limit: number,
-): { rows: readonly Record<string, unknown>[]; reachedLimit: boolean } {
+  includeCursor = false,
+): { rows: readonly Record<string, unknown>[]; reachedLimit: boolean; nextCursor?: string } {
+  const cursorId = includeCursor && rows.length > limit ? rows[limit - 1]?.id : undefined;
   return {
     rows: rows
       .slice(0, limit)
@@ -108,6 +180,7 @@ function projectRows(
         ),
       ),
     reachedLimit: rows.length > limit,
+    ...(typeof cursorId === "string" ? { nextCursor: cursorId } : {}),
   };
 }
 
@@ -123,19 +196,35 @@ export class InternalReportingService {
   async extract(input: {
     query?: ReportingQuery;
     offset?: number;
+    cursorId?: string;
+    cursorPage?: boolean;
     organizationId: string;
     source: PessoalReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
-    if (input.query && !this.inSnapshot) {
+    const needsPagedSnapshot =
+      input.offset === undefined && input.limit + 1 > REPORTING_DB_PAGE_SIZE;
+    if ((input.query || input.cursorPage || needsPagedSnapshot) && !this.inSnapshot) {
       return withReportingSnapshot(this.prisma, (transaction) =>
         new InternalReportingService(transaction, true).extract(input),
       );
     }
     if (input.query) {
-      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
-        this.extract({ ...input, query: undefined, fields, limit, offset }),
+      return executeReportingQuery(
+        { ...input, query: input.query },
+        {
+          loadPage: (fields, limit, cursorId) =>
+            this.extract({
+              ...input,
+              query: undefined,
+              offset: undefined,
+              fields,
+              limit,
+              cursorId,
+              cursorPage: true,
+            }),
+        },
       );
     }
     if (!PESSOAL_REPORTING_SOURCES.includes(input.source)) {
@@ -148,26 +237,31 @@ export class InternalReportingService {
     }
 
     if (input.source === PESSOAL_PAYROLL_REPORTING_SOURCES[0]) {
-      const rows = await this.prisma.payroll.findMany({
-        where: { organization_id: input.organizationId },
-        select: {
-          ...selectScalars(input.fields, PAYROLL_SCALAR_FIELDS),
-          ...(input.fields.includes("client_name") ? { client: { select: { name: true } } } : {}),
-          ...(input.fields.includes("responsible_name")
-            ? { responsible: { select: { name: true } } }
-            : {}),
-          ...(input.fields.includes("union_name") ? { union: { select: { name: true } } } : {}),
-          ...(input.fields.some((field) => field === "group_name" || field === "group_state")
-            ? {
-                group: { select: { name: true, archived_at: true, system_key: true } },
-              }
-            : {}),
-        },
-        ...(input.offset !== undefined
-          ? { skip: input.offset, orderBy: { id: "asc" as const } }
-          : {}),
-        take: input.limit + 1,
-      });
+      const rows = await readReportingRows(
+        input.limit,
+        { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
+        (page) =>
+          this.prisma.payroll.findMany({
+            where: { organization_id: input.organizationId },
+            select: {
+              ...selectScalars(input.fields, PAYROLL_SCALAR_FIELDS),
+              ...(page.includeCursor ? { id: true } : {}),
+              ...(input.fields.includes("client_name")
+                ? { client: { select: { name: true } } }
+                : {}),
+              ...(input.fields.includes("responsible_name")
+                ? { responsible: { select: { name: true } } }
+                : {}),
+              ...(input.fields.includes("union_name") ? { union: { select: { name: true } } } : {}),
+              ...(input.fields.some((field) => field === "group_name" || field === "group_state")
+                ? {
+                    group: { select: { name: true, archived_at: true, system_key: true } },
+                  }
+                : {}),
+            },
+            ...reportingPageOptions(page),
+          }),
+      );
       return projectRows(
         rows.map((row) => ({
           ...row,
@@ -180,24 +274,30 @@ export class InternalReportingService {
         })),
         input.fields,
         input.limit,
+        input.cursorPage,
       );
     }
 
     if (input.source === "pessoal.obligations") {
-      const rows = await this.prisma.obrigationsPessoal.findMany({
-        where: { organization_id: input.organizationId },
-        select: {
-          ...selectScalars(input.fields, OBLIGATION_SCALAR_FIELDS),
-          ...(input.fields.includes("client_name") ? { client: { select: { name: true } } } : {}),
-          ...(input.fields.includes("responsible_name")
-            ? { responsible: { select: { name: true } } }
-            : {}),
-        },
-        ...(input.offset !== undefined
-          ? { skip: input.offset, orderBy: { id: "asc" as const } }
-          : {}),
-        take: input.limit + 1,
-      });
+      const rows = await readReportingRows(
+        input.limit,
+        { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
+        (page) =>
+          this.prisma.obrigationsPessoal.findMany({
+            where: { organization_id: input.organizationId },
+            select: {
+              ...selectScalars(input.fields, OBLIGATION_SCALAR_FIELDS),
+              ...(page.includeCursor ? { id: true } : {}),
+              ...(input.fields.includes("client_name")
+                ? { client: { select: { name: true } } }
+                : {}),
+              ...(input.fields.includes("responsible_name")
+                ? { responsible: { select: { name: true } } }
+                : {}),
+            },
+            ...reportingPageOptions(page),
+          }),
+      );
       return projectRows(
         rows.map((row) => ({
           ...row,
@@ -209,6 +309,7 @@ export class InternalReportingService {
         })),
         input.fields,
         input.limit,
+        input.cursorPage,
       );
     }
 
@@ -218,15 +319,21 @@ export class InternalReportingService {
         : input.source === PESSOAL_SITUATIONS_REPORTING_SOURCES[0]
           ? this.prisma.situationsPessoal
           : this.prisma.unionPessoal;
-    const rows = await (delegate as unknown as ReportingDelegate).findMany({
-      where: { organization_id: input.organizationId },
-      select: Object.fromEntries(input.fields.map((field) => [field, true])),
-      ...(input.offset !== undefined
-        ? { skip: input.offset, orderBy: { id: "asc" as const } }
-        : {}),
-      take: input.limit + 1,
-    });
+    const reportingDelegate = delegate as unknown as ReportingDelegate;
+    const rows = await readReportingRows(
+      input.limit,
+      { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
+      (page) =>
+        reportingDelegate.findMany({
+          where: { organization_id: input.organizationId },
+          select: {
+            ...Object.fromEntries(input.fields.map((field) => [field, true])),
+            ...(page.includeCursor ? { id: true } : {}),
+          },
+          ...reportingPageOptions(page),
+        }),
+    );
 
-    return projectRows(rows, input.fields, input.limit);
+    return projectRows(rows, input.fields, input.limit, input.cursorPage);
   }
 }

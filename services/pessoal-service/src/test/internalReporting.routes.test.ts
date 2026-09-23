@@ -2,7 +2,11 @@ import "./envBootstrap.js";
 
 import { createHash, createHmac } from "node:crypto";
 
-import { createExpressErrorHandler, INTERNAL_SERVICE_TOKEN_HEADER } from "@workspace/shared";
+import {
+  createExpressErrorHandler,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+  MAX_REPORTING_QUERY_LIMIT,
+} from "@workspace/shared";
 import express from "express";
 import "express-async-errors";
 import request from "supertest";
@@ -205,6 +209,23 @@ describe("pessoal internal reporting routes", () => {
     });
   });
 
+  it("aceita o limite global em um extract assinado", async () => {
+    const body = { source: "pessoal.ldd", fields: ["type"], limit: MAX_REPORTING_QUERY_LIMIT };
+    const signed = signedGrant(body);
+    const { app, extract } = createApp();
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(extract).toHaveBeenCalledWith({ organizationId, ...body });
+  });
+
   it("recusa grant expirado, assinatura inválida e limite acima do máximo", async () => {
     const body = { source: "pessoal.ldd", fields: ["type"], limit: 1 };
     const expired = signedGrant(body, Math.floor(Date.now() / 1000) - 1);
@@ -225,7 +246,7 @@ describe("pessoal internal reporting routes", () => {
         .expect(403);
     }
 
-    const tooLargeBody = { ...body, limit: 102 };
+    const tooLargeBody = { ...body, limit: MAX_REPORTING_QUERY_LIMIT + 1 };
     const tooLarge = signedGrant(tooLargeBody);
     await request(app)
       .post("/internal/reporting/extract")

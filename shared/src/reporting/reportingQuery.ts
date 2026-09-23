@@ -101,8 +101,18 @@ type ReportingResult = {
   reachedLimit: boolean;
 };
 
+type ReportingQueryCursorPage = ReportingResult & { nextCursor?: string };
+type ReportingQueryCursorLoader = {
+  loadPage: (
+    fields: readonly string[],
+    limit: number,
+    cursor?: string,
+  ) => Promise<ReportingQueryCursorPage>;
+};
+
 export const MAX_REPORTING_QUERY_ROWS = 50_000;
 export const MAX_REPORTING_QUERY_LIMIT = MAX_REPORTING_QUERY_ROWS + 1;
+export const REPORTING_QUERY_ROW_LIMIT_CODE = "REPORTING_QUERY_ROW_LIMIT_EXCEEDED";
 
 export function reportingQueryFields(fields: readonly string[], query?: ReportingQuery): string[] {
   return [
@@ -159,7 +169,9 @@ function matchesFilter(actual: Scalar, operator: string, expected: Scalar | Scal
 
 export async function executeReportingQuery(
   input: { source: string; fields: readonly string[]; limit: number; query: ReportingQuery },
-  load: (fields: readonly string[], limit: number, offset: number) => Promise<ReportingResult>,
+  load:
+    | ((fields: readonly string[], limit: number, offset: number) => Promise<ReportingResult>)
+    | ReportingQueryCursorLoader,
 ): Promise<ReportingResult> {
   const parsed = reportingQuerySchema.safeParse(input.query);
   if (!parsed.success) throw new ServiceError(400, "Critérios de relatório inválidos.");
@@ -232,17 +244,37 @@ export async function executeReportingQuery(
   }
   const completeRows: Record<string, unknown>[] = [];
   let bytes = 0;
-  for (let offset = 0; ; offset += 100) {
-    const page = await load(fields, 100, offset);
+  let offset = 0;
+  let cursor: string | undefined;
+  for (;;) {
+    const page: ReportingQueryCursorPage =
+      typeof load === "function"
+        ? await load(fields, 100, offset)
+        : await load.loadPage(fields, 100, cursor);
     if (!page.rows.length && page.reachedLimit)
       throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
     for (const row of page.rows) {
       bytes += Buffer.byteLength(JSON.stringify(row));
-      if (bytes > 20 * 1024 * 1024 || completeRows.length >= MAX_REPORTING_QUERY_ROWS)
+      if (bytes > 20 * 1024 * 1024)
         throw new ServiceError(422, "O conjunto excede a capacidade de consulta do relatório.");
+      if (completeRows.length >= MAX_REPORTING_QUERY_ROWS) {
+        throw new ServiceError(
+          422,
+          "O conjunto excede a capacidade de consulta do relatório.",
+          undefined,
+          REPORTING_QUERY_ROW_LIMIT_CODE,
+        );
+      }
       completeRows.push(row);
     }
     if (!page.reachedLimit) break;
+    if (typeof load === "function") {
+      offset += 100;
+      continue;
+    }
+    if (!page.nextCursor || page.nextCursor === cursor)
+      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
+    cursor = page.nextCursor;
   }
   const groups = input.query.filter_groups ?? [];
   const grouped = new Set(groups.flatMap((group) => group.filters));
