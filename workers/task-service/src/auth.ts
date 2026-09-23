@@ -100,7 +100,17 @@ async function authenticate(request: Request, env: TaskWorkerEnv): Promise<Worke
       allowBearer: true,
     });
   } catch (error) {
-    if (error instanceof WorkerAuthenticationError) throw new ServiceError(401, "Não autenticado.");
+    if (error instanceof WorkerAuthenticationError) {
+      // Só booleanos: mostra qual segredo diverge sem vazar nenhum valor.
+      console.warn("Token recusado", {
+        event: "auth.token.rejected",
+        forwardedHeaders: request.headers.has(INTERNAL_SERVICE_TOKEN_HEADER),
+        internalTokenMatches:
+          request.headers.get(INTERNAL_SERVICE_TOKEN_HEADER) === env.INTERNAL_SERVICE_TOKEN,
+        message: error.message,
+      });
+      throw new ServiceError(401, "Não autenticado.");
+    }
     throw error;
   }
 }

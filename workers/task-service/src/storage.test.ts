@@ -85,6 +85,22 @@ describe("createTaskAttachmentStorage", () => {
     });
   });
 
+  it("usa o bucket padrão do Node quando TASK_ATTACHMENT_STORAGE_BUCKET não vem", async () => {
+    const { calls, fetchImpl } = supabase({
+      "GET /storage/v1/bucket/": () => Response.json({ public: false }),
+      "POST /storage/v1/object/": () => Response.json({}),
+    });
+    const { TASK_ATTACHMENT_STORAGE_BUCKET: _bucket, ...semBucket } = env;
+    const storage = createTaskAttachmentStorage(semBucket, {
+      fetchImpl,
+      createAttachmentId: () => "a",
+    });
+
+    await storage.upload({ organizationId: "o", taskId: "t", file });
+
+    expect(new URL(calls[0].url).pathname).toBe("/storage/v1/bucket/task-attachments-private");
+  });
+
   it("indisponível (503) sem configuração do Supabase", async () => {
     const storage = createTaskAttachmentStorage({});
     await expect(storage.remove("x")).rejects.toMatchObject({ statusCode: 503 });

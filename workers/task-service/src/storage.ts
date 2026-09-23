@@ -26,11 +26,12 @@ export function createTaskAttachmentStorage(
     createAttachmentId = () => crypto.randomUUID(),
   }: { fetchImpl?: typeof fetch; createAttachmentId?: () => string } = {},
 ): TaskAttachmentStorage {
-  const bucket = env.TASK_ATTACHMENT_STORAGE_BUCKET ?? "";
+  // Mesmo default do config/env.ts do Node.
+  const bucket = env.TASK_ATTACHMENT_STORAGE_BUCKET ?? "task-attachments-private";
   let bucketVerification: Promise<void> | undefined;
 
   function client() {
-    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !bucket) {
+    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
       throw new ServiceError(503, UNAVAILABLE);
     }
     return createSupabaseStorageClient(
