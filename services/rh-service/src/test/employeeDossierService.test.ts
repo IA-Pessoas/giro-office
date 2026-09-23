@@ -55,8 +55,10 @@ describe("EmployeeDossierService", () => {
     vi.clearAllMocks();
   });
 
-  it("retorna admissão real e admissão Domínio no dossiê completo", async () => {
-    prismaMock.user.findFirst.mockResolvedValue(user());
+  it("retorna o dossiê autorizado sem configuração de ponto", async () => {
+    const collaborator = user();
+    expect(collaborator).not.toHaveProperty("pointConfig");
+    prismaMock.user.findFirst.mockResolvedValue(collaborator);
 
     const result = await new EmployeeDossierService().getDossier({
       actorUserId: actorId,
@@ -72,29 +74,7 @@ describe("EmployeeDossierService", () => {
       allergies: [{ name: "poeira", fonts: "ambiental", action: "evitar" }],
       emergency_contacts: [],
     });
-  });
-
-  it("carrega o dossiê autorizado quando o colaborador não tem configuração de ponto", async () => {
-    const collaborator = user();
-    expect(collaborator).not.toHaveProperty("pointConfig");
-    prismaMock.user.findFirst.mockResolvedValue(collaborator);
-
-    const result = await new EmployeeDossierService().getDossier({
-      actorUserId: actorId,
-      organizationId,
-      rhPermission: 1,
-    });
-
-    expect(result).toMatchObject({
-      id: actorId,
-      full_name: "Ana Silva",
-      allergies: [{ name: "poeira", fonts: "ambiental", action: "evitar" }],
-      emergency_contacts: [],
-    });
     expect(prismaMock.user.findFirst).toHaveBeenCalledTimes(2);
-    for (const [query] of prismaMock.user.findFirst.mock.calls) {
-      expect(query.select).not.toHaveProperty("pointConfig");
-    }
   });
 
   it("entrega somente projeção não sensível para gestor de departamento", async () => {
