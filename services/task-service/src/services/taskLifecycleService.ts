@@ -10,6 +10,7 @@ import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import type { IntegracaoTaskConclusionBody } from "../schemas/integracaoTaskConclusionBody.schema.js";
+import { assertCommercialValidationReleased } from "./commercialValidationGate.js";
 import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
 import { throwIfActiveTaskConflict } from "./taskActiveConflict.js";
 import {
@@ -139,6 +140,7 @@ export class TaskLifecycleService {
         responsible3Id: task.responsible3_id,
         isOwner: params.isOwner === true,
       });
+      assertCommercialValidationReleased(task);
 
       return await prismaClient.$transaction(
         async (tx) => {
@@ -159,6 +161,7 @@ export class TaskLifecycleService {
             responsible3Id: currentTask.responsible3_id,
             isOwner: params.isOwner === true,
           });
+          assertCommercialValidationReleased(currentTask);
           const pending = await tx.taskCompletionRequest.findFirst({
             where: {
               task_id: params.task_id,
@@ -380,6 +383,7 @@ export class TaskLifecycleService {
         resourceOrganizationId: task.organization_id,
         isOwner: params.isOwner === true,
       });
+      assertCommercialValidationReleased(task);
 
       const updated = await prismaClient.$transaction(async (tx) => {
         const reopened = await tx.task.update({
@@ -485,6 +489,9 @@ export class TaskLifecycleService {
             isOwner,
             task: currentTask,
           });
+          if (body.status !== currentTask.status) {
+            assertCommercialValidationReleased(currentTask);
+          }
 
           if (requiresCompletionRequest) {
             if (currentTask.status === "Concluída") {
@@ -670,7 +677,6 @@ export class TaskLifecycleService {
         isOwner: params.isOwner === true,
         hasTaskCompletionPermission: permConclusion?.task_completion === true,
       });
-
       const updated = await prismaClient.$transaction(async (tx) => {
         const completionRequest = await tx.taskCompletionRequest.findFirst({
           where: {
@@ -683,6 +689,7 @@ export class TaskLifecycleService {
 
         if (!completionRequest) {
           if (decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED && exists.pending_approval) {
+            assertCommercialValidationReleased(exists);
             const legacyUpdated = await tx.task.update({
               where: { id: task_id },
               data: { status: "Concluída", pending_approval: false },
@@ -750,6 +757,7 @@ export class TaskLifecycleService {
         }
 
         const approved = decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED;
+        if (approved) assertCommercialValidationReleased(exists);
         const task = await tx.task.update({
           where: { id: task_id },
           data: {

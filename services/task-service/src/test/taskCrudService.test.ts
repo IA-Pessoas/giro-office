@@ -537,7 +537,7 @@ describe("TaskCrudService", () => {
       client_id: "client-1",
       prospecting_status: "Fechado",
       name: "Tarefa do wizard",
-      status: "A Realizar",
+      status: "Em Espera",
       department_id: "dep-1",
       observations: "",
       urgency: "",
@@ -548,7 +548,7 @@ describe("TaskCrudService", () => {
     expect(result.create).toMatchObject({
       project_id: "project-1",
       client_id: "client-1",
-      status: "A Realizar",
+      status: "Em Espera",
     });
     expect(prismaMock.taskDependent.findMany).not.toHaveBeenCalled();
   });
@@ -1086,23 +1086,75 @@ describe("TaskCrudService", () => {
       observations: "obs",
       urgency: "Alta",
       billing: "Realizar",
+      status: "Em Andamento",
       integracaoLevel: 2,
     });
 
     expect(prismaMock.task.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: "A Realizar", billing: "Realizar" }),
+        data: expect.objectContaining({
+          status: "Em Espera",
+          billing: "Realizar",
+          charge_comercial: true,
+          charge_financeiro: false,
+        }),
       }),
     );
   });
 
-  it("createTask disables charges for an Em Espera task regardless of billing", async () => {
+  it("updateTask não libera tarefa de cobrança pendente para execução", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      responsible_id: "user-1",
+      status: "Em Espera",
+      billing: "Realizar",
+      hiring_status: "A Realizar",
+    });
+
+    await expect(
+      new TaskCrudService().updateTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        status: "Em Andamento",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+  });
+
+  it("updateTask não permite remover a cobrança Realizar antes da validação Comercial", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      responsible_id: "user-1",
+      status: "Em Espera",
+      billing: "Realizar",
+      hiring_status: null,
+    });
+
+    await expect(
+      new TaskCrudService().updateTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        billing: "Não Realizar",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+  });
+
+  it("createTask preserves no-charge behavior for a Não Realizar task in Em Espera", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.findFirst.mockResolvedValue({
       name: "Nome do modelo",
       department_id: "department-model",
-      billing: "Realizar",
+      billing: "Não Realizar",
       responsible_id: "user-model-1",
       responsible2_id: null,
       responsible3_id: null,

@@ -17,6 +17,10 @@ import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import {
+  assertCommercialValidationReleased,
+  isAwaitingCommercialValidation,
+} from "./commercialValidationGate.js";
+import {
   assertResponsibleUsersInDepartment,
   listEligibleTaskResponsibles,
 } from "./responsibleUserContext.js";
@@ -38,6 +42,7 @@ const TASK_DETAIL_SELECT = {
   department_id: true,
   observations: true,
   billing: true,
+  hiring_status: true,
   urgency: true,
   responsible_id: true,
   responsible2_id: true,
@@ -330,10 +335,11 @@ export class TaskCrudService {
     let charge_comercial = model.billing !== "Não Realizar";
     let charge_financeiro = model.billing !== "Não Realizar";
 
-    if (params.status === "Em Espera") {
+    if (params.status === "Em Espera" && model.billing !== "Realizar") {
       charge_comercial = false;
       charge_financeiro = false;
     }
+    if (model.billing === "Realizar") charge_financeiro = false;
 
     const create = await params.prisma.task.create({
       data: {
@@ -342,7 +348,7 @@ export class TaskCrudService {
         project_id: params.project_id,
         client_id: params.client_id,
         name: model.name,
-        status: params.status,
+        status: model.billing === "Realizar" ? "Em Espera" : params.status,
         department_id: model.department_id,
         observations: params.observations,
         billing: model.billing,
@@ -350,7 +356,8 @@ export class TaskCrudService {
         responsible_id: model.responsible_id,
         responsible2_id: model.responsible2_id,
         responsible3_id: model.responsible3_id,
-        start_date: params.status === "Em Andamento" ? new Date() : null,
+        start_date:
+          params.status === "Em Andamento" && model.billing !== "Realizar" ? new Date() : null,
         pending_approval: false,
         charge_comercial,
         charge_financeiro,
@@ -421,7 +428,7 @@ export class TaskCrudService {
       defaultStatus = "A Realizar";
     }
 
-    const status = data.status ?? defaultStatus;
+    const status = billing === "Realizar" ? "Em Espera" : (data.status ?? defaultStatus);
     const departmentId = data.department_id ?? model.department_id;
     let responsibleId =
       data.responsible_id !== undefined ? data.responsible_id : model.responsible_id;
@@ -435,7 +442,8 @@ export class TaskCrudService {
       : data.responsible3_id !== undefined
         ? data.responsible3_id
         : model.responsible3_id;
-    const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
+    const charge_comercial =
+      billing !== "Não Realizar" && (status !== "Em Espera" || billing === "Realizar");
     const previsionDate =
       data.prevision_date === undefined || data.prevision_date === null
         ? null
@@ -783,6 +791,15 @@ export class TaskCrudService {
       const observations =
         data.observations !== undefined ? data.observations : exists.observations;
       const billing = data.billing !== undefined ? data.billing : exists.billing;
+      if (
+        isAwaitingCommercialValidation(exists) &&
+        ((data.status !== undefined && data.status !== exists.status) || billing !== exists.billing)
+      ) {
+        assertCommercialValidationReleased(exists);
+      }
+      if (billing !== exists.billing && billing === "Realizar") {
+        assertCommercialValidationReleased({ billing, hiring_status: exists.hiring_status });
+      }
       const urgency = data.urgency !== undefined ? data.urgency : exists.urgency;
       const departmentChanged = department_id !== exists.department_id;
       const modelChanged = model_id !== exists.model_id;

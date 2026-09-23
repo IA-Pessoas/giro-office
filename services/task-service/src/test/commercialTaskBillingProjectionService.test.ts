@@ -31,7 +31,11 @@ function createPrismaMock() {
   prisma.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
     callback(prisma),
   );
-  prisma.task.findFirst.mockResolvedValue({ id: TASK_ID, status: "A Realizar" });
+  prisma.task.findFirst.mockResolvedValue({
+    id: TASK_ID,
+    status: "A Realizar",
+    billing: "Realizar",
+  });
   prisma.task.updateMany.mockResolvedValue({ count: 1 });
   prisma.commercialTaskBillingProjectionEvent.findUnique.mockResolvedValue(null);
   return prisma;
@@ -39,7 +43,7 @@ function createPrismaMock() {
 
 describe("CommercialTaskBillingProjectionService", () => {
   it.each([
-    ["A Realizar", "A Realizar", true, false],
+    ["A Realizar", "Em Espera", true, false],
     ["Contratado", "Em Andamento", false, true],
     ["Não Contratado", "Não Contratado", false, false],
   ] as const)("aplica o estado %s aos efeitos legados", async (hiringStatus, status, chargeComercial, chargeFinanceiro) => {
@@ -59,6 +63,38 @@ describe("CommercialTaskBillingProjectionService", () => {
         billing_description: "Cobrança confirmada",
       },
     });
+  });
+
+  it("mantém em espera a tarefa aguardando decisão do Comercial", async () => {
+    const prisma = createPrismaMock();
+    prisma.task.findFirst.mockResolvedValue({
+      id: TASK_ID,
+      status: "Em Andamento",
+      billing: "Realizar",
+    });
+    const service = new CommercialTaskBillingProjectionService(prisma as never);
+
+    await service.apply(event("A Realizar"));
+
+    expect(prisma.task.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "Em Espera" }) }),
+    );
+  });
+
+  it("preserva o status atual de tarefas sem cobrança comercial", async () => {
+    const prisma = createPrismaMock();
+    prisma.task.findFirst.mockResolvedValue({
+      id: TASK_ID,
+      status: "Em Andamento",
+      billing: "Não Realizar",
+    });
+    const service = new CommercialTaskBillingProjectionService(prisma as never);
+
+    await service.apply(event("A Realizar"));
+
+    expect(prisma.task.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "Em Andamento" }) }),
+    );
   });
 
   it("ignora a repetição do mesmo evento sem repetir os efeitos", async () => {

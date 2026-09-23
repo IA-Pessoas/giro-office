@@ -63,6 +63,7 @@ export interface IntegracaoTaskDetail {
   department_id: string;
   observations: string | null;
   billing: string;
+  hiring_status?: string | null;
   urgency: string;
   responsible_id: string | null;
   responsible2_id: string | null;

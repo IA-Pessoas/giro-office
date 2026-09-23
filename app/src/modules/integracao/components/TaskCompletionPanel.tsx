@@ -19,7 +19,13 @@ interface TaskCompletionPanelProps {
   canApproveCompletion: boolean;
   task: Pick<
     IntegracaoTaskDetail,
-    "id" | "status" | "responsible_id" | "responsible2_id" | "responsible3_id"
+    | "id"
+    | "status"
+    | "billing"
+    | "hiring_status"
+    | "responsible_id"
+    | "responsible2_id"
+    | "responsible3_id"
   >;
   currentUserId: string | undefined;
   accessLevel: ModuleAccess["level"];
@@ -71,6 +77,8 @@ export function TaskCompletionPanel({
     isOwner ||
     (accessLevel === "edit" && canApproveCompletion);
   const canReopen = accessLevel === "admin" || isOwner;
+  const awaitingCommercialValidation =
+    task.billing === "Realizar" && task.hiring_status !== "Contratado";
   const isMutating =
     requestMutation.isPending ||
     decisionMutation.isPending ||
@@ -140,7 +148,11 @@ export function TaskCompletionPanel({
         </p>
       </div>
 
-      {task.status === "Concluída" ? (
+      {awaitingCommercialValidation ? (
+        <p className="text-sm text-amber-700 dark:text-amber-300" role="status">
+          Aguardando validação do Comercial para liberar a execução.
+        </p>
+      ) : task.status === "Concluída" ? (
         canReopen ? (
           <div className="space-y-2">
             <textarea
