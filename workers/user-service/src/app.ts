@@ -1485,7 +1485,8 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         user = await createOrganizationUser(
           db,
           auth.organizationId,
-          input,
+          // Quem convidou é quem está autenticado; o body não decide isso.
+          { ...input, invited_by: auth.userId },
           options.hashPassword ?? defaultHashPassword,
           auth,
         );

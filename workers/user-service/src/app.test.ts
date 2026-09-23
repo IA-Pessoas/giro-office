@@ -1283,13 +1283,15 @@ describe("user Worker", () => {
         type: "admin",
         status: "active",
         modules: { ti: 3, rh: 1 },
-        invited_by: USER_ID,
+        invited_by: "forged-inviter-id",
       }),
     });
 
     expect(response.status).toBe(201);
     const [[{ data }]] = db.user.create.mock.calls as unknown as [[{ data: object }]];
     expect(Object.keys(data).filter((key) => !columns.has(key))).toEqual([]);
+    // invited_by vem da sessão, não do body (o front manda o próprio id, mas poderia forjar).
+    expect(data).toMatchObject({ invited_by: USER_ID });
   });
 
   it("rejects organization user creation for a department in another tenant", async () => {
