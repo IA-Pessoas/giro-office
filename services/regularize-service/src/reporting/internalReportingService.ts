@@ -1,12 +1,7 @@
-import { Buffer } from "node:buffer";
-
 import {
+  collectReportingRows,
   executeReportingQuery,
-  MAX_REPORTING_QUERY_BYTES,
-  MAX_REPORTING_QUERY_ROWS,
-  REPORTING_QUERY_BYTE_LIMIT_CODE,
-  REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
-  REPORTING_QUERY_ROW_LIMIT_CODE,
+  REPORTING_QUERY_PAGE_SIZE as REPORTING_DB_PAGE_SIZE,
   type ReportingQuery,
   ServiceError,
   withReportingSnapshot,
@@ -46,31 +41,6 @@ type ReportingPage = {
   nextCursor?: string;
 };
 
-type ReportingResult = {
-  rows: readonly Record<string, unknown>[];
-  reachedLimit: boolean;
-};
-
-const REPORTING_DB_PAGE_SIZE = 100;
-
-function throwSnapshotByteLimit(): never {
-  throw new ServiceError(
-    422,
-    REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
-    undefined,
-    REPORTING_QUERY_BYTE_LIMIT_CODE,
-  );
-}
-
-function throwSnapshotRowLimit(): never {
-  throw new ServiceError(
-    422,
-    "O conjunto excede a capacidade de consulta do relatório.",
-    undefined,
-    REPORTING_QUERY_ROW_LIMIT_CODE,
-  );
-}
-
 async function loadReportingPage(
   delegate: ReportingDelegate,
   organizationId: string,
@@ -93,40 +63,6 @@ async function loadReportingPage(
     reachedLimit,
     ...(reachedLimit && typeof lastId === "string" ? { nextCursor: lastId } : {}),
   };
-}
-
-async function readReportingRows(
-  limit: number,
-  loadPage: (limit: number, cursor?: string) => Promise<ReportingPage>,
-): Promise<ReportingResult> {
-  const requested = limit + 1;
-  const rows: Record<string, unknown>[] = [];
-  let cursor: string | undefined;
-  let reachedLimit = false;
-  let bytes = 2;
-
-  while (rows.length < requested) {
-    const pageLimit = Math.min(REPORTING_DB_PAGE_SIZE, requested - rows.length);
-    const page = await loadPage(pageLimit, cursor);
-    if (!page.rows.length && page.reachedLimit) {
-      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
-    }
-    for (const row of page.rows) {
-      bytes += (rows.length ? 1 : 0) + Buffer.byteLength(JSON.stringify(row), "utf8");
-      if (bytes > MAX_REPORTING_QUERY_BYTES) throwSnapshotByteLimit();
-      if (rows.length >= MAX_REPORTING_QUERY_ROWS) throwSnapshotRowLimit();
-      rows.push(row);
-    }
-
-    reachedLimit = page.reachedLimit;
-    if (!page.reachedLimit || rows.length >= requested) break;
-    if (!page.nextCursor || page.nextCursor === cursor) {
-      throw new ServiceError(500, "Falha ao continuar a extração do relatório.");
-    }
-    cursor = page.nextCursor;
-  }
-
-  return { rows, reachedLimit };
 }
 
 function projectRows(
@@ -184,8 +120,9 @@ export class RegularizeLicenseReportingService {
       );
     }
 
-    const result = await readReportingRows(input.limit, (limit, cursor) =>
-      loadPage(input.fields, limit, cursor),
+    const result = await collectReportingRows(
+      (limit, cursor) => loadPage(input.fields, limit, cursor),
+      input.limit + 1,
     );
     return {
       rows: result.rows.slice(0, input.limit),
@@ -226,8 +163,9 @@ export class RegularizeMunicipalTaxesReportingService {
       );
     }
 
-    const result = await readReportingRows(input.limit, (limit, cursor) =>
-      loadPage(input.fields, limit, cursor),
+    const result = await collectReportingRows(
+      (limit, cursor) => loadPage(input.fields, limit, cursor),
+      input.limit + 1,
     );
     return {
       rows: result.rows.slice(0, input.limit),
