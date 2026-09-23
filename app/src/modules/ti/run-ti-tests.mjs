@@ -2078,6 +2078,49 @@ await runTest("ti inventory mutation errors preserve domain feedback and hide te
   );
 });
 
+await runTest("ti password reveal errors give safe recovery guidance", async () => {
+  const { getTiPasswordRevealErrorMessage } = await import(
+    "./utils/passwordRevealError.ts"
+  );
+  const failureMessage =
+    "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.";
+
+  assert.equal(
+    getTiPasswordRevealErrorMessage({
+      response: {
+        status: 500,
+        data: {
+          error: "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.",
+        },
+      },
+    }),
+    failureMessage,
+  );
+  assert.equal(
+    getTiPasswordRevealErrorMessage({
+      response: { status: 500, data: { error: "Falha de banco de dados." } },
+    }),
+    "Não foi possível revelar esta senha. Tente novamente mais tarde.",
+  );
+  assert.equal(
+    getTiPasswordRevealErrorMessage({ response: { status: 403 } }),
+    "Você não tem permissão para revelar esta senha.",
+  );
+  assert.equal(
+    getTiPasswordRevealErrorMessage({ response: { status: 404 } }),
+    "Esta senha não está mais disponível. Atualize a lista e tente novamente.",
+  );
+  assert.equal(getTiPasswordRevealErrorMessage(new Error("Network Error")),
+    "Não foi possível revelar esta senha. Tente novamente mais tarde.");
+});
+
+await runTest("ti password reveal modal uses safe error guidance", async () => {
+  const source = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(source, /getTiPasswordRevealErrorMessage\(revealQuery\.error\)/);
+  assert.doesNotMatch(source, /Acesso negado ou indisponível\./);
+});
+
 await runTest("ti inventory category status supports is_active fallback", async () => {
   const source = await readModuleSource("components/TiInventoryTab.tsx");
 
