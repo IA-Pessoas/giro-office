@@ -6,8 +6,14 @@ import {
   ServiceError,
 } from "@workspace/shared";
 import {
+  INTEGRACAO_TASK_STATUS_IN_PROGRESS,
+  INTEGRACAO_TASK_STATUS_TODO,
+  INTEGRACAO_TASK_STATUS_WAITING,
   type IntegracaoTaskStatus,
   TASK_ASSIGNMENT_FILTER,
+  TASK_BILLING_NOT_REALIZE,
+  TASK_BILLING_REALIZE,
+  TASK_HIRING_STATUS_CONTRACTED,
   type TaskAssignmentFilter,
   type TaskBilling,
 } from "../constants/integracaoTask.js";
@@ -16,6 +22,10 @@ import type { Prisma } from "../generated/prisma/client.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
+import {
+  assertCommercialValidationReleased,
+  isAwaitingCommercialValidation,
+} from "./commercialValidationGateService.js";
 import {
   assertResponsibleUsersInDepartment,
   listEligibleTaskResponsibles,
@@ -38,6 +48,7 @@ const TASK_DETAIL_SELECT = {
   department_id: true,
   observations: true,
   billing: true,
+  hiring_status: true,
   urgency: true,
   responsible_id: true,
   responsible2_id: true,
@@ -107,8 +118,20 @@ const DEPENDENTS_FOR_CREATE_SELECT = {
 } as const;
 
 const ACTIVE_TASK_STATUSES = ["Em Andamento", "A Realizar", "Em Espera"];
+const TASKS_RELEASED_FOR_EXECUTION_WHERE: Prisma.TaskWhereInput = {
+  OR: [
+    { billing: { not: TASK_BILLING_REALIZE } },
+    { hiring_status: TASK_HIRING_STATUS_CONTRACTED },
+  ],
+};
+const TASKS_AWAITING_COMMERCIAL_VALIDATION_WHERE: Prisma.TaskWhereInput = {
+  billing: TASK_BILLING_REALIZE,
+  OR: [{ hiring_status: null }, { hiring_status: { not: TASK_HIRING_STATUS_CONTRACTED } }],
+};
 
-export type TaskDetailRow = TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }>;
+export type TaskDetailRow = TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }> & {
+  commercial_validation_pending: boolean;
+};
 export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }>;
 type TaskListDatabaseRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
 export type TaskListRow = Omit<
@@ -327,13 +350,17 @@ export class TaskCrudService {
       [model.responsible_id, model.responsible2_id, model.responsible3_id],
     );
 
-    let charge_comercial = model.billing !== "Não Realizar";
-    let charge_financeiro = model.billing !== "Não Realizar";
+    let charge_comercial = model.billing !== TASK_BILLING_NOT_REALIZE;
+    let charge_financeiro = model.billing !== TASK_BILLING_NOT_REALIZE;
 
-    if (params.status === "Em Espera") {
+    if (
+      params.status === INTEGRACAO_TASK_STATUS_WAITING &&
+      model.billing !== TASK_BILLING_REALIZE
+    ) {
       charge_comercial = false;
       charge_financeiro = false;
     }
+    if (model.billing === TASK_BILLING_REALIZE) charge_financeiro = false;
 
     const create = await params.prisma.task.create({
       data: {
@@ -342,7 +369,8 @@ export class TaskCrudService {
         project_id: params.project_id,
         client_id: params.client_id,
         name: model.name,
-        status: params.status,
+        status:
+          model.billing === TASK_BILLING_REALIZE ? INTEGRACAO_TASK_STATUS_WAITING : params.status,
         department_id: model.department_id,
         observations: params.observations,
         billing: model.billing,
@@ -350,7 +378,11 @@ export class TaskCrudService {
         responsible_id: model.responsible_id,
         responsible2_id: model.responsible2_id,
         responsible3_id: model.responsible3_id,
-        start_date: params.status === "Em Andamento" ? new Date() : null,
+        start_date:
+          params.status === INTEGRACAO_TASK_STATUS_IN_PROGRESS &&
+          model.billing !== TASK_BILLING_REALIZE
+            ? new Date()
+            : null,
         pending_approval: false,
         charge_comercial,
         charge_financeiro,
@@ -413,15 +445,15 @@ export class TaskCrudService {
     }
 
     const billing = data.billing ?? model.billing;
-    let defaultStatus = "A Realizar";
+    let defaultStatus: IntegracaoTaskStatus = INTEGRACAO_TASK_STATUS_TODO;
     if (data.prospecting_status === "Fechado") {
-      defaultStatus = "Em Andamento";
-    }
-    if (billing === "Realizar") {
-      defaultStatus = "A Realizar";
+      defaultStatus = INTEGRACAO_TASK_STATUS_IN_PROGRESS;
     }
 
-    const status = data.status ?? defaultStatus;
+    const status =
+      billing === TASK_BILLING_REALIZE
+        ? INTEGRACAO_TASK_STATUS_WAITING
+        : (data.status ?? defaultStatus);
     const departmentId = data.department_id ?? model.department_id;
     let responsibleId =
       data.responsible_id !== undefined ? data.responsible_id : model.responsible_id;
@@ -435,7 +467,9 @@ export class TaskCrudService {
       : data.responsible3_id !== undefined
         ? data.responsible3_id
         : model.responsible3_id;
-    const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
+    const charge_comercial =
+      billing !== TASK_BILLING_NOT_REALIZE &&
+      (status !== INTEGRACAO_TASK_STATUS_WAITING || billing === TASK_BILLING_REALIZE);
     const previsionDate =
       data.prevision_date === undefined || data.prevision_date === null
         ? null
@@ -499,8 +533,11 @@ export class TaskCrudService {
 
     const dependentCreates = await Promise.all(
       dependents.map((dep: (typeof dependents)[number]) => {
-        let statusDependent = data.prospecting_status === "Fechado" ? "Em Andamento" : "A Realizar";
-        statusDependent = dep.wait === false ? statusDependent : "Em Espera";
+        let statusDependent: IntegracaoTaskStatus =
+          data.prospecting_status === "Fechado"
+            ? INTEGRACAO_TASK_STATUS_IN_PROGRESS
+            : INTEGRACAO_TASK_STATUS_TODO;
+        statusDependent = dep.wait === false ? statusDependent : INTEGRACAO_TASK_STATUS_WAITING;
 
         return this.#createDependentTaskInstance({
           prisma: tx,
@@ -591,7 +628,12 @@ export class TaskCrudService {
         isOwner: authorization.isOwner === true,
       });
 
-      return { detail };
+      return {
+        detail: {
+          ...detail,
+          commercial_validation_pending: isAwaitingCommercialValidation(detail),
+        },
+      };
     } catch (err: unknown) {
       logError("Erro ao buscar tarefa", { err });
       if (err instanceof ServiceError) throw err;
@@ -656,10 +698,28 @@ export class TaskCrudService {
         : undefined;
 
       if (params.status !== "Todos") {
-        if (isBasicAccess) {
+        if (params.status === INTEGRACAO_TASK_STATUS_WAITING) {
+          andFilters.push({
+            OR: [
+              { status: INTEGRACAO_TASK_STATUS_WAITING },
+              {
+                AND: [
+                  { status: { in: ACTIVE_TASK_STATUSES } },
+                  TASKS_AWAITING_COMMERCIAL_VALIDATION_WHERE,
+                ],
+              },
+            ],
+          });
+        } else if (isBasicAccess) {
           andFilters.push({ status: params.status });
         } else {
           where.status = params.status;
+        }
+        if (
+          params.status === INTEGRACAO_TASK_STATUS_IN_PROGRESS ||
+          params.status === INTEGRACAO_TASK_STATUS_TODO
+        ) {
+          andFilters.push(TASKS_RELEASED_FOR_EXECUTION_WHERE);
         }
       }
 
@@ -702,7 +762,11 @@ export class TaskCrudService {
         prismaClient.task.count({ where }),
         prismaClient.task.count({
           where: {
-            AND: [where, { status: { contains: "andamento", mode: "insensitive" } }],
+            AND: [
+              where,
+              { status: { contains: "andamento", mode: "insensitive" } },
+              TASKS_RELEASED_FOR_EXECUTION_WHERE,
+            ],
           },
         }),
         prismaClient.task.count({
@@ -714,13 +778,17 @@ export class TaskCrudService {
 
       const hasMore = params.page * params.limit < total;
       const data = list.map(
-        ({ responsible_id, responsible2_id, responsible3_id, client, project, ...task }) => ({
-          ...task,
-          client_name: client.company_name?.trim() || client.name,
-          project_name: project.name,
-          isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
-          isUnassigned: responsible_id === null,
-        }),
+        ({ responsible_id, responsible2_id, responsible3_id, client, project, ...task }) => {
+          const commercialValidationPending = isAwaitingCommercialValidation(task);
+          return {
+            ...task,
+            status: commercialValidationPending ? INTEGRACAO_TASK_STATUS_WAITING : task.status,
+            client_name: client.company_name?.trim() || client.name,
+            project_name: project.name,
+            isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
+            isUnassigned: responsible_id === null,
+          };
+        },
       );
 
       return {
@@ -783,6 +851,15 @@ export class TaskCrudService {
       const observations =
         data.observations !== undefined ? data.observations : exists.observations;
       const billing = data.billing !== undefined ? data.billing : exists.billing;
+      if (
+        isAwaitingCommercialValidation(exists) &&
+        ((data.status !== undefined && data.status !== exists.status) || billing !== exists.billing)
+      ) {
+        assertCommercialValidationReleased(exists);
+      }
+      if (billing !== exists.billing && billing === TASK_BILLING_REALIZE) {
+        assertCommercialValidationReleased({ billing, hiring_status: exists.hiring_status });
+      }
       const urgency = data.urgency !== undefined ? data.urgency : exists.urgency;
       const departmentChanged = department_id !== exists.department_id;
       const modelChanged = model_id !== exists.model_id;

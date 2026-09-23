@@ -5,7 +5,10 @@ import {
   error as logError,
   ServiceError,
 } from "@workspace/shared";
-
+import {
+  INTEGRACAO_TASK_STATUS_WAITING,
+  TASK_BILLING_REALIZE,
+} from "../constants/integracaoTask.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
 
@@ -18,7 +21,11 @@ function isUniqueConstraintError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
-function effectFor(event: CommercialTaskBillingUpdatedEvent, currentStatus: string) {
+function effectFor(
+  event: CommercialTaskBillingUpdatedEvent,
+  currentStatus: string,
+  billing: string,
+) {
   if (event.hiring_status === "Contratado") {
     return { status: "Em Andamento", charge_comercial: false, charge_financeiro: true };
   }
@@ -27,7 +34,11 @@ function effectFor(event: CommercialTaskBillingUpdatedEvent, currentStatus: stri
     return { status: "Não Contratado", charge_comercial: false, charge_financeiro: false };
   }
 
-  return { status: currentStatus, charge_comercial: true, charge_financeiro: false };
+  return {
+    status: billing === TASK_BILLING_REALIZE ? INTEGRACAO_TASK_STATUS_WAITING : currentStatus,
+    charge_comercial: true,
+    charge_financeiro: false,
+  };
 }
 
 export class CommercialTaskBillingProjectionService {
@@ -63,11 +74,11 @@ export class CommercialTaskBillingProjectionService {
 
         const task = await tx.task.findFirst({
           where: { id: event.task_id, organization_id: event.organization_id },
-          select: { id: true, status: true },
+          select: { id: true, status: true, billing: true },
         });
         if (!task) throw new ServiceError(404, "Tarefa não encontrada nesta organização.");
 
-        const effect = effectFor(event, task.status);
+        const effect = effectFor(event, task.status, task.billing);
         const updated = await tx.task.updateMany({
           where: { id: event.task_id, organization_id: event.organization_id },
           data: {
