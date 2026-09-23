@@ -61,6 +61,7 @@ describe("Regularize process reporting service", () => {
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: "10000000-0000-4000-8000-000000000001" },
       select: {
+        id: true,
         process_type: true,
         entry_date: true,
         completion_date: true,
@@ -69,7 +70,8 @@ describe("Regularize process reporting service", () => {
         locking_type: true,
         urgency: true,
       },
-      take: 2,
+      orderBy: { id: "asc" },
+      take: 3,
     });
   });
 
