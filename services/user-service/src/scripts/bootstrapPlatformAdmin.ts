@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 
+import { error as logError } from "@workspace/shared";
 import {
   bootstrapPlatformAdmin,
   parsePlatformAdminBootstrapInput,
@@ -49,6 +50,12 @@ async function main(): Promise<void> {
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error: unknown) => {
+    logError("Falha ao criar administrador da plataforma", {
+      errorName: error instanceof Error ? error.name : typeof error,
+      ...(error && typeof error === "object" && "code" in error && typeof error.code === "string"
+        ? { errorCode: error.code }
+        : {}),
+    });
     const errorMessage =
       error instanceof Error && /PLATFORM_ADMIN_(?:NAME|EMAIL|PASSWORD)/u.test(error.message)
         ? error.message
