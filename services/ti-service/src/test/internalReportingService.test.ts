@@ -108,184 +108,184 @@ describe("TiInventoryReportingService", () => {
 
     expect(findMany).not.toHaveBeenCalled();
   });
+});
 
-  describe("InternalReportingService", () => {
-    it.each([
-      100, 101, 102,
-    ])("extrai todos os %i registros em páginas por cursor, sem expor IDs internos", async (rowCount) => {
-      const rows = Array.from({ length: rowCount }, (_, index) => ({
-        id: `asset-${String(index).padStart(3, "0")}`,
-        asset_code: `NB-${String(index).padStart(3, "0")}`,
-      }));
-      const rowIndexes = new Map(rows.map((row, index) => [row.id, index]));
-      const findMany = vi.fn(async ({ cursor, skip = 0, take }) => {
-        const start = cursor ? (rowIndexes.get(cursor.id) ?? -1) + skip : 0;
-        return rows.slice(start, start + take);
-      });
-      const transaction = {
-        department: { findFirst: vi.fn() },
-        extensionsTecnologia: { findMany: vi.fn() },
-        inventoryTecnologia: { findMany },
-        tIRequest: { findMany: vi.fn() },
-        stock: { findMany: vi.fn() },
-      };
-      const prisma = {
-        ...transaction,
-        $transaction: vi.fn(async (read) => read(transaction)),
-      };
-      const service = new InternalReportingService(prisma as never);
+describe("InternalReportingService", () => {
+  it.each([
+    100, 101, 102,
+  ])("extrai todos os %i registros em páginas por cursor, sem expor IDs internos", async (rowCount) => {
+    const rows = Array.from({ length: rowCount }, (_, index) => ({
+      id: `asset-${String(index).padStart(3, "0")}`,
+      asset_code: `NB-${String(index).padStart(3, "0")}`,
+    }));
+    const rowIndexes = new Map(rows.map((row, index) => [row.id, index]));
+    const findMany = vi.fn(async ({ cursor, skip = 0, take }) => {
+      const start = cursor ? (rowIndexes.get(cursor.id) ?? -1) + skip : 0;
+      return rows.slice(start, start + take);
+    });
+    const transaction = {
+      department: { findFirst: vi.fn() },
+      extensionsTecnologia: { findMany: vi.fn() },
+      inventoryTecnologia: { findMany },
+      tIRequest: { findMany: vi.fn() },
+      stock: { findMany: vi.fn() },
+    };
+    const prisma = {
+      ...transaction,
+      $transaction: vi.fn(async (read) => read(transaction)),
+    };
+    const service = new InternalReportingService(prisma as never);
 
-      const result = await service.extract({
+    const result = await service.extract({
+      organizationId: "10000000-0000-4000-8000-000000000001",
+      source: "ti.inventory",
+      fields: ["asset_code"],
+      limit: rowCount,
+    });
+    expect(result).toEqual({
+      rows: rows.map(({ asset_code }) => ({ asset_code })),
+      reachedLimit: false,
+    });
+
+    expect(findMany).toHaveBeenCalledTimes(rowCount > 100 ? 2 : 1);
+    expect(findMany.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        where: { organization_id: "10000000-0000-4000-8000-000000000001" },
+        select: { id: true, asset_code: true },
+        orderBy: { id: "asc" },
+        take: 101,
+      }),
+    );
+    if (rowCount > 100) {
+      expect(findMany.mock.calls[1]?.[0]).toEqual(
+        expect.objectContaining({
+          cursor: { id: "asset-099" },
+          skip: 1,
+          orderBy: { id: "asc" },
+        }),
+      );
+    }
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "RepeatableRead",
+      maxWait: 5_000,
+      timeout: 30_000,
+    });
+    expect(result.rows.every((row) => !("id" in row))).toBe(true);
+  });
+
+  it.each([
+    { source: "ti.extensions", field: "number", delegate: "extensionsTecnologia" },
+    { source: "ti.requests", field: "title", delegate: "tIRequest" },
+    { source: "ti.stock", field: "name", delegate: "stock" },
+  ] as const)("continua $source pela chave id sem repetir páginas", async (caseInfo) => {
+    const rowCount = 102;
+    const rows = Array.from({ length: rowCount }, (_, index) => ({
+      id: `row-${String(index).padStart(3, "0")}`,
+      [caseInfo.field]: `value-${index}`,
+    }));
+    const rowIndexes = new Map(rows.map((row, index) => [row.id, index]));
+    const findMany = vi.fn(
+      async (query: { cursor?: { id: string }; skip?: number; take: number }) => {
+        const start = query.cursor
+          ? (rowIndexes.get(query.cursor.id) ?? -1) + (query.skip ?? 0)
+          : 0;
+        return rows.slice(start, start + query.take);
+      },
+    );
+    const transaction = {
+      department: { findFirst: vi.fn().mockResolvedValue({ id: "department-ti" }) },
+      extensionsTecnologia: { findMany: vi.fn() },
+      inventoryTecnologia: { findMany: vi.fn() },
+      tIRequest: { findMany: vi.fn() },
+      stock: { findMany: vi.fn() },
+    };
+    Object.assign(transaction[caseInfo.delegate], { findMany });
+    const prisma = {
+      ...transaction,
+      $transaction: vi.fn(async (read: (transaction: typeof transaction) => unknown) =>
+        read(transaction),
+      ),
+    };
+    const service = new InternalReportingService(prisma as never);
+
+    const result = await service.extract({
+      organizationId: "10000000-0000-4000-8000-000000000001",
+      source: caseInfo.source,
+      fields: [caseInfo.field],
+      limit: rowCount,
+    });
+
+    expect(result).toEqual({
+      rows: rows.map((row) => ({ [caseInfo.field]: row[caseInfo.field] })),
+      reachedLimit: false,
+    });
+    expect(result.rows.every((row) => !("id" in row))).toBe(true);
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(findMany.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({ cursor: { id: "row-099" }, skip: 1, orderBy: { id: "asc" } }),
+    );
+    if (caseInfo.source === "ti.stock") {
+      expect(transaction.department.findFirst).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("recusa um snapshot que excede o limite global de bytes", async () => {
+    const findMany = vi
+      .fn()
+      .mockResolvedValue([{ id: "asset-001", notes: "x".repeat(MAX_REPORTING_QUERY_BYTES) }]);
+    const service = new InternalReportingService({
+      department: { findFirst: vi.fn() },
+      extensionsTecnologia: { findMany: vi.fn() },
+      inventoryTecnologia: { findMany },
+      tIRequest: { findMany: vi.fn() },
+      stock: { findMany: vi.fn() },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId: "10000000-0000-4000-8000-000000000001",
+        source: "ti.inventory",
+        fields: ["notes"],
+        limit: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_BYTE_LIMIT_CODE });
+  });
+
+  it("recusa acima do limite global de linhas sem devolver resultado parcial", async () => {
+    const rows = Array.from({ length: MAX_REPORTING_QUERY_ROWS + 1 }, (_, index) => ({
+      id: `asset-${String(index).padStart(5, "0")}`,
+      asset_code: `NB-${index}`,
+    }));
+    const rowIndexes = new Map(rows.map((row, index) => [row.id, index]));
+    const findMany = vi.fn(
+      async (query: { cursor?: { id: string }; skip?: number; take: number }) => {
+        const start = query.cursor
+          ? (rowIndexes.get(query.cursor.id) ?? -1) + (query.skip ?? 0)
+          : 0;
+        return rows.slice(start, start + query.take);
+      },
+    );
+    const transaction = {
+      department: { findFirst: vi.fn() },
+      extensionsTecnologia: { findMany: vi.fn() },
+      inventoryTecnologia: { findMany },
+      tIRequest: { findMany: vi.fn() },
+      stock: { findMany: vi.fn() },
+    };
+    const prisma = {
+      ...transaction,
+      $transaction: vi.fn(async (read: (client: unknown) => unknown) => read(transaction)),
+    };
+    const service = new InternalReportingService(prisma as never);
+
+    await expect(
+      service.extract({
         organizationId: "10000000-0000-4000-8000-000000000001",
         source: "ti.inventory",
         fields: ["asset_code"],
-        limit: rowCount,
-      });
-      expect(result).toEqual({
-        rows: rows.map(({ asset_code }) => ({ asset_code })),
-        reachedLimit: false,
-      });
-
-      expect(findMany).toHaveBeenCalledTimes(rowCount > 100 ? 2 : 1);
-      expect(findMany.mock.calls[0]?.[0]).toEqual(
-        expect.objectContaining({
-          where: { organization_id: "10000000-0000-4000-8000-000000000001" },
-          select: { id: true, asset_code: true },
-          orderBy: { id: "asc" },
-          take: 101,
-        }),
-      );
-      if (rowCount > 100) {
-        expect(findMany.mock.calls[1]?.[0]).toEqual(
-          expect.objectContaining({
-            cursor: { id: "asset-099" },
-            skip: 1,
-            orderBy: { id: "asc" },
-          }),
-        );
-      }
-      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
-        isolationLevel: "RepeatableRead",
-        maxWait: 5_000,
-        timeout: 30_000,
-      });
-      expect(result.rows.every((row) => !("id" in row))).toBe(true);
-    });
-
-    it.each([
-      { source: "ti.extensions", field: "number", delegate: "extensionsTecnologia" },
-      { source: "ti.requests", field: "title", delegate: "tIRequest" },
-      { source: "ti.stock", field: "name", delegate: "stock" },
-    ] as const)("continua $source pela chave id sem repetir páginas", async (caseInfo) => {
-      const rowCount = 102;
-      const rows = Array.from({ length: rowCount }, (_, index) => ({
-        id: `row-${String(index).padStart(3, "0")}`,
-        [caseInfo.field]: `value-${index}`,
-      }));
-      const rowIndexes = new Map(rows.map((row, index) => [row.id, index]));
-      const findMany = vi.fn(
-        async (query: { cursor?: { id: string }; skip?: number; take: number }) => {
-          const start = query.cursor
-            ? (rowIndexes.get(query.cursor.id) ?? -1) + (query.skip ?? 0)
-            : 0;
-          return rows.slice(start, start + query.take);
-        },
-      );
-      const transaction = {
-        department: { findFirst: vi.fn().mockResolvedValue({ id: "department-ti" }) },
-        extensionsTecnologia: { findMany: vi.fn() },
-        inventoryTecnologia: { findMany: vi.fn() },
-        tIRequest: { findMany: vi.fn() },
-        stock: { findMany: vi.fn() },
-      };
-      Object.assign(transaction[caseInfo.delegate], { findMany });
-      const prisma = {
-        ...transaction,
-        $transaction: vi.fn(async (read: (transaction: typeof transaction) => unknown) =>
-          read(transaction),
-        ),
-      };
-      const service = new InternalReportingService(prisma as never);
-
-      const result = await service.extract({
-        organizationId: "10000000-0000-4000-8000-000000000001",
-        source: caseInfo.source,
-        fields: [caseInfo.field],
-        limit: rowCount,
-      });
-
-      expect(result).toEqual({
-        rows: rows.map((row) => ({ [caseInfo.field]: row[caseInfo.field] })),
-        reachedLimit: false,
-      });
-      expect(result.rows.every((row) => !("id" in row))).toBe(true);
-      expect(findMany).toHaveBeenCalledTimes(2);
-      expect(findMany.mock.calls[1]?.[0]).toEqual(
-        expect.objectContaining({ cursor: { id: "row-099" }, skip: 1, orderBy: { id: "asc" } }),
-      );
-      if (caseInfo.source === "ti.stock") {
-        expect(transaction.department.findFirst).toHaveBeenCalledTimes(1);
-      }
-    });
-
-    it("recusa um snapshot que excede o limite global de bytes", async () => {
-      const findMany = vi
-        .fn()
-        .mockResolvedValue([{ id: "asset-001", notes: "x".repeat(MAX_REPORTING_QUERY_BYTES) }]);
-      const service = new InternalReportingService({
-        department: { findFirst: vi.fn() },
-        extensionsTecnologia: { findMany: vi.fn() },
-        inventoryTecnologia: { findMany },
-        tIRequest: { findMany: vi.fn() },
-        stock: { findMany: vi.fn() },
-      } as never);
-
-      await expect(
-        service.extract({
-          organizationId: "10000000-0000-4000-8000-000000000001",
-          source: "ti.inventory",
-          fields: ["notes"],
-          limit: 1,
-        }),
-      ).rejects.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_BYTE_LIMIT_CODE });
-    });
-
-    it("recusa acima do limite global de linhas sem devolver resultado parcial", async () => {
-      const rows = Array.from({ length: MAX_REPORTING_QUERY_ROWS + 1 }, (_, index) => ({
-        id: `asset-${String(index).padStart(5, "0")}`,
-        asset_code: `NB-${index}`,
-      }));
-      const rowIndexes = new Map(rows.map((row, index) => [row.id, index]));
-      const findMany = vi.fn(
-        async (query: { cursor?: { id: string }; skip?: number; take: number }) => {
-          const start = query.cursor
-            ? (rowIndexes.get(query.cursor.id) ?? -1) + (query.skip ?? 0)
-            : 0;
-          return rows.slice(start, start + query.take);
-        },
-      );
-      const transaction = {
-        department: { findFirst: vi.fn() },
-        extensionsTecnologia: { findMany: vi.fn() },
-        inventoryTecnologia: { findMany },
-        tIRequest: { findMany: vi.fn() },
-        stock: { findMany: vi.fn() },
-      };
-      const prisma = {
-        ...transaction,
-        $transaction: vi.fn(async (read: (client: unknown) => unknown) => read(transaction)),
-      };
-      const service = new InternalReportingService(prisma as never);
-
-      await expect(
-        service.extract({
-          organizationId: "10000000-0000-4000-8000-000000000001",
-          source: "ti.inventory",
-          fields: ["asset_code"],
-          limit: MAX_REPORTING_QUERY_LIMIT,
-        }),
-      ).rejects.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_ROW_LIMIT_CODE });
-      expect(findMany).toHaveBeenCalledTimes(501);
-    });
+        limit: MAX_REPORTING_QUERY_LIMIT,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_ROW_LIMIT_CODE });
+    expect(findMany).toHaveBeenCalledTimes(501);
   });
 });
