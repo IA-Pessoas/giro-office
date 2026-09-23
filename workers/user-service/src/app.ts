@@ -597,6 +597,19 @@ const USER_MUTABLE_FIELDS = [
   "first_owner_flag",
 ] as const;
 
+/** Checa o alvo antes do storage: senão a foto do owner seria trocada antes do 403. */
+async function assertPhotoTarget(
+  db: UserPrismaClient,
+  auth: UserAuthContext,
+  userId: string,
+): Promise<void> {
+  const target = await db.user.findFirst({
+    where: organizationUserWhere(userId, auth.organizationId),
+    select: { type: true },
+  });
+  assertCanManageTarget(auth, target);
+}
+
 /** Criar ou promover owner é só do owner. Módulos seguem o teto de assertModulesWithinActor. */
 function isOwnerMutation(input: Record<string, unknown>): boolean {
   return input.type === "owner" || input.first_owner_flag === true;
@@ -1517,6 +1530,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       requireManageUsers(auth);
       await requireCsrf(c.req.raw, auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
+      await assertPhotoTarget(db, auth, id);
       const { file, extension } = await parseUserPhoto(c);
       const storage = userPhotoStorage(envOf(c, options), options);
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
@@ -1552,6 +1566,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       requireManageUsers(auth);
       await requireCsrf(c.req.raw, auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
+      await assertPhotoTarget(db, auth, id);
       const storage = userPhotoStorage(envOf(c, options), options);
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
       await requirePrivatePhotoBucket(storage);

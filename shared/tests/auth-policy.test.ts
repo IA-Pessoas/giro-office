@@ -49,6 +49,20 @@ test("manageUsers permite admin RH por permissao modular", () => {
   );
 });
 
+test("manageUsers permite admin TI por permissao modular", () => {
+  const tiAdmin = (ti: number) =>
+    authContext({
+      user_id: "ti-admin",
+      organization_id: "org-1",
+      permission: 1,
+      type: "admin",
+      modules: { ti, rh: 1 },
+    });
+
+  assert.equal(canAccessRoute(tiAdmin(3), manageUsersPolicy), true);
+  assert.equal(canAccessRoute(tiAdmin(2), manageUsersPolicy), false);
+});
+
 test("manageUsers bloqueia admin de outro modulo", () => {
   assert.equal(
     canAccessRoute(

@@ -1554,6 +1554,8 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
     expect((await request(app, "DELETE", `/user/${USER_ID}`)).status).toBe(403);
     expect((await request(app, "PUT", `/user/permission/${USER_ID}`, { ti: 1 })).status).toBe(403);
     expect(db.permission.updateMany).not.toHaveBeenCalled();
+    // Foto: a checagem vem antes do storage (senão a do owner seria trocada antes do 403).
+    expect((await request(app, "DELETE", `/user/${USER_ID}/photo`)).status).toBe(403);
   });
 
   it("salva permissões de não-owner até o próprio nível", async () => {
