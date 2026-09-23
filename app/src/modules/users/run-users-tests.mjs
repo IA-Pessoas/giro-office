@@ -699,3 +699,16 @@ runTest("create user modal discloses required account fields", () => {
   assert.match(source, /aria-required/);
   assert.match(source, /htmlFor="user-department"/);
 });
+
+runTest("user admin pages read the current API envelope and never call the legacy-api", () => {
+  const index = readFileSync(new URL("../../pages/users/index.tsx", import.meta.url), "utf8");
+  const details = readFileSync(new URL("../../pages/users/[id].tsx", import.meta.url), "utf8");
+
+  for (const source of [index, details]) {
+    assert.doesNotMatch(source, /meResponse\.data\.user/);
+    assert.match(source, /meResponse\.data\?\.data/);
+  }
+  assert.doesNotMatch(details, /["'`]\/users-detail/);
+  assert.match(details, /apiClient\.get\(`\/user\/\$\{encodeURIComponent\(id\)\}`\)/);
+  assert.match(details, /userResponse\.data\?\.data/);
+});

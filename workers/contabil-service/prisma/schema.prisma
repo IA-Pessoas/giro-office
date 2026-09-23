@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client"
+  runtime  = "workerd"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Client {
+  id                 String           @id @default(uuid())
+  name               String
+  company_name       String?
+  competence_entry   DateTime?
+  competence_output  DateTime?
+  contabil           Boolean?
+  organization_id    String
+  controlContabil    ControlContabil[]
+  triageClosings     TriageClosing[]
+
+  @@map("clients")
+}
+
+model ControlContabil {
+  id                               String   @id @default(uuid())
+  competence                       String
+  client_id                        String
+  regenerate_accounting_entries    Boolean
+  check_summary_by_accumulator     Boolean
+  post_accounting_transaction      Boolean
+  import_bank_statements           Boolean
+  reconcile_bank_statements        Boolean
+  reconcile_vendors                Boolean
+  integrate_taxes                  Boolean
+  settle_federal_taxes_via_ecac    Boolean
+  settle_state_taxes_via_sefaz_ba  Boolean
+  integrate_payroll                 Boolean
+  suspense_accounts                Boolean
+  check_overdrawn_accounts          Boolean
+  general_account_reconciliation    Boolean
+  check_loan_and_interest_accounts  Boolean
+  monthly_closing                   Boolean
+  reconcile_icms_pis_cofins         Boolean
+  depreciation                     Boolean
+  notes                            String
+  archived_at                      DateTime?
+  organization_id                  String
+  client                           Client   @relation(fields: [client_id], references: [id])
+
+  @@map("contabil.control")
+}
+
+model TriageClosing {
+  id              String   @id @default(uuid())
+  client_id       String
+  competence      String
+  status          String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  archived_at     DateTime?
+  organization_id String
+  client          Client   @relation(fields: [client_id], references: [id])
+
+  @@unique([organization_id, client_id, competence])
+
+  @@map("triagem.closings")
+}
+
+model RelationshipContabil {
+  id              String  @id @default(uuid())
+  client_id       String
+  bidding         Boolean
+  chart_accounts  String
+  tool            String
+  system          String
+  note            String
+  organization_id String
+
+  @@map("contabil.relationship")
+}
+
+model ResponsibleContabil {
+  id                     String   @id @default(uuid())
+  client_id              String
+  person_responsible_id  String?
+  posted_by_id           String?
+  customer_with_movement Boolean?
+  organization_id        String
+
+  @@map("contabil.responsibles")
+}
+
+model TriageConfig {
+  id              String   @id @default(uuid())
+  client_id       String
+  type            String
+  active_items    Json
+  updated_at      DateTime
+  organization_id String
+
+  @@unique([organization_id, client_id, type])
+  @@map("triagem.configs")
+}
+
+model TriageMonthly {
+  id              String   @id @default(uuid())
+  client_id       String
+  competence      String
+  type            String
+  checklist       Json
+  item_notes      Json     @default("{}")
+  billing_amount  String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  archived_at     DateTime?
+  organization_id String
+
+  @@unique([organization_id, client_id, competence, type])
+  @@map("triagem.monthly")
+}
+
+model TriageBankStatement {
+  id              String   @id @default(uuid())
+  client_id       String
+  competence      String
+  bank_id         String
+  status          String   @default("PENDING")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  archived_at     DateTime?
+  organization_id String
+
+  @@unique([organization_id, client_id, competence, bank_id])
+  @@map("triagem.bank_statements")
+}
+
+model TriageResponsible {
+  id              String   @id @default(uuid())
+  client_id       String
+  user_id         String
+  type            String
+  organization_id String
+
+  @@unique([organization_id, client_id, type])
+  @@map("triagem.responsibles")
+}
+
+model TriageCompetence {
+  id                              String    @id @default(uuid())
+  organization_id                String
+  client_id                       String
+  competence                      String
+  configuration_snapshot          Json
+  catalog_snapshot_initialized_at DateTime?
+  archived_at                     DateTime?
+
+  @@unique([organization_id, client_id, competence])
+  @@map("triagem.competences")
+}
+
+model TriageCatalogItem {
+  id              String   @id @default(uuid())
+  organization_id String
+  kind            String
+  code            String
+  label           String
+  url             String?
+  archived_at     DateTime?
+
+  @@unique([organization_id, kind, code])
+  @@map("triagem.catalog_items")
+}
+
+model TriageCompetenceCatalogSnapshot {
+  id              String   @id @default(uuid())
+  organization_id String
+  competence_id   String
+  catalog_item_id String
+  kind            String
+  code            String
+  label           String
+  url             String?
+
+  @@unique([organization_id, competence_id, catalog_item_id])
+  @@map("triagem.competence_catalog_snapshots")
+}

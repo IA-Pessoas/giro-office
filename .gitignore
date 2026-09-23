@@ -42,7 +42,6 @@ Thumbs.db
 # docs
 docs/*
 !docs/feature-flags.md
-!docs/vps-deploy.md
 !docs/migration/
 !docs/migration/**
 !docs/security/
@@ -82,3 +81,6 @@ ata-sample/
 *.zip
 *.dump
 *.sql.gz
+
+# Cache local do wrangler/miniflare (wrangler dev)
+.wrangler/

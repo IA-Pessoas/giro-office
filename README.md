@@ -158,4 +158,4 @@ Falhas continuam bloqueando o push; os pré-requisitos locais devem estar instal
 
 ## Deploy
 
-O procedimento do ambiente VPS está documentado em [docs/vps-deploy.md](docs/vps-deploy.md).
+O deploy é feito na Cloudflare (Workers) a partir da branch `cloudflare-migration`; não há mais deploy em VPS.

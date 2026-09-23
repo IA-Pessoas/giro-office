@@ -34,10 +34,6 @@ function discoverRuntimePoolFiles(directory = path.join(root, "services")) {
   return discovered;
 }
 
-const poolerSessionSize = 20;
-const rolloutPoolSize = 40;
-const rolloutOverlapFactor = 2;
-
 test("todos os pools de runtime possuem teto explicito e configuravel", () => {
   const runtimePoolFiles = discoverRuntimePoolFiles();
   assert.ok(runtimePoolFiles.length > 0, "nenhum pool de runtime foi descoberto");
@@ -61,35 +57,7 @@ test("todos os pools de runtime possuem teto explicito e configuravel", () => {
   }
 });
 
-test("orcamento de conexoes cabe no pooler em regime e durante rollout", () => {
-  const runtimePoolFiles = discoverRuntimePoolFiles();
-  const constructorsByService = new Map();
-  for (const { relativePath, constructorCount } of runtimePoolFiles) {
-    const serviceName = relativePath.split(path.sep)[1];
-    constructorsByService.set(
-      serviceName,
-      (constructorsByService.get(serviceName) ?? 0) + constructorCount,
-    );
-  }
-  const compose = fs.readFileSync(path.join(root, "docker-compose.vps.yml"), "utf8");
-  const composePoolProcesses = [...compose.matchAll(/- \.env\.vps\.([a-z0-9-]+)/gu)]
-    .map((match) => match[1])
-    .filter((serviceName) => constructorsByService.has(serviceName));
-  const steadyStateSlots = composePoolProcesses.reduce(
-    (total, serviceName) => total + constructorsByService.get(serviceName),
-    0,
-  );
-
-  assert.equal(steadyStateSlots, 20, "budget versionado precisa refletir os processos do Compose");
-  assert.ok(
-    steadyStateSlots <= poolerSessionSize,
-    `budget de ${steadyStateSlots} excede pooler session mode de ${poolerSessionSize}`,
-  );
-  assert.ok(
-    steadyStateSlots * rolloutOverlapFactor <= rolloutPoolSize,
-    `rollout requer ${steadyStateSlots * rolloutOverlapFactor} slots, acima de ${rolloutPoolSize}`,
-  );
-
+test("exemplos de env preservam um pool por processo", () => {
   const exampleFiles = [
     path.join(root, ".env.example"),
     ...fs
@@ -123,6 +91,5 @@ test("guards de banco e deploy executam em todo pull request", () => {
   );
   assert.match(workflow, /^on:\s*\n\s+pull_request:/mu);
   assert.match(workflow, /node --test scripts\/database-pool-policy\.test\.mjs/u);
-  assert.match(workflow, /node --test scripts\/production-deploy\.test\.mjs/u);
   assert.doesNotMatch(workflow, /pnpm install|npm install/u);
 });

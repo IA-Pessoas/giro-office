@@ -18,6 +18,7 @@ import { createTaskApp } from "../app.js";
 import type { TaskServiceEnv } from "../config/env.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { createAiTaskExtractionProvider } from "../integrations/aiTaskExtraction.js";
+import * as audit from "../integrations/audit.js";
 import { createLog } from "../integrations/audit.js";
 import { buildTaskServiceOpenApiSpec } from "../openapi/spec.js";
 import type {
@@ -27,10 +28,27 @@ import type {
 import { projectWizardCreateBodySchema } from "../schemas/projectWizard.schemas.js";
 import { ProjectWizardExtractionService } from "../services/projectWizardExtractionService.js";
 import { ProjectWizardService } from "../services/projectWizardService.js";
+import { TaskCrudService } from "../services/taskCrudService.js";
 import { DOCX_MIME_TYPE } from "../utils/docx.js";
 import { PDF_MIME_TYPE } from "../utils/pdf.js";
 
 vi.mock("../integrations/audit.js", () => ({ createLog: vi.fn() }));
+
+/** Mesma montagem do app: audit do módulo (mockado aqui) e TaskCrudService sobre o mesmo db. */
+function wizard(
+  db?: unknown,
+  taskService?: ConstructorParameters<typeof ProjectWizardService>[0]["taskService"],
+  compositionRepository?: ConstructorParameters<
+    typeof ProjectWizardService
+  >[0]["compositionRepository"],
+) {
+  return new ProjectWizardService({
+    db: db as never,
+    audit: audit as never,
+    taskService: taskService ?? new TaskCrudService(db as never, audit as never, {} as never),
+    ...(compositionRepository ? { compositionRepository } : {}),
+  });
+}
 
 function readFixture(name: string): Buffer {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
@@ -96,8 +114,7 @@ describe("project wizard routes", () => {
         destination: new MemoryLogStream(),
       }),
       {
-        projectWizardService:
-          projectWizardService ?? new ProjectWizardService(db as unknown as PrismaClient),
+        projectWizardService: projectWizardService ?? wizard(db as unknown as PrismaClient),
       },
     );
   }
@@ -210,7 +227,7 @@ describe("project wizard routes", () => {
   });
 
   it("POST /task/project-wizard/preview expõe dependências reais com espera e sem responsável", async () => {
-    const service = new ProjectWizardService(undefined, undefined, () => ({
+    const service = wizard(undefined, undefined, () => ({
       findTaskModels: vi.fn(async () => [
         {
           id: "model-main",
@@ -308,7 +325,7 @@ describe("project wizard routes", () => {
       type: "Projeto",
       department_status: "Ativo",
     };
-    const service = new ProjectWizardService(undefined, undefined, () => ({
+    const service = wizard(undefined, undefined, () => ({
       findTaskModels: vi.fn(async () =>
         ["model-one", "model-two"].map((id, index) => ({
           id,

@@ -1,4 +1,5 @@
 import {
+  CSRF_HEADER_NAME,
   FORWARDED_AUTH_CSRF_HASH_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
@@ -315,6 +316,58 @@ describe("buildForwardHeaders", () => {
   });
 
   it.each([
+    ["POST", "/user"],
+    ["PUT", "/user/user-1"],
+    ["DELETE", "/user/user-1"],
+    ["POST", "/user/user-1/photo"],
+    ["DELETE", "/user/user-1/photo"],
+    ["PUT", "/user/permission/user-1"],
+  ])("encaminha o x-csrf-token real para mutação User %s %s", (method, path) => {
+    const request = {
+      ...authenticatedRequest,
+      method,
+      originalUrl: path,
+      get: (name: string) =>
+        name.toLowerCase() === CSRF_HEADER_NAME ? "real-csrf-token" : undefined,
+      headers: {
+        cookie: "cw.session=forged; cw.csrf=forged",
+        [CSRF_HEADER_NAME]: "forged-header",
+      },
+    } as unknown as Request;
+
+    const headers = buildForwardHeaders(request, {
+      forwardSessionBinding: true,
+      internalServiceToken: "trusted-internal-token",
+    });
+
+    expect(headers.get(CSRF_HEADER_NAME)).toBe("real-csrf-token");
+    expect(headers.get(FORWARDED_AUTH_SESSION_ID_HEADER)).toBe("session-1");
+    expect(headers.get(FORWARDED_AUTH_CSRF_HASH_HEADER)).toBe("a".repeat(64));
+    expect(headers.get("cookie")).toBeNull();
+  });
+
+  it.each([
+    ["POST", "/user"],
+    ["PUT", "/user/user-1"],
+    ["DELETE", "/user/user-1"],
+    ["POST", "/user/user-1/photo"],
+    ["DELETE", "/user/user-1/photo"],
+    ["PUT", "/user/permission/user-1"],
+  ])("rejeita mutação User sem x-csrf-token %s %s", (method, path) => {
+    const request = {
+      ...authenticatedRequest,
+      method,
+      originalUrl: path,
+      get: () => undefined,
+      headers: { cookie: "cw.session=forged; cw.csrf=forged" },
+    } as unknown as Request;
+
+    expect(() => buildForwardHeaders(request, { forwardSessionBinding: true })).toThrow(
+      expect.objectContaining({ statusCode: 403 }),
+    );
+  });
+
+  it.each([
     "/platform/organizations/org-1/users/user-1",
     "/platform/organizations/org-1/departments",
   ])("remove identidade enviada pelo cliente em %s", (path) => {
@@ -382,8 +435,8 @@ describe("buildHttpProxyMiddleware", () => {
     await proxy(
       {
         body: {},
-        get: () => undefined,
-        headers: { "content-type": "application/json" },
+        get: (name: string) => (name === CSRF_HEADER_NAME ? "proof" : undefined),
+        headers: { "content-type": "application/json", [CSRF_HEADER_NAME]: "proof" },
         ip: "127.0.0.1",
         method: "POST",
         originalUrl: "/platform/organizations/org-1/ownership-transfer",

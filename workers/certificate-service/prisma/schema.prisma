@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client"
+  runtime  = "workerd"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model CertificatePJ {
+  id                          String   @id @default(uuid())
+  client_castelo_status       Boolean
+  client_focus_status         Boolean
+  name                        String
+  cnpj                        String
+  responsible                 String
+  model                       String
+  legal_nature                String
+  password                    String
+  expiration_date             DateTime
+  notes                       String?
+  was_paid                    Boolean
+  payment_date                DateTime?
+  payment_amount              Float?
+  contact_info                String?
+  file_path                   String?
+  file_original_name          String?
+  file_mime_type              String?
+  file_size_bytes             Int?
+  file_sha256                 String?
+  file_uploaded_at            DateTime?
+  file_uploaded_by_user_id    String?
+  file_storage_provider       String?
+  file_storage_bucket         String?
+  file_encryption_iv          String?
+  file_encryption_tag         String?
+  file_encryption_key_version String?
+  has_certificate             Boolean
+  organization_id             String
+
+  @@unique([organization_id, name, cnpj, model], map: "uq_cert_pj_org_name_cnpj_model")
+  @@index([organization_id, expiration_date, name], map: "idx_cert_pj_org_exp_name")
+  @@index([organization_id, has_certificate, expiration_date, name], map: "idx_cert_pj_org_has_exp_name")
+  @@map("certificate.pj")
+}
+
+model CertificatePF {
+  id                          String   @id @default(uuid())
+  client_castelo_status       Boolean
+  client_focus_status         Boolean
+  name                        String
+  cpf                         String
+  model                       String
+  password                    String
+  expiration_date             DateTime
+  notes                       String?
+  enterprise                  String?
+  cnpj                        String?
+  was_paid                    Boolean
+  payment_date               DateTime?
+  payment_amount             Float?
+  contact_info               String?
+  file_path                   String?
+  file_original_name          String?
+  file_mime_type              String?
+  file_size_bytes             Int?
+  file_sha256                 String?
+  file_uploaded_at            DateTime?
+  file_uploaded_by_user_id    String?
+  file_storage_provider       String?
+  file_storage_bucket         String?
+  file_encryption_iv          String?
+  file_encryption_tag         String?
+  file_encryption_key_version String?
+  has_certificate             Boolean
+  organization_id             String
+
+  @@unique([organization_id, name, cpf, model])
+  @@map("certificate.pf")
+}
+
+model CertificateNotification {
+  id              String   @id @default(uuid())
+  certificate_id  String
+  client_name     String
+  type            String
+  date            DateTime
+  organization_id String
+
+  @@unique([organization_id, certificate_id, type], map: "uq_cert_not_org_cert_type")
+  @@index([organization_id, date, client_name], map: "idx_cert_not_org_date_name")
+  @@map("notification.certificate")
+}
+
+model ReportGrantUse {
+  id         String   @id @default(uuid())
+  grant_hash String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([expires_at])
+  @@map("reports.grant_uses")
+}

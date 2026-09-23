@@ -11,7 +11,7 @@
     "pretypecheck": "pnpm prisma:generate",
     "typecheck": "turbo run typecheck",
     "test": "pnpm test:scripts && turbo run test && pnpm qa:integracao",
-    "test:scripts": "node --test scripts/codeowners-policy.test.mjs scripts/database-pool-policy.test.mjs scripts/developer-endpoint-audit.test.mjs scripts/dev-orchestrator.test.mjs scripts/git-hook-scope.test.mjs scripts/git-ref-backup.test.mjs scripts/org-ioc-ref-scan.test.mjs scripts/prisma-generate.test.mjs scripts/production-deploy.test.mjs scripts/supply-chain-integrity.test.mjs scripts/supply-chain-security.test.mjs scripts/supply-chain-ci.test.mjs",
+    "test:scripts": "node --test scripts/codeowners-policy.test.mjs scripts/database-pool-policy.test.mjs scripts/developer-endpoint-audit.test.mjs scripts/dev-orchestrator.test.mjs scripts/git-hook-scope.test.mjs scripts/git-ref-backup.test.mjs scripts/org-ioc-ref-scan.test.mjs scripts/prisma-generate.test.mjs scripts/supply-chain-integrity.test.mjs scripts/supply-chain-security.test.mjs scripts/supply-chain-ci.test.mjs",
     "lint": "biome lint .",
     "dev:app": "turbo run dev --filter=@workspace/app",
     "dev:api": "turbo run dev --filter=@workspace/legacy-api",
@@ -29,7 +29,7 @@
     "smoke": "node scripts/all-services-smoke.mjs",
     "smoke:coverage": "node scripts/check-smoke-spec-coverage.mjs",
     "smoke:scaffold": "node scripts/generate-service-harness.mjs",
-    "harness:test": "node --test scripts/service-harness.test.mjs scripts/check-compose-security.test.mjs scripts/nginx-forwarded-for.test.mjs scripts/ci-workflow-optimization.test.mjs scripts/check-unused-deps-candidates.test.mjs",
+    "harness:test": "node --test scripts/service-harness.test.mjs scripts/check-unused-deps-candidates.test.mjs",
     "deps:unused": "node --test scripts/check-unused-deps-candidates.test.mjs",
     "qa:integracao": "node --test scripts/qa-fixtures.test.mjs",
     "qa:integracao:db": "test -n \"${QA_INTEGRACAO_DATABASE_URL:-}\" && export DATABASE_URL=\"$QA_INTEGRACAO_DATABASE_URL\" && pnpm --filter @workspace/infra prisma:generate && pnpm --filter @workspace/infra exec tsx --test ../scripts/qa-integracao-seed.test.mjs",
@@ -43,8 +43,6 @@
     "graphify:postprocess:ui": "node scripts/graphify-postprocess.mjs ui",
     "graphify:postprocess:services": "node scripts/graphify-postprocess.mjs services",
     "graphify:refresh": "node scripts/graphify-refresh.mjs",
-    "deploy:production": "bash scripts/ops/deploy-production.sh",
-    "security:compose": "node scripts/check-compose-security.mjs",
     "security:supply-chain": "node scripts/supply-chain-integrity.mjs",
     "security:endpoint-audit": "node scripts/developer-endpoint-audit.mjs",
     "security:git-ref-backup": "node scripts/git-ref-backup.mjs",
@@ -60,7 +58,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.3.2",
     "turbo": "^2.9.14",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "wrangler": "4.135.0"
   },
   "devEngines": {
     "packageManager": {
@@ -80,7 +79,7 @@
       "prisma": "7.9.1",
       "@prisma/client": "7.9.1",
       "deepmerge-ts": "8.0.1",
-      "hono": "4.12.25",
+      "hono": "4.13.8",
       "@hono/node-server": "1.19.13",
       "effect": "3.20.0",
       "lodash": "4.18.0",

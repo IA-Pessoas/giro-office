@@ -9,6 +9,7 @@ import type { Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import {
   projectPlanAddTaskBodySchema,
   projectPlanCreateBodySchema,
@@ -24,6 +25,7 @@ import {
   ProjectPlanService,
   type ProjectPlanService as ProjectPlanServiceType,
 } from "../services/projectPlanService.js";
+import { TaskCrudService } from "../services/taskCrudService.js";
 
 export type ProjectPlanRouteDeps = Pick<
   ProjectPlanServiceType,
@@ -268,5 +270,9 @@ export function createProjectPlanRoutes(service: ProjectPlanRouteDeps): ReturnTy
 }
 
 export const projectPlanRoutes: ReturnType<typeof Router> = createProjectPlanRoutes(
-  new ProjectPlanService(),
+  new ProjectPlanService(
+    new TaskCrudService(nodeDeps.prisma, nodeDeps.audit, nodeDeps.projectProgress),
+    nodeDeps.prisma,
+    nodeDeps.audit,
+  ),
 );

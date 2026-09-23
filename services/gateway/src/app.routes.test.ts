@@ -1418,6 +1418,7 @@ it("proxies PUT /user/:id for an authorized owner", async () => {
           type: "owner",
         })}`,
         "content-type": "application/json",
+        [CSRF_HEADER_NAME]: "owner-csrf-token",
       },
       body: JSON.stringify({ modules: { rh: 1 } }),
     });
@@ -1470,6 +1471,7 @@ it("proxies authenticated self password updates with PUT to user-service", async
       headers: {
         Authorization: `Bearer ${token}`,
         "content-type": "application/json",
+        [CSRF_HEADER_NAME]: "self-password-csrf-token",
       },
       body: JSON.stringify({ password: "nova-senha-segura" }),
     });
@@ -1815,6 +1817,7 @@ it("proxies permission updates to the user service when permission is sufficient
       headers: {
         Authorization: `Bearer ${token}`,
         "content-type": "application/json",
+        [CSRF_HEADER_NAME]: "permission-csrf-token",
       },
       body: JSON.stringify({
         users: 2,

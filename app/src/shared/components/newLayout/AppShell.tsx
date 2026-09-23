@@ -176,7 +176,6 @@ const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao módulo.";
 const MODULE_NAV_LOADING_MESSAGE = "Carregando módulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
-const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";
 
 function formatAppShellNotificationTime(value: string): string {
   const date = new Date(value);
@@ -1063,7 +1062,6 @@ export function AppShell({
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/40" />
           <DialogPrimitive.Content
-            aria-describedby={AI_CHAT_DIALOG_DESCRIPTION_ID}
             className="fixed z-[70] right-4 bottom-4 w-[420px] max-w-[calc(100vw-2rem)] h-[70vh] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden focus:outline-none"
             onCloseAutoFocus={(event) => {
               if (!aiChatTriggerRef.current) {
@@ -1080,7 +1078,7 @@ export function AppShell({
                 <DialogPrimitive.Title className="text-sm font-semibold text-gray-900 dark:text-white">
                   Assistente IA
                 </DialogPrimitive.Title>
-                <DialogPrimitive.Description id={AI_CHAT_DIALOG_DESCRIPTION_ID} className="sr-only">
+                <DialogPrimitive.Description className="sr-only">
                   Assistente local da sessão: as mensagens ficam apenas nesta sessão, não são
                   enviadas ao servidor e ainda não são processadas por uma IA real.
                 </DialogPrimitive.Description>

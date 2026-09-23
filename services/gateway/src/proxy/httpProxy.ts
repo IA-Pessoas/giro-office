@@ -83,6 +83,45 @@ interface SessionCookieRule {
 }
 
 const SESSION_COOKIE_RULES: SessionCookieRule[] = [
+  // As mutações User usam o vínculo de sessão encaminhado ao Worker. O token
+  // CSRF continua sendo obrigatório no transporte mesmo quando a autenticação
+  // chega por Bearer, pois o Worker valida o token contra a sessão no banco.
+  {
+    method: "POST",
+    path: "/user",
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "PUT",
+    path: /^\/user\/[^/]+$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "DELETE",
+    path: /^\/user\/[^/]+$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "POST",
+    path: /^\/user\/[^/]+\/photo$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "DELETE",
+    path: /^\/user\/[^/]+\/photo$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "PUT",
+    path: /^\/user\/permission\/[^/]+$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
   {
     method: "POST",
     path: "/user/session",
@@ -326,9 +365,10 @@ export function buildForwardHeaders(
 
   if (sessionCookieRule?.inbound.includes(CSRF_COOKIE_NAME)) {
     const csrfToken = request.get(CSRF_HEADER_NAME);
-    if (csrfToken) {
-      headers.set(CSRF_HEADER_NAME, csrfToken);
+    if (!csrfToken) {
+      throw new ServiceError(403, "Token CSRF obrigatório para mutação User.");
     }
+    headers.set(CSRF_HEADER_NAME, csrfToken);
   }
 
   headers.set("x-forwarded-host", request.headers.host ?? "");

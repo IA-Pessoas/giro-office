@@ -21,5 +21,3 @@ jobs:
           node-version: 22
       - name: Validate database pool policy
         run: node --test scripts/database-pool-policy.test.mjs
-      - name: Validate production pool preflight
-        run: node --test scripts/production-deploy.test.mjs

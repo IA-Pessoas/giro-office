@@ -115,6 +115,12 @@ await runTest("next image remote patterns are not broad", async () => {
   assert.equal(source.includes('hostname: "*"'), false);
 });
 
+await runTest("next image does not depend on the /_next/image optimizer", async () => {
+  const source = await readAppFile("next.config.mjs");
+
+  assert.match(source, /images:\s*\{\s*unoptimized:\s*true\s*\}/);
+});
+
 await runTest("public logo assets respect source budget", async () => {
   const trackedAssets = [
     "public/logos/lions/Castelo.webp",
