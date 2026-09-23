@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { hashCsrfToken } from "../../runtime/src/session.js";
 import { createUserWorkerApp, type UserWorkerEnv } from "./app.js";
@@ -1253,6 +1254,42 @@ describe("user Worker", () => {
     expect(audit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "CREATE", referring: "user" }),
     );
+  });
+
+  it("only writes user columns the Worker Prisma schema declares", async () => {
+    // O Prisma mockado aceita qualquer campo; o real recusou `invited_by` em produção
+    // ("Unknown argument"), porque o model User do Worker não tinha a coluna.
+    const schema = readFileSync(new URL("../prisma/schema.prisma", import.meta.url), "utf8");
+    const userModel = /^model User \{([\s\S]*?)^\}/mu.exec(schema)?.[1] ?? "";
+    const columns = new Set([...userModel.matchAll(/^ {2}(\w+)\s/gmu)].map(([, field]) => field));
+    const db = prisma();
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword: vi.fn(async () => "created-argon2id-hash"),
+    } as never);
+
+    // Payload de buildAdminCreateUserPayload (CreateUserModal).
+    const response = await app.request("https://user.test/user", {
+      method: "POST",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Novo admin",
+        login: "novo.admin@example.com",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        organization_id: ORGANIZATION_ID,
+        type: "admin",
+        status: "active",
+        modules: { ti: 3, rh: 1 },
+        invited_by: USER_ID,
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const [[{ data }]] = db.user.create.mock.calls as unknown as [[{ data: object }]];
+    expect(Object.keys(data).filter((key) => !columns.has(key))).toEqual([]);
   });
 
   it("rejects organization user creation for a department in another tenant", async () => {
