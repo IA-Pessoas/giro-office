@@ -6,4 +6,7 @@ export interface PessoalWorkerEnv extends WorkerEnv {
   PESSOAL_PASSWORD_ENCRYPTION_KEY?: string;
   PESSOAL_PASSWORD_ENCRYPTION_KEY_VERSION?: string;
   AUDIT_SERVICE?: ServiceBinding;
+  /** Rotas /internal/reporting/* chamadas pelo reports-service. Sem eles: 503. */
+  REPORTS_INTERNAL_TOKEN?: string;
+  REPORTS_GRANT_SECRET?: string;
 }

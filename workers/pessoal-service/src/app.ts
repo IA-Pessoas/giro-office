@@ -1,3 +1,4 @@
+import { InternalReportingService } from "@workspace/pessoal-service/src/reporting/internalReportingService.js";
 import {
   createGroupBodySchema,
   groupIdParamsSchema,
@@ -78,6 +79,7 @@ import {
   sendPessoalAudit,
   UnionNotificationService,
 } from "./remainderServices.js";
+import { type PessoalReportingService, registerReportingRoutes } from "./reporting.js";
 
 type GroupRow = Record<string, unknown> & { organization_id: string };
 export type PessoalGroupPrisma = {
@@ -235,6 +237,7 @@ type PessoalOptions = {
   overviewService?: PessoalOverviewService;
   groupAssignmentService?: GroupAssignmentService;
   unionNotificationService?: UnionNotificationService;
+  reportingService?: PessoalReportingService;
 };
 type PessoalWorkerContext = { Bindings: PessoalWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type PessoalContext = Context<PessoalWorkerContext>;
@@ -1972,6 +1975,19 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     return withUnionNotificationService(c, async (service) =>
       c.json(createSuccessResponse(await service.runForDate({ now: new Date() }))),
     );
+  });
+  registerReportingRoutes(app, {
+    env: (c) => options.env ?? c.env,
+    withReportingService: (c, callback) =>
+      options.reportingService
+        ? callback(options.reportingService)
+        : withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+            callback(
+              new InternalReportingService(
+                client as unknown as ConstructorParameters<typeof InternalReportingService>[0],
+              ),
+            ),
+          ),
   });
   app.notFound((c) =>
     c.json({ success: false, error: "Recurso não encontrado.", code: "NOT_FOUND" }, 404),
