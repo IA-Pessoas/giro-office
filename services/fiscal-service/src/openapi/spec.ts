@@ -1,4 +1,4 @@
-import { reportingQueryOpenApiSchema } from "@workspace/shared";
+import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { FiscalServiceEnv } from "../config/env.js";
@@ -229,7 +229,11 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                       uniqueItems: true,
                       items: { type: "string" },
                     },
-                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                    limit: {
+                      type: "integer",
+                      minimum: 1,
+                      maximum: MAX_REPORTING_QUERY_LIMIT,
+                    },
                     query: reportingQueryOpenApiSchema,
                   },
                 },

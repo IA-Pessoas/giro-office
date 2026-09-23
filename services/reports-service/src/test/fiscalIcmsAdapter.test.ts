@@ -66,7 +66,7 @@ describe("FiscalIcmsAdapter", () => {
     ).resolves.toEqual([{ state: "SP" }]);
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "fiscal.icms", fields: ["state"], limit: 101 };
+    const body = { source: "fiscal.icms", fields: ["state"], limit: 50_001 };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://fiscal.test/internal/reporting/extract",
     );

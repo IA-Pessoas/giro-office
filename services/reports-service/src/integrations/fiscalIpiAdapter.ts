@@ -3,6 +3,7 @@ import {
   fiscalIpiReportingCatalog,
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
+  MAX_REPORTING_QUERY_LIMIT,
   REQUEST_ID_HEADER,
   ServiceError,
 } from "@workspace/shared";
@@ -23,7 +24,6 @@ import {
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
-const MAX_FISCAL_REPORTING_LIMIT = 101;
 
 const sources = fiscalIpiReportingCatalog.sources.map(
   ({ keys: _keys, ...source }) => source,
@@ -123,7 +123,7 @@ export class FiscalIpiAdapter implements ReportSourceAdapter {
       ...reportCriteria(definition, input.parameter_values),
       source,
       fields,
-      limit: Math.min(input.limit, MAX_FISCAL_REPORTING_LIMIT),
+      limit: Math.min(input.limit, MAX_REPORTING_QUERY_LIMIT),
     };
     const requestId = input.request_id || randomUUID();
     const signed = createGrant({
