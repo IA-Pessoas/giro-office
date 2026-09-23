@@ -74,6 +74,23 @@ describe("EmployeeDossierService", () => {
     });
   });
 
+  it("carrega o dossiê autorizado quando o colaborador não tem configuração de ponto", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(user({ pointConfig: null }));
+
+    const result = await new EmployeeDossierService().getDossier({
+      actorUserId: actorId,
+      organizationId,
+      rhPermission: 1,
+    });
+
+    expect(result).toMatchObject({
+      id: actorId,
+      full_name: "Ana Silva",
+      allergies: [{ name: "poeira", fonts: "ambiental", action: "evitar" }],
+      emergency_contacts: [],
+    });
+  });
+
   it("entrega somente projeção não sensível para gestor de departamento", async () => {
     prismaMock.user.findFirst
       .mockResolvedValueOnce(user())
