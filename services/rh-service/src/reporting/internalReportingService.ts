@@ -62,7 +62,7 @@ type ReportingPage = {
   nextCursor?: string;
 };
 
-type AttendanceCursor = { kind: number; id?: string };
+type AttendanceCursor = { kindIndex: number; id?: string };
 type AttendanceKind = "point" | "timeSheets" | "timeBankReleases" | "timeClockRequest";
 
 const REPORTING_DB_PAGE_SIZE = 100;
@@ -176,22 +176,22 @@ function encodeAttendanceCursor(cursor: AttendanceCursor): string {
 }
 
 function decodeAttendanceCursor(cursor: string | undefined): AttendanceCursor {
-  if (cursor === undefined) return { kind: 0 };
+  if (cursor === undefined) return { kindIndex: 0 };
   try {
     const parsed: unknown = JSON.parse(cursor);
     if (
       typeof parsed === "object" &&
       parsed !== null &&
-      "kind" in parsed &&
-      typeof parsed.kind === "number" &&
-      Number.isInteger(parsed.kind) &&
-      parsed.kind >= 0 &&
-      parsed.kind < attendanceKinds.length &&
+      "kindIndex" in parsed &&
+      typeof parsed.kindIndex === "number" &&
+      Number.isInteger(parsed.kindIndex) &&
+      parsed.kindIndex >= 0 &&
+      parsed.kindIndex < attendanceKinds.length &&
       (!("id" in parsed) || typeof parsed.id === "string")
     ) {
-      const cursorValue = parsed as { kind: number; id?: string };
+      const cursorValue = parsed as { kindIndex: number; id?: string };
       return {
-        kind: cursorValue.kind,
+        kindIndex: cursorValue.kindIndex,
         ...(cursorValue.id === undefined ? {} : { id: cursorValue.id }),
       };
     }
@@ -358,14 +358,14 @@ export class InternalReportingService {
     const rows: Record<string, unknown>[] = [];
     let lastOutputCursor: string | undefined;
 
-    for (let kindIndex = state.kind; kindIndex < attendanceKinds.length; kindIndex++) {
+    for (let kindIndex = state.kindIndex; kindIndex < attendanceKinds.length; kindIndex++) {
       const kind = attendanceKinds[kindIndex];
       if (!kind) break;
       const remaining = limit - rows.length;
       const rowsForKind = await this.loadAttendanceKind(
         kind,
         organizationId,
-        kindIndex === state.kind ? state.id : undefined,
+        kindIndex === state.kindIndex ? state.id : undefined,
         remaining + 1,
       );
       const visibleRows = rowsForKind.slice(0, remaining);
@@ -373,7 +373,7 @@ export class InternalReportingService {
       rows.push(...mappedRows.map(({ id: _id, ...row }) => row));
       const lastId = visibleRows[visibleRows.length - 1]?.id;
       if (typeof lastId === "string") {
-        lastOutputCursor = encodeAttendanceCursor({ kind: kindIndex, id: lastId });
+        lastOutputCursor = encodeAttendanceCursor({ kindIndex, id: lastId });
       }
 
       if (rowsForKind.length > remaining) {
@@ -381,6 +381,14 @@ export class InternalReportingService {
           throw new ServiceError(500, "Falha ao continuar a extração do relatório.");
         }
         return { rows, reachedLimit: true, nextCursor: lastOutputCursor };
+      }
+
+      if (rows.length === limit && kindIndex < attendanceKinds.length - 1) {
+        return {
+          rows,
+          reachedLimit: true,
+          nextCursor: encodeAttendanceCursor({ kindIndex: kindIndex + 1 }),
+        };
       }
     }
 
