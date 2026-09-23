@@ -266,7 +266,7 @@ await (async () => {
     assert.equal(isAdminPermission(null), false);
   });
 
-  await runTest("administration access allows owners and RH admins only", () => {
+  await runTest("administration access allows owners, RH admins and TI admins only", () => {
     assert.equal(canAccessAdministration(2), false);
     assert.equal(canAccessAdministration(100), false);
     assert.equal(canAccessAdministration(1), false);
@@ -298,6 +298,11 @@ await (async () => {
     assert.equal(canAccessAdministration({ permission: 1 }), false);
     assert.equal(canAccessAdministration({ permission: 1, modules: { rh: 3 } }), true);
     assert.equal(canAccessAdministration({ permission: 1, modules: { rh: 1 } }), false);
+    assert.equal(
+      canAccessAdministration({ permission: 1, type: "admin", modules: { ti: 3, rh: 1 } }),
+      true,
+    );
+    assert.equal(canAccessAdministration({ permission: 1, type: "admin", modules: { ti: 2 } }), false);
     assert.equal(canAccessAdministration(undefined), false);
   });
 

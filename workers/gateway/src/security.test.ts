@@ -148,6 +148,9 @@ describe("gateway Worker: negação por padrão nas 13 áreas antes sem policy",
 
     expect((await call(app, "GET", "/user", member())).status).toBe(403);
     expect((await call(app, "GET", "/user", member({ rh: 3 }))).status).toBe(200);
+    // Admin de TI também gerencia usuários; TI abaixo de 3 não.
+    expect((await call(app, "GET", "/user", member({ ti: 3 }))).status).toBe(200);
+    expect((await call(app, "GET", "/user", member({ ti: 2 }))).status).toBe(403);
   });
 
   it("rota mapeada porém não classificada é negada (enforce do Node)", async () => {

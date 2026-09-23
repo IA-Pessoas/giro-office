@@ -26,9 +26,12 @@ function hasExplicitModulePermission(
   return typeof modulePermission === "number" && modulePermission >= minPermission;
 }
 
+/** Owner, admin de RH ou admin de TI (o teto de concessão é aplicado no user-service). */
 function canManageUsers(context: AuthContext): boolean {
   return (
-    isExplicitOwner(context) || hasExplicitModulePermission(context, "rh", MODULE_ADMIN_PERMISSION)
+    isExplicitOwner(context) ||
+    hasExplicitModulePermission(context, "rh", MODULE_ADMIN_PERMISSION) ||
+    hasExplicitModulePermission(context, "ti", MODULE_ADMIN_PERMISSION)
   );
 }
 

@@ -55,7 +55,8 @@ export function canCreateUsers(
     return true;
   }
 
-  return subject.modules?.rh === 3;
+  // Admin de RH ou de TI gerencia usuários; o teto de concessão fica no user-service.
+  return subject.modules?.rh === 3 || subject.modules?.ti === 3;
 }
 
 export function canAccessAdministration(

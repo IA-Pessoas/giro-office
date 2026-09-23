@@ -410,10 +410,47 @@ export function requireOrganizationAuth(auth: UserAuthContext): void {
   }
 }
 
+/** Gerenciam usuários: owner, admin de RH (rh=3) e admin de TI (ti=3). */
 export function requireManageUsers(auth: UserAuthContext): void {
   requireOrganizationAuth(auth);
-  if (auth.claims.type !== "owner" && (auth.claims.modules.rh ?? 0) < 3) {
+  const modules = auth.claims.modules;
+  if (auth.claims.type !== "owner" && (modules.rh ?? 0) < 3 && (modules.ti ?? 0) < 3) {
     throw new ServiceError(403, "Usuário não tem permissão.");
+  }
+}
+
+// rh=1 e ti=1 são o autosserviço que todo usuário ativo recebe; não contam como concessão.
+const SELF_SERVICE_FLOOR: Record<string, number> = { rh: 1, ti: 1 };
+
+/**
+ * Quem não é owner só concede, em cada módulo, até o próprio nível. Vale para os módulos
+ * finais, depois da normalização (ex.: admin recebe 3 no módulo do departamento).
+ */
+export function assertModulesWithinActor(
+  auth: UserAuthContext,
+  modules: Record<string, unknown>,
+): void {
+  if (auth.claims.type === "owner") return;
+  const own = auth.claims.modules as Record<string, number | undefined>;
+  const over = Object.entries(modules).find(
+    ([key, level]) =>
+      Number(level ?? 0) > Math.max(Number(own[key] ?? 0), SELF_SERVICE_FLOOR[key] ?? 0),
+  );
+  if (over) {
+    throw new ServiceError(
+      403,
+      `Você não pode conceder o módulo ${over[0]} acima do seu próprio nível.`,
+    );
+  }
+}
+
+/** Só o owner mexe em outro owner (dados, permissões, desativação). */
+export function assertCanManageTarget(
+  auth: UserAuthContext,
+  target: { type?: unknown } | null | undefined,
+): void {
+  if (auth.claims.type !== "owner" && target?.type === "owner") {
+    throw new ServiceError(403, "Apenas o owner pode alterar outro owner.");
   }
 }
 
