@@ -54,11 +54,12 @@ function fakeDependencies() {
   };
 }
 
-function orgHeaders(organization = "org-1") {
+function orgHeaders(organization = "org-1", type: "owner" | "admin" | "user" = "owner") {
   return {
     "x-auth-user-id": "user-1",
     "x-auth-kind": "organization",
     "x-auth-organization-id": organization,
+    "x-auth-type": type,
     "x-internal-service-token": env.INTERNAL_SERVICE_TOKEN,
   };
 }
@@ -116,18 +117,17 @@ describe("organization-service Worker", () => {
   it("preserva as rotas organizacionais, envelope, query e escopo encaminhado", async () => {
     const dependencies = fakeDependencies();
     const app = createOrganizationWorkerApp({ env, ...dependencies });
-    const headers = orgHeaders("org-42");
+    const headers = orgHeaders(organizationId);
 
     const list = await app.request(
       "https://organization.test/organizations?page=2&pageSize=10&status=active",
       { headers },
     );
     expect(list.status).toBe(200);
-    expect(dependencies.rawService.list).toHaveBeenCalledWith({
-      page: 2,
-      pageSize: 10,
-      status: "active",
-    });
+    expect(dependencies.rawService.list).toHaveBeenCalledWith(
+      { page: 2, pageSize: 10, status: "active" },
+      organizationId,
+    );
 
     const created = await app.request("https://organization.test/organizations", {
       method: "POST",
@@ -173,6 +173,43 @@ describe("organization-service Worker", () => {
     expect(dependencies.rawService.list).toHaveBeenCalledTimes(1);
   });
 
+  it("não lê nem altera outra organização e reserva status e plano ao owner", async () => {
+    const dependencies = fakeDependencies();
+    const app = createOrganizationWorkerApp({ env, ...dependencies });
+    const other = orgHeaders("22222222-2222-4222-8222-222222222222");
+    const patch = (path: string, body: unknown, headers: Record<string, string>) =>
+      app.request(`https://organization.test/organizations/${organizationId}/${path}`, {
+        method: "PATCH",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    // Id de outra organização: 404, sem chegar ao serviço.
+    const foreign = [
+      (
+        await app.request(`https://organization.test/organizations/${organizationId}`, {
+          headers: other,
+        })
+      ).status,
+      (await patch("status", { status: "suspended" }, other)).status,
+      (await patch("subscription-plan", { subscription_plan: "pro" }, other)).status,
+      (await patch("logo-url", { logo_url: null }, other)).status,
+    ];
+    expect(foreign).toEqual([404, 404, 404, 404]);
+    expect(dependencies.rawService.findById).not.toHaveBeenCalled();
+    expect(dependencies.rawService.updateStatus).not.toHaveBeenCalled();
+    expect(dependencies.rawService.updateSubscriptionPlan).not.toHaveBeenCalled();
+    expect(dependencies.rawService.updateLogoUrl).not.toHaveBeenCalled();
+
+    // Na própria organização, admin troca o logo mas não suspende nem muda o plano.
+    const admin = orgHeaders(organizationId, "admin");
+    expect((await patch("status", { status: "suspended" }, admin)).status).toBe(403);
+    expect((await patch("subscription-plan", { subscription_plan: "pro" }, admin)).status).toBe(
+      403,
+    );
+    expect((await patch("logo-url", { logo_url: null }, admin)).status).toBe(200);
+  });
+
   it("não aceita conflito de cabeçalho de organização e preserva erro de contrato", async () => {
     const dependencies = fakeDependencies();
     const app = createOrganizationWorkerApp({ env, ...dependencies });
@@ -187,7 +224,7 @@ describe("organization-service Worker", () => {
     );
     const conflict = await app.request(
       `https://organization.test/organizations/${organizationId}`,
-      { headers: orgHeaders() },
+      { headers: orgHeaders(organizationId) },
     );
     expect(conflict.status).toBe(409);
     await expect(conflict.json()).resolves.toMatchObject({

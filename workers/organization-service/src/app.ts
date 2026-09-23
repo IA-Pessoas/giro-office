@@ -4,7 +4,12 @@ import { Hono } from "hono";
 import { ZodError } from "zod";
 import { buildOrganizationServiceOpenApiSpec } from "../../../services/organization-service/src/openapi/spec.js";
 import type { PlatformIdentity } from "./auth.js";
-import { requireOrganizationAuth, requirePlatformCsrf, requirePlatformSession } from "./auth.js";
+import {
+  AUTH_CONTEXT,
+  requireOrganizationAuth,
+  requirePlatformCsrf,
+  requirePlatformSession,
+} from "./auth.js";
 import { errorResponse, OrganizationWorkerError, successResponse } from "./errors.js";
 import { OrganizationService } from "./organizationService.js";
 import { createOrganizationPrisma } from "./prisma.js";
@@ -48,6 +53,28 @@ interface HonoEnv {
     platformIdentity: PlatformIdentity;
     serviceContext: ServiceContext;
   };
+}
+
+/**
+ * As rotas /organizations recebem o id pela URL; sem esta checagem qualquer usuário
+ * autenticado lia e alterava outra organização. Id alheio responde 404 (não revela se existe).
+ */
+function ownOrganizationAuth(c: { get(key: string): unknown }, id: string): WorkerAuthContext {
+  const auth = c.get(AUTH_CONTEXT) as WorkerAuthContext | undefined;
+  if (!auth || id !== auth.organizationId) {
+    throw new OrganizationWorkerError(404, "Organização não encontrada.");
+  }
+  return auth;
+}
+
+/** Suspender a organização ou trocar o plano (cobrança) é decisão do owner. */
+function requireOwner(auth: WorkerAuthContext): void {
+  if (auth.claims.type !== "owner") {
+    throw new OrganizationWorkerError(
+      403,
+      "Apenas o owner da organização pode fazer esta alteração.",
+    );
+  }
 }
 
 function parse<T>(schema: { parse: (value: unknown) => T }, value: unknown): T {
@@ -226,7 +253,10 @@ export function createOrganizationWorkerApp(options: OrganizationWorkerOptions) 
   const organizationRoutes = (path: string) => {
     app.get(path, async (c) => {
       const query = parse(listOrganizationsQuerySchema, queryRecord(c));
-      return successResponse(await service(c.get("serviceContext")).list(query));
+      const auth = c.get(AUTH_CONTEXT) as WorkerAuthContext;
+      return successResponse(
+        await service(c.get("serviceContext")).list(query, auth.organizationId),
+      );
     });
     app.post(path, async (c) => {
       const body = parse(createOrganizationBodySchema, await jsonBody(c));
@@ -238,10 +268,12 @@ export function createOrganizationWorkerApp(options: OrganizationWorkerOptions) 
 
   app.get("/organizations/:id", async (c) => {
     const params = parse(organizationIdParamsSchema, c.req.param());
+    ownOrganizationAuth(c, params.id);
     return successResponse(await service(c.get("serviceContext")).findById(params.id));
   });
   app.patch("/organizations/:id/status", async (c) => {
     const params = parse(organizationIdParamsSchema, c.req.param());
+    requireOwner(ownOrganizationAuth(c, params.id));
     const body = parse(updateOrganizationStatusBodySchema, await jsonBody(c));
     return successResponse(
       await service(c.get("serviceContext")).updateStatus(params.id, body.status),
@@ -249,6 +281,7 @@ export function createOrganizationWorkerApp(options: OrganizationWorkerOptions) 
   });
   app.patch("/organizations/:id/subscription-plan", async (c) => {
     const params = parse(organizationIdParamsSchema, c.req.param());
+    requireOwner(ownOrganizationAuth(c, params.id));
     const body = parse(updateOrganizationSubscriptionPlanBodySchema, await jsonBody(c));
     return successResponse(
       await service(c.get("serviceContext")).updateSubscriptionPlan(
@@ -259,6 +292,7 @@ export function createOrganizationWorkerApp(options: OrganizationWorkerOptions) 
   });
   app.patch("/organizations/:id/logo-url", async (c) => {
     const params = parse(organizationIdParamsSchema, c.req.param());
+    ownOrganizationAuth(c, params.id);
     const body = parse(updateOrganizationLogoUrlBodySchema, await jsonBody(c));
     return successResponse(
       await service(c.get("serviceContext")).updateLogoUrl(params.id, body.logo_url),

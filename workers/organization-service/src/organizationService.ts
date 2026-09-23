@@ -195,9 +195,13 @@ export class OrganizationService {
     }
   }
 
-  async list(params: ListOrganizationsParams) {
+  /** Rota de organização: o usuário só enxerga a própria (a listagem global é /platform). */
+  async list(params: ListOrganizationsParams, organizationId: string) {
     try {
-      const where = params.status === undefined ? {} : { status: params.status };
+      const where = {
+        id: organizationId,
+        ...(params.status === undefined ? {} : { status: params.status }),
+      };
       const [organizations, total] = await Promise.all([
         this.prisma.organization.findMany({
           where,
