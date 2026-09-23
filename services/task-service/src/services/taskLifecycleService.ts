@@ -10,7 +10,7 @@ import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import type { IntegracaoTaskConclusionBody } from "../schemas/integracaoTaskConclusionBody.schema.js";
-import { assertCommercialValidationReleased } from "./commercialValidationGate.js";
+import { assertCommercialValidationReleased } from "./commercialValidationGateService.js";
 import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
 import { throwIfActiveTaskConflict } from "./taskActiveConflict.js";
 import {
@@ -386,6 +386,13 @@ export class TaskLifecycleService {
       assertCommercialValidationReleased(task);
 
       const updated = await prismaClient.$transaction(async (tx) => {
+        const currentTask = await tx.task.findFirst({
+          where: { id: params.task_id, organization_id: params.organization_id },
+          select: { id: true, billing: true, hiring_status: true },
+        });
+        if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
+        assertCommercialValidationReleased(currentTask);
+
         const reopened = await tx.task.update({
           where: { id: params.task_id },
           data: { status: "Em Andamento", pending_approval: false, end_date: null },
@@ -689,7 +696,12 @@ export class TaskLifecycleService {
 
         if (!completionRequest) {
           if (decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED && exists.pending_approval) {
-            assertCommercialValidationReleased(exists);
+            const currentTask = await tx.task.findFirst({
+              where: { id: task_id, organization_id },
+              select: { id: true, billing: true, hiring_status: true },
+            });
+            if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
+            assertCommercialValidationReleased(currentTask);
             const legacyUpdated = await tx.task.update({
               where: { id: task_id },
               data: { status: "Concluída", pending_approval: false },
@@ -733,6 +745,16 @@ export class TaskLifecycleService {
           });
         }
 
+        const approved = decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED;
+        if (approved) {
+          const currentTask = await tx.task.findFirst({
+            where: { id: task_id, organization_id },
+            select: { id: true, billing: true, hiring_status: true },
+          });
+          if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
+          assertCommercialValidationReleased(currentTask);
+        }
+
         const resolved = await tx.taskCompletionRequest.updateMany({
           where: { id: completionRequest.id, status: TASK_COMPLETION_REQUEST_STATUS.PENDING },
           data: {
@@ -756,8 +778,6 @@ export class TaskLifecycleService {
           throw new ServiceError(409, "A solicitação de conclusão já foi encerrada.");
         }
 
-        const approved = decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED;
-        if (approved) assertCommercialValidationReleased(exists);
         const task = await tx.task.update({
           where: { id: task_id },
           data: {

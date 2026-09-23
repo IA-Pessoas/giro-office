@@ -64,6 +64,7 @@ export interface IntegracaoTaskDetail {
   observations: string | null;
   billing: string;
   hiring_status?: string | null;
+  commercial_validation_pending?: boolean;
   urgency: string;
   responsible_id: string | null;
   responsible2_id: string | null;

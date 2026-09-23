@@ -4,7 +4,11 @@ import {
   error as logError,
   ServiceError,
 } from "@workspace/shared";
-
+import {
+  INTEGRACAO_TASK_STATUS_WAITING,
+  TASK_BILLING_REALIZE,
+  TASK_HIRING_STATUS_CONTRACTED,
+} from "../constants/integracaoTask.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 
 const TASK_SELECT = {
@@ -88,15 +92,19 @@ export class CommercialProspectingCloseService {
             where: {
               id: { in: taskIds },
               organization_id: event.organization_id,
-              billing: "Realizar",
+              billing: TASK_BILLING_REALIZE,
+              OR: [
+                { hiring_status: null },
+                { hiring_status: { not: TASK_HIRING_STATUS_CONTRACTED } },
+              ],
             },
-            data: { status: "A Realizar" },
+            data: { status: INTEGRACAO_TASK_STATUS_WAITING },
           });
           await tx.task.updateMany({
             where: {
               id: { in: taskIds },
               organization_id: event.organization_id,
-              billing: { not: "Realizar" },
+              billing: { not: TASK_BILLING_REALIZE },
             },
             data: { status: "Em andamento" },
           });

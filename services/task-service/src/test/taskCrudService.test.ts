@@ -1234,6 +1234,28 @@ describe("TaskCrudService", () => {
     await expect(service.detailTask("task-1", "org-1")).rejects.toMatchObject({ statusCode: 404 });
   });
 
+  it("detailTask expõe se a validação Comercial ainda bloqueia a execução", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      billing: "Realizar",
+      hiring_status: "A Realizar",
+      responsible_id: null,
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+
+    await expect(
+      new TaskCrudService().detailTask("task-1", "org-1", {
+        user_id: "owner-1",
+        integracaoLevel: 3,
+        isOwner: true,
+      }),
+    ).resolves.toMatchObject({
+      detail: { commercial_validation_pending: true },
+    });
+  });
+
   it("listTasks calcula totais sobre todos os registros filtrados", async () => {
     const pageRows = [
       {

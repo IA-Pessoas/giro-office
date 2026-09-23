@@ -5,7 +5,10 @@ import {
   error as logError,
   ServiceError,
 } from "@workspace/shared";
-
+import {
+  INTEGRACAO_TASK_STATUS_WAITING,
+  TASK_BILLING_REALIZE,
+} from "../constants/integracaoTask.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import prismaClient from "../prisma/index.js";
 
@@ -32,7 +35,7 @@ function effectFor(
   }
 
   return {
-    status: billing === "Realizar" ? "Em Espera" : currentStatus,
+    status: billing === TASK_BILLING_REALIZE ? INTEGRACAO_TASK_STATUS_WAITING : currentStatus,
     charge_comercial: true,
     charge_financeiro: false,
   };

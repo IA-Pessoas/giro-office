@@ -64,8 +64,9 @@ describe("CommercialProspectingCloseService", () => {
         id: { in: ["task-1", "task-2"] },
         organization_id: EVENT.organization_id,
         billing: "Realizar",
+        OR: [{ hiring_status: null }, { hiring_status: { not: "Contratado" } }],
       },
-      data: { status: "A Realizar" },
+      data: { status: "Em Espera" },
     });
     expect(prisma.task.updateMany).toHaveBeenCalledWith({
       where: {

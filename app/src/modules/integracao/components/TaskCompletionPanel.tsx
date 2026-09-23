@@ -21,8 +21,7 @@ interface TaskCompletionPanelProps {
     IntegracaoTaskDetail,
     | "id"
     | "status"
-    | "billing"
-    | "hiring_status"
+    | "commercial_validation_pending"
     | "responsible_id"
     | "responsible2_id"
     | "responsible3_id"
@@ -77,8 +76,7 @@ export function TaskCompletionPanel({
     isOwner ||
     (accessLevel === "edit" && canApproveCompletion);
   const canReopen = accessLevel === "admin" || isOwner;
-  const awaitingCommercialValidation =
-    task.billing === "Realizar" && task.hiring_status !== "Contratado";
+  const awaitingCommercialValidation = task.commercial_validation_pending === true;
   const isMutating =
     requestMutation.isPending ||
     decisionMutation.isPending ||
