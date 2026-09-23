@@ -217,3 +217,12 @@ await runTest("fiscal-service lists use partial search and paginated result meta
     assert.match(source, /hasMore:\s*page \* take < total/);
   }
 });
+
+await runTest("fiscal NCM shows tax regime name instead of legacy code", async () => {
+  const { formatFiscalTaxRegime } = await import("./utils/fiscalTaxRegime.ts");
+  assert.equal(formatFiscalTaxRegime("0"), "Simples Nacional");
+  assert.equal(formatFiscalTaxRegime("1"), "Lucro Presumido");
+  assert.equal(formatFiscalTaxRegime("2"), "Lucro Real");
+  assert.equal(formatFiscalTaxRegime("Simples Nacional"), "Simples Nacional");
+  assert.match(fiscalSources.ncmSection, /formatFiscalTaxRegime\(item\.tax_regime\)/);
+});
