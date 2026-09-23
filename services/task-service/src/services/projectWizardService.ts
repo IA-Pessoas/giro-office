@@ -212,6 +212,7 @@ export class ProjectWizardService {
       createTaskInTransaction(
         data: CreateTaskCrudRequest,
         tx: Prisma.TransactionClient,
+        options?: { allowPendingCommercialProject?: boolean },
       ): Promise<{
         create: { id: string; responsible_id: string | null };
       }>;
@@ -415,6 +416,7 @@ export class ProjectWizardService {
               createDependencies: false,
             },
             tx,
+            { allowPendingCommercialProject: true },
           );
           createdTasks.push(result.create);
         }

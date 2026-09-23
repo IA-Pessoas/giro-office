@@ -5,6 +5,7 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
+import { PROJECT_STATUS_WAITING_COMMERCIAL } from "@workspace/shared/database";
 import {
   INTEGRACAO_TASK_STATUS_IN_PROGRESS,
   INTEGRACAO_TASK_STATUS_TODO,
@@ -24,6 +25,8 @@ import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import {
   assertCommercialValidationReleased,
+  assertProjectCommercialValidationReleased,
+  assertTaskProjectCommercialValidationReleased,
   isAwaitingCommercialValidation,
 } from "./commercialValidationGateService.js";
 import {
@@ -58,6 +61,7 @@ const TASK_DETAIL_SELECT = {
   end_date: true,
   date_created: true,
   date_updated: true,
+  project: { select: { status: true } },
 } as const;
 
 const TASK_CREATE_SELECT = {
@@ -90,7 +94,7 @@ const TASK_LIST_SELECT = {
   billing_description: true,
   charge_financeiro: true,
   client: { select: { name: true, company_name: true } },
-  project: { select: { name: true } },
+  project: { select: { name: true, status: true } },
   responsible_id: true,
   responsible2_id: true,
   responsible3_id: true,
@@ -129,7 +133,10 @@ const TASKS_AWAITING_COMMERCIAL_VALIDATION_WHERE: Prisma.TaskWhereInput = {
   OR: [{ hiring_status: null }, { hiring_status: { not: TASK_HIRING_STATUS_CONTRACTED } }],
 };
 
-export type TaskDetailRow = TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }> & {
+export type TaskDetailRow = Omit<
+  TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }>,
+  "project"
+> & {
   commercial_validation_pending: boolean;
 };
 export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }>;
@@ -397,12 +404,13 @@ export class TaskCrudService {
   async createTaskInTransaction(
     data: CreateTaskCrudRequest,
     tx: Prisma.TransactionClient,
+    options: { allowPendingCommercialProject?: boolean } = {},
   ): Promise<{ create: TaskCreateRow; dependentCreates: Array<{ create: TaskCreateRow }> }> {
     requireIntegracaoRouteAccess("POST", "/task", taskAuthorization(data));
 
     const project = await tx.project.findFirst({
       where: { id: data.project_id, organization_id: data.organization_id },
-      select: { client_id: true },
+      select: { client_id: true, status: true },
     });
 
     if (!project) {
@@ -411,6 +419,9 @@ export class TaskCrudService {
 
     if (project.client_id !== data.client_id) {
       throw new ServiceError(400, "Projeto nao pertence ao cliente informado.");
+    }
+    if (!options.allowPendingCommercialProject) {
+      assertProjectCommercialValidationReleased(project);
     }
 
     await assertNoActiveTaskForModel(tx, {
@@ -628,10 +639,13 @@ export class TaskCrudService {
         isOwner: authorization.isOwner === true,
       });
 
+      const { project, ...taskDetail } = detail;
       return {
         detail: {
-          ...detail,
-          commercial_validation_pending: isAwaitingCommercialValidation(detail),
+          ...taskDetail,
+          commercial_validation_pending:
+            isAwaitingCommercialValidation(detail) ||
+            project?.status === PROJECT_STATUS_WAITING_COMMERCIAL,
         },
       };
     } catch (err: unknown) {
@@ -687,6 +701,9 @@ export class TaskCrudService {
 
       if (isBasicAccess) {
         andFilters.push({ status: { in: ACTIVE_TASK_STATUSES } });
+        andFilters.push({
+          project: { is: { status: { not: PROJECT_STATUS_WAITING_COMMERCIAL } } },
+        });
       }
 
       const responsibleFilter: Prisma.TaskWhereInput[] | undefined = isBasicAccess
@@ -766,6 +783,7 @@ export class TaskCrudService {
               where,
               { status: { contains: "andamento", mode: "insensitive" } },
               TASKS_RELEASED_FOR_EXECUTION_WHERE,
+              { project: { is: { status: { not: PROJECT_STATUS_WAITING_COMMERCIAL } } } },
             ],
           },
         }),
@@ -779,7 +797,9 @@ export class TaskCrudService {
       const hasMore = params.page * params.limit < total;
       const data = list.map(
         ({ responsible_id, responsible2_id, responsible3_id, client, project, ...task }) => {
-          const commercialValidationPending = isAwaitingCommercialValidation(task);
+          const commercialValidationPending =
+            isAwaitingCommercialValidation(task) ||
+            project.status === PROJECT_STATUS_WAITING_COMMERCIAL;
           return {
             ...task,
             status: commercialValidationPending ? INTEGRACAO_TASK_STATUS_WAITING : task.status,
@@ -832,6 +852,7 @@ export class TaskCrudService {
             ),
         ),
       });
+      await assertTaskProjectCommercialValidationReleased(prismaClient, exists);
 
       if (data.status === "Concluída") {
         throw new ServiceError(

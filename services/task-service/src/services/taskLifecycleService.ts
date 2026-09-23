@@ -10,7 +10,10 @@ import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
 import * as audit from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import type { IntegracaoTaskConclusionBody } from "../schemas/integracaoTaskConclusionBody.schema.js";
-import { assertCommercialValidationReleased } from "./commercialValidationGateService.js";
+import {
+  assertCommercialValidationReleased,
+  assertTaskProjectCommercialValidationReleased,
+} from "./commercialValidationGateService.js";
 import { assertResponsibleUsersInDepartment } from "./responsibleUserContext.js";
 import { throwIfActiveTaskConflict } from "./taskActiveConflict.js";
 import {
@@ -141,6 +144,7 @@ export class TaskLifecycleService {
         isOwner: params.isOwner === true,
       });
       assertCommercialValidationReleased(task);
+      await assertTaskProjectCommercialValidationReleased(prismaClient, task);
 
       return await prismaClient.$transaction(
         async (tx) => {
@@ -162,6 +166,7 @@ export class TaskLifecycleService {
             isOwner: params.isOwner === true,
           });
           assertCommercialValidationReleased(currentTask);
+          await assertTaskProjectCommercialValidationReleased(tx, currentTask);
           const pending = await tx.taskCompletionRequest.findFirst({
             where: {
               task_id: params.task_id,
@@ -384,14 +389,22 @@ export class TaskLifecycleService {
         isOwner: params.isOwner === true,
       });
       assertCommercialValidationReleased(task);
+      await assertTaskProjectCommercialValidationReleased(prismaClient, task);
 
       const updated = await prismaClient.$transaction(async (tx) => {
         const currentTask = await tx.task.findFirst({
           where: { id: params.task_id, organization_id: params.organization_id },
-          select: { id: true, billing: true, hiring_status: true },
+          select: {
+            id: true,
+            billing: true,
+            hiring_status: true,
+            project_id: true,
+            organization_id: true,
+          },
         });
         if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
         assertCommercialValidationReleased(currentTask);
+        await assertTaskProjectCommercialValidationReleased(tx, currentTask);
 
         const reopened = await tx.task.update({
           where: { id: params.task_id },
@@ -496,6 +509,7 @@ export class TaskLifecycleService {
             isOwner,
             task: currentTask,
           });
+          await assertTaskProjectCommercialValidationReleased(tx, currentTask);
           if (body.status !== currentTask.status) {
             assertCommercialValidationReleased(currentTask);
           }
@@ -698,10 +712,17 @@ export class TaskLifecycleService {
           if (decision === TASK_COMPLETION_REQUEST_STATUS.APPROVED && exists.pending_approval) {
             const currentTask = await tx.task.findFirst({
               where: { id: task_id, organization_id },
-              select: { id: true, billing: true, hiring_status: true },
+              select: {
+                id: true,
+                billing: true,
+                hiring_status: true,
+                project_id: true,
+                organization_id: true,
+              },
             });
             if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
             assertCommercialValidationReleased(currentTask);
+            await assertTaskProjectCommercialValidationReleased(tx, currentTask);
             const legacyUpdated = await tx.task.update({
               where: { id: task_id },
               data: { status: "Concluída", pending_approval: false },
@@ -749,10 +770,17 @@ export class TaskLifecycleService {
         if (approved) {
           const currentTask = await tx.task.findFirst({
             where: { id: task_id, organization_id },
-            select: { id: true, billing: true, hiring_status: true },
+            select: {
+              id: true,
+              billing: true,
+              hiring_status: true,
+              project_id: true,
+              organization_id: true,
+            },
           });
           if (!currentTask) throw new ServiceError(404, "Tarefa não existe.");
           assertCommercialValidationReleased(currentTask);
+          await assertTaskProjectCommercialValidationReleased(tx, currentTask);
         }
 
         const resolved = await tx.taskCompletionRequest.updateMany({

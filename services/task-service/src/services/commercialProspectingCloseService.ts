@@ -4,6 +4,7 @@ import {
   error as logError,
   ServiceError,
 } from "@workspace/shared";
+import { PROJECT_STATUS_WAITING_COMMERCIAL } from "@workspace/shared/database";
 import {
   INTEGRACAO_TASK_STATUS_WAITING,
   TASK_BILLING_REALIZE,
@@ -21,7 +22,7 @@ const TASK_SELECT = {
 
 type CommercialProspectingClosePrisma = Pick<
   PrismaClient,
-  "task" | "commercialProspectingCloseEvent" | "$transaction"
+  "task" | "project" | "commercialProspectingCloseEvent" | "$transaction"
 >;
 
 export class CommercialProspectingCloseService {
@@ -109,6 +110,15 @@ export class CommercialProspectingCloseService {
             data: { status: "Em andamento" },
           });
         }
+
+        await tx.project.updateMany({
+          where: {
+            client_id: event.client_id,
+            organization_id: event.organization_id,
+            status: PROJECT_STATUS_WAITING_COMMERCIAL,
+          },
+          data: { status: "Em andamento" },
+        });
 
         return {
           event_id: recorded.event_id,
