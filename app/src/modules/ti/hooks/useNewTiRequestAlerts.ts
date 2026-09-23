@@ -9,7 +9,6 @@ import { useTiRequests } from "./useTiRequests";
 
 const NEW_REQUESTS_POLL_INTERVAL_MS = 30_000;
 
-// ponytail: only alerts while the TI module is open; a global alert needs a layout-level poll or push.
 export function useNewTiRequestAlerts(enabled: boolean): void {
   const queryClient = useQueryClient();
   const seenIdsRef = useRef<Set<string> | null>(null);
