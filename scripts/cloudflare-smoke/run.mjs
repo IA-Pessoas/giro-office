@@ -1140,8 +1140,20 @@ async function runChecks({ db, sql, baseUrls, secrets, runId, mode, migrationWor
         200,
         "GET /reports/jobs/:id",
       );
-      if (current.data.status === "completed")
-        return `job ${jobId.slice(0, 8)} queued -> completed pelo cron`;
+      if (current.data.status === "completed") {
+        const snapshot = expectStatus(
+          await http(baseUrls.gateway, `/reports/jobs/${jobId}/snapshot?scope=personal&limit=100`, {
+            token: tokenA,
+          }),
+          200,
+          "GET /reports/jobs/:id/snapshot",
+        );
+        assert(
+          JSON.stringify(snapshot.data).includes(`${runId} ncm`),
+          `snapshot sem o NCM da org A: ${JSON.stringify(snapshot.data).slice(0, 300)}`,
+        );
+        return `job ${jobId.slice(0, 8)} queued -> completed pelo cron, snapshot legível`;
+      }
       assert(
         !["failed", "expired", "cancelled"].includes(current.data.status),
         `job terminou em ${current.data.status}: ${JSON.stringify(current.data).slice(0, 300)}`,
