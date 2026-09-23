@@ -39,6 +39,7 @@ Esta matriz documenta nomes e escopo. Ela não contém valores, tokens ou URLs p
 | --- | --- | --- | --- |
 | `SUPABASE_URL` | Secret/var | Workers que usam Storage | manter durante a transição |
 | `SUPABASE_SERVICE_ROLE_KEY` | Secret | somente backend/Worker | nunca em Pages ou `NEXT_PUBLIC_*` |
+| `CNPJ_LOOKUP_API_URL`, `CNPJ_LOOKUP_API_TOKEN` | Secret | `giro-client-service` | **placeholder** desde 2026-09-23 (`https://cnpj-lookup.invalid/{cnpj}` e `placeholder`): a consulta falha e o cadastro segue manual; sobrescrever os dois com `wrangler secret put` quando houver o provedor real |
 | `*_BUCKET` | var | serviço dono do bucket | preservar nome, privacidade e prefixos existentes |
 | `REGULARIZE_LICENSE_PROTOCOL_BUCKET` | var | regularize-service | bucket privado de protocolos; default `regularize-license-protocols` |
 | `MTK_ENCRYPTION_KEY` | Secret | regularize-service | mesma chave AES-256-GCM legada; nunca expor no Pages |
