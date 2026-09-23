@@ -1,4 +1,5 @@
 import {
+  REPORTING_QUERY_BYTE_LIMIT_CODE,
   REPORTING_QUERY_ROW_LIMIT_CODE,
   type ReportingQuery,
   reportingQueryFields,
@@ -7,7 +8,7 @@ import {
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 
 export const REPORT_SNAPSHOT_LIMIT_MESSAGE =
-  "O relatório excede o limite global de 50.000 linhas. Reduza os filtros ou divida o relatório e tente novamente.";
+  "O relatório excede o limite global do snapshot (50.000 linhas ou 20 MiB). Reduza os filtros ou as colunas e tente novamente.";
 
 export function reportAggregationAlias(
   aggregation: ReportDefinition["aggregations"][number],
@@ -98,7 +99,10 @@ export function assertReportSourceResponse(response: { status: number }, payload
     payload && typeof payload === "object" && "code" in payload
       ? (payload as { code?: unknown }).code
       : undefined;
-  if (response.status === 422 && errorCode === REPORTING_QUERY_ROW_LIMIT_CODE) {
+  if (
+    response.status === 422 &&
+    [REPORTING_QUERY_ROW_LIMIT_CODE, REPORTING_QUERY_BYTE_LIMIT_CODE].includes(errorCode as string)
+  ) {
     throw new ServiceError(422, REPORT_SNAPSHOT_LIMIT_MESSAGE);
   }
   if (response.status === 422)
