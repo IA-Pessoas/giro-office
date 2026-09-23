@@ -954,6 +954,14 @@ async function lock(transaction: ContabilPrisma, key: string) {
   await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
 }
 
+/**
+ * Volta ao papel da conexão antes de gravar em triagem.monthly: giro_user_runtime só tem
+ * SELECT nessa tabela (migration 20260918160000), e o create/update caía em 42501.
+ */
+async function resetRlsRole(transaction: ContabilPrisma): Promise<void> {
+  await transaction.$executeRaw`RESET ROLE`;
+}
+
 async function setRlsContext(transaction: ContabilPrisma, organizationId: string): Promise<void> {
   await transaction.$executeRaw`SET LOCAL ROLE "giro_user_runtime"`;
   await transaction.$executeRaw`SELECT set_config('app.organization_id', ${organizationId}, true)`;
@@ -1100,6 +1108,7 @@ export function createDocumentsService(
               String(input.competence),
             );
             const now = new Date();
+            await resetRlsRole(transaction);
             return transaction.triageMonthly.create({
               data: {
                 ...identity,
@@ -1199,6 +1208,7 @@ export function createDocumentsService(
           const data: JsonRecord = billing
             ? { billing_amount: value }
             : { checklist: { ...currentChecklist, [field]: input.status }, item_notes: nextNotes };
+          await resetRlsRole(transaction);
           const updated = await transaction.triageMonthly.update({
             where: { id },
             data: { ...data, updated_at: new Date() },
