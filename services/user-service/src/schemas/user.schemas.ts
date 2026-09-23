@@ -18,7 +18,7 @@ export const userIdParamsSchema = z.object({
 export const createUserBodySchema = z
   .object({
     name: z.string().trim().min(1, "name e obrigatorio."),
-    login: z.string().trim().min(1, "login e obrigatorio."),
+    login: z.string().trim().toLowerCase().min(1, "login e obrigatorio."),
     password: z.string().min(1, "password e obrigatorio."),
     department_id: z.string().trim().min(1, "department_id e obrigatorio."),
     permission: z.number().int(),
@@ -64,7 +64,7 @@ export const createUserBodySchema = z
 export const updateUserBodySchema = z
   .object({
     name: z.string().trim().min(1).optional(),
-    login: z.string().trim().min(1).optional(),
+    login: z.string().trim().toLowerCase().min(1).optional(),
     password: z.string().min(1).optional(),
     department_id: z.string().trim().min(1).optional(),
     permission: z.number().int().optional(),

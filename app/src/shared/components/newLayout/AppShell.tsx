@@ -51,6 +51,7 @@ import {
   useMarkRhNotificationReadMutation,
   useRhNotifications,
 } from "@modules/rh/hooks/useRhRequests";
+import { useNewTiRequestAlerts } from "@modules/ti/hooks/useNewTiRequestAlerts";
 import { useFetch, useMe } from "@shared/hooks";
 import { taskOperationalNotificationService } from "@shared/services/taskOperationalNotificationService";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
@@ -357,6 +358,7 @@ export function AppShell({
     enabled: !isPlatformSuperAdmin && moduleAccessMap.rh?.canView === true,
   });
   const markRhNotificationReadMutation = useMarkRhNotificationReadMutation();
+  useNewTiRequestAlerts(!isPlatformSuperAdmin && moduleAccessMap.ti?.isAdmin === true);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);

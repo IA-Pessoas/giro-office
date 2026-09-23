@@ -24,6 +24,7 @@ import {
 import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
+  getContabilCompletionPercent,
   getCurrentContabilCompetence,
   rollbackContabilFieldValue,
   type ContabilControlFieldSaveStatus,
@@ -86,6 +87,12 @@ export function ContabilControlSection({
         status: fieldStatuses[fieldDefinition.field],
       })),
     [control, fieldStatuses],
+  );
+
+  const completedCount = checklistItems.filter((item) => item.checked).length;
+  const completionPercent = getContabilCompletionPercent(
+    completedCount,
+    checklistItems.length,
   );
 
   const notesValue = control?.notes ?? "";
@@ -362,6 +369,24 @@ export function ContabilControlSection({
                 <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
                   Marque cada atividade concluída ao longo do fechamento da competência.
                 </p>
+                <div className="mt-3 flex items-center gap-3">
+                  <div
+                    role="progressbar"
+                    aria-label="Conclusão da competência"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={completionPercent}
+                    className="h-2 w-40 overflow-hidden rounded-full bg-gray-200 dark:bg-slate-700"
+                  >
+                    <div
+                      className={`h-full rounded-full ${completionPercent === 100 ? "bg-emerald-500" : "bg-blue-500"}`}
+                      style={{ width: `${completionPercent}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium tabular-nums text-gray-700 dark:text-slate-300">
+                    {`${completionPercent}% concluído (${completedCount}/${checklistItems.length})`}
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center gap-3 text-sm text-gray-700 dark:text-slate-300">

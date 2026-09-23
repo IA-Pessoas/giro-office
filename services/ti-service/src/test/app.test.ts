@@ -195,9 +195,9 @@ describe("ti-service app", () => {
 
     const extensionNumberSchema = {
       type: "string",
-      minLength: 4,
+      minLength: 3,
       maxLength: 4,
-      pattern: "^[0-9]{4}$",
+      pattern: "^[0-9]{3,4}$",
       example: "1001",
     };
 

@@ -142,7 +142,9 @@ describe("AuthService", () => {
       "$argon2id$v=19$m=19456,p=1,t=2$lktGNqJmnbIyj6tMoe+a8Q$HRtIIMh3LPpaIs9yyun/WOjqfivhgr4Nt3m9wsIkTsQ",
     );
     expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { login: "account" } }),
+      expect.objectContaining({
+        where: { login: { equals: "account", mode: "insensitive" } },
+      }),
     );
   });
 

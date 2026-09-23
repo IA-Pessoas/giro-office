@@ -2,8 +2,8 @@ import { z } from "zod";
 
 import { paginationQuerySchema } from "./pagination.schemas.js";
 
-const tiExtensionNumberSchema = z.string().regex(/^[0-9]{4}$/, {
-  message: "number deve conter exatamente 4 dígitos.",
+const tiExtensionNumberSchema = z.string().regex(/^[0-9]{3,4}$/, {
+  message: "number deve conter 3 ou 4 dígitos.",
 });
 
 export const tiExtensionIdParamsSchema = z

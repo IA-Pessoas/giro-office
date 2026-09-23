@@ -24,6 +24,7 @@ import type { ContabilCompetence, ContabilControl } from "../types";
 import { CONTABIL_CONTROL_CHECKLIST_FIELDS } from "./contabilControlFields";
 import {
   filterContabilPortfolioRows,
+  getContabilCompletionPercent,
   getCurrentContabilCompetence,
 } from "./contabilControlSection.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
@@ -331,7 +332,7 @@ export function ContabilPortfolioSection() {
                           "—"
                         ) : (
                           <div className="flex items-center gap-2">
-                            <span>{`${progress}/${totalChecks}`}</span>
+                            <span>{`${progress}/${totalChecks} · ${getContabilCompletionPercent(progress, totalChecks)}%`}</span>
                             <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200 dark:bg-slate-700" aria-hidden="true">
                               <div
                                 className={`h-full rounded-full ${progress === totalChecks ? "bg-emerald-500" : "bg-blue-500"}`}

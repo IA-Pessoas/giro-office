@@ -2185,6 +2185,7 @@ const handlers = {
         title: uniqueText("Smoke TI Request"),
         description: "Smoke TI request created by the workspace harness.",
         category_id: requireState("tiRequestCategoryId"),
+        anydesk_code: "123456789",
         urgency: "Medium",
       },
     });

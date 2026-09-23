@@ -11,6 +11,10 @@ export function getCurrentContabilCompetence(date = new Date()): ContabilCompete
   return `${year}-${month}` as ContabilCompetence;
 }
 
+export function getContabilCompletionPercent(completed: number, total: number): number {
+  return total > 0 ? Math.round((completed / total) * 100) : 0;
+}
+
 export type ContabilControlFieldSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export function createContabilFieldStatusMap(

@@ -30,6 +30,7 @@ import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
   filterContabilPortfolioRows,
+  getContabilCompletionPercent,
   getCurrentContabilCompetence,
   rollbackContabilFieldValue,
   updateContabilControlFieldStatus,
@@ -117,6 +118,15 @@ await (async () => {
       [1],
     );
     assert.equal(filterContabilPortfolioRows(rows, "", { regime: "" }).length, 3);
+  });
+
+  await runTest("checklist mensal expõe porcentagem de conclusão e grafia Regerar", () => {
+    assert.equal(getContabilCompletionPercent(0, 17), 0);
+    assert.equal(getContabilCompletionPercent(5, 17), 29);
+    assert.equal(getContabilCompletionPercent(17, 17), 100);
+    assert.equal(getContabilCompletionPercent(0, 0), 0);
+    assert.equal(CONTABIL_CONTROL_FIELDS[0].label, "Regerar lançamentos contábeis");
+    assert.match(readWorkspaceSource("./components/ContabilControlSection.tsx"), /% concluído/);
   });
 
   await runTest("carteira associa o fechamento e o controle às colunas corretas", () => {

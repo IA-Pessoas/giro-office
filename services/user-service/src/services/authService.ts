@@ -216,8 +216,10 @@ class AuthService {
 
   async login({ login, password }: LoginRequest): Promise<IssuedSession> {
     const normalizedLogin = login.trim();
+    // ponytail: users_login_key is case-sensitive, so legacy "Ana" + "ana" would both match;
+    // add a unique index on lower(login) if that ever collides.
     const user = await prismaClient.user.findFirst({
-      where: { login: normalizedLogin },
+      where: { login: { equals: normalizedLogin, mode: "insensitive" } },
       include: {
         organization: { select: { id: true, status: true } },
         department: {
