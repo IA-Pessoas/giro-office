@@ -3652,16 +3652,18 @@ const handlers = {
       pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
+  // /organizations só enxerga a organização da sessão: ler a própria dá 200 e alterar a
+  // organização temporária criada acima dá 404 (isolamento entre tenants, PR #1268).
   async organizationGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      path: `/organizations/${requireState("tempOrganizationId")}`,
+      path: `/organizations/${requireState("session").organization_id}`,
     });
   },
 
   async organizationPatchStatus(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [404],
       path: `/organizations/${requireState("tempOrganizationId")}/status`,
       json: { status: "active" },
     });
@@ -3669,7 +3671,7 @@ const handlers = {
 
   async organizationPatchSubscriptionPlan(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [404],
       path: `/organizations/${requireState("tempOrganizationId")}/subscription-plan`,
       json: { subscription_plan: "smoke-plan" },
     });
@@ -3677,7 +3679,7 @@ const handlers = {
 
   async organizationPatchLogoUrl(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [404],
       path: `/organizations/${requireState("tempOrganizationId")}/logo-url`,
       json: { logo_url: "https://example.com/smoke-logo.png" },
     });
