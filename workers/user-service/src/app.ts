@@ -43,6 +43,8 @@ import type { UserAuditRecorder } from "./audit.js";
 import {
   ACTIVE_MODULE_KEYS,
   activeOrganizationId,
+  assertCanManageTarget,
+  assertModulesWithinActor,
   authenticatePlatformValidationRequest,
   authenticateUserRequest,
   type PlatformIdentity,
@@ -595,8 +597,22 @@ const USER_MUTABLE_FIELDS = [
   "first_owner_flag",
 ] as const;
 
+/** Checa o alvo antes do storage: senão a foto do owner seria trocada antes do 403. */
+async function assertPhotoTarget(
+  db: UserPrismaClient,
+  auth: UserAuthContext,
+  userId: string,
+): Promise<void> {
+  const target = await db.user.findFirst({
+    where: organizationUserWhere(userId, auth.organizationId),
+    select: { type: true },
+  });
+  assertCanManageTarget(auth, target);
+}
+
+/** Criar ou promover owner é só do owner. Módulos seguem o teto de assertModulesWithinActor. */
 function isOwnerMutation(input: Record<string, unknown>): boolean {
-  return input.type === "owner" || input.first_owner_flag === true || input.modules !== undefined;
+  return input.type === "owner" || input.first_owner_flag === true;
 }
 
 async function updateOrganizationUser(
@@ -605,12 +621,14 @@ async function updateOrganizationUser(
   organizationId: string,
   input: Record<string, unknown>,
   hashPassword: (password: string) => Promise<string> = defaultHashPassword,
+  actor?: UserAuthContext,
 ): Promise<Row> {
   const existing = await db.user.findFirst({
     where: organizationUserWhere(userId, organizationId),
     select: userSelect(),
   });
   if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
+  if (actor) assertCanManageTarget(actor, existing);
   if (input.organization_id !== undefined && input.organization_id !== organizationId) {
     throw new ServiceError(403, "Organizacao da requisicao nao confere.");
   }
@@ -722,6 +740,7 @@ async function updateOrganizationUser(
     ) {
       modulesToApply = withDefaultSelfServiceModules(modulesToApply, effectivePermission);
     }
+    if (actor && modulesToApply) assertModulesWithinActor(actor, modulesToApply);
     if (modulesToApply && Object.keys(modulesToApply).length > 0) {
       const permissionUpdate = await transaction.permission.updateMany({
         where: { user_id: userId, organization_id: organizationId },
@@ -770,6 +789,7 @@ async function deactivateOrganizationUser(
   db: UserPrismaClient,
   userId: string,
   organizationId: string,
+  actor?: UserAuthContext,
 ): Promise<void> {
   if (!db.$transaction) {
     throw new ServiceError(503, "Desativação de usuário não configurada com transação.");
@@ -781,6 +801,7 @@ async function deactivateOrganizationUser(
         select: userSelect(),
       });
       if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
+      if (actor) assertCanManageTarget(actor, existing);
       if (existing.type === "owner" && existing.status === "active") {
         const owners = await transaction.user.count({
           where: { ...organizationUsersWhere(organizationId), type: "owner", status: "active" },
@@ -934,12 +955,21 @@ async function updatePermissionAtomically(
   userId: string,
   organizationId: string,
   modules: Record<string, number>,
+  actor?: UserAuthContext,
 ): Promise<Row | null> {
   if (!db.$transaction) {
     throw new ServiceError(503, "Atualização de permissões não configurada com transação.");
   }
+  if (actor) assertModulesWithinActor(actor, modules);
   return db.$transaction(
     async (transaction) => {
+      if (actor) {
+        const target = await transaction.user.findFirst({
+          where: organizationUserWhere(userId, organizationId),
+          select: { type: true },
+        });
+        assertCanManageTarget(actor, target);
+      }
       const updated = await transaction.permission.updateMany({
         where: { user_id: userId, organization_id: organizationId },
         data: modules,
@@ -1120,6 +1150,7 @@ async function createOrganizationUser(
   organizationId: string,
   input: Record<string, unknown>,
   hashPassword: (password: string) => Promise<string>,
+  actor?: UserAuthContext,
 ): Promise<Row> {
   const department = await requireDepartmentInOrganization(
     db,
@@ -1134,6 +1165,7 @@ async function createOrganizationUser(
   const permission =
     type === "owner" ? 2 : type === "admin" && requestedPermission >= 2 ? 1 : requestedPermission;
   const modules = modulesForCreate(type, permission, department.name, input.modules);
+  if (actor) assertModulesWithinActor(actor, modules);
   const password = await hashPassword(String(input.password));
 
   const run = async (transaction: UserPrismaClient): Promise<Row> => {
@@ -1455,6 +1487,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
           auth.organizationId,
           input,
           options.hashPassword ?? defaultHashPassword,
+          auth,
         );
       } catch (error) {
         if (isUniqueViolation(error)) throw new ServiceError(409, "Login já cadastrado.");
@@ -1497,6 +1530,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       requireManageUsers(auth);
       await requireCsrf(c.req.raw, auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
+      await assertPhotoTarget(db, auth, id);
       const { file, extension } = await parseUserPhoto(c);
       const storage = userPhotoStorage(envOf(c, options), options);
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
@@ -1532,6 +1566,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       requireManageUsers(auth);
       await requireCsrf(c.req.raw, auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
+      await assertPhotoTarget(db, auth, id);
       const storage = userPhotoStorage(envOf(c, options), options);
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
       await requirePrivatePhotoBucket(storage);
@@ -1579,6 +1614,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         auth.organizationId,
         body,
         options.hashPassword ?? defaultHashPassword,
+        selfPasswordUpdate ? undefined : auth,
       );
       await options.audit?.({
         actorUserId: auth.userId,
@@ -1598,7 +1634,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       requireManageUsers(auth);
       await requireCsrf(c.req.raw, auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
-      await deactivateOrganizationUser(db, id, auth.organizationId);
+      await deactivateOrganizationUser(db, id, auth.organizationId, auth);
       await options.audit?.({
         actorUserId: auth.userId,
         organizationId: auth.organizationId,
@@ -1632,11 +1668,17 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
   app.put("/user/permission/:userId", async (c) =>
     withDb(c, options, async (db) => {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
-      requireOwner(auth);
+      requireManageUsers(auth);
       await requireCsrf(c.req.raw, auth);
       const { userId } = parse(permissionUserIdParamsSchema, c.req.param());
       const modules = parse(updatePermissionBodySchema, await jsonBody(c));
-      const permission = await updatePermissionAtomically(db, userId, auth.organizationId, modules);
+      const permission = await updatePermissionAtomically(
+        db,
+        userId,
+        auth.organizationId,
+        modules,
+        auth,
+      );
       await options.audit?.({
         actorUserId: auth.userId,
         organizationId: auth.organizationId,

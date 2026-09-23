@@ -1505,3 +1505,120 @@ describe("user Worker", () => {
     expect(db.permission.updateMany).not.toHaveBeenCalled();
   });
 });
+
+describe("admin de TI gerencia usuários com teto de permissão", () => {
+  // Perfil do Vinicius: admin de Tecnologia, ti=3 e rh=1.
+  const tiAdmin = () =>
+    forwardedHeaders({
+      "x-auth-type": "admin",
+      "x-auth-modules": JSON.stringify({ ti: 3, rh: 1 }),
+      "content-type": "application/json",
+    });
+  const nonOwnerTarget = () => ({
+    ...user(),
+    type: "user",
+    first_owner_flag: false,
+    permission: 1,
+  });
+  const newUser = (extra: Record<string, unknown> = {}) => ({
+    name: "Novo",
+    login: `novo-${Math.random()}@example.com`,
+    password: "secret",
+    department_id: "dep-1",
+    permission: 1,
+    type: "user",
+    ...extra,
+  });
+  const request = (
+    app: ReturnType<typeof createUserWorkerApp>,
+    method: string,
+    path: string,
+    body?: unknown,
+  ) =>
+    app.request(`https://user.test${path}`, {
+      method,
+      headers: tiAdmin(),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+
+  it("lista e cria usuário dentro do próprio nível", async () => {
+    const db = prisma();
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword: async () => "h",
+    } as never);
+
+    expect((await request(app, "GET", "/user")).status).toBe(200);
+    const created = await request(app, "POST", "/user", newUser({ modules: { ti: 2, rh: 1 } }));
+
+    expect(created.status).toBe(201);
+    expect(db.user.create).toHaveBeenCalled();
+  });
+
+  it("não concede módulo acima do próprio nível, nem via admin de outro departamento", async () => {
+    const db = prisma();
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword: async () => "h",
+    } as never);
+
+    const fiscal = await request(app, "POST", "/user", newUser({ modules: { fiscal: 2 } }));
+    expect(fiscal.status).toBe(403);
+
+    // Admin do Fiscal recebe fiscal=3 na normalização do servidor.
+    db.department.findFirst.mockResolvedValue({
+      id: "dep-1",
+      organization_id: ORGANIZATION_ID,
+      name: "Fiscal",
+    });
+    const fiscalAdmin = await request(app, "POST", "/user", newUser({ type: "admin" }));
+    expect(fiscalAdmin.status).toBe(403);
+    expect(db.user.create).not.toHaveBeenCalled();
+  });
+
+  it("não cria owner nem altera, desativa ou reconfigura um owner", async () => {
+    const db = prisma(); // user() é owner
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword: async () => "h",
+    } as never);
+
+    expect((await request(app, "POST", "/user", newUser({ type: "owner" }))).status).toBe(403);
+    expect((await request(app, "PUT", `/user/${USER_ID}`, { name: "Outro" })).status).toBe(403);
+    expect((await request(app, "DELETE", `/user/${USER_ID}`)).status).toBe(403);
+    expect((await request(app, "PUT", `/user/permission/${USER_ID}`, { ti: 1 })).status).toBe(403);
+    expect(db.permission.updateMany).not.toHaveBeenCalled();
+    // Foto: a checagem vem antes do storage (senão a do owner seria trocada antes do 403).
+    expect((await request(app, "DELETE", `/user/${USER_ID}/photo`)).status).toBe(403);
+  });
+
+  it("salva permissões de não-owner até o próprio nível", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue(nonOwnerTarget());
+    const app = createUserWorkerApp({
+      env: env(),
+      prisma: db,
+      hashPassword: async () => "h",
+    } as never);
+
+    expect((await request(app, "PUT", `/user/permission/${USER_ID}`, { ti: 3 })).status).toBe(200);
+    expect((await request(app, "PUT", `/user/permission/${USER_ID}`, { contabil: 2 })).status).toBe(
+      403,
+    );
+  });
+
+  it("quem tem TI abaixo de admin continua sem acesso", async () => {
+    const app = createUserWorkerApp({ env: env(), prisma: prisma() });
+    const response = await app.request("https://user.test/user", {
+      headers: forwardedHeaders({
+        "x-auth-type": "admin",
+        "x-auth-modules": JSON.stringify({ ti: 2, rh: 1 }),
+      }),
+    });
+
+    expect(response.status).toBe(403);
+  });
+});
