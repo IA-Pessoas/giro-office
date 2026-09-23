@@ -16,8 +16,8 @@ import "express-async-errors";
 import type { TaskServiceEnv } from "./config/env.js";
 import { createAiTaskExtractionProvider } from "./integrations/aiTaskExtraction.js";
 import { requireCommercialServiceToken } from "./middlewares/requireCommercialServiceToken.js";
+import { nodeDeps } from "./nodeDeps.js";
 import { buildTaskServiceOpenApiSpec } from "./openapi/spec.js";
-import prismaClient from "./prisma/index.js";
 import {
   createDepsTasksRoutes,
   type DepsTasksRouteDeps,
@@ -58,6 +58,7 @@ import { ProjectWizardExtractionService } from "./services/projectWizardExtracti
 import { ProjectWizardService } from "./services/projectWizardService.js";
 import { TaskAttachmentService } from "./services/taskAttachmentService.js";
 import { SupabaseTaskAttachmentStorage } from "./services/taskAttachmentStorage.js";
+import { TaskCrudService } from "./services/taskCrudService.js";
 import { TaskReportingService } from "./services/taskReportingService.js";
 
 const PROJECT_WIZARD_EXTRACTION_JSON_BODY_MAX_BYTES =
@@ -98,7 +99,13 @@ export function createTaskApp(
     ? createDepsTasksRoutes(options.depsTasksService)
     : depsTasksRoutes;
   const resolvedProjectWizardRoutes = createProjectWizardRoutes({
-    service: options?.projectWizardService ?? new ProjectWizardService(),
+    service:
+      options?.projectWizardService ??
+      new ProjectWizardService({
+        db: nodeDeps.prisma,
+        audit: nodeDeps.audit,
+        taskService: new TaskCrudService(nodeDeps.prisma, nodeDeps.audit, nodeDeps.projectProgress),
+      }),
     extractionService:
       options?.projectWizardExtractionService ??
       new ProjectWizardExtractionService(
@@ -109,6 +116,7 @@ export function createTaskApp(
           model: env.openaiModel,
           timeoutMs: env.aiExtractionTimeoutMs,
         }),
+        nodeDeps.prisma,
       ),
     extractionRateLimit: createRateLimitMiddleware({
       key: "task-service:project-wizard-extract-tasks",
@@ -119,12 +127,13 @@ export function createTaskApp(
     }),
   });
   const internalReportingService =
-    options?.internalReportingService ?? new TaskReportingService(prismaClient);
+    options?.internalReportingService ?? new TaskReportingService(nodeDeps.prisma);
   const commercialTaskBillingProjectionService =
-    options?.commercialTaskBillingProjectionService ?? new CommercialTaskBillingProjectionService();
+    options?.commercialTaskBillingProjectionService ??
+    new CommercialTaskBillingProjectionService(nodeDeps.prisma);
   const commercialProspectingCloseService =
     options?.commercialProspectingCloseService ??
-    new CommercialProspectingCloseService(prismaClient);
+    new CommercialProspectingCloseService(nodeDeps.prisma);
   const taskAttachmentRoutes = createTaskAttachmentRoutes({
     service:
       options?.taskAttachmentService ??
@@ -136,6 +145,8 @@ export function createTaskApp(
           ),
           env.taskAttachmentStorageBucket || "TaskAttachmentsPrivate",
         ),
+        nodeDeps.prisma,
+        nodeDeps.audit,
       ),
     uploadRateLimit: createRateLimitMiddleware({
       key: "task-service:task-attachment-upload",

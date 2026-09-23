@@ -47,7 +47,11 @@ describe("TaskPostponementService", () => {
   });
 
   it("prorroga em uma transação, preserva o histórico e notifica responsáveis e admin", async () => {
-    const service = new TaskPostponementService(() => new Date("2026-10-01T12:00:00.000Z"));
+    const service = new TaskPostponementService(
+      prismaMock as never,
+      auditMock as never,
+      () => new Date("2026-10-01T12:00:00.000Z"),
+    );
 
     await expect(
       service.create({
@@ -87,7 +91,11 @@ describe("TaskPostponementService", () => {
   });
 
   it("rejeita tarefa sem elegibilidade ou previsão que não avança", async () => {
-    const service = new TaskPostponementService(() => new Date("2026-09-17T12:00:00.000Z"));
+    const service = new TaskPostponementService(
+      prismaMock as never,
+      auditMock as never,
+      () => new Date("2026-09-17T12:00:00.000Z"),
+    );
     prismaMock.task.findFirst.mockResolvedValueOnce({ ...task, status: "Paralisado" });
 
     await expect(
@@ -118,7 +126,11 @@ describe("TaskPostponementService", () => {
   });
 
   it("rejeita previsão que ainda não venceu", async () => {
-    const service = new TaskPostponementService(() => new Date("2026-09-17T12:00:00.000Z"));
+    const service = new TaskPostponementService(
+      prismaMock as never,
+      auditMock as never,
+      () => new Date("2026-09-17T12:00:00.000Z"),
+    );
     prismaMock.task.findFirst.mockResolvedValueOnce({
       ...task,
       prevision_date: new Date("2026-09-17T00:00:00.000Z"),
@@ -139,7 +151,7 @@ describe("TaskPostponementService", () => {
   });
 
   it("não revela nem altera tarefa de outra organização", async () => {
-    const service = new TaskPostponementService();
+    const service = new TaskPostponementService(prismaMock as never, auditMock as never);
     prismaMock.task.findFirst.mockResolvedValue(null);
 
     await expect(
@@ -161,7 +173,11 @@ describe("TaskPostponementService", () => {
   });
 
   it("usa a previsão atual de cada prorrogação como histórico da próxima", async () => {
-    const service = new TaskPostponementService(() => new Date("2026-10-01T12:00:00.000Z"));
+    const service = new TaskPostponementService(
+      prismaMock as never,
+      auditMock as never,
+      () => new Date("2026-10-01T12:00:00.000Z"),
+    );
     const secondCurrentDate = new Date("2026-09-20T00:00:00.000Z");
     prismaMock.task.findFirst
       .mockResolvedValueOnce(task)
@@ -196,7 +212,7 @@ describe("TaskPostponementService", () => {
   });
 
   it("lista as prorrogações em ordem cronológica", async () => {
-    const service = new TaskPostponementService();
+    const service = new TaskPostponementService(prismaMock as never, auditMock as never);
     const history = [
       { id: "first", author_id: "user-9" },
       { id: "second", author_id: "user-9" },

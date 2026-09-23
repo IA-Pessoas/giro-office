@@ -6,8 +6,8 @@ import {
   ServiceError,
 } from "@workspace/shared";
 
-import * as audit from "../integrations/audit.js";
-import prismaClient from "../prisma/index.js";
+import type { TaskAudit } from "../integrations/audit.js";
+import type prismaClient from "../prisma/index.js";
 import type { TaskAttachmentMimeType, TaskAttachmentStorage } from "./taskAttachmentStorage.js";
 
 type AttachmentAccessInput = {
@@ -19,7 +19,11 @@ type AttachmentAccessInput = {
 };
 
 export class TaskAttachmentService {
-  constructor(private readonly storage: TaskAttachmentStorage) {}
+  constructor(
+    private readonly storage: TaskAttachmentStorage,
+    private readonly prisma: typeof prismaClient,
+    private readonly audit: TaskAudit,
+  ) {}
 
   async upload(
     input: AttachmentAccessInput & {
@@ -38,7 +42,7 @@ export class TaskAttachmentService {
     });
 
     try {
-      return await prismaClient.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
         const attachment = await tx.taskAttachment.create({
           data: {
             task_id: task.id,
@@ -57,7 +61,7 @@ export class TaskAttachmentService {
             created_at: true,
           },
         });
-        await audit.createLog({
+        await this.audit.createLog({
           userId: input.user_id,
           organizationId: task.organization_id,
           action: "Anexo de Tarefa",
@@ -86,7 +90,7 @@ export class TaskAttachmentService {
 
   async list(input: AttachmentAccessInput) {
     const task = await this.getTaskWithAccess("GET", "/task/attachment/list", input);
-    return prismaClient.taskAttachment.findMany({
+    return this.prisma.taskAttachment.findMany({
       where: { task_id: task.id, organization_id: task.organization_id, deleted_at: null },
       orderBy: { created_at: "desc" },
       select: {
@@ -102,7 +106,7 @@ export class TaskAttachmentService {
 
   async createAccessUrl(input: AttachmentAccessInput & { attachment_id: string }) {
     const task = await this.getTaskWithAccess("GET", "/task/attachment/access", input);
-    const attachment = await prismaClient.taskAttachment.findFirst({
+    const attachment = await this.prisma.taskAttachment.findFirst({
       where: {
         id: input.attachment_id,
         task_id: task.id,
@@ -117,7 +121,7 @@ export class TaskAttachmentService {
 
   async remove(input: AttachmentAccessInput & { attachment_id: string }) {
     const task = await this.getTaskWithAccess("DELETE", "/task/attachment", input);
-    const result = await prismaClient.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.taskAttachment.updateMany({
         where: {
           id: input.attachment_id,
@@ -128,7 +132,7 @@ export class TaskAttachmentService {
         data: { deleted_at: new Date(), deleted_by: input.user_id },
       });
       if (updated.count === 0) throw new ServiceError(404, "Anexo não encontrado.");
-      await audit.createLog({
+      await this.audit.createLog({
         userId: input.user_id,
         organizationId: task.organization_id,
         action: "Remoção de Anexo de Tarefa",
@@ -143,7 +147,7 @@ export class TaskAttachmentService {
   }
 
   private async getTaskWithAccess(method: string, path: string, input: AttachmentAccessInput) {
-    const task = await prismaClient.task.findFirst({
+    const task = await this.prisma.task.findFirst({
       where: { id: input.task_id, organization_id: input.organization_id },
       select: {
         id: true,

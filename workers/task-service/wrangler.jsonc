@@ -5,10 +5,11 @@
   "workers_dev": false,
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": { "AI_EXTRACTION_MODE": "openai" },
   "services": [
     { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" },
-    { "binding": "USER_SERVICE", "service": "giro-user-service" },
-    { "binding": "PROJECT_SERVICE", "service": "giro-project-service" }
+    { "binding": "PROJECT_SERVICE", "service": "giro-project-service" },
+    { "binding": "USER_SERVICE", "service": "giro-user-service" }
   ],
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
   "observability": { "enabled": true }
