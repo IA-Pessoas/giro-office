@@ -7,6 +7,122 @@ import { InternalReportingService } from "../reporting/internalReportingService.
 const organizationId = "00000000-0000-4000-8000-000000000002";
 
 describe("pessoal internal reporting service", () => {
+  it.each([
+    ["pessoal.ldd", "type"],
+    ["pessoal.obligations", "competence"],
+    ["pessoal.payroll", "advance"],
+    ["pessoal.situations", "status"],
+    ["pessoal.unions", "name"],
+  ])("pagina %s em lotes ordenados e remove o cursor da projeção", async (source, field) => {
+    const records = Array.from({ length: 1002 }, (_, index) => ({
+      id: `row-${String(index).padStart(4, "0")}`,
+      [field]: source === "pessoal.payroll" ? index % 2 === 0 : `value-${index}`,
+    }));
+    const findMany = vi
+      .fn()
+      .mockImplementation((input: { cursor?: { id: string }; skip?: number; take: number }) => {
+        const cursorIndex = input.cursor
+          ? records.findIndex((row) => row.id === input.cursor?.id)
+          : -1;
+        const start = cursorIndex < 0 ? 0 : cursorIndex + (input.skip ?? 0);
+        return Promise.resolve(records.slice(start, start + input.take));
+      });
+    const delegateBySource = {
+      "pessoal.ldd": { lddPessoal: { findMany } },
+      "pessoal.obligations": { obrigationsPessoal: { findMany } },
+      "pessoal.payroll": { payroll: { findMany } },
+      "pessoal.situations": { situationsPessoal: { findMany } },
+      "pessoal.unions": { unionPessoal: { findMany } },
+    };
+    const transactionClient = delegateBySource[source as keyof typeof delegateBySource];
+    const transaction = vi.fn(
+      async (read: (client: unknown) => Promise<unknown>, _options: unknown) =>
+        read(transactionClient),
+    );
+    const service = new InternalReportingService({
+      ...transactionClient,
+      $transaction: transaction,
+    } as never);
+
+    const result = await service.extract({
+      organizationId,
+      source: source as never,
+      fields: [field],
+      limit: 1001,
+    });
+
+    expect(result.rows).toHaveLength(1001);
+    expect(result.rows[0]).toEqual({ [field]: records[0]?.[field] });
+    expect(result.rows[result.rows.length - 1]).toEqual({ [field]: records[1000]?.[field] });
+    expect(result.reachedLimit).toBe(true);
+    expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "RepeatableRead",
+      maxWait: 5000,
+      timeout: 30000,
+    });
+    expect(findMany).toHaveBeenCalledTimes(2);
+    expect(findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        cursor: { id: "row-0999" },
+        skip: 1,
+        orderBy: { id: "asc" },
+        take: 2,
+        select: { [field]: true, id: true },
+      }),
+    );
+  });
+
+  it("paginates consultas filtradas com cursor estável sem expor o ID", async () => {
+    const records = Array.from({ length: 1002 }, (_, index) => ({
+      id: `ldd-${String(index).padStart(4, "0")}`,
+      type: `value-${index}`,
+    }));
+    const findMany = vi
+      .fn()
+      .mockImplementation((input: { cursor?: { id: string }; skip?: number; take: number }) => {
+        const cursorIndex = input.cursor
+          ? records.findIndex((row) => row.id === input.cursor?.id)
+          : -1;
+        const start = cursorIndex < 0 ? (input.skip ?? 0) : cursorIndex + (input.skip ?? 0);
+        return Promise.resolve(records.slice(start, start + input.take));
+      });
+    const transaction = vi.fn(
+      async (read: (client: unknown) => Promise<unknown>, _options: unknown) =>
+        read({ lddPessoal: { findMany } }),
+    );
+    const service = new InternalReportingService({ $transaction: transaction } as never);
+
+    const result = await service.extract({
+      organizationId,
+      source: "pessoal.ldd",
+      fields: ["type"],
+      limit: 1000,
+      query: {
+        filters: [{ field: "type", operator: "eq", parameter: "target", value: "value-1001" }],
+      },
+    });
+
+    expect(result).toEqual({ rows: [{ type: "value-1001" }], reachedLimit: false });
+    expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "RepeatableRead",
+      maxWait: 5000,
+      timeout: 30000,
+    });
+    expect(findMany).toHaveBeenCalledTimes(11);
+    const queries = findMany.mock.calls.map(([query]) => query);
+    expect(queries[0]).toMatchObject({
+      orderBy: { id: "asc" },
+      take: 101,
+      select: { id: true, type: true },
+    });
+    expect(queries[0]?.cursor).toBeUndefined();
+    expect(queries.slice(1).every((query) => query.skip === 1 && query.cursor?.id)).toBe(true);
+    expect(queries.slice(1).map((query) => query.cursor?.id)).toEqual(
+      Array.from({ length: 10 }, (_, index) => records[(index + 1) * 100 - 1]?.id),
+    );
+    expect(result.rows.some((row) => "id" in row)).toBe(false);
+  });
+
   it("filtra LDD por organização, limita a origem e projeta somente campos publicados", async () => {
     const findMany = vi.fn().mockResolvedValue([
       { type: "FGTS", id: "hidden-id", status: "Regular" },
