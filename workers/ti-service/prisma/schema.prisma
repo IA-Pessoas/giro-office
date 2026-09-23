@@ -29,6 +29,8 @@ model Organization {
   tiRobotRuns                    TIRobotRun[]
   tiRobots                       TIRobot[]
   termsTecnologia                TermTecnologia[]
+
+  @@map("organizations")
 }
 
 model Department {
@@ -73,6 +75,8 @@ model User {
   requestsTI          TIRequest[]               @relation("TiRequester")
   terms               TermTecnologia[]
   permissions         Permission[]
+
+  @@map("users")
 }
 
 model Permission {

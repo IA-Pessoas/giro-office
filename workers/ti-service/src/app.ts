@@ -910,6 +910,7 @@ export function createTiWorkerApp(options: TiOptions = {}) {
       requestId: c.req.header(REQUEST_ID_HEADER),
       fallbackMessage: "Erro interno no ti-service.",
     });
+    if (serialized.statusCode >= 500) console.error(error);
     return c.json(serialized.body, serialized.statusCode as ContentfulStatusCode);
   });
   return app;

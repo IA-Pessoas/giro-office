@@ -121,6 +121,16 @@ function inventoryServices(database: TiDatabase): TiServices {
   const categories = delegate(database, "inventoryCategoryTecnologia");
   const locations = delegate(database, "inventoryLocationTecnologia");
   const inventory = delegate(database, "inventoryTecnologia");
+  const inventoryUserSelect = {
+    select: { id: true, name: true, full_name: true, department_id: true, organization_id: true },
+  };
+  // Mesmo include do legado (INVENTORY_INCLUDE) na lista e no detalhe.
+  const inventoryInclude = {
+    category: true,
+    location: true,
+    user: inventoryUserSelect,
+    responsible_it_staff: inventoryUserSelect,
+  };
 
   return {
     inventoryCategories: {
@@ -207,28 +217,7 @@ function inventoryServices(database: TiDatabase): TiServices {
               : {}),
             ...userFilter,
           },
-          include: {
-            category: true,
-            location: true,
-            user: {
-              select: {
-                id: true,
-                name: true,
-                full_name: true,
-                department_id: true,
-                organization_id: true,
-              },
-            },
-            responsible_it_staff: {
-              select: {
-                id: true,
-                name: true,
-                full_name: true,
-                department_id: true,
-                organization_id: true,
-              },
-            },
-          },
+          include: inventoryInclude,
           orderBy: { asset_code: "asc" },
           skip,
           take,
@@ -238,7 +227,7 @@ function inventoryServices(database: TiDatabase): TiServices {
         const auth = context(value);
         const result = await inventory.findFirst({
           where: { id, organization_id: auth.organizationId },
-          include: { category: true, location: true },
+          include: inventoryInclude,
         });
         if (!result) throw new ServiceError(404, "Ativo de TI nao encontrado.");
         return result;
