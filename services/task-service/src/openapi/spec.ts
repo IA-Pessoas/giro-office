@@ -721,6 +721,11 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
               in: "query",
               schema: { type: "string", enum: TASK_ASSIGNMENT_FILTER_VALUES },
             },
+            {
+              name: "unique_service_released",
+              in: "query",
+              schema: { type: "boolean" },
+            },
             { name: "page", in: "query", schema: { type: "integer" } },
             { name: "limit", in: "query", schema: { type: "integer" } },
           ],
@@ -742,9 +747,17 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                             type: "array",
                             items: {
                               type: "object",
-                              required: ["id", "isOwn", "isUnassigned"],
+                              required: [
+                                "id",
+                                "client_name",
+                                "project_name",
+                                "isOwn",
+                                "isUnassigned",
+                              ],
                               properties: {
                                 id: { type: "string" },
+                                client_name: { type: "string" },
+                                project_name: { type: "string" },
                                 isOwn: { type: "boolean" },
                                 isUnassigned: { type: "boolean" },
                               },

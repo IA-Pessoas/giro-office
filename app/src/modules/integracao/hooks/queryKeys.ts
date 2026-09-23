@@ -43,6 +43,7 @@ export function integracaoTasksListQueryKey(params: IntegracaoTaskListParams) {
     params.search ?? "",
     params.clientId ?? null,
     params.assignment ?? "",
+    params.uniqueServiceReleased ?? false,
     params.page ?? 1,
     params.limit ?? 20,
   ] as const;

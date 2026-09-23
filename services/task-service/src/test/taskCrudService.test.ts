@@ -203,6 +203,8 @@ describe("TaskCrudService", () => {
     const task = {
       id: "unassigned",
       organization_id: "org-1",
+      client: { name: "Empresa", company_name: null },
+      project: { name: "Projeto" },
       responsible_id: null,
       responsible2_id: null,
       responsible3_id: null,
@@ -1187,6 +1189,8 @@ describe("TaskCrudService", () => {
         name: "Registro 21",
         status: "Em Andamento",
         billing: "Realizar",
+        client: { name: "Empresa", company_name: null },
+        project: { name: "Projeto" },
         responsible_id: "other-user",
         responsible2_id: null,
         responsible3_id: null,
@@ -1218,6 +1222,8 @@ describe("TaskCrudService", () => {
           name: "Registro 21",
           status: "Em Andamento",
           billing: "Realizar",
+          client_name: "Empresa",
+          project_name: "Projeto",
           isOwn: false,
           isUnassigned: false,
         },
@@ -1259,12 +1265,66 @@ describe("TaskCrudService", () => {
     });
   });
 
+  it("listTasks filtra serviços únicos contratados e retorna empresa e projeto", async () => {
+    prismaMock.task.findMany.mockResolvedValue([
+      {
+        id: "task-unique-1",
+        name: "Regularização especial",
+        status: "Em Andamento",
+        billing: "Realizar",
+        hiring_status: "Contratado",
+        client: { name: "Empresa", company_name: "Empresa Alfa" },
+        project: { name: "Projeto migração" },
+        responsible_id: "user-2",
+        responsible2_id: null,
+        responsible3_id: null,
+      },
+    ]);
+    prismaMock.task.count.mockResolvedValue(1);
+
+    const result = await new TaskCrudService().listTasks({
+      organization_id: "org-1",
+      user_id: "user-1",
+      status: "Todos",
+      ref: "",
+      ref_id: "",
+      search: "",
+      unique_service_released: true,
+      page: 1,
+      limit: 20,
+      integracaoLevel: 1,
+    });
+
+    expect(result.data).toMatchObject([
+      {
+        id: "task-unique-1",
+        client_name: "Empresa Alfa",
+        project_name: "Projeto migração",
+      },
+    ]);
+    expect(prismaMock.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: "org-1",
+          hiring_status: "Contratado",
+          client: { is: { service_unique: true } },
+        },
+        select: expect.objectContaining({
+          client: { select: { name: true, company_name: true } },
+          project: { select: { name: true } },
+        }),
+      }),
+    );
+  });
+
   it("listTasks compõe cliente e tarefas sem responsável com o escopo da organização", async () => {
     const clientId = "11111111-1111-4111-8111-111111111111";
     prismaMock.client.findFirst.mockResolvedValue({ id: clientId });
     prismaMock.task.findMany.mockResolvedValue([
       {
         id: "task-1",
+        client: { name: "Empresa", company_name: null },
+        project: { name: "Projeto" },
         responsible_id: null,
         responsible2_id: null,
         responsible3_id: null,
@@ -1364,6 +1424,8 @@ describe("TaskCrudService", () => {
       {
         id: "task-1",
         name: "Tarefa própria",
+        client: { name: "Empresa", company_name: null },
+        project: { name: "Projeto" },
         responsible_id: "user-1",
         responsible2_id: null,
         responsible3_id: null,
@@ -1431,6 +1493,8 @@ describe("TaskCrudService", () => {
       {
         id: "task-1",
         name: "Tarefa própria",
+        client: { name: "Empresa", company_name: null },
+        project: { name: "Projeto" },
         [responsibleField]: "user-1",
       },
     ]);
@@ -1460,6 +1524,8 @@ describe("TaskCrudService", () => {
       {
         id: "task-1",
         name: "Tarefa de terceiro",
+        client: { name: "Empresa", company_name: null },
+        project: { name: "Projeto" },
         responsible_id: "other-user",
         responsible2_id: null,
         responsible3_id: null,

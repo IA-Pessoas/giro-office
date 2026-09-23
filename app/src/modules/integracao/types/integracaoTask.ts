@@ -39,6 +39,8 @@ export interface IntegracaoTaskListItem {
   payment: string | null;
   billing_description: string | null;
   charge_financeiro: boolean;
+  client_name: string;
+  project_name: string;
 }
 
 export interface IntegracaoTaskListResult {
@@ -117,6 +119,7 @@ export interface IntegracaoTaskListParams {
   search?: string;
   clientId?: string;
   assignment?: "assigned" | "unassigned";
+  uniqueServiceReleased?: boolean;
   page?: number;
   limit?: number;
 }
