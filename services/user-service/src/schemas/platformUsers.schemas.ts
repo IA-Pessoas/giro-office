@@ -34,7 +34,7 @@ export const transferPlatformOwnershipBodySchema = z
 export const updatePlatformUserBodySchema = z
   .object({
     name: z.string().trim().min(1).max(255).optional(),
-    login: z.string().trim().min(1).max(255).optional(),
+    login: z.string().trim().toLowerCase().min(1).max(255).optional(),
     password: z.string().min(8).max(255).optional(),
     department_id: z.string().trim().min(1).optional(),
     permission: z.number().int().min(0).max(3).optional(),
