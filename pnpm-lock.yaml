@@ -1868,6 +1868,9 @@ importers:
       hono:
         specifier: 4.12.25
         version: 4.12.25
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
     devDependencies:
       '@biomejs/biome':
         specifier: 2.4.5
@@ -1875,6 +1878,9 @@ importers:
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.2
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
       typescript:
         specifier: 5.3.3
         version: 5.3.3

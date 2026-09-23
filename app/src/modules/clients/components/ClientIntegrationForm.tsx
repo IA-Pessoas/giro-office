@@ -113,8 +113,9 @@ export function ClientIntegrationForm({
               Consultando dados oficiais...
             </span>
           ) : cnpjLookupStatus === "unavailable" ? (
-            <span className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
-              Consulta automática indisponível; preencha os dados manualmente.
+            <span className="text-xs text-amber-700 dark:text-amber-300" role="status">
+              Não foi possível consultar o CNPJ automaticamente. Preencha os dados manualmente;
+              você pode salvar normalmente.
             </span>
           ) : null}
         </label>

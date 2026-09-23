@@ -1,3 +1,9 @@
+import {
+  AUTH_SESSION_COOKIE_NAME,
+  readCookie,
+  validateWorkerSession,
+  WorkerSessionValidationError,
+} from "@workspace/runtime";
 import type { AuditOutcome, AuditQuery, CreateAuditRequestPayload } from "@workspace/shared/audit";
 import { canAccessRoute } from "@workspace/shared/auth";
 import {
@@ -9,12 +15,15 @@ import {
 } from "@workspace/shared/http";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import pg from "pg";
 // Fonte única das regras de autorização: reusa os arquivos do gateway Node em vez de
 // duplicar 18 rotas exatas + 69 matchers, que divergiriam na primeira alteração.
 // São módulos puros, sem Express nem dependência de runtime Node.
 import { getRoutePolicy } from "../../../services/gateway/src/security/policies.js";
 import { isPublicRoute } from "../../../services/gateway/src/security/publicRoutes.js";
 import { normalizeGatewayPath } from "../../../services/gateway/src/security/routeClassification.js";
+// No Node o /dashboard/stats e servido pelo proprio gateway; mesmo SQL, sem copia.
+import { DashboardStatsService } from "../../../services/gateway/src/services/dashboardStatsService.js";
 import {
   authenticateGatewayRequest,
   clearForwardedIdentity,
@@ -24,7 +33,8 @@ import {
 import type { GatewayWorkerEnv } from "./env.js";
 
 type GatewayBindings = { Bindings: GatewayWorkerEnv; Variables: { requestId: string } };
-type GatewayOptions = { env?: GatewayWorkerEnv };
+type DashboardDbClient = Pick<pg.Client, "connect" | "end" | "query">;
+type GatewayOptions = { env?: GatewayWorkerEnv; dashboardDb?: () => DashboardDbClient };
 /**
  * Espelha `services/gateway`: `module` = `permissionModule` do serviceRegistry.
  * A policy não vive aqui: vem de `getRoutePolicy`, a mesma tabela que o Node usa.
@@ -298,6 +308,48 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
       }),
     ),
   );
+
+  // Paridade com services/gateway/src/routes/dashboard.routes.ts: rota do proprio gateway,
+  // nao encaminhada a um servico, entao le o banco direto pelo Hyperdrive.
+  app.get("/dashboard/stats", async (c) => {
+    const env = options.env ?? c.env;
+    const auth = await authenticateGatewayRequest(c.req.raw, env);
+    const policy = getRoutePolicy("GET", "/dashboard/stats");
+    if (!policy || !canAccessRoute({ ...auth, claims: { ...auth.claims } }, policy)) {
+      throw new ServiceError(403, "Acesso negado para esta rota.");
+    }
+    if (!auth.organizationId) throw new ServiceError(401, "Contexto autenticado não informado.");
+    // Sem proxy nao ha servico para validar a sessao; o gateway valida aqui, como os Workers.
+    if (!isServiceBinding(env.USER_SERVICE)) {
+      throw new ServiceError(503, "Validação de sessão indisponível.");
+    }
+    const hasCookie = Boolean(
+      readCookie(c.req.header("cookie") ?? undefined, AUTH_SESSION_COOKIE_NAME),
+    );
+    try {
+      await validateWorkerSession(auth, env.USER_SERVICE, hasCookie ? "cookie" : "bearer", {
+        internalServiceToken: env.INTERNAL_SERVICE_TOKEN,
+      });
+    } catch (error) {
+      if (error instanceof WorkerSessionValidationError) {
+        throw new ServiceError(error.statusCode, error.message);
+      }
+      throw error;
+    }
+
+    const connectionString = env.HYPERDRIVE?.connectionString || env.DATABASE_URL;
+    if (!connectionString)
+      throw new ServiceError(503, "Banco de dados não configurado no gateway.");
+    // Um client por request: conexoes nao podem atravessar requests no Workers.
+    const client = options.dashboardDb?.() ?? new pg.Client({ connectionString });
+    await client.connect();
+    try {
+      const stats = await new DashboardStatsService({ pool: client }).getStats(auth.organizationId);
+      return c.json(createSuccessResponse(stats));
+    } finally {
+      await client.end();
+    }
+  });
 
   app.all("*", async (c) => {
     // Paridade com o `authorize` do Node: path inválido é negado antes de qualquer coisa.
