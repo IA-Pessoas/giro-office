@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
+  MAX_REPORTING_QUERY_LIMIT,
   REQUEST_ID_HEADER,
   ServiceError,
   tiExtensionsReportingCatalog,
@@ -16,7 +17,7 @@ import type {
 import type { ReportsServiceEnv } from "../config/env.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import {
-  assertReportSourceResponse,
+  readReportSourcePayload,
   reportCriteria,
   reportingQueryFields,
   reportResultFields,
@@ -24,7 +25,6 @@ import {
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
-const MAX_TI_EXTENSIONS_REPORTING_LIMIT = 101;
 
 const sources = tiExtensionsReportingCatalog.sources.map(
   ({ keys: _keys, ...source }) => source,
@@ -112,7 +112,7 @@ export class TiExtensionsAdapter implements ReportSourceAdapter {
       ...reportCriteria(definition, input.parameter_values),
       source,
       fields,
-      limit: Math.min(input.limit, MAX_TI_EXTENSIONS_REPORTING_LIMIT),
+      limit: Math.min(input.limit, MAX_REPORTING_QUERY_LIMIT),
     };
     const requestId = input.request_id || randomUUID();
     const signed = createGrant({
@@ -136,8 +136,7 @@ export class TiExtensionsAdapter implements ReportSourceAdapter {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(this.env.sourceTimeoutMs),
       });
-      assertReportSourceResponse(response);
-      const payload: unknown = await response.json();
+      const payload: unknown = await readReportSourcePayload(response);
       if (!response.ok || !isExtractResponse(payload)) {
         throw new Error("Resposta interna inválida.");
       }
