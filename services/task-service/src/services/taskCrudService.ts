@@ -13,6 +13,7 @@ import {
   TASK_ASSIGNMENT_FILTER,
   TASK_BILLING_NOT_REALIZE,
   TASK_BILLING_REALIZE,
+  TASK_HIRING_STATUS_CONTRACTED,
   type TaskAssignmentFilter,
   type TaskBilling,
 } from "../constants/integracaoTask.js";
@@ -117,6 +118,16 @@ const DEPENDENTS_FOR_CREATE_SELECT = {
 } as const;
 
 const ACTIVE_TASK_STATUSES = ["Em Andamento", "A Realizar", "Em Espera"];
+const TASKS_RELEASED_FOR_EXECUTION_WHERE: Prisma.TaskWhereInput = {
+  OR: [
+    { billing: { not: TASK_BILLING_REALIZE } },
+    { hiring_status: TASK_HIRING_STATUS_CONTRACTED },
+  ],
+};
+const TASKS_AWAITING_COMMERCIAL_VALIDATION_WHERE: Prisma.TaskWhereInput = {
+  billing: TASK_BILLING_REALIZE,
+  OR: [{ hiring_status: null }, { hiring_status: { not: TASK_HIRING_STATUS_CONTRACTED } }],
+};
 
 export type TaskDetailRow = TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }> & {
   commercial_validation_pending: boolean;
@@ -522,7 +533,7 @@ export class TaskCrudService {
 
     const dependentCreates = await Promise.all(
       dependents.map((dep: (typeof dependents)[number]) => {
-        let statusDependent =
+        let statusDependent: IntegracaoTaskStatus =
           data.prospecting_status === "Fechado"
             ? INTEGRACAO_TASK_STATUS_IN_PROGRESS
             : INTEGRACAO_TASK_STATUS_TODO;
@@ -687,10 +698,28 @@ export class TaskCrudService {
         : undefined;
 
       if (params.status !== "Todos") {
-        if (isBasicAccess) {
+        if (params.status === INTEGRACAO_TASK_STATUS_WAITING) {
+          andFilters.push({
+            OR: [
+              { status: INTEGRACAO_TASK_STATUS_WAITING },
+              {
+                AND: [
+                  { status: { in: ACTIVE_TASK_STATUSES } },
+                  TASKS_AWAITING_COMMERCIAL_VALIDATION_WHERE,
+                ],
+              },
+            ],
+          });
+        } else if (isBasicAccess) {
           andFilters.push({ status: params.status });
         } else {
           where.status = params.status;
+        }
+        if (
+          params.status === INTEGRACAO_TASK_STATUS_IN_PROGRESS ||
+          params.status === INTEGRACAO_TASK_STATUS_TODO
+        ) {
+          andFilters.push(TASKS_RELEASED_FOR_EXECUTION_WHERE);
         }
       }
 
@@ -733,7 +762,11 @@ export class TaskCrudService {
         prismaClient.task.count({ where }),
         prismaClient.task.count({
           where: {
-            AND: [where, { status: { contains: "andamento", mode: "insensitive" } }],
+            AND: [
+              where,
+              { status: { contains: "andamento", mode: "insensitive" } },
+              TASKS_RELEASED_FOR_EXECUTION_WHERE,
+            ],
           },
         }),
         prismaClient.task.count({
@@ -745,13 +778,17 @@ export class TaskCrudService {
 
       const hasMore = params.page * params.limit < total;
       const data = list.map(
-        ({ responsible_id, responsible2_id, responsible3_id, client, project, ...task }) => ({
-          ...task,
-          client_name: client.company_name?.trim() || client.name,
-          project_name: project.name,
-          isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
-          isUnassigned: responsible_id === null,
-        }),
+        ({ responsible_id, responsible2_id, responsible3_id, client, project, ...task }) => {
+          const commercialValidationPending = isAwaitingCommercialValidation(task);
+          return {
+            ...task,
+            status: commercialValidationPending ? INTEGRACAO_TASK_STATUS_WAITING : task.status,
+            client_name: client.company_name?.trim() || client.name,
+            project_name: project.name,
+            isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
+            isUnassigned: responsible_id === null,
+          };
+        },
       );
 
       return {
