@@ -1,6 +1,10 @@
 import { createHash, createHmac } from "node:crypto";
 
-import { rhHolidayReportingCatalog } from "@workspace/shared";
+import {
+  MAX_REPORTING_QUERY_LIMIT,
+  REPORTING_QUERY_BYTE_LIMIT_CODE,
+  rhHolidayReportingCatalog,
+} from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { RhHolidayAdapter } from "../integrations/rhHolidayAdapter.js";
@@ -65,7 +69,11 @@ describe("RhHolidayAdapter", () => {
     });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "rh.holidays", fields: ["name", "date"], limit: 101 };
+    const body = {
+      source: "rh.holidays",
+      fields: ["name", "date"],
+      limit: MAX_REPORTING_QUERY_LIMIT,
+    };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://rh.test/internal/reporting/extract",
     );
@@ -114,5 +122,43 @@ describe("RhHolidayAdapter", () => {
         request_id: "request-852",
       }),
     ).rejects.toMatchObject({ statusCode: 503 });
+  });
+
+  it("mapeia o limite global de bytes para um erro acionável", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: vi.fn().mockResolvedValue({ code: REPORTING_QUERY_BYTE_LIMIT_CODE }),
+      }),
+    );
+    const adapter = new RhHolidayAdapter({
+      rhServiceUrl: "http://rh.test",
+      reportsInternalToken: "internal-token",
+      reportsGrantSecret: "grant-secret",
+      sourceTimeoutMs: 100,
+    });
+
+    await expect(
+      adapter.preview({
+        definition: {
+          sources: ["rh.holidays"],
+          columns: [{ source: "rh.holidays", field: "name", alias: "name" }],
+          joins: [],
+          filters: [],
+          filter_groups: [],
+          parameters: [],
+          aggregations: [],
+          order_by: [],
+        },
+        organization_id: "10000000-0000-0000-0000-000000000001",
+        limit: MAX_REPORTING_QUERY_LIMIT,
+        request_id: "request-852",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      message: expect.stringContaining("limite global"),
+    });
   });
 });

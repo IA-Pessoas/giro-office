@@ -26,6 +26,7 @@ const pessoalDerivedFields = new Set([
 ]);
 it("rh.attendance: filters derived rows beyond 101 and counts the complete set", async () => {
   const points = Array.from({ length: 150 }, (_, index) => ({
+    id: `point-${String(index).padStart(3, "0")}`,
     clock_in: new Date(2026, 0, 1, 0, index),
     clock_out: index === 149 ? new Date(2026, 0, 2) : null,
   }));
@@ -34,7 +35,13 @@ it("rh.attendance: filters derived rows beyond 101 and counts the complete set",
     $transaction: async function (read) {
       return read(this);
     },
-    point: { findMany: async ({ take, skip = 0 }) => points.slice(skip, skip + take) },
+    point: {
+      findMany: async ({ take, skip = 0, cursor }) => {
+        const cursorIndex = cursor ? points.findIndex((point) => point.id === cursor.id) : -1;
+        const start = cursorIndex < 0 ? skip : cursorIndex + skip;
+        return points.slice(start, start + take);
+      },
+    },
     timeSheets: empty,
     timeBankReleases: empty,
     timeClockRequest: empty,
@@ -69,7 +76,10 @@ for (const source of reportingSources.filter((source) => source.key !== "rh.atte
         source.fields[0];
       const value = (index: number) =>
         field.value_type === "boolean" ? index === 149 : `Value ${String(index).padStart(3, "0")}`;
-      const hasCursor = source.key.startsWith("pessoal.") || source.key.startsWith("fiscal.");
+      const hasCursor =
+        source.key.startsWith("pessoal.") ||
+        source.key.startsWith("fiscal.") ||
+        source.key.startsWith("rh.");
       const rows = Array.from({ length: 150 }, (_, index) => ({
         ...(hasCursor ? { id: `row-${String(index).padStart(3, "0")}` } : {}),
         [field.key]: value(index),
@@ -105,14 +115,17 @@ for (const source of reportingSources.filter((source) => source.key !== "rh.atte
             .map((row) => Object.fromEntries(Object.keys(select).map((key) => [key, row[key]])));
         },
       };
-      const prisma = new Proxy(
+      const emptyDelegate = { findMany: async () => [] };
+      const prisma = new Proxy<Record<PropertyKey, unknown>>(
         {},
         {
           has: (_target, key) => key === "$transaction",
           get: (_target, key) =>
             key === "$transaction"
-              ? async (read) => read(new Proxy({}, { get: () => delegate }))
-              : delegate,
+              ? async (read: (transaction: unknown) => Promise<unknown>) => read(prisma)
+              : source.key === "rh.attendance" && key !== "point"
+                ? emptyDelegate
+                : delegate,
         },
       );
       const Service =
