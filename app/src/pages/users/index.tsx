@@ -164,7 +164,7 @@ export const getServerSideProps = canSSRAdmin<UsersIndexPageProps>(
 
       return {
         props: {
-          me: meResponse.data.user,
+          me: meResponse.data?.data ?? null,
           users: filterAdminUsersByStatus(extractUsersList(usersResponse.data), "active"),
           deps,
         },
