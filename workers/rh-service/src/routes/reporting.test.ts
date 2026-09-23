@@ -126,10 +126,12 @@ describe("rh Worker /internal/reporting", () => {
       success: true,
       data: { rows: [{ name: "Natal", date: "2026-12-25T00:00:00.000Z" }], reachedLimit: false },
     });
+    // Paginação estável (#1267): ordena por id e busca uma linha a mais para saber se há próxima.
     expect(db.holidays.findMany).toHaveBeenCalledWith({
       where: { organization_id: ORGANIZATION_ID },
-      select: { name: true, date: true },
-      take: 6,
+      select: { name: true, date: true, id: true },
+      orderBy: { id: "asc" },
+      take: 7,
     });
     const replay = await extract(app, holidaysBody, grantHeaders(signed));
     expect(replay.status).toBe(403);
