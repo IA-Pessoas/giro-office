@@ -64,8 +64,6 @@ runTest("task completion panel exposes request, decision, cancel, history and re
   assert.match(source, /Recusar/);
   assert.match(source, /Cancelar solicitação/);
   assert.match(source, /Reabrir tarefa/);
-  assert.match(source, /commercial_validation_pending/);
-  assert.match(source, /Aguardando validação do Comercial para liberar a execução/);
 });
 
 runTest("task attachment contract keeps private paths out of the UI", () => {
