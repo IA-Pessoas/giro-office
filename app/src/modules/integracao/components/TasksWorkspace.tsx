@@ -82,6 +82,7 @@ export function TasksWorkspace() {
   const { access: financeiroAccess } = useModuleAccess("financeiro");
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [refFilter, setRefFilter] = useState("");
+  const [uniqueServiceReleased, setUniqueServiceReleased] = useState(false);
   const [assignmentFilter, setAssignmentFilter] = useState<"all" | "assigned" | "unassigned">(
     "all",
   );
@@ -114,13 +115,22 @@ export function TasksWorkspace() {
     () => ({
       status: statusFilter,
       ref: refFilter,
+      uniqueServiceReleased,
       search: debouncedSearch,
       clientId: routeClientId,
       assignment: assignmentFilter === "all" ? undefined : assignmentFilter,
       page,
       limit: TASKS_PAGE_SIZE,
     }),
-    [assignmentFilter, debouncedSearch, page, refFilter, routeClientId, statusFilter],
+    [
+      assignmentFilter,
+      debouncedSearch,
+      page,
+      refFilter,
+      routeClientId,
+      statusFilter,
+      uniqueServiceReleased,
+    ],
   );
 
   const tasksQuery = useIntegracaoTasksList(listParams, { enabled: router.isReady });
@@ -134,7 +144,7 @@ export function TasksWorkspace() {
 
   useEffect(() => {
     setPage(1);
-  }, [assignmentFilter, refFilter, routeClientId, searchTerm, statusFilter]);
+  }, [assignmentFilter, refFilter, routeClientId, searchTerm, statusFilter, uniqueServiceReleased]);
 
   useEffect(() => {
     if (!router.isReady || !routeTaskId) {
@@ -365,7 +375,21 @@ export function TasksWorkspace() {
       />
 
       <section className={`${PROJECT_SUBPANEL_CLASSNAME} p-4`}>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_240px]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_180px_180px_220px]">
+          <label className="space-y-2">
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-white">
+              <Filter className="h-4 w-4 text-slate-400" />
+              Liberação do Comercial
+            </span>
+            <ProjectSelect
+              value={uniqueServiceReleased ? "true" : ""}
+              onChange={(event) => setUniqueServiceReleased(event.target.value === "true")}
+            >
+              <option value="">Todas</option>
+              <option value="true">Serviços únicos liberados</option>
+            </ProjectSelect>
+          </label>
+
           <label className="space-y-2">
             <span className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-white">
               <Search className="h-4 w-4 text-slate-400" />
@@ -440,6 +464,8 @@ export function TasksWorkspace() {
             <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-950/40">
               <tr className="text-left">
                 <th className={TASK_TABLE_NAME_HEAD_CELL_CLASSNAME}>Tarefa</th>
+                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-44`}>Empresa</th>
+                <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-36`}>Projeto</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Status</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-28`}>Cobrança</th>
                 <th className={`${TASK_TABLE_HEAD_CELL_CLASSNAME} w-36`}>Responsável</th>
@@ -454,20 +480,20 @@ export function TasksWorkspace() {
             <tbody>
               {isInitialLoading ? (
                 <tr>
-                  <td className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={10}>
+                  <td className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={12}>
                     <LoaderCircle className="mr-2 inline h-4 w-4 animate-spin" />
                     Carregando tarefas...
                   </td>
                 </tr>
               ) : tasksQuery.isError ? (
                 <tr>
-                  <td className="px-5 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={10}>
+                  <td className="px-5 py-10 text-sm text-rose-600 dark:text-rose-300" colSpan={12}>
                     Não foi possível carregar as tarefas no momento.
                   </td>
                 </tr>
               ) : tasks.length === 0 ? (
                 <tr>
-                  <td className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={10}>
+                  <td className="px-5 py-10 text-sm text-slate-500 dark:text-slate-400" colSpan={12}>
                     Nenhuma tarefa encontrada com os filtros atuais.
                   </td>
                 </tr>
@@ -483,6 +509,16 @@ export function TasksWorkspace() {
                         title={task.name}
                       >
                         {task.name}
+                      </p>
+                    </td>
+                    <td className={TASK_TABLE_CELL_CLASSNAME}>
+                      <p className="line-clamp-2" title={task.client_name}>
+                        {formatNullable(task.client_name)}
+                      </p>
+                    </td>
+                    <td className={TASK_TABLE_CELL_CLASSNAME}>
+                      <p className="line-clamp-2" title={task.project_name}>
+                        {formatNullable(task.project_name)}
                       </p>
                     </td>
                     <td className={TASK_TABLE_CELL_CLASSNAME}>

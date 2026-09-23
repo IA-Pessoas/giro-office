@@ -78,6 +78,8 @@ const TASK_LIST_SELECT = {
   payment: true,
   billing_description: true,
   charge_financeiro: true,
+  client: { select: { name: true, company_name: true } },
+  project: { select: { name: true } },
   responsible_id: true,
   responsible2_id: true,
   responsible3_id: true,
@@ -111,8 +113,10 @@ export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }
 type TaskListDatabaseRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
 export type TaskListRow = Omit<
   TaskListDatabaseRow,
-  "responsible_id" | "responsible2_id" | "responsible3_id"
+  "responsible_id" | "responsible2_id" | "responsible3_id" | "client" | "project"
 > & {
+  client_name: string;
+  project_name: string;
   isOwn: boolean;
   isUnassigned: boolean;
 };
@@ -180,6 +184,7 @@ export interface ListTaskCrudParams {
   search: string;
   client_id?: string;
   assignment?: TaskAssignmentFilter;
+  unique_service_released?: boolean;
   page: number;
   limit: number;
   integracaoLevel?: IntegracaoPermissionLevel;
@@ -664,6 +669,11 @@ export class TaskCrudService {
         where.charge_financeiro = true;
       }
 
+      if (params.unique_service_released === true) {
+        where.hiring_status = "Contratado";
+        where.client = { is: { service_unique: true } };
+      }
+
       if (params.search) {
         const searchFilter: Prisma.TaskWhereInput = {
           name: { contains: params.search, mode: "insensitive" },
@@ -703,11 +713,15 @@ export class TaskCrudService {
       ]);
 
       const hasMore = params.page * params.limit < total;
-      const data = list.map(({ responsible_id, responsible2_id, responsible3_id, ...task }) => ({
-        ...task,
-        isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
-        isUnassigned: responsible_id === null,
-      }));
+      const data = list.map(
+        ({ responsible_id, responsible2_id, responsible3_id, client, project, ...task }) => ({
+          ...task,
+          client_name: client.company_name?.trim() || client.name,
+          project_name: project.name,
+          isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
+          isUnassigned: responsible_id === null,
+        }),
+      );
 
       return {
         data,

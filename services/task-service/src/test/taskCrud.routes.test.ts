@@ -243,7 +243,14 @@ describe("task crud routes", () => {
     );
     expect(pathSpec).toContain('"isOwn":{"type":"boolean"}');
     expect(pathSpec).toContain('"isUnassigned":{"type":"boolean"}');
-    expect(pathSpec).toContain('"required":["id","isOwn","isUnassigned"]');
+    expect(pathSpec).toContain(
+      '"unique_service_released","in":"query","schema":{"type":"boolean"}',
+    );
+    expect(pathSpec).toContain('"client_name":{"type":"string"}');
+    expect(pathSpec).toContain('"project_name":{"type":"string"}');
+    expect(pathSpec).toContain(
+      '"required":["id","client_name","project_name","isOwn","isUnassigned"]',
+    );
   });
 
   it("GET /task/list encaminha busca e pagina validadas", async () => {
@@ -282,9 +289,21 @@ describe("task crud routes", () => {
     );
   });
 
+  it("GET /task/list encaminha filtro de serviço único liberado", async () => {
+    const res = await request(createTestApp())
+      .get("/task/list")
+      .query({ unique_service_released: "true" });
+
+    expect(res.status).toBe(200);
+    expect(taskCrudServiceMock.listTasks).toHaveBeenCalledWith(
+      expect.objectContaining({ unique_service_released: true }),
+    );
+  });
+
   it.each([
     { client_id: "cliente-invalido" },
     { assignment: "anyone" },
+    { unique_service_released: "yes" },
   ])("GET /task/list rejeita filtro inválido: %o", async (query) => {
     const res = await request(createTestApp()).get("/task/list").query(query);
 
