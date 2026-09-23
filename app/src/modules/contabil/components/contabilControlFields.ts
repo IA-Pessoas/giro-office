@@ -13,7 +13,7 @@ export interface ContabilControlFieldDefinition {
 export const CONTABIL_CONTROL_FIELDS: ContabilControlFieldDefinition[] = [
   {
     field: "regenerate_accounting_entries",
-    label: "Regenerar lançamentos contábeis",
+    label: "Regerar lançamentos contábeis",
     kind: "boolean",
     order: 1,
   },
