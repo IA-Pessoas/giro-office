@@ -165,7 +165,7 @@ describe("fiscal internal reporting routes", () => {
         .expect(403);
     }
 
-    const tooLargeBody = { ...body, limit: 102 };
+    const tooLargeBody = { ...body, limit: 50_002 };
     const tooLarge = signedGrant(tooLargeBody);
     await request(app)
       .post("/internal/reporting/extract")
@@ -177,5 +177,27 @@ describe("fiscal internal reporting routes", () => {
       .expect(400);
 
     expect(extract).not.toHaveBeenCalled();
+  });
+
+  it.each([100, 101, 102, 50_001])("aceita extração fiscal com limite %i", async (limit) => {
+    const body = { source: "fiscal.icms", fields: ["state"], limit };
+    const signed = signedGrant(body);
+    const { app, extract } = createApp();
+
+    await request(app)
+      .post("/internal/reporting/extract")
+      .set(INTERNAL_SERVICE_TOKEN_HEADER, internalToken)
+      .set("x-request-id", requestId)
+      .set("x-reports-grant", signed.grant)
+      .set("x-reports-grant-signature", signed.signature)
+      .send(body)
+      .expect(200);
+
+    expect(extract).toHaveBeenCalledWith({
+      organizationId,
+      source: "fiscal.icms",
+      fields: ["state"],
+      limit,
+    });
   });
 });

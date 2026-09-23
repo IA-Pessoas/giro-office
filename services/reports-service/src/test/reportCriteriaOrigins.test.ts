@@ -69,7 +69,7 @@ for (const source of reportingSources.filter((source) => source.key !== "rh.atte
         source.fields[0];
       const value = (index: number) =>
         field.value_type === "boolean" ? index === 149 : `Value ${String(index).padStart(3, "0")}`;
-      const hasCursor = source.key.startsWith("pessoal.");
+      const hasCursor = source.key.startsWith("pessoal.") || source.key.startsWith("fiscal.");
       const rows = Array.from({ length: 150 }, (_, index) => ({
         ...(hasCursor ? { id: `row-${String(index).padStart(3, "0")}` } : {}),
         [field.key]: value(index),

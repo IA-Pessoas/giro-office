@@ -73,7 +73,7 @@ describe("FiscalIpiAdapter", () => {
     ).resolves.toEqual([{ ncm: "84719012", aliquot: "5.00" }]);
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "fiscal.ipi", fields: ["ncm", "aliquot"], limit: 101 };
+    const body = { source: "fiscal.ipi", fields: ["ncm", "aliquot"], limit: 50_001 };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://fiscal.test/internal/reporting/extract",
     );
