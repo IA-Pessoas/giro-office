@@ -294,6 +294,7 @@ model TIRequest {
   urgency         String
   status          String
   attachment      String?
+  anydesk_code    String?
   created_at      DateTime          @default(now())
   updated_at      DateTime          @updatedAt
   organization_id String
