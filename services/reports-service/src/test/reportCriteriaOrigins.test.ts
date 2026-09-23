@@ -78,6 +78,7 @@ for (const source of reportingSources.filter((source) => source.key !== "rh.atte
         field.value_type === "boolean" ? index === 149 : `Value ${String(index).padStart(3, "0")}`;
       const hasCursor =
         source.key.startsWith("ti.") ||
+        source.key.startsWith("regularize.") ||
         source.key.startsWith("pessoal.") ||
         source.key.startsWith("fiscal.") ||
         source.key.startsWith("rh.");

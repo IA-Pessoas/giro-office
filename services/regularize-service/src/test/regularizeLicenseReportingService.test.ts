@@ -31,8 +31,9 @@ describe("RegularizeLicenseReportingService", () => {
 
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: "10000000-0000-4000-8000-000000000001" },
-      select: { has: true, protocol: true },
-      take: 2,
+      select: { id: true, has: true, protocol: true },
+      orderBy: { id: "asc" },
+      take: 3,
     });
   });
 

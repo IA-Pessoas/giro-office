@@ -174,9 +174,14 @@ describe("RegularizeLicenseAdapter", () => {
           order_by: [],
         },
         organization_id: "10000000-0000-4000-8000-000000000001",
-        limit: 101,
+        limit: 102,
         request_id: "request-847",
       }),
     ).resolves.toEqual({ rows: [{ has: true }], reachedLimit: true });
+    expect(
+      JSON.parse((vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit).body as string),
+    ).toMatchObject({
+      limit: 102,
+    });
   });
 });
