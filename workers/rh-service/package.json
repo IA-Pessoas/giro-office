@@ -21,7 +21,7 @@
     "@workspace/rh-service": "workspace:*",
     "@workspace/runtime": "workspace:*",
     "@workspace/shared": "workspace:*",
-    "hono": "4.12.25",
+    "hono": "4.13.8",
     "pdfkit": "0.19.1",
     "zod": "^3.24.0"
   },

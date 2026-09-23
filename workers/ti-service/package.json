@@ -21,7 +21,7 @@
     "@workspace/runtime": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/ti-service": "workspace:*",
-    "hono": "4.12.25",
+    "hono": "4.13.8",
     "zod": "^3.24.0"
   },
   "devDependencies": {

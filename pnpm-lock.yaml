@@ -10,7 +10,7 @@ overrides:
   prisma: 7.9.1
   '@prisma/client': 7.9.1
   deepmerge-ts: 8.0.1
-  hono: 4.12.25
+  hono: 4.13.8
   '@hono/node-server': 1.19.13
   effect: 3.20.0
   lodash: 4.18.0
@@ -1610,8 +1610,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -1647,8 +1647,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -1684,8 +1684,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -1724,8 +1724,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -1761,8 +1761,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -1801,8 +1801,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -1835,8 +1835,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -1866,8 +1866,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       pg:
         specifier: ^8.13.0
         version: 8.20.0
@@ -1903,8 +1903,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -1937,8 +1937,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -1977,8 +1977,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -2014,8 +2014,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -2054,8 +2054,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -2091,8 +2091,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -2128,8 +2128,8 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       pdfkit:
         specifier: 0.19.1
         version: 0.19.1
@@ -2159,8 +2159,8 @@ importers:
         specifier: 7.9.1
         version: 7.9.1
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
     devDependencies:
       '@biomejs/biome':
         specifier: 2.4.5
@@ -2187,8 +2187,8 @@ importers:
         specifier: workspace:*
         version: link:../../services/task-service
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -2227,8 +2227,8 @@ importers:
         specifier: workspace:*
         version: link:../../services/ti-service
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -2267,8 +2267,8 @@ importers:
         specifier: workspace:*
         version: link:../../services/triagem-service
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -2313,8 +2313,8 @@ importers:
         specifier: 2.4.3
         version: 2.4.3
       hono:
-        specifier: 4.12.25
-        version: 4.12.25
+        specifier: 4.13.8
+        version: 4.13.8
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -5817,8 +5817,8 @@ packages:
   help-me@5.0.0:
     resolution: {integrity: sha512-7xgomUX6ADmcYzFik0HzAxh/73YlKR9bmFzf51CZwR+b6YtzU2m0u49hQCqV6SvlqIqsaxovfwdvbnsw3b/zpg==}
 
-  hono@4.12.25:
-    resolution: {integrity: sha512-2NFaIyNVgJmBs/ecmtGzlmluTFs5cHEWGTdu0t1HBwYzoGXOL5nUQBRMXsXWla5i4KkG//QMzVP88m1+I3fdAQ==}
+  hono@4.13.8:
+    resolution: {integrity: sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ==}
     engines: {node: '>=16.9.0'}
 
   html-entities@2.6.0:
@@ -11720,7 +11720,7 @@ snapshots:
 
   help-me@5.0.0: {}
 
-  hono@4.12.25: {}
+  hono@4.13.8: {}
 
   html-entities@2.6.0:
     optional: true
