@@ -64,6 +64,7 @@ export function Clients() {
     () => ({
       search: deferredSearch.trim() || undefined,
       status: status || undefined,
+      legacyIntegrationStatusFilter: false,
       page,
       limit,
     }),
