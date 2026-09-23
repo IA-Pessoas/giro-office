@@ -231,6 +231,12 @@ runTest("buildClientListParams keeps the Regularize active-client query out of t
   );
 });
 
+runTest("main clients list disables the legacy integration status filter", () => {
+  const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
+
+  assert.match(clients, /legacyIntegrationStatusFilter:\s*false/);
+});
+
 runTest("client integration filters use backend-supported not-contracted token", () => {
   const filters = readFileSync("src/modules/clients/components/ClientFilters.tsx", "utf8");
 
