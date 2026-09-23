@@ -14,6 +14,42 @@ const organizationId = "00000000-0000-4000-8000-000000000002";
 
 describe("pessoal internal reporting service", () => {
   it.each([
+    100, 101, 102,
+  ])("extrai todos os %i registros ao redor do limite antigo", async (count) => {
+    const records = Array.from({ length: count }, (_, index) => ({
+      id: `row-${String(index).padStart(3, "0")}`,
+      type: `value-${index}`,
+    }));
+    const findMany = vi.fn().mockResolvedValue(records);
+    const transactionClient = { lddPessoal: { findMany } };
+    const transaction = vi.fn(async (read: (client: unknown) => Promise<unknown>) =>
+      read(transactionClient),
+    );
+    const service = new InternalReportingService({
+      ...transactionClient,
+      $transaction: transaction,
+    } as never);
+
+    const result = await service.extract({
+      organizationId,
+      source: "pessoal.ldd",
+      fields: ["type"],
+      limit: 1000,
+    });
+
+    expect(result.rows).toHaveLength(count);
+    expect(result.rows[0]).toEqual({ type: "value-0" });
+    expect(result.rows[count - 1]).toEqual({ type: `value-${count - 1}` });
+    expect(result.reachedLimit).toBe(false);
+    expect(findMany).toHaveBeenCalledOnce();
+    expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "RepeatableRead",
+      maxWait: 5000,
+      timeout: 30000,
+    });
+  });
+
+  it.each([
     ["pessoal.ldd", "type"],
     ["pessoal.obligations", "competence"],
     ["pessoal.payroll", "advance"],
