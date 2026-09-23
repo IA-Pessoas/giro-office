@@ -205,12 +205,33 @@ function claimsAccessContext(auth: WorkerAuthContext): ReportingAccessContextCli
   };
 }
 
-function accessContextClient(c: ReportsContext, options: ReportsWorkerOptions) {
+/**
+ * Contexto de acesso atual (compartilhamento, biblioteca, exclusão). Em produção não há
+ * USER_SERVICE_URL, só o binding USER_SERVICE: sem aceitá-lo, o Worker usava só os claims do
+ * token (sem departamento) e as rotas que dependem dele respondiam 403. Se o user-service
+ * falhar, volta aos claims, que é o comportamento anterior e nunca concede mais acesso.
+ */
+export function accessContextClient(
+  c: ReportsContext,
+  options: ReportsWorkerOptions,
+): ReportingAccessContextClient {
   if (options.accessContextClient) return options.accessContextClient;
   const env = options.env ?? c.env;
-  return env.USER_SERVICE_URL
-    ? new UserAccessContextClient(toReportsServiceEnv(env))
-    : claimsAccessContext(c.get("auth"));
+  const claims = claimsAccessContext(c.get("auth"));
+  if (!env.USER_SERVICE_URL && !env.USER_SERVICE) return claims;
+  const userService = new UserAccessContextClient(toReportsServiceEnv(env));
+  return {
+    getAccessContext: async (input) => {
+      try {
+        return await userService.getAccessContext(input);
+      } catch (error) {
+        console.error("[reports-worker] contexto de acesso do user-service indisponível", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+        return claims.getAccessContext(input);
+      }
+    },
+  };
 }
 
 function createPureServices(c: ReportsContext, options: ReportsWorkerOptions) {
