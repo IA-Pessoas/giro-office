@@ -228,3 +228,18 @@ describe("organization-service platform registry", () => {
     expect(resolveGatewayService(env, path, method)).toBeNull();
   });
 });
+
+describe("project-service gateway registry", () => {
+  it("encaminha o token interno junto da identidade autenticada", () => {
+    const env = {
+      projectServiceUrl: "http://project-service:3033",
+      auditServiceToken: "gateway-project-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/project", "POST")).toMatchObject({
+      key: "project-service",
+      targetUrl: "http://project-service:3033",
+      internalServiceToken: "gateway-project-token",
+    });
+  });
+});
