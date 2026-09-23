@@ -1,4 +1,4 @@
-import { MAX_REPORTING_QUERY_LIMIT } from "@workspace/shared";
+import { MAX_REPORTING_QUERY_LIMIT, MAX_REPORTING_QUERY_ROWS } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { SourceCatalogService } from "../catalog/sourceCatalogService.js";
@@ -55,11 +55,72 @@ describe("ReportExecutionService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 400,
-      message: "A origem excedeu seu limite de linhas para o snapshot.",
+      message:
+        "O relatório excede o limite global de 50.000 linhas. Reduza os filtros ou divida o relatório e tente novamente.",
     });
     expect(adapter.preview).toHaveBeenCalledWith(
       expect.objectContaining({ limit: MAX_REPORTING_QUERY_LIMIT }),
     );
+  });
+
+  it.each([100, 101, 102])("aceita resultados de %i linhas", async (rowCount) => {
+    const boundaryAdapter: ReportSourceAdapter = {
+      ...adapter,
+      preview: vi.fn().mockResolvedValue({
+        rows: Array.from({ length: rowCount }, () => ({ protocol: "P-1" })),
+        reachedLimit: false,
+      }),
+    };
+    const catalog = new SourceCatalogService([boundaryAdapter]);
+    const service = new ReportExecutionService(catalog, new ReportDefinitionService(catalog));
+    const definition = reportDefinitionSchema.parse({
+      sources: ["regularize.licenses"],
+      columns: [{ source: "regularize.licenses", field: "protocol", alias: "protocol" }],
+    });
+
+    await expect(
+      service.execute({
+        definition,
+        scope: {
+          organization_id: "10000000-0000-4000-8000-000000000001",
+          modules: { regularize: 1 },
+        },
+        parameterValues: {},
+        requestId: "request-boundary",
+      }),
+    ).resolves.toHaveLength(rowCount);
+  });
+
+  it("recusa resposta acima do limite global de linhas", async () => {
+    const overLimitAdapter: ReportSourceAdapter = {
+      ...adapter,
+      preview: vi.fn().mockResolvedValue({
+        rows: Array.from({ length: MAX_REPORTING_QUERY_ROWS + 1 }, () => ({ protocol: "P-1" })),
+        reachedLimit: false,
+      }),
+    };
+    const catalog = new SourceCatalogService([overLimitAdapter]);
+    const service = new ReportExecutionService(catalog, new ReportDefinitionService(catalog));
+    const definition = reportDefinitionSchema.parse({
+      sources: ["regularize.licenses"],
+      columns: [{ source: "regularize.licenses", field: "protocol", alias: "protocol" }],
+    });
+
+    await expect(
+      service.execute({
+        definition,
+        scope: {
+          organization_id: "10000000-0000-4000-8000-000000000001",
+          modules: { regularize: 1 },
+        },
+        parameterValues: {},
+        requestId: "request-global-limit",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message:
+        "O relatório excede o limite global de 50.000 linhas. Reduza os filtros ou divida o relatório e tente novamente.",
+    });
   });
 
   it("executa uma composição em blocos independentes e preserva área vazia", async () => {

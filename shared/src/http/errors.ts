@@ -56,7 +56,7 @@ export class ServiceError extends Error {
   readonly statusCode: number;
   readonly code: string;
 
-  constructor(statusCode: number, message?: string, cause?: unknown) {
+  constructor(statusCode: number, message?: string, cause?: unknown, code?: string) {
     if (!Number.isInteger(statusCode) || statusCode < 400 || statusCode > 599) {
       throw new RangeError("ServiceError statusCode must be an integer between 400 and 599.");
     }
@@ -66,7 +66,7 @@ export class ServiceError extends Error {
 
     this.name = "ServiceError";
     this.statusCode = statusCode;
-    this.code = getErrorCodeForStatusCode(statusCode);
+    this.code = code?.trim() || getErrorCodeForStatusCode(statusCode);
 
     Object.setPrototypeOf(this, new.target.prototype);
   }

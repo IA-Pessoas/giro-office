@@ -1,9 +1,10 @@
 import { createHash, createHmac } from "node:crypto";
 
-import { pessoalPayrollReportingCatalog } from "@workspace/shared";
+import { pessoalPayrollReportingCatalog, REPORTING_QUERY_ROW_LIMIT_CODE } from "@workspace/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PessoalPayrollAdapter } from "../integrations/pessoalPayrollAdapter.js";
+import { REPORT_SNAPSHOT_LIMIT_MESSAGE } from "../services/reportExecutionService.js";
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -97,7 +98,7 @@ describe("PessoalPayrollAdapter", () => {
     });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "pessoal.payroll", fields: ["advance", "employees"], limit: 101 };
+    const body = { source: "pessoal.payroll", fields: ["advance", "employees"], limit: 50_001 };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://pessoal.test/internal/reporting/extract",
     );
@@ -159,5 +160,61 @@ describe("PessoalPayrollAdapter", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 503 });
     expect(JSON.stringify(fetchMock.mock.results)).not.toContain("sensitive");
+  });
+
+  it("preserves 403 when the source response body is not JSON", async () => {
+    const json = vi.fn().mockRejectedValue(new SyntaxError("invalid JSON"));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403, json }));
+    const adapter = new PessoalPayrollAdapter({
+      pessoalServiceUrl: "http://pessoal.test",
+      reportsInternalToken: "internal-token",
+      reportsGrantSecret: "grant-secret",
+      sourceTimeoutMs: 100,
+    });
+
+    await expect(
+      adapter.preview({
+        definition,
+        organization_id: "00000000-0000-4000-8000-000000000002",
+        limit: 10,
+        request_id: "request-843",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      message: "A consulta não está autorizada para esta área.",
+    });
+    expect(json).not.toHaveBeenCalled();
+  });
+  it("preserves the actionable global row limit reported by the source", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: vi.fn().mockResolvedValue({
+          success: false,
+          error: "internal capacity",
+          code: REPORTING_QUERY_ROW_LIMIT_CODE,
+        }),
+      }),
+    );
+    const adapter = new PessoalPayrollAdapter({
+      pessoalServiceUrl: "http://pessoal.test",
+      reportsInternalToken: "internal-token",
+      reportsGrantSecret: "grant-secret",
+      sourceTimeoutMs: 100,
+    });
+
+    await expect(
+      adapter.preview({
+        definition,
+        organization_id: "00000000-0000-4000-8000-000000000002",
+        limit: 50_001,
+        request_id: "request-843",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      message: REPORT_SNAPSHOT_LIMIT_MESSAGE,
+    });
   });
 });

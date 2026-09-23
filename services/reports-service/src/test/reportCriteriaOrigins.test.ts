@@ -69,11 +69,17 @@ for (const source of reportingSources.filter((source) => source.key !== "rh.atte
         source.fields[0];
       const value = (index: number) =>
         field.value_type === "boolean" ? index === 149 : `Value ${String(index).padStart(3, "0")}`;
+      const hasCursor = source.key.startsWith("pessoal.");
       const rows = Array.from({ length: 150 }, (_, index) => ({
+        ...(hasCursor ? { id: `row-${String(index).padStart(3, "0")}` } : {}),
         [field.key]: value(index),
         organization_id: organizationId,
       }));
-      rows.push({ [field.key]: "ZZZ foreign", organization_id: "foreign" });
+      rows.push({
+        ...(hasCursor ? { id: "row-foreign" } : {}),
+        [field.key]: "ZZZ foreign",
+        organization_id: "foreign",
+      });
       const delegate = {
         findFirst: async () => ({ id: "technology" }),
         findMany: async ({
@@ -81,16 +87,23 @@ for (const source of reportingSources.filter((source) => source.key !== "rh.atte
           take,
           select,
           skip = 0,
+          cursor,
         }: {
           where: { organization_id: string };
           take: number;
           skip?: number;
+          cursor?: { id: string };
           select: Record<string, unknown>;
-        }) =>
-          rows
-            .filter((row) => row.organization_id === where.organization_id)
-            .slice(skip, skip + take)
-            .map((row) => Object.fromEntries(Object.keys(select).map((key) => [key, row[key]]))),
+        }) => {
+          const authorizedRows = rows.filter(
+            (row) => row.organization_id === where.organization_id,
+          );
+          const cursorIndex = cursor ? authorizedRows.findIndex((row) => row.id === cursor.id) : -1;
+          const start = cursorIndex < 0 ? skip : cursorIndex + skip;
+          return authorizedRows
+            .slice(start, start + take)
+            .map((row) => Object.fromEntries(Object.keys(select).map((key) => [key, row[key]])));
+        },
       };
       const prisma = new Proxy(
         {},

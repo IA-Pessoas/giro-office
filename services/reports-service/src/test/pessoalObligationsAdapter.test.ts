@@ -83,7 +83,11 @@ describe("PessoalObligationsAdapter", () => {
     ).resolves.toEqual({ rows: [{ competence: "2026-08", advance: false }], reachedLimit: true });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "pessoal.obligations", fields: ["competence", "advance"], limit: 101 };
+    const body = {
+      source: "pessoal.obligations",
+      fields: ["competence", "advance"],
+      limit: 50_001,
+    };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://pessoal.test/internal/reporting/extract",
     );

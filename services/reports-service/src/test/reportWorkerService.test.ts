@@ -1,5 +1,7 @@
+import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
+import { REPORT_SNAPSHOT_LIMIT_MESSAGE } from "../services/reportExecutionService.js";
 import { ReportWorkerService } from "../services/reportWorkerService.js";
 
 describe("ReportWorkerService", () => {
@@ -67,6 +69,49 @@ describe("ReportWorkerService", () => {
         error_message:
           "Não foi possível gerar o relatório. Confira o acesso e os critérios e tente novamente.",
       }),
+    );
+  });
+
+  it("registra o limite global como falha acionável sem persistir resultado parcial", async () => {
+    const complete = vi.fn();
+    const transition = vi.fn().mockResolvedValue(undefined);
+    const worker = new ReportWorkerService(
+      {
+        claimNext: vi.fn().mockResolvedValue({
+          id: "job-1",
+          organization_id: "org-1",
+          requester_id: "user-1",
+          report_model_version_id: "version-1",
+          lease_token: "lease-1",
+          payload_json: {},
+        }),
+      } as never,
+      {
+        reportModelVersion: {
+          findFirst: vi.fn().mockResolvedValue({
+            report_model_id: "model-1",
+            definition_json: { sources: ["source"], columns: [] },
+          }),
+        },
+        reportModel: {
+          findFirst: vi.fn().mockResolvedValue({ created_by_user_id: "user-1", active: true }),
+        },
+      } as never,
+      {
+        getAccessContext: vi.fn().mockResolvedValue({ organization: { id: "org-1" }, modules: {} }),
+      } as never,
+      {
+        execute: vi.fn().mockRejectedValue(new ServiceError(400, REPORT_SNAPSHOT_LIMIT_MESSAGE)),
+        assertAuthorizedDefinition: vi.fn(),
+      } as never,
+      { complete, transition } as never,
+    );
+
+    await expect(worker.processNext()).resolves.toBe(true);
+
+    expect(complete).not.toHaveBeenCalled();
+    expect(transition).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed", error_message: REPORT_SNAPSHOT_LIMIT_MESSAGE }),
     );
   });
 
