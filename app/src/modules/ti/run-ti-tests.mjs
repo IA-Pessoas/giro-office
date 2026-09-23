@@ -1222,7 +1222,7 @@ await runTest("ti user selects reuse the operational users source where still in
   }
 });
 
-await runTest("ti extension numbers use an exact four-digit contract", async () => {
+await runTest("ti extension numbers accept three or four digits", async () => {
   const {
     TI_EXTENSION_NUMBER_LENGTH,
     isValidTiExtensionNumber,
@@ -1232,8 +1232,9 @@ await runTest("ti extension numbers use an exact four-digit contract", async () 
   assert.equal(TI_EXTENSION_NUMBER_LENGTH, 4);
   assert.equal(isValidTiExtensionNumber("1001"), true);
   assert.equal(isValidTiExtensionNumber("0007"), true);
+  assert.equal(isValidTiExtensionNumber("123"), true);
 
-  for (const invalid of ["", "123", "12345", "12A4", "12-4", " 1234 "]) {
+  for (const invalid of ["", "12", "12345", "12A4", "12-4", " 1234 "]) {
     assert.equal(isValidTiExtensionNumber(invalid), false);
   }
 
@@ -1252,7 +1253,7 @@ await runTest("ti extension form validates digits and hides the internal id", as
   assert.equal(
     [
       ...tabSource.matchAll(
-        /toast\.error\("Informe um ramal com exatamente 4 dígitos\."\)/g,
+        /toast\.error\("Informe um ramal com 3 ou 4 dígitos\."\)/g,
       ),
     ].length,
     2,
@@ -1301,7 +1302,7 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /selectedExtensionId\s*\?\s*\(/);
   assert.doesNotMatch(tabSource, /Selecione um ramal para ver detalhes\./);
   assert.match(tabSource, /Criar ramal/);
-  assert.match(tabSource, /placeholder="Ex: 1001"/);
+  assert.match(tabSource, /placeholder="Ex: 101 ou 1001"/);
   assert.doesNotMatch(tabSource, /placeholder="1001"/);
   assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
 });

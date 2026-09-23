@@ -197,7 +197,7 @@ describe("ti-service app", () => {
       type: "string",
       minLength: 4,
       maxLength: 4,
-      pattern: "^[0-9]{4}$",
+      pattern: "^[0-9]{3,4}$",
       example: "1001",
     };
 
