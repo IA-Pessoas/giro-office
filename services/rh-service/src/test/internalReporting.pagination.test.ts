@@ -126,6 +126,39 @@ describe("extração incremental de relatórios RH", () => {
     );
   });
 
+  it("avança para o próximo agregado quando a página termina exatamente na fronteira", async () => {
+    const makeRows = (prefix: string, count: number, row: Record<string, unknown>) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `${prefix}-${String(index).padStart(3, "0")}`,
+        ...row,
+      }));
+    const points = delegateFor(makeRows("point", 100, { clock_in: new Date(), clock_out: null }));
+    const sheets = delegateFor(makeRows("sheet", 1, { status: "Assinada", totals: {} }));
+    const prisma: Record<string, unknown> = {
+      point: points,
+      timeSheets: sheets,
+      timeBankReleases: delegateFor([]),
+      timeClockRequest: delegateFor([]),
+    };
+    prisma.$transaction = vi.fn(async (read: (client: unknown) => Promise<unknown>) =>
+      read(prisma),
+    );
+
+    const result = await new InternalReportingService(prisma as never).extract({
+      organizationId,
+      source: "rh.attendance",
+      fields: ["status"],
+      limit: 101,
+    });
+
+    expect(result.rows).toHaveLength(101);
+    expect(result.rows.slice(0, 100).every((row) => row.status === "Em andamento")).toBe(true);
+    expect(result.rows[100]?.status).toBe("Assinada");
+    expect(result.reachedLimit).toBe(false);
+    expect(points.findMany).toHaveBeenCalledOnce();
+    expect(sheets.findMany).toHaveBeenCalledOnce();
+  });
+
   it("aceita o limite global e rejeita valores acima dele no contrato interno", () => {
     const base = { source: "rh.holidays", fields: ["name"] };
     expect(
