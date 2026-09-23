@@ -41,6 +41,7 @@ import {
 import {
   applyWizardTaskChange,
   canAttemptWizardExtraction,
+  createProjectWizardId,
   getWizardExtractionSourceValidationMessage,
   getWizardTaskDateWarning,
   WIZARD_EXTRACTION_MAX_ATTEMPTS,
@@ -174,7 +175,7 @@ export function ProjectFormModal({
       extractionRequestLockRef.current = false;
       previewRequestLockRef.current = false;
     } else if (!isEditing && !idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = crypto.randomUUID();
+      idempotencyKeyRef.current = createProjectWizardId();
     }
   }, [extractTasksMutation.reset, isEditing, open, previewMutation.reset, reset]);
 
@@ -274,7 +275,7 @@ export function ProjectFormModal({
         // responsável automático quando o departamento tiver um único elegível.
         ...proposals.map((proposal) =>
           applyWizardTaskChange(
-            { ...proposal, id: crypto.randomUUID(), source: "ai" as const },
+            { ...proposal, id: createProjectWizardId(), source: "ai" as const },
             "model_id",
             proposal.model_id,
             taskModels,
@@ -1024,7 +1025,7 @@ export function ProjectFormModal({
                   setTasks((current) => [
                     ...current,
                     {
-                      id: crypto.randomUUID(),
+                      id: createProjectWizardId(),
                       name: "",
                       department_id: "",
                       model_id: "",
