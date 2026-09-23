@@ -741,7 +741,8 @@ export class UnionNotificationService {
         where: {
           organization_id: organizationId,
           pessoal: { gte: 1 },
-          user: { organization_id: organizationId, status: "Ativo" },
+          // users.status é "active"/"inactive" (user-service); "Ativo" é de clients.
+          user: { organization_id: organizationId, status: "active" },
         },
         select: { user_id: true },
       }),
