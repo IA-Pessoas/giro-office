@@ -1710,27 +1710,32 @@ await runTest("ti inventory tab exposes assets, categories, departments, assignm
   assert.match(source, /useTiInventory\(/);
   assert.match(source, /useTiInventoryAsset\(/);
   assert.match(source, /useTiInventoryCategories\(/);
-  assert.match(source, /departmentService\.list\(\)/);
-  assert.match(source, /useFetch<DepItem\[\]>/);
-  assert.doesNotMatch(source, /useTiInventoryLocations\(/);
+  assert.match(source, /useTiInventoryLocations\(\)/);
+  assert.doesNotMatch(source, /departmentService\.list\(\)/);
   assert.match(source, /<ConfirmationDialog/);
   assert.doesNotMatch(source, /\bconfirm\(/);
 });
 
-await runTest("ti inventory department options come from the global department endpoint", async () => {
+await runTest("ti inventory department options come from inventory locations, the asset FK", async () => {
   const source = await readModuleSource("components/TiInventoryTab.tsx");
 
-  assert.match(source, /import \{ departmentService, type DepItem \} from "@modules\/departments"/);
-  assert.match(source, /const departmentsQuery = useFetch<DepItem\[\]>/);
-  assert.match(source, /\["ti-inventory", "departments"\]/);
-  assert.match(source, /\(\) => departmentService\.list\(\)/);
-  assert.doesNotMatch(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
+  // location_id referencia tecnologia.inventoryLocations; id de departamento de RH dava
+  // "Departamento/local de inventario nao encontrado" no cadastro.
+  assert.doesNotMatch(source, /@modules\/departments/);
+  assert.match(source, /const departmentsQuery = useTiInventoryLocations\(\)/);
   assert.match(source, /departmentsById/);
   assert.match(source, /departmentFilterOptions/);
   assert.match(source, /departmentFormOptions/);
-  assert.doesNotMatch(source, /const locationsQuery = useTiInventoryLocations\(\)/);
-  assert.doesNotMatch(source, /const locationsById/);
-  assert.doesNotMatch(source, /const locationOptions/);
+  assert.match(source, /\.filter\(isCatalogActive\)/);
+});
+
+await runTest("ti inventory categories can be deleted through soft deactivation", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(source, /label="Excluir"/);
+  assert.match(source, /payload: \{ active: false \}/);
+  assert.match(source, /categories\.filter\(isCatalogActive\)/);
+  assert.doesNotMatch(source, /NÃ£o/);
 });
 
 await runTest("ti inventory keeps primary actions clear and opens asset detail in a dialog", async () => {

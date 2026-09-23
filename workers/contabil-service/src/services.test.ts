@@ -33,6 +33,64 @@ function prisma() {
 const auth = { userId: USER, organizationId: ORG, modules: { contabil: 2 } };
 
 describe("contabil services tenant and catalog seams", () => {
+  it("lista carteira com CNPJ, regime e responsáveis do tenant", async () => {
+    const database = {
+      client: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: CLIENT,
+            name: "Art",
+            company_name: "ART TOLDO",
+            cpf_cnpj: "49791761000380",
+            regime: "Lucro Real",
+            controlContabil: [],
+            triageClosings: [],
+          },
+          {
+            id: MONTHLY,
+            name: "Sem responsável",
+            company_name: null,
+            cpf_cnpj: "",
+            regime: null,
+            controlContabil: [],
+            triageClosings: [],
+          },
+        ]),
+      },
+      responsibleContabil: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { client_id: CLIENT, person_responsible_id: "user-1", posted_by_id: "user-2" },
+          ]),
+      },
+    };
+    const result = (await createControlService(database as never, audit()).list(
+      "2026-08",
+      ORG,
+    )) as {
+      items: Record<string, unknown>[];
+    };
+
+    expect(database.responsibleContabil.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, client_id: { in: [CLIENT, MONTHLY] } },
+      }),
+    );
+    expect(result.items[0]).toMatchObject({
+      legal_name: "ART TOLDO",
+      cpf_cnpj: "49791761000380",
+      regime: "Lucro Real",
+      person_responsible_id: "user-1",
+      posted_by_id: "user-2",
+    });
+    expect(result.items[1]).toMatchObject({
+      regime: null,
+      person_responsible_id: null,
+      posted_by_id: null,
+    });
+  });
+
   it("recusa marcador bancário de cliente fora do tenant", async () => {
     const database = prisma();
     database.client.findFirst.mockResolvedValue(null);

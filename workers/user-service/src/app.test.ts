@@ -719,6 +719,32 @@ describe("user Worker", () => {
     );
   });
 
+  it("mantém os módulos enviados junto com type e permission, como o Node", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue({
+      ...user(),
+      type: "admin",
+      first_owner_flag: false,
+      permission: 1,
+    });
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+
+    // Payload do syncDepartmentPermission da tela de permissões.
+    const response = await app.request(`https://user.test/user/${USER_ID}`, {
+      method: "PUT",
+      headers: { ...forwardedHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ permission: 2, type: "admin", modules: { fiscal: 2, ti: 1, rh: 1 } }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(db.permission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { user_id: USER_ID, organization_id: ORGANIZATION_ID },
+        data: expect.objectContaining({ fiscal: 2, rh: 1, ti: 3 }),
+      }),
+    );
+  });
+
   it("rejeita downgrade ou remoção do último owner ativo", async () => {
     const db = prisma();
     db.user.count.mockResolvedValue(1);

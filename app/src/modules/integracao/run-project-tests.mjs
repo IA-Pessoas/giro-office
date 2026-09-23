@@ -796,7 +796,7 @@ runTest("task model modal uses contextual user selectors", () => {
   assert.deepEqual(unwrapTaskModelOptions({ success: true, data: options }), options);
   const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
   assert.match(source, /useAssignableUsers/);
-  assert.match(source, /module: "integracao"/);
+  assert.doesNotMatch(source, /module: "integracao"/);
   assert.match(source, /departmentId: formData\.department_id/);
   assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
   assert.doesNotMatch(source, /listAdminUsers/);
