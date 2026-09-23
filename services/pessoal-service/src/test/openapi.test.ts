@@ -1,5 +1,6 @@
 import "./envBootstrap.js";
 
+import { MAX_REPORTING_QUERY_LIMIT } from "@workspace/shared";
 import { describe, expect, it } from "vitest";
 
 import { getPessoalServiceEnv } from "../config/env.js";
@@ -74,7 +75,11 @@ describe("pessoal-service OpenAPI", () => {
             requestBody?: {
               content?: Record<
                 string,
-                { schema?: { properties?: { source?: { enum?: unknown } } } }
+                {
+                  schema?: {
+                    properties?: { source?: { enum?: unknown }; limit?: { maximum?: number } };
+                  };
+                }
               >;
             };
           };
@@ -88,6 +93,7 @@ describe("pessoal-service OpenAPI", () => {
       "pessoal.obligations",
       "pessoal.unions",
     ]);
+    expect(extractSchema?.properties?.limit?.maximum).toBe(MAX_REPORTING_QUERY_LIMIT);
   });
 
   it("documenta request bodies estritos para mutacoes do dominio", () => {
