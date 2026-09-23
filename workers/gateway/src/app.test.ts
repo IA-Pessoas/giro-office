@@ -516,4 +516,65 @@ describe("gateway Worker", () => {
     expect(response.status).toBe(403);
     expect(binding.fetch).not.toHaveBeenCalled();
   });
+  describe("GET /dashboard/stats", () => {
+    function dashboardDb() {
+      const client = {
+        connect: vi.fn(async () => undefined),
+        end: vi.fn(async () => undefined),
+        query: vi.fn(async () => ({ rows: [] })),
+      };
+      return client;
+    }
+
+    it("validates the session, reads the database scoped to the organization and closes it", async () => {
+      const db = dashboardDb();
+      const userService = { fetch: vi.fn(async () => new Response(null, { status: 200 })) };
+      const app = createGatewayWorkerApp({
+        env: env(undefined, {
+          USER_SERVICE: userService,
+          HYPERDRIVE: { connectionString: "postgresql://worker:test@db.example/giro" },
+        }),
+        dashboardDb: () => db as never,
+      });
+
+      const response = await app.request("https://gateway.test/dashboard/stats", {
+        headers: { authorization: `Bearer ${await jwt()}` },
+      });
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { data: { totalClients: number } };
+      expect(body.data.totalClients).toBe(0);
+      const validation = userService.fetch.mock.calls[0]?.[0] as Request;
+      expect(new URL(validation.url).pathname).toBe("/user/session/validate");
+      expect(validation.headers.get("x-internal-service-token")).toBe(TOKEN);
+      expect(db.query).toHaveBeenCalled();
+      for (const call of db.query.mock.calls as unknown as Array<[string, unknown[]]>) {
+        expect(call[1]).toEqual(["org-1"]);
+      }
+      expect(db.end).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects a revoked session before touching the database", async () => {
+      const db = dashboardDb();
+      const app = createGatewayWorkerApp({
+        env: env(undefined, {
+          USER_SERVICE: { fetch: vi.fn(async () => new Response(null, { status: 401 })) },
+          HYPERDRIVE: { connectionString: "postgresql://worker:test@db.example/giro" },
+        }),
+        dashboardDb: () => db as never,
+      });
+
+      const response = await app.request("https://gateway.test/dashboard/stats", {
+        headers: { authorization: `Bearer ${await jwt()}` },
+      });
+
+      expect(response.status).toBe(401);
+      expect(db.connect).not.toHaveBeenCalled();
+    });
+
+    it("answers 401 without credentials", async () => {
+      const app = createGatewayWorkerApp({ env: env() });
+      expect((await app.request("https://gateway.test/dashboard/stats")).status).toBe(401);
+    });
+  });
 });

@@ -24,5 +24,7 @@
     { "binding": "PESSOAL_SERVICE", "service": "giro-pessoal-service" },
     { "binding": "REGULARIZE_SERVICE", "service": "giro-regularize-service" }
   ],
+  // Só para GET /dashboard/stats, servido pelo próprio gateway como no Node.
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
   "observability": { "enabled": true }
 }
