@@ -48,6 +48,8 @@ export function setupAPIClient(
   ctx?: ApiServerContext,
   onUnauthorized?: () => void,
   onCsrfFailure?: () => void,
+  // false quando a tela já explica a falha (ex.: consulta opcional de CNPJ).
+  { notifyServerErrors = true }: { notifyServerErrors?: boolean } = {},
 ) {
   const gateway = ctx ? getWorkerGateway() : undefined;
   const api = createApiClient({
@@ -62,9 +64,11 @@ export function setupAPIClient(
     onUnauthorized,
     onCsrfFailure,
     getUnauthorizedErrorForSsr: () => new AuthTokenError(),
-    onServerError: () => {
-      notifyServerError(toast);
-    },
+    onServerError: notifyServerErrors
+      ? () => {
+          notifyServerError(toast);
+        }
+      : undefined,
   });
 
   if (gateway) {
