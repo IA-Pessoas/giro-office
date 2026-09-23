@@ -108,7 +108,7 @@ export class UnionNotificationService {
           pessoal: { gte: 1 },
           user: {
             organization_id: organizationId,
-            status: "Ativo",
+            status: "active",
           },
         },
         select: permissionUserSelect,

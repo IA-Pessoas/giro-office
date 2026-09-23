@@ -62,6 +62,7 @@ model User {
   version           Int              @default(1)
   permission_id     String?
   department_id     String
+  invited_by        String?
   joined_at         DateTime?        @default(now())
   photo_url         String?
   authSessions      AuthSession[]

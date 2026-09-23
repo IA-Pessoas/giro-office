@@ -115,6 +115,19 @@ async function call(
 }
 
 describe("gateway Worker: superfície /platform", () => {
+  it("audita super_admin sem user_id (FK de users) e guarda o id em metadata", async () => {
+    const { app, bindings } = setup();
+    const response = await call(app, "PATCH", "/platform/organizations/org-9/status", superAdmin());
+
+    expect(response.status).toBe(200);
+    const auditCall = bindings.AUDIT_SERVICE.fetch.mock.calls.find(
+      ([request]) => new URL((request as Request).url).pathname === "/internal/audit/requests",
+    );
+    const payload = (await (auditCall?.[0] as Request).json()) as Record<string, unknown>;
+    expect(payload.userId).toBeNull();
+    expect(payload.metadata).toMatchObject({ actorKind: "platform", platformUserId: "platform-1" });
+  });
+
   it.each([
     ["GET", "/platform/organizations"],
     ["POST", "/platform/organizations"],

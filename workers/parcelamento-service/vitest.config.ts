@@ -1,4 +1,7 @@
+import { wasmModule } from "../runtime/src/vitestWasmModule";
+
 export default {
+  plugins: [wasmModule()],
   resolve: {
     alias: [
       { find: "@workspace/shared/http", replacement: "../../shared/src/http/index.ts" },

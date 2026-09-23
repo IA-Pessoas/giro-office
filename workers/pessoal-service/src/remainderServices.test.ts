@@ -548,7 +548,7 @@ function notificationPrisma(): PessoalNotificationPrisma {
         where?.organization_id === ORGANIZATION_ID ? [{ user_id: USER_ID }] : [],
       ),
     },
-    user: { findMany: vi.fn(async () => [{ id: USER_ID, status: "Ativo" }]) },
+    user: { findMany: vi.fn(async () => [{ id: USER_ID, status: "active" }]) },
     pessoalNotification: {
       findMany: vi.fn(async () => []),
       createMany: vi.fn(async ({ data }) => ({ count: data.length })),
