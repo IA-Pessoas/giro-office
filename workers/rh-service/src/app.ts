@@ -38,6 +38,7 @@ import { PrismaClient } from "./prisma.js";
 import { registerOperationalUserRoutes } from "./routes/operationalUsers.js";
 import { registerPointRoutes } from "./routes/point.js";
 import { registerProfileRoutes } from "./routes/profile.js";
+import { registerReportingRoutes } from "./routes/reporting.js";
 import { registerRequestRoutes } from "./routes/requests.js";
 import { registerScoreRoutes } from "./routes/score.js";
 import type { RhDb, RhRouteDeps } from "./routes/shared.js";
@@ -967,6 +968,7 @@ export function createRhWorkerApp(options: RhOptions = {}) {
   registerRequestRoutes(app, deps);
   registerScoreRoutes(app, deps);
   registerTimeSheetRoutes(app, deps);
+  registerReportingRoutes(app, deps);
   app.notFound((c) =>
     c.json({ success: false, error: "Recurso não encontrado.", code: "NOT_FOUND" }, 404),
   );

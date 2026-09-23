@@ -10,4 +10,7 @@ export interface RhWorkerEnv extends WorkerEnv {
   RH_REQUEST_MESSAGE_BUCKET?: string;
   /** Intervalo mínimo entre batidas de ponto; padrão 30, como no Node. */
   POINT_MIN_INTERVAL_MINUTES?: string;
+  /** Rotas /internal/reporting/* chamadas pelo reports-service. Sem eles: 503. */
+  REPORTS_INTERNAL_TOKEN?: string;
+  REPORTS_GRANT_SECRET?: string;
 }

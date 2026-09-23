@@ -404,3 +404,14 @@ enum ScoreEvaluatorRole {
   SUBORDINATE
   TI
 }
+
+// Replay guard dos grants de relatórios (/internal/reporting), igual ao canônico.
+model ReportGrantUse {
+  id         String   @id @default(uuid())
+  grant_hash String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([expires_at])
+  @@map("reports.grant_uses")
+}
