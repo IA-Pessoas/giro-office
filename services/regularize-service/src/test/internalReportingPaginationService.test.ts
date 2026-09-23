@@ -1,4 +1,5 @@
 import {
+  MAX_REPORTING_QUERY_BYTES,
   MAX_REPORTING_QUERY_LIMIT,
   MAX_REPORTING_QUERY_ROWS,
   REPORTING_QUERY_BYTE_LIMIT_CODE,
@@ -169,7 +170,7 @@ describe("Regularize reporting pagination", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_ROW_LIMIT_CODE });
 
-    const largeValue = "x".repeat(20 * 1024 * 1024);
+    const largeValue = "x".repeat(MAX_REPORTING_QUERY_BYTES);
     const byteTransaction = {
       license: {
         findMany: vi.fn().mockResolvedValue([{ id: "license-00001", protocol: largeValue }]),
@@ -190,6 +191,14 @@ describe("Regularize reporting pagination", () => {
         query: {
           filters: [{ field: "protocol", operator: "contains", parameter: "p", value: "x" }],
         },
+        limit: 1,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_BYTE_LIMIT_CODE });
+    await expect(
+      byteLimited.extract({
+        organizationId: "10000000-0000-4000-8000-000000000001",
+        source: "regularize.licenses",
+        fields: ["protocol"],
         limit: 1,
       }),
     ).rejects.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_BYTE_LIMIT_CODE });
