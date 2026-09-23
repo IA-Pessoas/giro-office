@@ -84,3 +84,6 @@ ata-sample/
 
 # Cache local do wrangler/miniflare (wrangler dev)
 .wrangler/
+
+# Estado local do banco do smoke de CRUD (scripts/cloudflare-smoke/crud-db.mjs)
+scripts/cloudflare-smoke/.crud-smoke.json

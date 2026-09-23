@@ -1,2 +1,7 @@
 import { defineConfig } from "vitest/config";
-export default defineConfig({ test: { environment: "node" } });
+import { wasmModule } from "../runtime/src/vitestWasmModule";
+
+export default defineConfig({
+  plugins: [wasmModule()],
+  test: { environment: "node", testTimeout: 30_000, hookTimeout: 30_000 },
+});
