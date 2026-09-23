@@ -445,7 +445,7 @@ export class TaskCrudService {
     }
 
     const billing = data.billing ?? model.billing;
-    let defaultStatus: string = INTEGRACAO_TASK_STATUS_TODO;
+    let defaultStatus: IntegracaoTaskStatus = INTEGRACAO_TASK_STATUS_TODO;
     if (data.prospecting_status === "Fechado") {
       defaultStatus = INTEGRACAO_TASK_STATUS_IN_PROGRESS;
     }
