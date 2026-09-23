@@ -29,6 +29,7 @@ import { CONTABIL_RELATIONSHIP_FIELDS } from "./components/contabilRelationshipF
 import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
+  filterContabilPortfolioRows,
   getCurrentContabilCompetence,
   rollbackContabilFieldValue,
   updateContabilControlFieldStatus,
@@ -100,6 +101,22 @@ await (async () => {
     assert.match(source, /sem controle mensal/i);
     assert.match(source, /Tentar novamente/);
     assert.match(source, /—/);
+  });
+
+  await runTest("dashboard contábil filtra por busca sem acento e por coluna", () => {
+    const rows = [
+      { id: 1, searchText: "ART TOLDO INDÚSTRIA 49.791.761/0003-80", values: { regime: "Lucro Real", depreciation: "done" } },
+      { id: 2, searchText: "FARMANUTRI LTDA 20630454000153", values: { regime: "Lucro Real", depreciation: "pending" } },
+      { id: 3, searchText: "AXISVIA LOGISTICA", values: { regime: "Simples Nacional", depreciation: "done" } },
+    ];
+
+    assert.deepEqual(filterContabilPortfolioRows(rows, " industria ", {}).map((row) => row.id), [1]);
+    assert.deepEqual(filterContabilPortfolioRows(rows, "2063045", {}).map((row) => row.id), [2]);
+    assert.deepEqual(
+      filterContabilPortfolioRows(rows, "", { regime: "Lucro Real", depreciation: "done" }).map((row) => row.id),
+      [1],
+    );
+    assert.equal(filterContabilPortfolioRows(rows, "", { regime: "" }).length, 3);
   });
 
   await runTest("carteira associa o fechamento e o controle às colunas corretas", () => {
