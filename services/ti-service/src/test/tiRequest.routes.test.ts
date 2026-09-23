@@ -358,7 +358,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      error: "anydesk_code e obrigatorio.",
+      error: "anydesk_code é obrigatório.",
       code: "BAD_REQUEST",
     });
   });

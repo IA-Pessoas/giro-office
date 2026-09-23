@@ -18,11 +18,10 @@ export const tiRequestIdParamsSchema = z
   })
   .strict();
 
-const tiRequestAnydeskCodeSchema = z
-  .string({ required_error: "anydesk_code e obrigatorio." })
-  .trim()
-  .min(1, "anydesk_code e obrigatorio.")
-  .max(64, "anydesk_code deve ter no maximo 64 caracteres.");
+const tiRequestAnydeskCodeSchema = zNonEmptyText("anydesk_code").max(
+  64,
+  "anydesk_code deve ter no maximo 64 caracteres.",
+);
 
 export const createTiRequestBodySchema = z
   .object({

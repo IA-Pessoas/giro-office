@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -39,11 +39,7 @@ import {
   getTiRequestMessageActionError,
   validateTiRequestMessageImage,
 } from "../utils/requestMessageAttachment";
-import {
-  findUnseenTiRequestIds,
-  playNewTiRequestSound,
-  splitTiRequestsByQueue,
-} from "../utils/requestQueue";
+import { splitTiRequestsByQueue } from "../utils/requestQueue";
 import { TiNativeSelect } from "./TiNativeSelect";
 import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
 import {
@@ -72,8 +68,6 @@ const REQUEST_URGENCY_OPTIONS = [
 ] as const;
 
 const REQUEST_STATUS_UPDATE_OPTIONS = REQUEST_STATUS_OPTIONS.filter((option) => option.value);
-
-const NEW_REQUESTS_POLL_INTERVAL_MS = 30_000;
 
 type RequestDraft = {
   title: string;
@@ -331,11 +325,6 @@ export function TiRequestsTab() {
   }
 
   const requestsQuery = useTiRequests(filters);
-  const newRequestsQuery = useTiRequests(
-    { status: "New" },
-    { enabled: canManageRequests, refetchInterval: NEW_REQUESTS_POLL_INTERVAL_MS },
-  );
-  const seenNewRequestIdsRef = useRef<Set<string> | null>(null);
   const categoriesQuery = useTiRequestCategories();
   const requests = requestsQuery.data ?? [];
   const selectedRequest = requests.find((request) => request.id === selectedRequestId);
@@ -438,30 +427,6 @@ export function TiRequestsTab() {
     updateStatusMutation.isPending ||
     createMessageMutation.isPending;
   const isCategorySaving = createCategoryMutation.isPending || updateCategoryMutation.isPending;
-
-  useEffect(() => {
-    const newRequests = newRequestsQuery.data;
-
-    if (!newRequests) {
-      return;
-    }
-
-    const unseenIds = findUnseenTiRequestIds(seenNewRequestIdsRef.current, newRequests);
-    seenNewRequestIdsRef.current = new Set([
-      ...(seenNewRequestIdsRef.current ?? []),
-      ...newRequests.map((request) => String(request.id)),
-    ]);
-
-    if (unseenIds.length > 0) {
-      playNewTiRequestSound();
-      toast.info(
-        unseenIds.length === 1
-          ? "Novo chamado recebido."
-          : `${unseenIds.length} novos chamados recebidos.`,
-      );
-      void requestsQuery.refetch();
-    }
-  }, [newRequestsQuery.data]);
 
   useEffect(() => {
     if (!messageAttachment) {

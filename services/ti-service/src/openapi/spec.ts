@@ -498,7 +498,7 @@ const schemas: Record<string, OpenApiSchema> = {
       user_id: { type: "string", format: "uuid" },
       number: {
         type: "string",
-        minLength: 4,
+        minLength: 3,
         maxLength: 4,
         pattern: "^[0-9]{3,4}$",
         example: "1001",
@@ -513,7 +513,7 @@ const schemas: Record<string, OpenApiSchema> = {
       user_id: { type: "string", format: "uuid" },
       number: {
         type: "string",
-        minLength: 4,
+        minLength: 3,
         maxLength: 4,
         pattern: "^[0-9]{3,4}$",
         example: "1001",
