@@ -14,6 +14,10 @@ export const taskListQuerySchema = z
     assignment: z
       .enum(TASK_ASSIGNMENT_FILTER_VALUES, { message: "assignment inválido." })
       .optional(),
+    unique_service_released: z
+      .enum(["true", "false"], { message: "unique_service_released inválido." })
+      .transform((value) => value === "true")
+      .optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
   })
