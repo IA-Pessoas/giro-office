@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { zNonEmptyText } from "@workspace/shared/schemas";
+import { z } from "zod";
 
 import { isValidCnpj, normalizeCnpj } from "../domain/cnpj.js";
 
