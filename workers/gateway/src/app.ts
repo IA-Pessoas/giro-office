@@ -236,7 +236,9 @@ function auditPayload(
   return {
     requestId,
     organizationId: auth?.organizationId || null,
-    userId: auth?.userId ?? null,
+    // audit_requests.user_id tem FK para users; o id de platform_users quebrava o insert e a
+    // auditoria de super_admin sumia. Ele segue em metadata.platformUserId.
+    userId: auth?.actorKind === "platform" ? null : (auth?.userId ?? null),
     permission: auth?.claims.permission ?? null,
     method: request.method,
     path: url.pathname,
@@ -250,6 +252,7 @@ function auditPayload(
     finishedAt,
     metadata: {
       actorKind: auth?.actorKind ?? "public",
+      ...(auth?.actorKind === "platform" ? { platformUserId: auth.userId } : {}),
       routeTarget: route.binding,
       routePrefix: route.prefix,
     },
