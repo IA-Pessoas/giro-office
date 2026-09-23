@@ -79,6 +79,7 @@ describe("ti request routes", () => {
         title: "Notebook nao liga",
         description: "Equipamento nao inicia.",
         category_id: categoryId,
+        anydesk_code: "123456789",
         urgency: "High",
       });
 
@@ -101,6 +102,7 @@ describe("ti request routes", () => {
         title: "Notebook nao liga",
         description: "Equipamento nao inicia.",
         category_id: categoryId,
+        anydesk_code: "123456789",
         urgency: "High",
       });
 
@@ -338,6 +340,25 @@ describe("ti request routes", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("POST /ti/requests requires anydesk_code", async () => {
+    const response = await request(createTestApp())
+      .post("/ti/requests")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({
+        title: "Notebook nao liga",
+        description: "Equipamento nao inicia.",
+        category_id: categoryId,
+        anydesk_code: "   ",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "anydesk_code e obrigatorio.",
       code: "BAD_REQUEST",
     });
   });

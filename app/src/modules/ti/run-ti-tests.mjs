@@ -1421,6 +1421,37 @@ await runTest("ti requests tab consumes live hooks instead of rendering only an 
   assert.doesNotMatch(tabSource, /const\s+(requests|messages|categories)\s*=\s*\[/);
 });
 
+await runTest("ti requests queue splits open and closed tickets and detects unseen new ones", async () => {
+  const { findUnseenTiRequestIds, isClosedTiRequestStatus, splitTiRequestsByQueue } =
+    await import("./utils/requestQueue.ts");
+
+  const { open, closed } = splitTiRequestsByQueue([
+    { id: "1", status: "New" },
+    { id: "2", status: "In_Progress" },
+    { id: "3", status: "Waiting" },
+    { id: "4", status: "Resolved" },
+    { id: "5", status: "Closed" },
+  ]);
+  assert.deepEqual(open.map((request) => request.id), ["1", "2", "3"]);
+  assert.deepEqual(closed.map((request) => request.id), ["4", "5"]);
+  assert.equal(isClosedTiRequestStatus(undefined), false);
+
+  assert.deepEqual(findUnseenTiRequestIds(null, [{ id: "1" }]), []);
+  assert.deepEqual(findUnseenTiRequestIds(new Set(["1"]), [{ id: "1" }, { id: "2" }]), ["2"]);
+});
+
+await runTest("ti requests tab requires AnyDesk and polls new tickets with sound", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+
+  assert.match(tabSource, /Código AnyDesk/);
+  assert.match(tabSource, /anydesk_code: requestDraft\.anydesk_code\.trim\(\)/);
+  assert.match(tabSource, /Informe o código AnyDesk para criar o chamado\./);
+  assert.match(tabSource, /refetchInterval: NEW_REQUESTS_POLL_INTERVAL_MS/);
+  assert.match(tabSource, /playNewTiRequestSound\(\)/);
+  assert.match(tabSource, /renderRequestsTable\(requestQueues\.open/);
+  assert.match(tabSource, /renderRequestsTable\(\s*requestQueues\.closed/);
+});
+
 await runTest("ti requests creation opens in a dialog and leaves filters spanning the workspace", async () => {
   const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
 

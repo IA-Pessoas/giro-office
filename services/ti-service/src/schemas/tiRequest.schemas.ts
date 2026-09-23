@@ -18,10 +18,17 @@ export const tiRequestIdParamsSchema = z
   })
   .strict();
 
+const tiRequestAnydeskCodeSchema = z
+  .string({ required_error: "anydesk_code e obrigatorio." })
+  .trim()
+  .min(1, "anydesk_code e obrigatorio.")
+  .max(64, "anydesk_code deve ter no maximo 64 caracteres.");
+
 export const createTiRequestBodySchema = z
   .object({
     title: zNonEmptyText("title"),
     description: zNonEmptyText("description"),
+    anydesk_code: tiRequestAnydeskCodeSchema,
     category_id: z.string().uuid({ message: "Categoria de TI invalida." }),
     requester_id: z.string().uuid({ message: "Solicitante invalido." }).optional(),
     assigned_to_id: z.string().uuid({ message: "Responsavel invalido." }).optional(),
@@ -37,6 +44,7 @@ export const updateTiRequestBodySchema = z
     category_id: z.string().uuid({ message: "Categoria de TI invalida." }).optional(),
     urgency: tiRequestUrgencySchema.optional(),
     attachment: z.string().url({ message: "Anexo deve ser uma URL valida." }).optional(),
+    anydesk_code: tiRequestAnydeskCodeSchema.optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

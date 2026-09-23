@@ -371,11 +371,12 @@ const schemas: Record<string, OpenApiSchema> = {
   },
   TiRequestInput: {
     type: "object",
-    required: ["title", "description", "category_id"],
+    required: ["title", "description", "category_id", "anydesk_code"],
     properties: {
       title: { type: "string", minLength: 1 },
       description: { type: "string", minLength: 1 },
       category_id: { type: "string", format: "uuid" },
+      anydesk_code: { type: "string", minLength: 1, maxLength: 64 },
       requester_id: { type: "string", format: "uuid" },
       assigned_to_id: { type: "string", format: "uuid" },
       urgency: {
@@ -396,6 +397,7 @@ const schemas: Record<string, OpenApiSchema> = {
       category_id: { type: "string", format: "uuid" },
       urgency: { type: "string", enum: urgencyValues },
       attachment: { type: "string", format: "uri" },
+      anydesk_code: { type: "string", minLength: 1, maxLength: 64 },
     },
     additionalProperties: false,
   },
