@@ -225,6 +225,8 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
             id: true,
             name: true,
             company_name: true,
+            cpf_cnpj: true,
+            regime: true,
             controlContabil: {
               where: { competence, organization_id: organizationId, archived_at: null },
               orderBy: { id: "asc" },
@@ -237,6 +239,16 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
             },
           },
         });
+        const responsibles = await prisma.responsibleContabil.findMany({
+          where: {
+            organization_id: organizationId,
+            client_id: { in: clients.map((client) => client.id) },
+          },
+          select: { client_id: true, person_responsible_id: true, posted_by_id: true },
+        });
+        const responsibleByClient = new Map(
+          responsibles.map((responsible) => [String(responsible.client_id), responsible]),
+        );
         return {
           competence,
           items: clients
@@ -253,6 +265,11 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
                   typeof client.company_name === "string" && client.company_name.trim()
                     ? client.company_name.trim()
                     : String(client.name),
+                cpf_cnpj: client.cpf_cnpj ?? "",
+                regime: client.regime ?? null,
+                person_responsible_id:
+                  responsibleByClient.get(String(client.id))?.person_responsible_id ?? null,
+                posted_by_id: responsibleByClient.get(String(client.id))?.posted_by_id ?? null,
                 control: control ?? null,
                 closing: closing ?? {
                   client_id: client.id,

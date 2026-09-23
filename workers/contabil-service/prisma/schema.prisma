@@ -12,6 +12,8 @@ model Client {
   id                 String           @id @default(uuid())
   name               String
   company_name       String?
+  cpf_cnpj           String           @default("")
+  regime             String?
   competence_entry   DateTime?
   competence_output  DateTime?
   contabil           Boolean?

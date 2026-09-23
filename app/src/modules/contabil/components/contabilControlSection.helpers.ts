@@ -57,3 +57,19 @@ export function rollbackContabilFieldValue(
     [field]: confirmed[field],
   };
 }
+
+function normalizeSearchText(value: string) {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+export function filterContabilPortfolioRows<
+  Row extends { searchText: string; values: Record<string, string> },
+>(rows: readonly Row[], search: string, filters: Record<string, string>): Row[] {
+  const term = normalizeSearchText(search.trim());
+
+  return rows.filter(
+    (row) =>
+      (!term || normalizeSearchText(row.searchText).includes(term)) &&
+      Object.entries(filters).every(([key, value]) => !value || row.values[key] === value),
+  );
+}
