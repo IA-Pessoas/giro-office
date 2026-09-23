@@ -666,6 +666,14 @@ async function updateOrganizationUser(
   }
   if (input.type === "owner" && (input.type === "owner" || input.first_owner_flag === true)) {
     modulesToApply = { ...MAX_MODULES };
+  } else if (modulePatch) {
+    // Paridade com o Node: módulos enviados vencem; admin mantém o módulo do departamento.
+    modulesToApply = { ...modulePatch };
+    const departmentModuleName =
+      requestedType === "admin" && normalizesTypeOrPermission
+        ? departmentModule(normalizationDepartmentName)
+        : undefined;
+    if (departmentModuleName) modulesToApply[departmentModuleName] = MAX_MODULE_PERMISSION;
   } else if (normalizesTypeOrPermission) {
     const effectivePermission =
       typeof data.permission === "number"
@@ -677,8 +685,6 @@ async function updateOrganizationUser(
       normalizationDepartmentName,
       input.status ?? existing.status,
     );
-  } else if (modulePatch) {
-    modulesToApply = modulePatch;
   }
   if (input.password !== undefined) {
     data.password = await hashPassword(String(input.password));
