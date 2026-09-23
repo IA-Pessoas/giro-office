@@ -39,6 +39,7 @@ function forwardedOrganizationAuth(c: WorkerContext): WorkerAuthContext | undefi
     throw new OrganizationWorkerError(401, "Não autenticado.");
   }
 
+  const type = c.req.header("x-auth-type");
   return {
     token: "forwarded",
     userId: forwardedUserId,
@@ -51,6 +52,8 @@ function forwardedOrganizationAuth(c: WorkerContext): WorkerAuthContext | undefi
       auth_kind: "organization",
       modules: {},
       modulePermissionsPresent: c.req.header("x-auth-modules") !== undefined,
+      // O gateway encaminha o tipo; as rotas de status e plano exigem owner.
+      ...(type === "owner" || type === "admin" || type === "user" ? { type } : {}),
     } as WorkerAuthContext["claims"],
   };
 }
