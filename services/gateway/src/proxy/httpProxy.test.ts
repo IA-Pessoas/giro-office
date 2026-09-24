@@ -255,6 +255,18 @@ describe("buildForwardHeaders", () => {
   it.each([
     {
       method: "GET",
+      path: "/platform/super-admins",
+      expectedCookie: "cw.session=verified-platform-token",
+      expectedCsrf: null,
+    },
+    {
+      method: "PATCH",
+      path: "/platform/super-admins/platform-user-1/impersonation-permission",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
+    {
+      method: "GET",
       path: "/platform/organizations/org-1",
       expectedCookie: "cw.session=verified-platform-token",
       expectedCsrf: null,
@@ -304,6 +316,12 @@ describe("buildForwardHeaders", () => {
     {
       method: "POST",
       path: "/platform/organizations/org-1/users",
+      expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
+      expectedCsrf: "proof",
+    },
+    {
+      method: "POST",
+      path: "/platform/organizations/org-1/users/user-1/impersonate",
       expectedCookie: "cw.session=verified-platform-token; cw.csrf=proof",
       expectedCsrf: "proof",
     },
@@ -487,6 +505,51 @@ describe("buildForwardHeaders", () => {
 });
 
 describe("buildHttpProxyMiddleware", () => {
+  it("devolve os cookies de sessão emitidos ao iniciar personificação", async () => {
+    const upstreamHeaders = new Headers();
+    upstreamHeaders.append("set-cookie", "cw.session=impersonation.jwt; HttpOnly");
+    upstreamHeaders.append("set-cookie", "cw.csrf=impersonation-csrf");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new globalThis.Response(null, { status: 204, headers: upstreamHeaders })),
+    );
+    const setHeader = vi.fn();
+    const response = {
+      end: vi.fn(),
+      setHeader,
+      status: vi.fn().mockReturnThis(),
+    } as unknown as Response;
+    const request = {
+      body: {},
+      get: (name: string) => (name.toLowerCase() === CSRF_HEADER_NAME ? "proof" : undefined),
+      headers: {
+        "content-type": "application/json",
+        cookie: "cw.session=browser-token; cw.csrf=proof",
+        [CSRF_HEADER_NAME]: "proof",
+      },
+      ip: "127.0.0.1",
+      method: "POST",
+      originalUrl: "/platform/organizations/org-1/users/user-1/impersonate",
+      protocol: "https",
+      auth: {
+        ...authenticatedRequest.auth,
+        token: "verified-platform-token",
+        actorKind: "platform",
+        isPlatformAdmin: true,
+      },
+    } as unknown as Request;
+    const proxy = buildHttpProxyMiddleware("http://upstream.test", {
+      forwardPlatformSessionCredentials: true,
+    });
+
+    await proxy(request, response, vi.fn());
+
+    expect(setHeader).toHaveBeenCalledWith("set-cookie", [
+      "cw.session=impersonation.jwt; HttpOnly",
+      "cw.csrf=impersonation-csrf",
+    ]);
+  });
+
   it("devolve os cookies de plataforma emitidos ao sair da personificação", async () => {
     const upstreamHeaders = new Headers();
     upstreamHeaders.append("set-cookie", "cw.session=platform.jwt; HttpOnly");

@@ -147,8 +147,11 @@ describe("user-service gateway registry", () => {
   });
 
   it.each([
+    ["GET", "/platform/super-admins"],
+    ["PATCH", "/platform/super-admins/platform-user-1/impersonation-permission"],
     ["GET", "/platform/organizations/org-1/users/user-1"],
     ["GET", "/platform/organizations/org-1/users/user-1/permissions"],
+    ["POST", "/platform/organizations/org-1/users/user-1/impersonate"],
     ["PUT", "/platform/organizations/org-1/users/user-1/permissions"],
     ["GET", "/platform/organizations/org-1/departments"],
     ["DELETE", "/platform/organizations/org-1/users/user-1"],
