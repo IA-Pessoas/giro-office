@@ -494,10 +494,8 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     ).data;
     expect(afterCreate.total).toBe(0);
 
-    const kept = expectOk(
-      await call("POST", "/pessoal/unions", union),
-      "POST union sem auditoria",
-    ).data.id;
+    const kept = expectOk(await call("POST", "/pessoal/unions", union), "POST union sem auditoria")
+      .data.id;
     const refusedDelete = await smokeCall(
       failingAudit(),
       undefined,
