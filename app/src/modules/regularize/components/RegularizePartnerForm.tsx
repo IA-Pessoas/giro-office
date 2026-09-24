@@ -13,6 +13,7 @@ import {
   toRegularizeInputDate,
   trimRegularizeOptionalText,
 } from "../utils/regularizeForm";
+import { type PartnerFormErrors, validatePartnerForm } from "../utils/partnerForm";
 import {
   RegularizeFormActions,
   RegularizeFormError,
@@ -63,6 +64,7 @@ function buildPartnerFormState(
 export function RegularizePartnerForm({
   defaultPfId,
   defaultPjId,
+  excludePfIds,
   isSubmitting,
   onClose,
   onSubmit,
@@ -71,6 +73,7 @@ export function RegularizePartnerForm({
 }: {
   defaultPfId: string;
   defaultPjId: string;
+  excludePfIds?: readonly string[];
   isSubmitting: boolean;
   onClose: () => void;
   onSubmit: (
@@ -83,6 +86,7 @@ export function RegularizePartnerForm({
     buildPartnerFormState(partner, defaultPfId, defaultPjId),
   );
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<PartnerFormErrors>({});
 
   const isEditing = Boolean(partner);
 
@@ -90,6 +94,7 @@ export function RegularizePartnerForm({
     if (open) {
       setFormState(buildPartnerFormState(partner, defaultPfId, defaultPjId));
       setFormError(null);
+      setFieldErrors({});
     }
   }, [defaultPfId, defaultPjId, open, partner]);
 
@@ -107,23 +112,22 @@ export function RegularizePartnerForm({
     event.preventDefault();
     setFormError(null);
 
-    const part = Number(formState.part);
+    const dateInput = (name: string) =>
+      event.currentTarget.elements.namedItem(name) as HTMLInputElement | null;
+    const errors = validatePartnerForm(formState, {
+      entryIncomplete: dateInput("entry")?.validity.badInput,
+      exitIncomplete: dateInput("exit")?.validity.badInput,
+    });
+    setFieldErrors(errors);
 
-    if (
-      !formState.pj_id ||
-      !formState.pf_id ||
-      !formState.part.trim() ||
-      !formState.entry ||
-      Number.isNaN(part)
-    ) {
-      setFormError("Preencha os campos obrigatórios.");
+    if (!formState.pj_id || Object.keys(errors).length > 0) {
       return;
     }
 
     const payload = {
       pj_id: formState.pj_id,
       pf_id: formState.pf_id,
-      part,
+      part: Number(formState.part),
       entry: formState.entry,
       exit: trimRegularizeOptionalText(formState.exit),
     };
@@ -138,7 +142,7 @@ export function RegularizePartnerForm({
         await onSubmit(payload);
       }
     } catch (error) {
-      setFormError(getRegularizeMutationErrorMessage(error, "Não foi possível salvar o sócio."));
+      setFormError(getRegularizeMutationErrorMessage(error, "Não foi possível salvar o vínculo."));
     }
   }
 
@@ -155,8 +159,8 @@ export function RegularizePartnerForm({
       contentClassName="w-[min(92vw,760px)]"
       bodyClassName="max-h-[72vh] overflow-y-auto"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <RegularizeFormError message={formError} />
+      <form noValidate onSubmit={handleSubmit} className="space-y-5">
+        <RegularizeFormError message={formError} title="Não foi possível salvar o vínculo" />
 
         <div className="grid gap-5 md:grid-cols-2">
           <RegularizeFormField label="Cliente PJ" required>
@@ -169,15 +173,22 @@ export function RegularizePartnerForm({
               <span className="text-red-500">*</span>
             </legend>
             <RegularizeClientPfSelect
+              excludeIds={excludePfIds}
               value={formState.pf_id}
               onChange={(id) => handleChange("pf_id", id)}
             />
+            {fieldErrors.pf_id ? (
+              <span role="alert" className="text-xs text-red-700 dark:text-red-300">
+                {fieldErrors.pf_id}
+              </span>
+            ) : null}
           </fieldset>
 
-          <RegularizeFormField label="Participação" required>
+          <RegularizeFormField label="Participação (%)" required error={fieldErrors.part}>
             <input
               type="number"
-              min="0"
+              min="0.01"
+              max="100"
               step="0.01"
               value={formState.part}
               onChange={(event) => handleChange("part", event.target.value)}
@@ -185,8 +196,9 @@ export function RegularizePartnerForm({
             />
           </RegularizeFormField>
 
-          <RegularizeFormField label="Entrada" required>
+          <RegularizeFormField label="Entrada" required error={fieldErrors.entry}>
             <input
+              name="entry"
               type="date"
               value={formState.entry}
               onChange={(event) => handleChange("entry", event.target.value)}
@@ -194,8 +206,9 @@ export function RegularizePartnerForm({
             />
           </RegularizeFormField>
 
-          <RegularizeFormField label="Saída">
+          <RegularizeFormField label="Saída" error={fieldErrors.exit}>
             <input
+              name="exit"
               type="date"
               value={formState.exit}
               onChange={(event) => handleChange("exit", event.target.value)}

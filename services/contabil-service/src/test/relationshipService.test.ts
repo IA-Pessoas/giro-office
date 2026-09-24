@@ -137,7 +137,7 @@ describe("RelationshipService", () => {
     );
   });
 
-  it("getByClientId lança 404 quando não encontra", async () => {
+  it("getByClientId retorna null quando não encontra (#1325)", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.relationshipContabil.findFirst).mockResolvedValue(null);
     const service = new RelationshipService(prisma, {
@@ -145,9 +145,7 @@ describe("RelationshipService", () => {
       logUpdateIfChanged: vi.fn(),
     });
 
-    await expect(service.getByClientId(CLIENT_ID, ORG_ID)).rejects.toMatchObject({
-      statusCode: 404,
-    });
+    await expect(service.getByClientId(CLIENT_ID, ORG_ID)).resolves.toBeNull();
   });
 
   it("getByClientId retorna registro", async () => {

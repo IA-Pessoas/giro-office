@@ -89,14 +89,14 @@ export const documentItemSchema = z
     if (body.status === undefined) {
       ctx.addIssue({ code: "custom", path: ["status"], message: "status é obrigatório." });
     }
-    if (body.type === "CONTABIL" && body.delivery_method !== undefined) {
+    if (body.type === "CONTABIL" && body.delivery_method != null) {
       ctx.addIssue({
         code: "custom",
         path: ["delivery_method"],
         message: "método de entrega só é aceito na rotina fiscal.",
       });
     }
-    if (body.type !== "FISCAL" && body.state_site !== undefined) {
+    if (body.type !== "FISCAL" && body.state_site != null) {
       ctx.addIssue({
         code: "custom",
         path: ["state_site"],

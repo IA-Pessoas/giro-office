@@ -21,6 +21,7 @@ export const TRIAGE_OVERVIEW_STATUS_VALUES = [
   "ROUTINE_PENDING",
   "BANK_PENDING",
   "COMPLETE",
+  "NO_APPLICABLE_ITEMS",
 ] as const;
 
 export const listTriageOverviewQuerySchema = z

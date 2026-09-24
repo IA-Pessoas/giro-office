@@ -106,6 +106,7 @@ SMOKE_BASE_URL_CONTABIL=... \
 SMOKE_BASE_URL_FISCAL=... \
 SMOKE_BASE_URL_TRIAGEM=... \
 SMOKE_BASE_URL_PARCELAMENTO=... \
+SMOKE_BASE_URL_PESSOAL=... \
 node scripts/cloudflare-smoke/run.mjs
 ```
 

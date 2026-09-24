@@ -1,4 +1,8 @@
-import { formatCnpjInput, normalizeCnpjInput } from "../../../shared/utils/inputFormatting.ts";
+import {
+  formatCnpjInput,
+  isValidCnpj,
+  normalizeCnpjInput,
+} from "../../../shared/utils/inputFormatting.ts";
 
 import type { PessoalUnion, PessoalUnionPayload } from "../types/unions";
 
@@ -58,4 +62,20 @@ export function buildPessoalUnionFormPayload(values: {
     cnpj: normalizePessoalUnionCnpjValue(values.cnpj),
     base_date: values.base_date || null,
   };
+}
+
+/**
+ * Erro de validação do formulário de sindicato, ou null. O CNPJ só é conferido quando é novo ou
+ * foi alterado, para não travar a edição de cadastros antigos com CNPJ fora do padrão.
+ */
+export function validatePessoalUnionPayload(
+  payload: PessoalUnionPayload,
+  originalCnpj?: string | null,
+): string | null {
+  if (!payload.name) return "Informe o nome do sindicato.";
+  if (!payload.cnpj) return "Informe o CNPJ do sindicato.";
+  if (payload.cnpj !== normalizeCnpjInput(originalCnpj) && !isValidCnpj(payload.cnpj)) {
+    return "CNPJ inválido. Confira os 14 caracteres e os dígitos verificadores.";
+  }
+  return null;
 }

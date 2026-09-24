@@ -2,7 +2,9 @@ import { z } from "zod";
 
 export const createResponsibleBodySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id inválido." }),
+    client_id: z
+      .string({ required_error: "client_id é obrigatório." })
+      .uuid({ message: "client_id inválido." }),
     person_responsible_id: z
       .string()
       .uuid({ message: "person_responsible_id inválido." })

@@ -1755,6 +1755,14 @@ const baseManifest = [
   op({
     service: "client-service",
     method: "DELETE",
+    path: "/client/{id}/histories/{historyId}",
+    action: "clientHistoriesDelete",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "DELETE",
     path: "/client/histories/pending/{pendingId}",
     action: "clientHistoriesPendingDelete",
     target: "gateway",

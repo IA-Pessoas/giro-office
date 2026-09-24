@@ -6,6 +6,7 @@ import {
   GroupAssignmentService,
   type PessoalAssignmentPrisma,
   type PessoalNotificationPrisma,
+  sendPessoalAudit,
   UnionNotificationService,
 } from "./remainderServices.js";
 
@@ -196,7 +197,7 @@ describe("GroupAssignmentService do Worker", () => {
       fetch: vi.fn(async () => new Response(null, { status: 503 })),
     };
     const audit = createPessoalAuditRecorder({
-      INTERNAL_SERVICE_TOKEN: "audit-test-token",
+      AUDIT_SERVICE_TOKEN: "audit-test-token",
       AUDIT_SERVICE: binding,
     } as unknown as PessoalWorkerEnv);
     const service = new GroupAssignmentService(prisma, audit, () => FIXED_NOW);
@@ -270,7 +271,7 @@ describe("GroupAssignmentService do Worker", () => {
       }),
     };
     const audit = createPessoalAuditRecorder({
-      INTERNAL_SERVICE_TOKEN: "audit-test-token",
+      AUDIT_SERVICE_TOKEN: "audit-test-token",
       AUDIT_SERVICE: binding,
     } as unknown as PessoalWorkerEnv);
     const service = new GroupAssignmentService(prisma, audit, () => FIXED_NOW);
@@ -351,7 +352,7 @@ describe("GroupAssignmentService do Worker", () => {
       }),
     };
     const audit = createPessoalAuditRecorder({
-      INTERNAL_SERVICE_TOKEN: "audit-test-token",
+      AUDIT_SERVICE_TOKEN: "audit-test-token",
       AUDIT_SERVICE: binding,
     } as unknown as PessoalWorkerEnv);
     const service = new GroupAssignmentService(prisma, audit, () => FIXED_NOW);
@@ -466,7 +467,7 @@ describe("GroupAssignmentService do Worker", () => {
       fetch: vi.fn(async () => new Response(null, { status: 503 })),
     };
     const recorder = createPessoalAuditRecorder({
-      INTERNAL_SERVICE_TOKEN: "audit-test-token",
+      AUDIT_SERVICE_TOKEN: "audit-test-token",
       AUDIT_SERVICE: binding,
     } as unknown as PessoalWorkerEnv);
 
@@ -480,6 +481,85 @@ describe("GroupAssignmentService do Worker", () => {
         referringId: PREVIEW_ID,
       }),
     ).rejects.toMatchObject({ statusCode: 502 });
+  });
+
+  it("autentica no AUDIT_SERVICE com AUDIT_SERVICE_TOKEN, não com o token interno", async () => {
+    const binding = {
+      fetch: vi.fn(async (_request: Request) => new Response(null, { status: 201 })),
+    };
+    const recorder = createPessoalAuditRecorder({
+      INTERNAL_SERVICE_TOKEN: "gateway-internal-token",
+      AUDIT_SERVICE_TOKEN: "audit-test-token",
+      AUDIT_SERVICE: binding,
+    } as unknown as PessoalWorkerEnv);
+
+    await expect(
+      recorder({
+        requestId: "audit-request-token",
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        action: "Cadastro",
+        referring: "pessoal.union",
+        referringId: PREVIEW_ID,
+      }),
+    ).resolves.toBe(true);
+    const request = binding.fetch.mock.calls[0]?.[0];
+    expect(request?.headers.get("x-internal-service-token")).toBe("audit-test-token");
+  });
+
+  it("completa os campos obrigatórios do audit-service nas escritas de domínio", async () => {
+    const binding = {
+      fetch: vi.fn(async (_request: Request) => new Response(null, { status: 201 })),
+    };
+    // Formato enviado pelas rotas de sindicato/LDD: sem requestId, createdAt nem path.
+    await sendPessoalAudit(
+      {
+        AUDIT_SERVICE_TOKEN: "audit-test-token",
+        AUDIT_SERVICE: binding,
+      } as unknown as PessoalWorkerEnv,
+      {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: "pessoal.union",
+        referringId: PREVIEW_ID,
+        department: "pessoal",
+      },
+    );
+
+    const body = await binding.fetch.mock.calls[0]?.[0].json();
+    expect(body).toMatchObject({
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      path: "/pessoal/union",
+      referring: "pessoal.union",
+      action: "Cadastro",
+    });
+    expect(new Date(body.createdAt).toISOString()).toBe(body.createdAt);
+    expect(body.finishedAt).toBe(body.createdAt);
+  });
+
+  it("recusa auditar sem AUDIT_SERVICE_TOKEN em vez de enviar credencial errada", async () => {
+    const binding = { fetch: vi.fn(async () => new Response(null, { status: 201 })) };
+    const recorder = createPessoalAuditRecorder({
+      INTERNAL_SERVICE_TOKEN: "gateway-internal-token",
+      AUDIT_SERVICE: binding,
+    } as unknown as PessoalWorkerEnv);
+
+    await expect(
+      recorder({
+        requestId: "audit-request-no-token",
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        action: "Cadastro",
+        referring: "pessoal.union",
+        referringId: PREVIEW_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 503 });
+    expect(binding.fetch).not.toHaveBeenCalled();
   });
 
   it("aborta e propaga timeout do AUDIT_SERVICE", async () => {
@@ -502,7 +582,7 @@ describe("GroupAssignmentService do Worker", () => {
         ),
       };
       const recorder = createPessoalAuditRecorder({
-        INTERNAL_SERVICE_TOKEN: "audit-test-token",
+        AUDIT_SERVICE_TOKEN: "audit-test-token",
         AUDIT_SERVICE: binding,
       } as unknown as PessoalWorkerEnv);
       const pending = recorder({

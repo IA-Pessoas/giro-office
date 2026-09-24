@@ -79,6 +79,7 @@ function service(): ClientWorkerService {
     createPending: vi.fn(async () => ({ id: PENDING_ID, client_id: CLIENT_ID, reason: "Retorno" })),
     listPending: vi.fn(async () => ({ list: [] })),
     deletePending: vi.fn(async () => undefined),
+    deleteHistory: vi.fn(async () => undefined),
     createPA: vi.fn(async () => ({ client_id: CLIENT_ID })),
     getPADetail: vi.fn(async () => ({ client_id: CLIENT_ID })),
     updatePA: vi.fn(async () => ({ client_id: CLIENT_ID })),
@@ -208,5 +209,156 @@ describe("client Worker", () => {
       USER_ID,
       "Retorno",
     );
+  });
+
+  it("creates a history with a multipart attachment", async () => {
+    const clientService = service();
+    const historyStorage = {
+      upload: vi.fn(async () => `clients/historys/${CLIENT_ID}/doc.pdf`),
+      createSignedAccessUrl: vi.fn(),
+      download: vi.fn(),
+      remove: vi.fn(),
+    };
+    const app = createClientWorkerApp({ env: env(), clientService, historyStorage });
+    const form = new FormData();
+    form.append("date", "2026-09-23T12:00:00.000Z");
+    form.append("history", "Contato com anexo");
+    form.append("file", new File(["%PDF-1.4"], "doc.pdf", { type: "application/pdf" }));
+
+    const response = await app.request(`https://client.test/client/${CLIENT_ID}/histories`, {
+      method: "POST",
+      headers: headers(),
+      body: form,
+    });
+
+    expect(response.status).toBe(201);
+    expect(historyStorage.upload).toHaveBeenCalledWith(CLIENT_ID, expect.any(File));
+    expect(clientService.createHistory).toHaveBeenCalledWith(
+      CLIENT_ID,
+      ORGANIZATION_ID,
+      USER_ID,
+      expect.objectContaining({
+        history: "Contato com anexo",
+        file: `clients/historys/${CLIENT_ID}/doc.pdf`,
+      }),
+    );
+  });
+
+  it("removes the uploaded attachment when the history insert fails", async () => {
+    const clientService = service();
+    vi.mocked(clientService.createHistory).mockRejectedValueOnce(new Error("db down"));
+    const historyStorage = {
+      upload: vi.fn(async () => "clients/historys/orphan.pdf"),
+      createSignedAccessUrl: vi.fn(),
+      download: vi.fn(),
+      remove: vi.fn(async () => undefined),
+    };
+    const app = createClientWorkerApp({ env: env(), clientService, historyStorage });
+    const form = new FormData();
+    form.append("date", "2026-09-23T12:00:00.000Z");
+    form.append("history", "Contato");
+    form.append("file", new File(["%PDF-1.4"], "doc.pdf", { type: "application/pdf" }));
+
+    const response = await app.request(`https://client.test/client/${CLIENT_ID}/histories`, {
+      method: "POST",
+      headers: headers(),
+      body: form,
+    });
+
+    expect(response.status).toBe(500);
+    expect(historyStorage.remove).toHaveBeenCalledWith("clients/historys/orphan.pdf");
+  });
+
+  it("rejects a non-file attachment instead of ignoring it", async () => {
+    const app = createClientWorkerApp({ env: env(), clientService: service() });
+
+    const response = await app.request(`https://client.test/client/${CLIENT_ID}/histories`, {
+      method: "POST",
+      headers: { ...headers(), "content-type": "application/json" },
+      body: JSON.stringify({
+        date: "2026-09-23T12:00:00.000Z",
+        history: "Contato",
+        file: "doc.pdf",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("edits a history keeping the offset datetime and rejects one without offset", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const patch = (date: string) =>
+      app.request(`https://client.test/client/${CLIENT_ID}/histories/${HISTORY_ID}`, {
+        method: "PATCH",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ date, history: "Contato" }),
+      });
+
+    const withOffset = await patch("2026-09-23T10:00:00-03:00");
+    const withoutOffset = await patch("2026-09-23T10:00");
+
+    expect(withOffset.status).toBe(200);
+    expect(clientService.updateHistory).toHaveBeenCalledWith(
+      HISTORY_ID,
+      ORGANIZATION_ID,
+      USER_ID,
+      expect.objectContaining({ date: new Date("2026-09-23T13:00:00.000Z") }),
+    );
+    expect(withoutOffset.status).toBe(400);
+    expect(((await withoutOffset.json()) as { error: string }).error).toBe(
+      "Informe data e hora com fuso horário (ISO 8601).",
+    );
+    expect(clientService.updateHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletes a history passing whether the caller manages the organization", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const remove = (extra: Record<string, string>) =>
+      app.request(`https://client.test/client/${CLIENT_ID}/histories/${HISTORY_ID}`, {
+        method: "DELETE",
+        headers: headers(extra),
+      });
+
+    const byOwner = await remove({});
+    const byUser = await remove({ "x-auth-type": "user", "x-auth-permission": "1" });
+
+    expect(byOwner.status).toBe(200);
+    expect(byUser.status).toBe(200);
+    expect(clientService.deleteHistory).toHaveBeenNthCalledWith(
+      1,
+      CLIENT_ID,
+      HISTORY_ID,
+      ORGANIZATION_ID,
+      USER_ID,
+      true,
+    );
+    expect(clientService.deleteHistory).toHaveBeenNthCalledWith(
+      2,
+      CLIENT_ID,
+      HISTORY_ID,
+      ORGANIZATION_ID,
+      USER_ID,
+      false,
+    );
+  });
+
+  it("rejects unknown multipart fields with a Portuguese message", async () => {
+    const app = createClientWorkerApp({ env: env(), clientService: service() });
+    const form = new FormData();
+    form.append("date", "2026-09-23T12:00:00.000Z");
+    form.append("history", "Contato");
+    form.append("extra", "x");
+
+    const response = await app.request(`https://client.test/client/${CLIENT_ID}/histories`, {
+      method: "POST",
+      headers: headers(),
+      body: form,
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Campo não permitido no histórico.");
   });
 });

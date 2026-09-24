@@ -23,6 +23,7 @@ export const WORKERS = [
   },
   { key: "task", dir: "workers/task-service", service: "giro-task-service" },
   { key: "reports", dir: "workers/reports-service", service: "giro-reports-service" },
+  { key: "pessoal", dir: "workers/pessoal-service", service: "giro-pessoal-service" },
   { key: "gateway", dir: "workers/gateway", service: "giro-gateway" },
 ];
 
@@ -208,6 +209,7 @@ const SERVICE_CLIENT_DIRS = [
   "services/triagem-service/src/generated/prisma",
   "services/parcelamento-service/src/generated/prisma",
   "services/task-service/src/generated/prisma",
+  "services/pessoal-service/src/generated/prisma",
 ];
 
 /**

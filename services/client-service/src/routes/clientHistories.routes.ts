@@ -23,6 +23,7 @@ import {
   createClientHistory,
   createClientHistoryFileAccessUrl,
   createHistoryPending,
+  deleteClientHistory,
   deleteHistoryPending,
   getClientHistoryDetail,
   listClientHistories,
@@ -81,6 +82,10 @@ function uploadHistoryFile(request: Request, response: Response, next: NextFunct
 
     next(err);
   });
+}
+
+function managesOrganization(request: Request): boolean {
+  return request.user_type === "owner" || isAdminPermission(request.permission);
 }
 
 export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
@@ -209,6 +214,29 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
     },
   );
 
+  router.delete(
+    "/:id/histories/:historyId",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const params = parseWithZod(historyIdParamsSchema, request.params);
+        const organizationId = resolveOrganizationId(request, undefined);
+        await deleteClientHistory(
+          prisma,
+          organizationId,
+          params.id,
+          params.historyId,
+          request.user_id,
+          managesOrganization(request),
+        );
+        response.json(createSuccessResponse({ ok: true }));
+      } catch (err) {
+        logError("Erro ao excluir histórico", { err });
+        next(err);
+      }
+    },
+  );
+
   router.post(
     "/:id/histories/pending",
     isAuthenticated,
@@ -253,7 +281,7 @@ export function createClientHistoriesRouter(deps: ClientRouterDeps): Router {
     isAuthenticated,
     async (request: Request, response: Response, next: NextFunction) => {
       try {
-        if (!isAdminPermission(request.permission)) {
+        if (!managesOrganization(request)) {
           throw new ServiceError(403, "Usuário não tem permissão.");
         }
         const params = parseWithZod(pendingDeleteParamsSchema, request.params);

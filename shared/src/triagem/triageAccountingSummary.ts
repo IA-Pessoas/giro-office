@@ -5,6 +5,8 @@ export const TRIAGE_ACCOUNTING_STATUS_PRECEDENCE = [
   "ROUTINE_PENDING",
   "BANK_PENDING",
   "COMPLETE",
+  // Nenhum item de rotina ou extrato aplicável: não é o mesmo que concluída.
+  "NO_APPLICABLE_ITEMS",
 ] as const;
 
 export type TriageAccountingStatus = (typeof TRIAGE_ACCOUNTING_STATUS_PRECEDENCE)[number];

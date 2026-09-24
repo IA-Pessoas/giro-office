@@ -16,6 +16,7 @@ import {
   getRegularizeUnsupportedDateClearError,
   hasRegularizeChanges,
 } from "@modules/clients/utils/regularizeForm";
+import { getIntegrationEmailError } from "@modules/clients/utils/integrationForm";
 import {
   validateCpfCnpjDocument,
   validateOptionalCpfDocument,
@@ -96,8 +97,16 @@ export default function ClientRegularizePage() {
       return;
     }
 
+    const payload = buildRegularizePayload(formValues, client);
+    const emailError = "email" in payload ? getIntegrationEmailError(formValues.email) : null;
+
+    if (emailError) {
+      toast.error(emailError);
+      return;
+    }
+
     try {
-      await updateRegularizeMutation.mutateAsync(buildRegularizePayload(formValues, client));
+      await updateRegularizeMutation.mutateAsync(payload);
       toast.success("Fluxo de regularização atualizado com sucesso.");
       await router.push(`/clients/${clientId}`);
     } catch (error) {
