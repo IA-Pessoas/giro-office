@@ -24,9 +24,11 @@ import type { ContabilCompetence, ContabilControl } from "../types";
 import { CONTABIL_CONTROL_CHECKLIST_FIELDS } from "./contabilControlFields";
 import {
   filterContabilPortfolioRows,
+  formatContabilCount,
   getContabilCompletionPercent,
   getCurrentContabilCompetence,
 } from "./contabilControlSection.helpers";
+import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
 
 const TEXT_FILTER_COLUMNS = [
@@ -139,12 +141,10 @@ export function ContabilPortfolioSection() {
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
           <CalendarDays aria-hidden="true" className="h-4 w-4 text-blue-600 dark:text-blue-300" />
           Competência
-          <input
-            aria-label="Competência da carteira"
-            type="month"
+          <ContabilCompetenceSelect
+            label="Competência da carteira"
             value={competence}
-            onChange={(event) => setCompetence(event.target.value as ContabilCompetence)}
-            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            onChange={setCompetence}
           />
         </label>
       </div>
@@ -184,7 +184,9 @@ export function ContabilPortfolioSection() {
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p aria-live="polite" className="text-sm text-gray-600 dark:text-slate-400">
-              {items.length} clientes, {controlsStarted} controles iniciados e {missingControls} sem controle mensal.
+              {formatContabilCount(items.length, "cliente", "clientes")},{" "}
+              {formatContabilCount(controlsStarted, "controle iniciado", "controles iniciados")} e{" "}
+              {missingControls} sem controle mensal.
               {visibleRows.length !== items.length ? ` Exibindo ${visibleRows.length}.` : null}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

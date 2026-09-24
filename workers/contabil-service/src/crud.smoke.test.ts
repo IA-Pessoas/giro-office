@@ -277,11 +277,11 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
       note: "Atualizado",
     });
     expectOk(await call("DELETE", `/contabil/relationships/${id}`), "DELETE relationships");
-    expectOk(
+    const afterDelete = expectOk(
       await call("GET", `/contabil/relationships/client/${clientId}`),
       "GET após DELETE",
-      [404],
     );
+    expect(afterDelete.data).toBeNull();
   });
 
   it("responsáveis: cria, aparece na carteira, atualiza (inclusive null) e remove", async () => {
@@ -334,11 +334,11 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
       customer_with_movement: false,
     });
     expectOk(await call("DELETE", `/contabil/responsibles/${id}`), "DELETE responsibles");
-    expectOk(
+    const afterDelete = expectOk(
       await call("GET", `/contabil/responsibles/client/${clientId}`),
       "GET após DELETE",
-      [404],
     );
+    expect(afterDelete.data).toBeNull();
   });
 
   it("fechamento da triagem: padrão, grava status, lê e arquiva", async () => {

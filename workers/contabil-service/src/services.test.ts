@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { createClosingService, createControlService, createDocumentsService } from "./services.js";
+import {
+  createClosingService,
+  createControlService,
+  createDocumentsService,
+  createRelationshipService,
+  createResponsibleService,
+} from "./services.js";
 
 const ORG = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -140,6 +146,19 @@ describe("contabil services tenant and catalog seams", () => {
         service.createYear({ ...base, year: 2026, confirmed: true }),
       ).rejects.toMatchObject({ statusCode: 404 });
     });
+  });
+
+  it("responsável e relacionamento sem registro devolvem null (#1325)", async () => {
+    const database = {
+      responsibleContabil: { findFirst: vi.fn().mockResolvedValue(null) },
+      relationshipContabil: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    await expect(
+      createResponsibleService(database as never, audit()).getByClientId(CLIENT, ORG),
+    ).resolves.toBeNull();
+    await expect(
+      createRelationshipService(database as never, audit()).getByClientId(CLIENT, ORG),
+    ).resolves.toBeNull();
   });
 
   it("recusa marcador bancário de cliente fora do tenant", async () => {

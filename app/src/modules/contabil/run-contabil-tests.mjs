@@ -35,6 +35,9 @@ import {
   rollbackContabilFieldValue,
   shouldSyncRemoteContabilControl,
   updateContabilControlFieldStatus,
+  formatContabilCount,
+  getContabilCompetenceYears,
+  CONTABIL_MONTH_OPTIONS,
 } from "./components/contabilControlSection.helpers.ts";
 import {
   buildContabilRelationshipFormValues,
@@ -98,7 +101,8 @@ await (async () => {
   await runTest("carteira operacional mostra competência, resumo, ausência e recuperação", () => {
     const source = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
 
-    assert.match(source, /type="month"/);
+    assert.match(source, /<ContabilCompetenceSelect/);
+    assert.doesNotMatch(source, /type="month"/);
     assert.match(source, /Carteira operacional/);
     assert.match(source, /sem controle mensal/i);
     assert.match(source, /Tentar novamente/);
@@ -847,5 +851,19 @@ await (async () => {
     const effects = source.split("useEffect(").slice(1).map((chunk) => chunk.split("}, [")[0]);
     assert.ok(effects.every((effect) => !effect.includes("bootstrapControl(")));
     assert.match(source, /Iniciar controle/);
+  });
+  await runTest("pluraliza a contagem da carteira (#1325)", () => {
+    assert.equal(formatContabilCount(1, "cliente", "clientes"), "1 cliente");
+    assert.equal(formatContabilCount(0, "cliente", "clientes"), "0 clientes");
+    assert.equal(formatContabilCount(2, "controle iniciado", "controles iniciados"), "2 controles iniciados");
+  });
+
+  await runTest("seletor de competência lista meses em português (#1325)", () => {
+    assert.equal(CONTABIL_MONTH_OPTIONS.length, 12);
+    assert.deepEqual(CONTABIL_MONTH_OPTIONS[0], { value: "01", label: "Janeiro" });
+    assert.deepEqual(CONTABIL_MONTH_OPTIONS[8], { value: "09", label: "Setembro" });
+    const years = getContabilCompetenceYears("2019-03", new Date(2026, 8, 1));
+    assert.equal(years[0], 2019);
+    assert.equal(years.at(-1), 2027);
   });
 })();
