@@ -43,6 +43,25 @@ export function normalizeDocumentValue(value: string | null | undefined): string
   return (value ?? "").replace(/\D/g, "");
 }
 
+// Mesmo padrão do z.string().email() do backend (zod 3), para o erro aparecer antes do 400.
+const EMAIL_PATTERN = /^(?!\.)(?!.*\.\.)([A-Z0-9_'+\-.]*)[A-Z0-9_+-]@([A-Z0-9][A-Z0-9-]*\.)+[A-Z]{2,}$/i;
+
+export function getIntegrationEmailError(value: string | null | undefined): string | null {
+  const email = (value ?? "").trim();
+
+  return email && !EMAIL_PATTERN.test(email) ? "Informe um e-mail válido." : null;
+}
+
+// A máscara descarta letras; o aviso diz por que o que foi digitado sumiu.
+export function getPhoneInputHint(rawValue: string): string | null {
+  return /[a-zA-Z]/.test(rawValue) ? "Telefone aceita apenas números." : null;
+}
+
+// CNPJ igual ao salvo já foi consultado no cadastro; só um CNPJ novo dispara a consulta oficial.
+export function getCnpjToLookup(current: string, saved: string | null | undefined): string {
+  return normalizeCnpjInput(current) === normalizeCnpjInput(saved) ? "" : current;
+}
+
 export function hasUsableIntegrationData(client: Client | null | undefined): boolean {
   const value = client?.type === "PJ" ? normalizeCnpjInput(client.cpf_cnpj) : normalizeDocumentValue(client?.cpf_cnpj);
   return value.length > 0;

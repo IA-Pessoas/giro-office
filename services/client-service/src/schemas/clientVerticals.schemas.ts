@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+const clientEmailSchema = z
+  .string()
+  .trim()
+  .email("Informe um e-mail válido.")
+  .nullable()
+  .optional();
+
 export const createIntegrationBodySchema = z
   .object({
     organization_id: z.string().uuid({ message: "organization_id inválido." }).optional(),
@@ -12,7 +19,7 @@ export const createIntegrationBodySchema = z
     responsible: z.string().nullable().optional(),
     cpf_responsible: z.string().nullable().optional(),
     number: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
+    email: clientEmailSchema,
     agent: z.string().nullable().optional(),
     cpf_agent: z.string().nullable().optional(),
     instagram: z.string().nullable().optional(),
@@ -42,7 +49,7 @@ export const updateIntegrationBodySchema = z
     agent: z.string().nullable().optional(),
     cpf_agent: z.string().nullable().optional(),
     number: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
+    email: clientEmailSchema,
     address: z.string().nullable().optional(),
     cep: z.string().nullable().optional(),
     neighborhood: z.string().nullable().optional(),
@@ -85,7 +92,7 @@ export const updateRegularizeBodySchema = z
     responsible: z.string().nullable().optional(),
     cpf_responsible: z.string().nullable().optional(),
     number: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
+    email: clientEmailSchema,
     address: z.string().nullable().optional(),
     cep: z.string().nullable().optional(),
     neighborhood: z.string().nullable().optional(),
