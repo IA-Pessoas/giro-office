@@ -1,8 +1,10 @@
 import {
   type CreateProjectCrudRequest,
   createProjectInTransaction,
+  getProjectDeleteTasksMessage,
   INTEGRACAO_PERMISSION_LEVEL,
   error as logError,
+  PROJECT_DELETE_HIRING_MESSAGE,
   type ProjectCreateRow,
   type ProjectCrudAuthContext,
   requireIntegracaoRouteAccess,
@@ -232,6 +234,13 @@ export class ProjectCrudService {
       isOwner: data.isOwner === true,
     });
 
+    const taskCount = await this.prisma.task.count({
+      where: { project_id: data.project_id, organization_id: data.organizationId },
+    });
+    if (taskCount > 0) {
+      throw new ServiceError(409, getProjectDeleteTasksMessage(taskCount));
+    }
+
     try {
       const response = await this.prisma.project.delete({
         where: { id: data.project_id },
@@ -250,7 +259,7 @@ export class ProjectCrudService {
     } catch (err: unknown) {
       logError("Erro ao excluir projeto no banco", { err });
       if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
-        throw new ServiceError(409, "Não é possível excluir projeto com dependências.");
+        throw new ServiceError(409, PROJECT_DELETE_HIRING_MESSAGE);
       }
       throw err;
     }

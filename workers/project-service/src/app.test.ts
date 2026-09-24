@@ -347,7 +347,7 @@ describe("project Worker", () => {
       prisma: {
         project: { findFirst, delete: deleteProject },
         client: { findFirst: vi.fn(), update: vi.fn() },
-        task: { findMany: vi.fn(), groupBy: vi.fn() },
+        task: { findMany: vi.fn(), groupBy: vi.fn(), count: vi.fn(async () => 0) },
         $transaction: vi.fn(),
         $disconnect: vi.fn(async () => undefined),
       } as never,
@@ -361,6 +361,45 @@ describe("project Worker", () => {
 
     expect(response.status).toBe(200);
     expect((await response.json()).data.response).toBeNull();
+  });
+
+  it("DELETE devolve 409 nomeando tarefas vinculadas e contratação de plano", async () => {
+    const deleteProject = vi.fn(async () => {
+      throw { code: "P2003" };
+    });
+    const count = vi.fn(async () => 2);
+    const app = createProjectWorkerApp({
+      env: env(),
+      prisma: {
+        project: {
+          findFirst: vi.fn(async () => ({ id: PROJECT_ID, organization_id: ORG })),
+          delete: deleteProject,
+        },
+        client: { findFirst: vi.fn(), update: vi.fn() },
+        task: { findMany: vi.fn(), groupBy: vi.fn(), count },
+        $transaction: vi.fn(),
+        $disconnect: vi.fn(async () => undefined),
+      } as never,
+    });
+    const remove = () =>
+      app.request(`https://project.test/project?project_id=${PROJECT_ID}`, {
+        method: "DELETE",
+        headers: jsonHeaders(),
+        body: JSON.stringify({ project_id: PROJECT_ID }),
+      });
+
+    let response = await remove();
+    expect(response.status).toBe(409);
+    expect(JSON.stringify(await response.json())).toContain(
+      "ele tem 2 tarefa(s) vinculada(s). Exclua as tarefas antes.",
+    );
+    expect(count).toHaveBeenCalledWith({ where: { project_id: PROJECT_ID, organization_id: ORG } });
+    expect(deleteProject).not.toHaveBeenCalled();
+
+    count.mockResolvedValue(0);
+    response = await remove();
+    expect(response.status).toBe(409);
+    expect(JSON.stringify(await response.json())).toContain("há contratação de plano vinculada");
   });
 
   it("maps a concurrent project creation conflict to 409", async () => {

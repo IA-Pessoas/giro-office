@@ -1,6 +1,7 @@
 import type { ModuleAccess } from "@modules/auth";
 
 import type { IntegracaoTaskListItem, ProjectTaskSummary } from "../types";
+import { getStringField } from "../services/projectService.contract.ts";
 import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "../../../shared/ui/newLayout/scrollbar.ts";
 
 export const TASK_TABLE_HEAD_CELL_CLASSNAME =
@@ -61,4 +62,19 @@ export function getProjectTaskCardLabels(
     title: name || modelName || "Tarefa sem nome",
     modelName: name && modelName && modelName !== name ? modelName : null,
   };
+}
+
+const TASK_DELETE_ADMIN_MESSAGE =
+  "Somente usuários com permissão administrativa na Integração podem excluir tarefas.";
+
+/** 409 traz o motivo nominal do bloqueio (anexos, cobrança comercial). */
+export function getTaskDeleteErrorMessage(error: unknown): string {
+  const response = (error as { response?: { status?: number; data?: Record<string, unknown> } })
+    ?.response;
+  if (response?.status === 403) return TASK_DELETE_ADMIN_MESSAGE;
+  const fallback = "Não foi possível excluir a tarefa.";
+  if (response?.status !== 409) return fallback;
+  return (
+    getStringField(response.data, "error") ?? getStringField(response.data, "message") ?? fallback
+  );
 }

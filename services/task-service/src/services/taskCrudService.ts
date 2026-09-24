@@ -305,6 +305,13 @@ export function resolveEligibleTaskResponsible(
   throw new ServiceError(422, "Selecione um responsável elegível para a tarefa.");
 }
 
+/** Anexos visíveis exigem ação do usuário: removê-los antes apaga o arquivo pelo fluxo próprio. */
+function getTaskDeleteBlockMessage(attachments: number): string | null {
+  return attachments > 0
+    ? `Não é possível excluir a tarefa: ela tem ${attachments} anexo(s). Remova os anexos.`
+    : null;
+}
+
 export class TaskCrudService {
   readonly #workflow: TaskWorkflowService;
 
@@ -1047,12 +1054,46 @@ export class TaskCrudService {
         isOwner: data.isOwner === true,
       });
 
+      let removedDependencies: Record<string, unknown> = {};
       try {
-        await this.prisma.task.delete({
-          where: { id: data.task_id },
+        removedDependencies = await this.prisma.$transaction(async (tx) => {
+          const where = { task_id: data.task_id, organization_id: data.organization_id };
+          const attachments = await tx.taskAttachment.count({
+            where: { ...where, deleted_at: null },
+          });
+          const blockMessage = getTaskDeleteBlockMessage(attachments);
+          if (blockMessage) throw new ServiceError(409, blockMessage);
+
+          // Tudo abaixo pertence à tarefa e sai com ela; o que se perde vai para a auditoria.
+          // Anexos já removidos pelo usuário (soft delete) ainda seguram a FK.
+          // ponytail: objetos no storage não são apagados aqui; limpar se o bucket crescer.
+          const removedAttachments = await tx.taskAttachment.findMany({
+            where: { ...where, deleted_at: { not: null } },
+            select: { object_path: true },
+          });
+          const billing = await tx.commercialTaskBilling.findFirst({
+            where,
+            select: { hiring_status: true, payment: true, billing_description: true },
+          });
+          const completionRequests = await tx.taskCompletionRequest.deleteMany({ where });
+          const postponements = await tx.taskPostponement.deleteMany({ where });
+          await tx.taskAttachment.deleteMany({ where: { ...where, deleted_at: { not: null } } });
+          await tx.commercialTaskBilling.deleteMany({ where });
+          await tx.task.delete({ where: { id: data.task_id } });
+          return {
+            ...(removedAttachments.length > 0
+              ? { removed_attachment_paths: removedAttachments.map((a) => a.object_path) }
+              : {}),
+            ...(billing ? { commercial_billing: billing } : {}),
+            ...(completionRequests.count > 0
+              ? { completion_requests_removed: completionRequests.count }
+              : {}),
+            ...(postponements.count > 0 ? { postponements_removed: postponements.count } : {}),
+          };
         });
       } catch (err: unknown) {
         logError("Erro ao excluir tarefa no banco", { err });
+        if (err instanceof ServiceError) throw err;
         if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
           throw new ServiceError(
             409,
@@ -1068,7 +1109,7 @@ export class TaskCrudService {
         action: "Exclusão",
         referring: "integracao.tasks",
         referringId: data.task_id,
-        changes: "{}",
+        changes: Object.keys(removedDependencies).length > 0 ? removedDependencies : "{}",
       });
 
       return { deleted: true };

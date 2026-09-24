@@ -32,6 +32,7 @@ function createMockPrisma(): ProjectCrudPrisma {
       update: vi.fn(async () => ({})),
       delete: vi.fn(async () => ({})),
     },
+    task: { count: vi.fn(async () => 0) },
   } as unknown as ProjectCrudPrisma;
   prisma.$transaction = vi.fn(async (callback) => callback(prisma));
   return prisma;
@@ -407,9 +408,37 @@ describe("ProjectCrudService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Não é possível excluir projeto com dependências.",
+      message: "Não é possível excluir o projeto: há contratação de plano vinculada a ele.",
     });
     expect(prisma.project.delete).toHaveBeenCalledTimes(1);
     expect(audit.createLog).not.toHaveBeenCalled();
+  });
+
+  it("delete devolve 409 listando as tarefas vinculadas", async () => {
+    const prisma = createMockPrisma();
+    prisma.project.findFirst = vi.fn(async () => ({ id: PROJECT_ID }));
+    prisma.task.count = vi.fn(async () => 3);
+    const service = new ProjectCrudService(prisma, {
+      createLog: vi.fn(async () => {}),
+      logUpdateIfChanged: vi.fn(async () => {}),
+    });
+
+    await expect(
+      service.delete({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        permission: 3,
+        integracaoLevel: 3,
+        project_id: PROJECT_ID,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message:
+        "Não é possível excluir o projeto: ele tem 3 tarefa(s) vinculada(s). Exclua as tarefas antes.",
+    });
+    expect(prisma.task.count).toHaveBeenCalledWith({
+      where: { project_id: PROJECT_ID, organization_id: ORG_ID },
+    });
+    expect(prisma.project.delete).not.toHaveBeenCalled();
   });
 });

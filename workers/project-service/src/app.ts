@@ -14,6 +14,8 @@ import { integracaoProjectProgressBodySchema } from "@workspace/project-service/
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   createProjectInTransaction,
+  getProjectDeleteTasksMessage,
+  PROJECT_DELETE_HIRING_MESSAGE,
   type ProjectCrudAuthContext,
   type ProjectReportingSource,
   parseWithZod,
@@ -87,6 +89,7 @@ type ProjectPrisma = {
     groupBy(
       args: Record<string, unknown>,
     ): Promise<Array<{ status: string; _count: { status: number } }>>;
+    count(args: { where: Record<string, unknown> }): Promise<number>;
   };
 };
 
@@ -476,6 +479,12 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
         resourceOrganizationId: data.organizationId,
         isOwner: data.isOwner,
       });
+      const taskCount = await prisma.task.count({
+        where: { project_id: data.project_id, organization_id: data.organizationId },
+      });
+      if (taskCount > 0) {
+        throw new ServiceError(409, getProjectDeleteTasksMessage(taskCount));
+      }
       try {
         const response = await prisma.project.delete({ where: { id: data.project_id } });
         await audit.createLog({
@@ -489,7 +498,7 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
         return { response };
       } catch (error) {
         if (isPrismaError(error, "P2003")) {
-          throw new ServiceError(409, "Não é possível excluir projeto com dependências.");
+          throw new ServiceError(409, PROJECT_DELETE_HIRING_MESSAGE);
         }
         if (isPrismaError(error, "P2025")) return { response: null };
         if (isProjectConflict(error)) {
