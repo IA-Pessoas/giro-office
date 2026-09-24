@@ -129,6 +129,72 @@ describe("ncm routes", () => {
     expect(deps.update).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "123",
+    "847190121",
+  ])("POST e PUT /fiscal/ncm rejeitam codigo NCM %s (≠ 8 digitos)", async (ncmCode) => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ncmRouteDeps: deps });
+
+    const createResponse = await request(app)
+      .post("/fiscal/ncm")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ ...validNcmBody, ncm_code: ncmCode });
+
+    const updateResponse = await request(app)
+      .put("/fiscal/ncm")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ ...validNcmBody, ncm_id: NCM_ID, ncm_code: ncmCode });
+
+    expect(createResponse.status).toBe(400);
+    expect(updateResponse.status).toBe(400);
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.update).not.toHaveBeenCalled();
+  });
+
+  it("POST e PUT /fiscal/ncm rejeitam vigencia final anterior a inicial", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ncmRouteDeps: deps });
+    const body = {
+      ...validNcmBody,
+      validity_start_date: "2026-01-01T00:00:00.000Z",
+      validity_end_date: "2025-01-01T00:00:00.000Z",
+    };
+
+    const createResponse = await request(app)
+      .post("/fiscal/ncm")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send(body);
+
+    const updateResponse = await request(app)
+      .put("/fiscal/ncm")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ ...body, ncm_id: NCM_ID });
+
+    expect(createResponse.status).toBe(400);
+    expect(updateResponse.status).toBe(400);
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.update).not.toHaveBeenCalled();
+  });
+
+  it("POST /fiscal/ncm grava o regime pelo codigo legado lido pela tela", async () => {
+    const deps = createMockDeps();
+    const app = createFiscalApp({ env, logger, ncmRouteDeps: deps });
+
+    const res = await request(app)
+      .post("/fiscal/ncm")
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ ...validNcmBody, tax_regime: " lucro real " });
+
+    expect(res.status).toBe(201);
+    expect(deps.create).toHaveBeenCalledWith(expect.objectContaining({ tax_regime: "2" }));
+  });
+
   it("POST /fiscal/ncm com Visualizador retorna 403 antes do servico", async () => {
     const deps = createMockDeps();
     const app = createFiscalApp({ env, logger, ncmRouteDeps: deps });
