@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
-    platformUser: { findMany: vi.fn() },
+    platformUser: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      updateMany: vi.fn(),
+    },
     user: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -10,7 +15,9 @@ const { prismaMock } = vi.hoisted(() => ({
       updateMany: vi.fn(),
     },
     department: { findMany: vi.fn() },
-    $transaction: vi.fn(),
+    $transaction: vi.fn(async (callback: (transaction: { user: unknown }) => unknown) =>
+      callback(prismaMock),
+    ),
   },
 }));
 const { managementMock } = vi.hoisted(() => ({
@@ -44,6 +51,9 @@ import { PlatformUsersService } from "../services/platformUsersService.js";
 describe("PlatformUsersService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.platformUser.findFirst.mockReset();
+    prismaMock.platformUser.findUnique.mockReset();
+    prismaMock.platformUser.updateMany.mockReset();
     prismaMock.platformUser.findMany.mockResolvedValue([
       {
         id: "platform-user-1",
@@ -77,6 +87,118 @@ describe("PlatformUsersService", () => {
       select: { id: true, name: true, email: true, status: true, can_impersonate: true },
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });
+  });
+
+  it("rejects an operator without impersonation permission before changing the target", async () => {
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-user-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: false,
+    });
+    const audit = vi.fn();
+    const service = new PlatformUsersService(audit);
+
+    await expect(
+      service.updateSuperAdminImpersonationPermission("platform-user-1", "platform-user-2", true),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(prismaMock.platformUser.updateMany).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("does not allow an operator to change their own impersonation permission", async () => {
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-user-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    const service = new PlatformUsersService(vi.fn());
+
+    await expect(
+      service.updateSuperAdminImpersonationPermission("platform-user-1", "platform-user-1", false),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(prismaMock.platformUser.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.platformUser.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("changes another super admin permission and records the platform actor and before/after", async () => {
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-user-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.platformUser.findFirst.mockResolvedValue({
+      id: "platform-user-2",
+      name: "Outra administradora",
+      email: "outra@example.com",
+      status: "active",
+      can_impersonate: false,
+    });
+    prismaMock.platformUser.updateMany.mockResolvedValue({ count: 1 });
+    const audit = vi.fn().mockResolvedValue(undefined);
+    const service = new PlatformUsersService(audit);
+
+    await expect(
+      service.updateSuperAdminImpersonationPermission("platform-user-1", "platform-user-2", true),
+    ).resolves.toEqual({
+      id: "platform-user-2",
+      name: "Outra administradora",
+      email: "outra@example.com",
+      status: "active",
+      can_impersonate: true,
+    });
+
+    expect(prismaMock.platformUser.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "platform-user-2",
+        platform_role: "super_admin",
+        can_impersonate: false,
+      },
+      data: { can_impersonate: true },
+    });
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platformActorUserId: "platform-user-1",
+        organizationId: null,
+        action: "platform.super_admin.impersonation_permission.updated",
+        referring: "platform_user",
+        referringId: "platform-user-2",
+        changes: { can_impersonate: { from: false, to: true } },
+        outcome: "success",
+        required: true,
+      }),
+    );
+  });
+
+  it("does not emit an audit event when the requested permission already matches", async () => {
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-user-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.platformUser.findFirst.mockResolvedValue({
+      id: "platform-user-2",
+      name: "Outra administradora",
+      email: "outra@example.com",
+      status: "active",
+      can_impersonate: true,
+    });
+    const audit = vi.fn();
+    const service = new PlatformUsersService(audit);
+
+    await service.updateSuperAdminImpersonationPermission(
+      "platform-user-1",
+      "platform-user-2",
+      true,
+    );
+
+    expect(prismaMock.platformUser.updateMany).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
   });
 
   it("filters every query by organization", async () => {

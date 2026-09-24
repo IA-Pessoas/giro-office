@@ -503,6 +503,15 @@ const baseManifest = [
   }),
   op({
     service: "user-service",
+    method: "PATCH",
+    path: "/platform/super-admins/{superAdminId}/impersonation-permission",
+    action: "platformSuperAdminImpersonationPermission",
+    target: "gateway",
+    auth: "session",
+    condition: "platformImpersonationSmokeEnabled",
+  }),
+  op({
+    service: "user-service",
     method: "GET",
     path: "/platform/organizations/{organizationId}/users",
     action: "platformUsers",

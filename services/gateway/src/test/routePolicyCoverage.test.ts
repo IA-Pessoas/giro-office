@@ -65,6 +65,7 @@ describe("platform default deny", () => {
       ["DELETE", "/platform/session"],
       ["GET", "/platform/me"],
       ["GET", "/platform/super-admins"],
+      ["PATCH", "/platform/super-admins/platform-user-2/impersonation-permission"],
       ["GET", "/platform/organizations"],
       ["POST", "/platform/organizations"],
       ["GET", "/platform/organizations/org-1"],

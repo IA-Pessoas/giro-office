@@ -10,7 +10,7 @@ import type { Logger } from "@workspace/shared/logger";
 export interface CreateUserAuditParams {
   actorUserId?: string;
   platformActorUserId?: string;
-  organizationId: string;
+  organizationId?: string | null;
   action: string;
   referring: string;
   referringId: string;
@@ -35,7 +35,7 @@ export function createUserAudit(options: UserAuditOptions): UserAuditRecorder {
     const now = new Date().toISOString();
     const payload: CreateAuditRequestPayload = {
       requestId: randomUUID(),
-      organizationId: params.organizationId,
+      organizationId: params.organizationId ?? null,
       ...(params.actorUserId ? { userId: params.actorUserId } : {}),
       method: "ENTITY_CHANGE",
       path: `/${params.referring}`,
@@ -56,8 +56,8 @@ export function createUserAudit(options: UserAuditOptions): UserAuditRecorder {
       try {
         await recordAudit.recordRequired(payload);
       } catch (err: unknown) {
-        options.logger.error({ err }, "Falha na auditoria obrigatória para personificação.");
-        throw new ServiceError(503, "Auditoria indisponível para iniciar personificação.");
+        options.logger.error({ err }, "Falha na auditoria obrigatória para ação de plataforma.");
+        throw new ServiceError(503, "Auditoria indisponível para registrar a ação.");
       }
       return;
     }

@@ -445,7 +445,8 @@ await runTest("mantém lista e painel de detalhe isolados pela organização sel
   assert.match(usersPanelSource, /departmentsQuery\.refetch/);
 });
 
-await runTest("usa abas acessíveis e mostra a lista somente leitura de super admins", () => {
+await runTest("usa abas acessíveis e controla permissões de personificação por operador", async () => {
+  const superAdminsHookSource = await source("./hooks/usePlatformSuperAdmins.ts");
   assert.match(superAdminPageSource, /role="tablist"/);
   assert.equal((superAdminPageSource.match(/^\s+role="tab"$/gm) ?? []).length, 4);
   assert.match(superAdminPageSource, /aria-selected=\{activePanel === "superAdmins"\}/);
@@ -455,8 +456,17 @@ await runTest("usa abas acessíveis e mostra a lista somente leitura de super ad
   assert.match(superAdminPageSource, />\s*Super admins\s*</);
   assert.match(superAdminPageSource, />\s*Auditoria\s*</);
   assert.match(superAdminPageSource, /<PlatformSuperAdminsPanel\s*\/>/);
-  assert.match(superAdminsPanelSource, /Pode personificar/);
-  assert.match(superAdminsPanelSource, /Não pode personificar/);
+  assert.match(superAdminsPanelSource, /formatImpersonationPermission/);
+  assert.match(managementUtilsSource, /formatImpersonationPermission/);
+  assert.match(managementUtilsSource, /Pode personificar/);
+  assert.match(managementUtilsSource, /Não pode personificar/);
+  assert.match(superAdminsPanelSource, /role="switch"/);
+  assert.match(superAdminsPanelSource, /currentUser\.can_impersonate === true/);
+  assert.match(superAdminsPanelSource, /admin\.id === currentUser\?\.id/);
+  assert.match(superAdminsPanelSource, /permissionMutation\.mutate/);
+  assert.match(superAdminsHookSource, /useMutation/);
+  assert.match(superAdminsHookSource, /invalidateQueries/);
+  assert.match(platformServiceSource, /updateSuperAdminImpersonationPermission/);
 });
 
 await runTest("mantém seleção por id e detalhe independente da página do diretório", () => {
@@ -528,6 +538,14 @@ await runTest("exibe alterações de permissões por módulo no detalhe da audit
   assert.match(managementUtilsSource, /changes\.modules/);
   assert.match(managementUtilsSource, /Módulo \$\{moduleKey\}/);
   assert.match(auditPanelSource, /selectedAuditChanges/);
+});
+
+await runTest("formata a concessão e a revogação da permissão de personificação na auditoria", async () => {
+  const { formatAuditChanges } = await import("./utils/platformManagement.ts");
+  assert.deepEqual(
+    formatAuditChanges({ can_impersonate: { from: false, to: true } }),
+    ["Permissão de personificação: Não pode personificar → Pode personificar"],
+  );
 });
 
 await runTest("preserva rascunhos de outras ações ao atualizar um campo", () => {

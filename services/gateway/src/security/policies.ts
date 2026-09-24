@@ -249,6 +249,11 @@ const routePolicyMatchers: Array<{
     policy: platformOnlyPolicy,
   },
   {
+    method: "PATCH",
+    path: /^\/platform\/super-admins\/[^/]+\/impersonation-permission\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
     method: "GET",
     path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
     policy: userManagementPolicy,

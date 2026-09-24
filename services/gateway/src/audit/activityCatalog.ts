@@ -124,6 +124,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "a lista de super admins da plataforma" },
   },
   {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/super-admins\/[^/]+\/impersonation-permission$/,
+    description: { action: "alterou", item: "a permissão de personificação de um super admin" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },

@@ -95,6 +95,10 @@ export interface PlatformSuperAdmin {
   can_impersonate: boolean;
 }
 
+export interface UpdatePlatformSuperAdminPermissionPayload {
+  can_impersonate: boolean;
+}
+
 export interface PlatformDepartmentOption {
   id: string;
   name: string;
@@ -139,6 +143,7 @@ export interface PlatformAuditRecord {
       before: Partial<Record<string, 0 | 1 | 2 | 3>>;
       after: Partial<Record<string, 0 | 1 | 2 | 3>>;
     };
+    can_impersonate?: { from: boolean; to: boolean };
   };
 }
 

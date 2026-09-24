@@ -23,6 +23,22 @@ const identity = {
   platform_role: "super_admin",
   can_impersonate: true,
 };
+const platformSuperAdmins = [
+  {
+    id: identity.id,
+    name: identity.name,
+    email: identity.email,
+    status: "active",
+    can_impersonate: true,
+  },
+  {
+    id: "b4bc983b-1c5c-43d8-80f0-dab220f0c501",
+    name: "Administradora sem permissão",
+    email: "sem-permissao@example.test",
+    status: "inactive",
+    can_impersonate: false,
+  },
+];
 const organization = {
   id: "fc70c08e-1907-4268-b303-f88c6f5c5c01",
   name: "Organização Aurora",
@@ -162,22 +178,44 @@ const upstream = createServer(async (request, response) => {
   if (url.pathname === "/platform/me") return reply(response, 200, identity);
   if (url.pathname === "/platform/super-admins" && request.method === "GET") {
     assert.equal(request.headers.authorization, undefined);
-    return reply(response, 200, [
-      {
-        id: identity.id,
-        name: identity.name,
-        email: identity.email,
-        status: "active",
-        can_impersonate: true,
-      },
-      {
-        id: "b4bc983b-1c5c-43d8-80f0-dab220f0c501",
-        name: "Administradora sem permissão",
-        email: "sem-permissao@example.test",
-        status: "inactive",
-        can_impersonate: false,
-      },
-    ]);
+    platformSuperAdmins[0].can_impersonate = identity.can_impersonate;
+    return reply(response, 200, platformSuperAdmins);
+  }
+  const superAdminPermissionMatch = url.pathname.match(
+    /^\/platform\/super-admins\/([^/]+)\/impersonation-permission$/,
+  );
+  if (superAdminPermissionMatch && request.method === "PATCH") {
+    assert.equal(request.headers["x-csrf-token"], csrf);
+    assert.equal(request.headers.authorization, undefined);
+    if (typeof body?.can_impersonate !== "boolean") {
+      return reply(response, 400, "Permissão inválida.");
+    }
+    if (!identity.can_impersonate) return reply(response, 403, "Acesso negado.");
+    const target = platformSuperAdmins.find((admin) => admin.id === superAdminPermissionMatch[1]);
+    if (!target) return reply(response, 404, "Super admin não encontrado.");
+    if (target.id === identity.id) return reply(response, 409, "Autoalteração não permitida.");
+
+    const before = target.can_impersonate;
+    target.can_impersonate = body.can_impersonate;
+    if (before !== target.can_impersonate) {
+      auditEvents.unshift({
+        id: `audit-safe-${auditEvents.length + 2}`,
+        requestId: `request-safe-${auditEvents.length + 2}`,
+        organizationId: null,
+        method: "ENTITY_CHANGE",
+        path: "/platform_user",
+        outcome: "success",
+        serviceSource: "user-service",
+        createdAt: "2026-08-25T12:01:00.000Z",
+        action: "platform.super_admin.impersonation_permission.updated",
+        referring: "platform_user",
+        referringId: target.id,
+        actorPlatformUserId: identity.id,
+        actorPlatformUserName: identity.name,
+        changes: { can_impersonate: { from: before, to: target.can_impersonate } },
+      });
+    }
+    return reply(response, 200, target);
   }
   if (url.pathname === "/platform/organizations" && request.method === "GET") {
     const search = (url.searchParams.get("search") ?? "").toLowerCase();
@@ -622,6 +660,7 @@ try {
     organizations.splice(0, organizations.length, organization, secondOrganization);
     platformUser.status = "active";
     identity.can_impersonate = true;
+    platformSuperAdmins[1].can_impersonate = false;
     impersonationStarted = false;
     platformUserPermissions = { rh: 1, fiscal: 1 };
     createdUser = null;
@@ -640,6 +679,40 @@ try {
     await page.getByRole("cell", { name: "operador@example.test", exact: true }).waitFor();
     await page.getByText("Pode personificar", { exact: true }).waitFor();
     await page.getByText("Não pode personificar", { exact: true }).waitFor();
+    const ownSuperAdminRow = page.getByRole("row", { name: /operador@example\.test/ });
+    assert.equal(await ownSuperAdminRow.getByRole("switch").isDisabled(), true);
+    const targetSuperAdminRow = page.getByRole("row", { name: /Administradora sem permissão/ });
+    const targetPermissionSwitch = targetSuperAdminRow.getByRole("switch");
+    assert.equal(await targetPermissionSwitch.getAttribute("aria-checked"), "false");
+    await targetPermissionSwitch.click();
+    const revokePermissionSwitch = targetSuperAdminRow.getByRole("switch", {
+      name: /Revogar permissão/,
+    });
+    await revokePermissionSwitch.waitFor();
+    assert.equal(await revokePermissionSwitch.getAttribute("aria-checked"), "true");
+    await revokePermissionSwitch.click();
+    const grantPermissionSwitch = targetSuperAdminRow.getByRole("switch", {
+      name: /Conceder permissão/,
+    });
+    await grantPermissionSwitch.waitFor();
+    assert.equal(await grantPermissionSwitch.getAttribute("aria-checked"), "false");
+    assert.ok(
+      requests.filter(
+        (request) =>
+          request.method === "PATCH" &&
+          request.path.endsWith("/impersonation-permission") &&
+          request.csrfHeader === csrf,
+      ).length >= 2,
+    );
+    assert.ok(
+      auditEvents.some(
+        (event) =>
+          event.action === "platform.super_admin.impersonation_permission.updated" &&
+          event.actorPlatformUserId === identity.id &&
+          event.referringId === platformSuperAdmins[1].id,
+      ),
+    );
+    auditEvents.length = 0;
     assert.ok(
       requests.some(
         (request) => request.method === "GET" && request.path === "/platform/super-admins",
@@ -692,6 +765,14 @@ try {
     assert.equal(await page.getByRole("button", { name: "Personificar", exact: true }).count(), 1);
     identity.can_impersonate = false;
     await page.reload({ waitUntil: "networkidle" });
+    await page.getByRole("tab", { name: "Super admins", exact: true }).click();
+    assert.equal(
+      await page
+        .getByRole("row", { name: /Administradora sem permissão/ })
+        .getByRole("switch")
+        .isDisabled(),
+      true,
+    );
     await page.getByRole("tab", { name: "Usuários", exact: true }).click();
     await page.getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ }).waitFor();
     assert.equal(await page.getByRole("button", { name: "Personificar", exact: true }).count(), 0);

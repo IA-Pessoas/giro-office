@@ -19,6 +19,7 @@ const { auditMock, authServiceMock, platformAuthMock, platformUsersMock } = vi.h
   platformAuthMock: { validateSession: vi.fn() },
   platformUsersMock: {
     listSuperAdmins: vi.fn(),
+    updateSuperAdminImpersonationPermission: vi.fn(),
     list: vi.fn(),
     getById: vi.fn(),
     listDepartments: vi.fn(),
@@ -57,8 +58,21 @@ const { testEnv } = vi.hoisted(() => ({
     supabaseServiceRoleKey: "service-role-key",
   },
 }));
+const { prismaMock } = vi.hoisted(() => ({
+  prismaMock: {
+    platformUser: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    $transaction: vi.fn(async (callback: (transaction: { platformUser: unknown }) => unknown) =>
+      callback(prismaMock),
+    ),
+  },
+}));
 
 vi.mock("../config/env.js", () => ({ getUserServiceEnv: () => testEnv }));
+vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
 vi.mock("../services/platformAuthService.js", () => ({
   PlatformAuthService: vi.fn(function PlatformAuthService() {
     return platformAuthMock;
@@ -81,11 +95,12 @@ import { getUserServiceEnv } from "../config/env.js";
 import { buildUserServiceOpenApiSpec } from "../openapi/spec.js";
 
 const platformIdentity = {
-  id: "platform-user-1",
+  id: "550e8400-e29b-41d4-a716-446655440000",
   name: "Platform Administrator",
   email: "admin@example.com",
   auth_kind: "platform" as const,
   platform_role: "super_admin" as const,
+  can_impersonate: true,
 };
 const csrfToken = "A".repeat(43);
 
@@ -116,6 +131,17 @@ function createApp() {
   );
 }
 
+async function useActualPermissionService() {
+  const { PlatformUsersService } = await vi.importActual<
+    typeof import("../services/platformUsersService.js")
+  >("../services/platformUsersService.js");
+  const service = new PlatformUsersService(auditMock);
+  platformUsersMock.updateSuperAdminImpersonationPermission.mockImplementation(
+    (actorId: string, targetId: string, canImpersonate: boolean) =>
+      service.updateSuperAdminImpersonationPermission(actorId, targetId, canImpersonate),
+  );
+}
+
 function platformGatewayHeaders(
   overrides: Partial<Record<"userId" | "authKind" | "platformRole" | "internalToken", string>> = {},
 ): Record<string, string> {
@@ -133,10 +159,14 @@ function platformGatewayHeaders(
 describe("platform users routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    platformUsersMock.updateSuperAdminImpersonationPermission.mockReset();
+    prismaMock.platformUser.findUnique.mockReset();
+    prismaMock.platformUser.findFirst.mockReset();
+    prismaMock.platformUser.updateMany.mockReset();
     platformAuthMock.validateSession.mockResolvedValue(platformIdentity);
     platformUsersMock.listSuperAdmins.mockResolvedValue([
       {
-        id: "platform-user-1",
+        id: platformIdentity.id,
         name: "Platform Administrator",
         email: "admin@example.com",
         status: "active",
@@ -186,7 +216,7 @@ describe("platform users routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual([
       {
-        id: "platform-user-1",
+        id: platformIdentity.id,
         name: "Platform Administrator",
         email: "admin@example.com",
         status: "active",
@@ -194,6 +224,109 @@ describe("platform users routes", () => {
       },
     ]);
     expect(platformUsersMock.listSuperAdmins).toHaveBeenCalledOnce();
+  });
+
+  it("altera a permissão de personificação com sessão de plataforma e CSRF", async () => {
+    await useActualPermissionService();
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: platformIdentity.id,
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.platformUser.findFirst.mockResolvedValue({
+      id: "550e8400-e29b-41d4-a716-446655440001",
+      name: "Outra administradora",
+      email: "outra@example.com",
+      status: "active",
+      can_impersonate: false,
+    });
+    prismaMock.platformUser.updateMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(createApp())
+      .patch("/platform/super-admins/550e8400-e29b-41d4-a716-446655440001/impersonation-permission")
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: true });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.can_impersonate).toBe(true);
+    expect(auditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platformActorUserId: platformIdentity.id,
+        organizationId: null,
+        referringId: "550e8400-e29b-41d4-a716-446655440001",
+        changes: { can_impersonate: { from: false, to: true } },
+        required: true,
+      }),
+    );
+    expect(platformUsersMock.updateSuperAdminImpersonationPermission).toHaveBeenCalledWith(
+      platformIdentity.id,
+      "550e8400-e29b-41d4-a716-446655440001",
+      true,
+    );
+  });
+
+  it("nega por HTTP o operador sem permissão de personificação", async () => {
+    platformAuthMock.validateSession.mockResolvedValue({
+      ...platformIdentity,
+      can_impersonate: false,
+    });
+
+    const response = await request(createApp())
+      .patch("/platform/super-admins/550e8400-e29b-41d4-a716-446655440001/impersonation-permission")
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: true });
+
+    expect(response.status).toBe(403);
+    expect(platformUsersMock.updateSuperAdminImpersonationPermission).not.toHaveBeenCalled();
+    expect(prismaMock.platformUser.updateMany).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  it("rejeita por HTTP a alteração da própria permissão", async () => {
+    await useActualPermissionService();
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: platformIdentity.id,
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+
+    const response = await request(createApp())
+      .patch(`/platform/super-admins/${platformIdentity.id}/impersonation-permission`)
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: false });
+
+    expect(response.status).toBe(409);
+    expect(platformUsersMock.updateSuperAdminImpersonationPermission).toHaveBeenCalledWith(
+      platformIdentity.id,
+      platformIdentity.id,
+      false,
+    );
+    expect(prismaMock.platformUser.updateMany).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  it("rejeita body inválido ou CSRF ausente antes da mutação", async () => {
+    const invalid = await request(createApp())
+      .patch("/platform/super-admins/550e8400-e29b-41d4-a716-446655440001/impersonation-permission")
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: "true" });
+    const headers = platformGatewayHeaders();
+    delete headers[CSRF_HEADER_NAME];
+    const missingCsrf = await request(createApp())
+      .patch("/platform/super-admins/550e8400-e29b-41d4-a716-446655440001/impersonation-permission")
+      .set(headers)
+      .send({ can_impersonate: true });
+    const invalidTargetId = await request(createApp())
+      .patch("/platform/super-admins/not-a-uuid/impersonation-permission")
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: true });
+
+    expect(invalid.status).toBe(400);
+    expect(missingCsrf.status).toBe(403);
+    expect(invalidTargetId.status).toBe(400);
+    expect(platformUsersMock.updateSuperAdminImpersonationPermission).not.toHaveBeenCalled();
   });
 
   it("returns 401 without a platform session", async () => {
@@ -600,6 +733,32 @@ describe("platform users OpenAPI", () => {
     );
     expect(spec).toHaveProperty(["paths", path, "post", "responses", "403"]);
     expect(spec).toHaveProperty(["paths", path, "post", "responses", "503"]);
+  });
+
+  it("documents the super admin permission mutation with CSRF and audit outcomes", () => {
+    const spec = buildUserServiceOpenApiSpec(testEnv);
+    const path = "/platform/super-admins/{superAdminId}/impersonation-permission";
+
+    expect(spec.paths).toHaveProperty([path, "patch", "requestBody", "required"], true);
+    expect(spec.paths).toHaveProperty(
+      [
+        path,
+        "patch",
+        "requestBody",
+        "content",
+        "application/json",
+        "schema",
+        "properties",
+        "can_impersonate",
+        "type",
+      ],
+      "boolean",
+    );
+    expect(spec.paths).toHaveProperty([path, "patch", "parameters", 0, "schema", "format"], "uuid");
+    expect(spec.paths).toHaveProperty([path, "patch", "parameters", 1, "name"], "x-csrf-token");
+    expect(spec.paths).toHaveProperty([path, "patch", "responses", "403"]);
+    expect(spec.paths).toHaveProperty([path, "patch", "responses", "409"]);
+    expect(spec.paths).toHaveProperty([path, "patch", "responses", "503"]);
   });
 
   it("documents the shared modular permissions contract with CSRF and 422 validation", () => {

@@ -34,6 +34,35 @@ describe("authorizeRequest", () => {
     );
   });
 
+  it("returns 403 to an organization token on the platform impersonation permission mutation", () => {
+    const next = vi.fn();
+    const request = {
+      method: "PATCH",
+      path: "/platform/super-admins/platform-user-2/impersonation-permission",
+      originalUrl: "/platform/super-admins/platform-user-2/impersonation-permission",
+      auth: {
+        token: "organization-token",
+        userId: "user-1",
+        organizationId: "org-1",
+        actorKind: "organization",
+        isPlatformAdmin: false,
+        claims: {
+          user_id: "user-1",
+          organization_id: "org-1",
+          auth_kind: "organization",
+          permission: 2,
+          type: "owner",
+        },
+      },
+    } as Request;
+
+    authorizeRequest(request, {} as Response, next);
+
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 403, code: "FORBIDDEN" }),
+    );
+  });
+
   it("denies an authenticated route without an explicit policy", () => {
     const next = vi.fn();
     const request = {

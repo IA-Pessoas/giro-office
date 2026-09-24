@@ -10,6 +10,7 @@ import type {
   PlatformSuperAdmin,
   PlatformUsersListResponse,
   TransferPlatformOwnershipPayload,
+  UpdatePlatformSuperAdminPermissionPayload,
   UpdatePlatformOrganizationUserPayload,
   UpdatePlatformOrganizationLogoPayload,
   UpdatePlatformOrganizationPlanPayload,
@@ -35,6 +36,17 @@ export const platformService = {
   async listSuperAdmins(): Promise<PlatformSuperAdmin[]> {
     const response = await api.get("/platform/super-admins");
     return unwrapData<PlatformSuperAdmin[]>(response);
+  },
+
+  async updateSuperAdminImpersonationPermission(
+    superAdminId: string,
+    payload: UpdatePlatformSuperAdminPermissionPayload,
+  ): Promise<PlatformSuperAdmin> {
+    const response = await api.patch(
+      `/platform/super-admins/${superAdminId}/impersonation-permission`,
+      payload,
+    );
+    return unwrapData<PlatformSuperAdmin>(response);
   },
 
   async listUsers(
