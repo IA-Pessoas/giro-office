@@ -18,6 +18,7 @@ import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption, useClient } from "@modules/clients";
 import { ConfirmationDialog, PaginationControls } from "@shared/components";
 import { useDebouncedValue } from "@shared/hooks";
+import { isServerErrorAlreadyNotified } from "@shared/services/serverErrorToast";
 
 import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../types";
 import { useDeleteIntegracaoTaskMutation, useIntegracaoTasksList } from "../hooks";
@@ -201,7 +202,7 @@ export function TasksWorkspace() {
       setTaskDeletionError(null);
     } catch (error) {
       const message = getTaskDeleteErrorMessage(error);
-      toast.error(message);
+      if (!isServerErrorAlreadyNotified(error)) toast.error(message);
       setTaskDeletionError(message);
       throw error;
     }
@@ -287,7 +288,7 @@ export function TasksWorkspace() {
             Tarefas
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Acompanhe tarefas reais da integração, com filtros alinhados ao task-service.
+            Acompanhe as tarefas da integração por cliente, status e responsável.
           </p>
         </div>
 
@@ -524,7 +525,7 @@ export function TasksWorkspace() {
                       </span>
                     </td>
                     <td className={TASK_TABLE_CELL_CLASSNAME}>
-                      {task.isUnassigned ? "Sem responsável" : "Com responsável"}
+                      {task.responsible_name ?? (task.isUnassigned ? "Sem responsável" : "—")}
                     </td>
                     <td className={TASK_TABLE_CELL_CLASSNAME}>
                       <span

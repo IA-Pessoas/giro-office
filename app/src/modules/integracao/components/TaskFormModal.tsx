@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, FileText, LoaderCircle, Save } from "lucide-react";
+import { FileText, LoaderCircle, Save } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import type { ModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { isServerErrorAlreadyNotified } from "@shared/services/serverErrorToast";
 import { useFetch } from "@shared/hooks";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -404,7 +405,9 @@ export function TaskFormModal({
       onSuccess?.(createdTask);
       onOpenChange(false);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível criar a tarefa."));
+      if (!isServerErrorAlreadyNotified(error)) {
+        toast.error(getApiErrorMessage(error, "Não foi possível criar a tarefa."));
+      }
     }
   }
 
@@ -425,7 +428,9 @@ export function TaskFormModal({
         );
       }
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível criar o projeto."));
+      if (!isServerErrorAlreadyNotified(error)) {
+        toast.error(getApiErrorMessage(error, "Não foi possível criar o projeto."));
+      }
     }
   }
 
@@ -494,7 +499,9 @@ export function TaskFormModal({
       onSuccess?.(updatedTask);
       onOpenChange(false);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível atualizar a tarefa."));
+      if (!isServerErrorAlreadyNotified(error)) {
+        toast.error(getApiErrorMessage(error, "Não foi possível atualizar a tarefa."));
+      }
     }
   }
 
@@ -743,13 +750,12 @@ export function TaskFormModal({
                     Previsão atual
                   </span>
                   <div className="relative">
-                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       type="date"
                       value={editValues.prevision_date}
                       readOnly={!canSetInitialPrevision}
                       onChange={(event) => updateEditValue("prevision_date", event.target.value)}
-                      className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                      className={PROJECT_INPUT_CLASSNAME}
                     />
                   </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -995,12 +1001,11 @@ export function TaskFormModal({
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Previsão</span>
               <div className="relative">
-                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="date"
                   value={createValues.prevision_date}
                   onChange={(event) => updateCreateValue("prevision_date", event.target.value)}
-                  className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                  className={PROJECT_INPUT_CLASSNAME}
                 />
               </div>
             </label>

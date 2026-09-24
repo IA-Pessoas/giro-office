@@ -16,3 +16,9 @@ export function notifyServerError(adapter: ServerErrorToastAdapter): void {
     toastId: SERVER_ERROR_TOAST_ID,
   });
 }
+
+/** 5xx já ganha o toast genérico do interceptor; o chamador não deve repetir. */
+export function isServerErrorAlreadyNotified(error: unknown): boolean {
+  const status = (error as { response?: { status?: unknown } } | null)?.response?.status;
+  return typeof status === "number" && status >= 500;
+}

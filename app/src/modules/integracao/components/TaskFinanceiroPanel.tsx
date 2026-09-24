@@ -196,10 +196,23 @@ export function TaskFinanceiroPanel({ canManage, canView, clientId, onSettled }:
             value={departmentId}
             onChange={(event) => setDepartmentId(event.target.value)}
             className="mt-3 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+            disabled={departmentsQuery.isLoading}
           >
-            <option value="">Selecione o departamento</option>
+            <option value="">
+              {departmentsQuery.isLoading ? "Carregando departamentos..." : "Selecione o departamento"}
+            </option>
             {(departmentsQuery.data ?? []).map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
           </select>
+          {departmentId && usersQuery.isLoading ? (
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400" role="status">
+              Carregando usuários...
+            </p>
+          ) : null}
+          {departmentId && !usersQuery.isLoading && (usersQuery.data ?? []).length === 0 ? (
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              Nenhum usuário ativo neste departamento.
+            </p>
+          ) : null}
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {(usersQuery.data ?? []).map((user) => (
               <label key={user.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">

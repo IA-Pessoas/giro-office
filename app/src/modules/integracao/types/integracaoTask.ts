@@ -41,6 +41,7 @@ export interface IntegracaoTaskListItem {
   charge_financeiro: boolean;
   client_name: string;
   project_name: string;
+  responsible_name: string | null;
 }
 
 export interface IntegracaoTaskListResult {
