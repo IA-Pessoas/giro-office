@@ -66,6 +66,17 @@ describe("regularize dashboard route", () => {
     });
   });
 
+  it("keeps legacy guidance placeholder processes out of the dashboard", async () => {
+    const prisma = createDashboardPrisma();
+    await request(createTestApp(prisma))
+      .get("/regularize/dashboard?year=2026")
+      .set(gatewayHeaders());
+
+    const excluded = { process_type: { not: "Processo técnico para orientação legada" } };
+    expect(vi.mocked(prisma.process.count).mock.calls[0]?.[0]?.where).toMatchObject(excluded);
+    expect(vi.mocked(prisma.process.findMany).mock.calls[0]?.[0]?.where).toMatchObject(excluded);
+  });
+
   it("returns a safe requestId when aggregation fails", async () => {
     const prisma = createDashboardPrisma();
     vi.mocked(prisma.process.count).mockRejectedValueOnce(new Error("private database detail"));

@@ -1,4 +1,5 @@
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { OPERATIONAL_PROCESS_FILTER } from "../schemas/status.schemas.js";
 
 export interface RegularizeDashboardProcess {
   id: string;
@@ -50,11 +51,12 @@ export class RegularizeDashboardService {
       this.prisma.process.count({
         where: {
           organization_id: organizationId,
+          ...OPERATIONAL_PROCESS_FILTER,
           status: { notIn: [...CLOSED_PROCESS_STATUSES] },
         },
       }),
       this.prisma.process.findMany({
-        where: { organization_id: organizationId },
+        where: { organization_id: organizationId, ...OPERATIONAL_PROCESS_FILTER },
         select: {
           id: true,
           process_type: true,

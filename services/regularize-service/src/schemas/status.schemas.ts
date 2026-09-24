@@ -88,6 +88,14 @@ const PROCESS_STATUS_EQUIVALENTS = {
   Paralisado: ["Paralisado", "Paralizado"],
 } as const;
 
+// A migração criou um processo técnico para cada orientação legada sem processo (a FK é
+// obrigatória). Ele segura a orientação, mas não é trabalho do Regularize: fica fora das listas
+// operacionais e continua acessível pelo id (#1377).
+export const LEGACY_GUIDANCE_PROCESS_TYPE = "Processo técnico para orientação legada";
+export const OPERATIONAL_PROCESS_FILTER = {
+  process_type: { not: LEGACY_GUIDANCE_PROCESS_TYPE },
+} as const;
+
 export function buildProcessStatusFilter(status: string): Record<string, unknown> {
   if (status === "Todos") {
     return {};
