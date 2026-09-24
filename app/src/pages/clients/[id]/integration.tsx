@@ -19,6 +19,7 @@ import {
   hasUsableIntegrationData,
   mergeClientCompanyLookup,
 } from "@modules/clients/utils/integrationForm";
+import { getClientInternalName } from "@modules/clients/utils/clientForm";
 import {
   validateCpfCnpjDocument,
   validateOptionalCpfDocument,
@@ -92,7 +93,7 @@ export default function ClientIntegrationPage() {
       return;
     }
 
-    if (!formValues.name.trim()) {
+    if (!getClientInternalName(formValues)) {
       toast.error("Preencha o nome do cliente para continuar.");
       return;
     }

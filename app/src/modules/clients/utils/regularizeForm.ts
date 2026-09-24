@@ -118,6 +118,7 @@ export const REGULARIZE_SEGMENT_OPTIONS = [
 
 export function createRegularizeInitialValues(client: Client): ClientRegularizeFormValues {
   return {
+    type: client.type,
     dominio_code: client.dominio_code ?? "",
     name: client.name ?? "",
     company_name: client.company_name ?? "",
@@ -151,6 +152,12 @@ export function createRegularizeInitialValues(client: Client): ClientRegularizeF
     end_strike: normalizeDateInputValue(client.end_strike),
     deletion_date: normalizeDateInputValue(client.deletion_date),
   };
+}
+
+export function isRegularizeCompanyClient(
+  values: Pick<ClientRegularizeFormValues, "type">,
+): boolean {
+  return values.type === "PJ";
 }
 
 export function buildRegularizePayload(

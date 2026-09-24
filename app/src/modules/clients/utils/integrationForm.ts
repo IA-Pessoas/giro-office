@@ -12,6 +12,7 @@ import type {
   UpdateClientIntegrationFormValues,
   UpdateClientIntegrationPayload,
 } from "../types";
+import { getClientInternalName } from "./clientForm.ts";
 const nullableTextFieldNames = [
   "company_name",
   "fantasy_name",
@@ -152,7 +153,7 @@ export function buildCreateClientIntegrationPayload(
   return {
     organization_id: organizationId,
     type: values.type,
-    name: values.name.trim(),
+    name: getClientInternalName(values),
     cpf_cnpj: normalizeIntegrationDocumentValue(values.cpf_cnpj, values.type),
     company_name: normalizeNullableTextValue(values.company_name),
     fantasy_name: normalizeNullableTextValue(values.fantasy_name),
@@ -183,7 +184,7 @@ export function buildUpdateClientIntegrationPayload(
     payload.type = values.type;
   }
 
-  const nextName = values.name.trim();
+  const nextName = getClientInternalName(values);
   const currentName = currentValues.name.trim();
 
   if (nextName.length > 0 && nextName !== currentName) {
