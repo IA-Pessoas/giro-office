@@ -163,6 +163,23 @@ describe("TriageUrgentRequestService", () => {
     });
   });
 
+  it("não fecha, reabre nem edita urgência de competência arquivada (#1326)", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageUrgentRequest.findFirst).mockResolvedValue(record as never);
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({
+      archived_at: new Date("2026-09-20T00:00:00.000Z"),
+    } as never);
+    const service = new TriageUrgentRequestService(prisma);
+
+    await expect(service.close(REQUEST_ID, "Documento validado.", editor())).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    await expect(
+      service.update(REQUEST_ID, { description: "Nova descrição." }, editor()),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.triageUrgentRequest.update).not.toHaveBeenCalled();
+  });
+
   it("fecha somente com nota de resolução e reabre limpando a resolução", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageUrgentRequest.findFirst)

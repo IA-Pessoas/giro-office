@@ -276,6 +276,7 @@ export class TriageUrgentRequestService {
     }
 
     const current = await this.findOne(id, auth);
+    await this.assertWritable(current, auth);
     if (current.status === "CLOSED") {
       throw new ServiceError(409, "Solicitação fechada deve ser reaberta antes da edição.");
     }
@@ -295,6 +296,7 @@ export class TriageUrgentRequestService {
     requireWritePermission(auth);
     const note = validateDescription(resolutionNote);
     const current = await this.findOne(id, auth);
+    await this.assertWritable(current, auth);
     if (current.status === "CLOSED") return toDto(current);
 
     const updated = await this.withOrganization(auth, (transaction) =>
@@ -311,6 +313,7 @@ export class TriageUrgentRequestService {
     requireContext(auth);
     requireWritePermission(auth);
     const current = await this.findOne(id, auth);
+    await this.assertWritable(current, auth);
     if (current.status === "OPEN") return toDto(current);
 
     const updated = await this.withOrganization(auth, (transaction) =>
@@ -321,6 +324,20 @@ export class TriageUrgentRequestService {
       }),
     );
     return toDto(updated);
+  }
+
+  private assertWritable(
+    record: RequestRecord,
+    auth: TriageUrgentRequestAuthContext,
+  ): Promise<void> {
+    return this.withOrganization(auth, (transaction) =>
+      assertCompetenceWritable(
+        transaction,
+        auth.organizationId,
+        record.client_id,
+        record.competence,
+      ),
+    );
   }
 
   private async findOne(id: string, auth: TriageUrgentRequestAuthContext): Promise<RequestRecord> {

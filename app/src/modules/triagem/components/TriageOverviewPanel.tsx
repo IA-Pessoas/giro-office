@@ -9,6 +9,7 @@ import type {
   TriageOverviewIndicators,
   TriageOverviewStatus,
 } from "../services/triagemOverviewService";
+import { formatTriageCompetence } from "./triagem.helpers";
 
 const PAGE_SIZE = 20;
 
@@ -35,16 +36,6 @@ const STATUS_OPTIONS: Array<{ value: TriageOverviewStatus | ""; label: string }>
     label,
   })),
 ];
-
-function formatCompetence(value: string): string {
-  const [year, month] = value.split("-").map(Number);
-  if (!year || !month) return value;
-  return new Intl.DateTimeFormat("pt-BR", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, 1)));
-}
 
 export function TriageOverviewPanel({ clientId }: { clientId?: string }) {
   const [competence, setCompetence] = useState("");
@@ -148,7 +139,7 @@ export function TriageOverviewPanel({ clientId }: { clientId?: string }) {
               {result.items.map((item) => (
                 <tr key={`${item.client_id}:${item.competence}`}>
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{item.legal_name}</td>
-                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{formatCompetence(item.competence)}</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{formatTriageCompetence(item.competence)}</td>
                   <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{STATUS_LABELS[item.status]}</td>
                 </tr>
               ))}

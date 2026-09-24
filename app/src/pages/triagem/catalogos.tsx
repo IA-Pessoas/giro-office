@@ -1,6 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Settings } from "lucide-react";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { AccessDeniedPanel } from "@modules/contabil";
@@ -20,7 +20,7 @@ export default function TriagemCatalogosPage() {
       ) : !access.canView ? (
         <AccessDeniedPanel />
       ) : (
-        <div className="mx-auto max-w-5xl space-y-6">
+        <div className="mx-auto max-w-[1600px] space-y-6">
           <header>
             <Link
               href="/triagem"
@@ -29,7 +29,10 @@ export default function TriagemCatalogosPage() {
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Voltar para a Triagem
             </Link>
-            <h1 className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+            <h1 className="mt-2 mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
+                <Settings className="h-5 w-5 text-white" aria-hidden="true" />
+              </div>
               Catálogos da Triagem
             </h1>
             <p className="mt-1 text-gray-600 dark:text-slate-400">

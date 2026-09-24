@@ -208,6 +208,12 @@ export class TriageExternalLinkService {
       if (!existing) {
         throw new ServiceError(404, "Link externo não encontrado.");
       }
+      await assertCompetenceWritable(
+        transaction,
+        auth.organizationId,
+        existing.client_id,
+        existing.competence,
+      );
 
       await this.assertCatalogItemForCompetence(
         transaction,
@@ -246,6 +252,12 @@ export class TriageExternalLinkService {
       if (!existing) {
         throw new ServiceError(404, "Link externo não encontrado.");
       }
+      await assertCompetenceWritable(
+        transaction,
+        auth.organizationId,
+        existing.client_id,
+        existing.competence,
+      );
       if (existing.archived_at) {
         return existing;
       }
