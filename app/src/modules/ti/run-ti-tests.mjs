@@ -548,6 +548,16 @@ await runTest("ti stock list preserves server pagination metadata", async () => 
   assert.match(hookSource, /UseQueryResult<PaginatedResult<TiStockItem>, Error>/);
 });
 
+await runTest("ti term matches each asset code it cites", async () => {
+  const { termCitesAsset } = await import("./utils/termAssetCodes.ts");
+
+  assert.equal(termCitesAsset({ asset_code: "MS27CASTELO, N30CASTELO" }, "n30castelo"), true);
+  assert.equal(termCitesAsset({ asset_code: " N04CASTELO " }, "N04CASTELO"), true);
+  assert.equal(termCitesAsset({ asset_code: "N04CASTELO" }, "N04"), false);
+  assert.equal(termCitesAsset({ equipament_list: "Notebook N04CASTELO" }, "N04CASTELO"), true);
+  assert.equal(termCitesAsset({ asset_code: null }, ""), false);
+});
+
 await runTest("ti stock location display never falls back to a raw id", async () => {
   const { resolveTiStockLocationName } = await import("./utils/stockDisplay.ts");
   const locations = [{ id: 24, name: "Almoxarifado TI" }];
