@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { updateClientBodySchema } from "../schemas/client.schemas.js";
 import {
   createIntegrationBodySchema,
   updateRegularizeBodySchema,
@@ -15,6 +16,7 @@ describe("regularize opening date", () => {
     for (const result of [
       updateRegularizeBodySchema.safeParse({ opening_date: "2099-01-01" }),
       createIntegrationBodySchema.safeParse({ ...createBody, opening_date: "2099-01-01" }),
+      updateClientBodySchema.safeParse({ opening_date: "2099-01-01" }),
     ]) {
       expect(result.success).toBe(false);
       expect(firstMessage(result)).toBe("Data de abertura não pode ser no futuro.");
@@ -34,12 +36,20 @@ describe("regularize CNAE", () => {
   });
 
   it.each(["QA_abc", "6201-5", "62015011"])("rejects %s", (cnae) => {
-    const result = updateRegularizeBodySchema.safeParse({ cnae });
-    expect(result.success).toBe(false);
-    expect(firstMessage(result)).toBe("CNAE deve ter 7 dígitos (ex.: 6201-5/01).");
+    for (const result of [
+      updateRegularizeBodySchema.safeParse({ cnae }),
+      updateClientBodySchema.safeParse({ cnae }),
+    ]) {
+      expect(result.success).toBe(false);
+      expect(firstMessage(result)).toBe("CNAE deve ter 7 dígitos (ex.: 6201-5/01).");
+    }
   });
 
-  it("accepts null to clear the CNAE", () => {
-    expect(updateRegularizeBodySchema.safeParse({ cnae: null }).success).toBe(true);
+  it("treats an empty CNAE as clearing it", () => {
+    for (const cnae of [null, ""]) {
+      const result = updateRegularizeBodySchema.safeParse({ cnae });
+      expect(result.success).toBe(true);
+      expect(result.data?.cnae ?? null).toBeNull();
+    }
   });
 });

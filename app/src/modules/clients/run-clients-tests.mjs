@@ -39,7 +39,6 @@ import {
   getRegularizeUnsupportedDateClearError,
   getRegularizeRegimeOptions,
   hasRegularizeChanges,
-  REGULARIZE_REGIME_OPTIONS,
 } from "./utils/regularizeForm.ts";
 import { FISCAL_TAX_REGIME_OPTIONS } from "../fiscal/utils/fiscalTaxRegime.ts";
 import {
@@ -916,7 +915,7 @@ runTest("client lifecycle asks for confirmation and termination marks required f
 });
 
 runTest("clients, regularize and fiscal share one tax regime list", () => {
-  assert.deepEqual([...REGULARIZE_REGIME_OPTIONS], [...CLIENT_TAX_REGIME_OPTIONS]);
+  assert.deepEqual(getRegularizeRegimeOptions(""), [...CLIENT_TAX_REGIME_OPTIONS]);
   assert.deepEqual(
     FISCAL_TAX_REGIME_OPTIONS.map((option) => option.label),
     [...CLIENT_TAX_REGIME_OPTIONS],

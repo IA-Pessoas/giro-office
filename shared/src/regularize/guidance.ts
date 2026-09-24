@@ -1,11 +1,8 @@
 /**
- * Regimes tributários (fonte única).
+ * Regimes tributários aceitos em Clientes, Regularize e Fiscal (fonte única).
+ * MEI é enquadramento do Simples; e-Social, CNO e CAEPF são cadastros, não regimes.
  * Fica neste arquivo porque o app lê shared/src via condição "development" e o Next não
  * resolve import relativo ".js" entre arquivos .ts daqui.
- *
- * Regimes tributários aceitos em Clientes, Regularize e Fiscal.
- * A ordem importa: o Fiscal legado grava o índice ("0", "1", "2") em tributacao_pis_cofins.regime.
- * MEI é enquadramento do Simples; e-Social, CNO e CAEPF são cadastros, não regimes.
  */
 export const TAX_REGIME_OPTIONS = ["Simples Nacional", "Lucro Presumido", "Lucro Real"] as const;
 

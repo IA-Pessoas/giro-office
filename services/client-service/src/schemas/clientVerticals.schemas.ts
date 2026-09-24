@@ -1,33 +1,11 @@
 import { z } from "zod";
 
+import { cnaeSchema, openingDateSchema } from "./client.schemas.js";
+
 const clientEmailSchema = z
   .string()
   .trim()
   .email("Informe um e-mail válido.")
-  .nullable()
-  .optional();
-
-// "Hoje" no fuso de São Paulo: uma abertura datada de hoje à noite no Brasil já é amanhã em UTC.
-function todayInSaoPaulo(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
-}
-
-const openingDateSchema = z.coerce
-  .date()
-  .nullable()
-  .optional()
-  .refine(
-    (date) => !date || date.toISOString().slice(0, 10) <= todayInSaoPaulo(),
-    "Data de abertura não pode ser no futuro.",
-  );
-
-// CNAE: 7 dígitos, com ou sem máscara (6201-5/01).
-const cnaeSchema = z
-  .string()
-  .refine(
-    (value) => /^[\d.\-/\s]+$/.test(value) && value.replace(/\D/g, "").length === 7,
-    "CNAE deve ter 7 dígitos (ex.: 6201-5/01).",
-  )
   .nullable()
   .optional();
 

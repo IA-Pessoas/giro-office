@@ -99,11 +99,9 @@ const booleanFieldNames = [
   "consultoria",
 ] as const satisfies ReadonlyArray<keyof ClientRegularizeFormValues>;
 
-export const REGULARIZE_REGIME_OPTIONS = TAX_REGIME_OPTIONS;
-
 // Valor antigo (MEI, E-SOCIAL, CNO, CAEPF) continua visível até alguém escolher um regime válido.
 export function getRegularizeRegimeOptions(current: string): string[] {
-  const options: string[] = [...REGULARIZE_REGIME_OPTIONS];
+  const options: string[] = [...TAX_REGIME_OPTIONS];
   return current && !options.includes(current) ? [...options, current] : options;
 }
 

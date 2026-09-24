@@ -11,7 +11,7 @@ import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 import { normalizeDocumentValue } from "./documentValidation.ts";
 import { mapClientStatusFromApi, mapClientStatusToApi } from "./statusMapper.ts";
 
-// Fonte única com Regularize e Fiscal (shared/src/regularize/taxRegime.ts).
+// Fonte única com Regularize e Fiscal (TAX_REGIME_OPTIONS em shared/src/regularize/guidance.ts).
 export const CLIENT_TAX_REGIME_OPTIONS = TAX_REGIME_OPTIONS satisfies readonly ClientTaxRegime[];
 
 function isClientTaxRegime(value: string | null | undefined): value is ClientTaxRegime {
