@@ -14,6 +14,9 @@ const { prismaMock, auditMock, workflowMock, operationalNotificationMock } = vi.
       updateMany: vi.fn(),
       findMany: vi.fn(),
     },
+    project: {
+      findFirst: vi.fn(async () => ({ status: "Em andamento" })),
+    },
     user: {
       findMany: vi.fn(),
     },
@@ -63,6 +66,34 @@ describe("TaskLifecycleService", () => {
       responsible_id: "user-1",
       responsible2_id: null,
       responsible3_id: null,
+    });
+
+    await expect(
+      new TaskLifecycleService().requestTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        reason: "Pronta.",
+        integracaoLevel: 0,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.taskCompletionRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("impede solicitar conclusão quando o projeto ainda aguarda o Comercial", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      project_id: "project-1",
+      status: "Em Andamento",
+      billing: "Não Realizar",
+      hiring_status: null,
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.project.findFirst.mockResolvedValue({
+      status: "Aguardando liberação do Comercial",
     });
 
     await expect(
@@ -273,6 +304,7 @@ describe("TaskLifecycleService", () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.project.findFirst.mockResolvedValue({ status: "Em andamento" });
   });
 
   it("concludeTask lança 404 quando tarefa não existe", async () => {

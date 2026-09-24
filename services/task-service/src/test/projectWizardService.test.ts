@@ -30,6 +30,42 @@ const request = {
 };
 
 describe("ProjectWizardService", () => {
+  it("mantém projeto de cliente novo aguardando o fechamento Comercial", async () => {
+    const db = createDatabase(
+      vi.fn(async ({ data }: { data: object }) => ({ id: "project-1", ...data })),
+    );
+    db.client.findFirst = vi.fn(async () => ({
+      id: request.client_id,
+      type_registration: "Novo",
+      prospecting_status: "Análise/Agendamento",
+    }));
+
+    await new ProjectWizardService(db).create(request);
+
+    expect(db.project.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "Aguardando liberação do Comercial" }),
+      }),
+    );
+  });
+
+  it("não bloqueia cliente novo cuja prospecção já foi fechada", async () => {
+    const db = createDatabase(
+      vi.fn(async ({ data }: { data: object }) => ({ id: "project-1", ...data })),
+    );
+    db.client.findFirst = vi.fn(async () => ({
+      id: request.client_id,
+      type_registration: "Novo",
+      prospecting_status: "Fechado",
+    }));
+
+    await new ProjectWizardService(db).create(request);
+
+    expect(db.project.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "Em andamento" }) }),
+    );
+  });
+
   it("recompõe usando o banco da transação e recusa a revisão obsoleta sem gravar", async () => {
     const db = createDatabase();
     const tx = {
@@ -282,6 +318,7 @@ describe("ProjectWizardService", () => {
         createDependencies: false,
       },
       expect.anything(),
+      { allowPendingCommercialProject: true },
     );
     expect(taskCreator.createTaskInTransaction).toHaveBeenNthCalledWith(
       2,
@@ -293,6 +330,7 @@ describe("ProjectWizardService", () => {
         createDependencies: false,
       }),
       expect.anything(),
+      { allowPendingCommercialProject: true },
     );
     expect(result).toEqual({
       project: { id: "project-1", client_id: request.client_id },
@@ -410,6 +448,7 @@ describe("ProjectWizardService", () => {
         createDependencies: false,
       }),
       expect.anything(),
+      { allowPendingCommercialProject: true },
     );
     expect(taskCreator.createTaskInTransaction).toHaveBeenNthCalledWith(
       2,
@@ -420,6 +459,7 @@ describe("ProjectWizardService", () => {
         createDependencies: false,
       }),
       expect.anything(),
+      { allowPendingCommercialProject: true },
     );
     expect(taskCreator.createTaskInTransaction).toHaveBeenNthCalledWith(
       3,
@@ -430,6 +470,7 @@ describe("ProjectWizardService", () => {
         createDependencies: false,
       }),
       expect.anything(),
+      { allowPendingCommercialProject: true },
     );
   });
 

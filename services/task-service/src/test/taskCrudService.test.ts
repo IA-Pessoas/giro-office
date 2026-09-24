@@ -65,7 +65,12 @@ describe("TaskCrudService", () => {
   it("createTaskInTransaction persiste tarefa e dependentes somente no tx sem efeitos pós-commit", async () => {
     const tx = {
       $transaction: vi.fn(),
-      project: { findFirst: vi.fn().mockResolvedValue({ client_id: "client-1" }) },
+      project: {
+        findFirst: vi.fn().mockResolvedValue({
+          client_id: "client-1",
+          status: "Aguardando liberação do Comercial",
+        }),
+      },
       department: { findFirst: vi.fn().mockResolvedValue({ id: "dep-1" }) },
       task: {
         findFirst: vi.fn().mockResolvedValue(null),
@@ -102,6 +107,7 @@ describe("TaskCrudService", () => {
         integracaoLevel: 2,
       },
       tx as unknown as Prisma.TransactionClient,
+      { allowPendingCommercialProject: true },
     );
 
     expect(result).toMatchObject({
@@ -112,7 +118,7 @@ describe("TaskCrudService", () => {
     });
     expect(tx.project.findFirst).toHaveBeenCalledWith({
       where: { id: "project-1", organization_id: "org-1" },
-      select: { client_id: true },
+      select: { client_id: true, status: true },
     });
     expect(tx.task.findFirst).toHaveBeenCalledTimes(2);
     expect(tx.taskModel.findFirst).toHaveBeenCalledTimes(2);
@@ -970,6 +976,29 @@ describe("TaskCrudService", () => {
     expect(prismaMock.task.create).not.toHaveBeenCalled();
   });
 
+  it("bloqueia criação manual de tarefa em projeto aguardando liberação Comercial", async () => {
+    prismaMock.project.findFirst.mockResolvedValue({
+      client_id: "client-1",
+      status: "Aguardando liberação do Comercial",
+    });
+    const service = new TaskCrudService();
+
+    await expect(
+      service.createTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        model_id: "model-1",
+        project_id: "project-1",
+        client_id: "client-1",
+        prospecting_status: "Fechado",
+        observations: "obs",
+        urgency: "Alta",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.task.create).not.toHaveBeenCalled();
+  });
+
   it("createTask cria a tarefa quando o projeto pertence ao cliente", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue(null);
@@ -999,7 +1028,7 @@ describe("TaskCrudService", () => {
 
     expect(prismaMock.project.findFirst).toHaveBeenCalledWith({
       where: { id: "project-1", organization_id: "org-1" },
-      select: { client_id: true },
+      select: { client_id: true, status: true },
     });
     expect(prismaMock.task.create).toHaveBeenCalledTimes(1);
   });
@@ -1256,6 +1285,27 @@ describe("TaskCrudService", () => {
     });
   });
 
+  it("detailTask expõe bloqueio herdado do projeto mesmo em tarefa não faturável", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      billing: "Não Realizar",
+      hiring_status: null,
+      responsible_id: null,
+      responsible2_id: null,
+      responsible3_id: null,
+      project: { status: "Aguardando liberação do Comercial" },
+    });
+
+    await expect(
+      new TaskCrudService().detailTask("task-1", "org-1", {
+        user_id: "owner-1",
+        integracaoLevel: 3,
+        isOwner: true,
+      }),
+    ).resolves.toMatchObject({ detail: { commercial_validation_pending: true } });
+  });
+
   it("listTasks calcula totais sobre todos os registros filtrados", async () => {
     const pageRows = [
       {
@@ -1328,6 +1378,11 @@ describe("TaskCrudService", () => {
           {
             OR: [{ billing: { not: "Realizar" } }, { hiring_status: "Contratado" }],
           },
+          {
+            project: {
+              is: { status: { not: "Aguardando liberação do Comercial" } },
+            },
+          },
         ],
       },
     });
@@ -1342,6 +1397,59 @@ describe("TaskCrudService", () => {
         ],
       },
     });
+  });
+
+  it("listTasks sinaliza tarefa de projeto pendente também para acesso elevado", async () => {
+    prismaMock.task.findMany.mockResolvedValue([
+      {
+        id: "task-held",
+        name: "Tarefa aguardando",
+        status: "Em Andamento",
+        billing: "Não Realizar",
+        hiring_status: null,
+        client: { name: "Empresa", company_name: null },
+        project: {
+          name: "Projeto novo",
+          status: "Aguardando liberação do Comercial",
+        },
+        responsible_id: "user-1",
+        responsible2_id: null,
+        responsible3_id: null,
+      },
+    ]);
+    prismaMock.task.count
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(1);
+
+    const result = await new TaskCrudService().listTasks({
+      organization_id: "org-1",
+      user_id: "user-1",
+      status: "Todos",
+      ref: "",
+      ref_id: "",
+      search: "",
+      page: 1,
+      limit: 20,
+      integracaoLevel: 1,
+    });
+
+    expect(result.data[0]).toMatchObject({ id: "task-held", status: "Em Espera" });
+    expect(result.summary.inProgress).toBe(0);
+    expect(prismaMock.task.count).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            {
+              project: {
+                is: { status: { not: "Aguardando liberação do Comercial" } },
+              },
+            },
+          ]),
+        }),
+      }),
+    );
   });
 
   it("listTasks filtra serviços únicos contratados e retorna empresa e projeto", async () => {
@@ -1390,7 +1498,7 @@ describe("TaskCrudService", () => {
         },
         select: expect.objectContaining({
           client: { select: { name: true, company_name: true } },
-          project: { select: { name: true } },
+          project: { select: { name: true, status: true } },
         }),
       }),
     );
@@ -1607,6 +1715,11 @@ describe("TaskCrudService", () => {
           AND: [
             { status: { in: ["Em Andamento", "A Realizar", "Em Espera"] } },
             {
+              project: {
+                is: { status: { not: "Aguardando liberação do Comercial" } },
+              },
+            },
+            {
               OR: [
                 { responsible_id: "user-1" },
                 { responsible2_id: "user-1" },
@@ -1655,6 +1768,11 @@ describe("TaskCrudService", () => {
       AND: [
         { status: { in: ["Em Andamento", "A Realizar", "Em Espera"] } },
         {
+          project: {
+            is: { status: { not: "Aguardando liberação do Comercial" } },
+          },
+        },
+        {
           OR: [
             { responsible_id: "user-1" },
             { responsible2_id: "user-1" },
@@ -1680,6 +1798,11 @@ describe("TaskCrudService", () => {
           { status: { contains: "andamento", mode: "insensitive" } },
           {
             OR: [{ billing: { not: "Realizar" } }, { hiring_status: "Contratado" }],
+          },
+          {
+            project: {
+              is: { status: { not: "Aguardando liberação do Comercial" } },
+            },
           },
         ],
       },

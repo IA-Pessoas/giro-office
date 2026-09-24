@@ -22,6 +22,9 @@ const EVENT = {
 describe("CommercialProspectingCloseService", () => {
   it("reabre tarefas comerciais e devolve a competência da tarefa contratual", async () => {
     const prisma = {
+      project: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
       task: {
         findMany: vi.fn().mockResolvedValue([
           {
@@ -76,10 +79,19 @@ describe("CommercialProspectingCloseService", () => {
       },
       data: { status: "Em andamento" },
     });
+    expect(prisma.project.updateMany).toHaveBeenCalledWith({
+      where: {
+        client_id: EVENT.client_id,
+        organization_id: EVENT.organization_id,
+        status: "Aguardando liberação do Comercial",
+      },
+      data: { status: "Em andamento" },
+    });
   });
 
   it("não reaplica tarefas quando o evento já foi processado", async () => {
     const prisma = {
+      project: { updateMany: vi.fn() },
       task: { findMany: vi.fn(), updateMany: vi.fn() },
       commercialProspectingCloseEvent: {
         findUnique: vi.fn().mockResolvedValue({
@@ -103,6 +115,7 @@ describe("CommercialProspectingCloseService", () => {
 
     expect(prisma.task.findMany).not.toHaveBeenCalled();
     expect(prisma.task.updateMany).not.toHaveBeenCalled();
+    expect(prisma.project.updateMany).not.toHaveBeenCalled();
     expect(prisma.commercialProspectingCloseEvent.create).not.toHaveBeenCalled();
   });
 });
