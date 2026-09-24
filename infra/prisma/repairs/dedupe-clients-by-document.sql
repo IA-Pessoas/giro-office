@@ -4,10 +4,12 @@
 --   psql "$DATABASE_URL" -X -f infra/prisma/repairs/dedupe-clients-by-document.sql            -- dry-run (padrao)
 --   psql "$DATABASE_URL" -X -v apply=1 -f infra/prisma/repairs/dedupe-clients-by-document.sql -- aplica
 --
--- Regra: fica o cliente mais antigo (register_date_prospecting, depois id). Todo vinculo dos
--- duplicados passa a apontar para ele, campos de cadastro vazios dele recebem o primeiro valor
--- preenchido dos duplicados e os duplicados sao removidos. Documentos com tamanho diferente de
--- 11/14 digitos ou com um digito so (mascarados, placeholders) ficam de fora.
+-- Regra: fica o cliente ativo e nao excluido mais antigo (register_date_prospecting, depois id);
+-- sem nenhum ativo no grupo, o nao excluido mais antigo. Todo vinculo dos duplicados passa a apontar
+-- para ele, campos de cadastro vazios dele recebem o primeiro valor preenchido dos duplicados e os
+-- duplicados sao removidos. Ficam de fora documentos com tamanho diferente de 11/14 ou com um
+-- caractere so (mascarados, placeholders) e clientes de teste (QA_, QA E2E): rode antes a limpeza
+-- de docs/adr/0002-testes-em-producao.md.
 -- Idempotente: sem duplicados, nao altera nada.
 \set ON_ERROR_STOP on
 \if :{?apply}
@@ -24,10 +26,15 @@ SET LOCAL client_dedupe.apply = :'apply';
   LOCK TABLE clients IN SHARE ROW EXCLUSIVE MODE;
 \endif
 
--- Documento so com digitos, ou NULL quando nao pode identificar o cliente.
+-- Documento so com letras e digitos (CNPJ alfanumerico, como report-invalid-documents.sql), ou
+-- NULL quando nao pode identificar o cliente.
 CREATE FUNCTION pg_temp.client_doc(raw text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
-  SELECT d FROM (SELECT regexp_replace(raw, '\D', '', 'g') AS d) n
-  WHERE length(d) IN (11, 14) AND d !~ '^(\d)\1*$'
+  SELECT d FROM (SELECT upper(regexp_replace(raw, '[^a-zA-Z0-9]', '', 'g')) AS d) n
+  WHERE length(d) IN (11, 14) AND d !~ '^(.)\1*$'
+$$;
+
+CREATE FUNCTION pg_temp.is_test_client(name text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT name LIKE 'QA\_%' OR name LIKE 'QA E2E%'
 $$;
 
 DO $guard$
@@ -47,9 +54,10 @@ WITH ranked AS (
          row_number() OVER w AS dup_rank,
          first_value(id) OVER w AS keep_id
   FROM clients
-  WHERE pg_temp.client_doc(cpf_cnpj) IS NOT NULL
+  WHERE pg_temp.client_doc(cpf_cnpj) IS NOT NULL AND NOT pg_temp.is_test_client(name)
   WINDOW w AS (PARTITION BY organization_id, pg_temp.client_doc(cpf_cnpj)
-               ORDER BY register_date_prospecting, id)
+               ORDER BY deletion_date IS NOT NULL, lower(coalesce(status, '')) <> 'ativo',
+                        register_date_prospecting, id)
 )
 SELECT organization_id, doc, keep_id, id AS dup_id, name AS dup_name, dup_rank
 FROM ranked
@@ -158,7 +166,8 @@ BEGIN
     RETURN;
   END IF;
   IF EXISTS (
-    SELECT 1 FROM clients WHERE pg_temp.client_doc(cpf_cnpj) IS NOT NULL
+    SELECT 1 FROM clients
+    WHERE pg_temp.client_doc(cpf_cnpj) IS NOT NULL AND NOT pg_temp.is_test_client(name)
     GROUP BY organization_id, pg_temp.client_doc(cpf_cnpj)
     HAVING count(*) > 1
   ) THEN

@@ -1,7 +1,7 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import {
   ArrowLeft,
   Calculator,
@@ -31,6 +31,7 @@ import type { ClientFormValues } from "@modules/clients/types";
 import {
   buildUpdateClientPayload,
   createClientFormInitialValues,
+  getClientInternalName,
 } from "@modules/clients/utils/clientForm";
 import {
   formatCpfCnpjInput,
@@ -41,6 +42,7 @@ import {
   mapClientStatusFromApi,
 } from "@modules/clients/utils/statusMapper";
 import { ConfirmationDialog } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -112,7 +114,7 @@ export default function ClientDetailPage() {
       return;
     }
 
-    if (!formValues.name.trim()) {
+    if (!getClientInternalName(formValues)) {
       toast.error("Preencha o nome do cliente para continuar.");
       return;
     }
@@ -224,7 +226,9 @@ export default function ClientDetailPage() {
                   <SummaryItem
                     label="CPF/CNPJ"
                     value={formatCpfCnpjInput(client.cpf_cnpj, client.type === "PF" ? "PF" : "PJ")}
-                  />
+                  >
+                    <DocumentIssueBadge value={client.cpf_cnpj} />
+                  </SummaryItem>
                   <SummaryItem label="Regime" value={client.regime || "A definir"} />
                   <SummaryItem label="Organização" value={organizationName} />
                   <SummaryItem
@@ -434,13 +438,22 @@ export default function ClientDetailPage() {
   );
 }
 
-function SummaryItem({ label, value }: { label: string; value: string }) {
+function SummaryItem({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value: string;
+  children?: ReactNode;
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {label}
       </p>
       <p className="mt-2 text-sm text-slate-900 dark:text-white">{value}</p>
+      {children}
     </div>
   );
 }
