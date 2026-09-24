@@ -239,6 +239,10 @@ function createCommercialUpstream() {
       respondJson(response, { id: pathname.split("/").pop(), deleted: true });
       return;
     }
+    if (pathname === "/commercial/prospecting/clients") {
+      respondJson(response, state.archivedProspectingIds.has(prospecting.id) ? [] : [client]);
+      return;
+    }
     if (pathname === "/client/list") {
       respondJson(response, {
         items: [{ ...client, cpf_cnpj: "12.345.678/0001-90" }],
@@ -525,7 +529,7 @@ async function run() {
     await prospectingDialog.screenshot({ path: `${evidenceDir}/09-commercial-prospecting-create-modal.png` });
     const prospectingForm = prospectingDialog.getByRole("form", { name: "Nova prospecção" });
     await prospectingForm.getByText(client.company_name, { exact: true }).waitFor();
-    await prospectingForm.getByLabel("Data do status").fill("2026-09-15");
+    await prospectingForm.getByLabel("Data da etapa").fill("2026-09-15");
     await prospectingForm.getByLabel("Descrição").fill("Retorno na próxima semana");
     const prospectingSaveButton = prospectingForm.locator('button[type="submit"]');
     const createProspectingResponsePromise = page.waitForResponse(
@@ -584,7 +588,7 @@ async function run() {
 
     await page.getByRole("button", { name: "Editar cobrança" }).click();
     await page.getByLabel("Situação da contratação").selectOption("Contratado");
-    await page.getByLabel("Pagamento").fill("Pago");
+    await page.getByLabel("Forma de pagamento").fill("Pago");
     await page.getByLabel("Descrição", { exact: true }).last().fill("Cobrança confirmada");
     await page.getByRole("button", { name: "Salvar cobrança" }).click();
     await page.getByText("Cobrança confirmada", { exact: true }).waitFor();

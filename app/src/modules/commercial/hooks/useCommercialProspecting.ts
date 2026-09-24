@@ -13,13 +13,21 @@ export function useCommercialProspecting() {
   return useFetch(commercialQueryKeys.prospecting(), () => commercialService.listProspecting());
 }
 
+export function useCommercialProspectingClients() {
+  return useFetch(commercialQueryKeys.prospectingClients(), () => commercialService.listProspectingClients());
+}
+
 export function useCreateCommercialProspecting() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (payload: CreateCommercialProspectingPayload) =>
       commercialService.createProspecting(payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospecting() }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospecting() }),
+        queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospectingClients() }),
+      ]),
   });
 }
 
@@ -38,6 +46,11 @@ export function useArchiveCommercialProspecting() {
 
   return useMutation({
     mutationFn: (id: string) => commercialService.archiveProspecting(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospecting() }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospecting() }),
+        queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospectingClients() }),
+      ]);
+    },
   });
 }

@@ -4,12 +4,13 @@ import { Archive, CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lu
 import { toast } from "react-toastify";
 
 import { useModuleAccess } from "@modules/auth";
-import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
+import { ClientPickerModal, getClientDisplayName, type ClientPickerOption } from "@modules/clients";
 import { ConfirmationDialog, Dialog } from "@shared/components";
 import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCommercialProspecting,
+  useCommercialProspectingClients,
   useArchiveCommercialProspecting,
   useCreateCommercialProspecting,
   useUpdateCommercialProspecting,
@@ -49,11 +50,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-// Regra do app (a mesma do ClientPickerModal): razão social, depois nome.
-function getClientDisplayName(client: { name: string; company_name: string | null }): string {
-  return client.company_name || client.name;
-}
-
 type Draft = { name: string; contract_value: string };
 type PendingConfirmation =
   | { type: "delete-config"; config: CommercialProposalConfig }
@@ -77,6 +73,8 @@ export function CommercialCatalog() {
   const { access, isLoading: accessLoading } = useModuleAccess("comercial");
   const configsQuery = useCommercialProposalConfigs();
   const prospectingQuery = useCommercialProspecting();
+  // Clientes sem nenhuma prospecção (ativa ou arquivada): o backend recusa os demais.
+  const eligibleClientsQuery = useCommercialProspectingClients();
   const createMutation = useCreateCommercialProposalConfig();
   const deleteMutation = useDeleteCommercialProposalConfig();
   const updateMutation = useUpdateCommercialProposalConfig();
@@ -90,7 +88,9 @@ export function CommercialCatalog() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [prospectingPickError, setProspectingPickError] = useState("");
   const [prospectingDraft, setProspectingDraft] = useState<ProspectingDraft>(emptyProspectingDraft);
   const [isCreatingProspecting, setIsCreatingProspecting] = useState(false);
   const [prospectingEditingId, setProspectingEditingId] = useState<string | null>(null);
@@ -279,9 +279,10 @@ export function CommercialCatalog() {
     );
   }
 
-  function deleteConfig(config: CommercialProposalConfig) {
+  function requestConfigDelete(config: CommercialProposalConfig) {
     setConfirmationError(null);
     setPendingConfirmation({ type: "delete-config", config });
+    setIsConfirmationOpen(true);
   }
 
   async function confirmPendingAction() {
@@ -294,7 +295,7 @@ export function CommercialCatalog() {
         await archiveProspectingMutation.mutateAsync(pendingConfirmation.item.id);
         if (prospectingEditingId === pendingConfirmation.item.id) cancelProspectingForm();
       }
-      setPendingConfirmation(null);
+      setIsConfirmationOpen(false);
     } catch (error) {
       setConfirmationError(
         getErrorMessage(
@@ -310,6 +311,12 @@ export function CommercialCatalog() {
   }
 
   function startProspectingCreate(client: ClientPickerOption) {
+    const isEligible = eligibleClientsQuery.data?.some((eligible) => eligible.id === client.id);
+    if (eligibleClientsQuery.data && !isEligible) {
+      setProspectingPickError(`${client.name} já tem uma prospecção, ativa ou arquivada.`);
+      return;
+    }
+    setProspectingPickError("");
     setIsCreatingProspecting(true);
     setProspectingEditingId(null);
     setProspectingDraft({ ...emptyProspectingDraft, client });
@@ -380,7 +387,7 @@ export function CommercialCatalog() {
               {prospectingDraft.client?.name ?? "Nenhum cliente selecionado"}
             </p>
           </div>
-          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Status
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Etapa
             <select
               value={prospectingDraft.status}
               onChange={(event) =>
@@ -394,7 +401,7 @@ export function CommercialCatalog() {
               {COMMERCIAL_PROSPECTING_STATUSES.map((status) => <option key={status}>{status}</option>)}
             </select>
           </label>
-          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Data do status
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Data da etapa
             <input
               type="date"
               value={prospectingDraft.status_date}
@@ -439,9 +446,10 @@ export function CommercialCatalog() {
     );
   }
 
-  function archiveProspecting(item: CommercialProspecting) {
+  function requestProspectingArchive(item: CommercialProspecting) {
     setConfirmationError(null);
     setPendingConfirmation({ type: "archive-prospecting", item });
+    setIsConfirmationOpen(true);
   }
 
   if (accessLoading) {
@@ -511,7 +519,7 @@ export function CommercialCatalog() {
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" aria-labelledby="commercial-catalog-title">
           <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700"><h2 id="commercial-catalog-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">Configurações cadastradas</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{configsQuery.data.length} {configsQuery.data.length === 1 ? "item" : "itens"}</p></div>
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
-            {configsQuery.data.map((config) => <div key={config.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{config.name}</p><p className="mt-1 text-sm tabular-nums text-slate-500 dark:text-slate-400">Valor base do contrato: {formatContractValue(config.contract_value)}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startEdit(config)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Excluir configuração ${config.name}`} onClick={() => deleteConfig(config)} disabled={deleteMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/30"><Trash2 className="h-4 w-4" aria-hidden="true" />Excluir configuração</button></div> : null}</div>)}
+            {configsQuery.data.map((config) => <div key={config.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{config.name}</p><p className="mt-1 text-sm tabular-nums text-slate-500 dark:text-slate-400">Valor base do contrato: {formatContractValue(config.contract_value)}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startEdit(config)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Excluir configuração ${config.name}`} onClick={() => requestConfigDelete(config)} disabled={deleteMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/30"><Trash2 className="h-4 w-4" aria-hidden="true" />Excluir configuração</button></div> : null}</div>)}
           </div>
         </section>
       ) : (
@@ -525,6 +533,7 @@ export function CommercialCatalog() {
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Acompanhe em que etapa está cada cliente em prospecção.</p>
           </div>
           {canEdit && prospectingEditingId === null ? (
+            // O picker é o gatilho: seu overlay fixo não abre dentro do Dialog (translate + overflow).
             <div ref={prospectingCreateTriggerRef}>
               <ClientPickerModal
                 triggerLabel="Nova prospecção"
@@ -537,6 +546,8 @@ export function CommercialCatalog() {
             </div>
           ) : null}
         </div>
+
+        {prospectingPickError ? <p className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300" role="alert"><CircleAlert className="h-4 w-4" aria-hidden="true" />{prospectingPickError}</p> : null}
 
         {prospectingEditingId !== null ? renderProspectingForm("edit") : null}
         <Dialog
@@ -557,7 +568,7 @@ export function CommercialCatalog() {
         </Dialog>
 
 
-        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{getClientDisplayName(item.client)}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Arquivar prospecção ${getClientDisplayName(item.client)}`} onClick={() => archiveProspecting(item)} disabled={archiveProspectingMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-amber-200 px-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-900/60 dark:text-amber-300 dark:hover:bg-amber-950/30"><Archive className="h-4 w-4" aria-hidden="true" />Arquivar prospecção</button></div> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
+        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{getClientDisplayName(item.client)}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Arquivar prospecção ${getClientDisplayName(item.client)}`} onClick={() => requestProspectingArchive(item)} disabled={archiveProspectingMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-amber-200 px-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-900/60 dark:text-amber-300 dark:hover:bg-amber-950/30"><Archive className="h-4 w-4" aria-hidden="true" />Arquivar prospecção</button></div> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
       </section>
 
       <section
@@ -588,7 +599,7 @@ export function CommercialCatalog() {
                 <form key={item.task_id} onSubmit={submitTaskBillingEdit} className="space-y-4 bg-blue-50/60 p-5 dark:bg-blue-950/20">
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-white">{item.task_name}</p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Status atual: {item.task_status}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Situação da tarefa: {item.task_status}</p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-3">
                     <label className="text-sm font-medium text-slate-800 dark:text-slate-100">
@@ -605,7 +616,7 @@ export function CommercialCatalog() {
                       Forma de pagamento
                       <input
                         value={taskBillingDraft.payment}
-                        placeholder="Ex.: À vista, 3x no boleto, pago em 10/09"
+                        placeholder="Ex.: À vista, boleto em 3x, cartão de crédito"
                         onChange={(event) => setTaskBillingDraft((current) => ({ ...current, payment: event.target.value }))}
                         className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                         maxLength={255}
@@ -638,7 +649,7 @@ export function CommercialCatalog() {
                     <p className="font-semibold text-slate-900 dark:text-white">{item.task_name}</p>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.task_status} · {item.billing}</p>
                     <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-                      {item.hiring_status ?? "Sem decisão comercial"} · {item.payment ?? "Pagamento não informado"}
+                      {item.hiring_status ?? "Contratação não definida"} · {item.payment ?? "Pagamento não informado"}
                     </p>
                     {item.billing_description ? <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{item.billing_description}</p> : null}
                   </div>
@@ -653,10 +664,11 @@ export function CommercialCatalog() {
       </section>
       </div>
       <ConfirmationDialog
-        open={pendingConfirmation !== null}
+        open={isConfirmationOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setPendingConfirmation(null);
+            // Mantém pendingConfirmation para o texto não trocar durante a animação de saída.
+            setIsConfirmationOpen(false);
             setConfirmationError(null);
           }
         }}

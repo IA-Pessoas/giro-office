@@ -4,6 +4,7 @@ import { type KeyboardEvent, useDeferredValue, useEffect, useId, useRef, useStat
 
 import { useClients } from "../hooks/useClients";
 import type { ClientListFilters } from "../types";
+import { getClientDisplayName } from "../utils/clientDisplayName";
 
 const CLIENT_PICKER_LIMIT = 50;
 const FIRST_CLIENT_PAGE = 1;
@@ -43,7 +44,7 @@ export function ClientPickerModal({
   });
   const clients = (clientsQuery.data?.items ?? []).map((client) => ({
     id: client.id,
-    name: client.company_name || client.name,
+    name: getClientDisplayName(client),
     document: client.cpf_cnpj,
   }));
   const total = clientsQuery.data?.total ?? 0;

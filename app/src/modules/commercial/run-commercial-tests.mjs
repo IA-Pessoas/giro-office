@@ -73,6 +73,7 @@ runTest("commercial prospecting uses the dedicated legacy-status contract", () =
   const catalog = read("./components/CommercialCatalog.tsx");
 
   assert.match(contract, /prospecting:\s*["']\/commercial\/prospecting["']/);
+  assert.match(contract, /prospectingClients:\s*["']\/commercial\/prospecting\/clients["']/);
   assert.match(service, /listProspecting/);
   assert.match(service, /createProspecting/);
   assert.match(service, /updateProspecting/);
@@ -106,23 +107,32 @@ runTest("commercial prospecting picks the client with the shared searchable pick
   const catalog = read("./components/CommercialCatalog.tsx");
   const hooks = read("./hooks/useCommercialProspecting.ts");
 
-  assert.match(catalog, /import \{ ClientPickerModal, type ClientPickerOption \} from "@modules\/clients"/);
+  assert.match(catalog, /import \{ ClientPickerModal, getClientDisplayName, type ClientPickerOption \} from "@modules\/clients"/);
   assert.match(catalog, /<ClientPickerModal[\s\S]*onSelectClient=/);
   assert.doesNotMatch(catalog, /Selecione um cliente<\/option>/);
-  assert.doesNotMatch(hooks, /useCommercialProspectingClients/);
+  assert.match(catalog, /eligibleClientsQuery\.data\?\.some\(\(eligible\) => eligible\.id === client\.id\)/);
+  assert.match(catalog, /já tem uma prospecção, ativa ou arquivada/);
+  assert.match(hooks, /createProspecting\(payload\)[\s\S]*prospectingClients\(\)/);
 });
 
 runTest("commercial shows client names with the app rule (razão social, then nome)", () => {
   const catalog = read("./components/CommercialCatalog.tsx");
 
-  assert.match(catalog, /function getClientDisplayName\(client: \{ name: string; company_name: string \| null \}\)[\s\S]*client\.company_name \|\| client\.name/);
+  const clientsIndex = read("../clients/index.ts");
+  const displayName = read("../clients/utils/clientDisplayName.ts");
+  const picker = read("../clients/components/ClientPickerModal.tsx");
+
+  assert.match(displayName, /client\.company_name \|\| client\.name/);
+  assert.match(clientsIndex, /getClientDisplayName/);
+  assert.match(picker, /getClientDisplayName\(client\)/);
+  assert.match(catalog, /getClientDisplayName\(item\.client\)/);
   assert.doesNotMatch(catalog, /fantasy_name/);
 });
 
 runTest("commercial confirmations use the shared dialog and saves show a toast", () => {
   const catalog = read("./components/CommercialCatalog.tsx");
 
-  assert.match(catalog, /<ConfirmationDialog/);
+  assert.match(catalog, /<ConfirmationDialog[\s\S]*open=\{isConfirmationOpen\}/);
   assert.doesNotMatch(catalog, /window\.confirm/);
   assert.match(catalog, /toast\.success\("Cobrança salva\."\)/);
 });
@@ -131,13 +141,13 @@ runTest("commercial payment field says what to write", () => {
   const catalog = read("./components/CommercialCatalog.tsx");
 
   assert.match(catalog, /Forma de pagamento/);
-  assert.match(catalog, /placeholder="Ex\.: À vista, 3x no boleto, pago em 10\/09"/);
+  assert.match(catalog, /placeholder="Ex\.: À vista, boleto em 3x, cartão de crédito"/);
 });
 
 runTest("commercial copy has no technical jargon and uses the module width", () => {
   const catalog = read("./components/CommercialCatalog.tsx");
 
-  assert.doesNotMatch(catalog, /legados|auditável|por evento/);
+  assert.doesNotMatch(catalog, /legados|auditável|por evento|Sem decisão comercial|Status atual/);
   assert.doesNotMatch(catalog, /max-w-\[1200px\]/);
   assert.match(catalog, /max-w-\[1600px\]/);
 });
