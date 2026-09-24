@@ -10,6 +10,7 @@ import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
+import { maskCPF } from "@shared/utils/formatters";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -603,7 +604,7 @@ export function TiTermsTab() {
                             {getTermTitle(term)}
                           </button>
                           <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">
-                            {getText(term.user_cpf)}
+                            {maskCPF(term.user_cpf) || getText(term.user_cpf)}
                           </p>
                         </td>
                         <td className="max-w-56 break-all px-4 py-3 align-top">{getTermAsset(term)}</td>

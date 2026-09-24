@@ -12,6 +12,13 @@ import {
   parseBrlDecimalInput,
   parseBrlInput,
 } from "./utils/inputFormatting.ts";
+import { maskCPF } from "./utils/formatters.ts";
+
+// #1344: listas mostram só os dígitos do meio do CPF.
+assert.equal(maskCPF("11144477735"), "***.444.777-**");
+assert.equal(maskCPF("111.444.777-35"), "***.444.777-**");
+assert.equal(maskCPF("123"), "***");
+assert.equal(maskCPF(null), "");
 
 assert.equal(formatCpfInput("12345678901"), "123.456.789-01");
 assert.equal(formatCpfInput("123456"), "123.456");
