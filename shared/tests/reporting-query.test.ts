@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   executeReportingQuery,
   REPORTING_QUERY_BYTE_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
 } from "../src/reporting/reportingQuery.js";
 
 test("combines an AND group with ungrouped criteria before limiting", async () => {
@@ -294,7 +295,9 @@ test("tags raw result sets beyond the global row limit", async () => {
       typeof error === "object" &&
       error !== null &&
       "code" in error &&
-      error.code === "REPORTING_QUERY_ROW_LIMIT_EXCEEDED",
+      error.code === "REPORTING_QUERY_ROW_LIMIT_EXCEEDED" &&
+      "message" in error &&
+      error.message === REPORTING_QUERY_ROW_LIMIT_MESSAGE,
   );
   assert.equal(loadedRows, 50_001);
 });
