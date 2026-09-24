@@ -3,10 +3,11 @@ import { Plus, Trash2, NotebookPen } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { useAuth } from "@/context/AuthContext";
-import { isAdminPermission } from "@modules/auth";
+import { ConfirmationDialog } from "@shared/components";
 
 import { useHistoryPendingList, useCreateHistoryPendingMutation, useDeleteHistoryPendingMutation } from "../hooks/useClientHistoryPending";
 import type { ClientHistoryPendingItem } from "../types";
+import { canManageClientHistories } from "../utils/historyAccess";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -22,7 +23,7 @@ export function ClientHistoryPendingSection({
 }) {
   const { user } = useAuth();
   const userId = user?.id;
-  const isAdmin = isAdminPermission(user?.permission);
+  const canManage = canManageClientHistories(user);
 
   const listQuery = useHistoryPendingList(userId);
   const createMutation = useCreateHistoryPendingMutation(clientId);
@@ -30,6 +31,7 @@ export function ClientHistoryPendingSection({
 
   const [reason, setReason] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const scopedList = useMemo(() => {
     const list = listQuery.data ?? [];
@@ -63,7 +65,7 @@ export function ClientHistoryPendingSection({
       return;
     }
 
-    if (!isAdmin) {
+    if (!canManage) {
       toast.warning("Você não tem permissão para remover esta pendência.");
       return;
     }
@@ -71,6 +73,7 @@ export function ClientHistoryPendingSection({
     try {
       setDeletingId(pendingId);
       await deleteMutation.mutateAsync({ pendingId, userId: user.id });
+      toast.dismiss();
       toast.success("Pendência removida com sucesso.");
     } catch (error) {
       const message =
@@ -159,10 +162,10 @@ export function ClientHistoryPendingSection({
                       {activePendingId === item.id ? "Criando..." : "Criar histórico"}
                     </button>
 
-                    {isAdmin ? (
+                    {canManage ? (
                       <button
                         type="button"
-                        onClick={() => void handleDelete(item.id)}
+                        onClick={() => setConfirmingId(item.id)}
                         disabled={deleteMutation.isPending && deletingId === item.id}
                         className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950/30"
                       >
@@ -177,6 +180,20 @@ export function ClientHistoryPendingSection({
           </div>
         )}
       </div>
+
+      <ConfirmationDialog
+        open={Boolean(confirmingId)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingId(null);
+        }}
+        title="Remover pendência"
+        description="A pendência será removida e não aparecerá mais para o responsável."
+        onConfirm={() => (confirmingId ? handleDelete(confirmingId) : undefined)}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={null}
+        confirmLabel="Remover"
+        cancelLabel="Cancelar"
+      />
     </section>
   );
 }

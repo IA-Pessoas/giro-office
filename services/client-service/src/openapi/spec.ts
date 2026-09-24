@@ -712,6 +712,26 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             },
           },
         },
+        delete: {
+          tags: ["Histories"],
+          summary: "Excluir historico (autor, admin ou owner)",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "historyId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Historico excluido",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
       },
       "/client/{id}/histories/{historyId}/file": {
         get: {

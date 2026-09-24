@@ -52,6 +52,7 @@ import {
   createClientFormInitialValues,
 } from "./utils/clientForm.ts";
 import { toDatetimeLocalValue, toHistoryIsoDate } from "./utils/historyDate.ts";
+import { canDeleteClientHistory, canManageClientHistories } from "./utils/historyAccess.ts";
 
 function runTest(name, fn) {
   try {
@@ -835,4 +836,23 @@ runTest("history modal and service share the ISO date helper", () => {
   assert.match(modal, /toDatetimeLocalValue/);
   assert.doesNotMatch(modal, /function toDatetimeLocalValue/);
   assert.equal(service.match(/toHistoryIsoDate\(payload\.date\)/g)?.length, 2);
+});
+
+runTest("history deletion follows author, admin or owner", () => {
+  const history = { user_id: "author" };
+
+  assert.equal(canDeleteClientHistory({ id: "author", permission: 1, type: "user" }, history), true);
+  assert.equal(canDeleteClientHistory({ id: "other", permission: 1, type: "user" }, history), false);
+  assert.equal(canDeleteClientHistory({ id: "other", permission: 2, type: "user" }, history), true);
+  assert.equal(canDeleteClientHistory({ id: "other", permission: null, type: "owner" }, history), true);
+  assert.equal(canDeleteClientHistory(null, history), false);
+  assert.equal(canManageClientHistories({ id: "o", permission: null, type: "owner" }), true);
+  assert.equal(canManageClientHistories({ id: "u", permission: 1, type: "user" }), false);
+});
+
+runTest("history modal defaults the date and keeps the file note to edit mode", () => {
+  const modal = readFileSync("src/modules/clients/components/ClientHistoryModal.tsx", "utf8");
+
+  assert.match(modal, /date: toDatetimeLocalValue\(new Date\(\)\.toISOString\(\)\)/);
+  assert.match(modal, /mode === "edit" \? \(\s*<p[^>]*>\s*Atualização de arquivo não é suportada na edição\./);
 });

@@ -90,6 +90,14 @@ function organizationId(c: ClientContext): string {
   return auth.organizationId;
 }
 
+// Mesma regra do isAdminPermission do Express: owner ou permissão de admin.
+const ADMIN_PERMISSION = 2;
+
+function managesOrganization(c: ClientContext): boolean {
+  const { isOwner, permission } = authz(c);
+  return isOwner || (permission ?? 0) >= ADMIN_PERMISSION;
+}
+
 function authz(c: ClientContext) {
   return clientAuthorization(c.get("auth"));
 }
@@ -556,9 +564,26 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
     }),
   );
 
+  app.delete("/client/:id/histories/:historyId", async (c) =>
+    withService(c, async (service) => {
+      const params = parse(historyIdParamsSchema, {
+        id: c.req.param("id"),
+        historyId: c.req.param("historyId"),
+      });
+      await service.deleteHistory(
+        params.id,
+        params.historyId,
+        organizationId(c),
+        c.get("auth").userId,
+        managesOrganization(c),
+      );
+      return c.json(createSuccessResponse({ ok: true }));
+    }),
+  );
+
   app.delete("/client/histories/pending/:pendingId", async (c) =>
     withService(c, async (service) => {
-      if ((c.get("auth").claims.permission ?? 0) < 2 && c.get("auth").claims.type !== "owner") {
+      if (!managesOrganization(c)) {
         throw new ServiceError(403, "Usuário não tem permissão.");
       }
       const { pendingId } = parse(pendingDeleteParamsSchema, {

@@ -214,6 +214,13 @@ export const clientService = {
     return data as ClientHistoryPendingItem[];
   },
 
+  async deleteHistory(clientId: string, historyId: string): Promise<{ ok: boolean }> {
+    const api = setupAPIClient();
+    const response = await api.delete(CLIENT_ENDPOINTS.deleteHistory(clientId, historyId));
+
+    return unwrapClientEnvelope<{ ok: boolean }>(response.data);
+  },
+
   async deleteHistoryPending(pendingId: string): Promise<{ ok: boolean }> {
     const api = setupAPIClient();
     const response = await api.delete(CLIENT_ENDPOINTS.deleteHistoryPending(pendingId));

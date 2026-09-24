@@ -905,6 +905,34 @@ describe("client-service", () => {
     );
   });
 
+  it("DELETE /client/:id/histories/:historyId lets the author or an admin remove it", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const historyId = "770e8400-e29b-41d4-a716-446655440003";
+    const prisma = {
+      clientHistory: {
+        findFirst: vi.fn().mockResolvedValue({ id: historyId, user_id: "someone-else" }),
+        delete: vi.fn().mockResolvedValue({ id: historyId }),
+      },
+    } as unknown as PrismaClient;
+    const app = buildTestApp(mock, { prisma });
+    const remove = (token: string) =>
+      request(app)
+        .delete(`/client/${TEST_CLIENT_ID}/histories/${historyId}`)
+        .set("Authorization", `Bearer ${token}`);
+
+    const byOtherUser = await remove(bearerToken(TEST_ORG_ID, 1));
+    const byAdmin = await remove(bearerToken(TEST_ORG_ID, 2));
+
+    expect(byOtherUser.status).toBe(403);
+    expect(byOtherUser.body.error).toBe("Usuário não tem permissão para excluir este histórico.");
+    expect(byAdmin.status).toBe(200);
+    expect(prisma.clientHistory.delete).toHaveBeenCalledTimes(1);
+    expect(prisma.clientHistory.findFirst).toHaveBeenCalledWith({
+      where: { id: historyId, client_id: TEST_CLIENT_ID, organization_id: TEST_ORG_ID },
+      select: { id: true, user_id: true },
+    });
+  });
+
   it("GET /client/:id/histories/:historyId/file returns a signed attachment URL", async () => {
     const mock: IClientService = { ...mockServiceBase() };
     const historyId = "770e8400-e29b-41d4-a716-446655440003";
