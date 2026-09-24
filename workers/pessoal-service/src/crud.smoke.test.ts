@@ -131,14 +131,14 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     const created = expectOk(
       await call("POST", "/pessoal/unions", {
         name: `Sindicato ${stamp}`,
-        cnpj: "12.345.678/0001-90",
+        cnpj: "11.444.777/0001-61",
         base_date: tomorrow,
       }),
       "POST unions",
     );
     unionId = created.data.id;
     expect(expectOk(await call("GET", `/pessoal/unions/${unionId}`), "GET union").data.cnpj).toBe(
-      "12.345.678/0001-90",
+      "11.444.777/0001-61",
     );
     const all = expectOk(await call("GET", "/pessoal/unions"), "GET unions").data;
     expect(all.some((union: { id: string }) => union.id === unionId)).toBe(true);
@@ -152,7 +152,7 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     expectOk(
       await call("PATCH", `/pessoal/unions/${unionId}`, {
         name: `Sindicato ${stamp} Editado`,
-        cnpj: "98.765.432/0001-10",
+        cnpj: "45.723.174/0001-10",
         base_date: tomorrow,
       }),
       "PATCH union",
@@ -160,14 +160,14 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     const edited = expectOk(await call("GET", `/pessoal/unions/${unionId}`), "GET editado").data;
     expect(edited).toMatchObject({
       name: `Sindicato ${stamp} Editado`,
-      cnpj: "98.765.432/0001-10",
+      cnpj: "45.723.174/0001-10",
     });
     expect(String(edited.base_date).slice(0, 10)).toBe(tomorrow);
 
     const disposable = expectOk(
       await call("POST", "/pessoal/unions", {
         name: `Descartável ${stamp}`,
-        cnpj: "1",
+        cnpj: "04.252.011/0001-10",
         base_date: null,
       }),
       "POST union descartável",
@@ -484,7 +484,7 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
         },
       });
     const name = `QA_audit_${stamp}`;
-    const union = { name, cnpj: "11.222.333/0001-44", base_date: null };
+    const union = { name, cnpj: "11.222.333/0001-81", base_date: null };
     const refused = await smokeCall(failingAudit(), undefined, "POST", "/pessoal/unions", union);
     expect(refused.status).toBeGreaterThanOrEqual(500);
     expect(refused.text).not.toMatch(/AUDIT_SERVICE|audit-service/iu);
