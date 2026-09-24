@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { verifyPassword } from "../security/passwordHashService.js";
 import { bootstrapPlatformAdmin } from "../services/platformAdminBootstrapService.js";
 
 const repository = {
@@ -10,6 +11,7 @@ const repository = {
 const validInput = {
   name: "Platform Administrator",
   email: "admin@example.com",
+  password: "a-long-test-only-password",
 };
 
 describe("bootstrapPlatformAdmin", () => {
@@ -19,33 +21,38 @@ describe("bootstrapPlatformAdmin", () => {
     repository.create.mockResolvedValue({ id: "platform-user-1", email: validInput.email });
   });
 
-  it("creates one active Argon2id super admin", async () => {
+  it("creates one active super admin with the supplied password and impersonation permission", async () => {
     const result = await bootstrapPlatformAdmin(validInput, repository);
 
     expect(result).toEqual({
       id: "platform-user-1",
       email: validInput.email,
       created: true,
-      temporaryPassword: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
     });
-    expect(Buffer.from(result.temporaryPassword, "base64url")).toHaveLength(32);
-    expect(repository.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: validInput.name,
-        email: validInput.email,
-        password: expect.stringMatching(/^\$argon2id\$/),
-        platform_role: "super_admin",
-        status: "active",
-        session_version: 0,
-      }),
-    );
+
+    const [createdAdmin] = repository.create.mock.calls[0];
+    expect(createdAdmin).toMatchObject({
+      name: validInput.name,
+      email: validInput.email,
+      password: expect.stringMatching(/^\$argon2id\$/),
+      platform_role: "super_admin",
+      status: "active",
+      session_version: 0,
+      can_impersonate: true,
+    });
+    expect(await verifyPassword(validInput.password, createdAdmin.password)).toEqual({
+      valid: true,
+      needsRehash: false,
+    });
   });
 
-  it("never overwrites an existing platform admin", async () => {
+  it("does nothing when the platform admin already exists", async () => {
     repository.findByEmail.mockResolvedValue({ id: "existing", email: validInput.email });
 
-    await expect(bootstrapPlatformAdmin(validInput, repository)).rejects.toMatchObject({
-      statusCode: 409,
+    await expect(bootstrapPlatformAdmin(validInput, repository)).resolves.toEqual({
+      id: "existing",
+      email: validInput.email,
+      created: false,
     });
     expect(repository.create).not.toHaveBeenCalled();
   });
@@ -59,12 +66,5 @@ describe("bootstrapPlatformAdmin", () => {
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({ email: "admin@example.com" }),
     );
-  });
-
-  it("generates a new secret instead of accepting operator-chosen material", async () => {
-    const first = await bootstrapPlatformAdmin(validInput, repository);
-    const second = await bootstrapPlatformAdmin(validInput, repository);
-
-    expect(first.temporaryPassword).not.toBe(second.temporaryPassword);
   });
 });

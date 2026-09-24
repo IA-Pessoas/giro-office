@@ -62,6 +62,7 @@ async function startPlatformSessionServer() {
           email: "admin@example.com",
           auth_kind: "platform",
           platform_role: "super_admin",
+          can_impersonate: true,
         },
       }));
       return;
@@ -124,6 +125,7 @@ await runTest("platform client survives organizational 401 and platform refresh/
       email: "admin@example.com",
       auth_kind: "platform",
       platform_role: "super_admin",
+      can_impersonate: true,
     });
     await assert.rejects(platformApi.post("/platform/session/refresh"), { status: 401 });
     await assert.rejects(platformApi.delete("/platform/session"), { status: 401 });
