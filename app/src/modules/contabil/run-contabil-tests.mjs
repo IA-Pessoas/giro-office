@@ -34,7 +34,11 @@ import {
   getContabilCompletionPercent,
   getCurrentContabilCompetence,
   rollbackContabilFieldValue,
+  shouldSyncRemoteContabilControl,
   updateContabilControlFieldStatus,
+  formatContabilCount,
+  getContabilCompetenceYears,
+  CONTABIL_MONTH_OPTIONS,
 } from "./components/contabilControlSection.helpers.ts";
 import {
   buildContabilRelationshipFormValues,
@@ -98,7 +102,8 @@ await (async () => {
   await runTest("carteira operacional mostra competência, resumo, ausência e recuperação", () => {
     const source = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
 
-    assert.match(source, /type="month"/);
+    assert.match(source, /<ContabilCompetenceSelect/);
+    assert.doesNotMatch(source, /type="month"/);
     assert.match(source, /Carteira operacional/);
     assert.match(source, /sem controle mensal/i);
     assert.match(source, /Tentar novamente/);
@@ -337,7 +342,7 @@ await (async () => {
     );
   });
 
-  await runTest("viewer control section reads existing control without bootstrap write", () => {
+  await runTest("control section reads existing control via GET for viewer and editor", () => {
     const componentSource = readFileSync(
       new URL("./components/ContabilControlSection.tsx", import.meta.url),
       "utf8",
@@ -348,9 +353,8 @@ await (async () => {
     );
 
     assert.match(hookSource, /useContabilControlDetail/);
-    assert.match(componentSource, /enabled:\s*!canEdit/);
-    assert.match(componentSource, /canEdit\s*\?\s*bootstrapMutation\.data\s*:\s*detailQuery\.data/);
-    assert.match(componentSource, /if\s*\(!canEdit\)\s*\{/);
+    assert.match(componentSource, /useContabilControlDetail\(\{ clientId, competence \}\)/);
+    assert.match(componentSource, /const remoteControl = detailQuery\.data;/);
     assert.match(hookSource, /contabilControlService\.getControl/);
   });
 
@@ -834,6 +838,37 @@ await (async () => {
       "boom",
     );
   });
+  await runTest("controle contábil carregado por GET só sobrescreve o editor ao trocar de registro (#1324)", () => {
+    const control = { id: "control-1" };
+    assert.equal(shouldSyncRemoteContabilControl(false, "control-1", control), true);
+    assert.equal(shouldSyncRemoteContabilControl(true, null, control), true);
+    assert.equal(shouldSyncRemoteContabilControl(true, "control-1", null), true);
+    assert.equal(shouldSyncRemoteContabilControl(true, "control-1", control), false);
+    assert.equal(shouldSyncRemoteContabilControl(true, null, null), false);
+  });
+
+  await runTest("abrir a aba Contábil não cria controle: POST só no botão Iniciar controle (#1324)", () => {
+    const source = readWorkspaceSource("./components/ContabilControlSection.tsx");
+    const effects = source.split("useEffect(").slice(1).map((chunk) => chunk.split("}, [")[0]);
+    assert.ok(effects.every((effect) => !effect.includes("bootstrapControl(")));
+    assert.match(source, /Iniciar controle/);
+  });
+  await runTest("pluraliza a contagem da carteira (#1325)", () => {
+    assert.equal(formatContabilCount(1, "cliente", "clientes"), "1 cliente");
+    assert.equal(formatContabilCount(0, "cliente", "clientes"), "0 clientes");
+    assert.equal(formatContabilCount(2, "controle iniciado", "controles iniciados"), "2 controles iniciados");
+  });
+
+  await runTest("seletor de competência lista meses em português (#1325)", () => {
+    assert.equal(CONTABIL_MONTH_OPTIONS.length, 12);
+    assert.deepEqual(CONTABIL_MONTH_OPTIONS[0], { value: "01", label: "Janeiro" });
+    assert.deepEqual(CONTABIL_MONTH_OPTIONS[8], { value: "09", label: "Setembro" });
+    const years = getContabilCompetenceYears("2019-03", new Date(2026, 8, 1));
+    assert.equal(years[0], 2019);
+    assert.equal(years.at(-1), 2027);
+  });
+
+
   await runTest("payload do item da Triagem omite chaves fiscais na rotina contábil", () => {
     const notes = {
       note: "Aguardando extrato",

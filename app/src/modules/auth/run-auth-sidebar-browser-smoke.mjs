@@ -301,12 +301,15 @@ async function assertContabilPageRendered(page, pageErrors, consoleErrors, label
       consoleErrors,
     ),
   );
-  await competence.fill("2026-08");
-  await page.getByText("2 clientes, 1 controles iniciados e 1 sem controle mensal.", { exact: true }).waitFor({
+  const competenceYear = page.getByLabel("Competência da carteira (ano)", { exact: true });
+  const competenceMonth = page.getByLabel("Competência da carteira (mês)", { exact: true });
+  await competenceYear.selectOption("2026");
+  await competenceMonth.selectOption("08");
+  await page.getByText("2 clientes, 1 controle iniciado e 1 sem controle mensal.", { exact: true }).waitFor({
     state: "visible",
   });
   assert.equal(
-    await competence.inputValue(),
+    `${await competenceYear.inputValue()}-${await competenceMonth.inputValue()}`,
     "2026-08",
     appendDiagnostics(
       `${label}: a carteira deve atualizar a competência selecionada.`,

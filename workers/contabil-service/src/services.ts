@@ -79,7 +79,7 @@ export type ControlService = {
 export type RelationshipService = {
   create(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   update(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
-  getByClientId(clientId: string, organizationId: string): Promise<JsonRecord>;
+  getByClientId(clientId: string, organizationId: string): Promise<JsonRecord | null>;
   delete(id: string, organizationId: string): Promise<JsonRecord>;
 };
 
@@ -161,6 +161,27 @@ function serviceError(error: unknown, fallback: string): ServiceError {
   return error instanceof ServiceError ? error : new ServiceError(500, fallback, error);
 }
 
+// Mesma regra da tela (clients/[id]/contabil): só `contabil === false` bloqueia; nulo é elegível.
+async function assertContabilEligible(
+  prisma: ContabilPrisma,
+  clientId: string,
+  organizationId: string,
+): Promise<void> {
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, organization_id: organizationId },
+    select: { contabil: true },
+  });
+  if (!client) throw new ServiceError(404, "Cliente não encontrado.");
+  if (client.contabil === false)
+    throw new ServiceError(400, "Serviço contábil não contratado para este cliente.");
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2003"
+  );
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
@@ -215,8 +236,9 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         const clients = await prisma.client.findMany({
           where: {
             organization_id: organizationId,
-            contabil: true,
+            // contabil nulo é elegível, como na tela e na criação de competências.
             AND: [
+              { OR: [{ contabil: true }, { contabil: null }] },
               { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
               { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
             ],
@@ -290,6 +312,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
     async create(input) {
       const auth = authData(input);
       try {
+        await assertContabilEligible(prisma, String(input.clientId), auth.organizationId);
         const identity = {
           client_id: String(input.clientId),
           competence: String(input.competence),
@@ -336,15 +359,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`,
       );
       try {
-        const client = await prisma.client.findFirst({
-          where: {
-            id: String(input.clientId),
-            organization_id: auth.organizationId,
-            contabil: true,
-          },
-          select: { id: true },
-        });
-        if (!client) throw new ServiceError(404, "Cliente contábil não encontrado.");
+        await assertContabilEligible(prisma, String(input.clientId), auth.organizationId);
         const existing = await prisma.controlContabil.findMany({
           where: {
             client_id: String(input.clientId),
@@ -547,7 +562,7 @@ function createSimpleEntityService(
   audit: Audit,
   delegateName: "relationshipContabil" | "responsibleContabil",
   referring: string,
-  messages: { get: string },
+  messages: { foreignKey: string },
 ): RelationshipService {
   const delegate = prisma[delegateName];
   return {
@@ -565,6 +580,7 @@ function createSimpleEntityService(
       } catch (error) {
         if (isUniqueViolation(error))
           throw new ServiceError(409, "Já está cadastrado para esta organização.", error);
+        if (isForeignKeyViolation(error)) throw new ServiceError(400, messages.foreignKey, error);
         throw serviceError(error, `Erro ao criar ${referring}.`);
       }
     },
@@ -587,6 +603,7 @@ function createSimpleEntityService(
         });
         return updated;
       } catch (error) {
+        if (isForeignKeyViolation(error)) throw new ServiceError(400, messages.foreignKey, error);
         throw serviceError(error, `Erro ao atualizar ${referring}.`);
       }
     },
@@ -594,8 +611,8 @@ function createSimpleEntityService(
       const row = await delegate.findFirst({
         where: { client_id: clientId, organization_id: organizationId },
       });
-      if (!row) throw new ServiceError(404, messages.get);
-      return row;
+      // Sem cadastro é estado vazio: 200 com null.
+      return row ?? null;
     },
     async delete(id, organizationId) {
       const current = await delegate.findFirst({ where: { id, organization_id: organizationId } });
@@ -615,14 +632,34 @@ export function createRelationshipService(
   audit: Audit,
 ): RelationshipService {
   return createSimpleEntityService(prisma, audit, "relationshipContabil", "contabil.relationship", {
-    get: "Registro de relacionamento não encontrado para este cliente.",
+    foreignKey: "Cliente não encontrado.",
   });
 }
 
 export function createResponsibleService(prisma: ContabilPrisma, audit: Audit): ResponsibleService {
-  return createSimpleEntityService(prisma, audit, "responsibleContabil", "contabil.responsibles", {
-    get: "Registro de responsáveis não encontrado para este cliente.",
-  });
+  const service = createSimpleEntityService(
+    prisma,
+    audit,
+    "responsibleContabil",
+    "contabil.responsibles",
+    {
+      foreignKey: "Cliente, responsável ou lançado por não encontrado.",
+    },
+  );
+  return {
+    ...service,
+    // O banco tem DEFAULT '' nessas colunas com FK para users: omitir o campo viola a FK.
+    create: (input, auth) =>
+      service.create(
+        {
+          ...input,
+          person_responsible_id: input.person_responsible_id ?? null,
+          posted_by_id: input.posted_by_id ?? null,
+          customer_with_movement: input.customer_with_movement ?? false,
+        },
+        auth,
+      ),
+  };
 }
 
 const CLOSING_STATUSES = new Set([
