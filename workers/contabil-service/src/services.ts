@@ -79,7 +79,7 @@ export type ControlService = {
 export type RelationshipService = {
   create(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   update(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
-  getByClientId(clientId: string, organizationId: string): Promise<JsonRecord>;
+  getByClientId(clientId: string, organizationId: string): Promise<JsonRecord | null>;
   delete(id: string, organizationId: string): Promise<JsonRecord>;
 };
 
@@ -562,7 +562,7 @@ function createSimpleEntityService(
   audit: Audit,
   delegateName: "relationshipContabil" | "responsibleContabil",
   referring: string,
-  messages: { get: string; foreignKey: string },
+  messages: { foreignKey: string },
 ): RelationshipService {
   const delegate = prisma[delegateName];
   return {
@@ -611,8 +611,8 @@ function createSimpleEntityService(
       const row = await delegate.findFirst({
         where: { client_id: clientId, organization_id: organizationId },
       });
-      if (!row) throw new ServiceError(404, messages.get);
-      return row;
+      // Sem cadastro é estado vazio: 200 com null.
+      return row ?? null;
     },
     async delete(id, organizationId) {
       const current = await delegate.findFirst({ where: { id, organization_id: organizationId } });
@@ -632,7 +632,6 @@ export function createRelationshipService(
   audit: Audit,
 ): RelationshipService {
   return createSimpleEntityService(prisma, audit, "relationshipContabil", "contabil.relationship", {
-    get: "Registro de relacionamento não encontrado para este cliente.",
     foreignKey: "Cliente não encontrado.",
   });
 }
@@ -644,7 +643,6 @@ export function createResponsibleService(prisma: ContabilPrisma, audit: Audit): 
     "responsibleContabil",
     "contabil.responsibles",
     {
-      get: "Registro de responsáveis não encontrado para este cliente.",
       foreignKey: "Cliente, responsável ou lançado por não encontrado.",
     },
   );

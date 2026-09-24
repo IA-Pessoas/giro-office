@@ -5,6 +5,7 @@ import {
   createClosingService,
   createControlService,
   createDocumentsService,
+  createRelationshipService,
   createResponsibleService,
 } from "./services.js";
 
@@ -147,6 +148,19 @@ describe("contabil services tenant and catalog seams", () => {
         service.createYear({ ...base, year: 2026, confirmed: true }),
       ).rejects.toMatchObject({ statusCode: 404 });
     });
+  });
+
+  it("responsável e relacionamento sem registro devolvem null (#1325)", async () => {
+    const database = {
+      responsibleContabil: { findFirst: vi.fn().mockResolvedValue(null) },
+      relationshipContabil: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    await expect(
+      createResponsibleService(database as never, audit()).getByClientId(CLIENT, ORG),
+    ).resolves.toBeNull();
+    await expect(
+      createRelationshipService(database as never, audit()).getByClientId(CLIENT, ORG),
+    ).resolves.toBeNull();
   });
 
   it("grava responsáveis ausentes como null em vez do default '' que viola a FK", async () => {

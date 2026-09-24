@@ -31,6 +31,7 @@ import {
   type ContabilControlFieldSaveStatus,
   updateContabilControlFieldStatus,
 } from "./contabilControlSection.helpers";
+import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
 
 interface ContabilControlSectionProps {
@@ -72,6 +73,7 @@ export function ContabilControlSection({
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [operationMessage, setOperationMessage] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [archivedCompetence, setArchivedCompetence] = useState<ContabilCompetence | null>(null);
 
   const confirmedControlRef = useRef<ContabilControl | null>(null);
   const bootstrapRequestRef = useRef(0);
@@ -324,13 +326,15 @@ export function ContabilControlSection({
       await archiveMutation.mutateAsync({ client_id: clientId, competence });
       setControl(null);
       setControlId(null);
-      setOperationMessage("Competência arquivada. Os registros foram preservados e podem ser restaurados.");
+      setArchivedCompetence(competence);
+      setOperationMessage(null);
     });
   }
 
   function restoreCompetence() {
     return runOperation(async () => {
       await restoreMutation.mutateAsync({ client_id: clientId, competence });
+      setArchivedCompetence(null);
       setOperationMessage("Competência restaurada.");
     });
   }
@@ -362,16 +366,29 @@ export function ContabilControlSection({
       ) : null}
 
       {!isLoadingControl && !bootstrapError && !control ? (
-        <ContabilStateBox icon={AlertCircle} title="Sem controle nesta competência" compact>
-          <span>Ainda não há checklist contábil para esta competência.</span>
-          <input
-            aria-label="Competência"
-            type="month"
-            value={competence}
-            onChange={(event) => handleCompetenceChange(event.target.value)}
-            className="ml-2 h-8 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          />
-          {canEdit ? (
+        <ContabilStateBox
+          icon={archivedCompetence === competence ? Archive : AlertCircle}
+          title={archivedCompetence === competence ? "Competência arquivada" : "Sem controle nesta competência"}
+          compact
+        >
+          <span>
+            {archivedCompetence === competence
+              ? "Os registros foram preservados e podem ser restaurados."
+              : "Ainda não há checklist contábil para esta competência."}
+          </span>
+          <span className="ml-2">
+            <ContabilCompetenceSelect value={competence} onChange={handleCompetenceChange} />
+          </span>
+          {canEdit && archivedCompetence === competence ? (
+            <button
+              type="button"
+              onClick={() => void restoreCompetence()}
+              disabled={restoreMutation.isPending}
+              className="ml-2 inline-flex items-center gap-1 font-semibold text-blue-700 disabled:opacity-60 dark:text-blue-300"
+            >
+              <RotateCcw className="h-4 w-4" /> Restaurar competência
+            </button>
+          ) : canEdit ? (
             <button
               type="button"
               onClick={() => void bootstrapControl(clientId, competence)}
@@ -432,13 +449,10 @@ export function ContabilControlSection({
                     />
                   ) : null}
                 </div>
-                <input
-                  aria-label="Competência"
-                  type="month"
+                <ContabilCompetenceSelect
                   value={competence}
-                  onChange={(event) => handleCompetenceChange(event.target.value)}
+                  onChange={handleCompetenceChange}
                   disabled={isAnyFieldSaving}
-                  className="h-10 min-w-[180px] rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
               </div>
             </div>
@@ -541,11 +555,6 @@ export function ContabilControlSection({
       {operationMessage ? (
         <ContabilStateBox icon={CheckCircle2} title="Operação mensal concluída" compact>
           <span>{operationMessage}</span>
-          {operationMessage.includes("arquivada") && canEdit ? (
-            <button type="button" onClick={() => void restoreCompetence()} disabled={restoreMutation.isPending} className="ml-2 inline-flex items-center gap-1 font-semibold text-blue-700 dark:text-blue-300">
-              <RotateCcw className="h-4 w-4" /> Restaurar competência
-            </button>
-          ) : null}
         </ContabilStateBox>
       ) : null}
     </section>
