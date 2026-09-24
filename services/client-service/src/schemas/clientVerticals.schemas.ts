@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { cnaeSchema, openingDateSchema } from "./client.schemas.js";
+
 const clientEmailSchema = z
   .string()
   .trim()
@@ -15,7 +17,7 @@ export const createIntegrationBodySchema = z
     company_name: z.string().nullable().optional(),
     fantasy_name: z.string().nullable().optional(),
     cpf_cnpj: z.string().min(1),
-    opening_date: z.coerce.date().nullable().optional(),
+    opening_date: openingDateSchema,
     responsible: z.string().nullable().optional(),
     cpf_responsible: z.string().nullable().optional(),
     number: z.string().nullable().optional(),
@@ -87,7 +89,7 @@ export const updateRegularizeBodySchema = z
     company_name: z.string().nullable().optional(),
     fantasy_name: z.string().nullable().optional(),
     cpf_cnpj: z.string().min(1).optional(),
-    cnae: z.string().nullable().optional(),
+    cnae: cnaeSchema,
     cnae_secondary: z.string().nullable().optional(),
     responsible: z.string().nullable().optional(),
     cpf_responsible: z.string().nullable().optional(),
@@ -102,7 +104,7 @@ export const updateRegularizeBodySchema = z
     municipal_registration: z.string().nullable().optional(),
     state_registration: z.string().nullable().optional(),
     commercial_board_registration: z.string().nullable().optional(),
-    opening_date: z.coerce.date().nullable().optional(),
+    opening_date: openingDateSchema,
     regime: z.string().nullable().optional(),
     size: z.string().nullable().optional(),
     segment: z.string().nullable().optional(),
