@@ -58,8 +58,21 @@ const { testEnv } = vi.hoisted(() => ({
     supabaseServiceRoleKey: "service-role-key",
   },
 }));
+const { prismaMock } = vi.hoisted(() => ({
+  prismaMock: {
+    platformUser: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    $transaction: vi.fn(async (callback: (transaction: { platformUser: unknown }) => unknown) =>
+      callback(prismaMock),
+    ),
+  },
+}));
 
 vi.mock("../config/env.js", () => ({ getUserServiceEnv: () => testEnv }));
+vi.mock("../prisma/index.js", () => ({ default: prismaMock }));
 vi.mock("../services/platformAuthService.js", () => ({
   PlatformAuthService: vi.fn(function PlatformAuthService() {
     return platformAuthMock;
@@ -118,6 +131,17 @@ function createApp() {
   );
 }
 
+async function useActualPermissionService() {
+  const { PlatformUsersService } = await vi.importActual<
+    typeof import("../services/platformUsersService.js")
+  >("../services/platformUsersService.js");
+  const service = new PlatformUsersService(auditMock);
+  platformUsersMock.updateSuperAdminImpersonationPermission.mockImplementation(
+    (actorId: string, targetId: string, canImpersonate: boolean) =>
+      service.updateSuperAdminImpersonationPermission(actorId, targetId, canImpersonate),
+  );
+}
+
 function platformGatewayHeaders(
   overrides: Partial<Record<"userId" | "authKind" | "platformRole" | "internalToken", string>> = {},
 ): Record<string, string> {
@@ -135,6 +159,10 @@ function platformGatewayHeaders(
 describe("platform users routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    platformUsersMock.updateSuperAdminImpersonationPermission.mockReset();
+    prismaMock.platformUser.findUnique.mockReset();
+    prismaMock.platformUser.findFirst.mockReset();
+    prismaMock.platformUser.updateMany.mockReset();
     platformAuthMock.validateSession.mockResolvedValue(platformIdentity);
     platformUsersMock.listSuperAdmins.mockResolvedValue([
       {
@@ -199,13 +227,21 @@ describe("platform users routes", () => {
   });
 
   it("altera a permissão de personificação com sessão de plataforma e CSRF", async () => {
-    platformUsersMock.updateSuperAdminImpersonationPermission.mockResolvedValue({
+    await useActualPermissionService();
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: platformIdentity.id,
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.platformUser.findFirst.mockResolvedValue({
       id: "platform-user-2",
       name: "Outra administradora",
       email: "outra@example.com",
       status: "active",
-      can_impersonate: true,
+      can_impersonate: false,
     });
+    prismaMock.platformUser.updateMany.mockResolvedValue({ count: 1 });
 
     const response = await request(createApp())
       .patch("/platform/super-admins/platform-user-2/impersonation-permission")
@@ -214,6 +250,15 @@ describe("platform users routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.can_impersonate).toBe(true);
+    expect(auditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platformActorUserId: platformIdentity.id,
+        organizationId: null,
+        referringId: "platform-user-2",
+        changes: { can_impersonate: { from: false, to: true } },
+        required: true,
+      }),
+    );
     expect(platformUsersMock.updateSuperAdminImpersonationPermission).toHaveBeenCalledWith(
       platformIdentity.id,
       "platform-user-2",
@@ -222,9 +267,10 @@ describe("platform users routes", () => {
   });
 
   it("nega por HTTP o operador sem permissão de personificação", async () => {
-    platformUsersMock.updateSuperAdminImpersonationPermission.mockRejectedValueOnce(
-      new ServiceError(403, "Você não tem permissão para alterar essa permissão."),
-    );
+    platformAuthMock.validateSession.mockResolvedValue({
+      ...platformIdentity,
+      can_impersonate: false,
+    });
 
     const response = await request(createApp())
       .patch("/platform/super-admins/platform-user-2/impersonation-permission")
@@ -232,17 +278,19 @@ describe("platform users routes", () => {
       .send({ can_impersonate: true });
 
     expect(response.status).toBe(403);
-    expect(platformUsersMock.updateSuperAdminImpersonationPermission).toHaveBeenCalledWith(
-      platformIdentity.id,
-      "platform-user-2",
-      true,
-    );
+    expect(platformUsersMock.updateSuperAdminImpersonationPermission).not.toHaveBeenCalled();
+    expect(prismaMock.platformUser.updateMany).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
   });
 
   it("rejeita por HTTP a alteração da própria permissão", async () => {
-    platformUsersMock.updateSuperAdminImpersonationPermission.mockRejectedValueOnce(
-      new ServiceError(409, "Não é permitido alterar a própria permissão."),
-    );
+    await useActualPermissionService();
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: platformIdentity.id,
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
 
     const response = await request(createApp())
       .patch(`/platform/super-admins/${platformIdentity.id}/impersonation-permission`)
@@ -255,6 +303,8 @@ describe("platform users routes", () => {
       platformIdentity.id,
       false,
     );
+    expect(prismaMock.platformUser.updateMany).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
   });
 
   it("rejeita body inválido ou CSRF ausente antes da mutação", async () => {

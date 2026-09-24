@@ -67,6 +67,9 @@ export function createPlatformUsersRoutes(options: {
       try {
         const operator = request.platform_identity;
         if (!operator) throw new ServiceError(401, "Não autenticado.");
+        if (!operator.can_impersonate) {
+          throw new ServiceError(403, "Você não tem permissão para alterar essa permissão.");
+        }
 
         const { superAdminId } = parseWithZod(platformSuperAdminParamsSchema, request.params);
         const { can_impersonate } = parseWithZod(
