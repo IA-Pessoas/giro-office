@@ -10,6 +10,8 @@ Por defeito: **3030** (`PORT`).
 
 Ver [`src/config/env.ts`](src/config/env.ts): `DATABASE_URL`, `DATABASE_POOL_MAX` (default `1`), `JWT_SECRET`, `ADMIN_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, logging e `AUTH_COOKIE_SECURE`. A última variável é obrigatoriamente `true` em produção. `USER_SERVICE_INTERNAL_TOKEN` autentica exclusivamente o gateway e deve ter o mesmo valor configurado nele. `PLATFORM_AUTH_RATE_LIMIT_MAX` e `PLATFORM_AUTH_RATE_LIMIT_WINDOW_MS` controlam a segunda barreira local do login (padrões: 10 tentativas por 60 segundos). `REPORTS_INTERNAL_TOKEN` protege `POST /internal/reporting/access-context`; deve ser igual ao valor do reports-service e é obrigatório em produção.
 
+O principal de `DATABASE_URL` deve ser exclusivo do user-service, não-superuser, sem `BYPASSRLS` e membro de `giro_user_service_audit_runtime`. A migration concede essa membership ao principal que a aplica; aplique-a com o mesmo principal de runtime. O bootstrap recusa iniciar se a credencial não satisfizer esses requisitos.
+
 Para criar o administrador inicial da plataforma, disponibilize `PLATFORM_ADMIN_NAME`, `PLATFORM_ADMIN_EMAIL` e `PLATFORM_ADMIN_PASSWORD` no ambiente do processo e execute `pnpm --filter @workspace/user-service bootstrap:platform-admin`. As três variáveis são obrigatórias; se faltar alguma, o comando informa os nomes antes de abrir conexão. A senha é armazenada como hash Argon2id e não é exibida. O comando concede `can_impersonate` ao administrador criado, mas não altera uma conta que já exista com esse email. Não armazene a senha em arquivos versionados.
 
 O endpoint `/internal/reporting/access-context` é chamado diretamente pelo reports-service e não é publicado pelo gateway.

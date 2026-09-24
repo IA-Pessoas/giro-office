@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 
 import {
   usePlatformSuperAdmins,
@@ -64,7 +65,9 @@ export function PlatformSuperAdminsPanel() {
           Nenhum super admin cadastrado.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+        <div
+          className={`rounded-lg border border-slate-200 dark:border-slate-800 ${SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME} contain-layout`}
+        >
           <table className="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-800">
             <caption className="sr-only">Lista de super admins da plataforma</caption>
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950 dark:text-slate-400">
