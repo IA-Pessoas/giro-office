@@ -129,6 +129,19 @@ describe("triage document routes", () => {
     );
   });
 
+  it("GET /triagem/monthly sem registro retorna 200 com data null (#1322)", async () => {
+    const deps = createMockDeps();
+    vi.mocked(deps.getMonthly).mockResolvedValue(null);
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .get(`/triagem/monthly?client_id=${CLIENT_ID}&competence=2026-09`)
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: null });
+  });
+
   it("POST /triagem/monthly aceita a rotina fiscal explicitamente", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
@@ -247,6 +260,41 @@ describe("triage document routes", () => {
         status: "ATTENTION",
         delivery_method: "",
       });
+
+    expect(res.status).toBe(400);
+    expect(deps.updateItem).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /triagem/monthly/:id/item aceita chaves fiscais nulas na rotina contábil", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({
+        field: "financial_transactions",
+        status: "PENDING",
+        note: "Aguardando extrato",
+        justification: null,
+        delivery_method: null,
+        state_site: null,
+      });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateItem).toHaveBeenCalled();
+  });
+
+  it("PATCH /triagem/monthly/:id/item recusa site estadual na rotina contábil", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ field: "financial_transactions", status: "PENDING", state_site: "SP" });
 
     expect(res.status).toBe(400);
     expect(deps.updateItem).not.toHaveBeenCalled();
