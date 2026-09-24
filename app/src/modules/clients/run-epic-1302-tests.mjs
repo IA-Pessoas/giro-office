@@ -61,11 +61,14 @@ runTest("status mapping and client list/detail contracts remain aligned", () => 
 
   const clients = readFileSync("src/shared/components/newLayout/Clients.tsx", "utf8");
   const detail = readFileSync("src/pages/clients/[id].tsx", "utf8");
+  const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
   const pagination = readFileSync("src/shared/components/ui/PaginationControls.tsx", "utf8");
 
   assert.match(clients, /onCreated=\{\(client\) => void router\.push\(`\/clients\/\$\{client\.id\}`\)\}/);
-  assert.match(detail, /formatCpfCnpjInput/);
-  assert.match(detail, /showDocumentError=\{showDocumentError\}/);
+  assert.match(form, /formatCpfCnpjInput/);
+  assert.match(form, /showDocumentError/);
+  assert.match(form, /setHasSubmitted\(true\)/);
+  assert.match(detail, /formatCpfCnpj\(client\.cpf_cnpj\)/);
   assert.match(pagination, /Mostrando \{range\.start\} a \{range\.end\} de \{total\}/);
 });
 
