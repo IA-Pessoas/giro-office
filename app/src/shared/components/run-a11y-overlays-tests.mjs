@@ -62,10 +62,9 @@ runTest("AppShell has Escape handling for lightweight overlays", () => {
   assert.match(appShellSource, /document\.addEventListener\("keydown"/);
 });
 
-runTest("AppShell header popovers close on outside pointerdown without a click-eating backdrop", () => {
-  assert.match(appShellSource, /document\.addEventListener\("pointerdown", handlePointerDownOutside\)/);
-  assert.match(appShellSource, /!notificationsRef\.current\?\.contains\(target\)[\s\S]*setShowNotifications\(false\)/);
-  assert.match(appShellSource, /!userMenuRef\.current\?\.contains\(target\)[\s\S]*setShowUserMenu\(false\)/);
+runTest("AppShell header popovers close on outside click without a click-eating backdrop", () => {
+  assert.match(appShellSource, /const notificationsRef = useClickOutside\(closeNotifications\)/);
+  assert.match(appShellSource, /const userMenuRef = useClickOutside\(closeUserMenu\)/);
   assert.doesNotMatch(appShellSource, /className="fixed inset-0 z-40"/);
 });
 

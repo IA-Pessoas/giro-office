@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -52,7 +52,7 @@ import {
   useRhNotifications,
 } from "@modules/rh/hooks/useRhRequests";
 import { useNewTiRequestAlerts } from "@modules/ti/hooks/useNewTiRequestAlerts";
-import { useFetch, useMe } from "@shared/hooks";
+import { useClickOutside, useFetch, useMe } from "@shared/hooks";
 import { taskOperationalNotificationService } from "@shared/services/taskOperationalNotificationService";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 import { resolvePhotoUrl } from "@shared/utils";
@@ -490,8 +490,12 @@ export function AppShell({
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const aiChatTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const notificationsRef = useRef<HTMLDivElement>(null);
-  const userMenuRef = useRef<HTMLDivElement>(null);
+  // Clique fora fecha os popovers do cabeçalho sem backdrop: um backdrop invisível
+  // engolia o primeiro clique no botão ou aba que o usuário queria acionar (#1363).
+  const closeNotifications = useCallback(() => setShowNotifications(false), []);
+  const closeUserMenu = useCallback(() => setShowUserMenu(false), []);
+  const notificationsRef = useClickOutside(closeNotifications);
+  const userMenuRef = useClickOutside(closeUserMenu);
 
   const pathname = router.asPath.split("?")[0] ?? "";
   const displayUserName = user?.name ?? meQuery.data?.name ?? "Admin";
@@ -762,27 +766,6 @@ export function AppShell({
 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isMobileMenuOpen, isSidebarPreviewOpen]);
-
-  // Fecha os popovers do cabeçalho no clique fora sem backdrop: um backdrop invisível
-  // engolia o primeiro clique do usuário no botão ou aba que ele queria acionar.
-  useEffect(() => {
-    if (!showNotifications && !showUserMenu) {
-      return;
-    }
-
-    const handlePointerDownOutside = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (showNotifications && !notificationsRef.current?.contains(target)) {
-        setShowNotifications(false);
-      }
-      if (showUserMenu && !userMenuRef.current?.contains(target)) {
-        setShowUserMenu(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDownOutside);
-    return () => document.removeEventListener("pointerdown", handlePointerDownOutside);
-  }, [showNotifications, showUserMenu]);
 
   useEffect(() => {
     if (!showNotifications && !showUserMenu && !showAiChat) {

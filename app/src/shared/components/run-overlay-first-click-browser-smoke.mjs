@@ -141,6 +141,14 @@ try {
     close: () => page.getByRole("dialog").getByRole("button", { name: "Fechar", exact: true }).click(),
   });
 
+  await goto(page, "/parcelamento", page.getByRole("button", { name: "Selecionar cliente", exact: true }));
+  await assertFirstClickReachesTarget(page, {
+    name: "Parcelamento: fechar Selecionar cliente com Esc e clicar na aba Parcelamentos",
+    target: page.getByRole("tab", { name: "Parcelamentos" }),
+    open: () => openDialogWith(page, "Selecionar cliente"),
+    close: pressEscape,
+  });
+
   await goto(page, "/tecnologia", page.getByRole("tab", { name: "Ramais" }));
   await assertFirstClickReachesTarget(page, {
     name: "Tecnologia: sino de notificações aberto não engole o clique na aba Ramais",
