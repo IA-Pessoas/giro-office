@@ -682,6 +682,9 @@ runTest("regularize hydration masks documents and phone while phone payload stay
   assert.equal(initialValues.cpf_cnpj, "12.345.678/0001-90");
   assert.equal(initialValues.cpf_responsible, "123.456.789-10");
   assert.equal(initialValues.number, "(11) 99999-9999");
+  const changedOnlyType = { ...initialValues, type: "PF" };
+  assert.deepEqual(buildRegularizePayload(changedOnlyType, client), {});
+  assert.equal(hasRegularizeChanges(changedOnlyType, client), false);
   assert.deepEqual(
     buildRegularizePayload(
       { ...initialValues, number: "11 99999.9999" },

@@ -9,12 +9,12 @@ import { canSSRAuth } from "@modules/auth";
 import { ClientRegularizeForm } from "@modules/clients/components/ClientRegularizeForm";
 import { useClient, useUpdateClientRegularizeMutation } from "@modules/clients/hooks/useClients";
 import type { ClientRegularizeFormValues } from "@modules/clients/types";
+import { getClientInternalName } from "@modules/clients/utils/clientForm";
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
   getRegularizeUnsupportedDateClearError,
   hasRegularizeChanges,
-  isRegularizeCompanyClient,
 } from "@modules/clients/utils/regularizeForm";
 import {
   validateCpfCnpjDocument,
@@ -67,12 +67,7 @@ export default function ClientRegularizePage() {
       return;
     }
 
-    const isCompanyClient = isRegularizeCompanyClient(formValues);
-    const hasClientName = isCompanyClient
-      ? Boolean(formValues.name.trim() || formValues.company_name.trim() || formValues.fantasy_name.trim())
-      : Boolean(formValues.name.trim());
-
-    if (!hasClientName) {
+    if (!getClientInternalName(formValues)) {
       toast.error("Preencha o nome do cliente para continuar.");
       return;
     }
