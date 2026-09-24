@@ -456,22 +456,23 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
       const id = pathParam(c, clientIdParamsSchema);
       const { file: attachment, ...fields } = await formOrJsonBody(c);
       const parsed = parse(createHistoryBodySchema, fields);
-      const file = await saveHistoryFile(
-        options.historyStorage ?? WorkerHistoryStorage.fromEnv(options.env ?? c.env),
-        id,
-        attachment,
-      );
-      return c.json(
-        createSuccessResponse(
-          await service.createHistory(id, organizationId(c), c.get("auth").userId, {
-            date: parsed.date,
-            history: parsed.history,
-            ...(parsed.pending_id ? { pending_id: parsed.pending_id } : {}),
-            ...(file ? { file } : {}),
-          }),
-        ),
-        201,
-      );
+      if (attachment !== undefined && !(attachment instanceof File))
+        throw new ServiceError(400, "Anexo inválido: envie o arquivo como upload.");
+      const storage = options.historyStorage ?? WorkerHistoryStorage.fromEnv(options.env ?? c.env);
+      const file = await saveHistoryFile(storage, id, attachment);
+      try {
+        const created = await service.createHistory(id, organizationId(c), c.get("auth").userId, {
+          date: parsed.date,
+          history: parsed.history,
+          ...(parsed.pending_id ? { pending_id: parsed.pending_id } : {}),
+          ...(file ? { file } : {}),
+        });
+        return c.json(createSuccessResponse(created), 201);
+      } catch (error) {
+        // Sem histórico gravado, o anexo enviado não pode ficar órfão no bucket.
+        if (file) await storage?.remove(file).catch(() => undefined);
+        throw error;
+      }
     }),
   );
 

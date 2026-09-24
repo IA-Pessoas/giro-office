@@ -156,6 +156,7 @@ const historyFields = {
   date: z.coerce.date({ errorMap: () => ({ message: "Informe uma data válida." }) }),
   history: z
     .string({ required_error: "Informe o texto do histórico." })
+    .trim()
     .min(1, "Informe o texto do histórico."),
 };
 const HISTORY_UNKNOWN_FIELD_MESSAGE = "Campo não permitido no histórico.";
@@ -174,26 +175,29 @@ export const updateHistoryBodySchema = z
 
 export const createHistoryPendingBodySchema = z
   .object({
-    reason: z.string().min(1),
+    reason: z
+      .string({ required_error: "Informe o motivo da pendência." })
+      .trim()
+      .min(1, "Informe o motivo da pendência."),
   })
-  .strict();
+  .strict(HISTORY_UNKNOWN_FIELD_MESSAGE);
 
 export const historyIdParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    historyId: z.string().uuid(),
+    id: z.string().uuid("Cliente inválido."),
+    historyId: z.string().uuid("Histórico inválido."),
   })
   .strict();
 
 export const pendingListQuerySchema = z
   .object({
-    user_id: z.string().uuid().optional(),
+    user_id: z.string().uuid("Usuário inválido.").optional(),
   })
-  .strict();
+  .strict("Filtro não permitido.");
 
 export const pendingDeleteParamsSchema = z
   .object({
-    pendingId: z.string().uuid(),
+    pendingId: z.string().uuid("Pendência inválida."),
   })
   .strict();
 
