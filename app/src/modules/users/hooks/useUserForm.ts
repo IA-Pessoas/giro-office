@@ -1,6 +1,7 @@
 import { useState, ChangeEvent } from 'react';
 import { toast } from 'react-toastify';
 import type { UserItem, UpdateUserData } from '../types';
+import { isOrganizationOwner } from '@modules/auth';
 import { userService } from '../services/userService';
 
 const getInitialState = (user: UserItem) => ({
@@ -34,7 +35,8 @@ export const useUserForm = (initialUser: UserItem) => {
     try {
       const updateData: UpdateUserData = {
         name: formData.name,
-        permission: formData.permission,
+        // O papel do owner não é um nível de permissão (ADR 0002): não sobrescrever.
+        ...(isOrganizationOwner(initialUser) ? {} : { permission: formData.permission }),
         department_id: formData.department_id,
         status: formData.status,
         file: file || undefined,
