@@ -9,6 +9,7 @@ import {
   REPORTING_QUERY_BYTE_LIMIT_CODE,
   REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
   REPORTING_QUERY_ROW_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
   type ReportingQuery,
   ServiceError,
   withReportingSnapshot,
@@ -65,7 +66,7 @@ function reportingPageOptions(page: ReportingPage) {
 function throwSnapshotRowLimit(): never {
   throw new ServiceError(
     422,
-    "O conjunto excede a capacidade de consulta do relatório.",
+    REPORTING_QUERY_ROW_LIMIT_MESSAGE,
     undefined,
     REPORTING_QUERY_ROW_LIMIT_CODE,
   );

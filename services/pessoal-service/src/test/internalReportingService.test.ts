@@ -5,6 +5,7 @@ import {
   MAX_REPORTING_QUERY_ROWS,
   REPORTING_QUERY_BYTE_LIMIT_CODE,
   REPORTING_QUERY_ROW_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
 } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
@@ -564,20 +565,22 @@ describe("pessoal internal reporting service", () => {
     expect(situationsFindMany).not.toHaveBeenCalled();
   });
 
-  it("retorna erro acionável quando o snapshot sem query excede 50 mil linhas", async () => {
-    const records = Array.from({ length: MAX_REPORTING_QUERY_ROWS + 1 }, (_, index) => ({
-      id: `row-${String(index).padStart(5, "0")}`,
-      type: "FGTS",
-    }));
+  it.each([
+    ["abaixo do limite", MAX_REPORTING_QUERY_ROWS - 1, false],
+    ["no limite", MAX_REPORTING_QUERY_ROWS, false],
+    ["acima do limite", MAX_REPORTING_QUERY_ROWS + 1, true],
+  ] as const)("aplica o limite global de linhas no snapshot sem query %s", async (_, count, overLimit) => {
     const findMany = vi
       .fn()
       .mockImplementation(
         async (input: { cursor?: { id: string }; skip?: number; take: number }) => {
-          const cursorIndex = input.cursor
-            ? records.findIndex((row) => row.id === input.cursor?.id)
-            : -1;
-          const start = cursorIndex < 0 ? 0 : cursorIndex + (input.skip ?? 0);
-          return records.slice(start, start + input.take);
+          const cursorIndex = input.cursor ? Number(input.cursor.id.slice(4)) : -1;
+          const start = Math.max(0, cursorIndex + (input.skip ?? 1));
+          const pageLength = Math.max(0, Math.min(input.take, count - start));
+          return Array.from({ length: pageLength }, (_, index) => ({
+            id: `row-${String(start + index).padStart(5, "0")}`,
+            type: "FGTS",
+          }));
         },
       );
     const transaction = vi.fn(async (read: (client: unknown) => Promise<unknown>) =>
@@ -592,15 +595,25 @@ describe("pessoal internal reporting service", () => {
       organizationId,
       source: "pessoal.ldd",
       fields: ["type"],
-      limit: MAX_REPORTING_QUERY_ROWS + 1,
+      limit: count,
     });
-    await expect(
-      extraction.then(
-        () => "resolved",
-        (error: unknown) => error,
-      ),
-    ).resolves.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_ROW_LIMIT_CODE });
-    expect(findMany).toHaveBeenCalledTimes(51);
+    if (overLimit) {
+      await expect(
+        extraction.then(
+          () => "resolved",
+          (error: unknown) => error,
+        ),
+      ).resolves.toMatchObject({
+        statusCode: 422,
+        code: REPORTING_QUERY_ROW_LIMIT_CODE,
+        message: REPORTING_QUERY_ROW_LIMIT_MESSAGE,
+      });
+      expect(findMany).toHaveBeenCalledTimes(51);
+    } else {
+      const result = await extraction;
+      expect(result.rows).toHaveLength(count);
+      expect(result.reachedLimit).toBe(false);
+    }
   });
 
   it("retorna erro acionável quando o snapshot sem query excede 20 MiB", async () => {
