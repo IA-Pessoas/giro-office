@@ -13,7 +13,7 @@ Pessoa que opera a plataforma, fora de qualquer organização, e administra orga
 _Avoid_: usuário de plataforma, admin global, root
 
 **Owner**:
-Usuário de organização com poder total sobre a própria organização: passa por qualquer nível por módulo, e a UI exibe o papel "Owner" (ver `docs/adr/0002-owner-ignora-niveis-por-modulo.md`).
+Usuário de organização com poder total sobre a própria organização, acima dos níveis por módulo (ver `docs/adr/0002-owner-ignora-niveis-por-modulo.md`).
 _Avoid_: proprietário (só na UI), dono
 
 **Visualizador**:

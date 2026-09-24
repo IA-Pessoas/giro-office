@@ -3,7 +3,7 @@ import { isAxiosError } from "axios";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
-import { canAccessAdministration, isOrganizationOwner } from "@modules/auth";
+import { canAccessAdministration, isOrganizationOwner, OWNER_ROLE_LABEL } from "@modules/auth";
 import { useAuth } from "@/context/AuthContext";
 import { PasswordResetButton } from "@shared/components/PasswordResetButton";
 import { CREATE_USER_PERMISSION_OPTIONS } from "../constants/createUserConfig";
@@ -325,13 +325,18 @@ export function AdminUserDetailsPanel({
                 Permissão
               </label>
               {isOwner ? (
-                <input
-                  id="admin-user-permission"
-                  value="Owner"
-                  readOnly
-                  aria-describedby="admin-user-owner-hint"
-                  className={`${FIELD_CLASSNAME} bg-slate-100 dark:bg-slate-800`}
-                />
+                <>
+                  <input
+                    id="admin-user-permission"
+                    value={OWNER_ROLE_LABEL}
+                    readOnly
+                    aria-describedby="admin-user-owner-hint"
+                    className={`${FIELD_CLASSNAME} bg-slate-100 dark:bg-slate-800`}
+                  />
+                  <p id="admin-user-owner-hint" className={MUTED_CLASSNAME}>
+                    Acesso total à organização, independente dos níveis por módulo.
+                  </p>
+                </>
               ) : (
                 <select
                   id="admin-user-permission"
@@ -351,11 +356,6 @@ export function AdminUserDetailsPanel({
                   ))}
                 </select>
               )}
-              {isOwner ? (
-                <p id="admin-user-owner-hint" className={MUTED_CLASSNAME}>
-                  Acesso total à organização, independente dos níveis por módulo.
-                </p>
-              ) : null}
             </div>
 
             <div className="space-y-2 md:col-span-2">

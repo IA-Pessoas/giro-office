@@ -129,12 +129,7 @@ const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao"
  */
 const integracaoResponsibleTaskPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 
-const integracaoClientPolicy: AuthPolicy = {
-  modulePermission: {
-    module: "integracao",
-    minPermission: moduleAccessPermission,
-  },
-};
+const integracaoClientPolicy = createModulePolicy("integracao", moduleAccessPermission);
 /** Mutações do cadastro de clientes exigem edição; o client-service ainda cobra 3 para desativar. */
 const integracaoClientEditPolicy = createModulePolicy("integracao", moduleEditPermission);
 

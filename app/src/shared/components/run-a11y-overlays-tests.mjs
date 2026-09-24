@@ -282,7 +282,7 @@ runTest("Configuracoes access dialog uses accented permission copy", () => {
   assert.match(configuracoesSource, /Permissão atual: \{currentPermissionLabel\}/);
   assert.match(
     configuracoesSource,
-    /currentPermissionLabel = isOrganizationOwner\(meQuery\.data\)\s*\?\s*"Owner"/,
+    /currentPermissionLabel = isOrganizationOwner\(meQuery\.data\)\s*\?\s*OWNER_ROLE_LABEL/,
   );
   assert.equal(configuracoesSource.includes("Permissao atual"), false);
 });
