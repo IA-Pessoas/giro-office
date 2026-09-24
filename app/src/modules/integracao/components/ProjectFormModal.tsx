@@ -41,6 +41,7 @@ import {
 import {
   applyWizardTaskChange,
   canAttemptWizardExtraction,
+  WIZARD_EXTRACTION_UNAVAILABLE_CODE,
   WIZARD_EXTRACTION_UNAVAILABLE_MESSAGE,
   wizardExtractionConsumesAttempt,
   createProjectWizardId,
@@ -128,7 +129,7 @@ export function ProjectFormModal({
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [extractionAttempts, setExtractionAttempts] = useState(0);
-  // 503: extração não configurada; o botão fica desabilitado enquanto o modal viver.
+  // Extração não configurada no servidor: o botão fica desabilitado até fechar o modal.
   const [extractionUnavailable, setExtractionUnavailable] = useState(false);
   const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
   const [dependenciesChanged, setDependenciesChanged] = useState(false);
@@ -169,6 +170,7 @@ export function ProjectFormModal({
       setMeetingMinutesFile(null);
       setPendingConfirmation(null);
       setExtractionAttempts(0);
+      setExtractionUnavailable(false);
       if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
       setPreview(null);
       setDependenciesChanged(false);
@@ -292,7 +294,10 @@ export function ProjectFormModal({
       if (!wizardExtractionConsumesAttempt(status)) {
         setExtractionAttempts((current) => current - 1);
       }
-      if (status === 503) {
+      if (
+        isAxiosError(error) &&
+        error.response?.data?.code === WIZARD_EXTRACTION_UNAVAILABLE_CODE
+      ) {
         setExtractionUnavailable(true);
         return;
       }
@@ -824,6 +829,9 @@ export function ProjectFormModal({
                     extractionUnavailable ||
                     isBusy
                   }
+                  aria-describedby={
+                    extractionUnavailable ? "project-extraction-unavailable" : undefined
+                  }
                 >
                   {extractTasksMutation.isPending ? (
                     <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -842,7 +850,10 @@ export function ProjectFormModal({
                   </p>
                 ) : null}
                 {extractionUnavailable ? (
-                  <output className="block text-sm text-slate-600 dark:text-slate-300">
+                  <output
+                    id="project-extraction-unavailable"
+                    className="block text-sm text-slate-600 dark:text-slate-300"
+                  >
                     {WIZARD_EXTRACTION_UNAVAILABLE_MESSAGE}
                   </output>
                 ) : null}
