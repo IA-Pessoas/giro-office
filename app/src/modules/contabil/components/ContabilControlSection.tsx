@@ -127,7 +127,8 @@ export function ContabilControlSection({
       setBootstrapError(getContabilErrorMessage(detailQuery.error));
       return;
     }
-    if (detailQuery.isLoading || !shouldSyncRemoteContabilControl(canEdit, controlId, remoteControl)) {
+    const currentId = confirmedControlRef.current?.id ?? null;
+    if (detailQuery.isLoading || !shouldSyncRemoteContabilControl(canEdit, currentId, remoteControl)) {
       return;
     }
 
@@ -363,6 +364,13 @@ export function ContabilControlSection({
       {!isLoadingControl && !bootstrapError && !control ? (
         <ContabilStateBox icon={AlertCircle} title="Sem controle nesta competência" compact>
           <span>Ainda não há checklist contábil para esta competência.</span>
+          <input
+            aria-label="Competência"
+            type="month"
+            value={competence}
+            onChange={(event) => handleCompetenceChange(event.target.value)}
+            className="ml-2 h-8 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+          />
           {canEdit ? (
             <button
               type="button"
