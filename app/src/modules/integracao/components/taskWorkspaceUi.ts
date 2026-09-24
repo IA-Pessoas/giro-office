@@ -56,7 +56,7 @@ export function getProjectTaskCardLabels(
   task: Pick<ProjectTaskSummary, "name" | "model">,
 ): { title: string; modelName: string | null } {
   const name = task.name?.trim();
-  const modelName = task.model?.name ?? null;
+  const modelName = task.model?.name?.trim() || null;
   return {
     title: name || modelName || "Tarefa sem nome",
     modelName: name && modelName && modelName !== name ? modelName : null,

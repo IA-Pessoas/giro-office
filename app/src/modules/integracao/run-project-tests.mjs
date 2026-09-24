@@ -1780,4 +1780,8 @@ runTest("project detail task card shows the task name, model only as secondary i
     title: "Tarefa sem nome",
     modelName: null,
   });
+
+  const detailView = readFileSync("src/modules/integracao/components/ProjectDetailView.tsx", "utf8");
+  assert.match(detailView, /getProjectTaskCardLabels\(task\)/);
+  assert.doesNotMatch(detailView, /task\.model\?\.name \|\| task\.name/);
 });
