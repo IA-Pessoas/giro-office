@@ -1469,6 +1469,12 @@ runTest("wizard extraction only consumes attempts that reached the provider", ()
   assert.equal(wizardExtractionConsumesAttempt(undefined), true);
 });
 
+runTest("wizard extraction skips the global 5xx toast (the modal shows the error)", () => {
+  const service = readFileSync(new URL("./services/projectService.ts", import.meta.url), "utf8");
+  const body = service.slice(service.indexOf("async extractTasks(")).split("\n  },")[0];
+  assert.match(body, /setupAPIClient\(undefined, undefined, undefined, \{ notifyServerErrors: false \}\)/);
+});
+
 runTest("wizard extraction validates text and file sources before sending", () => {
   assert.equal(getWizardExtractionSourceValidationMessage({ text: "  Ata da reunião  " }), null);
   assert.equal(
