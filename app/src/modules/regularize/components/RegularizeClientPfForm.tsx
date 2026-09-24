@@ -120,7 +120,7 @@ function buildClientPfFormState(
   clientPf: RegularizeClientPfDetail | null,
 ): RegularizeClientPfFormState {
   if (!clientPf) {
-    return DEFAULT_CLIENT_PF_FORM_STATE;
+    return { ...DEFAULT_CLIENT_PF_FORM_STATE };
   }
 
   return {
