@@ -9,6 +9,21 @@ describe("task crud routes", () => {
     resetTaskRouteMocks();
   });
 
+  it("POST /task aceita tarefa operacional sem status de prospecção", async () => {
+    const res = await request(createTestApp()).post("/task").send({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "",
+      department_id: "department-1",
+      urgency: "Alta",
+    });
+    expect(res.status).toBe(201);
+    expect(taskCrudServiceMock.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({ prospecting_status: undefined }),
+    );
+  });
+
   it("POST /task preserva null explícito no responsável principal", async () => {
     const res = await request(createTestApp()).post("/task").send({
       model_id: "model-1",

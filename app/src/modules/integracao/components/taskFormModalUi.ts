@@ -16,9 +16,6 @@ export const TASK_FORM_TEXTAREA_CLASSNAME = "min-h-20 resize-y pl-10";
 export const TASK_FORM_AUXILIARY_WARNING_CLASSNAME =
   "rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200";
 
-export const TASK_CREATE_REQUIRED_FIELDS_MESSAGE =
-  "Preencha cliente, projeto, departamento, modelo, status de prospecção e urgência.";
-
 export function getAutomaticTaskResponsibleId(
   modelDefaultId: string | null | undefined,
   candidates: Array<{ id: string }>,
@@ -93,13 +90,23 @@ export function getTaskCreateValidationMessage({
   projectId,
   modelId,
   departmentId,
-  prospectingStatus,
   urgency,
   eligibleResponsibleCount,
   responsibleId,
 }: GetTaskCreateValidationMessageParams): string | null {
-  if (!clientId || !projectId || !departmentId || !modelId || !prospectingStatus || !urgency) {
-    return TASK_CREATE_REQUIRED_FIELDS_MESSAGE;
+  const missing = (
+    [
+      ["cliente", clientId],
+      ["projeto", projectId],
+      ["departamento", departmentId],
+      ["modelo", modelId],
+      ["urgência", urgency],
+    ] as const
+  )
+    .filter(([, value]) => !value)
+    .map(([label]) => label);
+  if (missing.length > 0) {
+    return `Preencha: ${missing.join(", ")}.`;
   }
 
   if (eligibleResponsibleCount > 1 && !responsibleId) {

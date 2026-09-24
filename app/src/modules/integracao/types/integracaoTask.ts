@@ -130,7 +130,7 @@ export interface CreateIntegracaoTaskBody {
   model_id: string;
   project_id: string;
   client_id: string;
-  prospecting_status: ProspectingStatus;
+  prospecting_status?: ProspectingStatus;
   name?: string;
   status?: IntegracaoTaskStatus;
   department_id: string;

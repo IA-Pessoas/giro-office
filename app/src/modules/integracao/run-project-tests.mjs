@@ -1219,6 +1219,30 @@ runTest("task create validation accepts blank observations before submit", () =>
   assert.equal(getTaskCreateValidationMessage({ ...validValues, observations: "   " }), null);
 });
 
+runTest("task create validation names only the missing fields and skips prospecting status", () => {
+  const validValues = {
+    clientId: "client-1",
+    projectId: "project-1",
+    modelId: "model-1",
+    departmentId: "department-1",
+    prospectingStatus: "",
+    urgency: "Normal",
+    observations: "",
+    eligibleResponsibleCount: 0,
+    responsibleId: "",
+  };
+
+  assert.equal(getTaskCreateValidationMessage(validValues), null);
+  assert.equal(
+    getTaskCreateValidationMessage({ ...validValues, projectId: "" }),
+    "Preencha: projeto.",
+  );
+  assert.equal(
+    getTaskCreateValidationMessage({ ...validValues, departmentId: "", modelId: "" }),
+    "Preencha: departamento, modelo.",
+  );
+});
+
 runTest("task responsible selection follows default, sole, explicit and unassigned branches", () => {
   const candidates = [{ id: "leader-1" }, { id: "admin-1" }];
 
@@ -1252,6 +1276,15 @@ runTest("task responsible selection follows default, sole, explicit and unassign
     }),
     null,
   );
+});
+
+runTest("task create form offers inline project for client without projects", () => {
+  const source = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+
+  assert.match(source, /hasNoProjectsForSelectedClient \? \(\s*<button/);
+  assert.match(source, /createProjectMutation\.mutateAsync\(/);
+  assert.match(source, /<option value="">Não se aplica<\/option>/);
+  assert.match(source, /toastId: "task-create-validation"/);
 });
 
 runTest("task create form marks observations as optional", () => {

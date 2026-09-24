@@ -45,7 +45,7 @@ export const integracaoTaskCreateBodySchema = z
     model_id: zNonEmptyText("model_id"),
     project_id: zNonEmptyText("project_id"),
     client_id: zNonEmptyText("client_id"),
-    prospecting_status: prospectingStatusZod,
+    prospecting_status: z.preprocess(normalizeOptionalText, prospectingStatusZod.optional()),
     name: optionalTextZod,
     status: optionalStatusZod,
     department_id: zNonEmptyText("department_id"),

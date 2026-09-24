@@ -55,14 +55,7 @@ const createTaskRequestBody = createObjectRequestBody({
     responsible_id: "user-uuid",
     prevision_date: "2026-04-10",
   },
-  required: [
-    "model_id",
-    "project_id",
-    "client_id",
-    "prospecting_status",
-    "urgency",
-    "department_id",
-  ],
+  required: ["model_id", "project_id", "client_id", "urgency", "department_id"],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
