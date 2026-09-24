@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createPessoalWorkerApp,
+  summarizeLddStatuses,
   type PessoalGroupPrisma,
   type PessoalGroupService,
   type PessoalLddService,
@@ -451,6 +452,25 @@ describe("pessoal Worker", () => {
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
       "2026-09",
     );
+  });
+
+  // #1301: "955 abertos, 0 vencidos" — pendente com vencimento passado é vencido.
+  it("counts pending LDD past its due date as overdue", () => {
+    const today = new Date("2026-09-23T15:00:00.000Z");
+    expect(
+      summarizeLddStatuses(
+        [
+          { status: "Pago", due_date: new Date("2026-01-10") },
+          { status: "Vencido", due_date: null },
+          { status: "Pendente", due_date: new Date("2026-09-22") },
+          { status: null, due_date: new Date("2026-08-01") },
+          { status: "Pendente", due_date: new Date("2026-09-23") },
+          { status: "pendente", due_date: null },
+          { status: "Pago", due_date: new Date("2026-08-01") },
+        ],
+        today,
+      ),
+    ).toEqual({ total: 7, open: 2, overdue: 3, paid: 2 });
   });
 
   it("returns the Pessoal overview scoped to the organization", async () => {
