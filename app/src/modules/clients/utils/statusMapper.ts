@@ -35,3 +35,22 @@ export function mapClientStatusToApi(
 
   return status ?? "";
 }
+
+export type ClientLifecycleActions = {
+  canActivate: boolean;
+  canDeactivate: boolean;
+  canTerminate: boolean;
+};
+
+// Prospect não tem ciclo de vida; Inativo e em inativação só podem ser reativados.
+export function getClientLifecycleActions(uiStatus: string): ClientLifecycleActions {
+  if (uiStatus === "Prospect") {
+    return { canActivate: false, canDeactivate: false, canTerminate: false };
+  }
+
+  if (uiStatus === "Inativo" || uiStatus === "Processo de Inativação") {
+    return { canActivate: true, canDeactivate: false, canTerminate: false };
+  }
+
+  return { canActivate: false, canDeactivate: true, canTerminate: true };
+}
