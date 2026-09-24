@@ -146,6 +146,8 @@ const organizationSelect = {
   subscription_plan: true,
 } as const;
 
+const TERMINATED_STATUSES = new Set(["Inativo", "Processo de Inativação"]);
+
 const clientSelect = {
   id: true,
   name: true,
@@ -799,7 +801,9 @@ export class ClientService implements ClientWorkerService {
     userId: string,
     input: Record<string, unknown>,
   ): Promise<unknown> {
-    await this.ensureClient(clientId, organizationId);
+    const client = await this.client(clientId, organizationId);
+    if (TERMINATED_STATUSES.has(String(client.status ?? "")))
+      throw new ServiceError(409, "Cliente já está inativo ou em processo de inativação.");
     const competence = String(input.competence_output);
     const [year, month] = competence.split("-").map(Number);
     const competenceDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));

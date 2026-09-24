@@ -40,6 +40,7 @@ import {
   hasRegularizeChanges,
 } from "./utils/regularizeForm.ts";
 import {
+  getClientLifecycleActions,
   mapClientStatusFromApi,
   mapClientStatusToApi,
 } from "./utils/statusMapper.ts";
@@ -883,4 +884,30 @@ runTest("integration form marks required fields and reserves the CNPJ notice slo
 
   assert.equal(form.match(/<RequiredFieldLabel[^>]*required>/g)?.length, 3);
   assert.match(form, /min-h-12/);
+});
+
+runTest("client lifecycle only enables the action valid for the status", () => {
+  const none = { canActivate: false, canDeactivate: false, canTerminate: false };
+
+  assert.deepEqual(getClientLifecycleActions("Prospect"), none);
+  assert.deepEqual(getClientLifecycleActions("Ativo"), {
+    canActivate: false,
+    canDeactivate: true,
+    canTerminate: true,
+  });
+  assert.deepEqual(getClientLifecycleActions("Inativo"), { ...none, canActivate: true });
+  assert.deepEqual(getClientLifecycleActions("Processo de Inativação"), { ...none, canActivate: true });
+  assert.deepEqual(getClientLifecycleActions("Paralisado"), { ...none, canActivate: true });
+  assert.deepEqual(getClientLifecycleActions("Não Contratado"), none);
+  assert.deepEqual(getClientLifecycleActions(""), none);
+});
+
+runTest("client lifecycle asks for confirmation and termination marks required fields", () => {
+  const detail = readFileSync("src/pages/clients/[id].tsx", "utf8");
+  const termination = readFileSync("src/modules/clients/components/ClientTerminationForm.tsx", "utf8");
+
+  assert.match(detail, /<ConfirmationDialog/);
+  assert.match(detail, /client\.name/);
+  assert.doesNotMatch(detail, /onClick=\{\(\) => void handleDeactivate\(\)\}/);
+  assert.equal(termination.match(/<RequiredFieldLabel[^>]*required>/g)?.length, 3);
 });
