@@ -38,5 +38,9 @@ export const tiStatusBadgeClassName = "min-h-7 border border-current/20 font-sem
 export const tiInputClassName =
   "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800";
 
+// Rótulo de metadado (<dt> em detalhes): menor e em caixa alta, distinto do valor.
+export const tiMetaLabelClassName =
+  "text-xs font-semibold uppercase tracking-normal text-slate-500 dark:text-slate-400";
+
 export const tiLabelClassName =
   "text-sm font-medium text-slate-700 dark:text-slate-300";

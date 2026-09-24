@@ -121,7 +121,7 @@ export function TiTextField({
       {label ? <span className={tiLabelClassName}>{label}</span> : null}
       <input
         aria-invalid={errorText ? true : undefined}
-        className={cn(tiInputClassName, errorText && "border-red-500 focus:border-red-500", className)}
+        className={cn(tiInputClassName, errorText && "border-red-500 focus:border-red-500 focus:ring-red-500/30 dark:border-red-500", className)}
         {...props}
       />
       {errorText ? (

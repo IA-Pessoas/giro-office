@@ -55,6 +55,7 @@ import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormCo
 import {
   tiInputClassName,
   tiLabelClassName,
+  tiMetaLabelClassName,
   tiPrimaryButtonClassName,
   tiSecondaryButtonClassName,
   tiThinScrollbarClassName,
@@ -836,31 +837,31 @@ export function TiRobotsTab() {
               <>
                 <dl className="grid gap-3 text-sm sm:grid-cols-2">
                   <div>
-                    <dt className={tiLabelClassName}>Status</dt>
+                    <dt className={tiMetaLabelClassName}>Status</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
                       {getStatusLabel(activeRobot.status)}
                     </dd>
                   </div>
                   <div>
-                    <dt className={tiLabelClassName}>Execução prevista</dt>
+                    <dt className={tiMetaLabelClassName}>Execução prevista</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
                       {formatSchedule(activeRobot.schedule ?? getStringField(activeRobot, ["cron", "frequency"]))}
                     </dd>
                   </div>
                   <div>
-                    <dt className={tiLabelClassName}>Tipo</dt>
+                    <dt className={tiMetaLabelClassName}>Tipo</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
                       {getRobotTypeLabel(activeRobot.type)}
                     </dd>
                   </div>
                   <div>
-                    <dt className={tiLabelClassName}>Ativo</dt>
+                    <dt className={tiMetaLabelClassName}>Ativo</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
                       {isRobotActive(activeRobot) ? "Sim" : "Não"}
                     </dd>
                   </div>
                   <div>
-                    <dt className={tiLabelClassName}>Última execução</dt>
+                    <dt className={tiMetaLabelClassName}>Última execução</dt>
                     <dd className="mt-1 text-slate-700 dark:text-slate-200">
                       {formatDate(latestSelectedRunAt ?? activeRobot.last_run_at)}
                     </dd>

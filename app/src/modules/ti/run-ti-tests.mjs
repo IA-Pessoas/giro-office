@@ -143,7 +143,7 @@ await runTest("ti request transfer UI uses request-scoped candidates and preserv
 
 await runTest("ti request detail card keeps assignee actions from overflowing", async () => {
   const tiRequestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
-  const responsibleLabel = '<dt className={tiLabelClassName}>Responsável</dt>';
+  const responsibleLabel = '<dt className={tiMetaLabelClassName}>Responsável</dt>';
   const responsibleLabelIndex = tiRequestsTabSource.indexOf(responsibleLabel);
   const responsibleBlockStart = tiRequestsTabSource.lastIndexOf(
     '<div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">',
@@ -2504,6 +2504,9 @@ await runTest("ti dashboard uses the same KPI labels in tiles and summary rows",
   assert.equal(dashboard.match(/label="Robôs ativos"/g)?.length, 2);
   assert.doesNotMatch(dashboard, /label="Estoque"\s/);
   assert.doesNotMatch(dashboard, /label="Robôs"\s/);
+  assert.doesNotMatch(dashboard, /label="Abertos"/);
+  assert.doesNotMatch(dashboard, /label="Resolvidos"\s/);
+  assert.equal(dashboard.match(/label="Resolvidos em 7 dias"/g)?.length, 2);
 });
 
 await runTest("ti form controls follow the app form look (sentence-case labels, blue focus)", async () => {
