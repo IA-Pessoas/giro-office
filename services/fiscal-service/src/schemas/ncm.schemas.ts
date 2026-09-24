@@ -1,4 +1,5 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
+import { FISCAL_TAX_REGIME_CODES, TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 import { z } from "zod";
 
 import { commaSeparatedListSchema, paginationQuerySchema } from "./pagination.schemas.js";
@@ -8,16 +9,13 @@ const ncmCodeSchema = zNonEmptyText("ncm_code")
   .regex(/^\d+$/, { message: "ncm_code deve conter apenas números." })
   .length(8, { message: "ncm_code deve ter 8 dígitos." });
 
-// Código legado de tb_fiscal.tributacao_pis_cofins.regime, o mesmo que a tela lê
-// (app/src/modules/fiscal/utils/fiscalTaxRegime.ts). Nome conhecido vira código;
-// outros valores seguem como vieram para não quebrar registros herdados.
-const TAX_REGIME_CODE_BY_NAME: Record<string, string> = {
-  "simples nacional": "0",
-  "lucro presumido": "1",
-  "lucro real": "2",
-};
+// Nome de regime vira o código que a tela lê; outros valores seguem como vieram
+// para não quebrar registros herdados.
+const TAX_REGIME_CODE_BY_NAME = new Map<string, string>(
+  TAX_REGIME_OPTIONS.map((name) => [name.toLowerCase(), FISCAL_TAX_REGIME_CODES[name]]),
+);
 const taxRegimeSchema = zNonEmptyText("tax_regime").transform(
-  (value) => TAX_REGIME_CODE_BY_NAME[value.toLowerCase()] ?? value,
+  (value) => TAX_REGIME_CODE_BY_NAME.get(value.toLowerCase()) ?? value,
 );
 
 function refineValidity(

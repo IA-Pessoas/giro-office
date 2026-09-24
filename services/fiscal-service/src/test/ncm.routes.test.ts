@@ -181,7 +181,11 @@ describe("ncm routes", () => {
     expect(deps.update).not.toHaveBeenCalled();
   });
 
-  it("POST /fiscal/ncm grava o regime pelo codigo legado lido pela tela", async () => {
+  it.each([
+    ["Simples Nacional", "0"],
+    [" lucro real ", "2"],
+    ["0", "0"],
+  ])("POST /fiscal/ncm grava o regime %j como codigo %j lido pela tela", async (taxRegime, code) => {
     const deps = createMockDeps();
     const app = createFiscalApp({ env, logger, ncmRouteDeps: deps });
 
@@ -189,10 +193,10 @@ describe("ncm routes", () => {
       .post("/fiscal/ncm")
       .set("Content-Type", "application/json")
       .set(gatewayHeaders())
-      .send({ ...validNcmBody, tax_regime: " lucro real " });
+      .send({ ...validNcmBody, tax_regime: taxRegime });
 
     expect(res.status).toBe(201);
-    expect(deps.create).toHaveBeenCalledWith(expect.objectContaining({ tax_regime: "2" }));
+    expect(deps.create).toHaveBeenCalledWith(expect.objectContaining({ tax_regime: code }));
   });
 
   it("POST /fiscal/ncm com Visualizador retorna 403 antes do servico", async () => {
