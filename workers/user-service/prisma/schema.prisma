@@ -129,6 +129,7 @@ model PlatformUser {
   password        String
   platform_role   PlatformRole        @default(super_admin)
   status          String              @default("active")
+  can_impersonate Boolean             @default(false)
   session_version Int                  @default(0)
   authSessions    PlatformAuthSession[]
   created_at      DateTime             @default(now())
