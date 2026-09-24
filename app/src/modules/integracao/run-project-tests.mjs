@@ -85,6 +85,27 @@ runTest("task attachment contract keeps private paths out of the UI", () => {
   assert.doesNotMatch(source, /object_path/);
 });
 
+runTest("task attachment calls skip the global 5xx toast", () => {
+  const service = readFileSync(
+    new URL("./services/integracaoTasksService.ts", import.meta.url),
+    "utf8",
+  );
+  for (const method of [
+    "uploadAttachment",
+    "listAttachments",
+    "getAttachmentAccessUrl",
+    "deleteAttachment",
+  ]) {
+    const body = service.slice(service.indexOf(`async ${method}(`)).split("\n  },")[0];
+    assert.match(body, /attachmentApi\(\)/, method);
+    assert.doesNotMatch(body, /setupAPIClient\(/, method);
+  }
+  assert.match(
+    service,
+    /function attachmentApi\(\) \{\n\s*return setupAPIClient\([^)]*notifyServerErrors: false/,
+  );
+});
+
 runTest("task postponement contract and panel retain justification and chronological history", () => {
   assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponement, "/task/postponement");
   assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponementList, "/task/postponement/list");
