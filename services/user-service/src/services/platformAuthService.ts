@@ -100,6 +100,46 @@ function isActiveSuperAdmin(
   return user?.status === "active" && user.platform_role === PLATFORM_ROLE;
 }
 
+export function issuePlatformSession(
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    can_impersonate: boolean;
+    session_version: number;
+  },
+  sessionId: string,
+  csrfToken: string,
+): IssuedPlatformSession {
+  const token = jwt.sign(
+    {
+      user_id: user.id,
+      auth_kind: PLATFORM_AUTH_KIND,
+      platform_role: PLATFORM_ROLE,
+      session_version: user.session_version,
+      session_id: sessionId,
+      csrf_hash: hashCsrfToken(csrfToken),
+      name: user.name,
+      login: user.email,
+    },
+    getUserServiceEnv().jwtSecret,
+    { expiresIn: SESSION_MAX_AGE_SECONDS },
+  );
+
+  return {
+    identity: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      auth_kind: PLATFORM_AUTH_KIND,
+      platform_role: PLATFORM_ROLE,
+      can_impersonate: user.can_impersonate,
+    },
+    token,
+    csrfToken,
+  };
+}
+
 const prismaRepository: PlatformAuthRepository = {
   findByEmail: (email) =>
     prismaClient.platformUser.findUnique({
@@ -184,33 +224,7 @@ export class PlatformAuthService {
     sessionId: string,
     csrfToken: string,
   ): IssuedPlatformSession {
-    const token = jwt.sign(
-      {
-        user_id: user.id,
-        auth_kind: PLATFORM_AUTH_KIND,
-        platform_role: PLATFORM_ROLE,
-        session_version: user.session_version,
-        session_id: sessionId,
-        csrf_hash: hashCsrfToken(csrfToken),
-        name: user.name,
-        login: user.email,
-      },
-      getUserServiceEnv().jwtSecret,
-      { expiresIn: SESSION_MAX_AGE_SECONDS },
-    );
-
-    return {
-      identity: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        auth_kind: PLATFORM_AUTH_KIND,
-        platform_role: PLATFORM_ROLE,
-        can_impersonate: user.can_impersonate,
-      },
-      token,
-      csrfToken,
-    };
+    return issuePlatformSession(user, sessionId, csrfToken);
   }
 
   async login({ email, password }: PlatformLoginRequest): Promise<IssuedPlatformSession> {

@@ -228,6 +228,7 @@ async function runBrowserProof() {
         exact: true,
       })
       .waitFor();
+    await page.getByRole("button", { name: "Sair da personificação" }).waitFor();
     assert.deepEqual(pageErrors, []);
   } finally {
     await browser.close();

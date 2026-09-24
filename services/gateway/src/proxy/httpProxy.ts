@@ -166,6 +166,12 @@ const SESSION_COOKIE_RULES: SessionCookieRule[] = [
     outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
   },
   {
+    method: "POST",
+    path: "/platform/impersonation/exit",
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+  },
+  {
     method: "GET",
     path: "/platform/me",
     inbound: [AUTH_SESSION_COOKIE_NAME],
@@ -481,6 +487,34 @@ function getForwardedCookie(
     ? request.headers.cookie.join("; ")
     : request.headers.cookie;
   const isPlatformPath = normalizedPath?.toLowerCase().startsWith("/platform/") ?? false;
+  const isImpersonationExit =
+    request.method.toUpperCase() === "POST" &&
+    normalizedPath?.toLowerCase() === "/platform/impersonation/exit" &&
+    request.auth?.actorKind === "organization" &&
+    typeof request.auth.claims.impersonator_platform_user_id === "string" &&
+    request.auth.claims.impersonator_platform_user_id.length > 0;
+
+  if (
+    isImpersonationExit &&
+    options.forwardPlatformSessionCredentials &&
+    options.forwardSessionBinding &&
+    rule
+  ) {
+    const sessionToken = request.auth?.token;
+    if (!sessionToken) {
+      return undefined;
+    }
+    const cookies = rule.inbound.includes(AUTH_SESSION_COOKIE_NAME)
+      ? [`${AUTH_SESSION_COOKIE_NAME}=${encodeURIComponent(sessionToken)}`]
+      : [];
+    if (rule.inbound.includes(CSRF_COOKIE_NAME)) {
+      const csrfToken = readCookie(cookieHeader, CSRF_COOKIE_NAME);
+      if (csrfToken) {
+        cookies.push(`${CSRF_COOKIE_NAME}=${encodeURIComponent(csrfToken)}`);
+      }
+    }
+    return cookies.join("; ");
+  }
 
   if (
     (request.auth?.actorKind === "platform" ||

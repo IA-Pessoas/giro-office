@@ -183,6 +183,22 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/platform/impersonation/exit": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Encerrar a personificação e retornar à plataforma",
+          description:
+            "Revoga a sessão de personificação, registra motivo e duração na organização-alvo e emite uma nova sessão da plataforma quando o operador continua ativo.",
+          security: browserSession,
+          parameters: [csrfHeader],
+          responses: {
+            "200": { description: "Cookies de plataforma emitidos ou expirados", ...successJson },
+            "401": { description: "Sessão de personificação ausente, inválida ou revogada" },
+            "403": { description: "CSRF inválido ou a sessão não é de personificação" },
+            "503": { description: "Auditoria durável indisponível antes de encerrar" },
+          },
+        },
+      },
       "/platform/me": {
         get: {
           tags: ["Platform auth"],

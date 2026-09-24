@@ -335,16 +335,30 @@ export function AppShell({
   isIframeView?: boolean;
 }) {
   const router = useRouter();
-  const { user, logoutUser } = useAuth();
+  const { user, logoutUser, exitImpersonation } = useAuth();
+  const [isExitingImpersonation, setIsExitingImpersonation] = useState(false);
   const impersonation = user?.impersonation;
   const impersonationBanner = impersonation ? (
     <div
-      className="fixed inset-x-0 top-0 z-[60] flex h-12 items-center justify-center border-b border-amber-300 bg-amber-50 px-4 text-center text-sm font-semibold text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+      className="fixed inset-x-0 top-0 z-[60] flex h-12 items-center justify-between gap-3 border-b border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
       role="status"
     >
-      <span className="max-w-full truncate">
+      <span className="min-w-0 truncate">
         Você está personificando {user.name} ({impersonation.organization_name})
       </span>
+      <button
+        type="button"
+        className="shrink-0 rounded-md border border-amber-500 px-3 py-1 text-xs font-bold hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-amber-900"
+        disabled={isExitingImpersonation}
+        onClick={() => {
+          setIsExitingImpersonation(true);
+          void exitImpersonation()
+            .catch(() => undefined)
+            .finally(() => setIsExitingImpersonation(false));
+        }}
+      >
+        {isExitingImpersonation ? "Saindo…" : "Sair da personificação"}
+      </button>
     </div>
   ) : null;
   const isPlatformSuperAdmin =

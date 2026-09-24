@@ -2906,26 +2906,32 @@ const handlers = {
     ) {
       throw new Error("Platform impersonation did not replace the platform session cookie.");
     }
+  },
 
-    const organizationSessionCookies = state.sessionCookies;
-    state.sessionCookies = { "cw.csrf": "", "cw.session": "" };
-    try {
-      await helperCall("platform-session-after-impersonation", {
-        method: "POST",
-        path: "/platform/session",
-        target: "gateway",
-        service: "user-service",
-        auth: "public",
-        json: { email: env.platformAdminEmail, password: env.platformAdminPassword },
-        expectedStatus: [200],
-      });
-      if (!state.sessionCookies["cw.session"] || !state.sessionCookies["cw.csrf"]) {
-        throw new Error("Platform login after impersonation did not issue session cookies.");
-      }
-      state.platformSessionCookies = { ...state.sessionCookies };
-    } finally {
-      state.sessionCookies = organizationSessionCookies;
+  async platformImpersonationExit(op) {
+    const impersonationCookie = requireState("platformSessionCookies")["cw.session"];
+    const response = await platformHttpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) {
+      return;
     }
+
+    const identity = response.body?.data?.identity;
+    if (identity?.auth_kind !== "platform" || identity?.platform_role !== "super_admin") {
+      throw new Error("Impersonation exit did not restore the platform identity.");
+    }
+    if (
+      !state.platformSessionCookies?.["cw.session"] ||
+      state.platformSessionCookies["cw.session"] === impersonationCookie
+    ) {
+      throw new Error("Impersonation exit did not replace the organization session cookies.");
+    }
+
+    await platformHttpRequest(
+      { ...op, method: "GET", path: "/platform/me" },
+      {
+        expectedStatus: [200],
+      },
+    );
   },
 
   async platformUserCreate(op) {
