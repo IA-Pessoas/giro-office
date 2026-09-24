@@ -37,8 +37,10 @@ import {
   buildRegularizePayload,
   createRegularizeInitialValues,
   getRegularizeUnsupportedDateClearError,
+  getRegularizeRegimeOptions,
   hasRegularizeChanges,
 } from "./utils/regularizeForm.ts";
+import { FISCAL_TAX_REGIME_OPTIONS } from "../fiscal/utils/fiscalTaxRegime.ts";
 import {
   getClientLifecycleActions,
   mapClientStatusFromApi,
@@ -910,4 +912,29 @@ runTest("client lifecycle asks for confirmation and termination marks required f
   assert.match(detail, /client\.name/);
   assert.doesNotMatch(detail, /onClick=\{\(\) => void handleDeactivate\(\)\}/);
   assert.equal(termination.match(/<RequiredFieldLabel[^>]*required>/g)?.length, 3);
+});
+
+runTest("clients, regularize and fiscal share one tax regime list", () => {
+  assert.deepEqual(getRegularizeRegimeOptions(""), [...CLIENT_TAX_REGIME_OPTIONS]);
+  assert.deepEqual(
+    FISCAL_TAX_REGIME_OPTIONS.map((option) => option.label),
+    [...CLIENT_TAX_REGIME_OPTIONS],
+  );
+  assert.deepEqual(
+    FISCAL_TAX_REGIME_OPTIONS.map((option) => option.value),
+    ["0", "1", "2"],
+  );
+});
+
+runTest("regularize keeps a legacy regime visible instead of dropping it", () => {
+  assert.deepEqual(getRegularizeRegimeOptions(""), [...CLIENT_TAX_REGIME_OPTIONS]);
+  assert.deepEqual(getRegularizeRegimeOptions("Lucro Real"), [...CLIENT_TAX_REGIME_OPTIONS]);
+  assert.deepEqual(getRegularizeRegimeOptions("E-SOCIAL"), [...CLIENT_TAX_REGIME_OPTIONS, "E-SOCIAL"]);
+
+  for (const path of [
+    "src/components/Tabs/Client/Regularize.tsx",
+    "src/components/Forms/ClientTabs/Regularize/DataTab.tsx",
+  ]) {
+    assert.doesNotMatch(readFileSync(path, "utf8"), /CAEPF|E-SOCIAL/);
+  }
 });
