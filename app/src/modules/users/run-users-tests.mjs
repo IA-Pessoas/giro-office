@@ -520,7 +520,7 @@ runTest("admin user details sends a reset link instead of setting a password", (
 
 runTest("admin user details shows Owner instead of a permission level for the owner", () => {
   assert.match(adminUserDetailsPanelSource, /const isOwner = isOrganizationOwner\(user\)/);
-  assert.match(adminUserDetailsPanelSource, /\{isOwner \? \([\s\S]*?value="Owner"[\s\S]*?readOnly/);
+  assert.match(adminUserDetailsPanelSource, /\{isOwner \? \([\s\S]*?value=\{OWNER_ROLE_LABEL\}[\s\S]*?readOnly/);
   assert.match(
     adminUserDetailsPanelSource,
     /\.\.\.\(isOwner \? \{\} : \{ permission: Number\(formData\.permission\) \}\)/,

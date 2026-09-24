@@ -23,6 +23,7 @@ import {
   canCreateOrganizationOwner,
   canCreateUsers,
   isOrganizationOwner,
+  OWNER_ROLE_LABEL,
   useModuleAccess,
 } from "@modules/auth";
 import {
@@ -150,7 +151,7 @@ export function Configuracoes() {
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
   const canManageUsers = canCreateUsers(user);
   const currentPermissionLabel = isOrganizationOwner(meQuery.data)
-    ? "Owner"
+    ? OWNER_ROLE_LABEL
     : (PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário");
   const managedOrganizationId =
     canCreateOrganizationOwner(meQuery.data) && meQuery.data.organization_id
