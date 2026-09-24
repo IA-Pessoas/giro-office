@@ -34,7 +34,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function getStringField(data: Record<string, unknown> | undefined, key: "error" | "message") {
+export function getStringField(
+  data: Record<string, unknown> | undefined,
+  key: "error" | "message",
+) {
   const value = data?.[key];
   return typeof value === "string" && value.trim() ? value : null;
 }
