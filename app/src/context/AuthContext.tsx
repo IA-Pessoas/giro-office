@@ -57,6 +57,7 @@ interface AuthContextData {
     signInPlatform: (credentials: PlatformSignInProps) => Promise<void>;
     logoutUser: () => Promise<void>;
     logoutPlatform: () => Promise<void>;
+    exitImpersonation: () => Promise<void>;
     refreshSession: () => Promise<UserProps | null>;
     refreshPlatformSession: () => Promise<UserProps | null>;
     loading: boolean;
@@ -468,6 +469,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
     }
 
+    async function exitImpersonation() {
+        const requestVersion = beginAuthTransition();
+        try {
+            const response = await platformApi.post("/platform/impersonation/exit");
+            if (!isCurrentAuthTransition(requestVersion)) {
+                return;
+            }
+
+            const identity = response.data?.data?.identity;
+            setUser(isValidPlatformUser(identity) ? buildPlatformUser(identity) : null);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            clearRegularizeQueryCache(queryClient);
+            await clearPlatformQueryCache(queryClient);
+            await Router.push(isValidPlatformUser(identity) ? "/super-admin" : "/super-admin/login");
+        } catch (error) {
+            if (isCurrentAuthTransition(requestVersion)) {
+                toast.error("Não foi possível sair da personificação.");
+                logAuthError("Erro ao encerrar personificação:", error);
+            }
+            throw error;
+        }
+    }
+
     if (loading) {
         return (
             <SessionTransitionScreen
@@ -485,6 +509,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             signInPlatform,
             logoutUser,
             logoutPlatform,
+            exitImpersonation,
             refreshSession,
             refreshPlatformSession,
             loading,

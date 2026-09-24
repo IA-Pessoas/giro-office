@@ -1,7 +1,10 @@
 import {
   CSRF_HEADER_NAME,
+  FORWARDED_AUTH_CSRF_HASH_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
+  FORWARDED_AUTH_SESSION_ID_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   hashCsrfToken,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -15,7 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { auditMock, authServiceMock, platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
   auditMock: vi.fn(async () => {}),
-  authServiceMock: { startImpersonation: vi.fn() },
+  authServiceMock: { startImpersonation: vi.fn(), exitImpersonation: vi.fn() },
   platformAuthMock: { validateSession: vi.fn() },
   platformUsersMock: {
     listSuperAdmins: vi.fn(),
@@ -481,6 +484,83 @@ describe("platform users routes", () => {
         },
       }),
     );
+  });
+
+  it("encerra a personificação com auditoria do alvo e cookies de plataforma", async () => {
+    const csrf = "A".repeat(43);
+    const issued = {
+      identity: platformIdentity,
+      token: "platform.jwt",
+      csrfToken: "P".repeat(43),
+    };
+    authServiceMock.exitImpersonation.mockImplementation(async (_identity, recordExitEvent) => {
+      await recordExitEvent({
+        organizationId: "org-2",
+        targetUserId: "user-1",
+        targetName: "Ana",
+        platformUserId: platformIdentity.id,
+        startedAt: new Date("2026-09-23T15:00:00.000Z"),
+        endedAt: new Date("2026-09-23T15:01:00.000Z"),
+        durationMs: 60_000,
+        reason: "saída",
+      });
+      return { platformSession: issued };
+    });
+
+    const response = await request(createApp())
+      .post("/platform/impersonation/exit")
+      .set({
+        Cookie: `cw.session=impersonation.jwt; cw.csrf=${csrf}`,
+        [CSRF_HEADER_NAME]: csrf,
+        [FORWARDED_AUTH_USER_ID_HEADER]: "user-1",
+        [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "org-2",
+        [FORWARDED_AUTH_SESSION_ID_HEADER]: "impersonation-session-1",
+        [FORWARDED_AUTH_CSRF_HASH_HEADER]: hashCsrfToken(csrf),
+        [INTERNAL_SERVICE_TOKEN_HEADER]: getUserServiceEnv().userServiceInternalToken,
+      });
+
+    expect(response.status).toBe(200);
+    expect(authServiceMock.exitImpersonation).toHaveBeenCalledWith(
+      {
+        user_id: "user-1",
+        organization_id: "org-2",
+        session_id: "impersonation-session-1",
+        csrf_hash: hashCsrfToken(csrf),
+      },
+      expect.any(Function),
+    );
+    expect(response.body.data.identity).toEqual(platformIdentity);
+    expect(response.body.data).not.toHaveProperty("token");
+    expect(response.headers["set-cookie"]).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("cw.session=platform.jwt"),
+        expect.stringContaining("cw.csrf="),
+      ]),
+    );
+    expect(auditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: "user-1",
+        platformActorUserId: platformIdentity.id,
+        organizationId: "org-2",
+        action: "platform.impersonation.ended",
+        required: true,
+        changes: expect.objectContaining({ durationMs: 60_000, reason: "saída" }),
+      }),
+    );
+  });
+
+  it("recusa encerrar a personificação sem prova CSRF", async () => {
+    const response = await request(createApp())
+      .post("/platform/impersonation/exit")
+      .set({
+        Cookie: "cw.session=impersonation.jwt",
+        [FORWARDED_AUTH_USER_ID_HEADER]: "user-1",
+        [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: "org-2",
+        [INTERNAL_SERVICE_TOKEN_HEADER]: getUserServiceEnv().userServiceInternalToken,
+      });
+
+    expect(response.status).toBe(403);
+    expect(authServiceMock.exitImpersonation).not.toHaveBeenCalled();
   });
 
   it("exige CSRF antes de iniciar a personificação", async () => {

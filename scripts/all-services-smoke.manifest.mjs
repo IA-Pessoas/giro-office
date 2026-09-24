@@ -537,6 +537,15 @@ const baseManifest = [
   }),
   op({
     service: "user-service",
+    method: "POST",
+    path: "/platform/impersonation/exit",
+    action: "platformImpersonationExit",
+    target: "gateway",
+    auth: "session",
+    condition: "platformImpersonationSmokeEnabled",
+  }),
+  op({
+    service: "user-service",
     method: "PATCH",
     path: "/platform/organizations/{organizationId}/users/{userId}",
     action: "platformUserUpdate",

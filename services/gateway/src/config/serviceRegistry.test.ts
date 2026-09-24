@@ -140,6 +140,9 @@ describe("user-service gateway registry", () => {
     } as GatewayEnv;
 
     expect(resolveGatewayService(env, "/platform/me/", "GET")?.key).toBe("user-service");
+    expect(resolveGatewayService(env, "/platform/impersonation/exit", "POST")?.key).toBe(
+      "user-service",
+    );
     expect(resolveGatewayService(env, "/platform/../user/me", "GET")).toBeNull();
   });
 

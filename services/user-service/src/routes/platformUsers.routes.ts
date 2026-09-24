@@ -1,4 +1,5 @@
 import {
+  createExpiredSessionCookieHeaders,
   createSessionCookieHeaders,
   createSuccessResponse,
   error as logError,
@@ -9,6 +10,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import type { UserAuditRecorder } from "../integrations/audit.js";
+import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { updatePermissionBodySchema } from "../schemas/permission.schemas.js";
 import {
   listPlatformUsersQuerySchema,
@@ -21,6 +23,7 @@ import {
 } from "../schemas/platformUsers.schemas.js";
 import { createUserBodySchema } from "../schemas/user.schemas.js";
 import {
+  requireImpersonationCsrf,
   requirePlatformCsrf,
   requirePlatformGatewayAuth,
   requirePlatformSession,
@@ -43,6 +46,62 @@ export function createPlatformUsersRoutes(options: {
     }
     return result.data;
   }
+
+  router.post(
+    "/impersonation/exit",
+    isAuthenticated,
+    requireImpersonationCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const audit = options.audit;
+        if (!audit) {
+          throw new ServiceError(503, "Auditoria indisponível para encerrar personificação.");
+        }
+
+        const exited = await authService.exitImpersonation(
+          {
+            user_id: request.user_id,
+            organization_id: request.organization_id,
+            session_id: request.session_id,
+            csrf_hash: request.csrf_hash,
+          },
+          (event) =>
+            audit({
+              actorUserId: event.targetUserId,
+              platformActorUserId: event.platformUserId,
+              organizationId: event.organizationId,
+              action: "platform.impersonation.ended",
+              referring: "user",
+              referringId: event.targetUserId,
+              changes: {
+                operatorPlatformUserId: event.platformUserId,
+                target: { id: event.targetUserId, name: event.targetName },
+                startedAt: event.startedAt.toISOString(),
+                endedAt: event.endedAt.toISOString(),
+                durationMs: event.durationMs,
+                reason: event.reason,
+              },
+              outcome: "success",
+              required: true,
+            }),
+        );
+
+        const session = exited.platformSession;
+        response.append(
+          "Set-Cookie",
+          session
+            ? createSessionCookieHeaders(session.token, session.csrfToken, {
+                secure: options.authCookieSecure,
+              })
+            : createExpiredSessionCookieHeaders({ secure: options.authCookieSecure }),
+        );
+        response.json(createSuccessResponse({ identity: session?.identity ?? null }));
+      } catch (err) {
+        logError("Erro ao encerrar personificação", { err });
+        next(err);
+      }
+    },
+  );
 
   router.get(
     "/super-admins",

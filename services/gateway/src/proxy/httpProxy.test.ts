@@ -182,6 +182,51 @@ describe("buildForwardHeaders", () => {
     expect(headers.get("cookie")).toBeNull();
   });
 
+  it("encaminha para saída somente o token de personificação validado e a prova CSRF", () => {
+    const request = {
+      ...authenticatedRequest,
+      method: "POST",
+      originalUrl: "/platform/impersonation/exit",
+      headers: { cookie: "cw.session=forged; cw.csrf=proof", [CSRF_HEADER_NAME]: "proof" },
+      get: (name: string) => (name.toLowerCase() === CSRF_HEADER_NAME ? "proof" : undefined),
+      auth: {
+        ...authenticatedRequest.auth,
+        token: "verified-impersonation-token",
+        claims: {
+          ...authenticatedRequest.auth?.claims,
+          impersonator_platform_user_id: "platform-user-1",
+        },
+      },
+    } as unknown as Request;
+
+    const headers = buildForwardHeaders(request, {
+      forwardPlatformSessionCredentials: true,
+      forwardSessionBinding: true,
+      internalServiceToken: "internal",
+    });
+
+    expect(headers.get("cookie")).toBe("cw.session=verified-impersonation-token; cw.csrf=proof");
+    expect(headers.get(CSRF_HEADER_NAME)).toBe("proof");
+  });
+
+  it("não encaminha sessão organizacional comum à rota de saída", () => {
+    const request = {
+      ...authenticatedRequest,
+      method: "POST",
+      originalUrl: "/platform/impersonation/exit",
+      headers: { cookie: "cw.session=ordinary-token; cw.csrf=proof" },
+      get: (name: string) => (name.toLowerCase() === CSRF_HEADER_NAME ? "proof" : undefined),
+    } as unknown as Request;
+
+    const headers = buildForwardHeaders(request, {
+      forwardPlatformSessionCredentials: true,
+      forwardSessionBinding: true,
+      internalServiceToken: "internal",
+    });
+
+    expect(headers.get("cookie")).toBeNull();
+  });
+
   it.each([
     { label: "path canônico", path: "/platform/me", method: "GET", expectedCookie: true },
     { label: "trailing slash", path: "/platform/me/", method: "GET", expectedCookie: true },
@@ -442,6 +487,55 @@ describe("buildForwardHeaders", () => {
 });
 
 describe("buildHttpProxyMiddleware", () => {
+  it("devolve os cookies de plataforma emitidos ao sair da personificação", async () => {
+    const upstreamHeaders = new Headers();
+    upstreamHeaders.append("set-cookie", "cw.session=platform.jwt; HttpOnly");
+    upstreamHeaders.append("set-cookie", "cw.csrf=platform-csrf");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new globalThis.Response(null, { status: 204, headers: upstreamHeaders })),
+    );
+    const setHeader = vi.fn();
+    const response = {
+      end: vi.fn(),
+      setHeader,
+      status: vi.fn().mockReturnThis(),
+    } as unknown as Response;
+    const request = {
+      body: {},
+      get: (name: string) => (name.toLowerCase() === CSRF_HEADER_NAME ? "proof" : undefined),
+      headers: {
+        "content-type": "application/json",
+        cookie: "cw.csrf=proof",
+        [CSRF_HEADER_NAME]: "proof",
+      },
+      ip: "127.0.0.1",
+      method: "POST",
+      originalUrl: "/platform/impersonation/exit",
+      protocol: "https",
+      auth: {
+        ...authenticatedRequest.auth,
+        token: "verified-impersonation-token",
+        actorKind: "organization",
+        claims: {
+          ...authenticatedRequest.auth?.claims,
+          impersonator_platform_user_id: "platform-user-1",
+        },
+      },
+    } as unknown as Request;
+    const proxy = buildHttpProxyMiddleware("http://upstream.test", {
+      forwardPlatformSessionCredentials: true,
+      forwardSessionBinding: true,
+    });
+
+    await proxy(request, response, vi.fn());
+
+    expect(setHeader).toHaveBeenCalledWith("set-cookie", [
+      "cw.session=platform.jwt; HttpOnly",
+      "cw.csrf=platform-csrf",
+    ]);
+  });
+
   it("expõe somente a resposta confirmada de transferência para o ciclo de auditoria", async () => {
     vi.stubGlobal(
       "fetch",

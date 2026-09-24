@@ -87,6 +87,10 @@ describe("platform default deny", () => {
       });
     }
 
+    expect(getRoutePolicy("POST", "/platform/impersonation/exit")).toEqual({
+      special: "impersonationOnly",
+    });
+
     for (const [method, path] of [
       ["DELETE", "/platform/organizations"],
       ["PATCH", "/platform/organizations/org-1"],
