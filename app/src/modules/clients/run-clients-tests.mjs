@@ -29,6 +29,7 @@ import {
   createUpdateClientIntegrationInitialValues,
   hasUsableIntegrationData,
 } from "./utils/integrationForm.ts";
+import { formatPaMoneyFromApi, formatPaMoneyInput, parsePaMoneyCents } from "./utils/paForm.ts";
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
@@ -782,4 +783,30 @@ runTest("legacy client tabs use toast warnings for validation", () => {
   assert.match(integrationSource, /toast\.warn\('Preencha todos os campos'\)/);
   assert.doesNotMatch(regularizeSource, /\balert\(/);
   assert.doesNotMatch(integrationSource, /\balert\(/);
+});
+
+runTest("PA money fields accept only BRL amounts", () => {
+  assert.equal(formatPaMoneyInput("123456"), "R$ 1.234,56");
+  assert.equal(formatPaMoneyInput("QA_abc"), "");
+  assert.equal(formatPaMoneyInput(""), "");
+});
+
+runTest("PA legacy money values are read as reais, not cents", () => {
+  assert.equal(parsePaMoneyCents("1500"), 150000);
+  assert.equal(parsePaMoneyCents("1500.5"), 150050);
+  assert.equal(parsePaMoneyCents("1.500,00"), 150000);
+  assert.equal(parsePaMoneyCents("R$ 1.234,56"), 123456);
+  assert.equal(parsePaMoneyCents("R$ 12,3"), 1230);
+  assert.equal(parsePaMoneyCents("QA_abc"), null);
+  assert.equal(parsePaMoneyCents("1.2.3"), null);
+  assert.equal(formatPaMoneyFromApi("1500"), "R$ 1.500,00");
+  assert.equal(formatPaMoneyFromApi("QA_abc"), "QA_abc");
+  assert.equal(formatPaMoneyFromApi(null), "");
+});
+
+runTest("PA section relies on mutation invalidation instead of a second GET", () => {
+  const source = readFileSync("src/modules/clients/components/ClientPASection.tsx", "utf8");
+
+  assert.doesNotMatch(source, /toast\.success\([^)]*\);\s*await paQuery\.refetch\(\)/);
+  assert.match(source, /formatPaMoneyInput/);
 });

@@ -111,13 +111,23 @@ export const updateRegularizeBodySchema = z
   .strict()
   .refine((d) => Object.keys(d).length > 0, "Informe ao menos um campo para atualizar.");
 
+// Valor monetário em texto: "R$ 1.234,56", "1234,56", "1500" ou "1234.56" (espelha app/.../utils/paForm.ts).
+const moneyTextSchema = z
+  .string()
+  .regex(
+    /^(R\$\s?)?((\d{1,3}(\.\d{3})+|\d+)(,\d{1,2})?|\d+\.\d{1,2})$/,
+    "Informe um valor numérico (ex.: R$ 1.234,56).",
+  )
+  .nullable()
+  .optional();
+
 export const createClientPABodySchema = z.object({}).strict();
 
 export const updateClientPABodySchema = z
   .object({
     activities: z.string().nullable().optional(),
-    tax_billing: z.string().nullable().optional(),
-    management_billing: z.string().nullable().optional(),
+    tax_billing: moneyTextSchema,
+    management_billing: moneyTextSchema,
     works_bidding: z.boolean().nullable().optional(),
     dissatisfaction: z.string().nullable().optional(),
     registered_collabortors: z.number().int().nullable().optional(),
@@ -129,7 +139,7 @@ export const updateClientPABodySchema = z
     works_system: z.boolean().nullable().optional(),
     system_name: z.string().nullable().optional(),
     system_usage_time: z.string().nullable().optional(),
-    system_value: z.string().nullable().optional(),
+    system_value: moneyTextSchema,
     system_contact: z.string().nullable().optional(),
     system_operations: z.string().nullable().optional(),
     cloud_storage: z.boolean().nullable().optional(),
