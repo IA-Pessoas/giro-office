@@ -17,6 +17,7 @@ const STATUS_LABELS: Record<TriageOverviewStatus, string> = {
   ROUTINE_PENDING: "Rotina pendente",
   BANK_PENDING: "Banco pendente",
   COMPLETE: "Completa",
+  NO_APPLICABLE_ITEMS: "Sem itens aplicáveis",
 };
 
 const INDICATOR_KEYS: Record<TriageOverviewStatus, keyof TriageOverviewIndicators> = {
@@ -24,6 +25,7 @@ const INDICATOR_KEYS: Record<TriageOverviewStatus, keyof TriageOverviewIndicator
   ROUTINE_PENDING: "routine_pending",
   BANK_PENDING: "bank_pending",
   COMPLETE: "complete",
+  NO_APPLICABLE_ITEMS: "no_applicable_items",
 };
 
 const STATUS_OPTIONS: Array<{ value: TriageOverviewStatus | ""; label: string }> = [
@@ -70,7 +72,7 @@ export function TriageOverviewPanel({ clientId }: { clientId?: string }) {
             Painel operacional
           </h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-            Uma linha por cliente e competência elegível, com status derivado das fontes canônicas.
+            Uma linha por cliente e competência, com a situação das solicitações urgentes, da rotina e dos extratos.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -99,15 +101,15 @@ export function TriageOverviewPanel({ clientId }: { clientId?: string }) {
       </div>
 
       {result ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Indicadores do painel">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Indicadores do painel">
           {(Object.entries(STATUS_LABELS) as Array<[TriageOverviewStatus, string]>).map(([key, label]) => (
             <div
               key={key}
-              aria-label={`${label}: ${result.indicators[INDICATOR_KEYS[key]]}`}
+              aria-label={`${label}: ${(result.indicators[INDICATOR_KEYS[key]] ?? 0)}`}
               className="rounded-lg border border-gray-200 p-3 dark:border-slate-700"
             >
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-slate-400">{label}</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{result.indicators[INDICATOR_KEYS[key]]}</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{(result.indicators[INDICATOR_KEYS[key]] ?? 0)}</p>
             </div>
           ))}
         </div>

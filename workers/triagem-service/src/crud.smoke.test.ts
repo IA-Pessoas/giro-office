@@ -130,6 +130,29 @@ describe.skipIf(!smokeState)("triagem-service CRUD smoke (banco real)", () => {
     expect(archived.data.find((item: { id: string }) => item.id === id)?.archived_at).toBeTruthy();
   });
 
+  it("overview: competência sem itens aplicáveis não aparece como completa (#1326)", async () => {
+    requireSmokeState();
+    const emptyCompetence = "2001-03";
+    expectOk(
+      await call("POST", "/triagem/competencies", {
+        client_id: clientId,
+        competence: emptyCompetence,
+      }),
+      "POST competência vazia",
+    );
+    const overview = expectOk(
+      await call(
+        "GET",
+        `/triagem/overview?page=1&page_size=20&client_id=${clientId}&competence=${emptyCompetence}`,
+      ),
+      "GET overview competência vazia",
+    );
+    expect(overview.data.items).toEqual([
+      expect.objectContaining({ competence: emptyCompetence, status: "NO_APPLICABLE_ITEMS" }),
+    ]);
+    expect(overview.data.indicators).toMatchObject({ complete: 0, no_applicable_items: 1 });
+  });
+
   it("competência, links externos, urgências, histórico, overview e reconciliação", async () => {
     const state = requireSmokeState();
     const linkType = `smoke-type-${suffix}`;
