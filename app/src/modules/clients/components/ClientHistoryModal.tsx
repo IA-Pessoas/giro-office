@@ -105,8 +105,10 @@ export function ClientHistoryModal({
         return;
       }
 
+      // Data intocada volta como veio da API, sem perder segundos na conversão do input.
+      const dateUnchanged = form.date === toDatetimeLocalValue(history.date);
       await updateMutation.mutateAsync({
-        date: form.date,
+        date: dateUnchanged ? history.date : form.date,
         history: form.history.trim(),
       });
       toast.success("Histórico atualizado com sucesso.");
