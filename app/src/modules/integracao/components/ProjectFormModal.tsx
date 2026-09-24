@@ -41,6 +41,9 @@ import {
 import {
   applyWizardTaskChange,
   canAttemptWizardExtraction,
+  WIZARD_EXTRACTION_UNAVAILABLE_CODE,
+  WIZARD_EXTRACTION_UNAVAILABLE_MESSAGE,
+  wizardExtractionConsumesAttempt,
   createProjectWizardId,
   getWizardExtractionSourceValidationMessage,
   getWizardTaskDateWarning,
@@ -126,6 +129,8 @@ export function ProjectFormModal({
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [extractionAttempts, setExtractionAttempts] = useState(0);
+  // Extração não configurada no servidor: o botão fica desabilitado até fechar o modal.
+  const [extractionUnavailable, setExtractionUnavailable] = useState(false);
   const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
   const [dependenciesChanged, setDependenciesChanged] = useState(false);
   const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
@@ -165,6 +170,7 @@ export function ProjectFormModal({
       setMeetingMinutesFile(null);
       setPendingConfirmation(null);
       setExtractionAttempts(0);
+      setExtractionUnavailable(false);
       if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
       setPreview(null);
       setDependenciesChanged(false);
@@ -284,8 +290,16 @@ export function ProjectFormModal({
       ]);
       toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
     } catch (error) {
-      if (isAxiosError(error) && error.response?.status === 400) {
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      if (!wizardExtractionConsumesAttempt(status)) {
         setExtractionAttempts((current) => current - 1);
+      }
+      if (
+        isAxiosError(error) &&
+        error.response?.data?.code === WIZARD_EXTRACTION_UNAVAILABLE_CODE
+      ) {
+        setExtractionUnavailable(true);
+        return;
       }
       setExtractionError(getRequestErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE));
     } finally {
@@ -810,7 +824,13 @@ export function ProjectFormModal({
                   className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
                   onClick={() => void handleExtractTasks()}
                   disabled={
-                    (!hasMeetingMinutesText && !meetingMinutesFile) || !canExtractTasks || isBusy
+                    (!hasMeetingMinutesText && !meetingMinutesFile) ||
+                    !canExtractTasks ||
+                    extractionUnavailable ||
+                    isBusy
+                  }
+                  aria-describedby={
+                    extractionUnavailable ? "project-extraction-unavailable" : undefined
                   }
                 >
                   {extractTasksMutation.isPending ? (
@@ -828,6 +848,14 @@ export function ProjectFormModal({
                   >
                     {extractionError}
                   </p>
+                ) : null}
+                {extractionUnavailable ? (
+                  <output
+                    id="project-extraction-unavailable"
+                    className="block text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    {WIZARD_EXTRACTION_UNAVAILABLE_MESSAGE}
+                  </output>
                 ) : null}
                 {!canExtractTasks ? (
                   <output className="block text-sm text-slate-600 dark:text-slate-300">

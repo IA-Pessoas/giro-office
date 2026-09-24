@@ -85,6 +85,27 @@ runTest("task attachment contract keeps private paths out of the UI", () => {
   assert.doesNotMatch(source, /object_path/);
 });
 
+runTest("task attachment calls skip the global 5xx toast", () => {
+  const service = readFileSync(
+    new URL("./services/integracaoTasksService.ts", import.meta.url),
+    "utf8",
+  );
+  for (const method of [
+    "uploadAttachment",
+    "listAttachments",
+    "getAttachmentAccessUrl",
+    "deleteAttachment",
+  ]) {
+    const body = service.slice(service.indexOf(`async ${method}(`)).split("\n  },")[0];
+    assert.match(body, /attachmentApi\(\)/, method);
+    assert.doesNotMatch(body, /setupAPIClient\(/, method);
+  }
+  assert.match(
+    service,
+    /function attachmentApi\(\) \{\n\s*return setupAPIClient\([^)]*notifyServerErrors: false/,
+  );
+});
+
 runTest("task postponement contract and panel retain justification and chronological history", () => {
   assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponement, "/task/postponement");
   assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponementList, "/task/postponement/list");
@@ -175,7 +196,9 @@ import {
   createProjectWizardId,
   getWizardExtractionSourceValidationMessage,
   canAttemptWizardExtraction,
+  wizardExtractionConsumesAttempt,
   WIZARD_EXTRACTION_MAX_ATTEMPTS,
+  WIZARD_EXTRACTION_UNAVAILABLE_CODE,
   WIZARD_EXTRACTION_MAX_SOURCE_BYTES,
   WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING,
 } from "./components/projectWizardUi.ts";
@@ -1433,6 +1456,23 @@ runTest("wizard extraction allows only three provider attempts per opening", () 
   assert.equal(canAttemptWizardExtraction(2), true);
   assert.equal(canAttemptWizardExtraction(3), false);
   assert.equal(canAttemptWizardExtraction(4), false);
+});
+
+runTest("wizard extraction only consumes attempts that reached the provider", () => {
+  assert.equal(wizardExtractionConsumesAttempt(400), false);
+  assert.equal(wizardExtractionConsumesAttempt(403), false);
+  assert.equal(wizardExtractionConsumesAttempt(500), false);
+  assert.equal(wizardExtractionConsumesAttempt(503), false);
+  assert.equal(wizardExtractionConsumesAttempt(422), true);
+  assert.equal(wizardExtractionConsumesAttempt(502), true);
+  assert.equal(WIZARD_EXTRACTION_UNAVAILABLE_CODE, "AI_EXTRACTION_UNAVAILABLE");
+  assert.equal(wizardExtractionConsumesAttempt(undefined), true);
+});
+
+runTest("wizard extraction skips the global 5xx toast (the modal shows the error)", () => {
+  const service = readFileSync(new URL("./services/projectService.ts", import.meta.url), "utf8");
+  const body = service.slice(service.indexOf("async extractTasks(")).split("\n  },")[0];
+  assert.match(body, /setupAPIClient\(undefined, undefined, undefined, \{ notifyServerErrors: false \}\)/);
 });
 
 runTest("wizard extraction validates text and file sources before sending", () => {
