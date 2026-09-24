@@ -199,17 +199,25 @@ runTest("PJ client forms hide manual name while PF forms retain it", () => {
   assert.match(regularizeForm, /isRegularizeCompanyClient\(values\)/);
 });
 
-runTest("regularization recognizes PJ when CNPJ is incomplete but company names exist", () => {
+runTest("regularization uses client type to identify PJ despite incomplete identity fields", () => {
   assert.equal(
-    isRegularizeCompanyClient({ cpf_cnpj: "12.345", company_name: "Empresa LTDA", fantasy_name: "" }),
+    isRegularizeCompanyClient({ type: "PJ", cpf_cnpj: "12.345", company_name: "Empresa LTDA", fantasy_name: "" }),
     true,
   );
   assert.equal(
-    isRegularizeCompanyClient({ cpf_cnpj: "", company_name: "", fantasy_name: "Marca" }),
+    isRegularizeCompanyClient({ type: "PJ", cpf_cnpj: "", company_name: "", fantasy_name: "Marca" }),
     true,
   );
   assert.equal(
-    isRegularizeCompanyClient({ cpf_cnpj: "123.456.789-00", company_name: "", fantasy_name: "" }),
+    isRegularizeCompanyClient({ type: "PF", cpf_cnpj: "", company_name: "Empresa LTDA", fantasy_name: "" }),
+    false,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PJ", cpf_cnpj: "", company_name: "", fantasy_name: "" }),
+    true,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PF", cpf_cnpj: "12.345.678/0001-90", company_name: "", fantasy_name: "" }),
     false,
   );
 });
@@ -670,6 +678,7 @@ runTest("regularize hydration masks documents and phone while phone payload stay
   };
   const initialValues = createRegularizeInitialValues(client);
 
+  assert.equal(initialValues.type, "PJ");
   assert.equal(initialValues.cpf_cnpj, "12.345.678/0001-90");
   assert.equal(initialValues.cpf_responsible, "123.456.789-10");
   assert.equal(initialValues.number, "(11) 99999-9999");

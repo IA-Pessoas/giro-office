@@ -118,6 +118,7 @@ export const REGULARIZE_SEGMENT_OPTIONS = [
 
 export function createRegularizeInitialValues(client: Client): ClientRegularizeFormValues {
   return {
+    type: client.type,
     dominio_code: client.dominio_code ?? "",
     name: client.name ?? "",
     company_name: client.company_name ?? "",
@@ -154,13 +155,9 @@ export function createRegularizeInitialValues(client: Client): ClientRegularizeF
 }
 
 export function isRegularizeCompanyClient(
-  values: Pick<ClientRegularizeFormValues, "cpf_cnpj" | "company_name" | "fantasy_name">,
+  values: Pick<ClientRegularizeFormValues, "type">,
 ): boolean {
-  return (
-    normalizeDocumentValue(values.cpf_cnpj).length === 14 ||
-    values.company_name.trim().length > 0 ||
-    values.fantasy_name.trim().length > 0
-  );
+  return values.type === "PJ";
 }
 
 export function buildRegularizePayload(
