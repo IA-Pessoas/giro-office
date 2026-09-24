@@ -171,11 +171,13 @@ describe("TiRequestService", () => {
       title: "Notebook nao liga",
       description: "Equipamento nao inicia apos queda de energia.",
       category_id: categoryId,
+      anydesk_code: "123 456 789",
       urgency: "High",
     });
 
     expect(result).toMatchObject({
       id: "req-1",
+      anydesk_code: "123 456 789",
       requester_id: userId,
       status: "New",
       organization_id: organizationId,
@@ -192,6 +194,7 @@ describe("TiRequestService", () => {
           title: "Acesso",
           description: "Criar acesso.",
           category_id: categoryId,
+          anydesk_code: "123456789",
           requester_id: otherUserId,
           urgency: "Low",
         },
@@ -220,6 +223,7 @@ describe("TiRequestService", () => {
         title: "Acesso",
         description: "Criar acesso.",
         category_id: categoryId,
+        anydesk_code: "123456789",
         requester_id: otherUserId,
         urgency: "Low",
       },

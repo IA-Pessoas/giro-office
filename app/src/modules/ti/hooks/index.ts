@@ -7,3 +7,4 @@ export * from "./useTiTerms";
 export * from "./useTiStock";
 export * from "./useTiPasswords";
 export * from "./useTiExtensions";
+export * from "./useNewTiRequestAlerts";

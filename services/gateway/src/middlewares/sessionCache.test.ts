@@ -23,7 +23,11 @@ function buildResponse(): Response {
 }
 
 /** Token assinado com as claims que a chave de cache usa. */
-async function signToken(sessionId: string, sessionVersion: number): Promise<string> {
+async function signToken(
+  sessionId: string,
+  sessionVersion: number,
+  impersonatorPlatformUserId?: string,
+): Promise<string> {
   const { default: jwt } = await import("jsonwebtoken");
   return jwt.sign(
     {
@@ -34,6 +38,9 @@ async function signToken(sessionId: string, sessionVersion: number): Promise<str
       session_version: sessionVersion,
       csrf_hash: "a".repeat(64),
       permission: 3,
+      ...(impersonatorPlatformUserId
+        ? { impersonator_platform_user_id: impersonatorPlatformUserId }
+        : {}),
     },
     JWT_SECRET,
     { expiresIn: "1h" },
@@ -92,6 +99,17 @@ describe("cache de validação de sessão", () => {
 
     await run(middleware, "GET", await signToken("session-1", 1));
     await run(middleware, "GET", await signToken("session-1", 2));
+
+    expect(validator).toHaveBeenCalledTimes(2);
+  });
+
+  it("revalida cada leitura de uma sessão de personificação", async () => {
+    const validator = vi.fn().mockResolvedValue(undefined);
+    const middleware = buildMiddleware(validator);
+    const token = await signToken("session-1", 1, "platform-1");
+
+    expect(await run(middleware, "GET", token)).toBeUndefined();
+    expect(await run(middleware, "GET", token)).toBeUndefined();
 
     expect(validator).toHaveBeenCalledTimes(2);
   });

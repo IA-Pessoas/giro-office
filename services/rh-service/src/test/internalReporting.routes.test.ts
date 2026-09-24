@@ -3,6 +3,7 @@ import { createHash, createHmac } from "node:crypto";
 import {
   createExpressErrorHandler,
   INTERNAL_SERVICE_TOKEN_HEADER,
+  MAX_REPORTING_QUERY_LIMIT,
   ServiceError,
 } from "@workspace/shared";
 import express from "express";
@@ -306,7 +307,7 @@ describe("rh internal reporting routes", () => {
       .send(body)
       .expect(403);
 
-    const tooLargeBody = { ...body, limit: 102 };
+    const tooLargeBody = { ...body, limit: MAX_REPORTING_QUERY_LIMIT + 1 };
     const tooLarge = signedGrant({
       operation: "extract",
       source: tooLargeBody.source,

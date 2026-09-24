@@ -1,0 +1,54 @@
+name: Cloudflare migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Destino previamente preparado (nunca produção neste workflow)"
+        required: true
+        type: choice
+        options:
+          - staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-migrations-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: prisma/migrate-deploy (${{ inputs.target }})
+    runs-on: ubuntu-latest
+    environment: cloudflare-staging
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          test "$(corepack pnpm --version)" = "10.26.0"
+
+      - name: Install frozen dependencies without lifecycle scripts
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Require a non-empty staging database secret
+        run: test -n "$DATABASE_URL"
+
+      - name: Check migration status
+        run: corepack pnpm --filter @workspace/infra exec prisma migrate status
+
+      - name: Apply migrations once outside Worker requests
+        run: corepack pnpm --filter @workspace/infra exec prisma migrate deploy

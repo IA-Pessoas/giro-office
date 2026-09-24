@@ -115,7 +115,7 @@ export function TaskModelModal({
   const [optionsWarning, setOptionsWarning] = useState<string | null>(null);
   const usersQuery = useAssignableUsers({
     enabled: isOpen,
-    module: "integracao",
+    // Sem filtro de módulo: o task-service aceita qualquer ativo do departamento como responsável.
     departmentId: formData.department_id || undefined,
   });
   const users = usersQuery.data ?? [];

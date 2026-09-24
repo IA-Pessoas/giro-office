@@ -17,6 +17,33 @@
   background: #f8fafc;
 }
 
+.trigger[aria-pressed="true"] {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.historyScopes,
+.historyPagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.historyScopes {
+  margin-bottom: 1rem;
+}
+
+.historyPagination {
+  justify-content: space-between;
+}
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -109,6 +136,14 @@
 :global(.chakra-ui-dark) .drawer {
   background: #020617;
   box-shadow: -8px 0 24px rgba(2, 6, 23, 0.55);
+}
+
+:global(html[data-theme="dark"]) .trigger[aria-pressed="true"],
+:global(html.dark) .trigger[aria-pressed="true"],
+:global(.chakra-ui-dark) .trigger[aria-pressed="true"] {
+  border-color: #3b82f6;
+  background: #1e3a8a;
+  color: #dbeafe;
 }
 
 :global(html[data-theme="dark"]) .closeBtn,

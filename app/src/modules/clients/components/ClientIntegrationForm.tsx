@@ -32,6 +32,7 @@ interface ClientIntegrationFormProps {
   onSubmit: () => void;
   onCancel: () => void;
   cnpjLookupStatus?: "idle" | "loading" | "success" | "unavailable";
+  cnpjLookupError?: unknown;
 }
 
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-white";
@@ -52,7 +53,10 @@ export function ClientIntegrationForm({
   onSubmit,
   onCancel,
   cnpjLookupStatus = "idle",
+  cnpjLookupError,
 }: ClientIntegrationFormProps) {
+  const cnpjLookupReason = (cnpjLookupError as { response?: { data?: { error?: unknown } } })
+    ?.response?.data?.error;
   const isCreate = mode === "create" && isCreateValues(values);
   const createValues = isCreate ? values : null;
   const editValues = !isCreate ? (values as UpdateClientIntegrationFormValues) : null;
@@ -113,8 +117,10 @@ export function ClientIntegrationForm({
               Consultando dados oficiais...
             </span>
           ) : cnpjLookupStatus === "unavailable" ? (
-            <span className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
-              Consulta automática indisponível; preencha os dados manualmente.
+            <span className="text-xs text-amber-700 dark:text-amber-300" role="status">
+              {typeof cnpjLookupReason === "string" ? `${cnpjLookupReason} ` : null}
+              Não foi possível consultar o CNPJ automaticamente. Preencha os dados manualmente;
+              você pode salvar normalmente.
             </span>
           ) : null}
         </label>

@@ -61,6 +61,10 @@ vi.mock("../services/taskOperationalNotificationService.js", () => ({
 import type { Prisma } from "../generated/prisma/client.js";
 import { TaskCrudService } from "../services/taskCrudService.js";
 
+function makeTaskCrudService() {
+  return new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
+}
+
 describe("TaskCrudService", () => {
   it("createTaskInTransaction persiste tarefa e dependentes somente no tx sem efeitos pós-commit", async () => {
     const tx = {
@@ -94,7 +98,11 @@ describe("TaskCrudService", () => {
       },
     };
 
-    const result = await new TaskCrudService().createTaskInTransaction(
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).createTaskInTransaction(
       {
         user_id: "user-1",
         organization_id: "org-1",
@@ -168,7 +176,11 @@ describe("TaskCrudService", () => {
       return result;
     });
 
-    const result = new TaskCrudService().createTask({
+    const result = new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).createTask({
       user_id: "user-1",
       organization_id: "org-1",
       model_id: "model-1",
@@ -220,7 +232,7 @@ describe("TaskCrudService", () => {
     );
     prismaMock.task.findMany.mockResolvedValue([task]);
     prismaMock.task.count.mockResolvedValue(1);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
     await expect(
       service.detailTask("unassigned", "org-1", { user_id: "user-1", ...authorization }),
     ).resolves.toMatchObject({ detail: { responsible_id: null } });
@@ -253,7 +265,7 @@ describe("TaskCrudService", () => {
       responsible3_id: null,
     };
     prismaMock.task.findFirst.mockResolvedValue(task);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
     await expect(
       service.detailTask("unassigned", "org-1", { user_id: "user-1", integracaoLevel: 0 }),
     ).rejects.toMatchObject({ statusCode: 404 });
@@ -297,7 +309,7 @@ describe("TaskCrudService", () => {
     prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
     await expect(
-      new TaskCrudService().createTask({
+      new TaskCrudService(prismaMock as never, auditMock as never, {} as never).createTask({
         user_id: "user-1",
         organization_id: "org-1",
         model_id: "model-1",
@@ -333,7 +345,7 @@ describe("TaskCrudService", () => {
     prismaMock.department.findFirst.mockResolvedValue(null);
     prismaMock.task.update.mockImplementation(async ({ data }) => data);
     await expect(
-      new TaskCrudService().updateTask({
+      new TaskCrudService(prismaMock as never, auditMock as never, {} as never).updateTask({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -364,7 +376,7 @@ describe("TaskCrudService", () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: "eligible-1" }]);
 
     await expect(
-      new TaskCrudService().createTask({
+      new TaskCrudService(prismaMock as never, auditMock as never, {} as never).createTask({
         user_id: "user-1",
         organization_id: "org-1",
         model_id: "model-1",
@@ -396,7 +408,11 @@ describe("TaskCrudService", () => {
     prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
 
-    const result = await new TaskCrudService().createTask({
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).createTask({
       user_id: "user-1",
       organization_id: "org-1",
       model_id: "model-1",
@@ -446,7 +462,11 @@ describe("TaskCrudService", () => {
     prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
 
-    const result = await new TaskCrudService().createTask({
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).createTask({
       user_id: "user-1",
       organization_id: "org-1",
       model_id: "model-1",
@@ -474,7 +494,7 @@ describe("TaskCrudService", () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: "leader-1" }, { id: "admin-1" }]);
 
     await expect(
-      new TaskCrudService().createTask({
+      new TaskCrudService(prismaMock as never, auditMock as never, {} as never).createTask({
         user_id: "user-1",
         organization_id: "org-1",
         model_id: "model-1",
@@ -505,7 +525,11 @@ describe("TaskCrudService", () => {
     prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
 
-    const result = await new TaskCrudService().createTask({
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).createTask({
       user_id: "user-1",
       organization_id: "org-1",
       model_id: "model-1",
@@ -535,7 +559,11 @@ describe("TaskCrudService", () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: "leader-1" }]);
     prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
 
-    const result = await new TaskCrudService().createTask({
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).createTask({
       user_id: "user-1",
       organization_id: "org-1",
       model_id: "model-1",
@@ -584,7 +612,7 @@ describe("TaskCrudService", () => {
     ]);
     prismaMock.task.create.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
 
-    await new TaskCrudService().createTask({
+    await new TaskCrudService(prismaMock as never, auditMock as never, {} as never).createTask({
       user_id: "user-1",
       organization_id: "org-1",
       model_id: "model-1",
@@ -626,7 +654,11 @@ describe("TaskCrudService", () => {
     });
     prismaMock.user.findMany.mockResolvedValue([]);
     prismaMock.task.update.mockImplementation(async ({ data }) => data);
-    const result = await new TaskCrudService().updateTask({
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).updateTask({
       user_id: "user-1",
       organization_id: "org-1",
       task_id: "task-1",
@@ -656,7 +688,11 @@ describe("TaskCrudService", () => {
     });
     prismaMock.task.update.mockImplementation(async ({ data }) => data);
 
-    const result = await new TaskCrudService().updateTask({
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).updateTask({
       user_id: "user-1",
       organization_id: "org-1",
       task_id: "task-1",
@@ -685,7 +721,11 @@ describe("TaskCrudService", () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: "eligible-later" }]);
     prismaMock.task.update.mockImplementation(async ({ data }) => data);
 
-    const result = await new TaskCrudService().updateTask({
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).updateTask({
       user_id: "user-1",
       organization_id: "org-1",
       task_id: "task-1",
@@ -718,7 +758,11 @@ describe("TaskCrudService", () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: "admin-2" }]);
     prismaMock.task.update.mockImplementation(async ({ data }) => data);
 
-    const result = await new TaskCrudService().updateTask({
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).updateTask({
       user_id: "user-1",
       organization_id: "org-1",
       task_id: "task-1",
@@ -767,7 +811,7 @@ describe("TaskCrudService", () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: "admin-1" }]);
 
     await expect(
-      new TaskCrudService().updateTask({
+      new TaskCrudService(prismaMock as never, auditMock as never, {} as never).updateTask({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -813,7 +857,7 @@ describe("TaskCrudService", () => {
     prismaMock.task.update.mockRejectedValue({ code: "P2002" });
 
     await expect(
-      new TaskCrudService().updateTask({
+      new TaskCrudService(prismaMock as never, auditMock as never, {} as never).updateTask({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -829,7 +873,7 @@ describe("TaskCrudService", () => {
   it("createTask lança 409 quando já existe tarefa em andamento", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-1" });
     prismaMock.task.findFirst.mockResolvedValue({ id: "task-1" });
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.createTask({
@@ -867,7 +911,7 @@ describe("TaskCrudService", () => {
       activeTaskCreated = true;
       return { id: "task-winner", ...data };
     });
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
     const input = {
       user_id: "user-1",
       organization_id: "org-1",
@@ -909,7 +953,7 @@ describe("TaskCrudService", () => {
       responsible3_id: null,
     });
     prismaMock.user.findMany.mockResolvedValue([]);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.createTask({
@@ -931,7 +975,7 @@ describe("TaskCrudService", () => {
   it("createTask rejeita projeto de outro cliente antes de criar a tarefa", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ client_id: "client-2" });
     prismaMock.task.findFirst.mockResolvedValue(null);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.createTask({
@@ -955,7 +999,7 @@ describe("TaskCrudService", () => {
   it("createTask rejeita projeto ausente na organização", async () => {
     prismaMock.project.findFirst.mockResolvedValue(null);
     prismaMock.task.findFirst.mockResolvedValue(null);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.createTask({
@@ -981,7 +1025,7 @@ describe("TaskCrudService", () => {
       client_id: "client-1",
       status: "Aguardando liberação do Comercial",
     });
-    const service = new TaskCrudService();
+    const service = makeTaskCrudService();
 
     await expect(
       service.createTask({
@@ -1012,7 +1056,7 @@ describe("TaskCrudService", () => {
     });
     prismaMock.task.create.mockResolvedValue({ id: "task-1" });
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await service.createTask({
       user_id: "user-1",
@@ -1048,7 +1092,7 @@ describe("TaskCrudService", () => {
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
     workflowMock.afterTaskCreated.mockResolvedValue(undefined);
 
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await service.createTask({
       user_id: "user-creator",
@@ -1105,7 +1149,7 @@ describe("TaskCrudService", () => {
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
     workflowMock.afterTaskCreated.mockResolvedValue(undefined);
 
-    await new TaskCrudService().createTask({
+    await new TaskCrudService(prismaMock as never, auditMock as never, {} as never).createTask({
       user_id: "user-creator",
       organization_id: "org-1",
       model_id: "model-1",
@@ -1143,7 +1187,7 @@ describe("TaskCrudService", () => {
     });
 
     await expect(
-      new TaskCrudService().updateTask({
+      makeTaskCrudService().updateTask({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -1166,7 +1210,7 @@ describe("TaskCrudService", () => {
     });
 
     await expect(
-      new TaskCrudService().updateTask({
+      makeTaskCrudService().updateTask({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -1192,7 +1236,7 @@ describe("TaskCrudService", () => {
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
     workflowMock.afterTaskCreated.mockResolvedValue(undefined);
 
-    await new TaskCrudService().createTask({
+    await new TaskCrudService(prismaMock as never, auditMock as never, {} as never).createTask({
       user_id: "user-creator",
       organization_id: "org-1",
       model_id: "model-1",
@@ -1227,7 +1271,7 @@ describe("TaskCrudService", () => {
     prismaMock.taskDependent.findMany.mockResolvedValue([]);
     workflowMock.afterTaskCreated.mockResolvedValue(undefined);
 
-    await new TaskCrudService().createTask({
+    await new TaskCrudService(prismaMock as never, auditMock as never, {} as never).createTask({
       user_id: "user-creator",
       organization_id: "org-1",
       model_id: "model-1",
@@ -1258,7 +1302,7 @@ describe("TaskCrudService", () => {
 
   it("detailTask lança 404 quando tarefa não existe", async () => {
     prismaMock.task.findFirst.mockResolvedValue(null);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(service.detailTask("task-1", "org-1")).rejects.toMatchObject({ statusCode: 404 });
   });
@@ -1275,7 +1319,7 @@ describe("TaskCrudService", () => {
     });
 
     await expect(
-      new TaskCrudService().detailTask("task-1", "org-1", {
+      makeTaskCrudService().detailTask("task-1", "org-1", {
         user_id: "owner-1",
         integracaoLevel: 3,
         isOwner: true,
@@ -1298,7 +1342,7 @@ describe("TaskCrudService", () => {
     });
 
     await expect(
-      new TaskCrudService().detailTask("task-1", "org-1", {
+      makeTaskCrudService().detailTask("task-1", "org-1", {
         user_id: "owner-1",
         integracaoLevel: 3,
         isOwner: true,
@@ -1326,7 +1370,7 @@ describe("TaskCrudService", () => {
       .mockResolvedValueOnce(41)
       .mockResolvedValueOnce(9)
       .mockResolvedValueOnce(14);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     const result = await service.listTasks({
       organization_id: "org-1",
@@ -1422,7 +1466,7 @@ describe("TaskCrudService", () => {
       .mockResolvedValueOnce(0)
       .mockResolvedValueOnce(1);
 
-    const result = await new TaskCrudService().listTasks({
+    const result = await makeTaskCrudService().listTasks({
       organization_id: "org-1",
       user_id: "user-1",
       status: "Todos",
@@ -1469,7 +1513,7 @@ describe("TaskCrudService", () => {
     ]);
     prismaMock.task.count.mockResolvedValue(1);
 
-    const result = await new TaskCrudService().listTasks({
+    const result = await makeTaskCrudService().listTasks({
       organization_id: "org-1",
       user_id: "user-1",
       status: "Todos",
@@ -1521,7 +1565,7 @@ describe("TaskCrudService", () => {
     ]);
     prismaMock.task.count.mockResolvedValue(1);
 
-    const result = await new TaskCrudService().listTasks({
+    const result = await makeTaskCrudService().listTasks({
       organization_id: "org-1",
       user_id: "user-1",
       status: "Todos",
@@ -1557,7 +1601,7 @@ describe("TaskCrudService", () => {
     prismaMock.task.findMany.mockResolvedValue([]);
     prismaMock.task.count.mockResolvedValue(0);
 
-    await new TaskCrudService().listTasks({
+    await makeTaskCrudService().listTasks({
       organization_id: "org-1",
       user_id: "user-1",
       status: "Em Andamento",
@@ -1590,7 +1634,7 @@ describe("TaskCrudService", () => {
     prismaMock.task.findMany.mockResolvedValue([]);
     prismaMock.task.count.mockResolvedValue(0);
 
-    await new TaskCrudService().listTasks({
+    await makeTaskCrudService().listTasks({
       organization_id: "org-1",
       user_id: "user-1",
       status: "Em Espera",
@@ -1641,7 +1685,11 @@ describe("TaskCrudService", () => {
     ]);
     prismaMock.task.count.mockResolvedValue(1);
 
-    const result = await new TaskCrudService().listTasks({
+    const result = await new TaskCrudService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).listTasks({
       organization_id: "org-1",
       user_id: "user-1",
       status: "Todos",
@@ -1675,7 +1723,7 @@ describe("TaskCrudService", () => {
     prismaMock.client.findFirst.mockResolvedValue(null);
 
     await expect(
-      new TaskCrudService().listTasks({
+      new TaskCrudService(prismaMock as never, auditMock as never, {} as never).listTasks({
         organization_id: "org-1",
         user_id: "user-1",
         status: "Todos",
@@ -1694,7 +1742,7 @@ describe("TaskCrudService", () => {
   it("listTasks mantém a responsabilidade própria quando nível 0 pesquisa", async () => {
     prismaMock.task.findMany.mockResolvedValue([]);
     prismaMock.task.count.mockResolvedValue(0);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await service.listTasks({
       organization_id: "org-1",
@@ -1749,7 +1797,7 @@ describe("TaskCrudService", () => {
       .mockResolvedValueOnce(1)
       .mockResolvedValueOnce(1)
       .mockResolvedValueOnce(1);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     const result = await service.listTasks({
       organization_id: "org-1",
@@ -1829,7 +1877,7 @@ describe("TaskCrudService", () => {
       },
     ]);
     prismaMock.task.count.mockResolvedValue(1);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     const result = await service.listTasks({
       organization_id: "org-1",
@@ -1862,7 +1910,7 @@ describe("TaskCrudService", () => {
       },
     ]);
     prismaMock.task.count.mockResolvedValue(1);
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     const result = await service.listTasks({
       organization_id: "org-1",
@@ -1888,7 +1936,7 @@ describe("TaskCrudService", () => {
       responsible2_id: null,
       responsible3_id: null,
     });
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.updateTask({
@@ -1914,7 +1962,7 @@ describe("TaskCrudService", () => {
     });
 
     await expect(
-      new TaskCrudService().updateTask({
+      new TaskCrudService(prismaMock as never, auditMock as never, {} as never).updateTask({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -1935,7 +1983,7 @@ describe("TaskCrudService", () => {
       responsible2_id: null,
       responsible3_id: null,
     });
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.detailTask("task-1", "org-1", {
@@ -1962,7 +2010,7 @@ describe("TaskCrudService", () => {
   it("deleteTask lança 403 quando usuário não tem permissão", async () => {
     prismaMock.task.findFirst.mockResolvedValue({ id: "task-1", organization_id: "org-1" });
     prismaMock.user.findFirst.mockResolvedValue({ id: "user-1", permission: 1 });
-    const service = new TaskCrudService();
+    const service = new TaskCrudService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.deleteTask({

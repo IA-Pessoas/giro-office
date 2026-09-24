@@ -7,8 +7,9 @@ import {
 } from "@workspace/shared";
 import { Prisma } from "../generated/prisma/client.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
-import * as audit from "../integrations/audit.js";
-import prismaClient from "../prisma/index.js";
+import type { TaskAudit } from "../integrations/audit.js";
+import type { ProjectProgressIntegration } from "../integrations/projectProgress.js";
+import type prismaClient from "../prisma/index.js";
 import type { IntegracaoTaskConclusionBody } from "../schemas/integracaoTaskConclusionBody.schema.js";
 import {
   assertCommercialValidationReleased,
@@ -115,7 +116,15 @@ function parseOptionalDate(v: string | Date | null): Date | null {
 }
 
 export class TaskLifecycleService {
-  readonly #workflow = new TaskWorkflowService();
+  readonly #workflow: TaskWorkflowService;
+
+  constructor(
+    private readonly prisma: typeof prismaClient,
+    private readonly audit: TaskAudit,
+    projectProgress: ProjectProgressIntegration,
+  ) {
+    this.#workflow = new TaskWorkflowService(projectProgress);
+  }
 
   async requestTaskCompletion(params: {
     user_id: string;
@@ -126,7 +135,7 @@ export class TaskLifecycleService {
     isOwner?: boolean;
   }): Promise<{ id: string; status: string }> {
     try {
-      const task = await prismaClient.task.findFirst({
+      const task = await this.prisma.task.findFirst({
         where: { id: params.task_id, organization_id: params.organization_id },
       });
       if (!task) throw new ServiceError(404, "Tarefa não existe.");
@@ -144,9 +153,9 @@ export class TaskLifecycleService {
         isOwner: params.isOwner === true,
       });
       assertCommercialValidationReleased(task);
-      await assertTaskProjectCommercialValidationReleased(prismaClient, task);
+      await assertTaskProjectCommercialValidationReleased(this.prisma, task);
 
-      return await prismaClient.$transaction(
+      return await this.prisma.$transaction(
         async (tx) => {
           const currentTask = await tx.task.findFirst({
             where: { id: params.task_id, organization_id: params.organization_id },
@@ -204,7 +213,7 @@ export class TaskLifecycleService {
             ],
             exclude_user_id: params.user_id,
           });
-          await audit.createLog({
+          await this.audit.createLog({
             userId: params.user_id,
             organizationId: params.organization_id,
             action: "Solicitação de Conclusão",
@@ -243,7 +252,7 @@ export class TaskLifecycleService {
     isOwner?: boolean;
   }): Promise<{ id: string; status: string }> {
     try {
-      const task = await prismaClient.task.findFirst({
+      const task = await this.prisma.task.findFirst({
         where: { id: params.task_id, organization_id: params.organization_id },
       });
       if (!task) throw new ServiceError(404, "Tarefa não existe.");
@@ -258,7 +267,7 @@ export class TaskLifecycleService {
         isOwner: params.isOwner === true,
       });
 
-      return await prismaClient.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
         const request = await tx.taskCompletionRequest.findFirst({
           where: {
             task_id: params.task_id,
@@ -293,7 +302,7 @@ export class TaskLifecycleService {
           where: { id: params.task_id },
           data: { pending_approval: false },
         });
-        await audit.createLog({
+        await this.audit.createLog({
           userId: params.user_id,
           organizationId: params.organization_id,
           action: "Cancelamento de Solicitação de Conclusão",
@@ -330,7 +339,7 @@ export class TaskLifecycleService {
     }>
   > {
     try {
-      const task = await prismaClient.task.findFirst({
+      const task = await this.prisma.task.findFirst({
         where: { id: params.task_id, organization_id: params.organization_id },
       });
       if (!task) throw new ServiceError(404, "Tarefa não existe.");
@@ -344,7 +353,7 @@ export class TaskLifecycleService {
         responsible3Id: task.responsible3_id,
         isOwner: params.isOwner === true,
       });
-      return prismaClient.taskCompletionRequest.findMany({
+      return this.prisma.taskCompletionRequest.findMany({
         where: { task_id: params.task_id, organization_id: params.organization_id },
         orderBy: { created_at: "desc" },
         select: {
@@ -374,7 +383,7 @@ export class TaskLifecycleService {
     isOwner?: boolean;
   }): Promise<TaskCompleteApprovalRow> {
     try {
-      const task = await prismaClient.task.findFirst({
+      const task = await this.prisma.task.findFirst({
         where: { id: params.task_id, organization_id: params.organization_id },
       });
       if (!task) throw new ServiceError(404, "Tarefa não existe.");
@@ -389,9 +398,9 @@ export class TaskLifecycleService {
         isOwner: params.isOwner === true,
       });
       assertCommercialValidationReleased(task);
-      await assertTaskProjectCommercialValidationReleased(prismaClient, task);
+      await assertTaskProjectCommercialValidationReleased(this.prisma, task);
 
-      const updated = await prismaClient.$transaction(async (tx) => {
+      const updated = await this.prisma.$transaction(async (tx) => {
         const currentTask = await tx.task.findFirst({
           where: { id: params.task_id, organization_id: params.organization_id },
           select: {
@@ -422,7 +431,7 @@ export class TaskLifecycleService {
           include_administrators: true,
           exclude_user_id: params.user_id,
         });
-        await audit.createLog({
+        await this.audit.createLog({
           userId: params.user_id,
           organizationId: params.organization_id,
           action: "Reabertura de Tarefa",
@@ -468,7 +477,7 @@ export class TaskLifecycleService {
     try {
       const { user_id, organization_id, body } = params;
 
-      const exists = await prismaClient.task.findFirst({
+      const exists = await this.prisma.task.findFirst({
         where: { id: body.task_id, organization_id },
       });
 
@@ -476,7 +485,7 @@ export class TaskLifecycleService {
         throw new ServiceError(404, "Tarefa não existe.");
       }
 
-      const permSpecific = await prismaClient.permissionSpecific.findFirst({
+      const permSpecific = await this.prisma.permissionSpecific.findFirst({
         where: { user_id, organization_id },
       });
 
@@ -495,7 +504,7 @@ export class TaskLifecycleService {
         }
       }
 
-      const { task: updated, previousTask } = await prismaClient.$transaction(
+      const { task: updated, previousTask } = await this.prisma.$transaction(
         async (tx) => {
           const currentTask = await tx.task.findFirst({
             where: { id: body.task_id, organization_id },
@@ -575,7 +584,7 @@ export class TaskLifecycleService {
               },
               select: { id: true, status: true },
             });
-            await audit.createLog({
+            await this.audit.createLog({
               userId: user_id,
               organizationId: organization_id,
               action: "Solicitação de Conclusão",
@@ -626,7 +635,7 @@ export class TaskLifecycleService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
 
-      await audit.logUpdateIfChanged({
+      await this.audit.logUpdateIfChanged({
         userId: user_id,
         organizationId: organization_id,
         action: "Conclusão",
@@ -678,7 +687,7 @@ export class TaskLifecycleService {
         throw new ServiceError(400, "Motivo da recusa é obrigatório.");
       }
 
-      const exists = await prismaClient.task.findFirst({
+      const exists = await this.prisma.task.findFirst({
         where: { id: task_id, organization_id },
       });
 
@@ -686,7 +695,7 @@ export class TaskLifecycleService {
         throw new ServiceError(404, "Tarefa não existe.");
       }
 
-      const permConclusion = await prismaClient.permissionSpecific.findFirst({
+      const permConclusion = await this.prisma.permissionSpecific.findFirst({
         where: { user_id, organization_id },
       });
 
@@ -698,7 +707,7 @@ export class TaskLifecycleService {
         isOwner: params.isOwner === true,
         hasTaskCompletionPermission: permConclusion?.task_completion === true,
       });
-      const updated = await prismaClient.$transaction(async (tx) => {
+      const updated = await this.prisma.$transaction(async (tx) => {
         const completionRequest = await tx.taskCompletionRequest.findFirst({
           where: {
             task_id,
@@ -728,7 +737,7 @@ export class TaskLifecycleService {
               data: { status: "Concluída", pending_approval: false },
               select: COMPLETE_UPDATE_SELECT,
             });
-            await audit.createLog({
+            await this.audit.createLog({
               userId: user_id,
               organizationId: organization_id,
               action: "Aprovação de Conclusão",
@@ -815,7 +824,7 @@ export class TaskLifecycleService {
           },
           select: COMPLETE_UPDATE_SELECT,
         });
-        await audit.createLog({
+        await this.audit.createLog({
           userId: user_id,
           organizationId: organization_id,
           action:

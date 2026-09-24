@@ -51,6 +51,7 @@ import {
   useMarkRhNotificationReadMutation,
   useRhNotifications,
 } from "@modules/rh/hooks/useRhRequests";
+import { useNewTiRequestAlerts } from "@modules/ti/hooks/useNewTiRequestAlerts";
 import { useFetch, useMe } from "@shared/hooks";
 import { taskOperationalNotificationService } from "@shared/services/taskOperationalNotificationService";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
@@ -176,7 +177,6 @@ const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao módulo.";
 const MODULE_NAV_LOADING_MESSAGE = "Carregando módulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
-const AI_CHAT_DIALOG_DESCRIPTION_ID = "app-shell-ai-chat-description";
 
 function formatAppShellNotificationTime(value: string): string {
   const date = new Date(value);
@@ -327,6 +327,54 @@ type AppShellNotification = {
   createdAt: string;
 };
 
+function ImpersonationCountdown({
+  expiresAt,
+  onExpired,
+}: {
+  expiresAt: string;
+  onExpired: () => void;
+}) {
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const onExpiredRef = useRef(onExpired);
+  const handledExpiryRef = useRef<string | null>(null);
+  onExpiredRef.current = onExpired;
+
+  useEffect(() => {
+    const expiresAtMs = Date.parse(expiresAt);
+    if (!Number.isFinite(expiresAtMs)) {
+      setRemainingSeconds(null);
+      handledExpiryRef.current = null;
+      return;
+    }
+
+    const updateRemainingTime = () => {
+      const remaining = Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000));
+      setRemainingSeconds(remaining);
+      if (remaining === 0 && handledExpiryRef.current !== expiresAt) {
+        handledExpiryRef.current = expiresAt;
+        onExpiredRef.current();
+      }
+    };
+
+    updateRemainingTime();
+    const interval = window.setInterval(updateRemainingTime, 1000);
+    return () => window.clearInterval(interval);
+  }, [expiresAt]);
+
+  const timeRemaining =
+    remainingSeconds === null
+      ? "--:--"
+      : `${Math.floor(remainingSeconds / 60)
+          .toString()
+          .padStart(2, "0")}:${(remainingSeconds % 60).toString().padStart(2, "0")}`;
+
+  return (
+    <span className="shrink-0 tabular-nums text-xs" aria-live="off">
+      Tempo restante: {timeRemaining}
+    </span>
+  );
+}
+
 export function AppShell({
   children,
   isIframeView = false,
@@ -335,7 +383,36 @@ export function AppShell({
   isIframeView?: boolean;
 }) {
   const router = useRouter();
-  const { user, logoutUser } = useAuth();
+  const { user, logoutUser, exitImpersonation, expireImpersonation } = useAuth();
+  const [isExitingImpersonation, setIsExitingImpersonation] = useState(false);
+  const impersonation = user?.impersonation;
+  const impersonationBanner = impersonation ? (
+    <div
+      className="fixed inset-x-0 top-0 z-[60] flex h-12 items-center justify-between gap-3 border-b border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+      role="status"
+    >
+      <span className="min-w-0 truncate">
+        Você está personificando {user.name} ({impersonation.organization_name})
+      </span>
+      <ImpersonationCountdown
+        expiresAt={impersonation.expires_at}
+        onExpired={expireImpersonation}
+      />
+      <button
+        type="button"
+        className="shrink-0 rounded-md border border-amber-500 px-3 py-1 text-xs font-bold hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-amber-900"
+        disabled={isExitingImpersonation}
+        onClick={() => {
+          setIsExitingImpersonation(true);
+          void exitImpersonation()
+            .catch(() => undefined)
+            .finally(() => setIsExitingImpersonation(false));
+        }}
+      >
+        {isExitingImpersonation ? "Saindo…" : "Sair da personificação"}
+      </button>
+    </div>
+  ) : null;
   const isPlatformSuperAdmin =
     user?.auth_kind === "platform" && user.platform_role === "super_admin";
   const meQuery = useMe({ enabled: !isPlatformSuperAdmin });
@@ -358,6 +435,7 @@ export function AppShell({
     enabled: !isPlatformSuperAdmin && moduleAccessMap.rh?.canView === true,
   });
   const markRhNotificationReadMutation = useMarkRhNotificationReadMutation();
+  useNewTiRequestAlerts(!isPlatformSuperAdmin && moduleAccessMap.ti?.isAdmin === true);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -722,15 +800,25 @@ export function AppShell({
   }, [chatMessages, showAiChat]);
 
   if (isIframeView) {
-    return <div className="min-h-screen bg-gray-50 dark:bg-slate-950">{mainContent}</div>;
+    return (
+      <div
+        className={`min-h-screen bg-gray-50 dark:bg-slate-950 ${impersonation ? "pt-12" : ""}`}
+      >
+        {impersonationBanner}
+        {mainContent}
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
+    <div
+      className={`min-h-screen bg-gray-50 dark:bg-slate-950 ${impersonation ? "pt-12" : ""}`}
+    >
+      {impersonationBanner}
       <button
         ref={mobileMenuButtonRef}
         onClick={() => setIsMobileMenuOpen((v) => !v)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white dark:bg-slate-900 rounded-lg shadow-lg"
+        className={`lg:hidden fixed ${impersonation ? "top-14" : "top-4"} left-4 z-50 p-2 bg-white dark:bg-slate-900 rounded-lg shadow-lg`}
         type="button"
       >
         {isMobileMenuOpen ? (
@@ -751,7 +839,7 @@ export function AppShell({
           }
         }}
         onClick={pinSidebarOpen}
-        className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transition-all duration-300 z-40 ${
+        className={`fixed ${impersonation ? "top-12 h-[calc(100vh-3rem)]" : "top-0 h-full"} left-0 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transition-all duration-300 z-40 ${
           shouldExpandSidebar ? "w-64" : "w-20"
         } ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${isSidebarPreviewOpen ? "lg:z-50 lg:shadow-xl" : ""} lg:translate-x-0`}
       >
@@ -833,7 +921,9 @@ export function AppShell({
       <div
         className={`flex flex-col min-h-screen transition-all duration-300 ${isSidebarOpen ? "lg:ml-64" : "lg:ml-20"}`}
       >
-        <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 py-3 sticky top-0 z-40">
+        <header
+          className={`bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 py-3 sticky ${impersonation ? "top-12" : "top-0"} z-40`}
+        >
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 max-w-2xl">
               {isPlatformSuperAdmin ? (
@@ -1063,7 +1153,6 @@ export function AppShell({
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/40" />
           <DialogPrimitive.Content
-            aria-describedby={AI_CHAT_DIALOG_DESCRIPTION_ID}
             className="fixed z-[70] right-4 bottom-4 w-[420px] max-w-[calc(100vw-2rem)] h-[70vh] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden focus:outline-none"
             onCloseAutoFocus={(event) => {
               if (!aiChatTriggerRef.current) {
@@ -1080,7 +1169,7 @@ export function AppShell({
                 <DialogPrimitive.Title className="text-sm font-semibold text-gray-900 dark:text-white">
                   Assistente IA
                 </DialogPrimitive.Title>
-                <DialogPrimitive.Description id={AI_CHAT_DIALOG_DESCRIPTION_ID} className="sr-only">
+                <DialogPrimitive.Description className="sr-only">
                   Assistente local da sessão: as mensagens ficam apenas nesta sessão, não são
                   enviadas ao servidor e ainda não são processadas por uma IA real.
                 </DialogPrimitive.Description>

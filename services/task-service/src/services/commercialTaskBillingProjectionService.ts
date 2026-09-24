@@ -10,7 +10,7 @@ import {
   TASK_BILLING_REALIZE,
 } from "../constants/integracaoTask.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import prismaClient from "../prisma/index.js";
+import type prismaClient from "../prisma/index.js";
 
 export type CommercialTaskBillingProjectionPrismaDeps = Pick<
   typeof prismaClient,
@@ -42,7 +42,7 @@ function effectFor(
 }
 
 export class CommercialTaskBillingProjectionService {
-  constructor(private readonly prisma: CommercialTaskBillingProjectionPrismaDeps = prismaClient) {}
+  constructor(private readonly prisma: CommercialTaskBillingProjectionPrismaDeps) {}
 
   async apply(
     event: CommercialTaskBillingUpdatedEvent,

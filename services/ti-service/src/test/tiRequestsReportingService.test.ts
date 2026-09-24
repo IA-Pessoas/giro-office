@@ -71,11 +71,13 @@ describe("TiRequestsReportingService", () => {
         },
       ],
       reachedLimit: true,
+      nextCursor: "never-returned",
     });
 
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: "10000000-0000-4000-8000-000000000001" },
       select: {
+        id: true,
         title: true,
         category: { select: { name: true } },
         urgency: true,
@@ -83,6 +85,7 @@ describe("TiRequestsReportingService", () => {
         created_at: true,
         updated_at: true,
       },
+      orderBy: { id: "asc" },
       take: 2,
     });
   });

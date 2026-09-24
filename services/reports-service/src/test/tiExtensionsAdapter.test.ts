@@ -52,13 +52,13 @@ describe("TiExtensionsAdapter", () => {
           order_by: [],
         },
         organization_id: "10000000-0000-4000-8000-000000000001",
-        limit: 10,
+        limit: 102,
         request_id: "request-856",
       }),
     ).resolves.toEqual({ rows: [{ number: "1234" }], reachedLimit: true });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "ti.extensions", fields: ["number"], limit: 10 };
+    const body = { source: "ti.extensions", fields: ["number"], limit: 102 };
     const grant = String((request.headers as Record<string, string>)["x-reports-grant"]);
 
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(

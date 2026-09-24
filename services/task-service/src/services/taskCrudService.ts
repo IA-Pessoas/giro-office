@@ -21,8 +21,9 @@ import {
 import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
-import * as audit from "../integrations/audit.js";
-import prismaClient from "../prisma/index.js";
+import type { TaskAudit } from "../integrations/audit.js";
+import type { ProjectProgressIntegration } from "../integrations/projectProgress.js";
+import type prismaClient from "../prisma/index.js";
 import {
   assertCommercialValidationReleased,
   assertProjectCommercialValidationReleased,
@@ -305,14 +306,22 @@ export function resolveEligibleTaskResponsible(
 }
 
 export class TaskCrudService {
-  readonly #workflow = new TaskWorkflowService();
+  readonly #workflow: TaskWorkflowService;
+
+  constructor(
+    private readonly prisma: typeof prismaClient,
+    private readonly audit: TaskAudit,
+    projectProgress: ProjectProgressIntegration,
+  ) {
+    this.#workflow = new TaskWorkflowService(projectProgress);
+  }
 
   async #runTransaction<T>(callback: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    if (typeof prismaClient.$transaction !== "function") {
-      return callback(prismaClient as unknown as Prisma.TransactionClient);
+    if (typeof this.prisma.$transaction !== "function") {
+      return callback(this.prisma as unknown as Prisma.TransactionClient);
     }
 
-    return prismaClient.$transaction(callback);
+    return this.prisma.$transaction(callback);
   }
 
   /**
@@ -572,7 +581,7 @@ export class TaskCrudService {
         this.createTaskInTransaction(data, tx),
       );
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Cadastro",
@@ -583,7 +592,7 @@ export class TaskCrudService {
 
       await Promise.all(
         dependentCreates.map(({ create: dependentCreate }) =>
-          audit.createLog({
+          this.audit.createLog({
             userId: data.user_id,
             organizationId: data.organization_id,
             action: "Cadastro",
@@ -619,7 +628,7 @@ export class TaskCrudService {
     } = { user_id: "" },
   ): Promise<{ detail: TaskDetailRow }> {
     try {
-      const detail = await prismaClient.task.findFirst({
+      const detail = await this.prisma.task.findFirst({
         where: { id: taskId, organization_id: organizationId },
         select: TASK_DETAIL_SELECT,
       });
@@ -679,7 +688,7 @@ export class TaskCrudService {
       };
 
       if (params.client_id) {
-        const client = await prismaClient.client.findFirst({
+        const client = await this.prisma.client.findFirst({
           where: { id: params.client_id, organization_id: params.organization_id },
           select: { id: true },
         });
@@ -769,15 +778,15 @@ export class TaskCrudService {
       }
 
       const [list, total, inProgress, billable] = await Promise.all([
-        prismaClient.task.findMany({
+        this.prisma.task.findMany({
           where,
           select: TASK_LIST_SELECT,
           skip,
           take: params.limit,
           orderBy: { name: "asc" },
         }),
-        prismaClient.task.count({ where }),
-        prismaClient.task.count({
+        this.prisma.task.count({ where }),
+        this.prisma.task.count({
           where: {
             AND: [
               where,
@@ -787,7 +796,7 @@ export class TaskCrudService {
             ],
           },
         }),
-        prismaClient.task.count({
+        this.prisma.task.count({
           where: {
             AND: [where, { NOT: { billing: { contains: "não", mode: "insensitive" } } }],
           },
@@ -828,7 +837,7 @@ export class TaskCrudService {
     data: UpdateTaskCrudRequest,
   ): Promise<TaskGetPayload<{ select: typeof TASK_UPDATE_SELECT }>> {
     try {
-      const exists = await prismaClient.task.findFirst({
+      const exists = await this.prisma.task.findFirst({
         where: { id: data.task_id, organization_id: data.organization_id },
       });
 
@@ -852,7 +861,7 @@ export class TaskCrudService {
             ),
         ),
       });
-      await assertTaskProjectCommercialValidationReleased(prismaClient, exists);
+      await assertTaskProjectCommercialValidationReleased(this.prisma, exists);
 
       if (data.status === "Concluída") {
         throw new ServiceError(
@@ -890,7 +899,7 @@ export class TaskCrudService {
       let responsible3_id = exists.responsible3_id;
 
       if (modelChanged) {
-        await assertNoActiveTaskForModel(prismaClient, {
+        await assertNoActiveTaskForModel(this.prisma, {
           organizationId: data.organization_id,
           projectId: exists.project_id,
           modelId: model_id,
@@ -899,11 +908,11 @@ export class TaskCrudService {
       }
 
       if (departmentChanged) {
-        await assertTaskDepartmentInOrganization(prismaClient, data.organization_id, department_id);
+        await assertTaskDepartmentInOrganization(this.prisma, data.organization_id, department_id);
       }
 
       if (departmentChanged || modelChanged) {
-        const model = await prismaClient.taskModel.findFirst({
+        const model = await this.prisma.taskModel.findFirst({
           where: {
             id: model_id,
             organization_id: data.organization_id,
@@ -920,7 +929,7 @@ export class TaskCrudService {
           );
         }
         const candidates = await listEligibleTaskResponsibles(
-          prismaClient,
+          this.prisma,
           data.organization_id,
           department_id,
         );
@@ -933,14 +942,14 @@ export class TaskCrudService {
         responsible3_id = null;
       } else if (assignmentChanged) {
         const candidates = await listEligibleTaskResponsibles(
-          prismaClient,
+          this.prisma,
           data.organization_id,
           department_id,
         );
         responsible_id = resolveEligibleTaskResponsible(candidates, undefined, data.responsible_id);
       }
 
-      await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, department_id, [
+      await assertResponsibleUsersInDepartment(this.prisma, data.organization_id, department_id, [
         departmentChanged || responsible2_id !== exists.responsible2_id
           ? responsible2_id
           : undefined,
@@ -949,7 +958,7 @@ export class TaskCrudService {
           : undefined,
       ]);
 
-      const updated = await prismaClient.task.update({
+      const updated = await this.prisma.task.update({
         where: { id: data.task_id },
         data: {
           model_id,
@@ -967,7 +976,7 @@ export class TaskCrudService {
         select: TASK_UPDATE_SELECT,
       });
 
-      await audit.logUpdateIfChanged({
+      await this.audit.logUpdateIfChanged({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Atualização",
@@ -984,7 +993,7 @@ export class TaskCrudService {
         exists.responsible2_id !== updated.responsible2_id ||
         exists.responsible3_id !== updated.responsible3_id;
       if (relevantChange) {
-        await publishTaskOperationalNotifications(prismaClient, {
+        await publishTaskOperationalNotifications(this.prisma, {
           organization_id: data.organization_id,
           task_id: data.task_id,
           event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
@@ -1022,7 +1031,7 @@ export class TaskCrudService {
 
   async deleteTask(data: DeleteTaskCrudRequest): Promise<{ deleted: true }> {
     try {
-      const exists = await prismaClient.task.findFirst({
+      const exists = await this.prisma.task.findFirst({
         where: { id: data.task_id, organization_id: data.organization_id },
       });
 
@@ -1039,7 +1048,7 @@ export class TaskCrudService {
       });
 
       try {
-        await prismaClient.task.delete({
+        await this.prisma.task.delete({
           where: { id: data.task_id },
         });
       } catch (err: unknown) {
@@ -1053,7 +1062,7 @@ export class TaskCrudService {
         throw err;
       }
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Exclusão",

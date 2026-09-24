@@ -201,6 +201,7 @@ export default function ClientIntegrationPage() {
               cnpjLookupStatus={
                 cnpjLookup.isFetching ? "loading" : cnpjLookup.isError ? "unavailable" : "idle"
               }
+              cnpjLookupError={cnpjLookup.error}
               submitLabel={
                 updateIntegrationMutation.isPending ? "Salvando..." : "Salvar alterações"
               }

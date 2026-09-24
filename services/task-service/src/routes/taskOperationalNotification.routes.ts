@@ -10,11 +10,12 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import { taskOperationalNotificationReadBodySchema } from "../schemas/taskOperationalNotification.schemas.js";
 import { TaskOperationalNotificationService } from "../services/taskOperationalNotificationService.js";
 
 const router: ReturnType<typeof Router> = Router();
-const taskOperationalNotificationService = new TaskOperationalNotificationService();
+const taskOperationalNotificationService = new TaskOperationalNotificationService(nodeDeps.prisma);
 
 router.get(
   "/notifications",

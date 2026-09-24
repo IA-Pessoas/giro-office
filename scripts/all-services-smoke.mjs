@@ -104,6 +104,10 @@ const env = {
   password: process.env.PASSWORD ?? process.env.ADMIN_PASSWORD ?? "senha123",
   platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL?.trim() || "",
   platformAdminPassword: process.env.PLATFORM_ADMIN_PASSWORD ?? "",
+  // Opt in only when the platform smoke operator has can_impersonate.
+  platformImpersonationSmokeEnabled:
+    process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "true" ||
+    process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -2185,6 +2189,7 @@ const handlers = {
         title: uniqueText("Smoke TI Request"),
         description: "Smoke TI request created by the workspace harness.",
         category_id: requireState("tiRequestCategoryId"),
+        anydesk_code: "123456789",
         urgency: "Medium",
       },
     });
@@ -2823,12 +2828,110 @@ const handlers = {
     await platformHttpRequest(op, { expectedStatus: [200] });
   },
 
+  async platformSuperAdmins(op) {
+    const response = await platformHttpRequest(op, { expectedStatus: [200] });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data)) {
+      throw new Error("Platform super admin list did not return an array.");
+    }
+  },
+
+  async platformSuperAdminImpersonationPermission(op) {
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, {
+        path: "/platform/super-admins/smoke-missing/impersonation-permission",
+        json: { can_impersonate: true },
+        expectedStatus: op.expectedStatus,
+      });
+      return;
+    }
+
+    const identity = await platformHttpRequest(
+      { ...op, method: "GET" },
+      {
+        path: "/platform/me",
+        expectedStatus: [200],
+      },
+    );
+    const admins = await platformHttpRequest(
+      { ...op, method: "GET" },
+      {
+        path: "/platform/super-admins",
+        expectedStatus: [200],
+      },
+    );
+    const operatorId = pickFirst(identity.body, "data.id");
+    const target = admins.body?.data?.find((admin) => admin.id !== operatorId);
+    if (!operatorId || !target) {
+      throw new Error("Platform permission smoke requires another super admin as a target.");
+    }
+
+    // Reusing the current state exercises the authorized route without changing persistent data.
+    const updated = await platformHttpRequest(op, {
+      path: `/platform/super-admins/${target.id}/impersonation-permission`,
+      json: { can_impersonate: target.can_impersonate },
+      expectedStatus: [200],
+    });
+    if (updated.body?.data?.id !== target.id) {
+      throw new Error("Platform permission smoke did not return the selected super admin.");
+    }
+  },
+
   async platformUsers(op) {
     await platformHttpRequest(op, {
       path: `/platform/organizations/${requireState("session").organization_id}/users`,
       query: { skip: 0, take: 5 },
       expectedStatus: [200],
     });
+  },
+
+  async platformUserImpersonate(op) {
+    const session = requireState("session");
+    const path = `/platform/organizations/${session.organization_id}/users/${session.id}/impersonate`;
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, { path, expectedStatus: [401] });
+      return;
+    }
+
+    const originalPlatformCookie = requireState("platformSessionCookies")["cw.session"];
+    const response = await platformHttpRequest(op, { path, expectedStatus: [200] });
+    if (response.body?.data?.id !== session.id) {
+      throw new Error("Platform impersonation did not return the requested organization user.");
+    }
+    if (response.body?.data?.token !== undefined || response.body?.data?.csrfToken !== undefined) {
+      throw new Error("Platform impersonation response exposed session credentials.");
+    }
+    if (
+      !state.platformSessionCookies?.["cw.session"] ||
+      state.platformSessionCookies["cw.session"] === originalPlatformCookie
+    ) {
+      throw new Error("Platform impersonation did not replace the platform session cookie.");
+    }
+  },
+
+  async platformImpersonationExit(op) {
+    const impersonationCookie = requireState("platformSessionCookies")["cw.session"];
+    const response = await platformHttpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) {
+      return;
+    }
+
+    const identity = response.body?.data?.identity;
+    if (identity?.auth_kind !== "platform" || identity?.platform_role !== "super_admin") {
+      throw new Error("Impersonation exit did not restore the platform identity.");
+    }
+    if (
+      !state.platformSessionCookies?.["cw.session"] ||
+      state.platformSessionCookies["cw.session"] === impersonationCookie
+    ) {
+      throw new Error("Impersonation exit did not replace the organization session cookies.");
+    }
+
+    await platformHttpRequest(
+      { ...op, method: "GET", path: "/platform/me" },
+      {
+        expectedStatus: [200],
+      },
+    );
   },
 
   async platformUserCreate(op) {
@@ -3651,16 +3754,18 @@ const handlers = {
       pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
+  // /organizations só enxerga a organização da sessão: ler a própria dá 200 e alterar a
+  // organização temporária criada acima dá 404 (isolamento entre tenants, PR #1268).
   async organizationGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      path: `/organizations/${requireState("tempOrganizationId")}`,
+      path: `/organizations/${requireState("session").organization_id}`,
     });
   },
 
   async organizationPatchStatus(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [404],
       path: `/organizations/${requireState("tempOrganizationId")}/status`,
       json: { status: "active" },
     });
@@ -3668,7 +3773,7 @@ const handlers = {
 
   async organizationPatchSubscriptionPlan(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [404],
       path: `/organizations/${requireState("tempOrganizationId")}/subscription-plan`,
       json: { subscription_plan: "smoke-plan" },
     });
@@ -3676,7 +3781,7 @@ const handlers = {
 
   async organizationPatchLogoUrl(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [404],
       path: `/organizations/${requireState("tempOrganizationId")}/logo-url`,
       json: { logo_url: "https://example.com/smoke-logo.png" },
     });
@@ -7234,6 +7339,15 @@ function matchesFilter(op) {
 }
 
 function disabledConditionReason(condition) {
+  if (condition === "platformImpersonationSmokeEnabled") {
+    if (!env.platformImpersonationSmokeEnabled) {
+      return "PLATFORM_IMPERSONATION_SMOKE_ENABLED is false";
+    }
+    if (!env.auditEnabled) {
+      return "AUDIT_ENABLED is false";
+    }
+  }
+
   if (condition === "auditEnabled" && !env.auditEnabled) {
     return "AUDIT_ENABLED is false";
   }

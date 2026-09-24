@@ -9,6 +9,7 @@ import {
 } from "../hooks";
 import type { CreateFiscalNcmPayload, FiscalNcm } from "../types";
 import {
+  FISCAL_TAX_REGIME_OPTIONS,
   getFiscalErrorMessage,
   toFiscalInputDate,
   toFiscalIsoDate,
@@ -60,7 +61,7 @@ function buildFormState(ncm: FiscalNcm | null | undefined): FiscalNcmFormState {
   }
 
   return {
-    tax_regime: ncm.tax_regime,
+    tax_regime: ncm.tax_regime.trim(),
     ncm_code: ncm.ncm_code,
     federal_taxation_type: ncm.federal_taxation_type,
     description: ncm.description,
@@ -289,11 +290,11 @@ export function FiscalNcmFormPanel({
       ) : null}
 
       <div className={`${showHeader ? "mt-4" : ""} grid gap-4 xl:grid-cols-2`}>
-        <TextField
+        <SelectField
           label="Regime tributário"
           value={formState.tax_regime}
           onChange={(value) => handleChange("tax_regime", value)}
-          placeholder="Ex.: Simples Nacional"
+          options={FISCAL_TAX_REGIME_OPTIONS}
           required
         />
         <TextField
@@ -433,6 +434,45 @@ function TextField({
         placeholder={placeholder}
         className="h-9 rounded-lg border border-gray-300 px-3 text-[13px] text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
       />
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  onChange,
+  options,
+  required = false,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  required?: boolean;
+  value: string;
+}) {
+  const hasUnknownValue = Boolean(value) && !options.some((option) => option.value === value);
+
+  return (
+    <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-slate-300">
+      <span>
+        {label}
+        {required ? " *" : ""}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required={required}
+        className="h-9 rounded-lg border border-gray-300 px-3 text-[13px] text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+      >
+        <option value="">Selecione</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+        {hasUnknownValue ? <option value={value}>{value}</option> : null}
+      </select>
     </label>
   );
 }

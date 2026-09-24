@@ -11,6 +11,10 @@ export function getCurrentContabilCompetence(date = new Date()): ContabilCompete
   return `${year}-${month}` as ContabilCompetence;
 }
 
+export function getContabilCompletionPercent(completed: number, total: number): number {
+  return total > 0 ? Math.round((completed / total) * 100) : 0;
+}
+
 export type ContabilControlFieldSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export function createContabilFieldStatusMap(
@@ -56,4 +60,20 @@ export function rollbackContabilFieldValue(
     ...current,
     [field]: confirmed[field],
   };
+}
+
+function normalizeSearchText(value: string) {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+export function filterContabilPortfolioRows<
+  Row extends { searchText: string; values: Record<string, string> },
+>(rows: readonly Row[], search: string, filters: Record<string, string>): Row[] {
+  const term = normalizeSearchText(search.trim());
+
+  return rows.filter(
+    (row) =>
+      (!term || normalizeSearchText(row.searchText).includes(term)) &&
+      Object.entries(filters).every(([key, value]) => !value || row.values[key] === value),
+  );
 }

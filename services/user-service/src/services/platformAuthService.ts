@@ -38,6 +38,7 @@ export interface PlatformIdentity {
   email: string;
   auth_kind: typeof PLATFORM_AUTH_KIND;
   platform_role: typeof PLATFORM_ROLE;
+  can_impersonate: boolean;
 }
 
 export interface IssuedPlatformSession {
@@ -53,6 +54,7 @@ interface PlatformUserRecord {
   password: string;
   platform_role: string;
   status: string;
+  can_impersonate: boolean;
   session_version: number;
 }
 
@@ -98,6 +100,46 @@ function isActiveSuperAdmin(
   return user?.status === "active" && user.platform_role === PLATFORM_ROLE;
 }
 
+export function issuePlatformSession(
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    can_impersonate: boolean;
+    session_version: number;
+  },
+  sessionId: string,
+  csrfToken: string,
+): IssuedPlatformSession {
+  const token = jwt.sign(
+    {
+      user_id: user.id,
+      auth_kind: PLATFORM_AUTH_KIND,
+      platform_role: PLATFORM_ROLE,
+      session_version: user.session_version,
+      session_id: sessionId,
+      csrf_hash: hashCsrfToken(csrfToken),
+      name: user.name,
+      login: user.email,
+    },
+    getUserServiceEnv().jwtSecret,
+    { expiresIn: SESSION_MAX_AGE_SECONDS },
+  );
+
+  return {
+    identity: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      auth_kind: PLATFORM_AUTH_KIND,
+      platform_role: PLATFORM_ROLE,
+      can_impersonate: user.can_impersonate,
+    },
+    token,
+    csrfToken,
+  };
+}
+
 const prismaRepository: PlatformAuthRepository = {
   findByEmail: (email) =>
     prismaClient.platformUser.findUnique({
@@ -109,6 +151,7 @@ const prismaRepository: PlatformAuthRepository = {
         password: true,
         platform_role: true,
         status: true,
+        can_impersonate: true,
         session_version: true,
       },
     }),
@@ -122,6 +165,7 @@ const prismaRepository: PlatformAuthRepository = {
         password: true,
         platform_role: true,
         status: true,
+        can_impersonate: true,
         session_version: true,
       },
     }),
@@ -144,6 +188,7 @@ const prismaRepository: PlatformAuthRepository = {
             password: true,
             platform_role: true,
             status: true,
+            can_impersonate: true,
             session_version: true,
           },
         },
@@ -179,32 +224,7 @@ export class PlatformAuthService {
     sessionId: string,
     csrfToken: string,
   ): IssuedPlatformSession {
-    const token = jwt.sign(
-      {
-        user_id: user.id,
-        auth_kind: PLATFORM_AUTH_KIND,
-        platform_role: PLATFORM_ROLE,
-        session_version: user.session_version,
-        session_id: sessionId,
-        csrf_hash: hashCsrfToken(csrfToken),
-        name: user.name,
-        login: user.email,
-      },
-      getUserServiceEnv().jwtSecret,
-      { expiresIn: SESSION_MAX_AGE_SECONDS },
-    );
-
-    return {
-      identity: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        auth_kind: PLATFORM_AUTH_KIND,
-        platform_role: PLATFORM_ROLE,
-      },
-      token,
-      csrfToken,
-    };
+    return issuePlatformSession(user, sessionId, csrfToken);
   }
 
   async login({ email, password }: PlatformLoginRequest): Promise<IssuedPlatformSession> {
@@ -258,6 +278,7 @@ export class PlatformAuthService {
       email: user.email,
       auth_kind: PLATFORM_AUTH_KIND,
       platform_role: PLATFORM_ROLE,
+      can_impersonate: user.can_impersonate,
     };
   }
 

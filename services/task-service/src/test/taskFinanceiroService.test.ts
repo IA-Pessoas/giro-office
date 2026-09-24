@@ -57,7 +57,7 @@ describe("TaskFinanceiroService", () => {
       audited_at: new Date(),
     });
     prismaMock.taskFinanceiroCommand.updateMany.mockResolvedValue({ count: 0 });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -84,7 +84,7 @@ describe("TaskFinanceiroService", () => {
       response_snapshot: response,
       audited_at: null,
     });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -119,7 +119,7 @@ describe("TaskFinanceiroService", () => {
     });
     prismaMock.user.findFirst.mockResolvedValue({ department_id: "department-new" });
     prismaMock.task.findMany.mockResolvedValue([{ id: "task-1", department_id: "department-old" }]);
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -146,7 +146,7 @@ describe("TaskFinanceiroService", () => {
     });
     prismaMock.task.findMany.mockResolvedValue([{ id: "task-1", department_id: "department-1" }]);
     prismaMock.departmentCollector.findFirst.mockResolvedValue(null);
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -167,7 +167,7 @@ describe("TaskFinanceiroService", () => {
       { id: "task-2", department_id: "department-1", charge_financeiro: true },
     ]);
     prismaMock.task.updateMany.mockResolvedValue({ count: 2 });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -199,7 +199,7 @@ describe("TaskFinanceiroService", () => {
       command_hash: "outro-comando",
       response_snapshot: { task_ids: ["task-1"], settled: 1 },
     });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -221,7 +221,7 @@ describe("TaskFinanceiroService", () => {
       { id: "task-1", department_id: "department-1", charge_financeiro: true },
       { id: "task-2", department_id: "department-1", charge_financeiro: false },
     ]);
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -245,7 +245,7 @@ describe("TaskFinanceiroService", () => {
       { id: "task-2", department_id: "department-1", charge_financeiro: true },
     ]);
     prismaMock.task.updateMany.mockResolvedValue({ count: 1 });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -267,7 +267,7 @@ describe("TaskFinanceiroService", () => {
       { id: "task-1", department_id: "department-1", charge_financeiro: true },
     ]);
     prismaMock.task.updateMany.mockResolvedValue({ count: 1 });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -290,7 +290,7 @@ describe("TaskFinanceiroService", () => {
     ]);
     prismaMock.departmentCollector.findFirst.mockResolvedValue({ id: "collector-1" });
     prismaMock.task.updateMany.mockResolvedValue({ count: 1 });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -308,7 +308,7 @@ describe("TaskFinanceiroService", () => {
     prismaMock.department.findFirst.mockResolvedValue({ id: "department-1" });
     prismaMock.user.findMany.mockResolvedValue([{ id: "user-1" }, { id: "user-2" }]);
     prismaMock.departmentCollector.createMany.mockResolvedValue({ count: 2 });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.setCollectors({
@@ -337,7 +337,7 @@ describe("TaskFinanceiroService", () => {
   it("limita a fila financeira ao departamento do cobrador", async () => {
     prismaMock.departmentCollector.findMany.mockResolvedValue([{ department_id: "department-1" }]);
     prismaMock.task.findMany.mockResolvedValue([]);
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await service.listQueue({
       user_id: "user-1",
@@ -354,7 +354,7 @@ describe("TaskFinanceiroService", () => {
 
   it("rejeita fila para usuário sem departamento de cobrança", async () => {
     prismaMock.departmentCollector.findMany.mockResolvedValue([]);
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.listQueue({ user_id: "user-1", organization_id: "org-1", integracao_level: 1 }),
@@ -364,7 +364,7 @@ describe("TaskFinanceiroService", () => {
   it("ignora vínculos do departamento anterior após transferência do cobrador", async () => {
     prismaMock.user.findFirst.mockResolvedValue({ department_id: "department-new" });
     prismaMock.departmentCollector.findMany.mockResolvedValue([]);
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.listQueue({ user_id: "user-1", organization_id: "org-1", integracao_level: 1 }),
@@ -384,7 +384,7 @@ describe("TaskFinanceiroService", () => {
       { id: "task-1", department_id: "department-old", charge_financeiro: true },
     ]);
     prismaMock.user.findFirst.mockResolvedValue({ department_id: "department-new" });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({
@@ -408,7 +408,7 @@ describe("TaskFinanceiroService", () => {
       ]);
     prismaMock.taskFinanceiroCommand.findUnique.mockResolvedValue(null);
     prismaMock.task.updateMany.mockResolvedValue({ count: 1 });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settleExpress({
@@ -438,7 +438,7 @@ describe("TaskFinanceiroService", () => {
         .digest("hex"),
       response_snapshot: response,
     });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settleExpress({
@@ -461,7 +461,7 @@ describe("TaskFinanceiroService", () => {
     ]);
     prismaMock.departmentCollector.findFirst.mockResolvedValue({ id: "assignment-1" });
     prismaMock.task.updateMany.mockResolvedValue({ count: 1 });
-    const service = new TaskFinanceiroService();
+    const service = new TaskFinanceiroService(prismaMock as never, auditMock as never);
 
     await expect(
       service.settle({

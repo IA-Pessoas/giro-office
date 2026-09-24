@@ -71,7 +71,8 @@ export const clientService = {
   },
 
   async lookupCnpj(cnpj: string): Promise<ClientCompanyLookup> {
-    const api = setupAPIClient();
+    // Consulta opcional: a falha aparece no formulário, que continua salvando normalmente.
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     const response = await api.get(CLIENT_ENDPOINTS.lookupCnpj, { params: { cnpj } });
 
     return unwrapClientEnvelope<ClientCompanyLookup>(response.data);

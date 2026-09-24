@@ -29,11 +29,13 @@ function DashboardHeroCard({
   description,
   icon: Icon,
   label,
+  onAction,
   value,
 }: {
   description: string;
   icon: LucideIcon;
   label: string;
+  onAction?: () => void;
   value: number | string;
 }) {
   return (
@@ -45,6 +47,16 @@ function DashboardHeroCard({
           </p>
           <p className="mt-3 text-4xl font-semibold tracking-tight">{value}</p>
           <p className="mt-3 max-w-md text-sm leading-6 text-white/75">{description}</p>
+          {onAction ? (
+            <button
+              type="button"
+              onClick={onAction}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/15 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/25"
+            >
+              <Ticket className="h-4 w-4" />
+              Ver chamados
+            </button>
+          ) : null}
         </div>
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
           <Icon className="h-5 w-5" />
@@ -155,7 +167,7 @@ function DashboardStatePanel({
   );
 }
 
-export function TiDashboardTab() {
+export function TiDashboardTab({ onOpenRequests }: { onOpenRequests?: () => void } = {}) {
   const dashboardQuery = useTiDashboard();
   const summary = dashboardQuery.data;
   const isLoading = dashboardQuery.isLoading || dashboardQuery.isFetching;
@@ -202,6 +214,7 @@ export function TiDashboardTab() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
           <DashboardHeroCard
             icon={ClipboardList}
+            onAction={onOpenRequests}
             label={openRequests > 0 ? "Meus chamados em acompanhamento" : "Meus chamados em dia"}
             value={formatMetric(openRequests)}
             description={
@@ -240,6 +253,7 @@ export function TiDashboardTab() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
         <DashboardHeroCard
           icon={ClipboardList}
+          onAction={onOpenRequests}
           label={openRequests > 0 ? "Chamados em acompanhamento" : "Fluxo operacional em dia"}
           value={formatMetric(openRequests)}
           description={

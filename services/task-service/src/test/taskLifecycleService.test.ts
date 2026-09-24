@@ -69,7 +69,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().requestTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -97,7 +101,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().requestTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -124,7 +132,11 @@ describe("TaskLifecycleService", () => {
     prismaMock.task.update.mockResolvedValue({ id: "task-1", pending_approval: true });
 
     await expect(
-      new TaskLifecycleService().requestTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -159,7 +171,11 @@ describe("TaskLifecycleService", () => {
     });
     prismaMock.task.update.mockResolvedValue({ id: "task-1", pending_approval: true });
 
-    await new TaskLifecycleService().requestTaskCompletion({
+    await new TaskLifecycleService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).requestTaskCompletion({
       user_id: "user-1",
       organization_id: "org-1",
       task_id: "task-1",
@@ -192,7 +208,11 @@ describe("TaskLifecycleService", () => {
     prismaMock.taskCompletionRequest.create.mockRejectedValue({ code: "P2002" });
 
     await expect(
-      new TaskLifecycleService().requestTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -224,7 +244,11 @@ describe("TaskLifecycleService", () => {
       });
 
     await expect(
-      new TaskLifecycleService().requestTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -250,7 +274,11 @@ describe("TaskLifecycleService", () => {
     prismaMock.taskCompletionRequest.findMany.mockResolvedValue([]);
 
     await expect(
-      new TaskLifecycleService().listTaskCompletionRequests({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).listTaskCompletionRequests({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -279,7 +307,7 @@ describe("TaskLifecycleService", () => {
     prismaMock.task.update.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
     await expect(
-      new TaskLifecycleService().concludeTask({
+      new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never).concludeTask({
         user_id: "user-1",
         organization_id: "org-1",
         integracaoLevel: 1,
@@ -309,7 +337,7 @@ describe("TaskLifecycleService", () => {
 
   it("concludeTask lança 404 quando tarefa não existe", async () => {
     prismaMock.task.findFirst.mockResolvedValue(null);
-    const service = new TaskLifecycleService();
+    const service = new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.concludeTask({
@@ -335,7 +363,7 @@ describe("TaskLifecycleService", () => {
       billing: "Realizar",
     });
     prismaMock.permission.findFirst.mockResolvedValue({ integracao: 1 });
-    const service = new TaskLifecycleService();
+    const service = new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.approveTaskCompletion({
@@ -373,7 +401,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().approveTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -424,7 +456,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().approveTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -470,7 +506,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().approveTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -512,7 +552,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().approveTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -551,7 +595,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().approveTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -582,7 +630,11 @@ describe("TaskLifecycleService", () => {
     prismaMock.task.update.mockResolvedValue({ id: "task-1", pending_approval: false });
 
     await expect(
-      new TaskLifecycleService().cancelTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).cancelTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -623,7 +675,7 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().reopenTask({
+      new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never).reopenTask({
         user_id: "admin-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -684,7 +736,7 @@ describe("TaskLifecycleService", () => {
       id: "request-1",
       status: "pending",
     });
-    const service = new TaskLifecycleService();
+    const service = new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never);
 
     await service.concludeTask({
       user_id: "user-1",
@@ -737,7 +789,7 @@ describe("TaskLifecycleService", () => {
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: false });
 
     await expect(
-      new TaskLifecycleService().concludeTask({
+      new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never).concludeTask({
         user_id: "user-1",
         organization_id: "org-1",
         integracaoLevel: 1,
@@ -780,7 +832,7 @@ describe("TaskLifecycleService", () => {
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: false });
 
     await expect(
-      new TaskLifecycleService().concludeTask({
+      new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never).concludeTask({
         user_id: "user-1",
         organization_id: "org-1",
         integracaoLevel: 0,
@@ -813,7 +865,7 @@ describe("TaskLifecycleService", () => {
       billing: "Realizar",
     });
     prismaMock.user.findMany.mockResolvedValue([]);
-    const service = new TaskLifecycleService();
+    const service = new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.concludeTask({

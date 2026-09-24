@@ -117,6 +117,8 @@ export const listClientsQuerySchema = z
   });
 
 const optionalDateTime = z.coerce.date().optional();
+// z.coerce.date() transforma null em 1970-01-01; nas colunas DateTime? o null tem que passar.
+const nullableDateTime = z.coerce.date().nullable().optional();
 
 const extendedClientFields = {
   dominio_code: z.string().nullable().optional(),
@@ -125,20 +127,20 @@ const extendedClientFields = {
   neighborhood: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
-  customer_since: optionalDateTime,
+  customer_since: nullableDateTime,
   municipal_registration: z.string().nullable().optional(),
   state_registration: z.string().nullable().optional(),
   commercial_board_registration: z.string().nullable().optional(),
-  competence_entry: optionalDateTime,
-  competence_output: optionalDateTime,
-  opening_date: optionalDateTime,
+  competence_entry: nullableDateTime,
+  competence_output: nullableDateTime,
+  opening_date: nullableDateTime,
   instagram: z.string().nullable().optional(),
   indication: z.string().nullable().optional(),
   regime: z.string().nullable().optional(),
   size: z.string().nullable().optional(),
   segment: z.string().nullable().optional(),
-  start_strike: optionalDateTime,
-  end_strike: optionalDateTime,
+  start_strike: nullableDateTime,
+  end_strike: nullableDateTime,
   cnae: z.string().nullable().optional(),
   cnae_secondary: z.string().nullable().optional(),
   responsible: z.string().nullable().optional(),
@@ -154,7 +156,7 @@ const extendedClientFields = {
   consultoria: z.boolean().optional(),
   castelo_med: z.boolean().optional(),
   contract: z.boolean().optional(),
-  date_status: optionalDateTime,
+  date_status: nullableDateTime,
   description_prospecting: z.string().nullable().optional(),
   participants_meet: z.string().nullable().optional(),
   meet_type: z.string().nullable().optional(),
