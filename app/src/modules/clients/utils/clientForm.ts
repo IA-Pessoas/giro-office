@@ -6,14 +6,13 @@ import type {
   UpdateClientPayload,
 } from "../types";
 
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+
 import { normalizeDocumentValue } from "./documentValidation.ts";
 import { mapClientStatusFromApi, mapClientStatusToApi } from "./statusMapper.ts";
 
-export const CLIENT_TAX_REGIME_OPTIONS = [
-  "Simples Nacional",
-  "Lucro Presumido",
-  "Lucro Real",
-] as const satisfies readonly ClientTaxRegime[];
+// Fonte única com Regularize e Fiscal (shared/src/regularize/taxRegime.ts).
+export const CLIENT_TAX_REGIME_OPTIONS = TAX_REGIME_OPTIONS satisfies readonly ClientTaxRegime[];
 
 function isClientTaxRegime(value: string | null | undefined): value is ClientTaxRegime {
   return CLIENT_TAX_REGIME_OPTIONS.includes(value as ClientTaxRegime);

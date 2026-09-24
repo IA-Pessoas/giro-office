@@ -7,6 +7,30 @@ const clientEmailSchema = z
   .nullable()
   .optional();
 
+// "Hoje" no fuso de São Paulo: uma abertura datada de hoje à noite no Brasil já é amanhã em UTC.
+function todayInSaoPaulo(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+}
+
+const openingDateSchema = z.coerce
+  .date()
+  .nullable()
+  .optional()
+  .refine(
+    (date) => !date || date.toISOString().slice(0, 10) <= todayInSaoPaulo(),
+    "Data de abertura não pode ser no futuro.",
+  );
+
+// CNAE: 7 dígitos, com ou sem máscara (6201-5/01).
+const cnaeSchema = z
+  .string()
+  .refine(
+    (value) => /^[\d.\-/\s]+$/.test(value) && value.replace(/\D/g, "").length === 7,
+    "CNAE deve ter 7 dígitos (ex.: 6201-5/01).",
+  )
+  .nullable()
+  .optional();
+
 export const createIntegrationBodySchema = z
   .object({
     organization_id: z.string().uuid({ message: "organization_id inválido." }).optional(),
@@ -15,7 +39,7 @@ export const createIntegrationBodySchema = z
     company_name: z.string().nullable().optional(),
     fantasy_name: z.string().nullable().optional(),
     cpf_cnpj: z.string().min(1),
-    opening_date: z.coerce.date().nullable().optional(),
+    opening_date: openingDateSchema,
     responsible: z.string().nullable().optional(),
     cpf_responsible: z.string().nullable().optional(),
     number: z.string().nullable().optional(),
@@ -87,7 +111,7 @@ export const updateRegularizeBodySchema = z
     company_name: z.string().nullable().optional(),
     fantasy_name: z.string().nullable().optional(),
     cpf_cnpj: z.string().min(1).optional(),
-    cnae: z.string().nullable().optional(),
+    cnae: cnaeSchema,
     cnae_secondary: z.string().nullable().optional(),
     responsible: z.string().nullable().optional(),
     cpf_responsible: z.string().nullable().optional(),
@@ -102,7 +126,7 @@ export const updateRegularizeBodySchema = z
     municipal_registration: z.string().nullable().optional(),
     state_registration: z.string().nullable().optional(),
     commercial_board_registration: z.string().nullable().optional(),
-    opening_date: z.coerce.date().nullable().optional(),
+    opening_date: openingDateSchema,
     regime: z.string().nullable().optional(),
     size: z.string().nullable().optional(),
     segment: z.string().nullable().optional(),
