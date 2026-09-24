@@ -104,6 +104,10 @@ export function ContabilControlSection({
   );
 
   useEffect(() => {
+    setOperationError(null);
+  }, [clientId, competence]);
+
+  useEffect(() => {
     if (!clientId) {
       return;
     }

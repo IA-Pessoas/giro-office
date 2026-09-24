@@ -175,8 +175,8 @@ describe("ControlService", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organization_id: ORG_ID,
-          contabil: true,
           AND: [
+            { OR: [{ contabil: true }, { contabil: null }] },
             {
               OR: [
                 { competence_entry: null },

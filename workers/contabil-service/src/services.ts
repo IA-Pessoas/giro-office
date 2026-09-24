@@ -230,8 +230,9 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         const clients = await prisma.client.findMany({
           where: {
             organization_id: organizationId,
-            contabil: true,
+            // contabil nulo é elegível, como na tela e na criação de competências.
             AND: [
+              { OR: [{ contabil: true }, { contabil: null }] },
               { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
               { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
             ],
