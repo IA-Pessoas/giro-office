@@ -138,7 +138,7 @@ export function ContabilPortfolioSection() {
             Acompanhe todos os clientes Contábil da competência sem abrir cada ficha.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
           <CalendarDays aria-hidden="true" className="h-4 w-4 text-blue-600 dark:text-blue-300" />
           Competência
           <ContabilCompetenceSelect
@@ -146,7 +146,7 @@ export function ContabilPortfolioSection() {
             value={competence}
             onChange={setCompetence}
           />
-        </label>
+        </div>
       </div>
 
       {portfolioQuery.isLoading ? (

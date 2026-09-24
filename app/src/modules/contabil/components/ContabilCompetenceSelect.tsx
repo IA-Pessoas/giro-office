@@ -18,7 +18,7 @@ export function ContabilCompetenceSelect({
   const [year, month] = value.split("-");
 
   return (
-    <span className="inline-flex items-center gap-2">
+    <span role="group" aria-label={label} className="inline-flex items-center gap-2">
       <select
         aria-label={`${label} (mês)`}
         value={month}

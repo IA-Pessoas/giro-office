@@ -199,7 +199,7 @@ export function TriageDocumentsSection({
               : "Dez documentos por competência. Itens não aplicáveis não entram no indicador."}
           </p>
         </div>
-        <label className="text-sm font-medium text-gray-700 dark:text-slate-300">
+        <div className="text-sm font-medium text-gray-700 dark:text-slate-300">
           Competência
           <span className="ml-2">
             <ContabilCompetenceSelect
@@ -208,7 +208,7 @@ export function TriageDocumentsSection({
               onChange={setCompetence}
             />
           </span>
-        </label>
+        </div>
       </div>
       {mutationError ? (
         <p
