@@ -85,8 +85,7 @@ runTest("task attachment contract keeps private paths out of the UI", () => {
   assert.doesNotMatch(source, /object_path/);
 });
 
-runTest("task attachment failures show a single toast", () => {
-  // O painel já avisa cada falha; o toast genérico de 5xx duplicaria o aviso.
+runTest("task attachment calls skip the global 5xx toast", () => {
   const service = readFileSync(
     new URL("./services/integracaoTasksService.ts", import.meta.url),
     "utf8",
@@ -99,8 +98,12 @@ runTest("task attachment failures show a single toast", () => {
   ]) {
     const body = service.slice(service.indexOf(`async ${method}(`)).split("\n  },")[0];
     assert.match(body, /attachmentApi\(\)/, method);
+    assert.doesNotMatch(body, /setupAPIClient\(/, method);
   }
-  assert.match(service, /function attachmentApi\(\)[\s\S]*?notifyServerErrors: false/);
+  assert.match(
+    service,
+    /function attachmentApi\(\) \{\n\s*return setupAPIClient\([^)]*notifyServerErrors: false/,
+  );
 });
 
 runTest("task postponement contract and panel retain justification and chronological history", () => {
