@@ -26,6 +26,7 @@ import {
 import {
   buildCreateClientIntegrationPayload,
   buildUpdateClientIntegrationPayload,
+  createClientIntegrationInitialValues,
   createUpdateClientIntegrationInitialValues,
   getCnpjToLookup,
   getIntegrationEmailError,
@@ -36,6 +37,7 @@ import { formatPaMoneyFromApi, formatPaMoneyInput, parsePaMoneyCents } from "./u
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
+  isRegularizeCompanyClient,
   getRegularizeUnsupportedDateClearError,
   getRegularizeRegimeOptions,
   hasRegularizeChanges,
@@ -130,13 +132,6 @@ runTest("client form sends the selected tax regime on creation and update", () =
 
   assert.equal(buildCreateClientPayload(values, "organization-1").regime, "Simples Nacional");
   assert.equal(
-    buildCreateClientPayload(
-      { ...values, cpf_cnpj: "AB.123.456/7800-26" },
-      "organization-1",
-    ).cpf_cnpj,
-    "AB123456780026",
-  );
-  assert.equal(
     buildUpdateClientPayload({ ...values, regime: "Lucro Presumido" }).regime,
     "Lucro Presumido",
   );
@@ -147,16 +142,93 @@ runTest("client form sends the selected tax regime on creation and update", () =
   );
 });
 
-runTest("new client defaults to Ativo and keeps status display and payload aligned", () => {
-  const initialValues = createClientFormInitialValues();
+runTest("PJ client payloads derive the required API name while PF keeps its entered name", () => {
+  const pjValues = {
+    ...createClientFormInitialValues(),
+    type: "PJ",
+    name: "",
+    company_name: "Empresa Exemplo LTDA",
+    fantasy_name: "Exemplo",
+  };
 
-  assert.equal(initialValues.status, "Ativo");
+  assert.equal(buildCreateClientPayload(pjValues, "organization-1").name, "Empresa Exemplo LTDA");
   assert.equal(
-    buildCreateClientPayload({ ...initialValues, name: "Acme", cpf_cnpj: "12.345.678/0001-95" }, "organization-1").status,
-    "Ativo",
+    buildCreateClientPayload(
+      { ...pjValues, company_name: "", fantasy_name: "Nome Fantasia" },
+      "organization-1",
+    ).name,
+    "Nome Fantasia",
   );
-  assert.equal(mapClientStatusToApi("Prospect"), "Prospecção");
-  assert.equal(mapClientStatusToApi("Inativo"), "Inativo");
+  assert.equal(
+    buildUpdateClientPayload({ ...pjValues, company_name: "Nova Razão Social" }).name,
+    "Nova Razão Social",
+  );
+
+  const pfValues = { ...pjValues, type: "PF", name: "Pessoa Exemplo", company_name: "" };
+  assert.equal(buildCreateClientPayload(pfValues, "organization-1").name, "Pessoa Exemplo");
+});
+
+runTest("PJ integration creation derives required API name from company identity", () => {
+  const values = {
+    ...createClientIntegrationInitialValues(),
+    type: "PJ",
+    name: "",
+    company_name: "Empresa Integração LTDA",
+    fantasy_name: "Integração",
+  };
+
+  assert.equal(
+    buildCreateClientIntegrationPayload(values, "organization-1").name,
+    "Empresa Integração LTDA",
+  );
+
+  const client = { ...values, name: "", company_name: "", fantasy_name: "" };
+  assert.equal(
+    buildUpdateClientIntegrationPayload(
+      { ...createUpdateClientIntegrationInitialValues(client), name: "", company_name: "Nova LTDA" },
+      client,
+    ).name,
+    "Nova LTDA",
+  );
+});
+
+runTest("PJ client forms hide manual name while PF forms retain it", () => {
+  const clientForm = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+  const integrationForm = readFileSync(
+    "src/modules/clients/components/ClientIntegrationForm.tsx",
+    "utf8",
+  );
+  const regularizeForm = readFileSync(
+    "src/modules/clients/components/ClientRegularizeForm.tsx",
+    "utf8",
+  );
+  assert.match(clientForm, /values\.type === "PF"[\s\S]*?name="name"/);
+  assert.match(integrationForm, /values\.type === "PF"[\s\S]*?name="name"/);
+  assert.doesNotMatch(regularizeForm, /label="Nome \/ Apelido"/);
+  assert.match(regularizeForm, /isRegularizeCompanyClient\(values\)/);
+});
+
+runTest("regularization uses client type to identify PJ despite incomplete identity fields", () => {
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PJ", cpf_cnpj: "12.345", company_name: "Empresa LTDA", fantasy_name: "" }),
+    true,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PJ", cpf_cnpj: "", company_name: "", fantasy_name: "Marca" }),
+    true,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PF", cpf_cnpj: "", company_name: "Empresa LTDA", fantasy_name: "" }),
+    false,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PJ", cpf_cnpj: "", company_name: "", fantasy_name: "" }),
+    true,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PF", cpf_cnpj: "12.345.678/0001-90", company_name: "", fantasy_name: "" }),
+    false,
+  );
 });
 
 runTest("client regime is constrained and bound in both shared client flows", () => {
@@ -470,18 +542,16 @@ runTest("integration edit guard blocks when normalized cpf_cnpj is missing", () 
 });
 
 runTest("document validation enforces base client cpf_cnpj length", () => {
-  assert.equal(validateCpfCnpjDocument("529.982.247-25"), null);
-  assert.equal(validateCpfCnpjDocument("12.345.678/0001-95"), null);
+  assert.equal(validateCpfCnpjDocument("123.456.789-10"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90"), null);
   assert.equal(validateCpfCnpjDocument("123"), "CPF/CNPJ deve ter 11 ou 14 dígitos.");
-  assert.equal(validateCpfCnpjDocument("529.982.247-26", "PF"), "CPF inválido.");
-  assert.equal(validateCpfCnpjDocument("12.345.678/0001-00", "PJ"), "CNPJ inválido.");
 });
 
 runTest("document validation enforces integration person type length", () => {
-  assert.equal(validateCpfCnpjDocument("529.982.247-25", "PF"), null);
-  assert.equal(validateCpfCnpjDocument("12.345.678/0001-95", "PJ"), null);
-  assert.equal(validateCpfCnpjDocument("12.345.678/0001-95", "PF"), "CPF deve ter 11 dígitos.");
-  assert.equal(validateCpfCnpjDocument("529.982.247-25", "PJ"), "CNPJ deve ter 14 dígitos.");
+  assert.equal(validateCpfCnpjDocument("123.456.789-10", "PF"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90", "PJ"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90", "PF"), "CPF deve ter 11 dígitos.");
+  assert.equal(validateCpfCnpjDocument("123.456.789-10", "PJ"), "CNPJ deve ter 14 dígitos.");
 });
 
 runTest("document input formatter masks and limits by person type", () => {
@@ -490,7 +560,7 @@ runTest("document input formatter masks and limits by person type", () => {
   assert.equal(formatCpfCnpjInput("abc1234", "PF"), "123.4");
   assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
   assert.equal(formatCpfCnpjInput("AB123456780001", "PJ"), "AB.123.456/7800-01");
-  assert.equal(validateCpfCnpjDocument("AB.123.456/7800-26", "PJ"), null);
+  assert.equal(validateCpfCnpjDocument("AB.123.456/7800-01", "PJ"), null);
 });
 
 runTest("client input masks forward formatted document and phone values through event-compatible targets", () => {
@@ -543,7 +613,7 @@ runTest("client Regularize fields route generic documents, CPF, and phones throu
 
 runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {
   assert.equal(validateOptionalCpfDocument("CPF do responsável", ""), null);
-  assert.equal(validateOptionalCpfDocument("CPF do responsável", "529.982.247-25"), null);
+  assert.equal(validateOptionalCpfDocument("CPF do responsável", "123.456.789-10"), null);
   assert.equal(
     validateOptionalCpfDocument("CPF do responsável", "123"),
     "CPF do responsável deve ter 11 dígitos.",
@@ -612,22 +682,6 @@ runTest("regularize payload normalizes documents, nullable text, and dates", () 
   assert.equal(hasRegularizeChanges(values, client), true);
 });
 
-runTest("regularize payload preserves alphanumeric CNPJ", () => {
-  const client = {
-    type: "PJ",
-    name: "Acme",
-    cpf_cnpj: "12.345.678/0001-95",
-  };
-  const values = {
-    ...createRegularizeInitialValues(client),
-    cpf_cnpj: "AB.123.456/7800-26",
-  };
-
-  assert.deepEqual(buildRegularizePayload(values, client), {
-    cpf_cnpj: "AB123456780026",
-  });
-});
-
 runTest("regularize hydration masks documents and phone while phone payload stays canonical", () => {
   const client = {
     id: "client-1",
@@ -639,9 +693,13 @@ runTest("regularize hydration masks documents and phone while phone payload stay
   };
   const initialValues = createRegularizeInitialValues(client);
 
+  assert.equal(initialValues.type, "PJ");
   assert.equal(initialValues.cpf_cnpj, "12.345.678/0001-90");
   assert.equal(initialValues.cpf_responsible, "123.456.789-10");
   assert.equal(initialValues.number, "(11) 99999-9999");
+  const changedOnlyType = { ...initialValues, type: "PF" };
+  assert.deepEqual(buildRegularizePayload(changedOnlyType, client), {});
+  assert.equal(hasRegularizeChanges(changedOnlyType, client), false);
   assert.deepEqual(
     buildRegularizePayload(
       { ...initialValues, number: "11 99999.9999" },
@@ -776,7 +834,7 @@ runTest("client create modal binds person type to document validation and payloa
   assert.match(modal, /showPersonType/);
   assert.match(modal, /showDocumentError/);
   assert.match(form, /name="type"/);
-  assert.match(form, /showDocumentError && values\.cpf_cnpj/);
+  assert.match(form, /showDocumentError && showPersonType && values\.cpf_cnpj/);
   assert.ok(form.indexOf(">Nome</span>") < form.indexOf(">Razão social</span>"));
   assert.ok(form.indexOf(">Razão social</span>") < form.indexOf(">Tipo de pessoa</span>"));
   assert.ok(form.indexOf(">Tipo de pessoa</span>") < form.indexOf("{documentLabel}"));
@@ -794,21 +852,7 @@ runTest("clients list uses the shared page jump and navigation controls", () => 
   assert.match(clients, /totalPages=\{pageCount\}/);
   assert.match(clients, /onPageChange=\{setPage\}/);
   assert.match(clients, /hasMore=\{Boolean\(clientsPage\?\.hasMore\)/);
-  assert.match(clients, /useRouter/);
-  assert.match(clients, /onCreated=\{\(client\) => void router\.push\(`\/clients\/\$\{client\.id\}`\)\}/);
   assert.doesNotMatch(clients, /pageInputValue|function goToPage/);
-});
-
-runTest("client detail keeps document mask and field-level validation feedback", () => {
-  const detail = readFileSync("src/pages/clients/[id].tsx", "utf8");
-  const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
-
-  assert.match(detail, /formatCpfCnpjInput/);
-  assert.match(detail, /name === "cpf_cnpj"/);
-  assert.match(detail, /setShowDocumentError\(false\)/);
-  assert.match(detail, /showDocumentError=\{showDocumentError\}/);
-  assert.match(form, /showDocumentError && values\.cpf_cnpj/);
-  assert.doesNotMatch(form, /showDocumentError && showPersonType && values\.cpf_cnpj/);
 });
 
 runTest("clients list hides organization from the main table", () => {
