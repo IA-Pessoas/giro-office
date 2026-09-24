@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { AxiosError } from "axios";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { FiClock } from "react-icons/fi";
@@ -95,6 +95,7 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const historyRequestVersion = useRef(0);
 
   const getHistoryErrorMessage = (error: unknown): string => {
     const axiosError = error as AxiosError<{ error?: string }>;
@@ -112,6 +113,7 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
   };
 
   const loadHistory = async (nextScope: "item" | "organization", nextPage = 1) => {
+    const requestVersion = ++historyRequestVersion.current;
     setScope(nextScope);
     setLoading(true);
     setIsOpen(true);
@@ -127,20 +129,24 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
       });
 
       const result = extractAuditSearchResponse(response.data);
+      if (requestVersion !== historyRequestVersion.current) return;
       setLogs(result?.items ?? []);
       setPage(result?.page ?? nextPage);
       setTotal(result?.total ?? 0);
     } catch (error) {
+      if (requestVersion !== historyRequestVersion.current) return;
       setLogs([]);
       setTotal(0);
       setErrorMessage(getHistoryErrorMessage(error));
     } finally {
-      setLoading(false);
+      if (requestVersion === historyRequestVersion.current) setLoading(false);
     }
   };
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
+      historyRequestVersion.current += 1;
+      setLoading(false);
       setIsOpen(false);
       return;
     }
@@ -179,6 +185,7 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
                 type="button"
                 className={styles.trigger}
                 aria-pressed={scope === "item"}
+                disabled={loading}
                 onClick={() => void loadHistory("item")}
               >
                 Histórico do item
@@ -187,6 +194,7 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
                 type="button"
                 className={styles.trigger}
                 aria-pressed={scope === "organization"}
+                disabled={loading}
                 onClick={() => void loadHistory("organization")}
               >
                 Auditoria da organização
