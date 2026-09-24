@@ -53,8 +53,9 @@ export class PartnersService {
       select: { id: true },
     });
     if (exists) {
-      throw new ServiceError(409, "Socio ja cadastrado.");
+      throw new ServiceError(409, "Sócio já cadastrado.");
     }
+    await this.ensurePjParticipationFits(input.organizationId, input.body.pj_id, input.body.part);
 
     const created = await this.prisma.partners.create({
       data: {
@@ -89,11 +90,17 @@ export class PartnersService {
       select: partnerSelect,
     });
     if (!existing) {
-      throw new ServiceError(404, "Socio nao encontrado.");
+      throw new ServiceError(404, "Sócio não encontrado.");
     }
 
     await this.ensureClientPfExists(input.organizationId, input.body.pf_id);
     await this.ensureClientPjExists(input.organizationId, input.body.pj_id);
+    await this.ensurePjParticipationFits(
+      input.organizationId,
+      input.body.pj_id,
+      input.body.part,
+      existing.id,
+    );
 
     const updated = await this.prisma.partners.update({
       where: { id: input.body.id },
@@ -128,7 +135,7 @@ export class PartnersService {
       select: partnerSelect,
     });
     if (!detail) {
-      throw new ServiceError(404, "Socio nao encontrado.");
+      throw new ServiceError(404, "Sócio não encontrado.");
     }
 
     return { detail };
@@ -163,7 +170,7 @@ export class PartnersService {
       select: partnerSelect,
     });
     if (!existing) {
-      throw new ServiceError(404, "Socio nao encontrado.");
+      throw new ServiceError(404, "Sócio não encontrado.");
     }
 
     await this.prisma.partners.delete({ where: { id: existing.id } });
@@ -178,6 +185,30 @@ export class PartnersService {
     await this.reconciliationService.handlePartnersChanged(input.organizationId, existing.pf_id);
 
     return { ok: true };
+  }
+
+  // A soma dos vínculos de uma PJ não passa de 100%; na edição o próprio vínculo sai da conta.
+  private async ensurePjParticipationFits(
+    organizationId: string,
+    pjId: string,
+    part: number,
+    ignoreId?: string,
+  ): Promise<void> {
+    const { _sum } = await this.prisma.partners.aggregate({
+      where: {
+        organization_id: organizationId,
+        pj_id: pjId,
+        ...(ignoreId ? { id: { not: ignoreId } } : {}),
+      },
+      _sum: { part: true },
+    });
+    const current = _sum.part ?? 0;
+    if (current + part > 100) {
+      throw new ServiceError(
+        400,
+        `A soma das participações da empresa passaria de 100% (atual: ${current}%).`,
+      );
+    }
   }
 
   private async ensureClientPfExists(organizationId: string, pfId: string): Promise<void> {
