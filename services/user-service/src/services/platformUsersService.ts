@@ -1,7 +1,7 @@
 import { ACTIVE_MODULE_KEYS, type ModulePermissions, ServiceError } from "@workspace/shared";
 import { Prisma } from "../generated/prisma/client.js";
 import { PlatformRole } from "../generated/prisma/enums.js";
-import type { UserAuditRecorder } from "../integrations/audit.js";
+import { recordImpersonationEndEvent, type UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { PlatformUserManagementAdapter } from "./userManagementService.js";
 import { type CreateUserInput, UserManagementService, UserService } from "./userService.js";
@@ -124,6 +124,57 @@ export class PlatformUsersService {
             409,
             "A permissão mudou durante a operação. Atualize e tente novamente.",
           );
+        }
+
+        if (!canImpersonate) {
+          const endedAt = new Date();
+          const sessions = await transaction.authSession.findMany({
+            where: {
+              impersonator_platform_user_id: target.id,
+              revoked_at: null,
+              expires_at: { gt: endedAt },
+            },
+            select: {
+              id: true,
+              user_id: true,
+              created_at: true,
+              user: {
+                select: {
+                  name: true,
+                  organization_id: true,
+                  department: { select: { organization_id: true } },
+                },
+              },
+            },
+          });
+
+          for (const session of sessions) {
+            const organizationId =
+              session.user.organization_id ?? session.user.department.organization_id;
+            const revoked = await transaction.authSession.updateMany({
+              where: {
+                id: session.id,
+                user_id: session.user_id,
+                impersonator_platform_user_id: target.id,
+                revoked_at: null,
+                expires_at: { gt: endedAt },
+              },
+              data: { revoked_at: endedAt },
+            });
+
+            if (revoked.count === 1) {
+              await recordImpersonationEndEvent(audit, {
+                organizationId,
+                targetUserId: session.user_id,
+                targetName: session.user.name,
+                platformUserId: target.id,
+                startedAt: session.created_at,
+                endedAt,
+                durationMs: Math.max(0, endedAt.getTime() - session.created_at.getTime()),
+                reason: "revogação",
+              });
+            }
+          }
         }
 
         await audit({
