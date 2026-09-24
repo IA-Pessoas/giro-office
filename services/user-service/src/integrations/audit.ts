@@ -55,7 +55,8 @@ export function createUserAudit(options: UserAuditOptions): UserAuditRecorder {
     if (params.required) {
       try {
         await recordAudit.recordRequired(payload);
-      } catch {
+      } catch (err: unknown) {
+        options.logger.error({ err }, "Falha na auditoria obrigatória para personificação.");
         throw new ServiceError(503, "Auditoria indisponível para iniciar personificação.");
       }
       return;

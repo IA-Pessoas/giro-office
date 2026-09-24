@@ -104,6 +104,10 @@ const env = {
   password: process.env.PASSWORD ?? process.env.ADMIN_PASSWORD ?? "senha123",
   platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL?.trim() || "",
   platformAdminPassword: process.env.PLATFORM_ADMIN_PASSWORD ?? "",
+  // Opt in only when the platform smoke operator has can_impersonate.
+  platformImpersonationSmokeEnabled:
+    process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "true" ||
+    process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -7281,6 +7285,15 @@ function matchesFilter(op) {
 }
 
 function disabledConditionReason(condition) {
+  if (condition === "platformImpersonationSmokeEnabled") {
+    if (!env.platformImpersonationSmokeEnabled) {
+      return "PLATFORM_IMPERSONATION_SMOKE_ENABLED is false";
+    }
+    if (!env.auditEnabled) {
+      return "AUDIT_ENABLED is false";
+    }
+  }
+
   if (condition === "auditEnabled" && !env.auditEnabled) {
     return "AUDIT_ENABLED is false";
   }
