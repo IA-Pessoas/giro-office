@@ -980,6 +980,25 @@ describe("client-service", () => {
     expect(updateResponse.body.success).toBe(true);
     expect(updateResponse.body.data.activities).toBe("Atualizado");
   });
+
+  it("rejects POST on an existing client PA without overwriting its data (#1310)", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const prisma = buildPAPrismaMock();
+    const findFirst = (prisma as unknown as { pA: { findFirst: ReturnType<typeof vi.fn> } }).pA
+      .findFirst;
+    findFirst.mockReset().mockResolvedValue({ client_id: TEST_CLIENT_ID });
+    const app = buildTestApp(mock, { prisma });
+
+    const response = await request(app)
+      .post(`/client/${TEST_CLIENT_ID}/pa`)
+      .set("Authorization", `Bearer ${bearerToken(TEST_ORG_ID)}`)
+      .send({});
+
+    expect(response.status).toBe(409);
+    const pa = (prisma as unknown as { pA: Record<string, ReturnType<typeof vi.fn>> }).pA;
+    expect(pa.create).not.toHaveBeenCalled();
+    expect(pa.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("ClientService", () => {

@@ -256,6 +256,12 @@ export function ClientPASection({ clientId }: { clientId: string }) {
       toast.success("PA criado com sucesso.");
       await paQuery.refetch();
     } catch (error) {
+      // #1310: tela desatualizada. O PA já existe; recarrega para o salvar usar PATCH.
+      if ((error as { response?: { status?: number } })?.response?.status === 409) {
+        await paQuery.refetch();
+        return;
+      }
+
       const message =
         typeof error === "object" &&
         error !== null &&
