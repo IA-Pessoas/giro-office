@@ -1,5 +1,6 @@
 import { ACTIVE_MODULE_KEYS, type ModulePermissions, ServiceError } from "@workspace/shared";
 import { Prisma } from "../generated/prisma/client.js";
+import { PlatformRole } from "../generated/prisma/enums.js";
 import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { PlatformUserManagementAdapter } from "./userManagementService.js";
@@ -69,7 +70,7 @@ export class PlatformUsersService {
 
   async listSuperAdmins(): Promise<PlatformSuperAdminListRow[]> {
     return prismaClient.platformUser.findMany({
-      where: { platform_role: "super_admin" },
+      where: { platform_role: PlatformRole.super_admin },
       select: PLATFORM_SUPER_ADMIN_LIST_SELECT,
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });
