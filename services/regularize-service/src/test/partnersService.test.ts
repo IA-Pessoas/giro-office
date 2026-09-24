@@ -55,6 +55,26 @@ describe("PartnersService.create", () => {
     expect(prisma.partners.create).toHaveBeenCalled();
   });
 
+  it("counts only current partners (no exit or exit from today on) in the PJ sum", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-24T12:00:00.000Z"));
+    try {
+      const { prisma, partners } = service([]);
+
+      await partners.create(input(10));
+
+      expect(prisma.partners.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [{ exit: null }, { exit: { gte: new Date("2026-09-24T00:00:00.000Z") } }],
+          }),
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reports an existing link with an accented message", async () => {
     const { partners } = service([], true);
 
