@@ -1142,7 +1142,7 @@ export function createDocumentsService(
         throw new ServiceError(400, "Item ou status documental inválido.");
       if (
         type !== "FISCAL" &&
-        (input.delivery_method !== undefined || input.state_site !== undefined)
+        (input.delivery_method != null || input.state_site != null)
       )
         throw new ServiceError(400, "Campos fiscais não aceitos na rotina contábil.");
       const note = normalizeOptionalNote(input.note, "Nota documental");
@@ -1150,11 +1150,15 @@ export function createDocumentsService(
         input.justification,
         "Justificativa documental",
       );
-      const delivery = normalizeOptionalCatalogCode(
-        input.delivery_method,
-        "Método de entrega fiscal",
-      );
-      const site = normalizeOptionalCatalogCode(input.state_site, "Site estadual");
+      // Na rotina contábil, chaves fiscais nulas são ignoradas (o front antigo as envia).
+      const delivery =
+        type === "FISCAL"
+          ? normalizeOptionalCatalogCode(input.delivery_method, "Método de entrega fiscal")
+          : undefined;
+      const site =
+        type === "FISCAL"
+          ? normalizeOptionalCatalogCode(input.state_site, "Site estadual")
+          : undefined;
       const value = billing
         ? normalizeOptionalNote(input.value, "Valor de faturamento")
         : undefined;
