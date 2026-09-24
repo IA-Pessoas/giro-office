@@ -1972,6 +1972,52 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
       expect(db.user.updateMany).not.toHaveBeenCalled();
     });
 
+    it("audita o pedido mesmo quando o e-mail falha", async () => {
+      const db = prisma();
+      withTarget(db);
+      const audit = vi.fn(async () => {});
+      const app = createUserWorkerApp({
+        env: resetEnv(),
+        prisma: db,
+        audit,
+        sendPasswordResetEmail: vi.fn(async () => {
+          throw new Error("adapter fora do ar");
+        }),
+      } as never);
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      expect((await resetRequest(app, forwardedHeaders())).status).toBe(502);
+      expect(audit).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "PASSWORD_RESET_REQUESTED" }),
+      );
+      expect(consoleError).toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+
+    it("limita a um envio por minuto por usuário", async () => {
+      const db = prisma();
+      withTarget(db);
+      db.passwordResetToken.findFirst.mockResolvedValue({ id: "reset-recente" });
+      const app = createUserWorkerApp({
+        env: resetEnv(),
+        prisma: db,
+        sendPasswordResetEmail: vi.fn(async () => {}),
+      } as never);
+
+      expect((await resetRequest(app, forwardedHeaders())).status).toBe(429);
+      expect(db.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it("não redefine a senha de usuário desativado depois do envio", async () => {
+      const db = prisma();
+      db.passwordResetToken.findFirst.mockResolvedValue({ id: "reset-1", user_id: OTHER_USER_ID });
+      db.user.findFirst.mockResolvedValue(null);
+      const app = createUserWorkerApp({ env: env(), prisma: db });
+
+      expect((await confirmRequest(app, "nova-senha-forte")).status).toBe(400);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
     it("recusa nova senha curta no link", async () => {
       const db = prisma();
       db.passwordResetToken.findFirst.mockResolvedValue({ id: "reset-1", user_id: OTHER_USER_ID });

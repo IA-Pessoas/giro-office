@@ -173,7 +173,7 @@ export function createUserRoutes(
             "Administradores não definem a senha de outro usuário. Envie um link de redefinição.",
           );
         }
-        if (request.user_id === id && changes.password !== undefined) {
+        if (changes.password !== undefined) {
           await userService.assertOwnPasswordChange(
             id,
             auth.organization_id,

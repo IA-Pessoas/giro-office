@@ -75,11 +75,14 @@ export function ownPasswordPolicyError(
   return null;
 }
 
-/** Link de redefinição (#1342): o token vem do e-mail; a política é checada no serviço. */
+/** Link de redefinição (#1342): o token vem do e-mail. */
 export const confirmPasswordResetBodySchema = z
   .object({
     token: z.string().trim().min(1, "token e obrigatorio.").max(256),
-    password: z.string().min(1, "password e obrigatorio.").max(255),
+    password: z
+      .string()
+      .min(MIN_PASSWORD_LENGTH, `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`)
+      .max(255),
   })
   .strict();
 

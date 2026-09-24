@@ -1,11 +1,16 @@
-import { createCsrfToken, hashCsrfToken } from "@workspace/runtime";
+// O token do link é um segredo opaco de 32 bytes guardado só como SHA-256, igual ao CSRF.
+import {
+  createCsrfToken as createOpaqueToken,
+  hashCsrfToken as sha256Hex,
+} from "@workspace/runtime";
 import { ServiceError } from "@workspace/shared/http";
-import { MIN_PASSWORD_LENGTH } from "../../../services/user-service/src/schemas/user.schemas.js";
 import type { UserWorkerEnv } from "./env.js";
-import type { UserPrismaClient } from "./types.js";
+import type { Row, UserPrismaClient } from "./types.js";
 
 /** Link de redefinição enviado pelo administrador (#1342): uso único, 1 hora. */
 export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
+/** Um envio por usuário a cada minuto, para não inundar a caixa de e-mail. */
+const PASSWORD_RESET_COOLDOWN_MS = 60 * 1000;
 
 export type PasswordResetEmail = { to: string; name: string; link: string };
 export type PasswordResetEmailSender = (message: PasswordResetEmail) => Promise<void>;
@@ -39,28 +44,42 @@ export function httpPasswordResetEmailSender(env: UserWorkerEnv): PasswordResetE
   };
 }
 
-function recipientOf(user: Record<string, unknown>): string | null {
+// ponytail: o login serve de destino quando `email` está vazio; um admin que troca o login
+// do alvo antes de pedir o link recebe o link. Fica auditado; restringir exige e-mail verificado.
+function recipientOf(user: Row): string | null {
   if (typeof user.email === "string" && user.email.includes("@")) return user.email;
   if (typeof user.login === "string" && user.login.includes("@")) return user.login;
   return null;
 }
 
-export async function requestPasswordReset(
+/**
+ * Grava o token (invalidando os anteriores) e devolve o envio separado, para a auditoria
+ * registrar o pedido mesmo se o e-mail falhar.
+ */
+export async function issuePasswordReset(
   db: UserPrismaClient,
-  target: Record<string, unknown>,
+  target: Row,
   env: UserWorkerEnv,
   send: PasswordResetEmailSender | null,
-): Promise<{ expiresAt: Date }> {
+): Promise<{ expiresAt: Date; deliver: () => Promise<void> }> {
   if (!send || !env.APP_PUBLIC_URL) {
     throw new ServiceError(503, "Envio de e-mail de redefinição não configurado.");
   }
   if (target.status !== "active") throw new ServiceError(409, "O usuário está inativo.");
   const to = recipientOf(target);
   if (!to) throw new ServiceError(422, "O usuário não tem e-mail cadastrado.");
-
-  const token = createCsrfToken();
-  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
   const userId = String(target.id);
+  const recent = await db.passwordResetToken.findFirst({
+    where: {
+      user_id: userId,
+      created_at: { gt: new Date(Date.now() - PASSWORD_RESET_COOLDOWN_MS) },
+    },
+    select: { id: true },
+  });
+  if (recent) throw new ServiceError(429, "Aguarde um minuto antes de enviar outro link.");
+
+  const token = createOpaqueToken();
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
   if (!db.$transaction) throw new ServiceError(503, "Redefinição de senha não configurada.");
   await db.$transaction(async (transaction) => {
     await transaction.passwordResetToken.updateMany({
@@ -68,35 +87,37 @@ export async function requestPasswordReset(
       data: { used_at: new Date() },
     });
     await transaction.passwordResetToken.create({
-      data: { user_id: userId, token_hash: await hashCsrfToken(token), expires_at: expiresAt },
+      data: { user_id: userId, token_hash: await sha256Hex(token), expires_at: expiresAt },
     });
   });
 
   const link = new URL("/redefinir-senha", env.APP_PUBLIC_URL);
   link.searchParams.set("token", token);
-  try {
-    await send({ to, name: String(target.name ?? ""), link: link.toString() });
-  } catch {
-    throw new ServiceError(502, "Não foi possível enviar o e-mail de redefinição.");
-  }
-  return { expiresAt };
+  const deliver = async () => {
+    try {
+      await send({ to, name: String(target.name ?? ""), link: link.toString() });
+    } catch (error) {
+      console.error("Falha ao enviar e-mail de redefinição de senha", {
+        event: "user.password_reset.email_failed",
+        userId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      throw new ServiceError(502, "Não foi possível enviar o e-mail de redefinição.");
+    }
+  };
+  return { expiresAt, deliver };
 }
 
+/** A política mínima da senha já vem do schema da rota. */
 export async function confirmPasswordReset(
   db: UserPrismaClient,
   input: { token: string; password: string },
   hashPassword: (password: string) => Promise<string>,
 ): Promise<{ userId: string }> {
-  if (input.password.length < MIN_PASSWORD_LENGTH) {
-    throw new ServiceError(
-      400,
-      `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`,
-    );
-  }
   const invalid = new ServiceError(400, "Link de redefinição inválido ou expirado.");
   const reset = await db.passwordResetToken.findFirst({
     where: {
-      token_hash: await hashCsrfToken(input.token),
+      token_hash: await sha256Hex(input.token),
       used_at: null,
       expires_at: { gt: new Date() },
     },
@@ -104,6 +125,12 @@ export async function confirmPasswordReset(
   });
   if (!reset) throw invalid;
   const userId = String(reset.user_id);
+  // Usuário desativado depois do envio não reativa a conta pelo link.
+  const owner = await db.user.findFirst({
+    where: { id: userId, status: "active" },
+    select: { id: true },
+  });
+  if (!owner) throw invalid;
   const passwordHash = await hashPassword(input.password);
   if (!db.$transaction || !db.user.updateMany || !db.authSession.updateMany) {
     throw new ServiceError(503, "Redefinição de senha não configurada.");
