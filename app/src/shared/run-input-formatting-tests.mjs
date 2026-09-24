@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 
 import {
   formatBrazilianPhoneInput,
+  formatBrlDecimalInput,
   formatBrlInput,
   formatCnpjInput,
   formatCpfCnpjInput,
   formatCpfInput,
-  formatBrlDecimalInput,
   isValidCnpj,
   normalizeDigits,
   parseBrlDecimalInput,
