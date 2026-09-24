@@ -9,6 +9,7 @@ import type { Logger } from "@workspace/shared/logger";
 import type { ImpersonationEndEvent } from "../services/authService.js";
 
 export interface CreateUserAuditParams {
+  requestId?: string;
   actorUserId?: string;
   platformActorUserId?: string;
   organizationId?: string | null;
@@ -29,11 +30,36 @@ export interface UserAuditOptions {
 
 export type UserAuditRecorder = (params: CreateUserAuditParams) => Promise<void>;
 
-export function recordImpersonationEndEvent(
-  audit: UserAuditRecorder,
-  event: ImpersonationEndEvent,
-): Promise<void> {
-  return audit({
+export interface ImpersonationStartEvent {
+  organizationId: string;
+  targetUserId: string;
+  targetName: string;
+  platformUserId: string;
+  startedAt: Date;
+}
+
+export function impersonationStartAuditParams(
+  event: ImpersonationStartEvent,
+): CreateUserAuditParams {
+  return {
+    actorUserId: event.targetUserId,
+    platformActorUserId: event.platformUserId,
+    organizationId: event.organizationId,
+    action: "platform.impersonation.started",
+    referring: "user",
+    referringId: event.targetUserId,
+    changes: {
+      operatorPlatformUserId: event.platformUserId,
+      target: { id: event.targetUserId, name: event.targetName },
+      startedAt: event.startedAt.toISOString(),
+    },
+    outcome: "success",
+    required: true,
+  };
+}
+
+export function impersonationEndAuditParams(event: ImpersonationEndEvent): CreateUserAuditParams {
+  return {
     actorUserId: event.targetUserId,
     platformActorUserId: event.platformUserId,
     organizationId: event.organizationId,
@@ -50,7 +76,7 @@ export function recordImpersonationEndEvent(
     },
     outcome: "success",
     required: true,
-  });
+  };
 }
 
 export function createUserAudit(options: UserAuditOptions): UserAuditRecorder {
@@ -59,7 +85,7 @@ export function createUserAudit(options: UserAuditOptions): UserAuditRecorder {
   return async (params) => {
     const now = new Date().toISOString();
     const payload: CreateAuditRequestPayload = {
-      requestId: randomUUID(),
+      requestId: params.requestId ?? randomUUID(),
       organizationId: params.organizationId ?? null,
       ...(params.actorUserId ? { userId: params.actorUserId } : {}),
       method: "ENTITY_CHANGE",

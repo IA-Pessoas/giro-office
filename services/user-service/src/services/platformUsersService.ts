@@ -1,7 +1,8 @@
 import { ACTIVE_MODULE_KEYS, type ModulePermissions, ServiceError } from "@workspace/shared";
 import { Prisma } from "../generated/prisma/client.js";
 import { PlatformRole } from "../generated/prisma/enums.js";
-import { recordImpersonationEndEvent, type UserAuditRecorder } from "../integrations/audit.js";
+import { impersonationEndAuditParams, type UserAuditRecorder } from "../integrations/audit.js";
+import { enqueueUserAuditEvent } from "../integrations/auditOutbox.js";
 import prismaClient from "../prisma/index.js";
 import { PlatformUserManagementAdapter } from "./userManagementService.js";
 import { type CreateUserInput, UserManagementService, UserService } from "./userService.js";
@@ -88,6 +89,13 @@ export class PlatformUsersService {
 
     return prismaClient.$transaction(
       async (transaction) => {
+        const lockedIds = [platformActorUserId, superAdminId].sort();
+        await transaction.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "platform_users"
+          WHERE "id" IN (${Prisma.join(lockedIds)})
+          ORDER BY "id"
+          FOR UPDATE
+        `;
         const actor = await transaction.platformUser.findUnique({
           where: { id: platformActorUserId },
           select: { id: true, platform_role: true, status: true, can_impersonate: true },
@@ -117,7 +125,10 @@ export class PlatformUsersService {
             platform_role: PlatformRole.super_admin,
             can_impersonate: target.can_impersonate,
           },
-          data: { can_impersonate: canImpersonate },
+          data: {
+            can_impersonate: canImpersonate,
+            ...(canImpersonate ? {} : { session_version: { increment: 1 } }),
+          },
         });
         if (updated.count !== 1) {
           throw new ServiceError(
@@ -163,21 +174,24 @@ export class PlatformUsersService {
             });
 
             if (revoked.count === 1) {
-              await recordImpersonationEndEvent(audit, {
-                organizationId,
-                targetUserId: session.user_id,
-                targetName: session.user.name,
-                platformUserId: target.id,
-                startedAt: session.created_at,
-                endedAt,
-                durationMs: Math.max(0, endedAt.getTime() - session.created_at.getTime()),
-                reason: "revogação",
-              });
+              await enqueueUserAuditEvent(
+                transaction,
+                impersonationEndAuditParams({
+                  organizationId,
+                  targetUserId: session.user_id,
+                  targetName: session.user.name,
+                  platformUserId: target.id,
+                  startedAt: session.created_at,
+                  endedAt,
+                  durationMs: Math.max(0, endedAt.getTime() - session.created_at.getTime()),
+                  reason: "revogação",
+                }),
+              );
             }
           }
         }
 
-        await audit({
+        await enqueueUserAuditEvent(transaction, {
           platformActorUserId,
           organizationId: null,
           action: "platform.super_admin.impersonation_permission.updated",
@@ -190,7 +204,7 @@ export class PlatformUsersService {
 
         return { ...target, can_impersonate: canImpersonate };
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 10_000 },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 10_000 },
     );
   }
 

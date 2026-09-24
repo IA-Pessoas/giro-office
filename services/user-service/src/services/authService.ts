@@ -16,6 +16,8 @@ import jwt from "jsonwebtoken";
 
 import { getUserServiceEnv } from "../config/env.js";
 import { PlatformRole } from "../generated/prisma/enums.js";
+import type { CreateUserAuditParams, ImpersonationStartEvent } from "../integrations/audit.js";
+import { enqueueUserAuditEvent } from "../integrations/auditOutbox.js";
 import prismaClient from "../prisma/index.js";
 import {
   hashPassword,
@@ -187,7 +189,7 @@ export interface ImpersonationEndEvent {
   reason: "saída" | "expiração" | "revogação";
 }
 
-export type ImpersonationEndEventRecorder = (event: ImpersonationEndEvent) => Promise<void>;
+export type ImpersonationEndEventRecorder = (event: ImpersonationEndEvent) => CreateUserAuditParams;
 
 export interface FirstCreateResult {
   user: {
@@ -335,16 +337,15 @@ class AuthService {
       platformSessionId: string;
       platformSessionCsrfHash: string;
     },
-    recordStartEvent: (event: {
-      organizationId: string;
-      targetUserId: string;
-      targetName: string;
-      platformUserId: string;
-      startedAt: Date;
-    }) => Promise<void>,
+    recordStartEvent: (event: ImpersonationStartEvent) => CreateUserAuditParams,
   ): Promise<IssuedImpersonationSession> {
     return prismaClient.$transaction(
       async (transaction) => {
+        await transaction.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "platform_users"
+          WHERE "id" = ${input.platformUserId}
+          FOR UPDATE
+        `;
         const operator = await transaction.platformUser.findUnique({
           where: { id: input.platformUserId },
           select: { id: true, platform_role: true, status: true, can_impersonate: true },
@@ -418,13 +419,16 @@ class AuthService {
           throw new ServiceError(401, "Sessão da plataforma expirada ou substituída.");
         }
 
-        await recordStartEvent({
-          organizationId: input.organizationId,
-          targetUserId: target.id,
-          targetName: target.name,
-          platformUserId: input.platformUserId,
-          startedAt,
-        });
+        await enqueueUserAuditEvent(
+          transaction,
+          recordStartEvent({
+            organizationId: input.organizationId,
+            targetUserId: target.id,
+            targetName: target.name,
+            platformUserId: input.platformUserId,
+            startedAt,
+          }),
+        );
 
         return { ...issued, impersonationStartedAt: startedAt };
       },
@@ -523,16 +527,19 @@ class AuthService {
           platformSession = issuePlatformSession(operator, sessionId, csrfToken);
         }
 
-        await recordExitEvent({
-          organizationId,
-          targetUserId: session.user.id,
-          targetName: session.user.name,
-          platformUserId,
-          startedAt: session.created_at,
-          endedAt,
-          durationMs: Math.max(0, endedAt.getTime() - session.created_at.getTime()),
-          reason: "saída",
-        });
+        await enqueueUserAuditEvent(
+          transaction,
+          recordExitEvent({
+            organizationId,
+            targetUserId: session.user.id,
+            targetName: session.user.name,
+            platformUserId,
+            startedAt: session.created_at,
+            endedAt,
+            durationMs: Math.max(0, endedAt.getTime() - session.created_at.getTime()),
+            reason: "saída",
+          }),
+        );
 
         return { platformSession };
       },
@@ -592,16 +599,19 @@ class AuthService {
             return false;
           }
 
-          await recordEndEvent({
-            organizationId,
-            targetUserId: session.user_id,
-            targetName: session.user.name,
-            platformUserId,
-            startedAt: session.created_at,
-            endedAt: session.expires_at,
-            durationMs: Math.max(0, session.expires_at.getTime() - session.created_at.getTime()),
-            reason: "expiração",
-          });
+          await enqueueUserAuditEvent(
+            transaction,
+            recordEndEvent({
+              organizationId,
+              targetUserId: session.user_id,
+              targetName: session.user.name,
+              platformUserId,
+              startedAt: session.created_at,
+              endedAt: session.expires_at,
+              durationMs: Math.max(0, session.expires_at.getTime() - session.created_at.getTime()),
+              reason: "expiração",
+            }),
+          );
           return true;
         },
         { timeout: 10_000 },

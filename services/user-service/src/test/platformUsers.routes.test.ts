@@ -72,6 +72,9 @@ const { prismaMock } = vi.hoisted(() => ({
       findMany: vi.fn(),
       updateMany: vi.fn(),
     },
+    userAuditOutboxEvent: { create: vi.fn() },
+    $queryRaw: vi.fn(),
+    $executeRaw: vi.fn(),
     $transaction: vi.fn(async (callback: (transaction: { platformUser: unknown }) => unknown) =>
       callback(prismaMock),
     ),
@@ -172,6 +175,8 @@ describe("platform users routes", () => {
     prismaMock.platformUser.updateMany.mockReset();
     prismaMock.authSession.findMany.mockReset();
     prismaMock.authSession.updateMany.mockReset();
+    prismaMock.userAuditOutboxEvent.create.mockReset();
+    prismaMock.userAuditOutboxEvent.create.mockResolvedValue(undefined);
     platformAuthMock.validateSession.mockResolvedValue(platformIdentity);
     platformUsersMock.listSuperAdmins.mockResolvedValue([
       {
@@ -259,15 +264,17 @@ describe("platform users routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.can_impersonate).toBe(true);
-    expect(auditMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        platformActorUserId: platformIdentity.id,
-        organizationId: null,
-        referringId: "550e8400-e29b-41d4-a716-446655440001",
-        changes: { can_impersonate: { from: false, to: true } },
-        required: true,
-      }),
-    );
+    expect(prismaMock.userAuditOutboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        payload: expect.objectContaining({
+          platformActorUserId: platformIdentity.id,
+          organizationId: null,
+          referringId: "550e8400-e29b-41d4-a716-446655440001",
+          changes: { can_impersonate: { from: false, to: true } },
+          required: true,
+        }),
+      },
+    });
     expect(platformUsersMock.updateSuperAdminImpersonationPermission).toHaveBeenCalledWith(
       platformIdentity.id,
       "550e8400-e29b-41d4-a716-446655440001",
@@ -324,6 +331,10 @@ describe("platform users routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.can_impersonate).toBe(false);
+    expect(prismaMock.platformUser.updateMany).toHaveBeenCalledWith({
+      where: { id: targetId, platform_role: "super_admin", can_impersonate: true },
+      data: { can_impersonate: false, session_version: { increment: 1 } },
+    });
     expect(prismaMock.authSession.findMany).toHaveBeenCalledWith({
       where: {
         impersonator_platform_user_id: targetId,
@@ -354,17 +365,20 @@ describe("platform users routes", () => {
       data: { revoked_at: expect.any(Date) },
     });
     expect(prismaMock.authSession.updateMany).toHaveBeenCalledTimes(2);
-    expect(auditMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "platform.impersonation.ended",
-        platformActorUserId: targetId,
-        organizationId: "org-1",
-        referringId: "target-user-1",
-        changes: expect.objectContaining({ reason: "revogação" }),
-        required: true,
-      }),
-    );
-    expect(auditMock).toHaveBeenCalledTimes(3);
+    expect(prismaMock.userAuditOutboxEvent.create).toHaveBeenCalledTimes(3);
+    expect(prismaMock.userAuditOutboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        payload: expect.objectContaining({
+          action: "platform.impersonation.ended",
+          platformActorUserId: targetId,
+          organizationId: "org-1",
+          referringId: "target-user-1",
+          changes: expect.objectContaining({ reason: "revogação" }),
+          required: true,
+        }),
+      },
+    });
+    expect(auditMock).not.toHaveBeenCalled();
   });
 
   it("nega por HTTP o operador sem permissão de personificação", async () => {
@@ -531,8 +545,9 @@ describe("platform users routes", () => {
       csrfToken: "B".repeat(43),
       impersonationStartedAt: new Date("2026-09-23T15:00:00.000Z"),
     };
+    let queuedAuditParams: Record<string, unknown> | undefined;
     authServiceMock.startImpersonation.mockImplementation(async (_input, recordStartEvent) => {
-      await recordStartEvent({
+      queuedAuditParams = recordStartEvent({
         organizationId: "org-2",
         targetUserId: "user-1",
         targetName: "Ana",
@@ -567,7 +582,7 @@ describe("platform users routes", () => {
         expect.stringContaining("cw.csrf="),
       ]),
     );
-    expect(auditMock).toHaveBeenCalledWith(
+    expect(queuedAuditParams).toEqual(
       expect.objectContaining({
         actorUserId: "user-1",
         platformActorUserId: platformIdentity.id,
@@ -591,8 +606,9 @@ describe("platform users routes", () => {
       token: "platform.jwt",
       csrfToken: "P".repeat(43),
     };
+    let queuedAuditParams: Record<string, unknown> | undefined;
     authServiceMock.exitImpersonation.mockImplementation(async (_identity, recordExitEvent) => {
-      await recordExitEvent({
+      queuedAuditParams = recordExitEvent({
         organizationId: "org-2",
         targetUserId: "user-1",
         targetName: "Ana",
@@ -635,7 +651,7 @@ describe("platform users routes", () => {
         expect.stringContaining("cw.csrf="),
       ]),
     );
-    expect(auditMock).toHaveBeenCalledWith(
+    expect(queuedAuditParams).toEqual(
       expect.objectContaining({
         actorUserId: "user-1",
         platformActorUserId: platformIdentity.id,
