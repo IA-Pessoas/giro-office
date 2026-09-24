@@ -214,6 +214,16 @@ export async function sendPessoalAudit(
     throw new ServiceError(503, "Auditoria externa não configurada.");
   }
   const binding: ServiceBinding = env.AUDIT_SERVICE;
+  // As rotas de domínio mandam só o evento; o audit-service exige requestId e createdAt.
+  const now = new Date().toISOString();
+  const referring = typeof input.referring === "string" ? input.referring : "";
+  const payload = {
+    requestId: crypto.randomUUID(),
+    path: `/${referring.replace(/\./g, "/")}`,
+    createdAt: now,
+    finishedAt: now,
+    ...input,
+  };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AUDIT_SERVICE_TIMEOUT_MS);
 
@@ -225,7 +235,7 @@ export async function sendPessoalAudit(
           "content-type": "application/json",
           [INTERNAL_SERVICE_TOKEN_HEADER]: env.AUDIT_SERVICE_TOKEN,
         },
-        body: JSON.stringify(input),
+        body: JSON.stringify(payload),
       }),
       { signal: controller.signal },
     );

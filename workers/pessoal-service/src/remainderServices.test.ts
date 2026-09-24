@@ -6,6 +6,7 @@ import {
   GroupAssignmentService,
   type PessoalAssignmentPrisma,
   type PessoalNotificationPrisma,
+  sendPessoalAudit,
   UnionNotificationService,
 } from "./remainderServices.js";
 
@@ -504,6 +505,41 @@ describe("GroupAssignmentService do Worker", () => {
     ).resolves.toBe(true);
     const request = binding.fetch.mock.calls[0]?.[0];
     expect(request?.headers.get("x-internal-service-token")).toBe("audit-test-token");
+  });
+
+  it("completa os campos obrigatórios do audit-service nas escritas de domínio", async () => {
+    const binding = {
+      fetch: vi.fn(async (_request: Request) => new Response(null, { status: 201 })),
+    };
+    // Formato enviado pelas rotas de sindicato/LDD: sem requestId, createdAt nem path.
+    await sendPessoalAudit(
+      {
+        AUDIT_SERVICE_TOKEN: "audit-test-token",
+        AUDIT_SERVICE: binding,
+      } as unknown as PessoalWorkerEnv,
+      {
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        method: "ENTITY_CHANGE",
+        statusCode: 201,
+        outcome: "success",
+        serviceSource: "pessoal-service",
+        action: "Cadastro",
+        referring: "pessoal.union",
+        referringId: PREVIEW_ID,
+        department: "pessoal",
+      },
+    );
+
+    const body = await binding.fetch.mock.calls[0]?.[0].json();
+    expect(body).toMatchObject({
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      path: "/pessoal/union",
+      referring: "pessoal.union",
+      action: "Cadastro",
+    });
+    expect(new Date(body.createdAt).toISOString()).toBe(body.createdAt);
+    expect(body.finishedAt).toBe(body.createdAt);
   });
 
   it("recusa auditar sem AUDIT_SERVICE_TOKEN em vez de enviar credencial errada", async () => {
