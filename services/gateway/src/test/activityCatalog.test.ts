@@ -296,6 +296,12 @@ describe("activityCatalog", () => {
     ],
     ["GET", "/platform/super-admins", "consultou", "a lista de super admins da plataforma"],
     [
+      "POST",
+      "/platform/impersonation/exit",
+      "encerrou",
+      "uma personificação de usuário da organização",
+    ],
+    [
       "PATCH",
       "/platform/super-admins/platform-user-2/impersonation-permission",
       "alterou",

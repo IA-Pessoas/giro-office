@@ -806,7 +806,10 @@ await (async () => {
       assert.match(authContextSource, /refreshSession:\s*\(\)\s*=>\s*Promise<UserProps \| null>/);
       assert.match(authContextSource, /async function refreshSession\(\)/);
       assert.match(authContextSource, /<AuthContext\.Provider value=\{\{/);
-      assert.match(authContextSource, /signIn,\s*signInPlatform,\s*logoutUser,\s*logoutPlatform/);
+      assert.match(
+        authContextSource,
+        /signIn,\s*signInPlatform,\s*logoutUser,\s*logoutPlatform,\s*exitImpersonation/,
+      );
       assert.match(authContextSource, /refreshSession,\s*refreshPlatformSession,\s*loading/);
       assert.match(administracaoSource, /import \{ signOut, useAuth \} from "@\/context\/AuthContext";/);
       assert.match(administracaoSource, /const \{ user \} = useAuth\(\);/);
@@ -831,6 +834,12 @@ await (async () => {
       assert.equal(administracaoSource.includes("accessStoreActions.syncFromToken"), false);
     },
   );
+
+  await runTest("impersonation exit restores platform cookies and route", () => {
+    assert.match(authContextSource, /platformApi\.post\("\/platform\/impersonation\/exit"\)/);
+    assert.match(authContextSource, /Router\.push\(isValidPlatformUser\(identity\) \? "\/super-admin"/);
+    assert.match(appShellSource, /Sair da personificação/);
+  });
 
   await runTest("admin permission updates invalidate cached permission data after save", () => {
     assert.match(

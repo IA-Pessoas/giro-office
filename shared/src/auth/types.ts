@@ -3,7 +3,7 @@ import type { ModulePermissions } from "./modules.js";
 export type AuthUserType = "owner" | "admin" | "user";
 export type AuthKind = "organization" | "platform";
 export type PlatformRole = "super_admin";
-export type AuthSpecialPolicy = "manageUsers" | "ownerOnly" | "platformOnly";
+export type AuthSpecialPolicy = "impersonationOnly" | "manageUsers" | "ownerOnly" | "platformOnly";
 
 export interface AuthIdentity {
   user_id: string;

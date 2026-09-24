@@ -22,6 +22,7 @@ import {
   PASSWORD_HASH_VERSION,
   verifyPassword,
 } from "../security/passwordHashService.js";
+import { type IssuedPlatformSession, issuePlatformSession } from "./platformAuthService.js";
 
 interface LoginRequest {
   login: string;
@@ -169,6 +170,10 @@ export interface IssuedSession extends SessionUser {
 
 export interface IssuedImpersonationSession extends IssuedSession {
   impersonationStartedAt: Date;
+}
+
+export interface ExitedImpersonationSession {
+  platformSession: IssuedPlatformSession | null;
 }
 
 export interface FirstCreateResult {
@@ -408,6 +413,123 @@ class AuthService {
         });
 
         return { ...issued, impersonationStartedAt: startedAt };
+      },
+      { timeout: 10_000 },
+    );
+  }
+
+  async exitImpersonation(
+    identity: Pick<AuthIdentity, "user_id" | "organization_id" | "session_id" | "csrf_hash">,
+    recordExitEvent: (event: {
+      organizationId: string;
+      targetUserId: string;
+      targetName: string;
+      platformUserId: string;
+      startedAt: Date;
+      endedAt: Date;
+      durationMs: number;
+      reason: "saída";
+    }) => Promise<void>,
+  ): Promise<ExitedImpersonationSession> {
+    if (
+      !identity.session_id ||
+      !identity.csrf_hash ||
+      !CSRF_HASH_PATTERN.test(identity.csrf_hash) ||
+      !identity.organization_id
+    ) {
+      throw new ServiceError(401, "Sessão de personificação inválida.");
+    }
+    const organizationId = identity.organization_id;
+
+    return prismaClient.$transaction(
+      async (transaction) => {
+        const endedAt = new Date();
+        const session = await transaction.authSession.findFirst({
+          where: {
+            id: identity.session_id,
+            user_id: identity.user_id,
+            csrf_hash: identity.csrf_hash,
+            impersonator_platform_user_id: { not: null },
+            revoked_at: null,
+            expires_at: { gt: endedAt },
+          },
+          select: {
+            id: true,
+            created_at: true,
+            impersonator_platform_user_id: true,
+            impersonatorPlatformUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                platform_role: true,
+                status: true,
+                can_impersonate: true,
+                session_version: true,
+              },
+            },
+            user: {
+              select: {
+                id: true,
+                name: true,
+                organization_id: true,
+                department: { select: { organization_id: true } },
+              },
+            },
+          },
+        });
+        const platformUserId = session?.impersonator_platform_user_id;
+        const operator = session?.impersonatorPlatformUser;
+        const targetOrganizationId =
+          session?.user.organization_id ?? session?.user.department.organization_id;
+        if (!session || !platformUserId || !operator || targetOrganizationId !== organizationId) {
+          throw new ServiceError(401, "Sessão de personificação inválida.");
+        }
+
+        const revoked = await transaction.authSession.updateMany({
+          where: {
+            id: session.id,
+            user_id: identity.user_id,
+            csrf_hash: identity.csrf_hash,
+            impersonator_platform_user_id: platformUserId,
+            revoked_at: null,
+            expires_at: { gt: endedAt },
+          },
+          data: { revoked_at: endedAt },
+        });
+        if (revoked.count !== 1) {
+          throw new ServiceError(401, "Sessão de personificação inválida.");
+        }
+
+        const operatorActive =
+          operator.status === "active" && operator.platform_role === PlatformRole.super_admin;
+        let platformSession: IssuedPlatformSession | null = null;
+        if (operatorActive) {
+          const csrfToken = createCsrfToken();
+          const sessionId = randomUUID();
+          await transaction.platformAuthSession.create({
+            data: {
+              id: sessionId,
+              platform_user_id: operator.id,
+              csrf_hash: hashCsrfToken(csrfToken),
+              expires_at: getSessionExpiry(),
+            },
+          });
+          platformSession = issuePlatformSession(operator, sessionId, csrfToken);
+        }
+
+        await recordExitEvent({
+          organizationId,
+          targetUserId: session.user.id,
+          targetName: session.user.name,
+          platformUserId,
+          startedAt: session.created_at,
+          endedAt,
+          durationMs: Math.max(0, endedAt.getTime() - session.created_at.getTime()),
+          reason: "saída",
+        });
+
+        return { platformSession };
       },
       { timeout: 10_000 },
     );
