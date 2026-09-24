@@ -36,6 +36,18 @@ export interface TransferPlatformOwnershipInput {
 
 type PlatformUserListRow = Prisma.UserGetPayload<{ select: typeof PLATFORM_USER_LIST_SELECT }>;
 
+const PLATFORM_SUPER_ADMIN_LIST_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  status: true,
+  can_impersonate: true,
+} as const;
+
+type PlatformSuperAdminListRow = Prisma.PlatformUserGetPayload<{
+  select: typeof PLATFORM_SUPER_ADMIN_LIST_SELECT;
+}>;
+
 const PLATFORM_OWNERSHIP_SELECT = {
   ...PLATFORM_USER_LIST_SELECT,
   permission: true,
@@ -54,6 +66,14 @@ export class PlatformUsersService {
   private readonly userService = new UserService();
 
   constructor(private readonly audit?: UserAuditRecorder) {}
+
+  async listSuperAdmins(): Promise<PlatformSuperAdminListRow[]> {
+    return prismaClient.platformUser.findMany({
+      where: { platform_role: "super_admin" },
+      select: PLATFORM_SUPER_ADMIN_LIST_SELECT,
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    });
+  }
 
   async create(
     organizationId: string,

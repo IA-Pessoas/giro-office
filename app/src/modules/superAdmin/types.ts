@@ -87,6 +87,14 @@ export interface PlatformUsersListResponse {
   hasMore: boolean;
 }
 
+export interface PlatformSuperAdmin {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  can_impersonate: boolean;
+}
+
 export interface PlatformDepartmentOption {
   id: string;
   name: string;

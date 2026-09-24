@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
+    platformUser: { findMany: vi.fn() },
     user: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -43,11 +44,39 @@ import { PlatformUsersService } from "../services/platformUsersService.js";
 describe("PlatformUsersService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.platformUser.findMany.mockResolvedValue([
+      {
+        id: "platform-user-1",
+        name: "Platform Administrator",
+        email: "admin@example.com",
+        status: "active",
+        can_impersonate: true,
+      },
+    ]);
     prismaMock.user.findMany.mockResolvedValue([{ id: "user-1", name: "Ana" }]);
     prismaMock.user.count.mockResolvedValue(21);
     managementMock.create.mockReset();
     managementMock.getPermissions.mockResolvedValue({ rh: 2, fiscal: 1 });
     managementMock.updatePermissions.mockResolvedValue({ rh: 3, fiscal: 1 });
+  });
+
+  it("lists only safe fields from platform super admins", async () => {
+    const service = new PlatformUsersService();
+
+    await expect(service.listSuperAdmins()).resolves.toEqual([
+      {
+        id: "platform-user-1",
+        name: "Platform Administrator",
+        email: "admin@example.com",
+        status: "active",
+        can_impersonate: true,
+      },
+    ]);
+    expect(prismaMock.platformUser.findMany).toHaveBeenCalledWith({
+      where: { platform_role: "super_admin" },
+      select: { id: true, name: true, email: true, status: true, can_impersonate: true },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    });
   });
 
   it("filters every query by organization", async () => {

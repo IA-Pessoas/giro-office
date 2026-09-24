@@ -2828,6 +2828,13 @@ const handlers = {
     await platformHttpRequest(op, { expectedStatus: [200] });
   },
 
+  async platformSuperAdmins(op) {
+    const response = await platformHttpRequest(op, { expectedStatus: [200] });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data)) {
+      throw new Error("Platform super admin list did not return an array.");
+    }
+  },
+
   async platformUsers(op) {
     await platformHttpRequest(op, {
       path: `/platform/organizations/${requireState("session").organization_id}/users`,

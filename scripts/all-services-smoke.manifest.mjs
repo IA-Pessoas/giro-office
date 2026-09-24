@@ -496,6 +496,14 @@ const baseManifest = [
   op({
     service: "user-service",
     method: "GET",
+    path: "/platform/super-admins",
+    action: "platformSuperAdmins",
+    target: "gateway",
+    auth: "session",
+  }),
+  op({
+    service: "user-service",
+    method: "GET",
     path: "/platform/organizations/{organizationId}/users",
     action: "platformUsers",
     target: "gateway",

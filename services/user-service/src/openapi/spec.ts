@@ -195,6 +195,20 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/platform/super-admins": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Listar super admins da plataforma",
+          description:
+            "Consulta somente leitura de nome, email, status e permissão de personificar. Não retorna credenciais.",
+          security: platformBrowserSession,
+          responses: {
+            "200": { description: "Lista de super admins", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Identidade organizacional não permitida" },
+          },
+        },
+      },
       "/platform/organizations/{organizationId}/users": {
         get: {
           tags: ["Platform auth"],

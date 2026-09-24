@@ -294,6 +294,7 @@ describe("activityCatalog", () => {
       "gerou",
       "obrigações da competência",
     ],
+    ["GET", "/platform/super-admins", "consultou", "a lista de super admins da plataforma"],
     ["GET", "/platform/organizations", "consultou", "a lista global de organizações"],
     ["POST", "/platform/organizations", "criou", "uma organização"],
     ["POST", "/platform/organizations/org-1/users", "criou", "um usuário da organização"],

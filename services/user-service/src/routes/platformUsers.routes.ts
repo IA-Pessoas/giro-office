@@ -42,6 +42,20 @@ export function createPlatformUsersRoutes(options: {
     return result.data;
   }
 
+  router.get(
+    "/super-admins",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    async (_request: Request, response: Response, next: NextFunction) => {
+      try {
+        response.json(createSuccessResponse(await platformUsersService.listSuperAdmins()));
+      } catch (err) {
+        logError("Erro ao listar super admins da plataforma", { err });
+        next(err);
+      }
+    },
+  );
+
   router.post(
     "/organizations/:organizationId/ownership-transfer",
     requirePlatformGatewayAuth,

@@ -167,6 +167,7 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["POST /platform/session/refresh", platformOnlyPolicy],
   ["DELETE /platform/session", platformOnlyPolicy],
   ["GET /platform/me", platformOnlyPolicy],
+  ["GET /platform/super-admins", platformOnlyPolicy],
   ["GET /platform/organizations", platformOnlyPolicy],
   ["POST /platform/organizations", platformOnlyPolicy],
   ["GET /platform/audit/requests", platformOnlyPolicy],
