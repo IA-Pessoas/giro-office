@@ -19,7 +19,13 @@ import {
 import { toast } from "react-toastify";
 
 import { useAuth } from "@/context/AuthContext";
-import { canCreateOrganizationOwner, canCreateUsers, useModuleAccess } from "@modules/auth";
+import {
+  canCreateOrganizationOwner,
+  canCreateUsers,
+  isOrganizationOwner,
+  OWNER_ROLE_LABEL,
+  useModuleAccess,
+} from "@modules/auth";
 import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
@@ -144,7 +150,9 @@ export function Configuracoes() {
   const currentLogin = meQuery.data?.login ?? "";
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
   const canManageUsers = canCreateUsers(user);
-  const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário";
+  const currentPermissionLabel = isOrganizationOwner(meQuery.data)
+    ? OWNER_ROLE_LABEL
+    : (PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário");
   const managedOrganizationId =
     canCreateOrganizationOwner(meQuery.data) && meQuery.data.organization_id
       ? meQuery.data.organization_id

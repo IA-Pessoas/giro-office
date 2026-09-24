@@ -6,7 +6,12 @@ import { LuFolder } from "react-icons/lu";
 import { FaComputer } from "react-icons/fa6";
 import { IoCreate } from "react-icons/io5";
 
-import { canCreateUsers, resolveDepartmentModuleKey } from "@modules/auth";
+import {
+  canCreateUsers,
+  isOrganizationOwner,
+  OWNER_ROLE_LABEL,
+  resolveDepartmentModuleKey,
+} from "@modules/auth";
 import { useUserForm } from "../hooks/useUserForm";
 import LogDrawer from "@shared/components/LogDrawer";
 import { LoadingSpinner } from "@shared/components/LoadingSpinner";
@@ -170,20 +175,24 @@ function UserFormContent({ user, me, departments }) {
                 <>
                   <div className="u-stack u-gap-2">
                     <label className="users-section-title">Permissão</label>
-                    <select
-                      name="permission"
-                      value={formData.permission}
-                      onChange={handleInputChange}
-                      className="ui-input"
-                    >
-                      {permissoes
-                        .filter((p) => p.id <= me.permission)
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nome}
-                          </option>
-                        ))}
-                    </select>
+                    {isOrganizationOwner(user) ? (
+                      <input value={OWNER_ROLE_LABEL} readOnly className="ui-input bg-slate-100" />
+                    ) : (
+                      <select
+                        name="permission"
+                        value={formData.permission}
+                        onChange={handleInputChange}
+                        className="ui-input"
+                      >
+                        {permissoes
+                          .filter((p) => p.id <= me.permission)
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.nome}
+                            </option>
+                          ))}
+                      </select>
+                    )}
                   </div>
                   <div className="u-stack u-gap-2">
                     <label className="users-section-title">Status</label>
