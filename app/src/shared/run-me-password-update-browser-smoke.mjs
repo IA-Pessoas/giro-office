@@ -126,8 +126,17 @@ async function assertVisible(locator, page, label) {
   }
 }
 
+function passwordFields(page) {
+  return {
+    current: page.getByLabel("Senha atual", { exact: true }),
+    next: page.getByLabel("Nova Senha", { exact: true }),
+    confirm: page.getByLabel("Confirmar nova senha", { exact: true }),
+  };
+}
+
 async function assertViewerPasswordUpdate() {
   const password = "viewer-password-smoke";
+  const currentPassword = "viewer-senha-atual";
   const requests = [];
   const { browser, context, diagnostics, page } = await openProfile(viewer, { rh: 0 }, (payload) => {
     requests.push(payload);
@@ -135,17 +144,31 @@ async function assertViewerPasswordUpdate() {
 
   try {
     const nameInput = page.getByLabel("Nome");
-    const passwordInput = page.getByLabel("Nova Senha");
+    const fields = passwordFields(page);
+    const saveButton = page.getByRole("button", { name: "Salvar alterações" });
 
     assert.equal(await nameInput.isDisabled(), true, "Viewer não pode editar o nome.");
-    assert.equal(await passwordInput.getAttribute("type"), "password");
+    for (const input of Object.values(fields)) {
+      assert.equal(await input.getAttribute("type"), "password");
+    }
 
-    await passwordInput.fill(password);
-    await page.getByRole("button", { name: "Salvar alterações" }).click();
+    await fields.next.fill(password);
+    await fields.confirm.fill(password);
+    assert.equal(await saveButton.isDisabled(), true, "Sem a senha atual não pode salvar.");
+
+    await fields.current.fill(currentPassword);
+    await fields.confirm.fill(`${password}-diferente`);
+    await assertVisible(page.getByText("As senhas não conferem."), page, "aviso de confirmação");
+    assert.equal(await saveButton.isDisabled(), true, "Confirmação divergente não pode salvar.");
+
+    await fields.confirm.fill(password);
+    await saveButton.click();
 
     await page.getByText("Perfil atualizado com sucesso!").waitFor({ state: "visible" });
-    assert.deepEqual(requests, [{ password }]);
-    assert.equal(await passwordInput.inputValue(), "", "A senha deve ser limpa após sucesso.");
+    assert.deepEqual(requests, [{ password, current_password: currentPassword }]);
+    for (const input of Object.values(fields)) {
+      assert.equal(await input.inputValue(), "", "As senhas devem ser limpas após sucesso.");
+    }
     assert.equal((await page.locator("body").innerText()).includes(password), false);
     assert.equal(diagnostics.some((message) => message.includes(password)), false);
   } finally {
@@ -164,16 +187,19 @@ async function assertRhAdminProfileUpdate() {
 
   try {
     const nameInput = page.getByLabel("Nome");
-    const passwordInput = page.getByLabel("Nova Senha");
+    const fields = passwordFields(page);
+    const currentPassword = "rh-admin-senha-atual";
 
     assert.equal(await nameInput.isDisabled(), false, "Admin RH deve poder editar o nome.");
     await nameInput.fill(nextName);
-    await passwordInput.fill(password);
+    await fields.current.fill(currentPassword);
+    await fields.next.fill(password);
+    await fields.confirm.fill(password);
     await page.getByRole("button", { name: "Salvar alterações" }).click();
 
     await page.getByText("Perfil atualizado com sucesso!").waitFor({ state: "visible" });
-    assert.deepEqual(requests, [{ name: nextName, password }]);
-    assert.equal(await passwordInput.inputValue(), "", "A senha deve ser limpa após sucesso.");
+    assert.deepEqual(requests, [{ name: nextName, password, current_password: currentPassword }]);
+    assert.equal(await fields.next.inputValue(), "", "A senha deve ser limpa após sucesso.");
     assert.equal((await page.locator("body").innerText()).includes(password), false);
     assert.equal(diagnostics.some((message) => message.includes(password)), false);
   } finally {
