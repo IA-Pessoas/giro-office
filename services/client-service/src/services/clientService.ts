@@ -16,7 +16,10 @@ import {
   buildLegacyListStatusWhere,
   mergeClientListSearchWhere,
 } from "./clientListQueryService.js";
-import { assertValidClientDocument } from "../utils/clientDocuments.js";
+import {
+  assertValidClientDocument,
+  isClientDocumentUniqueConstraintError,
+} from "../utils/clientDocuments.js";
 
 export type OrganizationPublic = {
   id: string;
@@ -429,27 +432,34 @@ export class ClientService implements IClientService {
     }
     const extended = takeExtendedFields(input);
 
-    const [organization, row] = await Promise.all([
-      this.getOrganizationPublic(input.organization_id),
-      this.prisma.client.create({
-        data: {
-          name: input.name,
-          organization_id: input.organization_id,
-          status: input.status,
-          cpf_cnpj: normalizedDocument,
-          company_name: input.company_name ?? null,
-          fantasy_name: input.fantasy_name ?? null,
-          prospecting_status: input.prospecting_status,
-          type: input.type,
-          type_registration: input.type_registration,
-          service_unique: input.service_unique,
-          ...extended,
-        } as Prisma.ClientUncheckedCreateInput,
-        select: clientCreateSelect,
-      }),
-    ]);
+    try {
+      const [organization, row] = await Promise.all([
+        this.getOrganizationPublic(input.organization_id),
+        this.prisma.client.create({
+          data: {
+            name: input.name,
+            organization_id: input.organization_id,
+            status: input.status,
+            cpf_cnpj: normalizedDocument,
+            company_name: input.company_name ?? null,
+            fantasy_name: input.fantasy_name ?? null,
+            prospecting_status: input.prospecting_status,
+            type: input.type,
+            type_registration: input.type_registration,
+            service_unique: input.service_unique,
+            ...extended,
+          } as Prisma.ClientUncheckedCreateInput,
+          select: clientCreateSelect,
+        }),
+      ]);
 
-    return toPublic(row, organization);
+      return toPublic(row, organization);
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error)) {
+        throw new ServiceError(409, "Cliente já cadastrado.", error);
+      }
+      throw error;
+    }
   }
 
   async update(
@@ -535,16 +545,23 @@ export class ClientService implements IClientService {
 
     Object.assign(data, extended);
 
-    const [organization, row] = await Promise.all([
-      this.getOrganizationPublic(organizationId),
-      this.prisma.client.update({
-        where: { id },
-        data: data as Prisma.ClientUncheckedUpdateInput,
-        select: clientSelect,
-      }),
-    ]);
+    try {
+      const [organization, row] = await Promise.all([
+        this.getOrganizationPublic(organizationId),
+        this.prisma.client.update({
+          where: { id },
+          data: data as Prisma.ClientUncheckedUpdateInput,
+          select: clientSelect,
+        }),
+      ]);
 
-    return toPublic(row, organization);
+      return toPublic(row, organization);
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error)) {
+        throw new ServiceError(409, "Cliente já cadastrado.", error);
+      }
+      throw error;
+    }
   }
 
   async deactivate(
