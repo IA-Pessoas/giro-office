@@ -398,6 +398,7 @@ function createToken(
     user_id: string;
     organization_id: string;
     permission: number;
+    impersonator_platform_user_id?: string;
     type?: "owner" | "admin" | "user";
     modules?: Record<string, number | null>;
     csrf_hash?: string;
@@ -3547,11 +3548,12 @@ it("proxies audit routes to the audit service when the feature flag is enabled",
   }
 });
 
-it("records successful proxied requests when audit is enabled", async () => {
+it("records the target and real operator for successful impersonated requests", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
     permission: 2,
+    impersonator_platform_user_id: "platform-operator-1",
   });
   const auditService = await startAuditIngestServer();
   const upstream = createServer((_request, response) => {
@@ -3597,6 +3599,8 @@ it("records successful proxied requests when audit is enabled", async () => {
       metadata: {
         routeTarget: "task-service",
         activityVisible: true,
+        actorKind: "platform",
+        actorPlatformUserId: "platform-operator-1",
       },
     });
   } finally {
