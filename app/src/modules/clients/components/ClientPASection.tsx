@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { BriefcaseBusiness, CircleAlert, Database, Landmark, Plus, Save } from "lucide-react";
 import { toast } from "react-toastify";
+import { isAxiosError } from "axios";
 
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName, clientTextareaClassName } from "../form/clientFormControls";
@@ -256,8 +257,9 @@ export function ClientPASection({ clientId }: { clientId: string }) {
       toast.success("PA criado com sucesso.");
       await paQuery.refetch();
     } catch (error) {
-      // #1310: tela desatualizada. O PA já existe; recarrega para o salvar usar PATCH.
-      if ((error as { response?: { status?: number } })?.response?.status === 409) {
+      // Tela desatualizada: o PA já existe; recarrega para o salvar usar PATCH.
+      if (isAxiosError(error) && error.response?.status === 409) {
+        toast.info("Este cliente já possui PA. Dados recarregados.");
         await paQuery.refetch();
         return;
       }

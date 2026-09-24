@@ -984,9 +984,8 @@ describe("client-service", () => {
   it("rejects POST on an existing client PA without overwriting its data (#1310)", async () => {
     const mock: IClientService = { ...mockServiceBase() };
     const prisma = buildPAPrismaMock();
-    const findFirst = (prisma as unknown as { pA: { findFirst: ReturnType<typeof vi.fn> } }).pA
-      .findFirst;
-    findFirst.mockReset().mockResolvedValue({ client_id: TEST_CLIENT_ID });
+    const pa = (prisma as unknown as { pA: Record<string, ReturnType<typeof vi.fn>> }).pA;
+    pa.findFirst.mockReset().mockResolvedValue({ client_id: TEST_CLIENT_ID });
     const app = buildTestApp(mock, { prisma });
 
     const response = await request(app)
@@ -995,7 +994,8 @@ describe("client-service", () => {
       .send({});
 
     expect(response.status).toBe(409);
-    const pa = (prisma as unknown as { pA: Record<string, ReturnType<typeof vi.fn>> }).pA;
+    expect(response.body.success).toBe(false);
+    expect(response.body.code).toBe("CONFLICT");
     expect(pa.create).not.toHaveBeenCalled();
     expect(pa.update).not.toHaveBeenCalled();
   });
