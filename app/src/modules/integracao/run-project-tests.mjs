@@ -175,7 +175,9 @@ import {
   createProjectWizardId,
   getWizardExtractionSourceValidationMessage,
   canAttemptWizardExtraction,
+  wizardExtractionConsumesAttempt,
   WIZARD_EXTRACTION_MAX_ATTEMPTS,
+  WIZARD_EXTRACTION_UNAVAILABLE_CODE,
   WIZARD_EXTRACTION_MAX_SOURCE_BYTES,
   WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING,
 } from "./components/projectWizardUi.ts";
@@ -1433,6 +1435,17 @@ runTest("wizard extraction allows only three provider attempts per opening", () 
   assert.equal(canAttemptWizardExtraction(2), true);
   assert.equal(canAttemptWizardExtraction(3), false);
   assert.equal(canAttemptWizardExtraction(4), false);
+});
+
+runTest("wizard extraction only consumes attempts that reached the provider", () => {
+  assert.equal(wizardExtractionConsumesAttempt(400), false);
+  assert.equal(wizardExtractionConsumesAttempt(403), false);
+  assert.equal(wizardExtractionConsumesAttempt(500), false);
+  assert.equal(wizardExtractionConsumesAttempt(503), false);
+  assert.equal(wizardExtractionConsumesAttempt(422), true);
+  assert.equal(wizardExtractionConsumesAttempt(502), true);
+  assert.equal(WIZARD_EXTRACTION_UNAVAILABLE_CODE, "AI_EXTRACTION_UNAVAILABLE");
+  assert.equal(wizardExtractionConsumesAttempt(undefined), true);
 });
 
 runTest("wizard extraction validates text and file sources before sending", () => {

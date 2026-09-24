@@ -42,6 +42,18 @@ export function canAttemptWizardExtraction(consumedAttempts: number): boolean {
   );
 }
 
+export const WIZARD_EXTRACTION_UNAVAILABLE_MESSAGE = "Extração por IA indisponível no momento.";
+// Mesmo code do task-service Worker quando a extração não está configurada.
+export const WIZARD_EXTRACTION_UNAVAILABLE_CODE = "AI_EXTRACTION_UNAVAILABLE";
+
+// Gasta tentativa o que chegou ao provedor: 422 (IA não achou tarefas) e 502 (erro ou timeout
+// do provedor). Sem resposta também gasta, porque a chamada pode ter chegado. 4xx de validação,
+// 500 e 503 vêm antes da chamada.
+// ponytail: 502 do gateway (upstream fora) também gasta; separar exige code do worker no 502.
+export function wizardExtractionConsumesAttempt(status: number | undefined): boolean {
+  return status === undefined || status === 422 || status === 502;
+}
+
 interface WizardExtractionSourceValidationInput {
   text?: string;
   file?: Pick<File, "name" | "size" | "type"> | null;
