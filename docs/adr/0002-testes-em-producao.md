@@ -14,7 +14,9 @@ misturados aos dados reais da organização.
 
 1. **E2E roda em homologação, com dados sintéticos.** O ambiente sai do seed de QA:
    `pnpm --filter @workspace/infra prisma:seed:qa` (e `prisma:seed:qa:wizard` para projetos),
-   num banco descartável. O passo a passo do banco e dos serviços está em
+   num banco descartável. O seed cobre organizações, usuários e o fluxo de Integração/projetos;
+   módulos que ele não cobre (TI, RH, estoque) precisam de cadastro sintético na homologação antes
+   do E2E. O passo a passo do banco e dos serviços está em
    [docs/qa/wizard-projetos-qa.md](../qa/wizard-projetos-qa.md#como-rodar-a-evidência-end-to-end). As organizações e usuários
    sintéticos estão em `scripts/qa/integracao-fixtures.mjs`.
 2. **Em produção, só com autorização explícita do dono**, quando o comportamento depende de
@@ -36,6 +38,13 @@ misturados aos dados reais da organização.
 | --- | --- |
 | `scripts/qa/cleanup-e2e-prod-2026-09-23.sql` | Registros `QA_` da rodada de 23/09. Com `-v residue=1`, também os clientes "QA E2E CLIENT PF/PJ 20260922" |
 | `scripts/qa/cleanup-legacy-test-data.sql` | Chamados de TI "teste"/"teste 00001", ativo "teste" e termo "testecodigo" |
+| `scripts/qa/verify-no-test-data.sql` | Não apaga: conta dados de teste conhecidos em todo o schema (prefixo `QA_`/`QA E2E` e os nomes antigos) |
 
-Ordem: dry-run dos dois, conferência dos alvos, apply do primeiro (com `residue=1`) e depois do
-segundo. A última consulta do segundo script, "registros de teste restantes", precisa dar `0`.
+A limpeza dos resíduos antigos é exceção à regra 2: são anteriores à política e só têm o nome.
+Por isso o apply dela exige `-v expected=N`, com o total de alvos visto no dry-run, e aborta se
+o número mudou.
+
+Ordem: dry-run dos dois primeiros, conferência dos alvos, apply do primeiro (com `residue=1`) e
+depois do segundo. Por fim, o total da verificação precisa dar `0`; se não der, a lista por
+tabela aponta o que sobrou (por exemplo, categoria ou item de catálogo que ficou por ter
+dependência).

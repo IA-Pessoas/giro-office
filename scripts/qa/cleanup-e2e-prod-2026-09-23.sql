@@ -1,5 +1,6 @@
 -- Limpeza dos registros QA criados no teste E2E de produção de 23/09/2026.
--- Relatório: reports/qa-e2e-prod-2026-09-23.md
+-- Relatório: reports/qa-e2e-prod-2026-09-23.md (local, não versionado; tem dados de produção).
+-- Política e verificação final: docs/adr/0002-testes-em-producao.md e scripts/qa/verify-no-test-data.sql.
 --
 -- Uso (sempre rode o dry-run primeiro; ele termina em ROLLBACK):
 --   psql "$DATABASE_URL" -f scripts/qa/cleanup-e2e-prod-2026-09-23.sql
