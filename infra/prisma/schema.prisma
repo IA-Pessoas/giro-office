@@ -462,6 +462,22 @@ model PlatformAuthSession {
   @@map("platform_auth_sessions")
 }
 
+model UserAuditOutboxEvent {
+  id           String                  @id @default(uuid())
+  payload      Json
+  status       UserAuditOutboxStatus   @default(pending)
+  attempts     Int                     @default(0)
+  available_at DateTime                @default(now())
+  locked_at    DateTime?
+  processed_at DateTime?
+  last_error   String?
+  created_at   DateTime                @default(now())
+  updated_at   DateTime                @updatedAt
+
+  @@index([status, available_at, created_at], map: "idx_user_audit_outbox_dispatch")
+  @@map("user_audit_outbox_events")
+}
+
 model Permission {
   id              String       @id @default(uuid())
   user_id         String
@@ -3068,6 +3084,13 @@ enum status {
 
 enum PlatformRole {
   super_admin
+}
+
+enum UserAuditOutboxStatus {
+  pending
+  processing
+  delivered
+  failed
 }
 
 enum enumType {

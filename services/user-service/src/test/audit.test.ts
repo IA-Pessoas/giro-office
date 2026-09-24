@@ -52,6 +52,7 @@ describe("createUserAudit", () => {
     });
 
     await audit({
+      requestId: "outbox-request-1",
       platformActorUserId: "platform-user-1",
       organizationId: null,
       action: "platform.super_admin.impersonation_permission.updated",
@@ -65,6 +66,7 @@ describe("createUserAudit", () => {
     expect(recordRequiredMock).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: null,
+        requestId: "outbox-request-1",
         metadata: { actorPlatformUserId: "platform-user-1" },
         referringId: "platform-user-2",
         changes: { can_impersonate: { from: false, to: true } },

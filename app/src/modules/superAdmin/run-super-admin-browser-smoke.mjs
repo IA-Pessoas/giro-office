@@ -718,11 +718,13 @@ try {
         (request) => request.method === "GET" && request.path === "/platform/super-admins",
       ),
     );
+    await page.getByRole("tab", { name: "Super admins", exact: true }).focus();
     await page.keyboard.press("ArrowRight");
     assert.equal(
       await page.getByRole("tab", { name: "Auditoria", exact: true }).getAttribute("aria-selected"),
       "true",
     );
+    await page.getByRole("tab", { name: "Auditoria", exact: true }).focus();
     await page.keyboard.press("ArrowLeft");
     assert.equal(
       await page
@@ -736,15 +738,32 @@ try {
         path: join(
           screenshotDirectory,
           viewport.width > 1000
-            ? "issue-1281-super-admins.png"
-            : "issue-1281-super-admins-mobile.png",
+            ? "issue-1278-super-admins.png"
+            : "issue-1278-super-admins-mobile.png",
         ),
         fullPage: true,
         animations: "disabled",
       });
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole("table").waitFor();
+    const table = page.getByRole("table");
+    await table.waitFor();
+    const tableScroller = table.locator("..");
+    const tableDimensions = await tableScroller.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    assert.ok(
+      tableDimensions.scrollWidth > tableDimensions.clientWidth,
+      "Tabela deve manter rolagem horizontal local em telas estreitas",
+    );
+    await tableScroller.evaluate((element) => {
+      element.scrollLeft = 100;
+    });
+    assert.ok(await tableScroller.evaluate((element) => element.scrollLeft > 0));
+    await tableScroller.evaluate((element) => {
+      element.scrollLeft = 0;
+    });
     assert.equal(
       await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -753,7 +772,7 @@ try {
     );
     if (screenshotDirectory) {
       await page.screenshot({
-        path: join(screenshotDirectory, "issue-1281-super-admins-mobile.png"),
+        path: join(screenshotDirectory, "issue-1278-super-admins-mobile.png"),
         fullPage: true,
         animations: "disabled",
       });
@@ -1688,6 +1707,52 @@ try {
   );
   console.error("PAGE_ERRORS", pageErrors);
   console.error("CONSOLE_ERRORS", consoleErrors);
+  console.error(
+    "HORIZONTAL_OVERFLOW",
+    await page
+      ?.evaluate(() => {
+        const width = document.documentElement.clientWidth;
+        return {
+          width,
+          scrollWidth: document.documentElement.scrollWidth,
+          ancestors: (() => {
+            const elements = [];
+            let element = document.querySelector("table");
+            while (element && elements.length < 12) {
+              const style = getComputedStyle(element);
+              const rect = element.getBoundingClientRect();
+              elements.push({
+                tag: element.tagName,
+                className: typeof element.className === "string" ? element.className : "",
+                left: Math.round(rect.left),
+                right: Math.round(rect.right),
+                width: Math.round(rect.width),
+                minWidth: style.minWidth,
+                overflowX: style.overflowX,
+                display: style.display,
+                gridTemplateColumns: style.gridTemplateColumns,
+              });
+              element = element.parentElement;
+            }
+            return elements;
+          })(),
+          elements: Array.from(document.querySelectorAll("body *"))
+            .map((element) => {
+              const rect = element.getBoundingClientRect();
+              return {
+                tag: element.tagName,
+                className: typeof element.className === "string" ? element.className : "",
+                right: Math.round(rect.right),
+                width: Math.round(rect.width),
+                overflowX: getComputedStyle(element).overflowX,
+              };
+            })
+            .filter((element) => element.right > width + 1)
+            .slice(0, 12),
+        };
+      })
+      .catch(() => null),
+  );
   console.error(
     "API_REQUESTS",
     requests.map((request) => `${request.method} ${request.path}?${request.query}`),

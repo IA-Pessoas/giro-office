@@ -8,6 +8,8 @@ const { prismaMock } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       updateMany: vi.fn(),
     },
+    authSession: { findMany: vi.fn(), updateMany: vi.fn() },
+    userAuditOutboxEvent: { create: vi.fn() },
     user: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -15,7 +17,9 @@ const { prismaMock } = vi.hoisted(() => ({
       updateMany: vi.fn(),
     },
     department: { findMany: vi.fn() },
-    $transaction: vi.fn(async (callback: (transaction: { user: unknown }) => unknown) =>
+    $queryRaw: vi.fn(),
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(async (callback: (transaction: unknown) => unknown) =>
       callback(prismaMock),
     ),
   },
@@ -54,6 +58,12 @@ describe("PlatformUsersService", () => {
     prismaMock.platformUser.findFirst.mockReset();
     prismaMock.platformUser.findUnique.mockReset();
     prismaMock.platformUser.updateMany.mockReset();
+    prismaMock.authSession.findMany.mockReset();
+    prismaMock.authSession.updateMany.mockReset();
+    prismaMock.authSession.findMany.mockResolvedValue([]);
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.userAuditOutboxEvent.create.mockReset();
+    prismaMock.userAuditOutboxEvent.create.mockResolvedValue(undefined);
     prismaMock.platformUser.findMany.mockResolvedValue([
       {
         id: "platform-user-1",
@@ -160,18 +170,22 @@ describe("PlatformUsersService", () => {
       },
       data: { can_impersonate: true },
     });
-    expect(audit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        platformActorUserId: "platform-user-1",
-        organizationId: null,
-        action: "platform.super_admin.impersonation_permission.updated",
-        referring: "platform_user",
-        referringId: "platform-user-2",
-        changes: { can_impersonate: { from: false, to: true } },
-        outcome: "success",
-        required: true,
-      }),
-    );
+    expect(prismaMock.userAuditOutboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        payload: expect.objectContaining({
+          requestId: expect.any(String),
+          platformActorUserId: "platform-user-1",
+          organizationId: null,
+          action: "platform.super_admin.impersonation_permission.updated",
+          referring: "platform_user",
+          referringId: "platform-user-2",
+          changes: { can_impersonate: { from: false, to: true } },
+          outcome: "success",
+          required: true,
+        }),
+      },
+    });
+    expect(audit).not.toHaveBeenCalled();
   });
 
   it("does not emit an audit event when the requested permission already matches", async () => {
@@ -198,7 +212,66 @@ describe("PlatformUsersService", () => {
     );
 
     expect(prismaMock.platformUser.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.userAuditOutboxEvent.create).not.toHaveBeenCalled();
     expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("revokes active sessions, increments session_version, and enqueues both audit events atomically", async () => {
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-user-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.platformUser.findFirst.mockResolvedValue({
+      id: "platform-user-2",
+      name: "Outra administradora",
+      email: "outra@example.com",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.platformUser.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.authSession.findMany.mockResolvedValue([
+      {
+        id: "impersonation-session-1",
+        user_id: "target-user-1",
+        created_at: new Date("2026-09-24T10:00:00.000Z"),
+        user: {
+          name: "Usuário alvo",
+          organization_id: "org-1",
+          department: { organization_id: "org-1" },
+        },
+      },
+    ]);
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+    const service = new PlatformUsersService(vi.fn());
+
+    await service.updateSuperAdminImpersonationPermission(
+      "platform-user-1",
+      "platform-user-2",
+      false,
+    );
+
+    expect(prismaMock.platformUser.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "platform-user-2",
+        platform_role: "super_admin",
+        can_impersonate: true,
+      },
+      data: { can_impersonate: false, session_version: { increment: 1 } },
+    });
+    expect(prismaMock.userAuditOutboxEvent.create).toHaveBeenCalledTimes(2);
+    expect(prismaMock.userAuditOutboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        payload: expect.objectContaining({
+          action: "platform.impersonation.ended",
+          platformActorUserId: "platform-user-2",
+          organizationId: "org-1",
+          changes: expect.objectContaining({ reason: "revogação" }),
+        }),
+      },
+    });
+    expect(prismaMock.$queryRaw).toHaveBeenCalledOnce();
   });
 
   it("filters every query by organization", async () => {
