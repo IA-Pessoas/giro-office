@@ -218,11 +218,11 @@ export async function sendPessoalAudit(
   const now = new Date().toISOString();
   const referring = typeof input.referring === "string" ? input.referring : "";
   const payload = {
-    requestId: crypto.randomUUID(),
-    path: `/${referring.replace(/\./g, "/")}`,
-    createdAt: now,
-    finishedAt: now,
     ...input,
+    requestId: input.requestId ?? crypto.randomUUID(),
+    path: input.path ?? `/${referring.replace(/\./gu, "/")}`,
+    createdAt: input.createdAt ?? now,
+    finishedAt: input.finishedAt ?? now,
   };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AUDIT_SERVICE_TIMEOUT_MS);

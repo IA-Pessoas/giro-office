@@ -960,7 +960,9 @@ async function runChecks({ db, sql, baseUrls, secrets, runId, mode, migrationWor
     const waitForAction = async (id, action) => {
       for (let attempt = 0; attempt < 10; attempt += 1) {
         const { rows } = await auditRows(id);
-        if (rows.some((row) => row.action === action)) return;
+        const matches = rows.filter((row) => row.action === action).length;
+        assert(matches <= 1, `ENTITY_CHANGE ${action} de pessoal.union duplicado (${matches})`);
+        if (matches === 1) return;
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
       throw new Error(`a escrita do DP não gerou ENTITY_CHANGE ${action} de pessoal.union`);
