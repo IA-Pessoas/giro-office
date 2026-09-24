@@ -31,7 +31,7 @@ export function ClientForm({
   onCancel,
 }: ClientFormProps) {
   const documentLabel = showPersonType ? (values.type === "PF" ? "CPF" : "CNPJ") : "CPF/CNPJ";
-  const documentError = showDocumentError && showPersonType && values.cpf_cnpj
+  const documentError = showDocumentError && values.cpf_cnpj
     ? validateCpfCnpjDocument(values.cpf_cnpj, showPersonType ? values.type : undefined)
     : null;
 
@@ -87,10 +87,10 @@ export function ClientForm({
             value={values.cpf_cnpj}
             onChange={onChange}
             disabled={disabled}
-            inputMode="numeric"
+            inputMode={values.type === "PJ" ? "text" : "numeric"}
             autoComplete="off"
             aria-invalid={Boolean(documentError)}
-            aria-describedby={documentError ? "client-create-document-error" : undefined}
+            aria-describedby={documentError ? "client-document-error" : undefined}
             placeholder={
               showPersonType
                 ? values.type === "PF"
@@ -103,7 +103,7 @@ export function ClientForm({
           />
           {documentError ? (
             <span
-              id="client-create-document-error"
+              id="client-document-error"
               className="block text-xs font-medium text-red-600 dark:text-red-300"
             >
               {documentError}

@@ -776,7 +776,7 @@ runTest("client create modal binds person type to document validation and payloa
   assert.match(modal, /showPersonType/);
   assert.match(modal, /showDocumentError/);
   assert.match(form, /name="type"/);
-  assert.match(form, /showDocumentError && showPersonType && values\.cpf_cnpj/);
+  assert.match(form, /showDocumentError && values\.cpf_cnpj/);
   assert.ok(form.indexOf(">Nome</span>") < form.indexOf(">Razão social</span>"));
   assert.ok(form.indexOf(">Razão social</span>") < form.indexOf(">Tipo de pessoa</span>"));
   assert.ok(form.indexOf(">Tipo de pessoa</span>") < form.indexOf("{documentLabel}"));
@@ -794,7 +794,21 @@ runTest("clients list uses the shared page jump and navigation controls", () => 
   assert.match(clients, /totalPages=\{pageCount\}/);
   assert.match(clients, /onPageChange=\{setPage\}/);
   assert.match(clients, /hasMore=\{Boolean\(clientsPage\?\.hasMore\)/);
+  assert.match(clients, /useRouter/);
+  assert.match(clients, /onCreated=\{\(client\) => void router\.push\(`\/clients\/\$\{client\.id\}`\)\}/);
   assert.doesNotMatch(clients, /pageInputValue|function goToPage/);
+});
+
+runTest("client detail keeps document mask and field-level validation feedback", () => {
+  const detail = readFileSync("src/pages/clients/[id].tsx", "utf8");
+  const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+
+  assert.match(detail, /formatCpfCnpjInput/);
+  assert.match(detail, /name === "cpf_cnpj"/);
+  assert.match(detail, /setShowDocumentError\(false\)/);
+  assert.match(detail, /showDocumentError=\{showDocumentError\}/);
+  assert.match(form, /showDocumentError && values\.cpf_cnpj/);
+  assert.doesNotMatch(form, /showDocumentError && showPersonType && values\.cpf_cnpj/);
 });
 
 runTest("clients list hides organization from the main table", () => {

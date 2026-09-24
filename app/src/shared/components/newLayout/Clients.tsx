@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { Building2, Plus, Search } from "lucide-react";
 
@@ -51,6 +52,7 @@ function formatCpfCnpj(value: string): string {
 }
 
 export function Clients() {
+  const router = useRouter();
   const { access: integracaoAccess } = useModuleAccess("integracao");
   const canCreateClient = integracaoAccess.canEdit;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -82,7 +84,11 @@ export function Clients() {
   return (
     <div className="space-y-6">
       {canCreateClient ? (
-        <ClientCreateModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+        <ClientCreateModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onCreated={(client) => void router.push(`/clients/${client.id}`)}
+        />
       ) : null}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
