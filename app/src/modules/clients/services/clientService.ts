@@ -31,6 +31,7 @@ import {
   unwrapClientEnvelope,
   unwrapClientPaDetail,
 } from "./clientService.contract";
+import { toHistoryIsoDate } from "../utils/historyDate";
 
 export const clientService = {
   async list(filters: ClientListFilters = {}): Promise<ClientListPage> {
@@ -159,7 +160,7 @@ export const clientService = {
   async createHistory(clientId: string, payload: CreateClientHistoryPayload): Promise<ClientHistoryItem> {
     const api = setupAPIClient();
     const formData = new FormData();
-    formData.append("date", new Date(payload.date).toISOString());
+    formData.append("date", toHistoryIsoDate(payload.date));
     formData.append("history", payload.history);
 
     if (payload.pending_id) {
@@ -183,7 +184,10 @@ export const clientService = {
     payload: UpdateClientHistoryPayload,
   ): Promise<ClientHistoryItem> {
     const api = setupAPIClient();
-    const response = await api.patch(CLIENT_ENDPOINTS.updateHistory(clientId, historyId), payload);
+    const response = await api.patch(CLIENT_ENDPOINTS.updateHistory(clientId, historyId), {
+      ...payload,
+      date: toHistoryIsoDate(payload.date),
+    });
 
     return unwrapClientEnvelope<ClientHistoryItem>(response.data);
   },

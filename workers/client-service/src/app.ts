@@ -58,7 +58,7 @@ type CreateClientWorkerAppOptions = {
   historyStorage?: WorkerHistoryStorageLike;
 };
 
-function parse<T>(schema: z.ZodType<T>, value: unknown): T {
+function parse<S extends z.ZodTypeAny>(schema: S, value: unknown): z.output<S> {
   try {
     return schema.parse(value);
   } catch (error) {

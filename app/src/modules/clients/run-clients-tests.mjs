@@ -51,6 +51,7 @@ import {
   CLIENT_TAX_REGIME_OPTIONS,
   createClientFormInitialValues,
 } from "./utils/clientForm.ts";
+import { toDatetimeLocalValue, toHistoryIsoDate } from "./utils/historyDate.ts";
 
 function runTest(name, fn) {
   try {
@@ -809,4 +810,29 @@ runTest("PA section relies on mutation invalidation instead of a second GET", ()
 
   assert.doesNotMatch(source, /toast\.success\([^)]*\);\s*await paQuery\.refetch\(\)/);
   assert.match(source, /formatPaMoneyInput/);
+});
+
+runTest("history create -> edit -> read keeps the same time in UTC-3", () => {
+  const previousTz = process.env.TZ;
+  process.env.TZ = "America/Sao_Paulo";
+
+  try {
+    const created = toHistoryIsoDate("2026-09-23T10:00");
+    assert.equal(created, "2026-09-23T13:00:00.000Z");
+
+    const edited = toHistoryIsoDate(toDatetimeLocalValue(created));
+    assert.equal(edited, created);
+    assert.equal(toDatetimeLocalValue(edited), "2026-09-23T10:00");
+  } finally {
+    process.env.TZ = previousTz;
+  }
+});
+
+runTest("history modal and service share the ISO date helper", () => {
+  const modal = readFileSync("src/modules/clients/components/ClientHistoryModal.tsx", "utf8");
+  const service = readFileSync("src/modules/clients/services/clientService.ts", "utf8");
+
+  assert.match(modal, /toDatetimeLocalValue/);
+  assert.doesNotMatch(modal, /function toDatetimeLocalValue/);
+  assert.equal(service.match(/toHistoryIsoDate\(payload\.date\)/g)?.length, 2);
 });

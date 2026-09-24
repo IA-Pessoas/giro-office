@@ -780,7 +780,7 @@ describe("client-service", () => {
     const res = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("<script>alert(1)</script>"), {
         filename: "payload.html",
@@ -802,7 +802,7 @@ describe("client-service", () => {
     const res = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("<script>alert(1)</script>"), {
         filename: "payload.pdf",
@@ -826,7 +826,7 @@ describe("client-service", () => {
     await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("<script>alert(1)</script>"), {
         filename: "payload.html",
@@ -836,7 +836,7 @@ describe("client-service", () => {
     const second = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("<script>alert(1)</script>"), {
         filename: "payload.html",
@@ -854,7 +854,7 @@ describe("client-service", () => {
     const res = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.alloc(10 * 1024 * 1024 + 1), {
         filename: "large.pdf",
@@ -888,7 +888,7 @@ describe("client-service", () => {
     const res = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("%PDF-1.7"), {
         filename: "doc.pdf",

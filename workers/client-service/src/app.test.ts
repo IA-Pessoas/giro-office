@@ -274,10 +274,41 @@ describe("client Worker", () => {
     const response = await app.request(`https://client.test/client/${CLIENT_ID}/histories`, {
       method: "POST",
       headers: { ...headers(), "content-type": "application/json" },
-      body: JSON.stringify({ date: "2026-09-23", history: "Contato", file: "doc.pdf" }),
+      body: JSON.stringify({
+        date: "2026-09-23T12:00:00.000Z",
+        history: "Contato",
+        file: "doc.pdf",
+      }),
     });
 
     expect(response.status).toBe(400);
+  });
+
+  it("edits a history keeping the offset datetime and rejects one without offset", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const patch = (date: string) =>
+      app.request(`https://client.test/client/${CLIENT_ID}/histories/${HISTORY_ID}`, {
+        method: "PATCH",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ date, history: "Contato" }),
+      });
+
+    const withOffset = await patch("2026-09-23T10:00:00-03:00");
+    const withoutOffset = await patch("2026-09-23T10:00");
+
+    expect(withOffset.status).toBe(200);
+    expect(clientService.updateHistory).toHaveBeenCalledWith(
+      HISTORY_ID,
+      ORGANIZATION_ID,
+      USER_ID,
+      expect.objectContaining({ date: new Date("2026-09-23T13:00:00.000Z") }),
+    );
+    expect(withoutOffset.status).toBe(400);
+    expect(((await withoutOffset.json()) as { error: string }).error).toBe(
+      "Informe data e hora com fuso horário (ISO 8601).",
+    );
+    expect(clientService.updateHistory).toHaveBeenCalledTimes(1);
   });
 
   it("rejects unknown multipart fields with a Portuguese message", async () => {
