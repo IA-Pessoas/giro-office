@@ -155,6 +155,35 @@ runTest("pessoal query keys include domain and optional params", () => {
   ]);
 });
 
+runTest("pessoal error message never shows internal service names (#1300)", () => {
+  for (const internal of [
+    "AUDIT_SERVICE respondeu com HTTP 401.",
+    "Falha ao chamar audit-service.",
+    "USER_SERVICE_INTERNAL_TOKEN ausente.",
+  ]) {
+    assert.equal(
+      getPessoalErrorMessage({ response: { data: { error: internal } } }, "Fallback"),
+      "Fallback",
+    );
+  }
+  assert.equal(getPessoalErrorMessage(new Error("AUDIT_SERVICE fora"), "Fallback"), "Fallback");
+});
+
+runTest("pessoal write mutations refresh lists on success and on error (#1300)", () => {
+  for (const file of [
+    "usePessoalGroups.ts",
+    "usePessoalGroupAssignments.ts",
+    "usePessoalObligations.ts",
+    "usePessoalPasswords.ts",
+    "usePessoalPayroll.ts",
+    "usePessoalTracking.ts",
+    "usePessoalUnions.ts",
+  ]) {
+    const hook = readFileSync(new URL(`./hooks/${file}`, import.meta.url), "utf8");
+    assert.doesNotMatch(hook, /onSuccess:/, `${file} ainda invalida só no sucesso`);
+  }
+});
+
 runTest("pessoal error message prefers api fields before local fallback", () => {
   assert.equal(
     getPessoalErrorMessage(
@@ -364,7 +393,7 @@ runTest("union deletion uses the scoped client, cache mutation, and guarded dial
   assert.match(service, /api\.delete\(PESSOAL_ENDPOINTS\.unionDetail\(id\)\)/);
   assert.match(hook, /export function useDeletePessoalUnionMutation/);
   assert.match(hook, /mutationFn: \(id\) => pessoalService\.deleteUnion\(id\)/);
-  assert.match(hook, /onSuccess: async \(\) => \{\s*await queryClient\.invalidateQueries\(\{ queryKey: unionsKey \}\)/);
+  assert.match(hook, /onSettled: async \(\) => \{\s*await queryClient\.invalidateQueries\(\{ queryKey: unionsKey \}\)/);
   assert.match(section, /useDeletePessoalUnionMutation/);
   assert.match(section, /canEdit \? \(\s*<td/);
   assert.match(section, /<Dialog[\s\S]*title="Remover sindicato"/);
