@@ -57,9 +57,11 @@ export function createUserRoutes(
   }
 
   function isSelfPasswordUpdate(request: Request, id: string, body: object): boolean {
-    const keys = Object.keys(body);
-
-    return request.user_id === id && keys.length === 1 && keys[0] === "password";
+    return (
+      request.user_id === id &&
+      "password" in body &&
+      Object.keys(body).every((key) => key === "password" || key === "current_password")
+    );
   }
 
   router.get(
@@ -164,7 +166,23 @@ export function createUserRoutes(
           requireOwnerUserAuth(request);
         }
 
-        const user = await userManagement(auth).update(id, body);
+        const { current_password: currentPassword, ...changes } = body;
+        if (changes.password !== undefined && request.user_id !== id) {
+          throw new ServiceError(
+            403,
+            "Administradores não definem a senha de outro usuário. Envie um link de redefinição.",
+          );
+        }
+        if (changes.password !== undefined) {
+          await userService.assertOwnPasswordChange(
+            id,
+            auth.organization_id,
+            currentPassword,
+            changes.password,
+          );
+        }
+
+        const user = await userManagement(auth).update(id, changes);
 
         response.json(createSuccessResponse(user));
       } catch (err) {

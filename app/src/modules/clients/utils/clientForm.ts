@@ -33,7 +33,7 @@ export function createClientFormInitialValues(client?: Partial<Client>): ClientF
     company_name: client?.company_name ?? "",
     fantasy_name: client?.fantasy_name ?? "",
     cpf_cnpj: client?.cpf_cnpj ?? "",
-    status: mapClientStatusFromApi(client?.status),
+    status: mapClientStatusFromApi(client?.status) || "Ativo",
     regime: getClientTaxRegime(client?.regime),
     service_unique: client?.service_unique ?? false,
   };

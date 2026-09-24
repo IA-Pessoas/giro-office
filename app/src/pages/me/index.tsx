@@ -5,7 +5,7 @@ import { User } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { canCreateUsers } from "@modules/auth";
 import { useMe, useUpdateCurrentUser } from "@shared/hooks";
-import { buildSelfProfileUpdatePayload } from "@shared/utils/meProfileUpdate";
+import { buildSelfProfileUpdatePayload, selfPasswordError } from "@shared/utils/meProfileUpdate";
 
 const inputClass =
   "w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30";
@@ -20,12 +20,16 @@ export default function Me() {
   const [name, setName] = useState("");
   const [login, setLogin] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const canManageUsers = canCreateUsers(user);
+  const passwordDraft = { password: newPassword, currentPassword, confirmPassword };
+  const passwordError = selfPasswordError(passwordDraft);
   const updatePayload = buildSelfProfileUpdatePayload({
     canManageUsers,
     currentName: profileQuery.data?.name ?? "",
     name,
-    password: newPassword,
+    ...passwordDraft,
   });
 
   useEffect(() => {
@@ -45,7 +49,11 @@ export default function Me() {
     }
 
     updateUserMutation.mutate(updatePayload, {
-      onSuccess: () => setNewPassword(""),
+      onSuccess: () => {
+        setNewPassword("");
+        setCurrentPassword("");
+        setConfirmPassword("");
+      },
     });
   }
 
@@ -112,18 +120,54 @@ export default function Me() {
             </div>
 
             <div>
+              <label className={labelClass} htmlFor="me-current-password">
+                Senha atual
+              </label>
+              <input
+                id="me-current-password"
+                className={inputClass}
+                placeholder="Digite a senha atual"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+
+            <div>
               <label className={labelClass} htmlFor="me-new-password">
                 Nova Senha
               </label>
               <input
                 id="me-new-password"
                 className={inputClass}
-                placeholder="Digite a nova senha"
+                placeholder="Mínimo de 10 caracteres"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 autoComplete="new-password"
               />
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="me-confirm-password">
+                Confirmar nova senha
+              </label>
+              <input
+                id="me-confirm-password"
+                className={inputClass}
+                placeholder="Repita a nova senha"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                aria-describedby={passwordError ? "me-password-error" : undefined}
+              />
+              {passwordError ? (
+                <p id="me-password-error" className="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {passwordError}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">

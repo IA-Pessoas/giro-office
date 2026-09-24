@@ -57,7 +57,8 @@ export function useUpdateMe(): UseMutationResult<
         return;
       }
 
-      toast.error(PROFILE_UPDATE_ERROR_MESSAGE);
+      const serverMessage = isAxiosError(error) ? error.response?.data?.error : undefined;
+      toast.error(typeof serverMessage === "string" ? serverMessage : PROFILE_UPDATE_ERROR_MESSAGE);
     },
   });
 }

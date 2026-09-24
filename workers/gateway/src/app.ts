@@ -139,7 +139,7 @@ const platformMatchers: RouteMatcher[] = [
   },
   {
     methods: ["POST"],
-    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/u,
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/(?:reactivate|password-reset)\/?$/u,
     binding: "USER_SERVICE",
   },
   {
@@ -155,6 +155,28 @@ const platformMatchers: RouteMatcher[] = [
     binding: "ORGANIZATION_SERVICE",
   },
 ];
+
+/** Rotas públicas que recebem credencial: limitadas por IP (#1344). */
+const CREDENTIAL_ROUTES = new Set([
+  "POST /platform/session",
+  "POST /user/session",
+  "POST /user/password-reset/confirm",
+]);
+
+async function requireLoginRateLimit(
+  request: Request,
+  env: GatewayWorkerEnv,
+  method: string,
+  path: string,
+): Promise<void> {
+  // ponytail: sem o binding (dev local, testes) o limite é ignorado; em produção ele vem do wrangler.
+  if (!env.LOGIN_RATE_LIMITER || !CREDENTIAL_ROUTES.has(`${method.toUpperCase()} ${path}`)) return;
+  const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+  const { success } = await env.LOGIN_RATE_LIMITER.limit({ key: `${path}:${ip}` });
+  if (!success) {
+    throw new ServiceError(429, "Muitas tentativas. Aguarde um minuto e tente novamente.");
+  }
+}
 
 /** `PUT /user/:id` do próprio usuário, exceção do authorize.ts:8 do Node. */
 const SELF_USER_PUT_PATH = /^\/user\/(?!me$|session$|start-config$|permission\/)([^/]+)$/;
@@ -370,6 +392,7 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     // exatamente como authenticate.ts, csrfProtection.ts e authorize.ts do Node.
     const isPublic = isPublicRoute(c.req.method, path);
     let auth: Awaited<ReturnType<typeof authenticateGatewayRequest>> | undefined;
+    if (isPublic) await requireLoginRateLimit(c.req.raw, env, c.req.method, path);
     if (!isPublic) {
       auth = await authenticateGatewayRequest(c.req.raw, env);
       await requireCsrfForMutation(c.req.raw, auth);

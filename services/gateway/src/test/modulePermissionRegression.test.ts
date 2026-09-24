@@ -1,4 +1,5 @@
 import { type AuthContext, type AuthPolicy, canAccessRoute } from "@workspace/shared";
+import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 import { describe, expect, it } from "vitest";
 
 import { getRoutePolicy } from "../security/policies.js";
@@ -31,6 +32,53 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
+  // #1343 / ADR 0002: o papel Visualizador (nível 1) só lê; o owner escreve em tudo.
+  it("bloqueia escrita do Visualizador em cada módulo e libera o owner", () => {
+    const viewer = authContext({
+      permission: 1,
+      modules: Object.fromEntries(ACTIVE_MODULE_KEYS.map((module) => [module, 1])),
+    });
+    const owner = authContext({ type: "owner", permission: 2, modules: {} });
+    const writeRoutes = [
+      ["rh", "PUT", "/rh/requests"],
+      ["ti", "POST", "/ti/inventory"],
+      ["ti", "POST", "/department"],
+      ["integracao", "POST", "/project"],
+      ["integracao", "POST", "/task"],
+      ["comercial", "POST", "/commercial/prospects"],
+      ["integracao", "DELETE", "/client/client-1"],
+      ["financeiro", "PUT", "/task/financeiro/collectors"],
+      ["pessoal", "POST", "/pessoal/groups"],
+      ["parcelamento", "POST", "/parcelamento/panoramas"],
+      ["regularize", "POST", "/regularize/passwords"],
+      ["fiscal", "POST", "/fiscal/ncm"],
+      ["contabil", "POST", "/contabil/controls"],
+      ["certificado", "DELETE", "/certificate/cert-1"],
+    ] as const;
+
+    for (const [module, method, path] of writeRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(viewer, policy), `${module}: ${method} ${path}`).toBe(false);
+      expect(canAccessRoute(owner, policy), `owner: ${method} ${path}`).toBe(true);
+    }
+
+    // Exceções do ADR 0002: fluxos operacionais em que o nível 1 executa. Marketing não tem rota.
+    const covered = new Set<string>([
+      ...writeRoutes.map(([module]) => module),
+      "triagem",
+      "marketing",
+    ]);
+    expect(ACTIVE_MODULE_KEYS.filter((module) => !covered.has(module))).toEqual([]);
+    for (const [method, path] of [
+      ["POST", "/triagem/monthly"],
+      ["POST", "/task/financeiro/settle"],
+    ] as const) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path)), `${method} ${path}`).toBe(
+        true,
+      );
+    }
+  });
+
   it("permite RH nível 1 no próprio perfil, sem liberar as demais mutações RH", () => {
     const profilePolicy = requiredRoutePolicy("PUT", "/rh/profile/colaborator");
     const createRequestPolicy = requiredRoutePolicy("POST", "/rh/requests");

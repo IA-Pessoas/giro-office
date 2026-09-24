@@ -5,7 +5,6 @@ import { userService } from '../services/userService';
 
 const getInitialState = (user: UserItem) => ({
   name: user?.name || '',
-  password: '',
   permission: user?.permission ?? 0,
   department_id: user?.department_id || '',
   status: user?.status || '',
@@ -35,7 +34,6 @@ export const useUserForm = (initialUser: UserItem) => {
     try {
       const updateData: UpdateUserData = {
         name: formData.name,
-        password: formData.password || undefined,
         permission: formData.permission,
         department_id: formData.department_id,
         status: formData.status,

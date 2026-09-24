@@ -292,6 +292,7 @@ export function Administracao() {
     details: {
       loadUser: userService.getById,
       saveUser: userService.update,
+      sendPasswordReset: userService.sendPasswordReset,
     },
     permissions: {
       listUsers: () => listAdminUsers("active"),

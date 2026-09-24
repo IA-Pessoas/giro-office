@@ -444,7 +444,7 @@ const upstream = createServer(async (request, response) => {
     return reply(response, 201, createdUser);
   }
   const userMatch = url.pathname.match(
-    /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)(?:\/(reactivate))?$/,
+    /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)(?:\/(reactivate|password-reset))?$/,
   );
   const selectedUser = userMatch && organizations.find((item) => item.id === userMatch[1]);
   const managedUser =
@@ -456,7 +456,7 @@ const upstream = createServer(async (request, response) => {
       assert.equal(request.headers["x-csrf-token"], csrf);
       assert.equal(request.headers.authorization, undefined);
       assert.equal(body.expected_version, managedUser.version);
-      if (Object.hasOwn(body, "password")) assert.equal(typeof body.password, "string");
+      assert.equal(Object.hasOwn(body, "password"), false, "admin não envia senha");
       if (forceUserVersionConflict) {
         forceUserVersionConflict = false;
         managedUser.version += 1;
@@ -484,6 +484,11 @@ const upstream = createServer(async (request, response) => {
         status: { from: "active", to: "inactive" },
       });
       return reply(response, 200, managedUser);
+    }
+    if (request.method === "POST" && userMatch[3] === "password-reset") {
+      assert.equal(request.headers["x-csrf-token"], csrf);
+      assert.equal(request.headers.authorization, undefined);
+      return reply(response, 200, { sent: true });
     }
     if (request.method === "POST" && userMatch[3] === "reactivate") {
       assert.equal(request.headers["x-csrf-token"], csrf);
@@ -996,13 +1001,25 @@ try {
     await page.getByRole("button", { name: "Editar dados", exact: true }).waitFor();
     await page.getByRole("button", { name: "Editar dados", exact: true }).click();
     await userDetails.getByLabel("Nome", { exact: true }).fill("Usuário homologado editado");
-    await userDetails.getByLabel("Nova senha", { exact: true }).fill("OutraSenha!2026");
-    await userDetails.getByRole("button", { name: "Salvar alterações", exact: true }).click();
-    const passwordDialog = page.getByRole("dialog", {
-      name: "Confirmar alteração de senha",
+    assert.equal(await userDetails.getByLabel("Nova senha", { exact: true }).count(), 0);
+    await userDetails
+      .getByRole("button", { name: "Enviar link de redefinição de senha", exact: true })
+      .click();
+    const resetDialog = page.getByRole("dialog", {
+      name: "Enviar link de redefinição de senha",
       exact: true,
     });
-    await passwordDialog.getByRole("button", { name: "Alterar senha", exact: true }).click();
+    await resetDialog.getByRole("button", { name: "Enviar link", exact: true }).click();
+    await page.getByText("Link de redefinição enviado por e-mail.", { exact: true }).waitFor();
+    assert.ok(
+      requests.some(
+        (request) =>
+          request.method === "POST" &&
+          request.path ===
+            `/platform/organizations/${organization.id}/users/user-safe-created/password-reset`,
+      ),
+    );
+    await userDetails.getByRole("button", { name: "Salvar alterações", exact: true }).click();
     await page.getByRole("heading", { name: "Usuário homologado editado", exact: true }).waitFor();
     assert.ok(
       requests.some(
