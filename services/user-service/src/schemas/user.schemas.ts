@@ -61,11 +61,26 @@ export const createUserBodySchema = z
     }
   });
 
+export const MIN_PASSWORD_LENGTH = 10;
+
+/** Política da troca da própria senha (#1341); null quando a nova senha é aceita. */
+export function ownPasswordPolicyError(
+  currentPassword: string,
+  nextPassword: string,
+): string | null {
+  if (nextPassword.length < MIN_PASSWORD_LENGTH) {
+    return `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+  }
+  if (nextPassword === currentPassword) return "A nova senha deve ser diferente da atual.";
+  return null;
+}
+
 export const updateUserBodySchema = z
   .object({
     name: z.string().trim().min(1).optional(),
     login: z.string().trim().toLowerCase().min(1).optional(),
     password: z.string().min(1).optional(),
+    current_password: z.string().min(1).optional(),
     department_id: z.string().trim().min(1).optional(),
     permission: z.number().int().optional(),
     status: z.string().trim().min(1).optional(),

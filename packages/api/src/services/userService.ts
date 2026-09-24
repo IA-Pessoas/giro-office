@@ -188,6 +188,7 @@ export async function updateCurrentUser(
 
   if (payload.password !== undefined && payload.password !== "") {
     body.password = payload.password;
+    if (payload.currentPassword !== undefined) body.current_password = payload.currentPassword;
   }
 
   const { data } = await client.put(`/user/${currentUser.id}`, body);

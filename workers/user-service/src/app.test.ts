@@ -660,23 +660,35 @@ describe("user Worker", () => {
     );
   });
 
+  /** Após o incremento, a releitura da sessão enxerga session_version 2, como no banco. */
+  function mockPasswordChangedUser(db: ReturnType<typeof prisma>) {
+    db.user.findFirst.mockImplementation((async (args: { select?: Record<string, unknown> }) => ({
+      ...user(),
+      password: "stored-password-hash",
+      session_version: args?.select?.session_version ? 2 : 1,
+    })) as never);
+  }
+
   it("hashes password mutations instead of returning 501", async () => {
     const db = prisma();
+    mockPasswordChangedUser(db);
     const hashPassword = vi.fn(async () => "new-argon2id-hash");
+    const verifyPassword = vi.fn(async () => true);
     const app = createUserWorkerApp({
       env: env(),
       prisma: db,
       hashPassword,
+      verifyPassword,
     } as never);
 
     const response = await app.request(`https://user.test/user/${USER_ID}`, {
       method: "PUT",
       headers: { ...forwardedHeaders(), "content-type": "application/json" },
-      body: JSON.stringify({ password: "new-secret" }),
+      body: JSON.stringify({ password: "new-secret-123", current_password: "old-secret" }),
     });
 
     expect(response.status).toBe(200);
-    expect(hashPassword).toHaveBeenCalledWith("new-secret");
+    expect(hashPassword).toHaveBeenCalledWith("new-secret-123");
     expect(db.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -685,6 +697,100 @@ describe("user Worker", () => {
         }),
       }),
     );
+  });
+
+  describe("troca da própria senha", () => {
+    async function changeOwnPassword(body: Record<string, unknown>, valid = true) {
+      const db = prisma();
+      mockPasswordChangedUser(db);
+      const verifyPassword = vi.fn(async () => valid);
+      const hashPassword = vi.fn(async () => "new-argon2id-hash");
+      const app = createUserWorkerApp({
+        env: env(),
+        prisma: db,
+        hashPassword,
+        verifyPassword,
+      } as never);
+      const response = await app.request(`https://user.test/user/${USER_ID}`, {
+        method: "PUT",
+        headers: { ...forwardedHeaders(), "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return { response, db, verifyPassword };
+    }
+
+    it("recusa sem a senha atual", async () => {
+      const { response, db } = await changeOwnPassword({ password: "nova-senha-forte" });
+
+      expect(response.status).toBe(400);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("recusa com a senha atual incorreta", async () => {
+      const { response, db, verifyPassword } = await changeOwnPassword(
+        { password: "nova-senha-forte", current_password: "errada" },
+        false,
+      );
+
+      expect(response.status).toBe(403);
+      expect(verifyPassword).toHaveBeenCalledWith("errada", "stored-password-hash");
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("recusa nova senha com menos de 10 caracteres", async () => {
+      const { response, db } = await changeOwnPassword({
+        password: "curta",
+        current_password: "senha-atual",
+      });
+
+      expect(response.status).toBe(400);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("recusa nova senha igual à atual", async () => {
+      const { response, db } = await changeOwnPassword({
+        password: "senha-atual-123",
+        current_password: "senha-atual-123",
+      });
+
+      expect(response.status).toBe(400);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("exige a senha atual também quando o nome muda junto", async () => {
+      const { response, db } = await changeOwnPassword({
+        name: "Novo nome",
+        password: "nova-senha-forte",
+      });
+
+      expect(response.status).toBe(400);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("revoga as outras sessões e renova a sessão atual", async () => {
+      const { response, db } = await changeOwnPassword({
+        password: "nova-senha-forte",
+        current_password: "senha-atual",
+      });
+
+      expect(response.status).toBe(200);
+      expect(db.user.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({ current_password: expect.anything() }),
+        }),
+      );
+      expect(db.authSession.updateMany).toHaveBeenCalledWith({
+        where: { user_id: USER_ID, id: { not: "session-1" }, revoked_at: null },
+        data: { revoked_at: expect.any(Date) },
+      });
+      const sessionToken = /cw\.session=([^;]+)/.exec(
+        response.headers.get("set-cookie") ?? "",
+      )?.[1];
+      const claims = JSON.parse(
+        Buffer.from(String(sessionToken).split(".")[1], "base64url").toString(),
+      );
+      expect(claims).toMatchObject({ session_id: "session-1", session_version: 2 });
+    });
   });
 
   it("normaliza permissões e invalida a sessão ao fazer downgrade de type", async () => {

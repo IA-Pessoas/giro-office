@@ -833,6 +833,11 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                     name: { type: "string" },
                     login: { type: "string" },
                     password: { type: "string" },
+                    current_password: {
+                      type: "string",
+                      description:
+                        "Obrigatória quando o usuário troca a própria senha; a nova senha precisa de ao menos 10 caracteres e diferir da atual.",
+                    },
                     department_id: { type: "string" },
                     permission: { type: "integer" },
                     status: { type: "string" },
@@ -869,6 +874,10 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
           responses: {
             "200": { description: "Atualizado", ...successJson },
+            "400": {
+              description: "Payload inválido, senha atual ausente ou nova senha fora da política",
+            },
+            "403": { description: "Sem permissão ou senha atual incorreta" },
           },
         },
         delete: {
