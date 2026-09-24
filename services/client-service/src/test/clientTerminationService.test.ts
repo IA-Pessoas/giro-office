@@ -124,4 +124,28 @@ describe("terminateClient", () => {
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it.each([
+    "Inativo",
+    "Processo de Inativação",
+    "Prospecção",
+    "Paralisado",
+  ])("falha com 409 quando o cliente ja esta %s", async (status) => {
+    const prisma = {
+      client: { findFirst: vi.fn().mockResolvedValue({ id: "client-1", status }) },
+      $transaction: vi.fn(),
+    };
+
+    await expect(
+      terminateClient(prisma as never, "client-1", "org-1", "user-1", {
+        reason: "Pedido",
+        description: "Descricao",
+        competence_output: "2026-03",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "Só é possível inativar cliente ativo.",
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
 });

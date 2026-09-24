@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { after, before, test } from "node:test";
+import { test } from "node:test";
+
+import { hasDocker, usePostgres } from "./pgHarness.mjs";
 
 // Roda o relatorio real contra um Postgres descartavel em Docker. Sem Docker, pula.
 const SQL = readFileSync(new URL("../../repairs/report-non-person-users.sql", import.meta.url), "utf8");
-const CONTAINER = `non-person-users-test-${process.pid}`;
-const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 const FIXTURE = `
 CREATE TABLE departments (id text PRIMARY KEY, name text NOT NULL);
@@ -32,33 +31,7 @@ INSERT INTO permissions VALUES ('p1', 'u1', 0, 2, 0);
 INSERT INTO tasks VALUES ('t1', 'u2'), ('t2', 'u2'), ('t3', 'u1');
 `;
 
-function psql(sql) {
-  return spawnSync(
-    "docker",
-    ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-X", "-q", "-t", "-A", "-f", "-"],
-    { input: sql, encoding: "utf8" },
-  );
-}
-
-before(() => {
-  if (!hasDocker) return;
-  execFileSync("docker", [
-    "run", "-d", "--rm", "--name", CONTAINER, "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:17",
-  ]);
-  for (let i = 0; i < 60; i++) {
-    if (psql("SELECT 1").status === 0) {
-      const fixture = psql(FIXTURE);
-      assert.equal(fixture.status, 0, fixture.stderr);
-      return;
-    }
-    execFileSync("sleep", ["1"]);
-  }
-  throw new Error("Postgres de teste nao subiu");
-});
-
-after(() => {
-  if (hasDocker) spawnSync("docker", ["rm", "-f", CONTAINER], { stdio: "ignore" });
-});
+const { psql, query } = usePostgres("non-person-users-test", { setup: FIXTURE });
 
 test("lista entidades candidatas com vinculos e ativos com permissoes, sem gravar", {
   skip: !hasDocker,

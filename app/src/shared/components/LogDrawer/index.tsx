@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { AxiosError } from "axios";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { FiClock } from "react-icons/fi";
@@ -22,8 +22,11 @@ interface AuditChange {
 interface AuditRecord {
   id: string;
   userId?: string | null;
+  method?: string;
+  path?: string;
   action?: string | null;
   createdAt: string;
+  metadata?: Record<string, unknown> | null;
   changes?: Record<string, AuditChange> | null;
 }
 
@@ -49,7 +52,7 @@ const permissionMap: Record<number, string> = {
   2: "Administrador",
 };
 
-function extractAuditItems(payload: unknown): AuditRecord[] {
+function extractAuditSearchResponse(payload: unknown): AuditSearchResponse | null {
   if (
     payload &&
     typeof payload === "object" &&
@@ -59,10 +62,16 @@ function extractAuditItems(payload: unknown): AuditRecord[] {
     "items" in payload.data &&
     Array.isArray((payload.data as AuditSearchResponse).items)
   ) {
-    return (payload.data as AuditSearchResponse).items;
+    const data = payload.data as AuditSearchResponse;
+    return {
+      items: data.items,
+      total: typeof data.total === "number" ? data.total : data.items.length,
+      page: typeof data.page === "number" ? data.page : 1,
+      pageSize: typeof data.pageSize === "number" ? data.pageSize : 20,
+    };
   }
 
-  return [];
+  return null;
 }
 
 function formatValue(key: string, value: unknown): unknown {
@@ -80,9 +89,13 @@ function formatValue(key: string, value: unknown): unknown {
 export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
   const apiClient = setupAPIClient();
   const [isOpen, setIsOpen] = useState(false);
+  const [scope, setScope] = useState<"item" | "organization">("item");
   const [logs, setLogs] = useState<AuditRecord[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const historyRequestVersion = useRef(0);
 
   const getHistoryErrorMessage = (error: unknown): string => {
     const axiosError = error as AxiosError<{ error?: string }>;
@@ -99,7 +112,9 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
     return "Não foi possível carregar o histórico agora.";
   };
 
-  const handleOpen = async () => {
+  const loadHistory = async (nextScope: "item" | "organization", nextPage = 1) => {
+    const requestVersion = ++historyRequestVersion.current;
+    setScope(nextScope);
     setLoading(true);
     setIsOpen(true);
     setErrorMessage(null);
@@ -107,29 +122,36 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
     try {
       const response = await apiClient.get("/audit/requests", {
         params: {
-          referring,
-          referringId,
-          page: 1,
+          ...(nextScope === "item" ? { referring, referringId } : {}),
+          page: nextPage,
           pageSize: 20,
         },
       });
 
-      setLogs(extractAuditItems(response.data));
+      const result = extractAuditSearchResponse(response.data);
+      if (requestVersion !== historyRequestVersion.current) return;
+      setLogs(result?.items ?? []);
+      setPage(result?.page ?? nextPage);
+      setTotal(result?.total ?? 0);
     } catch (error) {
+      if (requestVersion !== historyRequestVersion.current) return;
       setLogs([]);
+      setTotal(0);
       setErrorMessage(getHistoryErrorMessage(error));
     } finally {
-      setLoading(false);
+      if (requestVersion === historyRequestVersion.current) setLoading(false);
     }
   };
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
+      historyRequestVersion.current += 1;
+      setLoading(false);
       setIsOpen(false);
       return;
     }
 
-    void handleOpen();
+    void loadHistory("item");
   };
 
   return (
@@ -150,27 +172,70 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
             </button>
           </DialogPrimitive.Close>
           <DialogPrimitive.Title className={styles.header}>
-            Histórico de alterações
+            {scope === "organization" ? "Auditoria da organização" : "Histórico de alterações"}
           </DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Lista de alterações registradas para o item selecionado.
+            {scope === "organization"
+              ? "Lista paginada de requisições auditadas nesta organização."
+              : "Lista de alterações registradas para o item selecionado."}
           </DialogPrimitive.Description>
           <div className={styles.body}>
+            <div className={styles.historyScopes} role="group" aria-label="Escopo do histórico">
+              <button
+                type="button"
+                className={styles.trigger}
+                aria-pressed={scope === "item"}
+                disabled={loading}
+                onClick={() => void loadHistory("item")}
+              >
+                Histórico do item
+              </button>
+              <button
+                type="button"
+                className={styles.trigger}
+                aria-pressed={scope === "organization"}
+                disabled={loading}
+                onClick={() => void loadHistory("organization")}
+              >
+                Auditoria da organização
+              </button>
+            </div>
             {loading ? (
               <div className={styles.spinner}>Carregando...</div>
             ) : errorMessage ? (
               <p className={styles.text}>{errorMessage}</p>
             ) : logs.length === 0 ? (
-              <p className={styles.text}>Nenhuma alteração registrada.</p>
+              <p className={styles.text}>
+                {scope === "organization"
+                  ? "Nenhuma requisição registrada."
+                  : "Nenhuma alteração registrada."}
+              </p>
             ) : (
               logs.map((log) => (
                 <div key={log.id} className={styles.logCard}>
-                  <p className={styles.logTitle}>{log.action ?? "Alteração"}</p>
+                  <p className={styles.logTitle}>
+                    {scope === "organization"
+                      ? (log.action ?? `${log.method ?? "Requisição"} ${log.path ?? ""}`)
+                      : (log.action ?? "Alteração")}
+                  </p>
                   <p className={styles.text}>
                     Em: {format(new Date(log.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                   </p>
                   {log.userId ? (
-                    <p className={styles.text}>Usuário: {log.userId}</p>
+                    <p className={styles.text}>
+                      {scope === "organization" ? "Autor (usuário-alvo)" : "Usuário"}: {log.userId}
+                    </p>
+                  ) : null}
+                  {scope === "organization" && (log.method || log.path) ? (
+                    <p className={styles.text}>
+                      {log.method ?? "Requisição"} {log.path ?? ""}
+                    </p>
+                  ) : null}
+                  {log.metadata?.actorKind === "platform" &&
+                  typeof log.metadata.actorPlatformUserId === "string" ? (
+                    <p className={styles.text}>
+                      Operador na personificação: {log.metadata.actorPlatformUserId}
+                    </p>
                   ) : null}
                   <div className={styles.changes}>
                     {log.action !== "Cadastro" && log.changes
@@ -190,6 +255,35 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
                 </div>
               ))
             )}
+            {scope === "organization" && total > 20 ? (
+              <div
+                className={styles.historyPagination}
+                role="group"
+                aria-label="Paginação da auditoria"
+              >
+                <button
+                  type="button"
+                  className={styles.trigger}
+                  aria-label="Página anterior"
+                  disabled={loading || page <= 1}
+                  onClick={() => void loadHistory("organization", page - 1)}
+                >
+                  Anterior
+                </button>
+                <span className={styles.text} aria-live="polite">
+                  Página {page} de {Math.ceil(total / 20)}
+                </span>
+                <button
+                  type="button"
+                  className={styles.trigger}
+                  aria-label="Próxima página"
+                  disabled={loading || page * 20 >= total}
+                  onClick={() => void loadHistory("organization", page + 1)}
+                >
+                  Próxima
+                </button>
+              </div>
+            ) : null}
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

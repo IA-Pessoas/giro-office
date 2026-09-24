@@ -18,9 +18,12 @@ export type RegularizeClientPfSelectOption = {
 };
 
 export function RegularizeClientPfSelect({
+  excludeIds,
   onChange,
   value,
 }: {
+  // PFs já vinculadas somem da lista, exceto a selecionada.
+  excludeIds?: readonly string[];
   onChange: (id: string, option?: RegularizeClientPfSelectOption) => void;
   value: string;
 }) {
@@ -43,11 +46,13 @@ export function RegularizeClientPfSelect({
   const isLoading = listQuery.isLoading || selectedPfQuery.isLoading;
 
   const options = useMemo<RegularizeClientPfSelectOption[]>(() => {
-    const pageOptions = (listQuery.data?.data ?? []).map((clientPf) => ({
-      id: clientPf.id,
-      label: clientPf.name || clientPf.id,
-      cpf: clientPf.cpf,
-    }));
+    const pageOptions = (listQuery.data?.data ?? [])
+      .filter((clientPf) => clientPf.id === value || !excludeIds?.includes(clientPf.id))
+      .map((clientPf) => ({
+        id: clientPf.id,
+        label: clientPf.name || clientPf.id,
+        cpf: clientPf.cpf,
+      }));
     const selected = selectedPfQuery.data;
 
     if (!selected || pageOptions.some((option) => option.id === selected.id)) {
@@ -58,7 +63,7 @@ export function RegularizeClientPfSelect({
       { id: selected.id, label: selected.name || selected.id, cpf: selected.cpf },
       ...pageOptions,
     ];
-  }, [listQuery.data, selectedPfQuery.data]);
+  }, [excludeIds, listQuery.data, selectedPfQuery.data, value]);
 
   const total = listQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PF_SELECT_PAGE_SIZE));

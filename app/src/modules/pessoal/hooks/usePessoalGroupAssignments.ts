@@ -51,7 +51,7 @@ export function useApplyPessoalGroupAssignmentPreviewMutation(): UseMutationResu
   return useMutation({
     mutationFn: ({ previewId, fingerprint, idempotencyKey }) =>
       pessoalService.applyGroupAssignmentPreview(previewId, fingerprint, idempotencyKey),
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: pessoalQueryKey("group-assignments", "eligible") });
       await queryClient.invalidateQueries({ queryKey: pessoalQueryKey("payroll") });
     },

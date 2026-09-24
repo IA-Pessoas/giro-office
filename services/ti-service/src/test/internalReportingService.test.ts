@@ -4,6 +4,7 @@ import {
   MAX_REPORTING_QUERY_ROWS,
   REPORTING_QUERY_BYTE_LIMIT_CODE,
   REPORTING_QUERY_ROW_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
 } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
@@ -285,7 +286,11 @@ describe("InternalReportingService", () => {
         fields: ["asset_code"],
         limit: MAX_REPORTING_QUERY_LIMIT,
       }),
-    ).rejects.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_ROW_LIMIT_CODE });
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      code: REPORTING_QUERY_ROW_LIMIT_CODE,
+      message: REPORTING_QUERY_ROW_LIMIT_MESSAGE,
+    });
     expect(findMany).toHaveBeenCalledTimes(501);
   });
 });

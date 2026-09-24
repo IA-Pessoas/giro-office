@@ -168,7 +168,7 @@ export class RelationshipService {
   async getByClientId(
     clientId: string,
     organizationId: string,
-  ): Promise<RelationshipContabilEntity> {
+  ): Promise<RelationshipContabilEntity | null> {
     const relationship = await this.prisma.relationshipContabil.findFirst({
       where: {
         client_id: clientId,
@@ -176,11 +176,8 @@ export class RelationshipService {
       },
     });
 
-    if (!relationship) {
-      throw new ServiceError(404, "Registro de relacionamento não encontrado para este cliente.");
-    }
-
-    return relationship;
+    // Sem cadastro é estado vazio: 200 com null.
+    return relationship ?? null;
   }
 
   async delete(id: string, organizationId: string): Promise<{ message: string }> {

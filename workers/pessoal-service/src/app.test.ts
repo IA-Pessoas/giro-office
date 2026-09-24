@@ -11,6 +11,7 @@ import {
   type PessoalSituationService,
   type PessoalUnionService,
   type PessoalWorkerEnv,
+  summarizeLddStatuses,
 } from "./app.js";
 
 const USER_ID = "b0000000-0000-4000-8000-000000000001";
@@ -193,6 +194,20 @@ describe("pessoal Worker", () => {
     expect(groupService.archive).toHaveBeenCalledWith(ORGANIZATION_ID, USER_ID, GROUP_ID);
   });
 
+  it("rejects a new union with an invalid CNPJ (#1301)", async () => {
+    const unions = unionService();
+    const app = createPessoalWorkerApp({ env: env(), unionService: unions });
+    for (const cnpj of ["123", "11.222.333/0001-44"]) {
+      const response = await app.request("https://pessoal.test/pessoal/unions", {
+        method: "POST",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ name: "Sindicato", cnpj }),
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(unions.create).not.toHaveBeenCalled();
+  });
+
   it("routes unions and situations through the existing domain services", async () => {
     const unions = unionService();
     const situations = situationService();
@@ -212,7 +227,7 @@ describe("pessoal Worker", () => {
     const unionCreate = await app.request("https://pessoal.test/pessoal/unions", {
       method: "POST",
       headers: jsonHeaders,
-      body: JSON.stringify({ name: "Sindicato", cnpj: "123" }),
+      body: JSON.stringify({ name: "Sindicato", cnpj: "11.222.333/0001-81" }),
     });
     const unionUpdate = await app.request(`https://pessoal.test/pessoal/unions/${UNION_ID}`, {
       method: "PATCH",
@@ -267,7 +282,7 @@ describe("pessoal Worker", () => {
     );
     expect(unions.create).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
-      { name: "Sindicato", cnpj: "123" },
+      { name: "Sindicato", cnpj: "11.222.333/0001-81" },
     );
     expect(unions.delete).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
@@ -451,6 +466,25 @@ describe("pessoal Worker", () => {
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
       "2026-09",
     );
+  });
+
+  // #1301: "955 abertos, 0 vencidos" — pendente com vencimento passado é vencido.
+  it("counts pending LDD past its due date as overdue", () => {
+    const today = new Date("2026-09-23T15:00:00.000Z");
+    expect(
+      summarizeLddStatuses(
+        [
+          { status: "Pago", due_date: new Date("2026-01-10") },
+          { status: "Vencido", due_date: null },
+          { status: "Pendente", due_date: new Date("2026-09-22") },
+          { status: null, due_date: new Date("2026-08-01") },
+          { status: "Pendente", due_date: new Date("2026-09-23") },
+          { status: "pendente", due_date: null },
+          { status: "Pago", due_date: new Date("2026-08-01") },
+        ],
+        today,
+      ),
+    ).toEqual({ total: 7, open: 2, overdue: 3, paid: 2 });
   });
 
   it("returns the Pessoal overview scoped to the organization", async () => {

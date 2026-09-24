@@ -44,9 +44,9 @@ export function useCreatePessoalObligationMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => pessoalService.createObligation(payload),
-    onSuccess: async (result) => {
+    onSettled: async (_result, _error, payload) => {
       await queryClient.invalidateQueries({
-        queryKey: obligationKey(result.obligation.client_id, result.obligation.competence),
+        queryKey: obligationKey(payload.client_id, payload.competence),
       });
     },
   });
@@ -61,7 +61,7 @@ export function useUpdatePessoalObligationMutation(
 
   return useMutation({
     mutationFn: (payload) => pessoalService.updateObligationField(id, payload),
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: obligationKey(clientId, competence) });
     },
   });
@@ -74,7 +74,7 @@ export function useGeneratePessoalObligationsMutation(
 
   return useMutation({
     mutationFn: () => pessoalService.generateObligations(competence),
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: pessoalQueryKey("obligations") });
     },
   });

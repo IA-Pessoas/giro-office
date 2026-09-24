@@ -154,19 +154,20 @@ const overviewItem = {
     competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
     status: {
       type: "string",
-      enum: ["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE"],
+      enum: ["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE", "NO_APPLICABLE_ITEMS"],
     },
   },
 } as const;
 
 const overviewIndicators = {
   type: "object",
-  required: ["urgent_open", "routine_pending", "bank_pending", "complete"],
+  required: ["urgent_open", "routine_pending", "bank_pending", "complete", "no_applicable_items"],
   properties: {
     urgent_open: { type: "integer", minimum: 0 },
     routine_pending: { type: "integer", minimum: 0 },
     bank_pending: { type: "integer", minimum: 0 },
     complete: { type: "integer", minimum: 0 },
+    no_applicable_items: { type: "integer", minimum: 0 },
   },
 } as const;
 
@@ -236,7 +237,13 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
               in: "query",
               schema: {
                 type: "string",
-                enum: ["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE"],
+                enum: [
+                  "URGENT_OPEN",
+                  "ROUTINE_PENDING",
+                  "BANK_PENDING",
+                  "COMPLETE",
+                  "NO_APPLICABLE_ITEMS",
+                ],
               },
             },
           ],

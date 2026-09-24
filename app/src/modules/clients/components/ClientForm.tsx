@@ -38,19 +38,21 @@ export function ClientForm({
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-1.5">
-          <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
-            Nome
-          </RequiredFieldLabel>
-          <input
-            name="name"
-            value={values.name}
-            onChange={onChange}
-            disabled={disabled}
-            className={clientTextFieldClassName}
-            aria-required="true"
-          />
-        </label>
+        {values.type === "PF" ? (
+          <label className="space-y-1.5">
+            <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
+              Nome
+            </RequiredFieldLabel>
+            <input
+              name="name"
+              value={values.name}
+              onChange={onChange}
+              disabled={disabled}
+              className={clientTextFieldClassName}
+              aria-required="true"
+            />
+          </label>
+        ) : null}
 
         <label className="space-y-1.5">
           <span className="block text-sm font-medium text-slate-700 dark:text-white">Razão social</span>

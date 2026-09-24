@@ -33,6 +33,8 @@ export interface ProjectCreateRow {
   sponsor_id: string | null;
 }
 
+export const PROJECT_STATUS_WAITING_COMMERCIAL = "Aguardando liberação do Comercial";
+
 const CREATE_SELECT = {
   id: true,
   name: true,
@@ -49,7 +51,12 @@ export interface ProjectCreationTransaction {
   client: {
     findFirst(args: {
       where: { id: string; organization_id: string };
-    }): Promise<{ id: string } | null>;
+      select: { id: true; type_registration: true; prospecting_status: true };
+    }): Promise<{
+      id: string;
+      type_registration: string;
+      prospecting_status: string;
+    } | null>;
   };
   project: {
     findFirst(args: {
@@ -82,6 +89,7 @@ export async function createProjectInTransaction(
 
   const client = await tx.client.findFirst({
     where: { id: data.client_id, organization_id: data.organizationId },
+    select: { id: true, type_registration: true, prospecting_status: true },
   });
   if (!client) {
     throw new ServiceError(404, "Cliente não encontrado.");
@@ -103,7 +111,10 @@ export async function createProjectInTransaction(
       name: data.name,
       client_id: data.client_id,
       organization_id: data.organizationId,
-      status: "Em andamento",
+      status:
+        client.type_registration === "Novo" && client.prospecting_status !== "Fechado"
+          ? PROJECT_STATUS_WAITING_COMMERCIAL
+          : "Em andamento",
       start_date: data.start_date,
       end_date: data.end_date ?? null,
       objective: data.objective,

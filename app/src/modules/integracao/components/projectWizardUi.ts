@@ -5,6 +5,28 @@ export const WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING = "Prazo fora do período d
 export const WIZARD_EXTRACTION_MAX_ATTEMPTS = 3;
 export const WIZARD_EXTRACTION_MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 
+type ProjectWizardCrypto = Pick<Crypto, "getRandomValues"> &
+  Partial<Pick<Crypto, "randomUUID">>;
+
+export function createProjectWizardId(
+  cryptoApi: ProjectWizardCrypto = globalThis.crypto,
+): string {
+  if (typeof cryptoApi.randomUUID === "function") return cryptoApi.randomUUID();
+
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20),
+  ].join("-");
+}
+
 const WIZARD_EXTRACTION_FILE_MIME_TYPES: Record<string, readonly string[]> = {
   ".txt": ["text/plain"],
   ".md": ["text/markdown", "text/plain", "text/x-markdown"],

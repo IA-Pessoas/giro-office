@@ -12,6 +12,7 @@ const CSRF_HASH_PATTERN = /^[a-f0-9]{64}$/u;
 
 export interface SessionCookieOptions {
   secure: boolean;
+  maxAgeSeconds?: number;
 }
 
 export function createCsrfToken(): string {
@@ -75,9 +76,12 @@ export function stripBrowserAuth(cookieHeader: string | undefined): string | und
   return remaining.length > 0 ? remaining.join("; ") : undefined;
 }
 
-function cookieAttributes({ secure }: SessionCookieOptions, httpOnly: boolean): string {
+function cookieAttributes(
+  { secure, maxAgeSeconds = SESSION_MAX_AGE_SECONDS }: SessionCookieOptions,
+  httpOnly: boolean,
+): string {
   return [
-    `Max-Age=${SESSION_MAX_AGE_SECONDS}`,
+    `Max-Age=${maxAgeSeconds}`,
     "Path=/",
     httpOnly ? "HttpOnly" : undefined,
     secure ? "Secure" : undefined,

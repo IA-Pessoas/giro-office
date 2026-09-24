@@ -600,7 +600,11 @@ describe("project Worker", () => {
       delete: vi.fn(async () => ({ id: PROJECT_ID })),
     };
     const client = {
-      findFirst: vi.fn(async () => ({ id: CLIENT_ID })),
+      findFirst: vi.fn(async () => ({
+        id: CLIENT_ID,
+        type_registration: "Novo",
+        prospecting_status: "Em negociação",
+      })),
       update: vi.fn(async () => ({ id: CLIENT_ID })),
     };
     const prisma = {
@@ -632,10 +636,15 @@ describe("project Worker", () => {
     expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(client.findFirst).toHaveBeenCalledWith({
       where: { id: CLIENT_ID, organization_id: ORG },
+      select: { id: true, type_registration: true, prospecting_status: true },
     });
     expect(project.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ organization_id: ORG, porcentage: 0 }),
+        data: expect.objectContaining({
+          organization_id: ORG,
+          porcentage: 0,
+          status: "Aguardando liberação do Comercial",
+        }),
       }),
     );
     expect(audit.fetch).toHaveBeenCalledOnce();

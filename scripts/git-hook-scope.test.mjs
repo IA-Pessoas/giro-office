@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -125,7 +127,8 @@ describe("buildHookPlan", () => {
         "pnpm",
         [
           "exec",
-          "biome",
+          "node",
+          "node_modules/@biomejs/biome/bin/biome",
           "check",
           "--files-ignore-unknown=true",
           "--no-errors-on-unmatched",
@@ -143,7 +146,9 @@ describe("buildHookPlan", () => {
   it("nao deixa o biome falhar quando todo arquivo empurrado e do tipo que ele ignora", () => {
     const files = [".github/workflows/quality.yml"];
     const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
-    const biome = commands.find(([, args]) => args.includes("biome"));
+    const biome = commands.find(([, args]) =>
+      args.includes("node_modules/@biomejs/biome/bin/biome"),
+    );
 
     assert.ok(biome, "esperava um comando do biome no plano");
     assert.ok(biome[1].includes("--no-errors-on-unmatched"));
@@ -154,6 +159,36 @@ describe("buildHookPlan", () => {
     const commands = buildHookPlan(classifyChangedFiles(files), ["abc"], { changedFiles: files });
 
     assert.deepEqual(commands[0], ["pnpm", ["check"]]);
+  });
+
+  it("divide listas grandes de arquivos do biome em comandos seguros para Windows", () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "git-hook-biome-batch-"));
+
+    try {
+      const files = Array.from({ length: 500 }, (_, index) => {
+        const filePath = path.join(directory, `file-${String(index).padStart(4, "0")}.ts`);
+        writeFileSync(filePath, "export {};\n");
+        return filePath;
+      });
+      const commands = buildHookPlan(classifyChangedFiles(["scripts/hook.mjs"]), ["abc"], {
+        changedFiles: files,
+      }).filter(([, args]) => args.includes("node_modules/@biomejs/biome/bin/biome"));
+
+      assert.ok(commands.length > 1, "a lista deve ser dividida em mais de um processo");
+      assert.deepEqual(
+        commands.flatMap(([, args]) => args.slice(6)),
+        files,
+        "cada arquivo deve ser validado exatamente uma vez e na ordem original",
+      );
+      for (const [, args] of commands) {
+        assert.ok(
+          args.join(" ").length < 8_000,
+          "cada comando deve caber com folga no limite do Windows",
+        );
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("audits dependency changes even inside an affected package", () => {

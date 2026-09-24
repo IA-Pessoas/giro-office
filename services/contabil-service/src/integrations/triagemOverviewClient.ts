@@ -105,8 +105,11 @@ export class TriagemOverviewClient {
       }
 
       const item = payload.data.items[0];
+      // Cliente sem competência criada na Triagem: o overview vem vazio.
+      if (!item) {
+        throw new ServiceError(404, "Resumo da Triagem não encontrado.");
+      }
       if (
-        !item ||
         item.client_id !== input.clientId ||
         item.competence !== input.competence ||
         typeof item.legal_name !== "string" ||

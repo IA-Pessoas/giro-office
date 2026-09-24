@@ -1,3 +1,4 @@
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 import {
   formatBrazilianPhoneInput,
   formatCpfCnpjInput,
@@ -98,15 +99,11 @@ const booleanFieldNames = [
   "consultoria",
 ] as const satisfies ReadonlyArray<keyof ClientRegularizeFormValues>;
 
-export const REGULARIZE_REGIME_OPTIONS = [
-  "Simples Nacional",
-  "Lucro Real",
-  "Lucro Presumido",
-  "MEI",
-  "E-SOCIAL",
-  "CNO",
-  "CAEPF",
-] as const;
+// Valor antigo (MEI, E-SOCIAL, CNO, CAEPF) continua visível até alguém escolher um regime válido.
+export function getRegularizeRegimeOptions(current: string): string[] {
+  const options: string[] = [...TAX_REGIME_OPTIONS];
+  return current && !options.includes(current) ? [...options, current] : options;
+}
 
 export const REGULARIZE_SIZE_OPTIONS = ["DEMAIS", "EPP", "ME"] as const;
 
@@ -118,6 +115,7 @@ export const REGULARIZE_SEGMENT_OPTIONS = [
 
 export function createRegularizeInitialValues(client: Client): ClientRegularizeFormValues {
   return {
+    type: client.type,
     dominio_code: client.dominio_code ?? "",
     name: client.name ?? "",
     company_name: client.company_name ?? "",
@@ -151,6 +149,12 @@ export function createRegularizeInitialValues(client: Client): ClientRegularizeF
     end_strike: normalizeDateInputValue(client.end_strike),
     deletion_date: normalizeDateInputValue(client.deletion_date),
   };
+}
+
+export function isRegularizeCompanyClient(
+  values: Pick<ClientRegularizeFormValues, "type">,
+): boolean {
+  return values.type === "PJ";
 }
 
 export function buildRegularizePayload(

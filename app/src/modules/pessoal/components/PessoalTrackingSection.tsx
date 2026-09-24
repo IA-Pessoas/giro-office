@@ -17,7 +17,7 @@ import {
 import { Dialog } from "@shared/components";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
-import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
+import { formatBrlDecimalInput, parseBrlDecimalInput } from "@shared/utils/inputFormatting";
 
 import {
   useCreatePessoalLddMutation,
@@ -81,6 +81,9 @@ const emptySituationFormValues: SituationFormValues = {
   description: "",
 };
 
+const LDD_DESCRIPTION =
+  "LDD é o acompanhamento de um débito do cliente (INSS, FGTS, IRRF ou ISS), com período, vencimento, saldo e situação.";
+
 const lddTypeOptions = ["INSS", "FGTS", "IRRF", "ISS"] as const;
 const lddRegistrationStatusOptions = ["Pendente", "Cadastrado"] as const;
 const lddStatusOptions = ["Pendente", "Pago", "Vencido"] as const;
@@ -136,7 +139,7 @@ function buildLddFormValues(ldd: PessoalLdd | null): LddFormValues {
     due_date: ldd.due_date ? ldd.due_date.slice(0, 10) : "",
     balance_amount:
       typeof ldd.balance_amount === "number"
-        ? formatBrlInput(String(Math.round(ldd.balance_amount * 100)))
+        ? formatBrlDecimalInput(ldd.balance_amount.toFixed(2))
         : "",
     registration_status: ldd.registration_status ?? "",
     status: ldd.status ?? "",
@@ -253,7 +256,7 @@ export function PessoalTrackingSection({
       type: lddFormValues.type.trim(),
       period: optional(lddFormValues.period),
       due_date: optional(lddFormValues.due_date),
-      balance_amount: optional(lddFormValues.balance_amount, parseBrlInput),
+      balance_amount: optional(lddFormValues.balance_amount, parseBrlDecimalInput),
       registration_status: optional(lddFormValues.registration_status),
       status: optional(lddFormValues.status),
     };
@@ -761,8 +764,9 @@ export function PessoalTrackingSection({
                   >
                     {selectedLdd ? "Editar LDD" : "Criar LDD"}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Campos seguem o contrato do pessoal-service.
+                  <p className="mt-1 inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                    O que é LDD?
+                    <FieldHelp label="LDD" description={LDD_DESCRIPTION} />
                   </p>
                 </div>
                 <button
@@ -832,7 +836,7 @@ export function PessoalTrackingSection({
                             if (
                               isMoney &&
                               (event.key === "Backspace" || event.key === "Delete") &&
-                              parseBrlInput(event.currentTarget.value) === 0
+                              parseBrlDecimalInput(event.currentTarget.value) === 0
                             ) {
                               event.preventDefault();
                               setLddFormValues((current) => ({
@@ -844,11 +848,17 @@ export function PessoalTrackingSection({
                           onChange={(event) =>
                             setLddFormValues((current) => ({
                               ...current,
+                              // Saldo é digitado em reais ("100" = R$ 100,00) e formatado ao sair.
                               [field.name]: isMoney
-                                ? formatBrlInput(normalizeDigits(event.target.value))
+                                ? event.target.value.replace(/[^\d,.R$\s]/g, "")
                                 : event.target.value,
                             }))
                           }
+                          onBlur={(event) => {
+                            if (!isMoney) return;
+                            const formatted = formatBrlDecimalInput(event.currentTarget.value);
+                            setLddFormValues((current) => ({ ...current, [field.name]: formatted }));
+                          }}
                           disabled={!canEdit || isLddSubmitting}
                           className={pessoalTextFieldClassName}
                         />

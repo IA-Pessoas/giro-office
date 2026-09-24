@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { prismaMock, passwordHashMock, jwtMock } = vi.hoisted(() => ({
   prismaMock: {
     $executeRaw: vi.fn(),
+    $queryRaw: vi.fn(),
     $transaction: vi.fn(async (callback) => callback(prismaMock)),
     user: {
       findFirst: vi.fn(),
@@ -12,6 +13,21 @@ const { prismaMock, passwordHashMock, jwtMock } = vi.hoisted(() => ({
       updateMany: vi.fn(),
     },
     authSession: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    platformUser: {
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    platformAuthSession: {
+      create: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    userAuditOutboxEvent: {
       create: vi.fn(),
       findFirst: vi.fn(),
       updateMany: vi.fn(),
@@ -53,11 +69,14 @@ vi.mock("jsonwebtoken", () => ({
 }));
 
 import { AuthService } from "../services/authService.js";
+import { PlatformUsersService } from "../services/platformUsersService.js";
 import { UserService } from "../services/userService.js";
 
 describe("AuthService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.$transaction.mockReset();
+    prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
     passwordHashMock.verifyPassword.mockResolvedValue({ valid: false, needsRehash: false });
     prismaMock.authSession.findFirst.mockResolvedValue({ id: "session-1" });
   });
@@ -220,6 +239,623 @@ describe("AuthService", () => {
       "jwt-secret",
       expect.any(Object),
     );
+  });
+
+  it("inicia personificação com claims do alvo, expiração de 60 minutos e sessão do operador revogada", async () => {
+    const startedAt = new Date();
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.user.findUnique.mockResolvedValue(
+      activeUser({
+        name: "Ana",
+        login: "ana",
+        permission: 2,
+        type: "owner",
+        permissions: [{ organization_id: "org-1", ti: 2 }],
+      }),
+    );
+    prismaMock.platformAuthSession.updateMany.mockResolvedValue({ count: 1 });
+    jwtMock.sign.mockReturnValue("impersonation.jwt");
+    const recordStartEvent = vi.fn(() => ({
+      action: "platform.impersonation.started",
+      referring: "user",
+      referringId: "user-1",
+      changes: {},
+      outcome: "success" as const,
+      required: true,
+    }));
+
+    const issued = await new AuthService().startImpersonation(
+      {
+        organizationId: "org-1",
+        targetUserId: "user-1",
+        platformUserId: "platform-1",
+        platformSessionId: "platform-session-1",
+        platformSessionCsrfHash: "a".repeat(64),
+      },
+      recordStartEvent,
+    );
+
+    expect(issued).toMatchObject({
+      id: "user-1",
+      name: "Ana",
+      login: "ana",
+      permission: 2,
+      organization_id: "org-1",
+      token: "impersonation.jwt",
+    });
+    expect(jwtMock.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "user-1",
+        organization_id: "org-1",
+        name: "Ana",
+        login: "ana",
+        permission: 2,
+        type: "owner",
+        modules: expect.objectContaining({ ti: 2 }),
+        impersonator_platform_user_id: "platform-1",
+      }),
+      "jwt-secret",
+      expect.objectContaining({ subject: "user-1", expiresIn: 3600 }),
+    );
+    expect(prismaMock.authSession.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        user_id: "user-1",
+        impersonator_platform_user_id: "platform-1",
+        expires_at: expect.any(Date),
+      }),
+    });
+    const sessionData = prismaMock.authSession.create.mock.calls[0][0].data;
+    expect(sessionData.expires_at.getTime() - issued.impersonationStartedAt.getTime()).toBe(
+      3_600_000,
+    );
+    expect(prismaMock.authSession.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.platformAuthSession.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: "platform-session-1",
+        platform_user_id: "platform-1",
+        csrf_hash: "a".repeat(64),
+      }),
+      data: { revoked_at: issued.impersonationStartedAt },
+    });
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+    expect(recordStartEvent).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      targetUserId: "user-1",
+      targetName: "Ana",
+      platformUserId: "platform-1",
+      startedAt: issued.impersonationStartedAt,
+    });
+    expect(prismaMock.$queryRaw).toHaveBeenCalledOnce();
+    expect(prismaMock.userAuditOutboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        payload: expect.objectContaining({
+          requestId: expect.any(String),
+          action: "platform.impersonation.started",
+          required: true,
+        }),
+      },
+    });
+    expect(issued.impersonationStartedAt.getTime()).toBeGreaterThanOrEqual(startedAt.getTime());
+  });
+
+  it("espera a revogação concorrente e não cria sessão após perder a permissão", async () => {
+    let canImpersonate = true;
+    let releaseRevocation!: () => void;
+    let signalRevocationUpdate!: () => void;
+    let signalSecondLock!: () => void;
+    const revocationGate = new Promise<void>((resolve) => {
+      releaseRevocation = resolve;
+    });
+    const revocationUpdateStarted = new Promise<void>((resolve) => {
+      signalRevocationUpdate = resolve;
+    });
+    const secondLockRequested = new Promise<void>((resolve) => {
+      signalSecondLock = resolve;
+    });
+    const lockWaiters: Array<() => void> = [];
+    const lockQueries: Array<{ sql: string; values: unknown[] }> = [];
+    let rowLocked = false;
+    const acquireRowLock = async (): Promise<void> => {
+      if (!rowLocked) {
+        rowLocked = true;
+        return;
+      }
+      await new Promise<void>((resolve) => lockWaiters.push(resolve));
+    };
+    const releaseRowLock = (): void => {
+      const next = lockWaiters.shift();
+      if (next) next();
+      else rowLocked = false;
+    };
+
+    prismaMock.$transaction.mockImplementation(async (callback) => {
+      let holdsRowLock = false;
+      const transaction = {
+        ...prismaMock,
+        $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+          lockQueries.push({ sql: Array.from(strings).join(""), values });
+          if (lockQueries.length === 2) signalSecondLock();
+          await acquireRowLock();
+          holdsRowLock = true;
+          return [];
+        },
+      };
+      try {
+        return await callback(transaction);
+      } finally {
+        if (holdsRowLock) releaseRowLock();
+      }
+    });
+    prismaMock.platformUser.findUnique.mockImplementation(async ({ where }) => ({
+      id: where.id,
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: canImpersonate,
+    }));
+    prismaMock.platformUser.findFirst.mockResolvedValue({
+      id: "platform-1",
+      name: "Outra administradora",
+      email: "outra@example.com",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.platformUser.updateMany.mockImplementation(async () => {
+      canImpersonate = false;
+      signalRevocationUpdate();
+      await revocationGate;
+      return { count: 1 };
+    });
+    prismaMock.authSession.findMany.mockResolvedValue([]);
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+
+    const revocation = new PlatformUsersService(vi.fn()).updateSuperAdminImpersonationPermission(
+      "platform-2",
+      "platform-1",
+      false,
+    );
+    await revocationUpdateStarted;
+
+    const start = new AuthService().startImpersonation(
+      {
+        organizationId: "org-1",
+        targetUserId: "user-1",
+        platformUserId: "platform-1",
+        platformSessionId: "platform-session-1",
+        platformSessionCsrfHash: "a".repeat(64),
+      },
+      vi.fn(),
+    );
+    await secondLockRequested;
+    expect(prismaMock.authSession.create).not.toHaveBeenCalled();
+    expect(lockQueries).toHaveLength(2);
+    expect(lockQueries.every(({ sql }) => sql.includes("FOR UPDATE"))).toBe(true);
+
+    releaseRevocation();
+    await revocation;
+    await expect(start).rejects.toMatchObject({ statusCode: 403 });
+    expect(prismaMock.authSession.create).not.toHaveBeenCalled();
+  });
+
+  it("revoga a sessão quando o início concorrente obtém o lock primeiro", async () => {
+    let canImpersonate = true;
+    let releaseStartAudit!: () => void;
+    let signalStartAudit!: () => void;
+    let signalRevocationLock!: () => void;
+    const startAuditGate = new Promise<void>((resolve) => {
+      releaseStartAudit = resolve;
+    });
+    const startAuditQueued = new Promise<void>((resolve) => {
+      signalStartAudit = resolve;
+    });
+    const revocationLockRequested = new Promise<void>((resolve) => {
+      signalRevocationLock = resolve;
+    });
+    let releaseStartTransaction!: () => void;
+    const startTransactionFinished = new Promise<void>((resolve) => {
+      releaseStartTransaction = resolve;
+    });
+    const lockQueries: Array<{ sql: string; values: unknown[] }> = [];
+    const sessions: Array<Record<string, unknown>> = [];
+    let transactionCount = 0;
+    let startAuditBlocked = false;
+    const target = activeUser({
+      name: "Ana",
+      login: "ana",
+      permission: 2,
+      type: "owner",
+      permissions: [{ organization_id: "org-1", ti: 2 }],
+    });
+
+    prismaMock.$transaction.mockImplementation(async (callback) => {
+      const isStartTransaction = transactionCount++ === 0;
+      const transaction = {
+        ...prismaMock,
+        $queryRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+          lockQueries.push({ sql: Array.from(strings).join(""), values });
+          if (!isStartTransaction) {
+            signalRevocationLock();
+            await startTransactionFinished;
+          }
+          return [];
+        },
+      };
+      try {
+        return await callback(transaction);
+      } finally {
+        if (isStartTransaction) releaseStartTransaction();
+      }
+    });
+    prismaMock.platformUser.findUnique.mockImplementation(async ({ where }) => ({
+      id: where.id,
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: where.id === "platform-1" ? canImpersonate : true,
+    }));
+    prismaMock.user.findUnique.mockResolvedValue(target);
+    prismaMock.platformUser.findFirst.mockResolvedValue({
+      id: "platform-1",
+      name: "Outra administradora",
+      email: "outra@example.com",
+      status: "active",
+      can_impersonate: canImpersonate,
+    });
+    prismaMock.platformUser.updateMany.mockImplementation(async ({ where }) => {
+      if (where.id === "platform-1") canImpersonate = false;
+      return { count: 1 };
+    });
+    prismaMock.platformAuthSession.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.authSession.create.mockImplementation(async ({ data }) => {
+      sessions.push({ ...data, created_at: new Date(), user: target });
+    });
+    prismaMock.authSession.findMany.mockImplementation(async ({ where }) =>
+      sessions.filter(
+        (session) =>
+          session.impersonator_platform_user_id === where.impersonator_platform_user_id &&
+          !session.revoked_at,
+      ),
+    );
+    prismaMock.authSession.updateMany.mockImplementation(async ({ where, data }) => {
+      const session = sessions.find(
+        (candidate) =>
+          candidate.id === where.id &&
+          candidate.impersonator_platform_user_id === where.impersonator_platform_user_id,
+      );
+      if (!session || session.revoked_at) return { count: 0 };
+      Object.assign(session, data);
+      return { count: 1 };
+    });
+    prismaMock.userAuditOutboxEvent.create.mockImplementation(async () => {
+      if (!startAuditBlocked) {
+        startAuditBlocked = true;
+        signalStartAudit();
+        await startAuditGate;
+      }
+    });
+
+    const start = new AuthService().startImpersonation(
+      {
+        organizationId: "org-1",
+        targetUserId: "user-1",
+        platformUserId: "platform-1",
+        platformSessionId: "platform-session-1",
+        platformSessionCsrfHash: "a".repeat(64),
+      },
+      () => ({
+        action: "platform.impersonation.started",
+        referring: "user",
+        referringId: "user-1",
+        changes: {},
+        outcome: "success",
+        required: true,
+      }),
+    );
+    await startAuditQueued;
+    expect(sessions).toHaveLength(1);
+
+    const revocation = new PlatformUsersService(vi.fn()).updateSuperAdminImpersonationPermission(
+      "platform-2",
+      "platform-1",
+      false,
+    );
+    await revocationLockRequested;
+    expect(prismaMock.authSession.findMany).not.toHaveBeenCalled();
+
+    releaseStartAudit();
+    await start;
+    await revocation;
+
+    expect(lockQueries).toHaveLength(2);
+    expect(lockQueries.every(({ sql }) => sql.includes('FROM "platform_users"'))).toBe(true);
+    expect(lockQueries.every(({ sql }) => sql.includes("FOR UPDATE"))).toBe(true);
+    expect(lockQueries[0]?.values).toContain("platform-1");
+    expect(JSON.stringify(lockQueries[1]?.values)).toContain("platform-1");
+    expect(prismaMock.authSession.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ impersonator_platform_user_id: "platform-1" }),
+      }),
+    );
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: expect.any(String),
+        impersonator_platform_user_id: "platform-1",
+        revoked_at: null,
+      }),
+      data: { revoked_at: expect.any(Date) },
+    });
+    expect(sessions[0]?.revoked_at).toEqual(expect.any(Date));
+  });
+
+  it("encerra personificação, audita a organização-alvo e emite sessão sem senha", async () => {
+    const createdAt = new Date(Date.now() - 60_000);
+    const session = {
+      id: "impersonation-session-1",
+      created_at: createdAt,
+      impersonator_platform_user_id: "platform-1",
+      impersonatorPlatformUser: {
+        id: "platform-1",
+        name: "Operador",
+        email: "operator@example.com",
+        platform_role: "super_admin",
+        status: "active",
+        can_impersonate: true,
+        session_version: 3,
+      },
+      user: {
+        id: "user-1",
+        name: "Ana",
+        organization_id: "org-1",
+        department: { organization_id: "org-1" },
+      },
+    };
+    prismaMock.authSession.findFirst.mockResolvedValueOnce(session).mockResolvedValueOnce(null);
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+    jwtMock.sign.mockReturnValue("platform.jwt");
+    const recordExitEvent = vi.fn(() => ({
+      action: "platform.impersonation.ended",
+      referring: "user",
+      referringId: "user-1",
+      changes: {},
+      outcome: "success" as const,
+      required: true,
+    }));
+    const identity = {
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_id: "impersonation-session-1",
+      csrf_hash: "a".repeat(64),
+    };
+
+    const result = await new AuthService().exitImpersonation(identity, recordExitEvent);
+
+    expect(result.platformSession).toMatchObject({
+      identity: { id: "platform-1", auth_kind: "platform", platform_role: "super_admin" },
+      token: "platform.jwt",
+    });
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: identity.session_id,
+        user_id: identity.user_id,
+        csrf_hash: identity.csrf_hash,
+        impersonator_platform_user_id: "platform-1",
+      }),
+      data: { revoked_at: expect.any(Date) },
+    });
+    expect(prismaMock.platformAuthSession.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        platform_user_id: "platform-1",
+        csrf_hash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        expires_at: expect.any(Date),
+      }),
+    });
+    expect(jwtMock.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: "platform-1", session_version: 3 }),
+      "jwt-secret",
+      expect.objectContaining({ expiresIn: expect.any(Number) }),
+    );
+    expect(recordExitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org-1",
+        targetUserId: "user-1",
+        platformUserId: "platform-1",
+        startedAt: createdAt,
+        reason: "saída",
+        durationMs: expect.any(Number),
+      }),
+    );
+    expect(prismaMock.userAuditOutboxEvent.create).toHaveBeenCalledWith({
+      data: { payload: expect.objectContaining({ action: "platform.impersonation.ended" }) },
+    });
+    expect(passwordHashMock.verifyPassword).not.toHaveBeenCalled();
+    await expect(
+      new AuthService().validateSession({
+        ...identity,
+        session_version: 1,
+        impersonator_platform_user_id: "platform-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it("encerra a personificação sem recriar sessão quando o operador foi inativado", async () => {
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "impersonation-session-1",
+      created_at: new Date(Date.now() - 30_000),
+      impersonator_platform_user_id: "platform-1",
+      impersonatorPlatformUser: {
+        id: "platform-1",
+        name: "Operador",
+        email: "operator@example.com",
+        platform_role: "super_admin",
+        status: "inactive",
+        can_impersonate: true,
+        session_version: 2,
+      },
+      user: {
+        id: "user-1",
+        name: "Ana",
+        organization_id: "org-1",
+        department: { organization_id: "org-1" },
+      },
+    });
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+    const recordExitEvent = vi.fn(() => ({
+      action: "platform.impersonation.ended",
+      referring: "user",
+      referringId: "user-1",
+      changes: {},
+      outcome: "success" as const,
+      required: true,
+    }));
+
+    const result = await new AuthService().exitImpersonation(
+      {
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_id: "impersonation-session-1",
+        csrf_hash: "a".repeat(64),
+      },
+      recordExitEvent,
+    );
+
+    expect(result.platformSession).toBeNull();
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledOnce();
+    expect(prismaMock.platformAuthSession.create).not.toHaveBeenCalled();
+    expect(recordExitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ platformUserId: "platform-1", reason: "saída" }),
+    );
+  });
+
+  it("recusa sessão comum e não revoga outra sessão ao tentar sair da personificação", async () => {
+    prismaMock.authSession.findFirst.mockResolvedValue(null);
+    const recordExitEvent = vi.fn(() => ({
+      action: "platform.impersonation.ended",
+      referring: "user",
+      referringId: "user-1",
+      changes: {},
+      outcome: "success" as const,
+      required: true,
+    }));
+
+    await expect(
+      new AuthService().exitImpersonation(
+        {
+          user_id: "user-1",
+          organization_id: "org-1",
+          session_id: "ordinary-session",
+          csrf_hash: "a".repeat(64),
+        },
+        recordExitEvent,
+      ),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(prismaMock.authSession.updateMany).not.toHaveBeenCalled();
+    expect(recordExitEvent).not.toHaveBeenCalled();
+  });
+
+  it("revoga e audita sessão de personificação expirada com a organização-alvo", async () => {
+    const startedAt = new Date(Date.now() - 3_660_000);
+    const expiresAt = new Date(startedAt.getTime() + 3_600_000);
+    prismaMock.authSession.findMany.mockResolvedValue([
+      {
+        id: "expired-impersonation-session",
+        user_id: "user-1",
+        created_at: startedAt,
+        expires_at: expiresAt,
+        impersonator_platform_user_id: "platform-1",
+        user: {
+          name: "Ana",
+          organization_id: null,
+          department: { organization_id: "org-1" },
+        },
+      },
+    ]);
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+    const recordEndEvent = vi.fn(() => ({
+      action: "platform.impersonation.ended",
+      referring: "user",
+      referringId: "user-1",
+      changes: {},
+      outcome: "success" as const,
+      required: true,
+    }));
+
+    const expiredCount = await new AuthService().expireImpersonationSessions(recordEndEvent);
+
+    expect(expiredCount).toBe(1);
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: "expired-impersonation-session",
+        impersonator_platform_user_id: "platform-1",
+        revoked_at: null,
+        expires_at: { lte: expect.any(Date) },
+      }),
+      data: { revoked_at: expect.any(Date) },
+    });
+    expect(recordEndEvent).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      targetUserId: "user-1",
+      targetName: "Ana",
+      platformUserId: "platform-1",
+      startedAt,
+      endedAt: expiresAt,
+      durationMs: 3_600_000,
+      reason: "expiração",
+    });
+  });
+
+  it("recusa operador sem permissão e alvo ou organização inativos", async () => {
+    const recordStartEvent = vi.fn(() => ({
+      action: "platform.impersonation.started",
+      referring: "user",
+      referringId: "user-1",
+      changes: {},
+      outcome: "success" as const,
+      required: true,
+    }));
+    const input = {
+      organizationId: "org-1",
+      targetUserId: "user-1",
+      platformUserId: "platform-1",
+      platformSessionId: "platform-session-1",
+      platformSessionCsrfHash: "a".repeat(64),
+    };
+
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: false,
+    });
+    await expect(
+      new AuthService().startImpersonation(input, recordStartEvent),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    for (const target of [
+      activeUser({ status: "inactive" }),
+      activeUser({ organization: { id: "org-1", status: "suspended" } }),
+    ]) {
+      prismaMock.user.findUnique.mockResolvedValueOnce(target);
+      await expect(
+        new AuthService().startImpersonation(input, recordStartEvent),
+      ).rejects.toMatchObject({
+        statusCode: 403,
+      });
+    }
+    expect(prismaMock.authSession.create).not.toHaveBeenCalled();
+    expect(prismaMock.platformAuthSession.updateMany).not.toHaveBeenCalled();
+    expect(recordStartEvent).not.toHaveBeenCalled();
   });
 
   it("login permite organização em trial", async () => {
@@ -602,6 +1238,159 @@ describe("AuthService", () => {
       }),
     ).resolves.toBeUndefined();
     expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("vincula a claim do operador à sessão de personificação persistida", async () => {
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      impersonator_platform_user_id: "platform-1",
+      impersonatorPlatformUser: {
+        platform_role: "super_admin",
+        status: "active",
+        can_impersonate: true,
+      },
+      user: activeUser(),
+    });
+
+    await expect(
+      new AuthService().validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+        impersonator_platform_user_id: "platform-1",
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      new AuthService().validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+      }),
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it("retorna operador, organização e expiração da sessão de personificação ativa", async () => {
+    const expiresAt = new Date("2026-09-24T14:00:00.000Z");
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      expires_at: expiresAt,
+      impersonator_platform_user_id: "platform-1",
+      impersonatorPlatformUser: {
+        id: "platform-1",
+        name: "Operador",
+        platform_role: "super_admin",
+        status: "active",
+        can_impersonate: true,
+      },
+      user: activeUser({
+        organization: { id: "org-1", name: "Organização Aurora", status: "active" },
+        department: {
+          organization_id: "org-1",
+          organization: { id: "org-1", name: "Organização Aurora", status: "active" },
+        },
+      }),
+    });
+
+    const result = await new AuthService().getImpersonationSessionInfo({
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_id: "session-1",
+    });
+
+    expect(result).toEqual({
+      operator: { id: "platform-1", name: "Operador" },
+      expires_at: expiresAt.toISOString(),
+      organization_name: "Organização Aurora",
+    });
+    expect(prismaMock.authSession.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "session-1",
+          user_id: "user-1",
+          impersonator_platform_user_id: { not: null },
+          revoked_at: null,
+        }),
+      }),
+    );
+  });
+
+  it("não retorna contexto de personificação sem uma sessão ativa", async () => {
+    const service = new AuthService();
+
+    await expect(
+      service.getImpersonationSessionInfo({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_id: undefined,
+      }),
+    ).resolves.toBeNull();
+    expect(prismaMock.authSession.findFirst).not.toHaveBeenCalled();
+
+    prismaMock.authSession.findFirst.mockResolvedValue(null);
+    await expect(
+      service.getImpersonationSessionInfo({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_id: "session-1",
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it.each([
+    ["perde permissão", { platform_role: "super_admin", status: "active", can_impersonate: false }],
+    ["é desativado", { platform_role: "super_admin", status: "inactive", can_impersonate: true }],
+    [
+      "deixa de ser super admin",
+      { platform_role: "support", status: "active", can_impersonate: true },
+    ],
+  ])("derruba a personificação quando o operador %s", async (_reason, operator) => {
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      impersonator_platform_user_id: "platform-1",
+      impersonatorPlatformUser: operator,
+      user: activeUser(),
+    });
+
+    await expect(
+      new AuthService().validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+        impersonator_platform_user_id: "platform-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it("não renova uma sessão de personificação", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      csrf_hash: "a".repeat(64),
+      impersonator_platform_user_id: "platform-1",
+    });
+
+    await expect(
+      new AuthService().refreshSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+        impersonator_platform_user_id: "platform-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ impersonator_platform_user_id: null }),
+      }),
+    );
   });
 
   it("aceita sessão para organização em trial", async () => {

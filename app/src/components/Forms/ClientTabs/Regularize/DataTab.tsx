@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getRegularizeRegimeOptions } from '@modules/clients/utils/regularizeForm';
 import { 
     Button, 
     Flex, 
@@ -305,14 +306,9 @@ export default function DataTabRegularize({ client }) {
                                     onChange={(e) => setRegime(e.target.value)}
                                     borderColor='main.divisor'
                                 >
-                                    <option>CAEPF</option>
-                                    <option>CNO</option>
-                                    <option>E-Social</option>
-                                    <option>Isento de IRPF</option>
-                                    <option>Lucro Presumido</option>
-                                    <option>Lucro Real</option>
-                                    <option>MEI</option>
-                                    <option>Simples Nacional</option>
+                                    {getRegularizeRegimeOptions(regime ?? '').map((option) => (
+                                        <option key={option}>{option}</option>
+                                    ))}
                                 </Select>
                             </Flex>
                             <Flex w="50%" direction="column" justifyContent={'flex-end'}>

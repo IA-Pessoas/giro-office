@@ -5,6 +5,7 @@ import {
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
+import { ACTIVE_CLIENT_STATUS } from "../../../services/client-service/src/schemas/client.schemas.js";
 import { lookupOfficialCnpj } from "./cnpjLookup.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import type { WorkerHistoryStorageLike } from "./historyStorage.js";
@@ -91,6 +92,13 @@ export type ClientWorkerService = {
   ) => Promise<unknown>;
   listPending: (organizationId: string, userId?: string) => Promise<unknown>;
   deletePending: (pendingId: string, organizationId: string) => Promise<void>;
+  deleteHistory: (
+    clientId: string,
+    historyId: string,
+    organizationId: string,
+    userId: string,
+    canManage: boolean,
+  ) => Promise<void>;
   createPA: (clientId: string, organizationId: string) => Promise<unknown>;
   getPADetail: (clientId: string, organizationId: string) => Promise<unknown>;
   updatePA: (
@@ -716,6 +724,27 @@ export class ClientService implements ClientWorkerService {
     };
   }
 
+  // Autor ou admin/owner exclui; o anexo sai do bucket depois que a linha some.
+  async deleteHistory(
+    clientId: string,
+    historyId: string,
+    organizationId: string,
+    userId: string,
+    canManage: boolean,
+  ): Promise<void> {
+    const existing = await (this.prisma as any).clientHistory.findFirst({
+      where: { id: historyId, client_id: clientId, organization_id: organizationId },
+      select: { id: true, user_id: true, file: true },
+    });
+    if (!existing) throw new ServiceError(404, "Histórico não encontrado.");
+    if (!canManage && existing.user_id !== userId)
+      throw new ServiceError(403, "Usuário não tem permissão para excluir este histórico.");
+    await (this.prisma as any).clientHistory.delete({ where: { id: historyId } });
+    if (existing.file && !/^https?:\/\//iu.test(String(existing.file))) {
+      await this.historyStorage?.remove(String(existing.file)).catch(() => undefined);
+    }
+  }
+
   async deletePending(pendingId: string, organizationId: string): Promise<void> {
     const exists = await (this.prisma as any).clientHistoryPending.findFirst({
       where: { id: pendingId, organization_id: organizationId },
@@ -771,7 +800,9 @@ export class ClientService implements ClientWorkerService {
     userId: string,
     input: Record<string, unknown>,
   ): Promise<unknown> {
-    await this.ensureClient(clientId, organizationId);
+    const client = await this.client(clientId, organizationId);
+    if (client.status !== ACTIVE_CLIENT_STATUS)
+      throw new ServiceError(409, "Só é possível inativar cliente ativo.");
     const competence = String(input.competence_output);
     const [year, month] = competence.split("-").map(Number);
     const competenceDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));

@@ -130,6 +130,61 @@ describe.skipIf(!smokeState)("triagem-service CRUD smoke (banco real)", () => {
     expect(archived.data.find((item: { id: string }) => item.id === id)?.archived_at).toBeTruthy();
   });
 
+  it("overview: competência sem itens aplicáveis não aparece como completa (#1326)", async () => {
+    requireSmokeState();
+    const emptyCompetence = "2001-03";
+    expectOk(
+      await call("POST", "/triagem/competencies", {
+        client_id: clientId,
+        competence: emptyCompetence,
+      }),
+      "POST competência vazia",
+    );
+    const overview = expectOk(
+      await call(
+        "GET",
+        `/triagem/overview?page=1&page_size=20&client_id=${clientId}&competence=${emptyCompetence}`,
+      ),
+      "GET overview competência vazia",
+    );
+    expect(overview.data.items).toEqual([
+      expect.objectContaining({ competence: emptyCompetence, status: "NO_APPLICABLE_ITEMS" }),
+    ]);
+    expect(overview.data.indicators).toMatchObject({ complete: 0, no_applicable_items: 1 });
+
+    // Arquivada é somente leitura até restaurar; criar de novo restaura.
+    const created = expectOk(
+      await call("POST", "/triagem/competencies", {
+        client_id: clientId,
+        competence: emptyCompetence,
+      }),
+      "POST competência vazia (repetida)",
+    );
+    expectOk(
+      await call("PATCH", `/triagem/competencies/${created.data.id as string}/archive`, {}),
+      "PATCH arquivar competência vazia",
+    );
+    expectOk(
+      await call("POST", "/triagem/urgent-requests", {
+        client_id: clientId,
+        competence: emptyCompetence,
+        urgency_code: "HIGH",
+        description: `Arquivada ${suffix}`,
+        responsible_id: requireSmokeState().userId,
+      }),
+      "POST urgência em competência arquivada",
+      [409],
+    );
+    const restored = expectOk(
+      await call("POST", "/triagem/competencies", {
+        client_id: clientId,
+        competence: emptyCompetence,
+      }),
+      "POST restaura competência arquivada",
+    );
+    expect(restored.data.archived_at).toBeNull();
+  });
+
   it("competência, links externos, urgências, histórico, overview e reconciliação", async () => {
     const state = requireSmokeState();
     const linkType = `smoke-type-${suffix}`;

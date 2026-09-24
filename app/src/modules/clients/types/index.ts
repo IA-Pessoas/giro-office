@@ -392,6 +392,7 @@ export interface ClientFinanceFormValues {
 }
 
 export interface ClientRegularizeFormValues {
+  type: "PJ" | "PF";
   dominio_code: string;
   name: string;
   company_name: string;

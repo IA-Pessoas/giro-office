@@ -349,7 +349,7 @@ export class TriageDocumentsService {
   async getMonthly(
     request: TriageMonthlyRequest,
     organizationIdOrAuth: string | TriageDocumentsAuthContext,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Record<string, unknown> | null> {
     const auth = typeof organizationIdOrAuth === "string" ? undefined : organizationIdOrAuth;
     const organizationId =
       typeof organizationIdOrAuth === "string"
@@ -366,9 +366,8 @@ export class TriageDocumentsService {
       },
     });
 
-    if (!monthly) {
-      throw new ServiceError(404, "Pendência documental mensal não encontrada.");
-    }
+    // Estado vazio é 200 com null: a tela oferece "Iniciar pendências".
+    if (!monthly) return null;
 
     const result = this.toMonthlyResponse(monthly, type);
     if (auth && this.overviewClient) {
@@ -386,7 +385,7 @@ export class TriageDocumentsService {
           triagem_summary: await this.overviewClient.getSummary(summaryRequest),
         };
       } catch (error: unknown) {
-        if (!(error instanceof ServiceError) || ![403, 503, 504].includes(error.statusCode)) {
+        if (!(error instanceof ServiceError) || ![403, 404, 503, 504].includes(error.statusCode)) {
           throw error;
         }
         logWarn("Resumo da Triagem indisponível; mantendo resposta mensal local", {
@@ -502,17 +501,21 @@ export class TriageDocumentsService {
     const value = isBillingAmount
       ? normalizeOptionalValue(update.value, "Valor de faturamento")
       : undefined;
-    const deliveryMethod = normalizeOptionalCatalogCode(
-      update.delivery_method,
-      "Método de entrega fiscal",
-    );
-    const stateSite = normalizeOptionalCatalogCode(update.state_site, "Site estadual");
-    if (type !== "FISCAL" && deliveryMethod !== undefined) {
+    // Na rotina contábil, chaves fiscais nulas são ignoradas (o front antigo as envia).
+    if (type !== "FISCAL" && update.delivery_method != null) {
       throw new ServiceError(400, "método de entrega só é aceito na rotina fiscal.");
     }
-    if (type !== "FISCAL" && stateSite !== undefined) {
+    if (type !== "FISCAL" && update.state_site != null) {
       throw new ServiceError(400, "site estadual só é aceito na rotina fiscal.");
     }
+    const deliveryMethod =
+      type === "FISCAL"
+        ? normalizeOptionalCatalogCode(update.delivery_method, "Método de entrega fiscal")
+        : undefined;
+    const stateSite =
+      type === "FISCAL"
+        ? normalizeOptionalCatalogCode(update.state_site, "Site estadual")
+        : undefined;
     if (
       deliveryMethod !== undefined &&
       deliveryMethod !== null &&

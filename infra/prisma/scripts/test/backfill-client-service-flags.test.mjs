@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { after, before, test } from "node:test";
+import { test } from "node:test";
+
+import { hasDocker, usePostgres } from "./pgHarness.mjs";
 
 // Roda o reparo real contra um Postgres descartavel em Docker. Sem Docker, pula.
 const SQL = readFileSync(
   new URL("../../repairs/backfill-client-service-flags.sql", import.meta.url),
   "utf8",
 );
-const CONTAINER = `service-flags-test-${process.pid}`;
-const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 const FIXTURE = `
 DROP TABLE IF EXISTS "contabil.control", "triagem.configs", "pessoal.ldd", clients;
@@ -34,39 +33,13 @@ INSERT INTO "triagem.configs" VALUES
 INSERT INTO "pessoal.ldd" VALUES ('1', 'c-pessoal');
 `;
 
-function psql(sql, vars = []) {
-  const args = ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-X", "-q", "-t", "-A"];
-  for (const v of vars) args.push("-v", v);
-  return spawnSync("docker", [...args, "-f", "-"], { input: sql, encoding: "utf8" });
-}
-
-function query(sql) {
-  const result = psql(sql);
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout.trim();
-}
+const { psql, query } = usePostgres("service-flags-test");
 
 const FLAGS = `SELECT string_agg(id || '=' || coalesce(contabil::text, '-') || coalesce(fiscal::text, '-')
   || coalesce(pessoal::text, '-'), ',' ORDER BY id) FROM clients`;
 const BEFORE =
   "c-already=true--,c-control=---,c-inactive=---,c-none=--true,c-pessoal=--false," +
   "c-triage-contabil=---,c-triage-fiscal=falsefalse-";
-
-before(() => {
-  if (!hasDocker) return;
-  execFileSync("docker", [
-    "run", "-d", "--rm", "--name", CONTAINER, "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:17",
-  ]);
-  for (let i = 0; i < 60; i++) {
-    if (psql("SELECT 1").status === 0) return;
-    execFileSync("sleep", ["1"]);
-  }
-  throw new Error("Postgres de teste nao subiu");
-});
-
-after(() => {
-  if (hasDocker) spawnSync("docker", ["rm", "-f", CONTAINER], { stdio: "ignore" });
-});
 
 test("dry-run relata as flags propostas e nao altera nada", { skip: !hasDocker }, () => {
   query(FIXTURE);

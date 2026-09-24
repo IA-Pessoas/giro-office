@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { after, before, test } from "node:test";
+import { test } from "node:test";
+
+import { hasDocker, usePostgres } from "./pgHarness.mjs";
 
 // Roda o reparo real contra um Postgres descartavel em Docker. Sem Docker, pula.
 const SQL = readFileSync(
   new URL("../../repairs/dedupe-clients-by-document.sql", import.meta.url),
   "utf8",
 );
-const CONTAINER = `dedupe-clients-test-${process.pid}`;
-const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 const FIXTURE = `
 DROP TABLE IF EXISTS pa, tasks, "pessoal.payroll", clients;
@@ -22,7 +21,8 @@ CREATE TABLE clients (
   city text,
   register_date_prospecting timestamp NOT NULL,
   deletion_date timestamp,
-  contabil boolean
+  contabil boolean,
+  status text NOT NULL DEFAULT 'Ativo'
 );
 CREATE TABLE tasks (id text PRIMARY KEY, client_id text REFERENCES clients(id));
 CREATE TABLE pa (id text PRIMARY KEY, client_id text UNIQUE REFERENCES clients(id));
@@ -43,33 +43,7 @@ CREATE TABLE "pessoal.payroll" (id text PRIMARY KEY, client_id text);
 INSERT INTO "pessoal.payroll" VALUES ('p1', 'dup');
 `;
 
-function psql(sql, vars = []) {
-  const args = ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-X", "-q", "-t", "-A"];
-  for (const v of vars) args.push("-v", v);
-  return spawnSync("docker", [...args, "-f", "-"], { input: sql, encoding: "utf8" });
-}
-
-function query(sql) {
-  const result = psql(sql);
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout.trim();
-}
-
-before(() => {
-  if (!hasDocker) return;
-  execFileSync("docker", [
-    "run", "-d", "--rm", "--name", CONTAINER, "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:17",
-  ]);
-  for (let i = 0; i < 60; i++) {
-    if (psql("SELECT 1").status === 0) return;
-    execFileSync("sleep", ["1"]);
-  }
-  throw new Error("Postgres de teste nao subiu");
-});
-
-after(() => {
-  if (hasDocker) spawnSync("docker", ["rm", "-f", CONTAINER], { stdio: "ignore" });
-});
+const { psql, query } = usePostgres("dedupe-clients-test");
 
 test("dry-run relata o duplicado e nao altera nada", { skip: !hasDocker }, () => {
   query(FIXTURE);
@@ -110,4 +84,25 @@ test("conflito de unicidade em vinculo aborta o apply sem alterar nada", { skip:
   assert.match(result.stderr, /pa\.client_id/);
   assert.equal(query("SELECT count(*) FROM clients"), "7");
   assert.equal(query("SELECT client_id FROM tasks WHERE id = 't1'"), "dup");
+});
+
+test("apply mantem o ativo, ignora clientes de teste e agrupa CNPJ alfanumerico", {
+  skip: !hasDocker,
+}, () => {
+  query(FIXTURE);
+  query(`INSERT INTO clients (id, organization_id, cpf_cnpj, name, register_date_prospecting, status)
+    VALUES
+      ('old-inactive', 'org-1', '11.222.333/0001-81', 'Antigo inativo', '2020-01-01', 'Inativo'),
+      ('new-active', 'org-1', '11222333000181', 'Novo ativo', '2025-01-01', 'Ativo'),
+      ('qa-a', 'org-1', '529.982.247-25', 'QA_Cliente_Dup', '2024-01-01', 'Ativo'),
+      ('qa-b', 'org-1', '52998224725', 'QA_Cliente_PJ', '2024-02-01', 'Ativo'),
+      ('alnum-a', 'org-1', '12.ABC.345/01DE-35', 'Alfa', '2024-01-01', 'Ativo'),
+      ('alnum-b', 'org-1', '12abc34501de35', 'Alfa copia', '2024-03-01', 'Ativo')`);
+  const result = psql(SQL, ["apply=1"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    query(`SELECT string_agg(id, ',' ORDER BY id) FROM clients
+      WHERE id IN ('old-inactive', 'new-active', 'qa-a', 'qa-b', 'alnum-a', 'alnum-b')`),
+    "alnum-a,new-active,qa-a,qa-b",
+  );
 });

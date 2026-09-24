@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { after, before, test } from "node:test";
+import { test } from "node:test";
+
+import { hasDocker, usePostgres } from "./pgHarness.mjs";
 
 // Roda o relatorio real contra um Postgres descartavel em Docker. Sem Docker, pula.
 const SQL = readFileSync(
   new URL("../../repairs/report-invalid-documents.sql", import.meta.url),
   "utf8",
 );
-const CONTAINER = `invalid-documents-test-${process.pid}`;
-const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 // Mesmos casos do teste de getDocumentIssue em app/src/modules/clients/run-clients-tests.mjs.
 const FIXTURE = `
@@ -25,33 +24,7 @@ INSERT INTO "certificate.pj" VALUES
   ('c1', 'org', '11222333000181', '******'), ('c2', 'org', '11222333000181', 'Maria');
 `;
 
-function psql(sql) {
-  return spawnSync(
-    "docker",
-    ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-X", "-q", "-t", "-A", "-f", "-"],
-    { input: sql, encoding: "utf8" },
-  );
-}
-
-before(() => {
-  if (!hasDocker) return;
-  execFileSync("docker", [
-    "run", "-d", "--rm", "--name", CONTAINER, "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:17",
-  ]);
-  for (let i = 0; i < 60; i++) {
-    if (psql("SELECT 1").status === 0) {
-      const fixture = psql(FIXTURE);
-      assert.equal(fixture.status, 0, fixture.stderr);
-      return;
-    }
-    execFileSync("sleep", ["1"]);
-  }
-  throw new Error("Postgres de teste nao subiu");
-});
-
-after(() => {
-  if (hasDocker) spawnSync("docker", ["rm", "-f", CONTAINER], { stdio: "ignore" });
-});
+const { psql, query } = usePostgres("invalid-documents-test", { setup: FIXTURE });
 
 test("relata so documentos invalidos, com o mesmo motivo da UI", { skip: !hasDocker }, () => {
   const result = psql(SQL);

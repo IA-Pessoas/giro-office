@@ -30,4 +30,12 @@ describe("Worker Prisma schema", () => {
 
     expect(missing).toEqual([]);
   });
+
+  it("keeps the optional impersonator reference in canonical and Worker auth sessions", () => {
+    const canonical = tablesOf("../../../infra/prisma/schema.prisma");
+    const worker = tablesOf("../prisma/schema.prisma");
+
+    expect(canonical.get("auth_sessions")?.fields).toContain("impersonator_platform_user_id");
+    expect(worker.get("auth_sessions")?.fields).toContain("impersonator_platform_user_id");
+  });
 });

@@ -14,6 +14,7 @@ import { ZodError, type z } from "zod";
 import {
   clientIdParamsSchema,
   createClientBodySchema,
+  isAdminPermission,
   listClientsQuerySchema,
   updateClientBodySchema,
 } from "../../../services/client-service/src/schemas/client.schemas.js";
@@ -58,7 +59,7 @@ type CreateClientWorkerAppOptions = {
   historyStorage?: WorkerHistoryStorageLike;
 };
 
-function parse<T>(schema: z.ZodType<T>, value: unknown): T {
+function parse<S extends z.ZodTypeAny>(schema: S, value: unknown): z.output<S> {
   try {
     return schema.parse(value);
   } catch (error) {
@@ -90,6 +91,11 @@ function organizationId(c: ClientContext): string {
   return auth.organizationId;
 }
 
+function managesOrganization(c: ClientContext): boolean {
+  const { isOwner, permission } = authz(c);
+  return isOwner || isAdminPermission(permission ?? undefined);
+}
+
 function authz(c: ClientContext) {
   return clientAuthorization(c.get("auth"));
 }
@@ -101,9 +107,9 @@ function pathParam(c: ClientContext, schema: z.ZodType<{ id: string }>): string 
 async function saveHistoryFile(
   storage: WorkerHistoryStorageLike | undefined,
   clientId: string,
-  body: Record<string, unknown>,
+  value: unknown,
 ): Promise<string | undefined> {
-  const file = body.file instanceof File ? body.file : undefined;
+  const file = value instanceof File ? value : undefined;
   if (!file) return undefined;
   if (!storage) throw new ServiceError(503, "Armazenamento de históricos não configurado.");
   return storage.upload(clientId, file);
@@ -454,24 +460,25 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
   app.post("/client/:id/histories", async (c) =>
     withService(c, async (service) => {
       const id = pathParam(c, clientIdParamsSchema);
-      const body = await formOrJsonBody(c);
-      const parsed = parse(createHistoryBodySchema, body);
-      const file = await saveHistoryFile(
-        options.historyStorage ?? WorkerHistoryStorage.fromEnv(options.env ?? c.env),
-        id,
-        body,
-      );
-      return c.json(
-        createSuccessResponse(
-          await service.createHistory(id, organizationId(c), c.get("auth").userId, {
-            date: parsed.date,
-            history: parsed.history,
-            ...(parsed.pending_id ? { pending_id: parsed.pending_id } : {}),
-            ...(file ? { file } : {}),
-          }),
-        ),
-        201,
-      );
+      const { file: attachment, ...fields } = await formOrJsonBody(c);
+      const parsed = parse(createHistoryBodySchema, fields);
+      if (attachment !== undefined && !(attachment instanceof File))
+        throw new ServiceError(400, "Anexo inválido: envie o arquivo como upload.");
+      const storage = options.historyStorage ?? WorkerHistoryStorage.fromEnv(options.env ?? c.env);
+      const file = await saveHistoryFile(storage, id, attachment);
+      try {
+        const created = await service.createHistory(id, organizationId(c), c.get("auth").userId, {
+          date: parsed.date,
+          history: parsed.history,
+          ...(parsed.pending_id ? { pending_id: parsed.pending_id } : {}),
+          ...(file ? { file } : {}),
+        });
+        return c.json(createSuccessResponse(created), 201);
+      } catch (error) {
+        // Sem histórico gravado, o anexo enviado não pode ficar órfão no bucket.
+        if (file) await storage?.remove(file).catch(() => undefined);
+        throw error;
+      }
     }),
   );
 
@@ -555,9 +562,26 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
     }),
   );
 
+  app.delete("/client/:id/histories/:historyId", async (c) =>
+    withService(c, async (service) => {
+      const params = parse(historyIdParamsSchema, {
+        id: c.req.param("id"),
+        historyId: c.req.param("historyId"),
+      });
+      await service.deleteHistory(
+        params.id,
+        params.historyId,
+        organizationId(c),
+        c.get("auth").userId,
+        managesOrganization(c),
+      );
+      return c.json(createSuccessResponse({ ok: true }));
+    }),
+  );
+
   app.delete("/client/histories/pending/:pendingId", async (c) =>
     withService(c, async (service) => {
-      if ((c.get("auth").claims.permission ?? 0) < 2 && c.get("auth").claims.type !== "owner") {
+      if (!managesOrganization(c)) {
         throw new ServiceError(403, "Usuário não tem permissão.");
       }
       const { pendingId } = parse(pendingDeleteParamsSchema, {

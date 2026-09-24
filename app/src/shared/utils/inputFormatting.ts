@@ -67,6 +67,8 @@ export function normalizeCnpjInput(value: string | null | undefined): string {
   return (value ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 14);
 }
 
+export { isValidCnpj } from "@workspace/shared/validation";
+
 export function formatCpfCnpjInput(value: string): string {
   const normalized = normalizeCnpjInput(value);
 
@@ -104,6 +106,28 @@ export function formatBrlInput(value: string): string {
   }
 
   return brlFormatter.format(cents / 100).replace(/\u00A0/g, " ");
+}
+
+/**
+ * Valor em reais digitado como decimal pt-BR: "100" é R$ 100,00 e "1.234,56" é R$ 1.234,56.
+ * Diferente de parseBrlInput, que lê os dígitos como centavos.
+ */
+export function parseBrlDecimalInput(value: string): number | null {
+  const cleaned = value.replace(/[^\d,.]/g, "");
+  if (!/\d/u.test(cleaned)) return null;
+  const separator = cleaned.includes(",") ? "," : /\.\d{1,2}$/u.test(cleaned) ? "." : null;
+  const splitAt = separator ? cleaned.lastIndexOf(separator) : cleaned.length;
+  const integer = normalizeDigits(cleaned.slice(0, splitAt)) || "0";
+  const fraction = normalizeDigits(cleaned.slice(splitAt + 1))
+    .padEnd(2, "0")
+    .slice(0, 2);
+  const cents = Number(`${integer}${fraction}`);
+  return Number.isSafeInteger(cents) ? cents / 100 : null;
+}
+
+export function formatBrlDecimalInput(value: string): string {
+  const amount = parseBrlDecimalInput(value);
+  return amount === null ? "" : brlFormatter.format(amount).replace(/\u00A0/g, " ");
 }
 
 export function parseBrlInput(value: string): number | null {

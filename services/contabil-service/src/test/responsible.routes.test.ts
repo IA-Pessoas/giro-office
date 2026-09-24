@@ -179,6 +179,7 @@ describe("responsible routes", () => {
       .send({});
 
     expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("client_id é obrigatório.");
     expect(deps.create).not.toHaveBeenCalled();
   });
 

@@ -318,6 +318,19 @@ integrationDescribe("triagem-service PostgreSQL integration", () => {
       items: [expect.objectContaining({ status: "COMPLETE" })],
     });
 
+    await adminPrisma.triageMonthly.update({
+      where: { id: monthly.id },
+      data: { checklist: { item: "NOT_APPLICABLE" } },
+    });
+    await adminPrisma.triageBankStatement.update({
+      where: { id: bank.id },
+      data: { status: "NOT_APPLICABLE" },
+    });
+    await expect(overviewService.list({ page: 1, pageSize: 1 }, authA)).resolves.toMatchObject({
+      items: [expect.objectContaining({ status: "NO_APPLICABLE_ITEMS" })],
+      indicators: expect.objectContaining({ complete: 0, no_applicable_items: 1 }),
+    });
+
     await service.create({ client_id: fixtureA.clientId, competence: "2026-08" }, authA);
     await expect(overviewService.list({ page: 1, pageSize: 1 }, authA)).resolves.toMatchObject({
       total: 2,

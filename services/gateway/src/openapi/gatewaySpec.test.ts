@@ -69,6 +69,11 @@ it("agrega o catálogo público do reports-service", () => {
   );
   expect(permissionUpdate?.responses).toHaveProperty("422");
 
+  expect(spec.paths["/platform/impersonation/exit"]?.post?.security).toEqual([
+    { cookieAuth: [] },
+    { bearerAuth: [] },
+  ]);
+
   for (const [path, method] of [
     ["/platform/organizations", "get"],
     ["/platform/organizations", "post"],

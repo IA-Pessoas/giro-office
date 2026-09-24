@@ -19,7 +19,7 @@ function usePessoalGroupsMutation<TVariables>(
 
   return useMutation({
     mutationFn,
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: groupsKey });
     },
   });

@@ -145,8 +145,19 @@ export function createAuthRoutes(
         });
 
         const user = await userService.getByIdWithModules(user_id, organization_id);
+        const impersonation = await authService.getImpersonationSessionInfo({
+          user_id,
+          organization_id,
+          session_id: request.session_id,
+        });
 
-        response.json(createSuccessResponse({ ...user, service: "user-service" }));
+        response.json(
+          createSuccessResponse({
+            ...user,
+            ...(impersonation ? { impersonation } : {}),
+            service: "user-service",
+          }),
+        );
       } catch (err) {
         logError("Erro ao buscar usuário autenticado", { err });
         next(err);

@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { after, before, test } from "node:test";
+import { test } from "node:test";
+
+import { hasDocker, usePostgres } from "./pgHarness.mjs";
 
 // Roda o reparo real contra um Postgres descartavel em Docker. Sem Docker, pula.
 const SQL = readFileSync(
   new URL("../../repairs/backfill-ti-inventory-from-terms.sql", import.meta.url),
   "utf8",
 );
-const CONTAINER = `ti-inventory-test-${process.pid}`;
-const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 const FIXTURE = `
 DROP TABLE IF EXISTS "tecnologia.inventory", "tecnologia.inventoryCategories", "tecnologia.terms", users;
@@ -45,37 +44,11 @@ INSERT INTO "tecnologia.terms" VALUES
   ('t5', 'u5', '2024-05-01', NULL, NULL, 'Eva', 'Kit', NULL, NULL, 'org');
 `;
 
-function psql(sql, vars = []) {
-  const args = ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-X", "-q", "-t", "-A"];
-  for (const v of vars) args.push("-v", v);
-  return spawnSync("docker", [...args, "-f", "-"], { input: sql, encoding: "utf8" });
-}
-
-function query(sql) {
-  const result = psql(sql);
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout.trim();
-}
+const { psql, query } = usePostgres("ti-inventory-test");
 
 const INVENTORY = `SELECT string_agg(i.asset_code || ':' || coalesce(i.user_id, '-') || ':'
   || coalesce(to_char(i.delivery_date, 'YYYY-MM-DD'), '-') || ':' || c.name, ',' ORDER BY i.asset_code)
   FROM "tecnologia.inventory" i JOIN "tecnologia.inventoryCategories" c ON c.id = i.category_id`;
-
-before(() => {
-  if (!hasDocker) return;
-  execFileSync("docker", [
-    "run", "-d", "--rm", "--name", CONTAINER, "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:17",
-  ]);
-  for (let i = 0; i < 60; i++) {
-    if (psql("SELECT 1").status === 0) return;
-    execFileSync("sleep", ["1"]);
-  }
-  throw new Error("Postgres de teste nao subiu");
-});
-
-after(() => {
-  if (hasDocker) spawnSync("docker", ["rm", "-f", CONTAINER], { stdio: "ignore" });
-});
 
 test("dry-run relata os ativos a criar sem gravar", { skip: !hasDocker }, () => {
   query(FIXTURE);

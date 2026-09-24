@@ -197,6 +197,27 @@ describe("TiPasswordService", () => {
     expect(result).toMatchObject({ id: passwordId, password: "segredo-vpn" });
   });
 
+  it("getById reports a safe actionable error when stored password cannot be decrypted", async () => {
+    const prisma = {
+      passwordTecnologia: {
+        findFirst: vi.fn(async () => ({
+          ...passwordRecord(),
+          password: "invalid-ciphertext-fixture",
+        })),
+      },
+    };
+    const service = new TiPasswordService(prisma as never, encryption);
+
+    const error = await service.getById(context, passwordId).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({
+      statusCode: 500,
+      message:
+        "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.",
+    });
+    expect(error).not.toHaveProperty("cause");
+  });
+
   it("rejects inactive reveal before decrypt", async () => {
     const prisma = {
       passwordTecnologia: {

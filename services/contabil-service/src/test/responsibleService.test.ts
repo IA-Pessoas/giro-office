@@ -134,7 +134,7 @@ describe("ResponsibleService", () => {
     );
   });
 
-  it("getByClientId lança 404 quando não encontra", async () => {
+  it("getByClientId retorna null quando não encontra (#1325)", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.responsibleContabil.findFirst).mockResolvedValue(null);
     const service = new ResponsibleService(prisma, {
@@ -142,9 +142,7 @@ describe("ResponsibleService", () => {
       logUpdateIfChanged: vi.fn(),
     });
 
-    await expect(service.getByClientId(CLIENT_ID, ORG_ID)).rejects.toMatchObject({
-      statusCode: 404,
-    });
+    await expect(service.getByClientId(CLIENT_ID, ORG_ID)).resolves.toBeNull();
   });
 
   it("getByClientId retorna registro", async () => {

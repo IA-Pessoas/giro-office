@@ -595,7 +595,12 @@ export function buildAuditLifecycleMiddleware({
                     actorPlatformUserId: request.auth?.userId,
                   }
                 : { auth_kind: "platform", platform_user_id: request.auth?.userId }
-            : {}),
+            : request.auth?.claims.impersonator_platform_user_id
+              ? {
+                  actorKind: "platform",
+                  actorPlatformUserId: request.auth.claims.impersonator_platform_user_id,
+                }
+              : {}),
         },
         action: ownershipChanges
           ? "platform.organization.ownership.transfer.completed"

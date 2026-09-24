@@ -40,7 +40,11 @@ function createMockPrisma(): ProjectCrudPrisma {
 describe("ProjectCrudService", () => {
   it("helper compartilhado cria o projeto usando somente o tx fornecido", async () => {
     const tx = createMockPrisma();
-    tx.client.findFirst = vi.fn(async () => ({ id: CLIENT_ID }));
+    tx.client.findFirst = vi.fn(async () => ({
+      id: CLIENT_ID,
+      type_registration: "Existente",
+      prospecting_status: "Fechado",
+    }));
     tx.project.create = vi.fn(async ({ data }) => ({ id: PROJECT_ID, ...data }));
 
     const result = await shared.createProjectInTransaction(baseCreateInput, tx);
@@ -59,6 +63,7 @@ describe("ProjectCrudService", () => {
     });
     expect(tx.client.findFirst).toHaveBeenCalledWith({
       where: { id: CLIENT_ID, organization_id: ORG_ID },
+      select: { id: true, type_registration: true, prospecting_status: true },
     });
     expect(tx.project.findFirst).toHaveBeenCalledWith({
       where: { name: "Projeto Alpha", client_id: CLIENT_ID, organization_id: ORG_ID },
@@ -152,7 +157,11 @@ describe("ProjectCrudService", () => {
   it("createInTransaction usa apenas a transação do chamador e não audita", async () => {
     const prisma = createMockPrisma();
     const tx = createMockPrisma();
-    tx.client.findFirst = vi.fn(async () => ({ id: CLIENT_ID }));
+    tx.client.findFirst = vi.fn(async () => ({
+      id: CLIENT_ID,
+      type_registration: "Existente",
+      prospecting_status: "Fechado",
+    }));
     tx.project.create = vi.fn(async () => ({ id: PROJECT_ID }));
     const audit = { createLog: vi.fn(async () => {}), logUpdateIfChanged: vi.fn(async () => {}) };
     const service = new ProjectCrudService(prisma, audit);
@@ -165,6 +174,7 @@ describe("ProjectCrudService", () => {
     expect(result.create.id).toBe(PROJECT_ID);
     expect(tx.client.findFirst).toHaveBeenCalledWith({
       where: { id: CLIENT_ID, organization_id: ORG_ID },
+      select: { id: true, type_registration: true, prospecting_status: true },
     });
     expect(tx.project.findFirst).toHaveBeenCalledWith({
       where: { name: "Projeto Alpha", client_id: CLIENT_ID, organization_id: ORG_ID },

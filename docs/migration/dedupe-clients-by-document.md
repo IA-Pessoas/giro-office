@@ -8,11 +8,15 @@ mas não foi aplicado em produção. Ele é pré-requisito da constraint única 
 
 O arquivo [dedupe-clients-by-document.sql](../../infra/prisma/repairs/dedupe-clients-by-document.sql):
 
-- Agrupa clientes por organização e documento só com dígitos. Ficam fora documentos com
-  tamanho diferente de 11 ou 14 dígitos e documentos com um único dígito repetido
-  (mascarados e placeholders, tratados em #1375).
-- Mantém o cliente mais antigo. `clients` não tem `created_at`, então o critério é
-  `register_date_prospecting` (default `now()` na criação), com desempate por `id`.
+- Agrupa clientes por organização e documento só com letras e dígitos (CNPJ alfanumérico
+  incluso, como em `report-invalid-documents.sql`). Ficam fora documentos com tamanho diferente
+  de 11 ou 14 e com um único caractere repetido (mascarados e placeholders, tratados em #1375),
+  e clientes de teste (`QA_`, `QA E2E`): rode antes a limpeza de
+  [0002-testes-em-producao.md](../adr/0002-testes-em-producao.md).
+- Mantém o cliente mais antigo entre os ativos e não excluídos; sem ativo no grupo, o mais
+  antigo não excluído. Assim o cadastro em uso nunca é apagado em favor de um inativo.
+  `clients` não tem `created_at`, então "mais antigo" é `register_date_prospecting` (default
+  `now()` na criação), com desempate por `id`.
 - Move para o mantido todo vínculo com FK para `clients.id`, descoberto em `pg_constraint`,
   e os vínculos sem FK listados no próprio script (`commercial.*`,
   `client.commercial_projection_events`, `pessoal.payroll`,

@@ -98,6 +98,30 @@ describe("TriageExternalLinkService", () => {
     });
   });
 
+  it("recusa link em competência arquivada (#1326)", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({
+      id: "competence-1",
+      archived_at: new Date("2026-09-20T00:00:00.000Z"),
+      catalog_snapshot_initialized_at: new Date("2026-09-01T00:00:00.000Z"),
+    } as never);
+
+    await expect(
+      new TriageExternalLinkService(prisma).create(
+        {
+          client_id: CLIENT_ID,
+          competence: "2026-09",
+          type: "DRIVE",
+          url: "https://drive.example.test/triagem",
+          description: "Pasta mensal",
+          responsible_id: RESPONSIBLE_ID,
+        },
+        editor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.triageExternalLink.create).not.toHaveBeenCalled();
+  });
+
   it("lista somente links ativos da organização, cliente e competência", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageExternalLink.findMany).mockResolvedValue([record] as never);
@@ -151,6 +175,20 @@ describe("TriageExternalLinkService", () => {
       select: { id: true },
     });
     expect(prisma.triageCatalogItem.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("não edita nem arquiva link de competência arquivada (#1326)", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageExternalLink.findFirst).mockResolvedValue(record as never);
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({
+      id: "competence-1",
+      archived_at: new Date("2026-09-20T00:00:00.000Z"),
+      catalog_snapshot_initialized_at: new Date("2026-09-01T00:00:00.000Z"),
+    } as never);
+    const service = new TriageExternalLinkService(prisma);
+
+    await expect(service.archive(LINK_ID, editor())).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.triageExternalLink.update).not.toHaveBeenCalled();
   });
 
   it("revisa tipo, descrição e responsável sem alterar o vínculo do cliente", async () => {

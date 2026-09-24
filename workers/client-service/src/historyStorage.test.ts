@@ -48,4 +48,29 @@ describe("WorkerHistoryStorage", () => {
     });
     expect(storage.upload).not.toHaveBeenCalled();
   });
+
+  it("rejects oversized and disallowed files with Portuguese messages", async () => {
+    const storage = {
+      getBucket: vi.fn().mockResolvedValue({ public: false }),
+      upload: vi.fn(),
+      download: vi.fn(),
+      remove: vi.fn(),
+      createSignedUrl: vi.fn(),
+    };
+    const adapter = new WorkerHistoryStorage(storage, "ClientHistory");
+    const oversized = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "grande.pdf", {
+      type: "application/pdf",
+    });
+    const executable = new File(["MZ"], "app.exe", { type: "application/x-msdownload" });
+
+    await expect(adapter.upload("client-1", oversized)).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Arquivo excede o limite de 10 MB.",
+    });
+    await expect(adapter.upload("client-1", executable)).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Tipo de arquivo não permitido.",
+    });
+    expect(storage.upload).not.toHaveBeenCalled();
+  });
 });

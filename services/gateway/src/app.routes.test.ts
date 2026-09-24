@@ -398,6 +398,7 @@ function createToken(
     user_id: string;
     organization_id: string;
     permission: number;
+    impersonator_platform_user_id?: string;
     type?: "owner" | "admin" | "user";
     modules?: Record<string, number | null>;
     csrf_hash?: string;
@@ -503,6 +504,7 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
     const requests = [];
     for (const path of [
       "/platform/me",
+      "/platform/super-admins",
       "/platform/organizations",
       "/platform/organizations/org-1",
       "/platform/organizations/org-1/users",
@@ -514,11 +516,12 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
     }
 
     expect(requests.map((response) => response.status)).toEqual([
-      200, 200, 200, 200, 200, 200, 200,
+      200, 200, 200, 200, 200, 200, 200, 200,
     ]);
     const proxiedRequests = seen.filter(({ url }) => url !== "/internal/audit/requests");
     expect(proxiedRequests.map(({ service, url }) => ({ service, url }))).toEqual([
       { service: "user-service", url: "/platform/me" },
+      { service: "user-service", url: "/platform/super-admins" },
       { service: "organization-service", url: "/platform/organizations" },
       { service: "organization-service", url: "/platform/organizations/org-1" },
       { service: "user-service", url: "/platform/organizations/org-1/users" },
@@ -538,7 +541,8 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
       });
       expect(forwarded.organizationId).toBeUndefined();
     }
-    expect(proxiedRequests.slice(0, 6).map(({ cookie }) => cookie)).toEqual([
+    expect(proxiedRequests.slice(0, 7).map(({ cookie }) => cookie)).toEqual([
+      `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
@@ -546,7 +550,7 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
       `cw.session=${platformToken}`,
       `cw.session=${platformToken}`,
     ]);
-    expect(proxiedRequests[6]?.cookie).toBeUndefined();
+    expect(proxiedRequests[7]?.cookie).toBeUndefined();
 
     const platformOnOrganizationRoute = await fetch(`${gatewayUrl}/organizations`, {
       headers: { Cookie: `cw.session=${platformToken}` },
@@ -566,7 +570,7 @@ it("roteia cada contrato de plataforma ao upstream correto com identidade antifo
     expect(organizationOnPlatformRoute.status).toBe(403);
     expect(browserBearer.status).toBe(401);
     expect(internalValidation.status).toBe(404);
-    expect(proxiedRequests).toHaveLength(7);
+    expect(proxiedRequests).toHaveLength(8);
   } finally {
     await stopServer(gateway);
     await stopServer(userService);
@@ -3547,11 +3551,12 @@ it("proxies audit routes to the audit service when the feature flag is enabled",
   }
 });
 
-it("records successful proxied requests when audit is enabled", async () => {
+it("records the target and real operator for successful impersonated requests", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
     permission: 2,
+    impersonator_platform_user_id: "platform-operator-1",
   });
   const auditService = await startAuditIngestServer();
   const upstream = createServer((_request, response) => {
@@ -3597,6 +3602,8 @@ it("records successful proxied requests when audit is enabled", async () => {
       metadata: {
         routeTarget: "task-service",
         activityVisible: true,
+        actorKind: "platform",
+        actorPlatformUserId: "platform-operator-1",
       },
     });
   } finally {

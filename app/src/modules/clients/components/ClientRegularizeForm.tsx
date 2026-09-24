@@ -10,8 +10,9 @@ import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientRegularizeFormValues } from "../types";
+import { isRegularizeCompanyClient } from "../utils/regularizeForm";
 import {
-  REGULARIZE_REGIME_OPTIONS,
+  getRegularizeRegimeOptions,
   REGULARIZE_SEGMENT_OPTIONS,
   REGULARIZE_SIZE_OPTIONS,
 } from "../utils/regularizeForm";
@@ -100,6 +101,7 @@ export function ClientRegularizeForm({
   onSubmit,
   onCancel,
 }: ClientRegularizeFormProps) {
+  const isCompanyClient = isRegularizeCompanyClient(values);
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
     forwardFormattedInputChange(event, formatCpfCnpjInput, onChange);
   };
@@ -116,7 +118,9 @@ export function ClientRegularizeForm({
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Identificação</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <TextField label="Código Domínio" name="dominio_code" value={values.dominio_code} onChange={onChange} disabled={disabled} />
-          <TextField label="Nome / Apelido" name="name" value={values.name} onChange={onChange} disabled={disabled} />
+          {!isCompanyClient ? (
+            <TextField label="Nome" name="name" value={values.name} onChange={onChange} disabled={disabled} />
+          ) : null}
           <TextField label="Razão Social" name="company_name" value={values.company_name} onChange={onChange} disabled={disabled} />
           <TextField label="Nome Fantasia" name="fantasy_name" value={values.fantasy_name} onChange={onChange} disabled={disabled} />
           <TextField label="CPF/CNPJ" name="cpf_cnpj" value={values.cpf_cnpj} onChange={handleCpfCnpjChange} disabled={disabled} />
@@ -155,7 +159,7 @@ export function ClientRegularizeForm({
             <span className={labelClassName}>Regime</span>
             <ClientNativeSelect name="regime" value={values.regime} onChange={onChange} disabled={disabled}>
               <option value="">Selecione um regime</option>
-              {REGULARIZE_REGIME_OPTIONS.map((option) => (
+              {getRegularizeRegimeOptions(values.regime).map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
