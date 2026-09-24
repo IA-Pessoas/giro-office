@@ -24,9 +24,12 @@ type RegularizePrimaryReportingSource =
   | RegularizeLicenseReportingSource
   | RegularizeProcessReportingSource;
 
+// Filtro opcional da fonte de processos (placeholders de orientação legada, #1377).
+type ReportingFilter = Partial<typeof OPERATIONAL_PROCESS_FILTER>;
+
 type ReportingDelegate = {
   findMany(input: {
-    where: { organization_id: string; process_type?: { not: string } };
+    where: { organization_id: string } & ReportingFilter;
     select: Record<string, true>;
     take: number;
     cursor?: { id: string };
@@ -47,7 +50,7 @@ async function loadReportingPage(
   fields: readonly string[],
   limit: number,
   cursor?: string,
-  filter: { process_type?: { not: string } } = {},
+  filter: ReportingFilter = {},
 ): Promise<ReportingPage> {
   const rows = await delegate.findMany({
     where: { organization_id: organizationId, ...filter },

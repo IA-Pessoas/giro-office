@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { after, before, test } from "node:test";
+import { test } from "node:test";
+
+import { hasDocker, usePostgres } from "./pgHarness.mjs";
 
 // Roda o reparo real contra um Postgres descartavel em Docker. Sem Docker, pula.
 const SQL = readFileSync(
   new URL("../../repairs/backfill-installment-paid-count.sql", import.meta.url),
   "utf8",
 );
-const CONTAINER = `installment-paid-test-${process.pid}`;
-const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 const FIXTURE = `
 DROP TABLE IF EXISTS "parcelamento.installmentsCompetencies", "parcelamento.installments";
@@ -38,17 +37,7 @@ INSERT INTO "parcelamento.installmentsCompetencies" VALUES
   ('6', 'org', 'settles', 2, 0, '2024-01'), ('7', 'org', 'settles', 2, 0, '2024-02');
 `;
 
-function psql(sql, vars = []) {
-  const args = ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-X", "-q", "-t", "-A"];
-  for (const v of vars) args.push("-v", v);
-  return spawnSync("docker", [...args, "-f", "-"], { input: sql, encoding: "utf8" });
-}
-
-function query(sql) {
-  const result = psql(sql);
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout.trim();
-}
+const { psql, query } = usePostgres("installment-paid-test");
 
 // id=pagas/restantes/vencidas/saldo/status/liquidado?
 const STATE = `SELECT string_agg(id || '=' || paid_installments_count || '/' || remaining_installments_count
@@ -57,22 +46,6 @@ const STATE = `SELECT string_agg(id || '=' || paid_installments_count || '/' || 
 const BEFORE =
   "already=5/55/0/5500/Ativo/false,none=0/60/0/6000/Ativo/false," +
   "settles=0/2/0/200/Ativo/false,sum=0/60/0/6000/Ativo/false";
-
-before(() => {
-  if (!hasDocker) return;
-  execFileSync("docker", [
-    "run", "-d", "--rm", "--name", CONTAINER, "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:17",
-  ]);
-  for (let i = 0; i < 60; i++) {
-    if (psql("SELECT 1").status === 0) return;
-    execFileSync("sleep", ["1"]);
-  }
-  throw new Error("Postgres de teste nao subiu");
-});
-
-after(() => {
-  if (hasDocker) spawnSync("docker", ["rm", "-f", CONTAINER], { stdio: "ignore" });
-});
 
 test("dry-run relata o recalculo sem gravar", { skip: !hasDocker }, () => {
   query(FIXTURE);
