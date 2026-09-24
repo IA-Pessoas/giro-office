@@ -1,8 +1,8 @@
 import {
+  type DocumentPersonType,
   isValidCpfCnpj,
   normalizeCpfCnpj,
   ServiceError,
-  type DocumentPersonType,
 } from "@workspace/shared";
 
 export function getClientDocumentType(type: string | null | undefined): DocumentPersonType {

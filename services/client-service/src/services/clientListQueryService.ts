@@ -1,5 +1,5 @@
-import type { Prisma } from "../generated/prisma/client.js";
 import { normalizeCpfCnpj } from "@workspace/shared";
+import type { Prisma } from "../generated/prisma/client.js";
 
 export type ListRefFilter = "integracao" | "deps" | undefined;
 

@@ -13,13 +13,13 @@ import {
   type UpdateClientBody,
 } from "../schemas/client.schemas.js";
 import {
-  buildLegacyListStatusWhere,
-  mergeClientListSearchWhere,
-} from "./clientListQueryService.js";
-import {
   assertValidClientDocument,
   isClientDocumentUniqueConstraintError,
 } from "../utils/clientDocuments.js";
+import {
+  buildLegacyListStatusWhere,
+  mergeClientListSearchWhere,
+} from "./clientListQueryService.js";
 
 export type OrganizationPublic = {
   id: string;
