@@ -10,7 +10,8 @@ import { canCreateUsers, resolveDepartmentModuleKey } from "@modules/auth";
 import { useUserForm } from "../hooks/useUserForm";
 import LogDrawer from "@shared/components/LogDrawer";
 import { LoadingSpinner } from "@shared/components/LoadingSpinner";
-import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "@shared/components";
+import { PasswordResetButton, TabsContent, TabsList, TabsRoot, TabsTrigger } from "@shared/components";
+import { userService } from "../services/userService";
 
 interface UserProfileProps {
   userId: string;
@@ -140,14 +141,10 @@ function UserFormContent({ user, me, departments }) {
                 />
               </div>
               <div className="u-stack u-gap-2">
-                <label className="users-section-title">Nova Senha</label>
-                <input
-                  type="password"
-                  name="password"
-                  placeholder="Deixe em branco para manter"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="ui-input"
+                <p className="users-section-title">Senha</p>
+                <PasswordResetButton
+                  onSend={() => userService.sendPasswordReset(user.id)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
                 />
               </div>
             </div>

@@ -5,5 +5,6 @@ export { ChatControllerUI } from './ChatControllerUI';
 export { default as LogDrawer } from './LogDrawer';
 export { Dialog } from './ui/Dialog';
 export { ConfirmationDialog } from './ui/ConfirmationDialog';
+export { PasswordResetButton } from './PasswordResetButton';
 export { TabsRoot, TabsList, TabsTrigger, TabsContent } from './ui/Tabs';
 export { PaginationControls } from './ui/PaginationControls';

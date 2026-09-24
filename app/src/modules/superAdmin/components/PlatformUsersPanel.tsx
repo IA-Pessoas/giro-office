@@ -3,7 +3,7 @@ import { Search, UserRound } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ConfirmationDialog } from "@shared/components";
+import { ConfirmationDialog, PasswordResetButton } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
@@ -69,9 +69,8 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
     onSuccess: () => window.location.assign("/"),
   });
   const [editMode, setEditMode] = useState(false);
-  const [passwordConfirmationOpen, setPasswordConfirmationOpen] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ name: "", login: "", department_id: "", password: "" });
+  const [draft, setDraft] = useState({ name: "", login: "", department_id: "" });
   const departmentName = departmentsQuery.data?.find(
     (department) => department.id === userDetailQuery.data?.department_id,
   )?.name;
@@ -123,7 +122,6 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
       name: selectedUser.name,
       login: selectedUser.login,
       department_id: selectedUser.department_id,
-      password: "",
     });
     setEditMode(false);
     setEditError(null);
@@ -140,7 +138,6 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
           name: draft.name,
           login: draft.login,
           department_id: draft.department_id,
-          ...(draft.password.trim() ? { password: draft.password } : {}),
           expected_version: selectedUser.version,
         },
       });
@@ -319,17 +316,11 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                         ))}
                       </select>
                     </label>
-                    <label className="block text-sm font-medium">
-                      Nova senha
-                      <Input
-                        autoComplete="new-password"
-                        type="password"
-                        value={draft.password}
-                        onChange={(event) =>
-                          setDraft({ ...draft, password: event.target.value })
-                        }
-                      />
-                    </label>
+                    <PasswordResetButton
+                      onSend={() => platformService.sendPasswordReset(organization.id, selectedUser.id)}
+                      className="rounded-lg border px-3 py-2 text-sm font-semibold"
+                      disabled={userUpdateMutation.isPending}
+                    />
                     <div className="flex gap-2">
                       <button
                         className={
@@ -337,11 +328,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                           "disabled:opacity-60"
                         }
                         disabled={userUpdateMutation.isPending}
-                        onClick={() =>
-                          draft.password.trim()
-                            ? setPasswordConfirmationOpen(true)
-                            : void saveUser()
-                        }
+                        onClick={() => void saveUser()}
                         type="button"
                       >
                         Salvar alterações
@@ -544,21 +531,6 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         open={isImpersonationOpen}
         title="Confirmar personificação"
         variant="neutral"
-      />
-      <ConfirmationDialog
-        cancelLabel="Cancelar"
-        confirmLabel="Alterar senha"
-        description="A nova senha revogará todas as sessões atuais deste usuário."
-        errorMessage={null}
-        isConfirming={userUpdateMutation.isPending}
-        onConfirm={async () => {
-          setPasswordConfirmationOpen(false);
-          await saveUser();
-        }}
-        onOpenChange={setPasswordConfirmationOpen}
-        open={passwordConfirmationOpen}
-        title="Confirmar alteração de senha"
-        variant="destructive"
       />
       <OwnershipTransferDialog
         currentOwner={selectedUser?.type === "owner" && selectedUser.status === "active" ? selectedUser : null}

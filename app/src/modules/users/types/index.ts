@@ -66,7 +66,6 @@ export interface AdminCreateUserData extends CreateUserData {
 
 export interface UpdateUserData {
   name?: string;
-  password?: string;
   permission?: number;
   type?: UserType;
   department_id?: string;

@@ -208,7 +208,52 @@ async function assertRhAdminProfileUpdate() {
   }
 }
 
+async function assertPasswordResetLink() {
+  const token = "smoke-reset-token";
+  const password = "senha-redefinida-smoke";
+  const requests = [];
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ baseURL: baseUrl });
+  const page = await context.newPage();
+
+  await page.route("**/user/password-reset/confirm", async (route) => {
+    assert.equal(route.request().method(), "POST");
+    requests.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ success: true, data: { reset: true } }),
+    });
+  });
+  await page.route("**/user/me", (route) => route.fulfill({ status: 401, body: "{}" }));
+  await page.route("**/platform/me", (route) => route.fulfill({ status: 401, body: "{}" }));
+  await page.route("**/socket.io/**", (route) => route.fulfill({ status: 200, body: "ok" }));
+
+  try {
+    await page.goto(`/redefinir-senha?token=${token}`, { waitUntil: "networkidle" });
+    await assertVisible(page.getByRole("heading", { name: "Redefinir senha" }), page, "heading");
+    assert.equal(new URL(page.url()).search, "", "O token deve sair da barra de endereço.");
+
+    const submit = page.getByRole("button", { name: "Definir nova senha" });
+    await page.getByLabel("Nova senha", { exact: true }).fill(password);
+    await page.getByLabel("Confirmar nova senha", { exact: true }).fill("outra-senha-smoke");
+    await assertVisible(page.getByText("As senhas não conferem."), page, "aviso de confirmação");
+    assert.equal(await submit.isDisabled(), true);
+
+    await page.getByLabel("Confirmar nova senha", { exact: true }).fill(password);
+    await submit.click();
+    await assertVisible(page.getByText("Senha redefinida. Entre com a nova senha."), page, "sucesso");
+    assert.deepEqual(requests, [{ token, password }]);
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
 await withNextServer(async () => {
+  await assertPasswordResetLink();
+  console.log("PASS usuário define a senha pelo link de redefinição");
+
   await assertViewerPasswordUpdate();
   console.log("PASS Viewer atualiza a própria senha pelo componente /me");
 
