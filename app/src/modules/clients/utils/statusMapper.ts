@@ -42,15 +42,13 @@ export type ClientLifecycleActions = {
   canTerminate: boolean;
 };
 
-// Prospect não tem ciclo de vida; Inativo e em inativação só podem ser reativados.
+const REACTIVATABLE_STATUSES = new Set(["Inativo", "Processo de Inativação", "Paralisado"]);
+
+// Nega por padrão: Prospect, Não Contratado e status desconhecido não têm ação de ciclo de vida.
 export function getClientLifecycleActions(uiStatus: string): ClientLifecycleActions {
-  if (uiStatus === "Prospect") {
-    return { canActivate: false, canDeactivate: false, canTerminate: false };
+  if (uiStatus === "Ativo") {
+    return { canActivate: false, canDeactivate: true, canTerminate: true };
   }
 
-  if (uiStatus === "Inativo" || uiStatus === "Processo de Inativação") {
-    return { canActivate: true, canDeactivate: false, canTerminate: false };
-  }
-
-  return { canActivate: false, canDeactivate: true, canTerminate: true };
+  return { canActivate: REACTIVATABLE_STATUSES.has(uiStatus), canDeactivate: false, canTerminate: false };
 }

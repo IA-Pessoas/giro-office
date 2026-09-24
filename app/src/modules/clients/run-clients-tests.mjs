@@ -897,6 +897,9 @@ runTest("client lifecycle only enables the action valid for the status", () => {
   });
   assert.deepEqual(getClientLifecycleActions("Inativo"), { ...none, canActivate: true });
   assert.deepEqual(getClientLifecycleActions("Processo de Inativação"), { ...none, canActivate: true });
+  assert.deepEqual(getClientLifecycleActions("Paralisado"), { ...none, canActivate: true });
+  assert.deepEqual(getClientLifecycleActions("Não Contratado"), none);
+  assert.deepEqual(getClientLifecycleActions(""), none);
 });
 
 runTest("client lifecycle asks for confirmation and termination marks required fields", () => {

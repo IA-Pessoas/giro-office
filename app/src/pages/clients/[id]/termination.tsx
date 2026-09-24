@@ -119,7 +119,7 @@ export default function ClientTerminationPage() {
           </section>
         ) : !getClientLifecycleActions(mapClientStatusFromApi(client.status)).canTerminate ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-600 dark:text-slate-300`}>
-            Este cliente já está inativo, em processo de inativação ou ainda é Prospect.
+            A inativação só está disponível para clientes ativos.
           </section>
         ) : !integracaoAccess.isAdmin ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-600 dark:text-slate-300`}>
