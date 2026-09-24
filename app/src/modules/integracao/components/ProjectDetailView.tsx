@@ -28,6 +28,7 @@ import {
   PROJECT_PANEL_CLASSNAME,
   PROJECT_SUBPANEL_CLASSNAME,
 } from "./projectUi";
+import { getProjectTaskCardLabels } from "./taskWorkspaceUi";
 
 export function ProjectDetailView({ projectId }: { projectId: string }) {
   const router = useRouter();
@@ -252,35 +253,41 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
           {project.tasks && project.tasks.length > 0 ? (
             <div className="grid gap-3">
-              {project.tasks.map((task) => (
-                <article
-                  key={task.id}
-                  className={`${PROJECT_SUBPANEL_CLASSNAME} flex flex-col gap-2 p-4`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium text-slate-900 dark:text-white">
-                      {task.model?.name || task.name || "Tarefa sem nome"}
-                    </p>
-                    {task.status ? (
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getProjectStatusTone(
-                          task.status,
-                        )}`}
-                      >
-                        {task.status}
-                      </span>
+              {project.tasks.map((task) => {
+                const labels = getProjectTaskCardLabels(task);
+                return (
+                  <article
+                    key={task.id}
+                    className={`${PROJECT_SUBPANEL_CLASSNAME} flex flex-col gap-2 p-4`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-slate-900 dark:text-white">{labels.title}</p>
+                      {task.status ? (
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getProjectStatusTone(
+                            task.status,
+                          )}`}
+                        >
+                          {task.status}
+                        </span>
+                      ) : null}
+                    </div>
+                    {labels.modelName ? (
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Modelo: {labels.modelName}
+                      </p>
                     ) : null}
-                  </div>
-                  {task.department?.name || task.model?.department?.name ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Departamento: {task.department?.name || task.model?.department?.name}
+                    {task.department?.name || task.model?.department?.name ? (
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Departamento: {task.department?.name || task.model?.department?.name}
+                      </p>
+                    ) : null}
+                    <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap break-words">
+                      {task.observations || task.observation || "Sem observações específicas."}
                     </p>
-                  ) : null}
-                  <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap break-words">
-                    {task.observations || task.observation || "Sem observações específicas."}
-                  </p>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div
