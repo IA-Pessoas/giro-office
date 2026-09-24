@@ -6,6 +6,7 @@ import {
   REPORTING_QUERY_BYTE_LIMIT_CODE,
   REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
   REPORTING_QUERY_ROW_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
   type ReportingQuery,
   ServiceError,
   withReportingSnapshot,
@@ -64,7 +65,7 @@ function throwSnapshotByteLimit(): never {
 function throwSnapshotRowLimit(): never {
   throw new ServiceError(
     422,
-    "O conjunto excede o limite global de 50.000 linhas do relatório. Aplique filtros mais específicos e tente novamente.",
+    REPORTING_QUERY_ROW_LIMIT_MESSAGE,
     undefined,
     REPORTING_QUERY_ROW_LIMIT_CODE,
   );

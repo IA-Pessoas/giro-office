@@ -7,6 +7,7 @@ import {
   REPORTING_QUERY_BYTE_LIMIT_CODE,
   REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
   REPORTING_QUERY_ROW_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
 } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
@@ -296,8 +297,7 @@ describe("fiscal internal reporting service", () => {
         error: {
           statusCode: 422,
           code: REPORTING_QUERY_ROW_LIMIT_CODE,
-          message:
-            "O conjunto excede o limite global de 50.000 linhas do relatório. Aplique filtros mais específicos e tente novamente.",
+          message: REPORTING_QUERY_ROW_LIMIT_MESSAGE,
         },
       });
       expect(icms.findMany).toHaveBeenCalledTimes(501);
