@@ -27,6 +27,7 @@ import {
   getContabilCompletionPercent,
   getCurrentContabilCompetence,
   rollbackContabilFieldValue,
+  shouldSyncRemoteContabilControl,
   type ContabilControlFieldSaveStatus,
   updateContabilControlFieldStatus,
 } from "./contabilControlSection.helpers";
@@ -58,8 +59,9 @@ export function ContabilControlSection({
   const archiveMutation = useArchiveContabilCompetenceMutation();
   const restoreMutation = useRestoreContabilCompetenceMutation();
   const [competence, setCompetence] = useState(() => getCurrentContabilCompetence());
-  const detailQuery = useContabilControlDetail({ clientId, competence }, { enabled: !canEdit });
-  const remoteControl = canEdit ? bootstrapMutation.data : detailQuery.data;
+  // Abrir a aba só lê (GET); criar o controle é ação explícita em "Iniciar controle".
+  const detailQuery = useContabilControlDetail({ clientId, competence });
+  const remoteControl = detailQuery.data;
   const [controlId, setControlId] = useState<string | null>(null);
   const [control, setControl] = useState<ContabilControl | null>(null);
   const [fieldStatuses, setFieldStatuses] = useState(() =>
@@ -97,7 +99,7 @@ export function ContabilControlSection({
   );
 
   const notesValue = control?.notes ?? "";
-  const isLoadingControl = canEdit ? bootstrapMutation.isPending : detailQuery.isFetching;
+  const isLoadingControl = detailQuery.isLoading || bootstrapMutation.isPending;
   const isAnyFieldSaving = useMemo(
     () => Object.values(fieldStatuses).some((status) => status === "saving"),
     [fieldStatuses],
@@ -108,24 +110,12 @@ export function ContabilControlSection({
   }, [clientId, competence]);
 
   useEffect(() => {
-    if (!clientId) {
-      return;
-    }
-
-    if (!canEdit) {
-      clearAllTimers();
-      setBootstrapError(null);
-      setControlId(null);
-      setControl(null);
-      setFieldStatuses(createContabilFieldStatusMap(CONTABIL_CONTROL_FIELDS));
-      confirmedControlRef.current = null;
-
-      return () => {
-        clearAllTimers();
-      };
-    }
-
-    void bootstrapControl(clientId, competence);
+    clearAllTimers();
+    setBootstrapError(null);
+    setControlId(null);
+    setControl(null);
+    setFieldStatuses(createContabilFieldStatusMap(CONTABIL_CONTROL_FIELDS));
+    confirmedControlRef.current = null;
 
     return () => {
       clearAllTimers();
@@ -133,12 +123,11 @@ export function ContabilControlSection({
   }, [clientId, competence, canEdit]);
 
   useEffect(() => {
-    if (canEdit) {
-      return;
-    }
-
     if (detailQuery.error) {
       setBootstrapError(getContabilErrorMessage(detailQuery.error));
+      return;
+    }
+    if (detailQuery.isLoading || !shouldSyncRemoteContabilControl(canEdit, controlId, remoteControl)) {
       return;
     }
 
@@ -146,7 +135,7 @@ export function ContabilControlSection({
     setControl(remoteControl ?? null);
     setControlId(remoteControl?.id ?? null);
     confirmedControlRef.current = remoteControl ?? null;
-  }, [canEdit, detailQuery.error, remoteControl]);
+  }, [canEdit, detailQuery.error, detailQuery.isLoading, remoteControl]);
 
   useEffect(() => {
     return () => {
@@ -341,8 +330,7 @@ export function ContabilControlSection({
   function restoreCompetence() {
     return runOperation(async () => {
       await restoreMutation.mutateAsync({ client_id: clientId, competence });
-      setOperationMessage("Competência restaurada. Recarregue o controle para continuar.");
-      void bootstrapControl(clientId, competence);
+      setOperationMessage("Competência restaurada.");
     });
   }
 
@@ -373,8 +361,18 @@ export function ContabilControlSection({
       ) : null}
 
       {!isLoadingControl && !bootstrapError && !control ? (
-        <ContabilStateBox icon={AlertCircle} title="Controle indisponível" compact>
-          O backend não retornou um controle válido para esta competência.
+        <ContabilStateBox icon={AlertCircle} title="Sem controle nesta competência" compact>
+          <span>Ainda não há checklist contábil para esta competência.</span>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => void bootstrapControl(clientId, competence)}
+              disabled={bootstrapMutation.isPending}
+              className="ml-2 inline-flex items-center gap-1 font-semibold text-blue-700 disabled:opacity-60 dark:text-blue-300"
+            >
+              Iniciar controle
+            </button>
+          ) : null}
         </ContabilStateBox>
       ) : null}
 

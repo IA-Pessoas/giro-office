@@ -33,6 +33,7 @@ import {
   getContabilCompletionPercent,
   getCurrentContabilCompetence,
   rollbackContabilFieldValue,
+  shouldSyncRemoteContabilControl,
   updateContabilControlFieldStatus,
 } from "./components/contabilControlSection.helpers.ts";
 import {
@@ -336,7 +337,7 @@ await (async () => {
     );
   });
 
-  await runTest("viewer control section reads existing control without bootstrap write", () => {
+  await runTest("control section reads existing control via GET for viewer and editor", () => {
     const componentSource = readFileSync(
       new URL("./components/ContabilControlSection.tsx", import.meta.url),
       "utf8",
@@ -347,9 +348,8 @@ await (async () => {
     );
 
     assert.match(hookSource, /useContabilControlDetail/);
-    assert.match(componentSource, /enabled:\s*!canEdit/);
-    assert.match(componentSource, /canEdit\s*\?\s*bootstrapMutation\.data\s*:\s*detailQuery\.data/);
-    assert.match(componentSource, /if\s*\(!canEdit\)\s*\{/);
+    assert.match(componentSource, /useContabilControlDetail\(\{ clientId, competence \}\)/);
+    assert.match(componentSource, /const remoteControl = detailQuery\.data;/);
     assert.match(hookSource, /contabilControlService\.getControl/);
   });
 
@@ -832,5 +832,20 @@ await (async () => {
       getContabilErrorMessage(new Error("boom")),
       "boom",
     );
+  });
+  await runTest("controle contábil carregado por GET só sobrescreve o editor ao trocar de registro (#1324)", () => {
+    const control = { id: "control-1" };
+    assert.equal(shouldSyncRemoteContabilControl(false, "control-1", control), true);
+    assert.equal(shouldSyncRemoteContabilControl(true, null, control), true);
+    assert.equal(shouldSyncRemoteContabilControl(true, "control-1", null), true);
+    assert.equal(shouldSyncRemoteContabilControl(true, "control-1", control), false);
+    assert.equal(shouldSyncRemoteContabilControl(true, null, null), false);
+  });
+
+  await runTest("abrir a aba Contábil não cria controle: POST só no botão Iniciar controle (#1324)", () => {
+    const source = readWorkspaceSource("./components/ContabilControlSection.tsx");
+    const effects = source.split("useEffect(").slice(1).map((chunk) => chunk.split("}, [")[0]);
+    assert.ok(effects.every((effect) => !effect.includes("bootstrapControl(")));
+    assert.match(source, /Iniciar controle/);
   });
 })();
