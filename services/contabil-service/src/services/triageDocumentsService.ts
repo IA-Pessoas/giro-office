@@ -349,7 +349,7 @@ export class TriageDocumentsService {
   async getMonthly(
     request: TriageMonthlyRequest,
     organizationIdOrAuth: string | TriageDocumentsAuthContext,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Record<string, unknown> | null> {
     const auth = typeof organizationIdOrAuth === "string" ? undefined : organizationIdOrAuth;
     const organizationId =
       typeof organizationIdOrAuth === "string"
@@ -366,9 +366,8 @@ export class TriageDocumentsService {
       },
     });
 
-    if (!monthly) {
-      throw new ServiceError(404, "Pendência documental mensal não encontrada.");
-    }
+    // Estado vazio é 200 com null: a tela oferece "Iniciar pendências".
+    if (!monthly) return null;
 
     const result = this.toMonthlyResponse(monthly, type);
     if (auth && this.overviewClient) {
@@ -386,7 +385,7 @@ export class TriageDocumentsService {
           triagem_summary: await this.overviewClient.getSummary(summaryRequest),
         };
       } catch (error: unknown) {
-        if (!(error instanceof ServiceError) || ![403, 503, 504].includes(error.statusCode)) {
+        if (!(error instanceof ServiceError) || ![403, 404, 503, 504].includes(error.statusCode)) {
           throw error;
         }
         logWarn("Resumo da Triagem indisponível; mantendo resposta mensal local", {

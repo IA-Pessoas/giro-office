@@ -800,7 +800,7 @@ describe("TriageDocumentsService", () => {
       overviewClient,
     ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
 
-    expect(result.triagem_summary).toEqual(
+    expect(result?.triagem_summary).toEqual(
       expect.objectContaining({ client_id: CLIENT_ID, competence: COMPETENCE }),
     );
     expect(overviewClient.getSummary).toHaveBeenCalledWith({
@@ -818,6 +818,24 @@ describe("TriageDocumentsService", () => {
     vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
     const overviewClient = {
       getSummary: vi.fn().mockRejectedValue(new ServiceError(503, "Triagem indisponível.")),
+    };
+
+    const result = await new TriageDocumentsService(
+      prisma,
+      { logUpdateIfChanged: vi.fn() },
+      overviewClient,
+    ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
+
+    expect(result).toEqual(expect.objectContaining({ id: MONTHLY_ID, triagem_summary: null }));
+  });
+
+  it("cliente sem competência na Triagem mantém resposta mensal com resumo null (#1322)", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const overviewClient = {
+      getSummary: vi
+        .fn()
+        .mockRejectedValue(new ServiceError(404, "Resumo da Triagem não encontrado.")),
     };
 
     const result = await new TriageDocumentsService(
@@ -958,7 +976,7 @@ describe("TriageDocumentsService", () => {
     expect(prisma.triageBankStatement.upsert).toHaveBeenCalledTimes(2);
     await expect(
       service.getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, OTHER_ORG_ID),
-    ).rejects.toMatchObject({ statusCode: 404 });
+    ).resolves.toBeNull();
   });
 
   it("não cria marcador bancário para cliente de outra organização", async () => {

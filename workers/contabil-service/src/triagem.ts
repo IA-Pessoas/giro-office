@@ -51,6 +51,10 @@ export function createTriagemOverviewClient(
       if (!response.ok) throw new ServiceError(503, "Resumo da Triagem indisponível.");
       const payload = (await response.json()) as { success?: unknown; data?: { items?: unknown } };
       const item = Array.isArray(payload.data?.items) ? payload.data.items[0] : undefined;
+      // Cliente sem competência criada na Triagem: o overview vem vazio.
+      if (payload.success === true && Array.isArray(payload.data?.items) && !item) {
+        throw new ServiceError(404, "Resumo da Triagem não encontrado.");
+      }
       if (
         payload.success !== true ||
         !item ||

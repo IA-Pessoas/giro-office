@@ -117,6 +117,8 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             success: { type: "boolean", enum: [true] },
             data: {
               type: "object",
+              nullable: true,
+              description: "null no GET quando ainda não há pendência mensal (estado vazio).",
               additionalProperties: true,
               properties: {
                 triagem_summary: {

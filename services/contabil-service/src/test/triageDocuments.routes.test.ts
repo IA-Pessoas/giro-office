@@ -129,6 +129,19 @@ describe("triage document routes", () => {
     );
   });
 
+  it("GET /triagem/monthly sem registro retorna 200 com data null (#1322)", async () => {
+    const deps = createMockDeps();
+    vi.mocked(deps.getMonthly).mockResolvedValue(null);
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .get(`/triagem/monthly?client_id=${CLIENT_ID}&competence=2026-09`)
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: null });
+  });
+
   it("POST /triagem/monthly aceita a rotina fiscal explicitamente", async () => {
     const deps = createMockDeps();
     const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
