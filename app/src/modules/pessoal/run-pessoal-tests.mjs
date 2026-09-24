@@ -22,8 +22,10 @@ import {
   buildPessoalUnionFormValues,
   formatPessoalUnionCnpjInput,
   normalizePessoalUnionCnpjValue,
+  validatePessoalUnionPayload,
 } from "./components/pessoalFormValueHelpers.ts";
 import { PESSOAL_QUERY_KEY, pessoalQueryKey } from "./hooks/queryKeys.ts";
+import { PESSOAL_GROUP_POLICY_LABELS } from "./types/groups.ts";
 import { formatPessoalObligationGenerationSummary } from "./utils/obligationGenerationSummary.ts";
 import { getPessoalErrorMessage } from "./utils/pessoalErrorMessage.ts";
 import {
@@ -192,6 +194,25 @@ runTest("pessoal write mutations refresh lists on success and on error (#1300)",
     const hook = readFileSync(new URL(`./hooks/${file}`, import.meta.url), "utf8");
     assert.doesNotMatch(hook, /onSuccess:/, `${file} ainda invalida só no sucesso`);
   }
+});
+
+runTest("pessoal union form rejects invalid CNPJ on new or changed values (#1301)", () => {
+  const union = (cnpj) => ({ name: "Sindicato QA", cnpj, base_date: null });
+  assert.match(validatePessoalUnionPayload(union("123")), /CNPJ inválido/);
+  assert.match(validatePessoalUnionPayload(union("11222333000144")), /CNPJ inválido/);
+  assert.equal(validatePessoalUnionPayload(union("11222333000181")), null);
+  assert.equal(validatePessoalUnionPayload(union("12ABC34501DE35")), null);
+  assert.match(validatePessoalUnionPayload({ ...union("11222333000181"), name: "" }), /nome/);
+  assert.match(validatePessoalUnionPayload(union("")), /CNPJ do sindicato/);
+  // Cadastro antigo com CNPJ fora do padrão continua editável se o CNPJ não mudar.
+  assert.equal(validatePessoalUnionPayload(union("123"), "123"), null);
+  assert.match(validatePessoalUnionPayload(union("124"), "123"), /CNPJ inválido/);
+});
+
+runTest("pessoal tabs and group policies are shown in Portuguese (#1301)", () => {
+  assert.equal(PESSOAL_TABS.find((tab) => tab.id === "overview")?.label, "Visão geral");
+  assert.equal(PESSOAL_GROUP_POLICY_LABELS.NORMAL, "Normal");
+  assert.equal(PESSOAL_GROUP_POLICY_LABELS.NO_OBLIGATIONS, "Sem obrigações");
 });
 
 runTest("pessoal error message prefers api fields before local fallback", () => {
@@ -518,10 +539,12 @@ runTest("pessoal money fields use the shared BRL mask and keep numeric payloads"
   assert.match(payroll, /isMoney[\s\S]*formatBrlInput\(normalizeDigits\(event\.target\.value\)\)/);
   assert.match(payroll, /event\.key === "Backspace" \|\| event\.key === "Delete"/);
   assert.match(payroll, /pessoalNumberFieldClassName/);
-  assert.match(tracking, /formatBrlInput/);
-  assert.match(tracking, /normalizeDigits\(event\.target\.value\)/);
-  assert.match(tracking, /parseBrlInput/);
-  assert.match(tracking, /balance_amount: optional\(lddFormValues\.balance_amount, parseBrlInput\)/);
+  // #1301: Saldo é digitado em reais ("100" = R$ 100,00), não em centavos.
+  assert.match(tracking, /onBlur=[\s\S]*formatBrlDecimalInput\(event\.currentTarget\.value\)/);
+  assert.match(
+    tracking,
+    /balance_amount: optional\(lddFormValues\.balance_amount, parseBrlDecimalInput\)/,
+  );
   assert.match(tracking, /isMoney \? "text"/);
   assert.match(controls, /pessoalNumberFieldClassName/);
 });
@@ -785,17 +808,17 @@ runTest("pessoal overview reads available dashboard data", () => {
   assert.match(overviewHook, /pessoalService\.getOverview\(\)/);
   assert.match(service, /getOverview\(\)/);
   assert.match(service, /PESSOAL_ENDPOINTS\.overview/);
-  assert.match(overview, /lg:grid-cols-\[minmax\(0,2fr\)_minmax\(280px,1fr\)\]/);
   assert.match(overview, /bg-gradient-to-br from-blue-700/);
-  assert.match(overview, /min-h-\[260px\]/);
-  assert.match(overview, /text-3xl font-bold/);
+  // #1301: o resumo não ocupa meia tela e Folha/Obrigações mostram números.
+  assert.doesNotMatch(overview, /min-h-\[260px\]|text-3xl font-bold/);
   assert.match(overview, /className="rounded-lg border border-gray-200 bg-white p-3/);
   assert.match(overview, /text-xs font-bold uppercase/);
   assert.match(overview, /onSelectTab\(card\.tabId\)/);
+  assert.match(overview, /value: formatCount\(summary\?\.payroll\?\.total/);
+  assert.match(overview, /value: formatCount\(summary\?\.obligations\?\.total/);
   assert.match(overview, /tabId: "payroll"/);
   assert.match(overview, /tabId: "obligations"/);
-  assert.match(overview, /grid grid-cols-2 gap-3/);
-  assert.match(overview, /featureCards\.slice\(2\)/);
+  assert.match(overview, /featureCards\.map\(renderCard\)/);
   assert.doesNotMatch(overview, /const splitCards|divide-y|divide-x/);
   assert.doesNotMatch(overview, /details:\s*\[\]/);
   assert.doesNotMatch(overview, /value: "Por cliente"|value: "Mensal"/);

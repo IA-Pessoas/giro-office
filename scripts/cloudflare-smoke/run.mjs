@@ -971,7 +971,7 @@ async function runChecks({ db, sql, baseUrls, secrets, runId, mode, migrationWor
       await http(baseUrls.pessoal, "/pessoal/unions", {
         method: "POST",
         token: tokenA,
-        body: { name: `QA_${runId} sindicato`, cnpj: "12.345.678/0001-90", base_date: null },
+        body: { name: `QA_${runId} sindicato`, cnpj: "11.444.777/0001-61", base_date: null },
       }),
       [200, 201],
       "POST /pessoal/unions",
