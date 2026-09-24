@@ -6,11 +6,17 @@ import { LuFolder } from "react-icons/lu";
 import { FaComputer } from "react-icons/fa6";
 import { IoCreate } from "react-icons/io5";
 
-import { canCreateUsers, resolveDepartmentModuleKey } from "@modules/auth";
+import {
+  canCreateUsers,
+  isOrganizationOwner,
+  OWNER_ROLE_LABEL,
+  resolveDepartmentModuleKey,
+} from "@modules/auth";
 import { useUserForm } from "../hooks/useUserForm";
 import LogDrawer from "@shared/components/LogDrawer";
 import { LoadingSpinner } from "@shared/components/LoadingSpinner";
-import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "@shared/components";
+import { PasswordResetButton, TabsContent, TabsList, TabsRoot, TabsTrigger } from "@shared/components";
+import { userService } from "../services/userService";
 
 interface UserProfileProps {
   userId: string;
@@ -140,14 +146,10 @@ function UserFormContent({ user, me, departments }) {
                 />
               </div>
               <div className="u-stack u-gap-2">
-                <label className="users-section-title">Nova Senha</label>
-                <input
-                  type="password"
-                  name="password"
-                  placeholder="Deixe em branco para manter"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="ui-input"
+                <p className="users-section-title">Senha</p>
+                <PasswordResetButton
+                  onSend={() => userService.sendPasswordReset(user.id)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
                 />
               </div>
             </div>
@@ -173,20 +175,24 @@ function UserFormContent({ user, me, departments }) {
                 <>
                   <div className="u-stack u-gap-2">
                     <label className="users-section-title">Permissão</label>
-                    <select
-                      name="permission"
-                      value={formData.permission}
-                      onChange={handleInputChange}
-                      className="ui-input"
-                    >
-                      {permissoes
-                        .filter((p) => p.id <= me.permission)
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nome}
-                          </option>
-                        ))}
-                    </select>
+                    {isOrganizationOwner(user) ? (
+                      <input value={OWNER_ROLE_LABEL} readOnly className="ui-input bg-slate-100" />
+                    ) : (
+                      <select
+                        name="permission"
+                        value={formData.permission}
+                        onChange={handleInputChange}
+                        className="ui-input"
+                      >
+                        {permissoes
+                          .filter((p) => p.id <= me.permission)
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.nome}
+                            </option>
+                          ))}
+                      </select>
+                    )}
                   </div>
                   <div className="u-stack u-gap-2">
                     <label className="users-section-title">Status</label>

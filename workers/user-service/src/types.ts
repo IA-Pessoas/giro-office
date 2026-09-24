@@ -21,6 +21,11 @@ export interface UserPrismaClient {
     create?(args: Record<string, unknown>): Promise<Row>;
     updateMany?(args: Record<string, unknown>): Promise<{ count: number }>;
   };
+  passwordResetToken: {
+    findFirst(args: Record<string, unknown>): Promise<Row | null>;
+    create(args: Record<string, unknown>): Promise<Row>;
+    updateMany(args: Record<string, unknown>): Promise<{ count: number }>;
+  };
   platformAuthSession: {
     findFirst(args: Record<string, unknown>): Promise<Row | null>;
     create?(args: Record<string, unknown>): Promise<Row>;

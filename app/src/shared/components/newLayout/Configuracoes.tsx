@@ -19,7 +19,13 @@ import {
 import { toast } from "react-toastify";
 
 import { useAuth } from "@/context/AuthContext";
-import { canCreateOrganizationOwner, canCreateUsers, useModuleAccess } from "@modules/auth";
+import {
+  canCreateOrganizationOwner,
+  canCreateUsers,
+  isOrganizationOwner,
+  OWNER_ROLE_LABEL,
+  useModuleAccess,
+} from "@modules/auth";
 import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
@@ -29,7 +35,7 @@ import { MyOrganizationSection } from "@modules/organizations";
 import { Dialog } from "@shared/components";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
-import { buildSelfProfileUpdatePayload } from "@shared/utils/meProfileUpdate";
+import { buildSelfProfileUpdatePayload, selfPasswordError } from "@shared/utils/meProfileUpdate";
 
 const SETTINGS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
@@ -102,9 +108,17 @@ export function Configuracoes() {
   const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [pendingPhotoPreviewUrl, setPendingPhotoPreviewUrl] = useState<string | null>(null);
   const [hasPhotoLoadError, setHasPhotoLoadError] = useState(false);
+
+  function clearPasswordDraft() {
+    setPassword("");
+    setCurrentPassword("");
+    setConfirmPassword("");
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -121,7 +135,7 @@ export function Configuracoes() {
     }
 
     setName(meQuery.data.name);
-    setPassword("");
+    clearPasswordDraft();
   }, [meQuery.data]);
 
   useEffect(() => {
@@ -136,7 +150,9 @@ export function Configuracoes() {
   const currentLogin = meQuery.data?.login ?? "";
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
   const canManageUsers = canCreateUsers(user);
-  const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário";
+  const currentPermissionLabel = isOrganizationOwner(meQuery.data)
+    ? OWNER_ROLE_LABEL
+    : (PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário");
   const managedOrganizationId =
     canCreateOrganizationOwner(meQuery.data) && meQuery.data.organization_id
       ? meQuery.data.organization_id
@@ -152,12 +168,14 @@ export function Configuracoes() {
   );
 
   const hasPendingPhotoChanges = pendingPhotoFile !== null;
+  const passwordDraft = { password, currentPassword, confirmPassword };
+  const passwordError = selfPasswordError(passwordDraft);
   const accessUpdatePayload = meQuery.data
     ? buildSelfProfileUpdatePayload({
         canManageUsers,
         currentName,
         name,
-        password,
+        ...passwordDraft,
       })
     : null;
 
@@ -226,7 +244,7 @@ export function Configuracoes() {
 
   const resetAccessDraft = () => {
     setName(currentName);
-    setPassword("");
+    clearPasswordDraft();
   };
 
   const handleAccessDialogOpenChange = (open: boolean) => {
@@ -244,7 +262,7 @@ export function Configuracoes() {
 
     try {
       await updateMeMutation.mutateAsync(accessUpdatePayload);
-      setPassword("");
+      clearPasswordDraft();
       setIsAccessDialogOpen(false);
     } catch {
       // Toasts are handled by the mutation hook.
@@ -522,6 +540,25 @@ export function Configuracoes() {
                     <div className="space-y-2">
                       <label
                         className={SETTINGS_LABEL_CLASSNAME}
+                        htmlFor="settings-access-current-password"
+                      >
+                        Senha atual
+                      </label>
+                      <input
+                        id="settings-access-current-password"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(event) => setCurrentPassword(event.target.value)}
+                        placeholder="Necessária para trocar a senha"
+                        autoComplete="current-password"
+                        className={SETTINGS_INPUT_CLASSNAME}
+                        disabled={isSaving}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label
+                        className={SETTINGS_LABEL_CLASSNAME}
                         htmlFor="settings-access-password"
                       >
                         Nova senha
@@ -536,6 +573,36 @@ export function Configuracoes() {
                         className={SETTINGS_INPUT_CLASSNAME}
                         disabled={isSaving}
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label
+                        className={SETTINGS_LABEL_CLASSNAME}
+                        htmlFor="settings-access-confirm-password"
+                      >
+                        Confirmar nova senha
+                      </label>
+                      <input
+                        id="settings-access-confirm-password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        placeholder="Repita a nova senha"
+                        autoComplete="new-password"
+                        className={SETTINGS_INPUT_CLASSNAME}
+                        disabled={isSaving}
+                        aria-describedby={
+                          passwordError ? "settings-access-password-error" : undefined
+                        }
+                      />
+                      {passwordError ? (
+                        <p
+                          id="settings-access-password-error"
+                          className="text-sm text-red-600 dark:text-red-400"
+                        >
+                          {passwordError}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

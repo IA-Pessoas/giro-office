@@ -31,6 +31,7 @@ interface UserRouteMocks {
     create: Mock;
     update: Mock;
     delete: Mock;
+    assertOwnPasswordChange: Mock;
   };
   permissionServiceMock: {
     getByUserId: Mock;
@@ -61,6 +62,7 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      assertOwnPasswordChange: vi.fn(),
     },
     permissionServiceMock: {
       getByUserId: vi.fn(),

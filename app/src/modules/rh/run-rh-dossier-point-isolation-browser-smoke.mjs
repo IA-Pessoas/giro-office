@@ -14,6 +14,7 @@ const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const repositoryRoot = resolve(appRoot, "..");
 const screenshotDir = resolve(repositoryRoot, "output/playwright/issue-1241");
 const pointConfigMessage = "Cadastre a configuração de ponto para visualizar o resumo.";
+const selectCollaboratorHint = "Selecione um colaborador para consultar o dossiê.";
 
 const user = {
   id: "rh-dossier-smoke-user",
@@ -25,6 +26,13 @@ const user = {
   type: "admin",
   modules: { rh: 3 },
 };
+
+async function selectCollaborator(page) {
+  const hint = page.getByText(selectCollaboratorHint, { exact: true });
+  if (await hint.isVisible()) {
+    await page.getByRole("button", { name: new RegExp(`^${user.name} Analista`) }).click();
+  }
+}
 
 const dossier = {
   id: user.id,
@@ -166,6 +174,10 @@ async function runBrowserProof() {
 
     await page.getByRole("button", { name: "Dossiê", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Dossiê do colaborador" })).toBeVisible();
+    // #1344: dados sensíveis só depois de escolher o colaborador.
+    await expect(page.getByText(selectCollaboratorHint, { exact: true })).toBeVisible();
+    expect(requestLog.filter((entry) => /\/rh\/profile\/(contact|allergy)/.test(entry))).toEqual([]);
+    await selectCollaborator(page);
     await expect(page.getByRole("heading", { name: "Dados cadastrais" }).locator("..").getByText(user.name, { exact: true })).toBeVisible();
     await expect(page.getByText("Marina QA", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Nome da alergia")).toHaveValue("Poeira");
@@ -208,6 +220,7 @@ async function runBrowserProof() {
     await pointConfigFailure;
 
     await expect(page.getByRole("heading", { name: "Dossiê do colaborador" })).toBeVisible();
+    await selectCollaborator(page);
     await expect(
       page.getByRole("heading", { name: "Dados cadastrais" }).locator("..").getByText(user.name, { exact: true }),
     ).toBeVisible();
