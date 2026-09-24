@@ -11,6 +11,7 @@ import {
   useUpdateClientPaMutation,
 } from "../hooks/useClients";
 import type { ClientPaResponse, UpdateClientPaPayload } from "../types";
+import { formatPaMoneyInput, PA_MONEY_FIELD_NAMES } from "../utils/paForm";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -244,10 +245,11 @@ export function ClientPASection({ clientId }: { clientId: string }) {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
     const { name, value } = event.target;
+    const isMoneyField = (PA_MONEY_FIELD_NAMES as readonly string[]).includes(name);
 
     setFormValues((current) => ({
       ...current,
-      [name]: value,
+      [name]: isMoneyField ? formatPaMoneyInput(value) : value,
     }));
   };
 
@@ -255,7 +257,6 @@ export function ClientPASection({ clientId }: { clientId: string }) {
     try {
       await createPaMutation.mutateAsync();
       toast.success("PA criado com sucesso.");
-      await paQuery.refetch();
     } catch (error) {
       // Tela desatualizada: o PA já existe; recarrega para o salvar usar PATCH.
       if (isAxiosError(error) && error.response?.status === 409) {
@@ -291,7 +292,6 @@ export function ClientPASection({ clientId }: { clientId: string }) {
     try {
       await updatePaMutation.mutateAsync(updatePayload);
       toast.success("PA atualizado com sucesso.");
-      await paQuery.refetch();
     } catch (error) {
       const message =
         typeof error === "object" &&

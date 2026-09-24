@@ -29,6 +29,7 @@ import {
   createUpdateClientIntegrationInitialValues,
   hasUsableIntegrationData,
 } from "./utils/integrationForm.ts";
+import { formatPaMoneyInput } from "./utils/paForm.ts";
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
@@ -782,4 +783,17 @@ runTest("legacy client tabs use toast warnings for validation", () => {
   assert.match(integrationSource, /toast\.warn\('Preencha todos os campos'\)/);
   assert.doesNotMatch(regularizeSource, /\balert\(/);
   assert.doesNotMatch(integrationSource, /\balert\(/);
+});
+
+runTest("PA money fields accept only BRL amounts", () => {
+  assert.equal(formatPaMoneyInput("123456"), "R$ 1.234,56");
+  assert.equal(formatPaMoneyInput("QA_abc"), "");
+  assert.equal(formatPaMoneyInput(""), "");
+});
+
+runTest("PA section relies on mutation invalidation instead of a second GET", () => {
+  const source = readFileSync("src/modules/clients/components/ClientPASection.tsx", "utf8");
+
+  assert.doesNotMatch(source, /toast\.success\([^)]*\);\s*await paQuery\.refetch\(\)/);
+  assert.match(source, /formatPaMoneyInput/);
 });
