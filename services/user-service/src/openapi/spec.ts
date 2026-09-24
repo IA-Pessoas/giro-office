@@ -209,6 +209,46 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/platform/super-admins/{superAdminId}/impersonation-permission": {
+        patch: {
+          tags: ["Platform auth"],
+          summary: "Alterar permissão de personificação de um super admin",
+          description:
+            "Somente um operador autorizado pode alterar outro super admin. A operação é auditada e não permite autoalteração.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "superAdminId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["can_impersonate"],
+                  properties: { can_impersonate: { type: "boolean" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Permissão atualizada", ...successJson },
+            "400": { description: "Path ou payload inválido" },
+            "401": { description: "Sessão de plataforma ausente ou inválida" },
+            "403": { description: "CSRF ou operador sem permissão" },
+            "404": { description: "Super admin não encontrado" },
+            "409": { description: "Autoalteração ou conflito de concorrência" },
+            "503": { description: "Auditoria durável indisponível" },
+          },
+        },
+      },
       "/platform/organizations/{organizationId}/users": {
         get: {
           tags: ["Platform auth"],

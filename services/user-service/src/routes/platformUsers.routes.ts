@@ -14,7 +14,9 @@ import {
   listPlatformUsersQuerySchema,
   platformOrganizationUserParamsSchema,
   platformOrganizationUsersParamsSchema,
+  platformSuperAdminParamsSchema,
   transferPlatformOwnershipBodySchema,
+  updatePlatformSuperAdminImpersonationPermissionSchema,
   updatePlatformUserBodySchema,
 } from "../schemas/platformUsers.schemas.js";
 import { createUserBodySchema } from "../schemas/user.schemas.js";
@@ -51,6 +53,37 @@ export function createPlatformUsersRoutes(options: {
         response.json(createSuccessResponse(await platformUsersService.listSuperAdmins()));
       } catch (err) {
         logError("Erro ao listar super admins da plataforma", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.patch(
+    "/super-admins/:superAdminId/impersonation-permission",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const operator = request.platform_identity;
+        if (!operator) throw new ServiceError(401, "Não autenticado.");
+
+        const { superAdminId } = parseWithZod(platformSuperAdminParamsSchema, request.params);
+        const { can_impersonate } = parseWithZod(
+          updatePlatformSuperAdminImpersonationPermissionSchema,
+          request.body,
+        );
+        response.json(
+          createSuccessResponse(
+            await platformUsersService.updateSuperAdminImpersonationPermission(
+              operator.id,
+              superAdminId,
+              can_impersonate,
+            ),
+          ),
+        );
+      } catch (err) {
+        logError("Erro ao atualizar permissão de personificação do super admin", { err });
         next(err);
       }
     },

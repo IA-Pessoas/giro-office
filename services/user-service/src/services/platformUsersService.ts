@@ -76,6 +76,73 @@ export class PlatformUsersService {
     });
   }
 
+  async updateSuperAdminImpersonationPermission(
+    platformActorUserId: string,
+    superAdminId: string,
+    canImpersonate: boolean,
+  ): Promise<PlatformSuperAdminListRow> {
+    const audit = this.audit;
+    if (!audit) {
+      throw new ServiceError(503, "Auditoria indisponível para alterar a permissão.");
+    }
+
+    return prismaClient.$transaction(
+      async (transaction) => {
+        const actor = await transaction.platformUser.findUnique({
+          where: { id: platformActorUserId },
+          select: { id: true, platform_role: true, status: true, can_impersonate: true },
+        });
+        if (
+          !actor ||
+          actor.platform_role !== PlatformRole.super_admin ||
+          actor.status !== "active" ||
+          !actor.can_impersonate
+        ) {
+          throw new ServiceError(403, "Você não tem permissão para alterar essa permissão.");
+        }
+        if (platformActorUserId === superAdminId) {
+          throw new ServiceError(409, "Não é permitido alterar a própria permissão.");
+        }
+
+        const target = await transaction.platformUser.findFirst({
+          where: { id: superAdminId, platform_role: PlatformRole.super_admin },
+          select: PLATFORM_SUPER_ADMIN_LIST_SELECT,
+        });
+        if (!target) throw new ServiceError(404, "Super admin não encontrado.");
+        if (target.can_impersonate === canImpersonate) return target;
+
+        const updated = await transaction.platformUser.updateMany({
+          where: {
+            id: target.id,
+            platform_role: PlatformRole.super_admin,
+            can_impersonate: target.can_impersonate,
+          },
+          data: { can_impersonate: canImpersonate },
+        });
+        if (updated.count !== 1) {
+          throw new ServiceError(
+            409,
+            "A permissão mudou durante a operação. Atualize e tente novamente.",
+          );
+        }
+
+        await audit({
+          platformActorUserId,
+          organizationId: null,
+          action: "platform.super_admin.impersonation_permission.updated",
+          referring: "platform_user",
+          referringId: target.id,
+          changes: { can_impersonate: { from: target.can_impersonate, to: canImpersonate } },
+          outcome: "success",
+          required: true,
+        });
+
+        return { ...target, can_impersonate: canImpersonate };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 10_000 },
+    );
+  }
+
   async create(
     organizationId: string,
     input: CreateUserInput,

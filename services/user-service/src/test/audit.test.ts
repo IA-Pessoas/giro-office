@@ -43,6 +43,35 @@ describe("createUserAudit", () => {
     expect(recordAuditMock.mock.calls[0][0]).not.toHaveProperty("userId");
   });
 
+  it("registra uma alteração global da plataforma sem forjar uma organização", async () => {
+    const audit = createUserAudit({
+      enabled: true,
+      serviceUrl: "http://audit.test",
+      serviceToken: "test-token",
+      logger: {} as never,
+    });
+
+    await audit({
+      platformActorUserId: "platform-user-1",
+      organizationId: null,
+      action: "platform.super_admin.impersonation_permission.updated",
+      referring: "platform_user",
+      referringId: "platform-user-2",
+      changes: { can_impersonate: { from: false, to: true } },
+      outcome: "success",
+      required: true,
+    });
+
+    expect(recordRequiredMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: null,
+        metadata: { actorPlatformUserId: "platform-user-1" },
+        referringId: "platform-user-2",
+        changes: { can_impersonate: { from: false, to: true } },
+      }),
+    );
+  });
+
   it("persiste eventos obrigatórios ou retorna indisponibilidade", async () => {
     const logger = { error: vi.fn() };
     const audit = createUserAudit({
@@ -86,7 +115,7 @@ describe("createUserAudit", () => {
     ).rejects.toMatchObject({ statusCode: 503 });
     expect(logger.error).toHaveBeenCalledWith(
       { err: expect.any(Error) },
-      "Falha na auditoria obrigatória para personificação.",
+      "Falha na auditoria obrigatória para ação de plataforma.",
     );
   });
 });

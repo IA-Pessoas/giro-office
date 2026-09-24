@@ -2835,6 +2835,47 @@ const handlers = {
     }
   },
 
+  async platformSuperAdminImpersonationPermission(op) {
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, {
+        path: "/platform/super-admins/smoke-missing/impersonation-permission",
+        json: { can_impersonate: true },
+        expectedStatus: op.expectedStatus,
+      });
+      return;
+    }
+
+    const identity = await platformHttpRequest(
+      { ...op, method: "GET" },
+      {
+        path: "/platform/me",
+        expectedStatus: [200],
+      },
+    );
+    const admins = await platformHttpRequest(
+      { ...op, method: "GET" },
+      {
+        path: "/platform/super-admins",
+        expectedStatus: [200],
+      },
+    );
+    const operatorId = pickFirst(identity.body, "data.id");
+    const target = admins.body?.data?.find((admin) => admin.id !== operatorId);
+    if (!operatorId || !target) {
+      throw new Error("Platform permission smoke requires another super admin as a target.");
+    }
+
+    // Reusing the current state exercises the authorized route without changing persistent data.
+    const updated = await platformHttpRequest(op, {
+      path: `/platform/super-admins/${target.id}/impersonation-permission`,
+      json: { can_impersonate: target.can_impersonate },
+      expectedStatus: [200],
+    });
+    if (updated.body?.data?.id !== target.id) {
+      throw new Error("Platform permission smoke did not return the selected super admin.");
+    }
+  },
+
   async platformUsers(op) {
     await platformHttpRequest(op, {
       path: `/platform/organizations/${requireState("session").organization_id}/users`,

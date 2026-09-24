@@ -92,6 +92,13 @@ export function formatAuditChanges(changes: PlatformAuditRecord["changes"]): str
       `Logo: ${formatAuditValue(changes.logo_url.from, "logo")} → ${formatAuditValue(changes.logo_url.to, "logo")}`,
     );
   }
+  if (changes.can_impersonate) {
+    const permissionLabel = (allowed: boolean) =>
+      allowed ? "Pode personificar" : "Não pode personificar";
+    lines.push(
+      `Permissão de personificação: ${permissionLabel(changes.can_impersonate.from)} → ${permissionLabel(changes.can_impersonate.to)}`,
+    );
+  }
   if (changes.modules) {
     const moduleKeys = new Set([
       ...Object.keys(changes.modules.before),

@@ -19,6 +19,7 @@ const { auditMock, authServiceMock, platformAuthMock, platformUsersMock } = vi.h
   platformAuthMock: { validateSession: vi.fn() },
   platformUsersMock: {
     listSuperAdmins: vi.fn(),
+    updateSuperAdminImpersonationPermission: vi.fn(),
     list: vi.fn(),
     getById: vi.fn(),
     listDepartments: vi.fn(),
@@ -86,6 +87,7 @@ const platformIdentity = {
   email: "admin@example.com",
   auth_kind: "platform" as const,
   platform_role: "super_admin" as const,
+  can_impersonate: true,
 };
 const csrfToken = "A".repeat(43);
 
@@ -194,6 +196,82 @@ describe("platform users routes", () => {
       },
     ]);
     expect(platformUsersMock.listSuperAdmins).toHaveBeenCalledOnce();
+  });
+
+  it("altera a permissão de personificação com sessão de plataforma e CSRF", async () => {
+    platformUsersMock.updateSuperAdminImpersonationPermission.mockResolvedValue({
+      id: "platform-user-2",
+      name: "Outra administradora",
+      email: "outra@example.com",
+      status: "active",
+      can_impersonate: true,
+    });
+
+    const response = await request(createApp())
+      .patch("/platform/super-admins/platform-user-2/impersonation-permission")
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: true });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.can_impersonate).toBe(true);
+    expect(platformUsersMock.updateSuperAdminImpersonationPermission).toHaveBeenCalledWith(
+      platformIdentity.id,
+      "platform-user-2",
+      true,
+    );
+  });
+
+  it("nega por HTTP o operador sem permissão de personificação", async () => {
+    platformUsersMock.updateSuperAdminImpersonationPermission.mockRejectedValueOnce(
+      new ServiceError(403, "Você não tem permissão para alterar essa permissão."),
+    );
+
+    const response = await request(createApp())
+      .patch("/platform/super-admins/platform-user-2/impersonation-permission")
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: true });
+
+    expect(response.status).toBe(403);
+    expect(platformUsersMock.updateSuperAdminImpersonationPermission).toHaveBeenCalledWith(
+      platformIdentity.id,
+      "platform-user-2",
+      true,
+    );
+  });
+
+  it("rejeita por HTTP a alteração da própria permissão", async () => {
+    platformUsersMock.updateSuperAdminImpersonationPermission.mockRejectedValueOnce(
+      new ServiceError(409, "Não é permitido alterar a própria permissão."),
+    );
+
+    const response = await request(createApp())
+      .patch(`/platform/super-admins/${platformIdentity.id}/impersonation-permission`)
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: false });
+
+    expect(response.status).toBe(409);
+    expect(platformUsersMock.updateSuperAdminImpersonationPermission).toHaveBeenCalledWith(
+      platformIdentity.id,
+      platformIdentity.id,
+      false,
+    );
+  });
+
+  it("rejeita body inválido ou CSRF ausente antes da mutação", async () => {
+    const invalid = await request(createApp())
+      .patch("/platform/super-admins/platform-user-2/impersonation-permission")
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: "true" });
+    const headers = platformGatewayHeaders();
+    delete headers[CSRF_HEADER_NAME];
+    const missingCsrf = await request(createApp())
+      .patch("/platform/super-admins/platform-user-2/impersonation-permission")
+      .set(headers)
+      .send({ can_impersonate: true });
+
+    expect(invalid.status).toBe(400);
+    expect(missingCsrf.status).toBe(403);
+    expect(platformUsersMock.updateSuperAdminImpersonationPermission).not.toHaveBeenCalled();
   });
 
   it("returns 401 without a platform session", async () => {
@@ -600,6 +678,31 @@ describe("platform users OpenAPI", () => {
     );
     expect(spec).toHaveProperty(["paths", path, "post", "responses", "403"]);
     expect(spec).toHaveProperty(["paths", path, "post", "responses", "503"]);
+  });
+
+  it("documents the super admin permission mutation with CSRF and audit outcomes", () => {
+    const spec = buildUserServiceOpenApiSpec(testEnv);
+    const path = "/platform/super-admins/{superAdminId}/impersonation-permission";
+
+    expect(spec.paths).toHaveProperty([path, "patch", "requestBody", "required"], true);
+    expect(spec.paths).toHaveProperty(
+      [
+        path,
+        "patch",
+        "requestBody",
+        "content",
+        "application/json",
+        "schema",
+        "properties",
+        "can_impersonate",
+        "type",
+      ],
+      "boolean",
+    );
+    expect(spec.paths).toHaveProperty([path, "patch", "parameters", 1, "name"], "x-csrf-token");
+    expect(spec.paths).toHaveProperty([path, "patch", "responses", "403"]);
+    expect(spec.paths).toHaveProperty([path, "patch", "responses", "409"]);
+    expect(spec.paths).toHaveProperty([path, "patch", "responses", "503"]);
   });
 
   it("documents the shared modular permissions contract with CSRF and 422 validation", () => {

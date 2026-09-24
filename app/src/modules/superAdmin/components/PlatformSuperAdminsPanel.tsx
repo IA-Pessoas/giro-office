@@ -1,17 +1,44 @@
-import { usePlatformSuperAdmins } from "../hooks/usePlatformSuperAdmins";
+import { useAuth } from "@/context/AuthContext";
+
+import {
+  usePlatformSuperAdmins,
+  useUpdatePlatformSuperAdminImpersonationPermission,
+} from "../hooks/usePlatformSuperAdmins";
 
 export function PlatformSuperAdminsPanel() {
+  const { user: currentUser } = useAuth();
   const superAdminsQuery = usePlatformSuperAdmins();
+  const permissionMutation = useUpdatePlatformSuperAdminImpersonationPermission();
   const superAdmins = superAdminsQuery.data ?? [];
+  const canManagePermissions =
+    currentUser?.auth_kind === "platform" &&
+    currentUser.platform_role === "super_admin" &&
+    currentUser.can_impersonate === true;
 
   return (
     <section className="space-y-4 p-4">
       <header>
         <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Super admins</h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Consulta somente leitura dos administradores e da permissão de personificar.
+          Consulte os administradores e conceda ou revogue a permissão de personificar.
         </p>
       </header>
+
+      {!canManagePermissions ? (
+        <p className="text-sm text-slate-600 dark:text-slate-300" role="status">
+          Sua conta não tem permissão para alterar a personificação.
+        </p>
+      ) : null}
+      {permissionMutation.isError ? (
+        <p className="text-sm text-rose-700 dark:text-rose-300" role="alert">
+          Não foi possível atualizar a permissão de personificação.
+        </p>
+      ) : null}
+      {permissionMutation.isSuccess ? (
+        <p className="text-sm text-emerald-700 dark:text-emerald-300" role="status">
+          Permissão de personificação atualizada.
+        </p>
+      ) : null}
 
       {superAdminsQuery.isLoading ? (
         <p className="text-sm text-slate-600 dark:text-slate-300" role="status">
@@ -53,6 +80,9 @@ export function PlatformSuperAdminsPanel() {
                 <th className="px-4 py-3 font-semibold" scope="col">
                   Personificação
                 </th>
+                <th className="px-4 py-3 font-semibold" scope="col">
+                  Alterar permissão
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -82,6 +112,51 @@ export function PlatformSuperAdminsPanel() {
                     >
                       {admin.can_impersonate ? "Pode personificar" : "Não pode personificar"}
                     </span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        aria-checked={admin.can_impersonate}
+                        aria-describedby={
+                          !canManagePermissions || admin.id === currentUser?.id
+                            ? `platform-super-admin-permission-reason-${admin.id}`
+                            : undefined
+                        }
+                        aria-label={`${admin.can_impersonate ? "Revogar" : "Conceder"} permissão de personificação para ${admin.name}`}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 ${admin.can_impersonate ? "bg-emerald-600" : "bg-slate-300 dark:bg-slate-700"}`}
+                        disabled={
+                          !canManagePermissions ||
+                          admin.id === currentUser?.id ||
+                          permissionMutation.isPending
+                        }
+                        onClick={() =>
+                          permissionMutation.mutate({
+                            superAdminId: admin.id,
+                            canImpersonate: !admin.can_impersonate,
+                          })
+                        }
+                        role="switch"
+                        type="button"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${admin.can_impersonate ? "translate-x-6" : "translate-x-1"}`}
+                        />
+                      </button>
+                      {admin.id === currentUser?.id ? (
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Sua conta</span>
+                      ) : null}
+                      {!canManagePermissions || admin.id === currentUser?.id ? (
+                        <span
+                          className="sr-only"
+                          id={`platform-super-admin-permission-reason-${admin.id}`}
+                        >
+                          {admin.id === currentUser?.id
+                            ? "Você não pode alterar sua própria permissão."
+                            : "Sua conta não tem permissão para alterar a personificação."}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
