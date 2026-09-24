@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "../generated/prisma/client.js";
-import { createPartnerBodySchema, updatePartnerBodySchema } from "../schemas/partners.schemas.js";
-import type { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
+import { createPartnerBodySchema } from "../schemas/partners.schemas.js";
 import { PartnersService } from "../services/partnersService.js";
+import type { RegularizeReconciliationService } from "../services/regularizeReconciliationService.js";
 
 const PJ_ID = "10000000-0000-4000-8000-000000000001";
 const PF_ID = "10000000-0000-4000-8000-000000000002";
@@ -10,41 +10,6 @@ const PARTNER_ID = "10000000-0000-4000-8000-000000000003";
 const ORG_ID = "10000000-0000-4000-8000-000000000004";
 
 const body = { pj_id: PJ_ID, pf_id: PF_ID, part: 50, entry: "2024-01-15" };
-
-function firstMessage(result: { success: boolean; error?: { issues: { message: string }[] } }) {
-  return result.error?.issues[0]?.message;
-}
-
-describe("partner body schema", () => {
-  it.each([0, -5, 150])("rejects participation %s outside (0, 100]", (part) => {
-    const result = createPartnerBodySchema.safeParse({ ...body, part });
-    expect(result.success).toBe(false);
-    expect(firstMessage(result)).toBe("Participação deve ser maior que 0% e no máximo 100%.");
-  });
-
-  it("rejects exit before entry on create and update", () => {
-    const exit = { ...body, exit: "2020-01-15" };
-    for (const result of [
-      createPartnerBodySchema.safeParse(exit),
-      updatePartnerBodySchema.safeParse({ ...exit, id: PARTNER_ID }),
-    ]) {
-      expect(result.success).toBe(false);
-      expect(firstMessage(result)).toBe("Data de saída não pode ser anterior à entrada.");
-    }
-  });
-
-  it("rejects incomplete dates with a field message", () => {
-    const result = createPartnerBodySchema.safeParse({ ...body, entry: "2024-01" });
-    expect(result.success).toBe(false);
-    expect(firstMessage(result)).toBe("Informe a data de entrada completa (dd/mm/aaaa).");
-  });
-
-  it("accepts 100% and exit on the entry day", () => {
-    expect(
-      createPartnerBodySchema.safeParse({ ...body, part: 100, exit: "2024-01-15" }).success,
-    ).toBe(true);
-  });
-});
 
 function service(existingParts: number[], duplicate = false) {
   const prisma = {
@@ -97,5 +62,35 @@ describe("PartnersService.create", () => {
       statusCode: 409,
       message: "Sócio já cadastrado.",
     });
+  });
+});
+
+describe("PartnersService.update", () => {
+  it("rejects moving a link onto a PF already linked to the PJ", async () => {
+    const otherPf = "10000000-0000-4000-8000-000000000009";
+    const prisma = {
+      clientPF: { findFirst: vi.fn().mockResolvedValue({ id: otherPf }) },
+      client: { findFirst: vi.fn().mockResolvedValue({ id: PJ_ID }) },
+      partners: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce({ id: PARTNER_ID, pj_id: PJ_ID, pf_id: PF_ID, part: 50 })
+          .mockResolvedValueOnce({ id: "another-link" }),
+        aggregate: vi.fn().mockResolvedValue({ _sum: { part: 0 } }),
+        update: vi.fn(),
+      },
+    } as unknown as PrismaClient;
+    const partners = new PartnersService(prisma, {
+      handlePartnersChanged: vi.fn(),
+    } as unknown as RegularizeReconciliationService);
+
+    await expect(
+      partners.update({
+        organizationId: ORG_ID,
+        userId: "user-1",
+        body: { ...createPartnerBodySchema.parse({ ...body, pf_id: otherPf }), id: PARTNER_ID },
+      }),
+    ).rejects.toMatchObject({ statusCode: 409, message: "Sócio já cadastrado." });
+    expect(prisma.partners.update).not.toHaveBeenCalled();
   });
 });

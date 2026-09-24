@@ -142,7 +142,7 @@ export function RegularizePartnerForm({
         await onSubmit(payload);
       }
     } catch (error) {
-      setFormError(getRegularizeMutationErrorMessage(error, "Não foi possível salvar o sócio."));
+      setFormError(getRegularizeMutationErrorMessage(error, "Não foi possível salvar o vínculo."));
     }
   }
 

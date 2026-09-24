@@ -4,14 +4,19 @@ import { idQuerySchema } from "./common.schemas.js";
 
 const PART_RANGE_MESSAGE = "Participação deve ser maior que 0% e no máximo 100%.";
 
-// Data completa (AAAA-MM-DD, com hora opcional); "2024-01" não vira 1º de janeiro em silêncio.
+// Data completa (AAAA-MM-DD, com hora opcional). Local em vez de zIsoDate do shared, que aceita
+// "2024-01" e "2024-02-31" rolando para outra data em silêncio.
 function partnerDate(label: string) {
   const message = `Informe a data de ${label} completa (dd/mm/aaaa).`;
   return z
     .string({ required_error: message, invalid_type_error: message })
     .regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/, message)
-    .transform((value) => new Date(value))
-    .refine((date) => !Number.isNaN(date.getTime()), message);
+    .refine((value) => {
+      const day = value.slice(0, 10);
+      const date = new Date(day);
+      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day;
+    }, message)
+    .transform((value) => new Date(value));
 }
 
 const partnerFields = z

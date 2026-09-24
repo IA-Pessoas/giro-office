@@ -95,6 +95,20 @@ export class PartnersService {
 
     await this.ensureClientPfExists(input.organizationId, input.body.pf_id);
     await this.ensureClientPjExists(input.organizationId, input.body.pj_id);
+    if (existing.pj_id !== input.body.pj_id || existing.pf_id !== input.body.pf_id) {
+      const duplicate = await this.prisma.partners.findFirst({
+        where: {
+          organization_id: input.organizationId,
+          pj_id: input.body.pj_id,
+          pf_id: input.body.pf_id,
+          id: { not: existing.id },
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new ServiceError(409, "Sócio já cadastrado.");
+      }
+    }
     await this.ensurePjParticipationFits(
       input.organizationId,
       input.body.pj_id,
