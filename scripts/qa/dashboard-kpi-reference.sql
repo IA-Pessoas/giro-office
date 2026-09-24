@@ -77,9 +77,11 @@ SELECT kpi, value FROM (
   UNION ALL SELECT 41, 'financial.paidCertificateReceipts', (SELECT coalesce(sum(payment_amount), 0) FROM certificates
       WHERE was_paid AND payment_date >= date_trunc('month', current_date)
         AND payment_date < date_trunc('month', current_date) + interval '1 month')::text
-  UNION ALL SELECT 42, 'financial.monthlyPaidCertificateReceipts (7 meses, soma)', (SELECT coalesce(sum(payment_amount), 0)
-      FROM certificates WHERE was_paid AND payment_date >= date_trunc('month', current_date) - interval '6 months'
-        AND payment_date < date_trunc('month', current_date) + interval '1 month')::text
+  UNION ALL SELECT 42, 'financial.monthlyPaidCertificateReceipts[' || to_char(m, 'YYYY-MM') || ']',
+      (SELECT coalesce(sum(payment_amount), 0) FROM certificates
+       WHERE was_paid AND payment_date >= m AND payment_date < m + interval '1 month')::text
+    FROM generate_series(date_trunc('month', current_date) - interval '6 months',
+                         date_trunc('month', current_date), interval '1 month') m
   UNION ALL SELECT 50, 'commercial.activeProspects', (SELECT count(*) FROM prospects
       WHERE status NOT IN ('Fechado', 'Recusado pelo Cliente'))::text
   UNION ALL SELECT 51, 'commercial.closedThisMonth', (SELECT count(*) FROM prospects
@@ -87,9 +89,21 @@ SELECT kpi, value FROM (
   UNION ALL SELECT 52, 'commercial.billing.pending', (SELECT count(*) FROM billing WHERE hiring_status = 'A Realizar')::text
   UNION ALL SELECT 53, 'commercial.billing.contracted', (SELECT count(*) FROM billing WHERE hiring_status = 'Contratado')::text
   UNION ALL SELECT 54, 'commercial.billing.notContracted', (SELECT count(*) FROM billing WHERE hiring_status = 'Não Contratado')::text
-  UNION ALL SELECT 60, 'departments[].openTasks (soma)', (SELECT count(*) FROM open_tasks t
-      JOIN departments d ON d.id = t.department_id AND d.organization_id = t.organization_id)::text
+  UNION ALL SELECT 55, 'commercial.byStatus[' || s || ']', (SELECT count(*) FROM prospects WHERE status = s)::text
+    FROM unnest(ARRAY['Análise Financeira', 'Análise/Agendamento', 'Envio de Proposta', 'Paralisado',
+                      'Recusado pelo Cliente', 'Fechado']) s
+  UNION ALL SELECT 60, 'departments[' || d.name || '].openTasks',
+      (SELECT count(*) FROM open_tasks t WHERE t.department_id = d.id)::text
+    FROM departments d, org WHERE d.organization_id = org.id
+  UNION ALL SELECT 61, 'departments[' || d.name || '].completedTasks',
+      (SELECT count(*) FROM done_tasks t WHERE t.department_id = d.id)::text
+    FROM departments d, org WHERE d.organization_id = org.id
+  UNION ALL SELECT 62, 'departments[' || d.name || '].urgentTasks',
+      (SELECT count(*) FROM open_tasks t WHERE t.department_id = d.id
+         AND (t.prevision_date::date < current_date
+              OR lower(coalesce(t.urgency, '')) IN ('alta', 'alto', 'urgente', 'crítica', 'critica', 'crítico', 'critico')))::text
+    FROM departments d, org WHERE d.organization_id = org.id
 ) kpis
-ORDER BY n;
+ORDER BY n, kpi;
 
 ROLLBACK;
