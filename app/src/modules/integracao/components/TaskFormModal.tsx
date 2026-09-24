@@ -25,6 +25,7 @@ import {
 } from "../hooks/queryKeys";
 import {
   useCreateIntegracaoTaskMutation,
+  useCreateProjectMutation,
   useIntegracaoTaskDetail,
   useProjectsList,
   useUpdateIntegracaoTaskMutation,
@@ -52,6 +53,7 @@ import {
   getTaskCreateValidationMessage,
   getTaskEditValidationMessage,
   getTaskUrgencyOptions,
+  LOOSE_TASKS_PROJECT_NAME,
   shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
 import { TaskCompletionPanel } from "./TaskCompletionPanel";
@@ -71,7 +73,7 @@ interface CreateFormState {
   client_id: string;
   project_id: string;
   model_id: string;
-  prospecting_status: ProspectingStatus;
+  prospecting_status: ProspectingStatus | "";
   name: string;
   status: IntegracaoTaskStatus | "";
   department_id: string;
@@ -98,7 +100,7 @@ const CREATE_INITIAL_STATE: CreateFormState = {
   client_id: "",
   project_id: "",
   model_id: "",
-  prospecting_status: PROSPECTING_STATUS_VALUES[0],
+  prospecting_status: "",
   name: "",
   status: "",
   department_id: "",
@@ -195,6 +197,7 @@ export function TaskFormModal({
   );
   const { user } = useAuth();
   const createMutation = useCreateIntegracaoTaskMutation();
+  const createProjectMutation = useCreateProjectMutation();
   const updateMutation = useUpdateIntegracaoTaskMutation();
 
   useEffect(() => {
@@ -366,7 +369,6 @@ export function TaskFormModal({
       projectId: createValues.project_id,
       modelId: createValues.model_id,
       departmentId: createValues.department_id,
-      prospectingStatus: createValues.prospecting_status,
       urgency: createValues.urgency,
       observations: createValues.observations,
       eligibleResponsibleCount: createResponsibleCandidates.length,
@@ -374,7 +376,7 @@ export function TaskFormModal({
     });
 
     if (validationMessage) {
-      toast.warning(validationMessage);
+      toast.warning(validationMessage, { toastId: "task-create-validation" });
       return;
     }
 
@@ -383,7 +385,7 @@ export function TaskFormModal({
         model_id: createValues.model_id,
         project_id: createValues.project_id,
         client_id: createValues.client_id,
-        prospecting_status: createValues.prospecting_status,
+        prospecting_status: createValues.prospecting_status || undefined,
         name: createValues.name.trim() || undefined,
         status: createValues.status || undefined,
         department_id: createValues.department_id,
@@ -400,6 +402,27 @@ export function TaskFormModal({
       onOpenChange(false);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Não foi possível criar a tarefa."));
+    }
+  }
+
+  async function handleCreateClientProject() {
+    try {
+      const project = await createProjectMutation.mutateAsync({
+        client_id: createValues.client_id,
+        name: LOOSE_TASKS_PROJECT_NAME,
+        // sv-SE formata como YYYY-MM-DD no fuso local.
+        start_date: new Date().toLocaleDateString("sv-SE"),
+        objective: "Tarefas avulsas do cliente.",
+      });
+      updateCreateValue("project_id", project.id);
+      // Cliente "Novo" ainda em prospecção: o projeto nasce aguardando o Comercial.
+      if (project.status === "Aguardando liberação do Comercial") {
+        toast.info(
+          "Projeto criado. As tarefas dele ficam liberadas depois da validação do Comercial.",
+        );
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Não foi possível criar o projeto."));
     }
   }
 
@@ -821,6 +844,18 @@ export function TaskFormModal({
                   </option>
                 ))}
               </ProjectSelect>
+              {hasNoProjectsForSelectedClient ? (
+                <button
+                  type="button"
+                  className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+                  onClick={() => void handleCreateClientProject()}
+                  disabled={createProjectMutation.isPending}
+                >
+                  {createProjectMutation.isPending
+                    ? "Criando projeto..."
+                    : `Criar projeto "${LOOSE_TASKS_PROJECT_NAME}"`}
+                </button>
+              ) : null}
             </label>
           </div>
 
@@ -869,14 +904,18 @@ export function TaskFormModal({
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
-                Status de prospecção
+                Status de prospecção (opcional)
               </span>
               <ProjectSelect
                 value={createValues.prospecting_status}
                 onChange={(event) =>
-                  updateCreateValue("prospecting_status", event.target.value as ProspectingStatus)
+                  updateCreateValue(
+                    "prospecting_status",
+                    event.target.value as ProspectingStatus | "",
+                  )
                 }
               >
+                <option value="">Não se aplica</option>
                 {PROSPECTING_STATUS_VALUES.map((status) => (
                   <option key={status} value={status}>
                     {status}
