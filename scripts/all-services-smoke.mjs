@@ -104,6 +104,10 @@ const env = {
   password: process.env.PASSWORD ?? process.env.ADMIN_PASSWORD ?? "senha123",
   platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL?.trim() || "",
   platformAdminPassword: process.env.PLATFORM_ADMIN_PASSWORD ?? "",
+  // Opt in only when the platform smoke operator has can_impersonate.
+  platformImpersonationSmokeEnabled:
+    process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "true" ||
+    process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -2830,6 +2834,50 @@ const handlers = {
       query: { skip: 0, take: 5 },
       expectedStatus: [200],
     });
+  },
+
+  async platformUserImpersonate(op) {
+    const session = requireState("session");
+    const path = `/platform/organizations/${session.organization_id}/users/${session.id}/impersonate`;
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, { path, expectedStatus: [401] });
+      return;
+    }
+
+    const originalPlatformCookie = requireState("platformSessionCookies")["cw.session"];
+    const response = await platformHttpRequest(op, { path, expectedStatus: [200] });
+    if (response.body?.data?.id !== session.id) {
+      throw new Error("Platform impersonation did not return the requested organization user.");
+    }
+    if (response.body?.data?.token !== undefined || response.body?.data?.csrfToken !== undefined) {
+      throw new Error("Platform impersonation response exposed session credentials.");
+    }
+    if (
+      !state.platformSessionCookies?.["cw.session"] ||
+      state.platformSessionCookies["cw.session"] === originalPlatformCookie
+    ) {
+      throw new Error("Platform impersonation did not replace the platform session cookie.");
+    }
+
+    const organizationSessionCookies = state.sessionCookies;
+    state.sessionCookies = { "cw.csrf": "", "cw.session": "" };
+    try {
+      await helperCall("platform-session-after-impersonation", {
+        method: "POST",
+        path: "/platform/session",
+        target: "gateway",
+        service: "user-service",
+        auth: "public",
+        json: { email: env.platformAdminEmail, password: env.platformAdminPassword },
+        expectedStatus: [200],
+      });
+      if (!state.sessionCookies["cw.session"] || !state.sessionCookies["cw.csrf"]) {
+        throw new Error("Platform login after impersonation did not issue session cookies.");
+      }
+      state.platformSessionCookies = { ...state.sessionCookies };
+    } finally {
+      state.sessionCookies = organizationSessionCookies;
+    }
   },
 
   async platformUserCreate(op) {
@@ -7237,6 +7285,15 @@ function matchesFilter(op) {
 }
 
 function disabledConditionReason(condition) {
+  if (condition === "platformImpersonationSmokeEnabled") {
+    if (!env.platformImpersonationSmokeEnabled) {
+      return "PLATFORM_IMPERSONATION_SMOKE_ENABLED is false";
+    }
+    if (!env.auditEnabled) {
+      return "AUDIT_ENABLED is false";
+    }
+  }
+
   if (condition === "auditEnabled" && !env.auditEnabled) {
     return "AUDIT_ENABLED is false";
   }

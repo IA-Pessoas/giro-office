@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { recordAuditMock } = vi.hoisted(() => ({
-  recordAuditMock: vi.fn(),
+const { recordAuditMock, recordRequiredMock } = vi.hoisted(() => ({
+  recordRequiredMock: vi.fn(),
+  recordAuditMock: Object.assign(vi.fn(), { recordRequired: vi.fn() }),
 }));
+recordAuditMock.recordRequired = recordRequiredMock;
 
 vi.mock("@workspace/shared/audit", () => ({
   createAuditRecorder: vi.fn(() => recordAuditMock),
@@ -39,5 +41,52 @@ describe("createUserAudit", () => {
       }),
     );
     expect(recordAuditMock.mock.calls[0][0]).not.toHaveProperty("userId");
+  });
+
+  it("persiste eventos obrigatórios ou retorna indisponibilidade", async () => {
+    const logger = { error: vi.fn() };
+    const audit = createUserAudit({
+      enabled: true,
+      serviceUrl: "http://audit.test",
+      serviceToken: "test-token",
+      logger: logger as never,
+    });
+    recordRequiredMock.mockResolvedValueOnce(undefined);
+
+    await audit({
+      actorUserId: "user-1",
+      platformActorUserId: "platform-user-1",
+      organizationId: "org-1",
+      action: "platform.impersonation.started",
+      referring: "user",
+      referringId: "user-1",
+      changes: { target: { id: "user-1" } },
+      outcome: "success",
+      required: true,
+    });
+
+    expect(recordRequiredMock).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "platform.impersonation.started" }),
+    );
+    expect(recordAuditMock).not.toHaveBeenCalled();
+
+    recordRequiredMock.mockRejectedValueOnce(new Error("Audit persistence unavailable"));
+    await expect(
+      audit({
+        actorUserId: "user-1",
+        platformActorUserId: "platform-user-1",
+        organizationId: "org-1",
+        action: "platform.impersonation.started",
+        referring: "user",
+        referringId: "user-1",
+        changes: { target: { id: "user-1" } },
+        outcome: "success",
+        required: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 503 });
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: expect.any(Error) },
+      "Falha na auditoria obrigatória para personificação.",
+    );
   });
 });

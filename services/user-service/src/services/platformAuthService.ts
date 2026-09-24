@@ -38,6 +38,7 @@ export interface PlatformIdentity {
   email: string;
   auth_kind: typeof PLATFORM_AUTH_KIND;
   platform_role: typeof PLATFORM_ROLE;
+  can_impersonate: boolean;
 }
 
 export interface IssuedPlatformSession {
@@ -53,6 +54,7 @@ interface PlatformUserRecord {
   password: string;
   platform_role: string;
   status: string;
+  can_impersonate: boolean;
   session_version: number;
 }
 
@@ -109,6 +111,7 @@ const prismaRepository: PlatformAuthRepository = {
         password: true,
         platform_role: true,
         status: true,
+        can_impersonate: true,
         session_version: true,
       },
     }),
@@ -122,6 +125,7 @@ const prismaRepository: PlatformAuthRepository = {
         password: true,
         platform_role: true,
         status: true,
+        can_impersonate: true,
         session_version: true,
       },
     }),
@@ -144,6 +148,7 @@ const prismaRepository: PlatformAuthRepository = {
             password: true,
             platform_role: true,
             status: true,
+            can_impersonate: true,
             session_version: true,
           },
         },
@@ -201,6 +206,7 @@ export class PlatformAuthService {
         email: user.email,
         auth_kind: PLATFORM_AUTH_KIND,
         platform_role: PLATFORM_ROLE,
+        can_impersonate: user.can_impersonate,
       },
       token,
       csrfToken,
@@ -258,6 +264,7 @@ export class PlatformAuthService {
       email: user.email,
       auth_kind: PLATFORM_AUTH_KIND,
       platform_role: PLATFORM_ROLE,
+      can_impersonate: user.can_impersonate,
     };
   }
 

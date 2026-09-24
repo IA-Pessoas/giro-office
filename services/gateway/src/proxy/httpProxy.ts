@@ -7,6 +7,7 @@ import {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
   FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -333,6 +334,7 @@ export function buildForwardHeaders(
     FORWARDED_AUTH_SESSION_VERSION_HEADER,
     FORWARDED_AUTH_SESSION_ID_HEADER,
     FORWARDED_AUTH_CSRF_HASH_HEADER,
+    FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
     FORWARDED_AUTH_KIND_HEADER,
     FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
     "authorization",
@@ -386,6 +388,12 @@ export function buildForwardHeaders(
 
     headers.set(FORWARDED_AUTH_USER_ID_HEADER, request.auth.userId);
     headers.set(FORWARDED_AUTH_KIND_HEADER, request.auth.actorKind);
+    if (request.auth.claims.impersonator_platform_user_id) {
+      headers.set(
+        FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
+        request.auth.claims.impersonator_platform_user_id,
+      );
+    }
 
     if (request.auth.actorKind === "platform") {
       if (request.auth.isPlatformAdmin) {

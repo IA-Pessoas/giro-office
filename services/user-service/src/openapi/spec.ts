@@ -420,6 +420,32 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/platform/organizations/{organizationId}/users/{userId}/impersonate": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Iniciar personificação de usuário da organização",
+          description:
+            "Emite a sessão de organização do alvo por 60 minutos, revoga a sessão atual da plataforma e registra o evento de auditoria.",
+          security: platformBrowserSession,
+          parameters: [
+            { name: "organizationId", in: "path", required: true, schema: { type: "string" } },
+            { name: "userId", in: "path", required: true, schema: { type: "string" } },
+            csrfHeader,
+          ],
+          responses: {
+            "200": {
+              description: "Sessão do alvo em cookies HttpOnly; nenhum token no JSON",
+              ...successJson,
+            },
+            "401": { description: "Sessão da plataforma ausente, inválida ou revogada" },
+            "403": {
+              description: "Operador sem permissão, usuário inativo ou organização inativa",
+            },
+            "404": { description: "Usuário não pertence à organização do path" },
+            "503": { description: "Auditoria indisponível antes de iniciar a sessão" },
+          },
+        },
+      },
       "/platform/organizations/{organizationId}/users/{userId}/reactivate": {
         post: {
           tags: ["Platform auth"],

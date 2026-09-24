@@ -16,6 +16,12 @@ const { prismaMock, passwordHashMock, jwtMock } = vi.hoisted(() => ({
       findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
+    platformUser: {
+      findUnique: vi.fn(),
+    },
+    platformAuthSession: {
+      updateMany: vi.fn(),
+    },
     organization: {
       findFirst: vi.fn(),
     },
@@ -220,6 +226,136 @@ describe("AuthService", () => {
       "jwt-secret",
       expect.any(Object),
     );
+  });
+
+  it("inicia personificação com claims do alvo, expiração de 60 minutos e sessão do operador revogada", async () => {
+    const startedAt = new Date();
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.user.findUnique.mockResolvedValue(
+      activeUser({
+        name: "Ana",
+        login: "ana",
+        permission: 2,
+        type: "owner",
+        permissions: [{ organization_id: "org-1", ti: 2 }],
+      }),
+    );
+    prismaMock.platformAuthSession.updateMany.mockResolvedValue({ count: 1 });
+    jwtMock.sign.mockReturnValue("impersonation.jwt");
+    const recordStartEvent = vi.fn(async () => {});
+
+    const issued = await new AuthService().startImpersonation(
+      {
+        organizationId: "org-1",
+        targetUserId: "user-1",
+        platformUserId: "platform-1",
+        platformSessionId: "platform-session-1",
+        platformSessionCsrfHash: "a".repeat(64),
+      },
+      recordStartEvent,
+    );
+
+    expect(issued).toMatchObject({
+      id: "user-1",
+      name: "Ana",
+      login: "ana",
+      permission: 2,
+      organization_id: "org-1",
+      token: "impersonation.jwt",
+    });
+    expect(jwtMock.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "user-1",
+        organization_id: "org-1",
+        name: "Ana",
+        login: "ana",
+        permission: 2,
+        type: "owner",
+        modules: expect.objectContaining({ ti: 2 }),
+        impersonator_platform_user_id: "platform-1",
+      }),
+      "jwt-secret",
+      expect.objectContaining({ subject: "user-1", expiresIn: 3600 }),
+    );
+    expect(prismaMock.authSession.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        user_id: "user-1",
+        impersonator_platform_user_id: "platform-1",
+        expires_at: expect.any(Date),
+      }),
+    });
+    const sessionData = prismaMock.authSession.create.mock.calls[0][0].data;
+    expect(sessionData.expires_at.getTime() - issued.impersonationStartedAt.getTime()).toBe(
+      3_600_000,
+    );
+    expect(prismaMock.authSession.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.platformAuthSession.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: "platform-session-1",
+        platform_user_id: "platform-1",
+        csrf_hash: "a".repeat(64),
+      }),
+      data: { revoked_at: issued.impersonationStartedAt },
+    });
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+    expect(recordStartEvent).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      targetUserId: "user-1",
+      targetName: "Ana",
+      platformUserId: "platform-1",
+      startedAt: issued.impersonationStartedAt,
+    });
+    expect(issued.impersonationStartedAt.getTime()).toBeGreaterThanOrEqual(startedAt.getTime());
+  });
+
+  it("recusa operador sem permissão e alvo ou organização inativos", async () => {
+    const recordStartEvent = vi.fn(async () => {});
+    const input = {
+      organizationId: "org-1",
+      targetUserId: "user-1",
+      platformUserId: "platform-1",
+      platformSessionId: "platform-session-1",
+      platformSessionCsrfHash: "a".repeat(64),
+    };
+
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: false,
+    });
+    await expect(
+      new AuthService().startImpersonation(input, recordStartEvent),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: "platform-1",
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    for (const target of [
+      activeUser({ status: "inactive" }),
+      activeUser({ organization: { id: "org-1", status: "suspended" } }),
+    ]) {
+      prismaMock.user.findUnique.mockResolvedValueOnce(target);
+      await expect(
+        new AuthService().startImpersonation(input, recordStartEvent),
+      ).rejects.toMatchObject({
+        statusCode: 403,
+      });
+    }
+    expect(prismaMock.authSession.create).not.toHaveBeenCalled();
+    expect(prismaMock.platformAuthSession.updateMany).not.toHaveBeenCalled();
+    expect(recordStartEvent).not.toHaveBeenCalled();
   });
 
   it("login permite organização em trial", async () => {
@@ -602,6 +738,93 @@ describe("AuthService", () => {
       }),
     ).resolves.toBeUndefined();
     expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("vincula a claim do operador à sessão de personificação persistida", async () => {
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      impersonator_platform_user_id: "platform-1",
+      impersonatorPlatformUser: {
+        platform_role: "super_admin",
+        status: "active",
+        can_impersonate: true,
+      },
+      user: activeUser(),
+    });
+
+    await expect(
+      new AuthService().validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+        impersonator_platform_user_id: "platform-1",
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      new AuthService().validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+      }),
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it.each([
+    ["perde permissão", { platform_role: "super_admin", status: "active", can_impersonate: false }],
+    ["é desativado", { platform_role: "super_admin", status: "inactive", can_impersonate: true }],
+    [
+      "deixa de ser super admin",
+      { platform_role: "support", status: "active", can_impersonate: true },
+    ],
+  ])("derruba a personificação quando o operador %s", async (_reason, operator) => {
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      csrf_hash: "a".repeat(64),
+      impersonator_platform_user_id: "platform-1",
+      impersonatorPlatformUser: operator,
+      user: activeUser(),
+    });
+
+    await expect(
+      new AuthService().validateSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+        impersonator_platform_user_id: "platform-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it("não renova uma sessão de personificação", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(activeUser());
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      csrf_hash: "a".repeat(64),
+      impersonator_platform_user_id: "platform-1",
+    });
+
+    await expect(
+      new AuthService().refreshSession({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_version: 1,
+        session_id: "session-1",
+        csrf_hash: "a".repeat(64),
+        impersonator_platform_user_id: "platform-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ impersonator_platform_user_id: null }),
+      }),
+    );
   });
 
   it("aceita sessão para organização em trial", async () => {

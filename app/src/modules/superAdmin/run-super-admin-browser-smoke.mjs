@@ -21,6 +21,7 @@ const identity = {
   email: "operador@example.test",
   auth_kind: "platform",
   platform_role: "super_admin",
+  can_impersonate: true,
 };
 const organization = {
   id: "fc70c08e-1907-4268-b303-f88c6f5c5c01",
@@ -71,6 +72,7 @@ let forceConflict = false;
 let forceUserVersionConflict = false;
 let nextUserCreateError = null;
 let auditUnavailable = false;
+let impersonationStarted = false;
 let revision = 1;
 let delayedDetailId = null;
 let delayedDetail;
@@ -135,9 +137,28 @@ const upstream = createServer(async (request, response) => {
   let raw = "";
   for await (const chunk of request) raw += chunk;
   const body = raw ? JSON.parse(raw) : undefined;
-  requests.push({ method: request.method, path: url.pathname, query: url.searchParams, body });
+  requests.push({
+    method: request.method,
+    path: url.pathname,
+    query: url.searchParams,
+    body,
+    cookie: request.headers.cookie,
+    csrfHeader: request.headers["x-csrf-token"],
+    authorization: request.headers.authorization,
+  });
 
-  if (url.pathname === "/user/me") return reply(response, 401, "Sessão de plataforma.");
+  if (url.pathname === "/user/me") {
+    if (!impersonationStarted) return reply(response, 401, "Sessão de plataforma.");
+    return reply(response, 200, {
+      id: platformUser.id,
+      name: platformUser.name,
+      login: platformUser.login,
+      permission: 1,
+      organization_id: organization.id,
+      type: "admin",
+      modules: { rh: 1, fiscal: 2 },
+    });
+  }
   if (url.pathname === "/platform/me") return reply(response, 200, identity);
   if (url.pathname === "/platform/organizations" && request.method === "GET") {
     const search = (url.searchParams.get("search") ?? "").toLowerCase();
@@ -206,6 +227,77 @@ const upstream = createServer(async (request, response) => {
       total: 26,
       page: requestedPage,
       pageSize: 25,
+    });
+  }
+  const impersonationMatch = url.pathname.match(
+    /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)\/impersonate$/,
+  );
+  const impersonationOrganization =
+    impersonationMatch && organizations.find((item) => item.id === impersonationMatch[1]);
+  const impersonationTarget =
+    impersonationMatch &&
+    usersForOrganization(impersonationMatch[1]).find((item) => item.id === impersonationMatch[2]);
+  if (impersonationMatch && request.method === "POST") {
+    assert.equal(request.headers["x-csrf-token"], csrf);
+    assert.equal(request.headers.authorization, undefined);
+    if (!impersonationOrganization || !impersonationTarget) {
+      return reply(response, 404, "Usuário não encontrado no tenant.");
+    }
+    if (impersonationTarget.status !== "active") return reply(response, 403, "Usuário inativo.");
+    impersonationStarted = true;
+    recordAuditEvent(impersonationOrganization.id, "platform.impersonation.started", impersonationTarget.id, {
+      operator_platform_user_id: { from: null, to: identity.id },
+      target_user_id: { from: null, to: impersonationTarget.id },
+    });
+    response.writeHead(200, {
+      "content-type": "application/json",
+      "set-cookie": [
+        `cw.session=impersonated-session-${impersonationTarget.id}; Max-Age=3600; Path=/; HttpOnly; SameSite=Lax`,
+        `cw.csrf=${"B".repeat(43)}; Max-Age=3600; Path=/; SameSite=Lax`,
+      ],
+    });
+    response.end(JSON.stringify({
+      success: true,
+      data: {
+        id: impersonationTarget.id,
+        name: impersonationTarget.name,
+        login: impersonationTarget.login,
+        organization_id: impersonationOrganization.id,
+        permission: impersonationTarget.permission ?? 1,
+        modules: { rh: 1, fiscal: 2 },
+      },
+    }));
+    return;
+  }
+  if (url.pathname === "/dashboard/stats" && impersonationStarted) {
+    return reply(response, 200, {
+      updatedAt: null,
+      totalClients: 0,
+      clientsByService: {
+        contabil: 0,
+        fiscal: 0,
+        pessoal: 0,
+        infoproduto: 0,
+        consultoria: 0,
+        castelo_med: 0,
+      },
+      monthlyTrends: [],
+      financial: { paidCertificateReceipts: 0, unpaidCertificates: 0, monthlyPaidCertificateReceipts: [] },
+      commercial: {
+        activeProspects: 0,
+        closedThisMonth: 0,
+        byStatus: [],
+        billing: { pending: 0, contracted: 0, notContracted: 0 },
+      },
+      departments: [],
+      recentClients: [],
+      insights: [],
+      tasks: { today: 0, completedToday: 0, pending: 0, urgent: 0 },
+      notifications: { total: 0, urgent: 0, pending: 0 },
+      projects: { active: 0, completed: 0, inProgress: 0, delayed: 0, waiting: 0 },
+      performance: [],
+      pendingTasks: [],
+      activities: [],
     });
   }
   const permissionsMatch = url.pathname.match(
@@ -498,8 +590,20 @@ try {
     { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport);
+    await context.addCookies([
+      {
+        name: "cw.session",
+        value: "opaque-local-test-session",
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax",
+      },
+      { name: "cw.csrf", value: csrf, url: baseUrl, sameSite: "Lax" },
+    ]);
     organizations.splice(0, organizations.length, organization, secondOrganization);
     platformUser.status = "active";
+    identity.can_impersonate = true;
+    impersonationStarted = false;
     platformUserPermissions = { rh: 1, fiscal: 1 };
     createdUser = null;
     createdUserOrganizationId = null;
@@ -512,6 +616,18 @@ try {
     currentOwner.type = "owner";
     requests.length = 0;
     await page.goto("/super-admin", { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
+    await page.getByRole("button", { name: "Usuários", exact: true }).click();
+    await page.getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ }).waitFor();
+    await page.getByRole("button", { name: "Personificar", exact: true }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Personificar", exact: true }).count(), 1);
+    identity.can_impersonate = false;
+    await page.reload({ waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "Usuários", exact: true }).click();
+    await page.getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Personificar", exact: true }).count(), 0);
+    identity.can_impersonate = true;
+    await page.reload({ waitUntil: "networkidle" });
     await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
 
     if (process.env.SUPER_ADMIN_DETAIL_CASE !== "failed") {
@@ -865,6 +981,10 @@ try {
     }
     await deactivateDialog.waitFor({ state: "hidden" });
     await page.getByText("Inativo", { exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "Personificar", exact: true }).isDisabled(),
+      true,
+    );
     await page.waitForFunction(
       () => document.activeElement?.textContent?.trim() === "Reativar usuário",
       null,
@@ -883,6 +1003,10 @@ try {
     await reactivateDialog.getByRole("button", { name: "Reativar usuário", exact: true }).click();
     await reactivateDialog.waitFor({ state: "hidden" });
     await page.getByRole("button", { name: "Desativar usuário", exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "Personificar", exact: true }).isEnabled(),
+      true,
+    );
     assert.ok(
       requests.some(
         (request) =>
@@ -1330,6 +1454,50 @@ try {
       });
     }
     console.log(`PASS ${viewport.width}px fluxos completos, foco/Tab/Escape nos dois diálogos`);
+    if (viewport.width > 1000) {
+      await page.getByRole("button", { name: /Organização Aurora/ }).click();
+      await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
+      await page.getByRole("button", { name: "Usuários", exact: true }).click();
+      await page.getByRole("button", { name: /pessoa@example\.test/ }).click();
+      await page.getByRole("button", { name: "Personificar", exact: true }).click();
+      const impersonationDialog = page.getByRole("dialog", {
+        name: "Confirmar personificação",
+        exact: true,
+      });
+      await impersonationDialog.getByText(platformUser.name, { exact: false }).last().waitFor();
+      await impersonationDialog.getByText(organization.name, { exact: false }).last().waitFor();
+      if (screenshotDirectory) {
+        await mkdir(screenshotDirectory, { recursive: true });
+        await settleLayout();
+        await page.screenshot({
+          path: join(screenshotDirectory, "issue-1282-impersonation-confirmation-desktop.png"),
+        });
+      }
+      const impersonationResponse = page.waitForResponse((response) =>
+        response.url().includes(
+          `/platform/organizations/${organization.id}/users/${platformUser.id}/impersonate`,
+        ),
+      );
+      await impersonationDialog
+        .getByRole("button", { name: "Iniciar personificação", exact: true })
+        .click();
+      assert.equal((await impersonationResponse).status(), 200);
+      await page.waitForURL((url) => url.pathname === "/dashboard");
+      await page.getByRole("link", { name: "RH", exact: true }).waitFor();
+      const impersonationRequest = requests.find(
+        (request) =>
+          request.path ===
+          `/platform/organizations/${organization.id}/users/${platformUser.id}/impersonate`,
+      );
+      assert.equal(impersonationRequest.method, "POST");
+      assert.equal(impersonationRequest.csrfHeader, csrf);
+      assert.equal(impersonationRequest.authorization, undefined);
+      const impersonatedMeRequest = requests.find(
+        (request) => request.path === "/user/me" && request.cookie?.includes("impersonated-session"),
+      );
+      assert.match(impersonatedMeRequest?.cookie ?? "", /cw\.session=impersonated-session/);
+      console.log("PASS personificação confirma usuário/organização e abre o dashboard com módulo RH");
+    }
   }
   await page.evaluate(() => {
     localStorage.setItem("workspace-theme", "dark");

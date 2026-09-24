@@ -86,6 +86,12 @@ export const platformService = {
     return unwrapData<PlatformUsersListResponse["users"][number]>(response);
   },
 
+  async startImpersonation(organizationId: string, userId: string): Promise<void> {
+    await api.post(
+      `/platform/organizations/${organizationId}/users/${userId}/impersonate`,
+    );
+  },
+
   async transferOwnership(
     organizationId: string,
     data: TransferPlatformOwnershipPayload,

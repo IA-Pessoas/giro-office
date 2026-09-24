@@ -30,6 +30,7 @@ interface UserProps {
     task_completion?: boolean;
     auth_kind?: "organization" | "platform";
     platform_role?: "super_admin";
+    can_impersonate?: boolean;
 }
 
 interface SignInProps {
@@ -102,7 +103,8 @@ function isValidPlatformUser(data: unknown): data is UserProps {
         typeof (data as UserProps).name === "string" &&
         typeof (data as UserProps).email === "string" &&
         (data as UserProps).auth_kind === "platform" &&
-        (data as UserProps).platform_role === "super_admin";
+        (data as UserProps).platform_role === "super_admin" &&
+        typeof (data as UserProps).can_impersonate === "boolean";
 }
 
 function buildCurrentUser(
@@ -144,6 +146,7 @@ function buildPlatformUser(data: UserProps): UserProps {
         modules: {},
         auth_kind: "platform",
         platform_role: "super_admin",
+        can_impersonate: data.can_impersonate,
     };
 }
 

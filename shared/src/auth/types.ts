@@ -14,6 +14,7 @@ export interface AuthIdentity {
   session_version?: number;
   session_id?: string;
   csrf_hash?: string;
+  impersonator_platform_user_id?: string;
   type?: AuthUserType;
   auth_kind?: AuthKind;
   platform_role?: PlatformRole;
