@@ -1,8 +1,14 @@
+import { Buffer } from "node:buffer";
 import {
   executeReportingQuery,
+  MAX_REPORTING_QUERY_BYTES,
+  MAX_REPORTING_QUERY_ROWS,
   PESSOAL_LDD_REPORTING_SOURCES,
   PESSOAL_PAYROLL_REPORTING_SOURCES,
   PESSOAL_SITUATIONS_REPORTING_SOURCES,
+  REPORTING_QUERY_BYTE_LIMIT_CODE,
+  REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
+  REPORTING_QUERY_ROW_LIMIT_CODE,
   type ReportingQuery,
   ServiceError,
   withReportingSnapshot,
@@ -40,6 +46,8 @@ type ReportingReadOptions = {
   includeCursor?: boolean;
 };
 
+type ReportingRowProjector = (row: Record<string, unknown>) => Record<string, unknown>;
+
 const REPORTING_DB_PAGE_SIZE = 1000;
 
 function reportingPageOptions(page: ReportingPage) {
@@ -54,12 +62,54 @@ function reportingPageOptions(page: ReportingPage) {
   };
 }
 
+function throwSnapshotRowLimit(): never {
+  throw new ServiceError(
+    422,
+    "O conjunto excede a capacidade de consulta do relatório.",
+    undefined,
+    REPORTING_QUERY_ROW_LIMIT_CODE,
+  );
+}
+
+function throwSnapshotByteLimit(): never {
+  throw new ServiceError(
+    422,
+    REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
+    undefined,
+    REPORTING_QUERY_BYTE_LIMIT_CODE,
+  );
+}
+
+function appendReportingPage(
+  rows: Record<string, unknown>[],
+  page: readonly Record<string, unknown>[],
+  limit: number,
+  projectRow: ReportingRowProjector,
+  byteSize: number,
+  enforceGlobalLimits: boolean,
+): number {
+  for (const row of page.slice(0, limit + 1 - rows.length)) {
+    if (enforceGlobalLimits) {
+      if (rows.length >= MAX_REPORTING_QUERY_ROWS) throwSnapshotRowLimit();
+      if (rows.length < limit) {
+        byteSize +=
+          (rows.length ? 1 : 0) + Buffer.byteLength(JSON.stringify(projectRow(row)), "utf8");
+        if (byteSize > MAX_REPORTING_QUERY_BYTES) throwSnapshotByteLimit();
+      }
+    }
+    rows.push(row);
+  }
+  return byteSize;
+}
+
 async function readReportingRows(
   limit: number,
   options: ReportingReadOptions,
   fetchPage: (page: ReportingPage) => Promise<readonly Record<string, unknown>[]>,
+  projectRow: ReportingRowProjector,
 ): Promise<readonly Record<string, unknown>[]> {
   const requested = limit + 1;
+  const enforceGlobalLimits = options.offset === undefined && !options.includeCursor;
   if (options.offset !== undefined) {
     return fetchPage({ take: requested, offset: options.offset, includeCursor: false });
   }
@@ -71,11 +121,14 @@ async function readReportingRows(
     });
   }
   if (requested <= REPORTING_DB_PAGE_SIZE) {
-    return fetchPage({ take: requested, includeCursor: false });
+    const page = await fetchPage({ take: requested, includeCursor: false });
+    appendReportingPage([], page, limit, projectRow, 2, enforceGlobalLimits);
+    return page;
   }
 
   const rows: Record<string, unknown>[] = [];
   let cursorId: string | undefined;
+  let byteSize = 2;
   while (rows.length < requested) {
     const take = Math.min(REPORTING_DB_PAGE_SIZE, requested - rows.length);
     const page = await fetchPage({
@@ -84,7 +137,7 @@ async function readReportingRows(
       includeCursor: true,
     });
     if (page.length === 0) break;
-    rows.push(...page.slice(0, requested - rows.length));
+    byteSize = appendReportingPage(rows, page, limit, projectRow, byteSize, enforceGlobalLimits);
     if (page.length < take || rows.length >= requested) break;
 
     const nextCursorId = page[page.length - 1]?.id;
@@ -162,23 +215,58 @@ function obligationSnapshotState(row: Record<string, unknown>): string {
   return row.group_snapshot_name ? "ATIVO" : "SEM_SNAPSHOT";
 }
 
+function projectReportingFields(
+  row: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, unknown> {
+  return Object.fromEntries(
+    fields
+      .filter((field) => Object.getOwnPropertyDescriptor(row, field) !== undefined)
+      .map((field) => [field, row[field]]),
+  );
+}
+
+function projectPayrollReportingRow(
+  row: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, unknown> {
+  return projectReportingFields(
+    {
+      ...row,
+      client_name: reportName(row, "client", "client_name"),
+      responsible_name: reportName(row, "responsible", "responsible_name"),
+      union_name: reportName(row, "union", "union_name"),
+      group_name: reportName(row, "group", "group_name"),
+      group_state: textValue(row.group_state) ?? payrollGroupState(row),
+    },
+    fields,
+  );
+}
+
+function projectObligationReportingRow(
+  row: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, unknown> {
+  return projectReportingFields(
+    {
+      ...row,
+      client_name: reportName(row, "client", "client_name"),
+      responsible_name: reportName(row, "responsible", "responsible_name"),
+      group_snapshot_state: textValue(row.group_snapshot_state) ?? obligationSnapshotState(row),
+    },
+    fields,
+  );
+}
+
 function projectRows(
   rows: readonly Record<string, unknown>[],
-  fields: readonly string[],
   limit: number,
+  projectRow: ReportingRowProjector,
   includeCursor = false,
 ): { rows: readonly Record<string, unknown>[]; reachedLimit: boolean; nextCursor?: string } {
   const cursorId = includeCursor && rows.length > limit ? rows[limit - 1]?.id : undefined;
   return {
-    rows: rows
-      .slice(0, limit)
-      .map((row) =>
-        Object.fromEntries(
-          fields
-            .filter((field) => Object.getOwnPropertyDescriptor(row, field) !== undefined)
-            .map((field) => [field, row[field]]),
-        ),
-      ),
+    rows: rows.slice(0, limit).map(projectRow),
     reachedLimit: rows.length > limit,
     ...(typeof cursorId === "string" ? { nextCursor: cursorId } : {}),
   };
@@ -237,6 +325,8 @@ export class InternalReportingService {
     }
 
     if (input.source === PESSOAL_PAYROLL_REPORTING_SOURCES[0]) {
+      const projectRow = (row: Record<string, unknown>) =>
+        projectPayrollReportingRow(row, input.fields);
       const rows = await readReportingRows(
         input.limit,
         { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
@@ -261,24 +351,14 @@ export class InternalReportingService {
             },
             ...reportingPageOptions(page),
           }),
+        projectRow,
       );
-      return projectRows(
-        rows.map((row) => ({
-          ...row,
-          client_name: reportName(row, "client", "client_name"),
-          responsible_name: reportName(row, "responsible", "responsible_name"),
-          union_name: reportName(row, "union", "union_name"),
-          group_name: reportName(row, "group", "group_name"),
-          group_state:
-            textValue((row as Record<string, unknown>).group_state) ?? payrollGroupState(row),
-        })),
-        input.fields,
-        input.limit,
-        input.cursorPage,
-      );
+      return projectRows(rows, input.limit, projectRow, input.cursorPage);
     }
 
     if (input.source === "pessoal.obligations") {
+      const projectRow = (row: Record<string, unknown>) =>
+        projectObligationReportingRow(row, input.fields);
       const rows = await readReportingRows(
         input.limit,
         { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
@@ -297,20 +377,9 @@ export class InternalReportingService {
             },
             ...reportingPageOptions(page),
           }),
+        projectRow,
       );
-      return projectRows(
-        rows.map((row) => ({
-          ...row,
-          client_name: reportName(row, "client", "client_name"),
-          responsible_name: reportName(row, "responsible", "responsible_name"),
-          group_snapshot_state:
-            textValue((row as Record<string, unknown>).group_snapshot_state) ??
-            obligationSnapshotState(row),
-        })),
-        input.fields,
-        input.limit,
-        input.cursorPage,
-      );
+      return projectRows(rows, input.limit, projectRow, input.cursorPage);
     }
 
     const delegate =
@@ -320,6 +389,7 @@ export class InternalReportingService {
           ? this.prisma.situationsPessoal
           : this.prisma.unionPessoal;
     const reportingDelegate = delegate as unknown as ReportingDelegate;
+    const projectRow = (row: Record<string, unknown>) => projectReportingFields(row, input.fields);
     const rows = await readReportingRows(
       input.limit,
       { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
@@ -332,8 +402,9 @@ export class InternalReportingService {
           },
           ...reportingPageOptions(page),
         }),
+      projectRow,
     );
 
-    return projectRows(rows, input.fields, input.limit, input.cursorPage);
+    return projectRows(rows, input.limit, projectRow, input.cursorPage);
   }
 }
