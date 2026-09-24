@@ -305,6 +305,21 @@ export function resolveEligibleTaskResponsible(
   throw new ServiceError(422, "Selecione um responsável elegível para a tarefa.");
 }
 
+/** Anexos e cobrança comercial não são apagados em cascata: o usuário precisa agir antes. */
+function getTaskDeleteBlockMessage(attachments: number, billings: number): string | null {
+  if (attachments === 0 && billings === 0) return null;
+  const reasons = [
+    ...(attachments > 0 ? [`${attachments} anexo(s)`] : []),
+    ...(billings > 0 ? ["cobrança comercial registrada"] : []),
+  ];
+  const actions = [
+    ...(attachments > 0 ? ["Remova os anexos"] : []),
+    ...(billings > 0 ? ["peça ao Comercial para ajustar a cobrança"] : []),
+  ];
+  const action = actions.join(" e ");
+  return `Não é possível excluir a tarefa: ela tem ${reasons.join(" e ")}. ${action.charAt(0).toUpperCase()}${action.slice(1)}.`;
+}
+
 export class TaskCrudService {
   readonly #workflow: TaskWorkflowService;
 
@@ -1048,10 +1063,22 @@ export class TaskCrudService {
       });
 
       try {
-        await this.prisma.task.delete({
-          where: { id: data.task_id },
+        await this.prisma.$transaction(async (tx) => {
+          const where = { task_id: data.task_id, organization_id: data.organization_id };
+          const [attachments, billings] = await Promise.all([
+            tx.taskAttachment.count({ where }),
+            tx.commercialTaskBilling.count({ where }),
+          ]);
+          const blockMessage = getTaskDeleteBlockMessage(attachments, billings);
+          if (blockMessage) throw new ServiceError(409, blockMessage);
+
+          // Histórico próprio da tarefa sai junto com ela.
+          await tx.taskCompletionRequest.deleteMany({ where });
+          await tx.taskPostponement.deleteMany({ where });
+          await tx.task.delete({ where: { id: data.task_id } });
         });
       } catch (err: unknown) {
+        if (err instanceof ServiceError) throw err;
         logError("Erro ao excluir tarefa no banco", { err });
         if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
           throw new ServiceError(

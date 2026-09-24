@@ -196,6 +196,7 @@ import {
   canEditIntegracaoTask,
   formatTasksFooterSummary,
   getProjectTaskCardLabels,
+  getTaskDeleteErrorMessage,
 } from "./components/taskWorkspaceUi.ts";
 import {
   TASK_FORM_BODY_CLASSNAME,
@@ -1784,4 +1785,21 @@ runTest("project detail task card shows the task name, model only as secondary i
   const detailView = readFileSync("src/modules/integracao/components/ProjectDetailView.tsx", "utf8");
   assert.match(detailView, /getProjectTaskCardLabels\(task\)/);
   assert.doesNotMatch(detailView, /task\.model\?\.name \|\| task\.name/);
+});
+
+runTest("task delete error surfaces the 409 reason from the API", () => {
+  const reason = "Não é possível excluir a tarefa: ela tem 1 anexo(s). Remova os anexos.";
+
+  assert.equal(
+    getTaskDeleteErrorMessage({ response: { status: 409, data: { error: reason } } }),
+    reason,
+  );
+  assert.match(
+    getTaskDeleteErrorMessage({ response: { status: 403, data: {} } }),
+    /permissão administrativa/,
+  );
+  assert.equal(getTaskDeleteErrorMessage(new Error("boom")), "Não foi possível excluir a tarefa.");
+
+  const workspace = readFileSync("src/modules/integracao/components/TasksWorkspace.tsx", "utf8");
+  assert.match(workspace, /getTaskDeleteErrorMessage\(error\)/);
 });

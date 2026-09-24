@@ -23,6 +23,18 @@ const { prismaMock, auditMock, workflowMock, operationalNotificationMock } = vi.
     taskModel: {
       findFirst: vi.fn(),
     },
+    taskAttachment: {
+      count: vi.fn(),
+    },
+    commercialTaskBilling: {
+      count: vi.fn(),
+    },
+    taskCompletionRequest: {
+      deleteMany: vi.fn(),
+    },
+    taskPostponement: {
+      deleteMany: vi.fn(),
+    },
     taskDependent: {
       findMany: vi.fn(),
     },
@@ -2020,5 +2032,57 @@ describe("TaskCrudService", () => {
         integracaoLevel: 1,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  describe("deleteTask dependências", () => {
+    const request = {
+      task_id: "task-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+      integracaoLevel: 3,
+      isOwner: true,
+    };
+
+    beforeEach(() => {
+      prismaMock.task.findFirst.mockResolvedValue({ id: "task-1", organization_id: "org-1" });
+      prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
+      prismaMock.taskAttachment.count.mockResolvedValue(0);
+      prismaMock.commercialTaskBilling.count.mockResolvedValue(0);
+      prismaMock.taskCompletionRequest.deleteMany.mockResolvedValue({ count: 0 });
+      prismaMock.taskPostponement.deleteMany.mockResolvedValue({ count: 0 });
+      prismaMock.task.delete.mockReset();
+      prismaMock.task.delete.mockResolvedValue({ id: "task-1" });
+    });
+
+    it("bloqueia com 409 nomeando anexos e cobrança comercial", async () => {
+      prismaMock.taskAttachment.count.mockResolvedValue(2);
+      prismaMock.commercialTaskBilling.count.mockResolvedValue(1);
+
+      await expect(makeTaskCrudService().deleteTask(request)).rejects.toMatchObject({
+        statusCode: 409,
+        message:
+          "Não é possível excluir a tarefa: ela tem 2 anexo(s) e cobrança comercial registrada. " +
+          "Remova os anexos e peça ao Comercial para ajustar a cobrança.",
+      });
+      expect(prismaMock.task.delete).not.toHaveBeenCalled();
+    });
+
+    it("bloqueia com 409 quando só há anexos", async () => {
+      prismaMock.taskAttachment.count.mockResolvedValue(1);
+
+      await expect(makeTaskCrudService().deleteTask(request)).rejects.toMatchObject({
+        statusCode: 409,
+        message: "Não é possível excluir a tarefa: ela tem 1 anexo(s). Remova os anexos.",
+      });
+    });
+
+    it("remove solicitações de conclusão e prorrogações junto com a tarefa", async () => {
+      await expect(makeTaskCrudService().deleteTask(request)).resolves.toEqual({ deleted: true });
+
+      const where = { task_id: "task-1", organization_id: "org-1" };
+      expect(prismaMock.taskCompletionRequest.deleteMany).toHaveBeenCalledWith({ where });
+      expect(prismaMock.taskPostponement.deleteMany).toHaveBeenCalledWith({ where });
+      expect(prismaMock.task.delete).toHaveBeenCalledWith({ where: { id: "task-1" } });
+    });
   });
 });

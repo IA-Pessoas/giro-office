@@ -35,6 +35,15 @@ export interface ProjectCreateRow {
 
 export const PROJECT_STATUS_WAITING_COMMERCIAL = "Aguardando liberação do Comercial";
 
+/** Tarefas bloqueiam a exclusão do projeto; a regra da tarefa decide o que cai em cascata. */
+export function getProjectDeleteTasksMessage(taskCount: number): string {
+  return `Não é possível excluir o projeto: ele tem ${taskCount} tarefa(s) vinculada(s). Exclua as tarefas antes.`;
+}
+
+/** Com as tarefas já checadas, a única FK restante que bloqueia é a contratação de plano. */
+export const PROJECT_DELETE_HIRING_MESSAGE =
+  "Não é possível excluir o projeto: há contratação de plano vinculada a ele.";
+
 const CREATE_SELECT = {
   id: true,
   name: true,

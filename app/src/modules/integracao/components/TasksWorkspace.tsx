@@ -46,6 +46,7 @@ import {
   TASK_TABLE_NAME_HEAD_CELL_CLASSNAME,
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
   canEditIntegracaoTask,
+  getTaskDeleteErrorMessage,
 } from "./taskWorkspaceUi";
 
 const TASKS_PAGE_SIZE = 20;
@@ -199,22 +200,7 @@ export function TasksWorkspace() {
       setPendingTaskDeletion(null);
       setTaskDeletionError(null);
     } catch (error) {
-      const statusCode =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { status?: number } }).response?.status === "number"
-          ? (error as { response?: { status?: number } }).response?.status
-          : null;
-
-      if (statusCode === 403) {
-        const message = "Somente usuários com permissão administrativa na Integração podem excluir tarefas.";
-        toast.error(message);
-        setTaskDeletionError(message);
-        throw error;
-      }
-
-      const message = "Não foi possível excluir a tarefa.";
+      const message = getTaskDeleteErrorMessage(error);
       toast.error(message);
       setTaskDeletionError(message);
       throw error;

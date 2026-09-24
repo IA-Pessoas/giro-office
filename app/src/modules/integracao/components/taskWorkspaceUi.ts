@@ -62,3 +62,16 @@ export function getProjectTaskCardLabels(
     modelName: name && modelName && modelName !== name ? modelName : null,
   };
 }
+
+const TASK_DELETE_ADMIN_MESSAGE =
+  "Somente usuários com permissão administrativa na Integração podem excluir tarefas.";
+
+/** 409 traz o motivo nominal do bloqueio (anexos, cobrança comercial). */
+export function getTaskDeleteErrorMessage(error: unknown): string {
+  const response = (error as { response?: { status?: number; data?: Record<string, unknown> } })
+    ?.response;
+  if (response?.status === 403) return TASK_DELETE_ADMIN_MESSAGE;
+  const reason = response?.data?.error ?? response?.data?.message;
+  if (response?.status === 409 && typeof reason === "string" && reason) return reason;
+  return "Não foi possível excluir a tarefa.";
+}
