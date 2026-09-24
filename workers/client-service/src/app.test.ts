@@ -274,7 +274,7 @@ describe("client Worker", () => {
     const response = await app.request(`https://client.test/client/${CLIENT_ID}/histories`, {
       method: "POST",
       headers: { ...headers(), "content-type": "application/json" },
-      body: JSON.stringify({ date: "2026-09-23", history: "Contato", file: "doc.pdf" }),
+      body: JSON.stringify({ date: "2026-09-23T12:00:00.000Z", history: "Contato", file: "doc.pdf" }),
     });
 
     expect(response.status).toBe(400);

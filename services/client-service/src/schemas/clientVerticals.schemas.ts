@@ -152,8 +152,14 @@ export const updateClientPABodySchema = z
   .strict()
   .refine((d) => Object.keys(d).length > 0, "Informe ao menos um campo para atualizar.");
 
+const HISTORY_DATE_MESSAGE = "Informe data e hora com fuso horário (ISO 8601).";
+
 const historyFields = {
-  date: z.coerce.date({ errorMap: () => ({ message: "Informe uma data válida." }) }),
+  // Sem offset o backend gravaria a hora local como UTC e cada edição deslocaria o horário.
+  date: z
+    .string({ required_error: HISTORY_DATE_MESSAGE })
+    .datetime({ offset: true, message: HISTORY_DATE_MESSAGE })
+    .transform((value) => new Date(value)),
   history: z
     .string({ required_error: "Informe o texto do histórico." })
     .trim()

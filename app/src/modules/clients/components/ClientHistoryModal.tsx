@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCreateClientHistoryMutation, useUpdateClientHistoryMutation } from "../hooks/useClientHistories";
 import { historyPendingQueryKey } from "../hooks/useClientHistoryPending";
 import type { ClientHistoryItem } from "../types";
+import { toDatetimeLocalValue } from "../utils/historyDate";
 
 type Mode = "create" | "edit";
 
@@ -24,18 +25,6 @@ interface HistoryFormState {
   date: string;
   history: string;
   file: File | null;
-}
-
-function toDatetimeLocalValue(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
-    date.getMinutes(),
-  )}`;
 }
 
 export function ClientHistoryModal({
