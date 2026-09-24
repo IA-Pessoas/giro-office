@@ -1,6 +1,12 @@
 import { isAxiosError } from "axios";
 
-import type { ContabilControlFilters, ContabilCompetence } from "../types";
+import type {
+  ContabilControlFilters,
+  ContabilCompetence,
+  TriageDocumentItemNotes,
+  TriageDocumentStatus,
+  TriageRoutineType,
+} from "../types";
 
 export const CONTABIL_ENDPOINTS = {
   controls: "/contabil/controls",
@@ -22,6 +28,27 @@ export const CONTABIL_ENDPOINTS = {
   triageStatements: "/triagem/statements",
   triageClosing: "/triagem/closing",
 } as const;
+
+// Método de entrega e site estadual só existem na rotina fiscal; o backend
+// recusa essas chaves (mesmo nulas) na rotina contábil.
+export function buildTriageItemPayload(
+  field: string,
+  status: TriageDocumentStatus | undefined,
+  itemNotes: Partial<TriageDocumentItemNotes> | undefined,
+  type: TriageRoutineType,
+  value?: string | null,
+) {
+  const { delivery_method, state_site, ...notes } = itemNotes ?? {};
+  return {
+    field,
+    ...(status ? { status } : {}),
+    ...(type === "FISCAL" ? { type } : {}),
+    ...(value !== undefined ? { value } : {}),
+    ...notes,
+    ...(type === "FISCAL" && delivery_method !== undefined ? { delivery_method } : {}),
+    ...(type === "FISCAL" && state_site !== undefined ? { state_site } : {}),
+  };
+}
 
 export function buildContabilControlParams(filters: ContabilControlFilters) {
   return {

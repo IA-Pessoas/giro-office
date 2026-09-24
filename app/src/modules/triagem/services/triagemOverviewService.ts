@@ -4,7 +4,8 @@ export type TriageOverviewStatus =
   | "URGENT_OPEN"
   | "ROUTINE_PENDING"
   | "BANK_PENDING"
-  | "COMPLETE";
+  | "COMPLETE"
+  | "NO_APPLICABLE_ITEMS";
 
 export type TriageOverviewItem = {
   client_id: string;
@@ -18,6 +19,8 @@ export type TriageOverviewIndicators = {
   routine_pending: number;
   bank_pending: number;
   complete: number;
+  // Opcional até o triagem-service com o status novo estar publicado.
+  no_applicable_items?: number;
 };
 
 export type TriageOverview = {

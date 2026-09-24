@@ -238,6 +238,14 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     expectOk(await call("GET", `/contabil/controls?${query}`), "GET restaurado");
   });
 
+  it("pendência mensal inexistente: GET devolve 200 com null (#1322)", async () => {
+    const empty = expectOk(
+      await call("GET", `/triagem/monthly?client_id=${clientId}&competence=2001-01&type=CONTABIL`),
+      "GET monthly sem registro",
+    );
+    expect(empty.data).toBeNull();
+  });
+
   it("relacionamento: cria, lê por cliente, atualiza todos os campos e remove", async () => {
     const created = expectOk(
       await call("POST", "/contabil/relationships", {
@@ -339,6 +347,30 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
       "GET após DELETE",
     );
     expect(afterDelete.data).toBeNull();
+  });
+
+  it("responsáveis: cria sem responsável nem lançado por (#1321)", async () => {
+    // As colunas têm DEFAULT '' com FK para users; omitir o campo não pode dar 500.
+    const created = expectOk(
+      await call("POST", "/contabil/responsibles", {
+        client_id: clientId,
+        customer_with_movement: false,
+      }),
+      "POST responsibles parcial",
+    );
+    expect(created.data).toMatchObject({ person_responsible_id: null, posted_by_id: null });
+    expectOk(
+      await call("DELETE", `/contabil/responsibles/${created.data.id as string}`),
+      "DELETE responsibles parcial",
+    );
+    expectOk(
+      await call("POST", "/contabil/responsibles", {
+        client_id: clientId,
+        posted_by_id: "00000000-0000-4000-8000-000000000000",
+      }),
+      "POST responsibles com usuário inexistente",
+      [400],
+    );
   });
 
   it("fechamento da triagem: padrão, grava status, lê e arquiva", async () => {
