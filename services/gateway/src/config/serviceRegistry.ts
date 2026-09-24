@@ -93,10 +93,19 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
         },
         { methods: ["POST"], path: /^\/platform\/session\/refresh\/?$/ },
         { methods: ["GET"], path: /^\/platform\/me\/?$/ },
+        { methods: ["GET"], path: /^\/platform\/super-admins\/?$/ },
         { methods: ["POST"], path: /^\/platform\/impersonation\/exit\/?$/ },
+        {
+          methods: ["PATCH"],
+          path: /^\/platform\/super-admins\/[^/]+\/impersonation-permission\/?$/,
+        },
         {
           methods: ["POST"],
           path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+        },
+        {
+          methods: ["POST"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate\/?$/,
         },
         {
           methods: ["GET"],
