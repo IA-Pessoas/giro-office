@@ -791,6 +791,7 @@ runTest("getDocumentIssue flags masked, wrong-length and bad check digit documen
   assert.equal(getDocumentIssue("12.ABC.345/01DE-35"), null);
   assert.equal(getDocumentIssue(""), null);
   assert.equal(getDocumentIssue(null), null);
+  assert.equal(getDocumentIssue("\n\t"), null);
   assert.equal(getDocumentIssue("******"), "Documento mascarado");
   assert.equal(getDocumentIssue("3231794528"), "Tamanho inválido");
   assert.equal(getDocumentIssue("529.982.247-26"), "Dígito verificador inválido");

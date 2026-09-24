@@ -36,7 +36,7 @@ DECLARE
   fw int;
   d1 int;
 BEGIN
-  IF btrim(coalesce(raw, '')) = '' THEN
+  IF coalesce(raw, '') !~ '\S' THEN
     RETURN NULL;
   END IF;
   IF raw LIKE '%*%' THEN
@@ -86,10 +86,16 @@ BEGIN
       ('"regularize.proceduralGuidances"', 'cpf_cnpj', false),
       ('"tecnologia.terms"', 'user_cpf', false)
     ) AS t(tbl, col, mask_only)
-    WHERE EXISTS (
-      SELECT 1 FROM pg_attribute
-      WHERE attrelid = to_regclass(tbl) AND attname = col AND NOT attisdropped)
   LOOP
+    -- Schema recortado ou coluna renomeada: avisa em vez de relatar zero em silencio.
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_attribute
+      WHERE attrelid = to_regclass(target.tbl) AND attname = target.col AND NOT attisdropped
+    ) THEN
+      RAISE NOTICE 'Coluna %.% nao existe; fora do relatorio', target.tbl, target.col;
+      CONTINUE;
+    END IF;
+
     SELECT CASE WHEN count(*) > 0 THEN 'organization_id' END INTO org_col
     FROM pg_attribute
     WHERE attrelid = to_regclass(target.tbl) AND attname = 'organization_id' AND NOT attisdropped;

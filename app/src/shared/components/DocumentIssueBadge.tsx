@@ -11,10 +11,14 @@ export function DocumentIssueBadge({ value }: { value: string | null | undefined
   }
 
   return (
-    <span title={issue}>
+    <span className="mt-1 block">
       <StatusBadge
         size="sm"
-        config={{ label: `Revisar documento: ${issue.toLowerCase()}`, variant: "warning", icon: AlertTriangle }}
+        config={{
+          label: `Revisar documento: ${issue.toLowerCase()}`,
+          variant: "warning",
+          icon: AlertTriangle,
+        }}
       />
     </span>
   );

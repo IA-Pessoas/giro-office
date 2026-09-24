@@ -17,7 +17,7 @@ CREATE TABLE clients (id text PRIMARY KEY, organization_id text, cpf_cnpj text);
 CREATE TABLE "certificate.pj" (id text PRIMARY KEY, organization_id text, cnpj text, responsible text);
 INSERT INTO clients VALUES
   ('cpf-ok', 'org', '529.982.247-25'), ('cnpj-ok', 'org', '11.222.333/0001-81'),
-  ('alnum-ok', 'org', '12.ABC.345/01DE-35'), ('empty', 'org', ''),
+  ('alnum-ok', 'org', '12.ABC.345/01DE-35'), ('empty', 'org', ''), ('blank', 'org', E'\n\t'),
   ('masked', 'org', '******'), ('short', 'org', '3231794528'),
   ('cpf-dv', 'org', '529.982.247-26'), ('cnpj-dv', 'org', '11.222.333/0001-82'),
   ('zeros', 'org', '000.000.000-00');
