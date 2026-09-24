@@ -19,6 +19,7 @@ interface ClientPickerModalProps {
   filters: Omit<ClientListFilters, "search" | "page" | "limit">;
   onSelectClient: (client: ClientPickerOption | null) => void;
   selectedClient: ClientPickerOption | null;
+  triggerLabel?: string;
 }
 
 export function ClientPickerModal({
@@ -26,6 +27,7 @@ export function ClientPickerModal({
   filters,
   onSelectClient,
   selectedClient,
+  triggerLabel = "Selecionar cliente",
 }: ClientPickerModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -97,7 +99,7 @@ export function ClientPickerModal({
       >
         <span className="min-w-0 text-center">
           <span className="block truncate text-sm font-semibold">
-            {selectedClient?.name || "Selecionar cliente"}
+            {selectedClient?.name || triggerLabel}
           </span>
           {selectedClient?.document ? (
             <span className="mt-0.5 block truncate text-xs text-blue-100">
