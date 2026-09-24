@@ -1,8 +1,11 @@
 import { useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Archive, CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
+import { toast } from "react-toastify";
+
 import { useModuleAccess } from "@modules/auth";
-import { Dialog } from "@shared/components";
+import { ClientPickerModal, getClientDisplayName, type ClientPickerOption } from "@modules/clients";
+import { ConfirmationDialog, Dialog } from "@shared/components";
 import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
@@ -48,8 +51,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 type Draft = { name: string; contract_value: string };
+type PendingConfirmation =
+  | { type: "delete-config"; config: CommercialProposalConfig }
+  | { type: "archive-prospecting"; item: CommercialProspecting };
 type ProspectingDraft = {
-  client_id: string;
+  client: ClientPickerOption | null;
   status: (typeof COMMERCIAL_PROSPECTING_STATUSES)[number];
   status_date: string;
   description: string;
@@ -57,7 +63,7 @@ type ProspectingDraft = {
 
 const emptyDraft: Draft = { name: "", contract_value: "" };
 const emptyProspectingDraft: ProspectingDraft = {
-  client_id: "",
+  client: null,
   status: COMMERCIAL_PROSPECTING_STATUSES[0],
   status_date: "",
   description: "",
@@ -67,7 +73,8 @@ export function CommercialCatalog() {
   const { access, isLoading: accessLoading } = useModuleAccess("comercial");
   const configsQuery = useCommercialProposalConfigs();
   const prospectingQuery = useCommercialProspecting();
-  const prospectingClientsQuery = useCommercialProspectingClients();
+  // Clientes sem nenhuma prospecção (ativa ou arquivada): o backend recusa os demais.
+  const eligibleClientsQuery = useCommercialProspectingClients();
   const createMutation = useCreateCommercialProposalConfig();
   const deleteMutation = useDeleteCommercialProposalConfig();
   const updateMutation = useUpdateCommercialProposalConfig();
@@ -80,12 +87,14 @@ export function CommercialCatalog() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
-  const [deleteError, setDeleteError] = useState("");
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
+  const [prospectingPickError, setProspectingPickError] = useState("");
   const [prospectingDraft, setProspectingDraft] = useState<ProspectingDraft>(emptyProspectingDraft);
   const [isCreatingProspecting, setIsCreatingProspecting] = useState(false);
   const [prospectingEditingId, setProspectingEditingId] = useState<string | null>(null);
   const [prospectingFormError, setProspectingFormError] = useState("");
-  const [prospectingActionError, setProspectingActionError] = useState("");
   const [taskBillingEditingId, setTaskBillingEditingId] = useState<string | null>(null);
   const [taskBillingDraft, setTaskBillingDraft] = useState<{
     hiring_status: CommercialTaskHiringStatus;
@@ -99,7 +108,7 @@ export function CommercialCatalog() {
   const [taskBillingFormError, setTaskBillingFormError] = useState("");
   const proposalConfigCreateTriggerRef = useRef<HTMLButtonElement>(null);
   const proposalConfigDialogTriggerRef = useRef<HTMLButtonElement>(null);
-  const prospectingCreateTriggerRef = useRef<HTMLButtonElement>(null);
+  const prospectingCreateTriggerRef = useRef<HTMLDivElement>(null);
   const originalContractValueRef = useRef<number | null>(null);
   const contractValueEditedRef = useRef(false);
 
@@ -136,6 +145,7 @@ export function CommercialCatalog() {
           billing_description: taskBillingDraft.billing_description.trim() || null,
         },
       });
+      toast.success("Cobrança salva.");
       cancelTaskBillingEdit();
     } catch (error) {
       setTaskBillingFormError(getErrorMessage(error, "Não foi possível salvar a cobrança."));
@@ -269,22 +279,47 @@ export function CommercialCatalog() {
     );
   }
 
-  async function deleteConfig(config: CommercialProposalConfig) {
-    if (!window.confirm(`Excluir a configuração "${config.name}"?`)) return;
+  function requestConfigDelete(config: CommercialProposalConfig) {
+    setConfirmationError(null);
+    setPendingConfirmation({ type: "delete-config", config });
+    setIsConfirmationOpen(true);
+  }
 
-    setDeleteError("");
+  async function confirmPendingAction() {
+    if (!pendingConfirmation) return;
     try {
-      await deleteMutation.mutateAsync(config.id);
-      if (editingId === config.id) cancelForm();
+      if (pendingConfirmation.type === "delete-config") {
+        await deleteMutation.mutateAsync(pendingConfirmation.config.id);
+        if (editingId === pendingConfirmation.config.id) cancelForm();
+      } else {
+        await archiveProspectingMutation.mutateAsync(pendingConfirmation.item.id);
+        if (prospectingEditingId === pendingConfirmation.item.id) cancelProspectingForm();
+      }
+      setIsConfirmationOpen(false);
     } catch (error) {
-      setDeleteError(getErrorMessage(error, "Não foi possível excluir a configuração."));
-  }
+      setConfirmationError(
+        getErrorMessage(
+          error,
+          pendingConfirmation.type === "delete-config"
+            ? "Não foi possível excluir a configuração."
+            : "Não foi possível arquivar a prospecção.",
+        ),
+      );
+      // Relança para o ConfirmationDialog continuar aberto com o erro.
+      throw error;
+    }
   }
 
-  function startProspectingCreate() {
+  function startProspectingCreate(client: ClientPickerOption) {
+    const isEligible = eligibleClientsQuery.data?.some((eligible) => eligible.id === client.id);
+    if (eligibleClientsQuery.data && !isEligible) {
+      setProspectingPickError(`${client.name} já tem uma prospecção, ativa ou arquivada.`);
+      return;
+    }
+    setProspectingPickError("");
     setIsCreatingProspecting(true);
     setProspectingEditingId(null);
-    setProspectingDraft(emptyProspectingDraft);
+    setProspectingDraft({ ...emptyProspectingDraft, client });
     setProspectingFormError("");
   }
 
@@ -292,7 +327,7 @@ export function CommercialCatalog() {
     setIsCreatingProspecting(false);
     setProspectingEditingId(item.id);
     setProspectingDraft({
-      client_id: item.client_id,
+      client: { id: item.client_id, name: getClientDisplayName(item.client) },
       status: item.status,
       status_date: item.status_date ? item.status_date.slice(0, 10) : "",
       description: item.description ?? "",
@@ -309,7 +344,7 @@ export function CommercialCatalog() {
 
   async function submitProspectingForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!prospectingEditingId && !prospectingDraft.client_id) {
+    if (!prospectingEditingId && !prospectingDraft.client) {
       setProspectingFormError("Selecione um cliente.");
       return;
     }
@@ -326,7 +361,7 @@ export function CommercialCatalog() {
         await updateProspectingMutation.mutateAsync({ id: prospectingEditingId, payload });
       } else {
         await createProspectingMutation.mutateAsync({
-          client_id: prospectingDraft.client_id,
+          client_id: prospectingDraft.client.id,
           ...payload,
         });
       }
@@ -346,24 +381,13 @@ export function CommercialCatalog() {
         aria-label={isEditing ? "Editar prospecção" : "Nova prospecção"}
       >
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_180px]">
-          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Cliente
-            <select
-              disabled={isEditing}
-              value={prospectingDraft.client_id}
-              onChange={(event) =>
-                setProspectingDraft((current) => ({ ...current, client_id: event.target.value }))
-              }
-              className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-            >
-              <option value="">Selecione um cliente</option>
-              {(prospectingClientsQuery.data ?? []).map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}{client.fantasy_name ? ` — ${client.fantasy_name}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Status
+          <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+            <span>Cliente</span>
+            <p className="mt-2 flex min-h-11 items-center rounded-lg border border-slate-300 bg-slate-50 px-3 text-base text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+              {prospectingDraft.client?.name ?? "Nenhum cliente selecionado"}
+            </p>
+          </div>
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Etapa
             <select
               value={prospectingDraft.status}
               onChange={(event) =>
@@ -377,7 +401,7 @@ export function CommercialCatalog() {
               {COMMERCIAL_PROSPECTING_STATUSES.map((status) => <option key={status}>{status}</option>)}
             </select>
           </label>
-          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Data do status
+          <label className="text-sm font-medium text-slate-800 dark:text-slate-100">Data da etapa
             <input
               type="date"
               value={prospectingDraft.status_date}
@@ -422,30 +446,19 @@ export function CommercialCatalog() {
     );
   }
 
-  async function archiveProspecting(item: CommercialProspecting) {
-    const clientName = item.client.fantasy_name || item.client.company_name || item.client.name;
-    if (!window.confirm(`Arquivar a prospecção de "${clientName}"? O histórico será preservado.`)) {
-      return;
-    }
-
-    setProspectingActionError("");
-    try {
-      await archiveProspectingMutation.mutateAsync(item.id);
-      if (prospectingEditingId === item.id) cancelProspectingForm();
-    } catch (error) {
-      setProspectingActionError(
-        getErrorMessage(error, "Não foi possível arquivar a prospecção."),
-      );
-    }
+  function requestProspectingArchive(item: CommercialProspecting) {
+    setConfirmationError(null);
+    setPendingConfirmation({ type: "archive-prospecting", item });
+    setIsConfirmationOpen(true);
   }
 
   if (accessLoading) {
-    return <div className="mx-auto max-w-[1200px] p-6 text-sm text-slate-500">Carregando acesso...</div>;
+    return <div className="mx-auto max-w-[1600px] p-6 text-sm text-slate-500">Carregando acesso...</div>;
   }
 
   if (!access.canView) {
     return (
-      <section className="mx-auto max-w-[1200px] rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+      <section className="mx-auto max-w-[1600px] rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
         Você não tem acesso ao módulo Comercial. Solicite a liberação ao administrador da organização.
       </section>
     );
@@ -453,7 +466,7 @@ export function CommercialCatalog() {
 
   return (
     <>
-      <div className="commercial-catalog mx-auto max-w-[1200px] space-y-8">
+      <div className="commercial-catalog mx-auto max-w-[1600px] space-y-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.14em] text-blue-600 dark:text-blue-300">Comercial</p>
@@ -505,9 +518,8 @@ export function CommercialCatalog() {
       ) : configsQuery.data?.length ? (
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900" aria-labelledby="commercial-catalog-title">
           <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700"><h2 id="commercial-catalog-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">Configurações cadastradas</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{configsQuery.data.length} {configsQuery.data.length === 1 ? "item" : "itens"}</p></div>
-          {deleteError ? <p className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300" role="alert"><CircleAlert className="h-4 w-4" aria-hidden="true" />{deleteError}</p> : null}
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
-            {configsQuery.data.map((config) => <div key={config.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{config.name}</p><p className="mt-1 text-sm tabular-nums text-slate-500 dark:text-slate-400">Valor base do contrato: {formatContractValue(config.contract_value)}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startEdit(config)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Excluir configuração ${config.name}`} onClick={() => void deleteConfig(config)} disabled={deleteMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/30"><Trash2 className="h-4 w-4" aria-hidden="true" />Excluir configuração</button></div> : null}</div>)}
+            {configsQuery.data.map((config) => <div key={config.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{config.name}</p><p className="mt-1 text-sm tabular-nums text-slate-500 dark:text-slate-400">Valor base do contrato: {formatContractValue(config.contract_value)}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startEdit(config)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Excluir configuração ${config.name}`} onClick={() => requestConfigDelete(config)} disabled={deleteMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/30"><Trash2 className="h-4 w-4" aria-hidden="true" />Excluir configuração</button></div> : null}</div>)}
           </div>
         </section>
       ) : (
@@ -518,10 +530,24 @@ export function CommercialCatalog() {
         <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700">
           <div>
             <h2 id="commercial-prospecting-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">Prospecção</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Acompanhe os status legados por cliente, com histórico auditável.</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Acompanhe em que etapa está cada cliente em prospecção.</p>
           </div>
-          {canEdit && prospectingEditingId === null ? <button ref={prospectingCreateTriggerRef} type="button" onClick={startProspectingCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"><Plus className="h-4 w-4" aria-hidden="true" />Nova prospecção</button> : null}
+          {canEdit && prospectingEditingId === null ? (
+            // O picker é o gatilho: seu overlay fixo não abre dentro do Dialog (translate + overflow).
+            <div ref={prospectingCreateTriggerRef}>
+              <ClientPickerModal
+                triggerLabel="Nova prospecção"
+                selectedClient={null}
+                onSelectClient={(client) => {
+                  if (client) startProspectingCreate(client);
+                }}
+                filters={{ legacyIntegrationStatusFilter: false }}
+              />
+            </div>
+          ) : null}
         </div>
+
+        {prospectingPickError ? <p className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300" role="alert"><CircleAlert className="h-4 w-4" aria-hidden="true" />{prospectingPickError}</p> : null}
 
         {prospectingEditingId !== null ? renderProspectingForm("edit") : null}
         <Dialog
@@ -534,16 +560,15 @@ export function CommercialCatalog() {
           preventClose={isSavingProspecting}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            prospectingCreateTriggerRef.current?.focus();
+            prospectingCreateTriggerRef.current?.querySelector("button")?.focus();
           }}
           bodyClassName="!px-0 !py-0"
         >
           {renderProspectingForm("create")}
         </Dialog>
 
-        {prospectingActionError ? <p className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300" role="alert">{prospectingActionError}</p> : null}
 
-        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{item.client.fantasy_name || item.client.company_name || item.client.name}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Arquivar prospecção ${item.client.fantasy_name || item.client.company_name || item.client.name}`} onClick={() => void archiveProspecting(item)} disabled={archiveProspectingMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-amber-200 px-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-900/60 dark:text-amber-300 dark:hover:bg-amber-950/30"><Archive className="h-4 w-4" aria-hidden="true" />Arquivar prospecção</button></div> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
+        {prospectingQuery.isLoading ? <div className="p-5 text-sm text-slate-500">Carregando prospecções...</div> : prospectingQuery.isError ? <div className="p-5 text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as prospecções.</div> : prospectingQuery.data?.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{prospectingQuery.data.map((item) => <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-900 dark:text-white">{getClientDisplayName(item.client)}</p><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.status}{item.description ? ` — ${item.description}` : ""}</p></div>{canEdit ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => startProspectingEdit(item)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" aria-hidden="true" />Editar</button><button type="button" aria-label={`Arquivar prospecção ${getClientDisplayName(item.client)}`} onClick={() => requestProspectingArchive(item)} disabled={archiveProspectingMutation.isPending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-amber-200 px-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-900/60 dark:text-amber-300 dark:hover:bg-amber-950/30"><Archive className="h-4 w-4" aria-hidden="true" />Arquivar prospecção</button></div> : null}</div>)}</div> : <div className="p-8 text-center text-sm text-slate-700 dark:text-slate-300">Nenhuma prospecção cadastrada.</div>}
       </section>
 
       <section
@@ -555,7 +580,7 @@ export function CommercialCatalog() {
             Cobrança de tarefas
           </h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Registre a decisão comercial, o pagamento e a descrição. A Integração receberá os efeitos por evento.
+            Registre se a tarefa foi contratada, a forma de pagamento e observações da cobrança.
           </p>
         </div>
 
@@ -574,7 +599,7 @@ export function CommercialCatalog() {
                 <form key={item.task_id} onSubmit={submitTaskBillingEdit} className="space-y-4 bg-blue-50/60 p-5 dark:bg-blue-950/20">
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-white">{item.task_name}</p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Status atual: {item.task_status}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Situação da tarefa: {item.task_status}</p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-3">
                     <label className="text-sm font-medium text-slate-800 dark:text-slate-100">
@@ -588,9 +613,10 @@ export function CommercialCatalog() {
                       </select>
                     </label>
                     <label className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                      Pagamento
+                      Forma de pagamento
                       <input
                         value={taskBillingDraft.payment}
+                        placeholder="Ex.: À vista, boleto em 3x, cartão de crédito"
                         onChange={(event) => setTaskBillingDraft((current) => ({ ...current, payment: event.target.value }))}
                         className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                         maxLength={255}
@@ -623,7 +649,7 @@ export function CommercialCatalog() {
                     <p className="font-semibold text-slate-900 dark:text-white">{item.task_name}</p>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.task_status} · {item.billing}</p>
                     <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-                      {item.hiring_status ?? "Sem decisão comercial"} · {item.payment ?? "Pagamento não informado"}
+                      {item.hiring_status ?? "Contratação não definida"} · {item.payment ?? "Pagamento não informado"}
                     </p>
                     {item.billing_description ? <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{item.billing_description}</p> : null}
                   </div>
@@ -637,6 +663,28 @@ export function CommercialCatalog() {
         )}
       </section>
       </div>
+      <ConfirmationDialog
+        open={isConfirmationOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Mantém pendingConfirmation para o texto não trocar durante a animação de saída.
+            setIsConfirmationOpen(false);
+            setConfirmationError(null);
+          }
+        }}
+        title={pendingConfirmation?.type === "archive-prospecting" ? "Arquivar prospecção" : "Excluir configuração"}
+        description={
+          pendingConfirmation?.type === "archive-prospecting"
+            ? `Arquivar a prospecção de "${getClientDisplayName(pendingConfirmation.item.client)}"? Ela sai da lista, e o histórico é preservado.`
+            : `Excluir a configuração "${pendingConfirmation?.config.name ?? ""}"? Ela deixa de aparecer nas propostas.`
+        }
+        onConfirm={confirmPendingAction}
+        isConfirming={deleteMutation.isPending || archiveProspectingMutation.isPending}
+        errorMessage={confirmationError}
+        confirmLabel={pendingConfirmation?.type === "archive-prospecting" ? "Arquivar" : "Excluir"}
+        cancelLabel="Cancelar"
+        variant={pendingConfirmation?.type === "archive-prospecting" ? "neutral" : "destructive"}
+      />
     </>
   );
 }

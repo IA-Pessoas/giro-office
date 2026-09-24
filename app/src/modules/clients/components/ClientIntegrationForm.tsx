@@ -130,7 +130,9 @@ export function ClientIntegrationForm({
           {/* Espaço reservado: o aviso da consulta chega depois e não pode empurrar os campos. */}
           <span className="block min-h-12 text-xs" aria-live="polite">
             {cnpjLookupStatus === "loading" ? (
-              <span className="text-slate-500 dark:text-slate-400">Consultando dados oficiais...</span>
+              <span className="text-slate-500 dark:text-slate-400">
+                Consultando dados oficiais...
+              </span>
             ) : cnpjLookupStatus === "unavailable" ? (
               <span className="line-clamp-3 text-amber-700 dark:text-amber-300">
                 {typeof cnpjLookupReason === "string" ? `${cnpjLookupReason} ` : null}
@@ -141,18 +143,20 @@ export function ClientIntegrationForm({
           </span>
         </label>
 
-        <label className="space-y-1.5">
-          <RequiredFieldLabel className={labelClassName} required>
-            Nome / Apelido
-          </RequiredFieldLabel>
-          <input
-            name="name"
-            value={values.name}
-            onChange={onChange}
-            disabled={disabled}
-            className={clientTextFieldClassName}
-          />
-        </label>
+        {values.type === "PF" ? (
+          <label className="space-y-1.5">
+            <RequiredFieldLabel className={labelClassName} required>
+              Nome / Apelido
+            </RequiredFieldLabel>
+            <input
+              name="name"
+              value={values.name}
+              onChange={onChange}
+              disabled={disabled}
+              className={clientTextFieldClassName}
+            />
+          </label>
+        ) : null}
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Razão Social</span>

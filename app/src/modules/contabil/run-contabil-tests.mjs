@@ -148,18 +148,17 @@ await (async () => {
     );
   });
 
-  await runTest("contabil page preserva o seletor de cliente da organização", () => {
-    const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
+  await runTest("carteira contábil exige seleção de empresas e checklist antes do dashboard", () => {
+    const page = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
+    const portfolio = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
 
-    assert.match(source, /ClientPickerModal/);
-    assert.match(source, /headerAction=\{/);
-    assert.doesNotMatch(source, /clientPickerContent=/);
-    assert.match(source, /status:\s*"Ativo"/);
-    assert.match(source, /legacyIntegrationStatusFilter:\s*false/);
-    assert.doesNotMatch(source, /ref:\s*"deps"/);
-    assert.doesNotMatch(source, /Departamento contabil/);
-    assert.doesNotMatch(source, /useClients\(/);
-    assert.doesNotMatch(source, /page:\s*1/);
+    assert.doesNotMatch(page, /ClientPickerModal/);
+    assert.match(page, /<ContabilShell canEdit=\{canEditContabil\} \/>/);
+    assert.match(portfolio, /step === "companies"/);
+    assert.match(portfolio, /step === "checklist"/);
+    assert.match(portfolio, /step === "dashboard"/);
+    assert.match(portfolio, /disabled=\{selectedClientIds\.length === 0\}/);
+    assert.match(portfolio, /disabled=\{selectedFields\.length === 0\}/);
   });
 
   await runTest("contabil endpoints use the expected contract", () => {

@@ -211,10 +211,58 @@ describe("gateway Worker: normalização de path", () => {
   });
 });
 
+describe("gateway Worker: limite de tentativas de login (#1344)", () => {
+  function setupWithLimiter(success: boolean) {
+    const limit = vi.fn(async () => ({ success }));
+    const userService = { fetch: vi.fn(async () => Response.json({ ok: true })) };
+    const app = createGatewayWorkerApp({
+      env: {
+        JWT_SECRET: SECRET,
+        INTERNAL_SERVICE_TOKEN: TOKEN,
+        AUDIT_SERVICE_TOKEN: "gateway-audit-token",
+        AUDIT_SERVICE: { fetch: vi.fn(async () => Response.json({ ok: true })) },
+        USER_SERVICE: userService,
+        LOGIN_RATE_LIMITER: { limit },
+      } as unknown as GatewayWorkerEnv,
+    });
+    return { app, limit, userService };
+  }
+
+  it.each([
+    ["POST", "/platform/session"],
+    ["POST", "/user/session"],
+    ["POST", "/user/password-reset/confirm"],
+  ] as const)("%s %s responde 429 quando o limite estoura", async (method, path) => {
+    const { app, limit, userService } = setupWithLimiter(false);
+
+    const response = await app.request(`https://gateway.test${path}`, {
+      method,
+      headers: { "cf-connecting-ip": "203.0.113.7" },
+    });
+
+    expect(response.status).toBe(429);
+    expect(limit).toHaveBeenCalledWith({ key: `${path}:203.0.113.7` });
+    expect(userService.fetch).not.toHaveBeenCalled();
+  });
+
+  it("deixa passar dentro do limite", async () => {
+    const { app, userService } = setupWithLimiter(true);
+
+    const response = await app.request("https://gateway.test/platform/session", {
+      method: "POST",
+      headers: { "cf-connecting-ip": "203.0.113.7" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(userService.fetch).toHaveBeenCalledOnce();
+  });
+});
+
 describe("gateway Worker: fluxo de sessão", () => {
   it.each([
     ["POST", "/user/session"],
     ["POST", "/user/start-config"],
+    ["POST", "/user/password-reset/confirm"],
   ] as const)("%s %s é pública e não exige JWT", async (method, path) => {
     const { app, bindings, forwarded } = setup();
     const response = await app.request(`https://gateway.test${path}`, { method });

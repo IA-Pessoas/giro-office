@@ -30,14 +30,29 @@ function positiveInteger(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+// O code diz ao wizard que a extração não está configurada (não gasta tentativa e desabilita o
+// botão); o motivo fica só no log.
+export const AI_EXTRACTION_UNAVAILABLE_CODE = "AI_EXTRACTION_UNAVAILABLE";
+export const AI_EXTRACTION_UNAVAILABLE_MESSAGE = "Extração por IA indisponível no momento.";
+
+function extractionUnavailable(reason: string): never {
+  console.error(`Extração de tarefas indisponível: ${reason}`);
+  throw new ServiceError(
+    503,
+    AI_EXTRACTION_UNAVAILABLE_MESSAGE,
+    undefined,
+    AI_EXTRACTION_UNAVAILABLE_CODE,
+  );
+}
+
 /** No Node, `AI_EXTRACTION_MODE=fake` é recusado em produção; aqui o fake só vem explícito. */
 function extractionProvider(env: TaskWorkerEnv) {
   const mode = (env.AI_EXTRACTION_MODE ?? "openai") as AiTaskExtractionMode;
   if (!AI_TASK_EXTRACTION_MODES.includes(mode)) {
-    throw new ServiceError(503, "Extração de tarefas indisponível: AI_EXTRACTION_MODE inválido.");
+    extractionUnavailable("AI_EXTRACTION_MODE inválido.");
   }
   if (mode === "openai" && !env.OPENAI_API_KEY) {
-    throw new ServiceError(503, "Extração de tarefas indisponível: configure OPENAI_API_KEY.");
+    extractionUnavailable("configure o secret OPENAI_API_KEY.");
   }
   return createAiTaskExtractionProvider({
     mode,

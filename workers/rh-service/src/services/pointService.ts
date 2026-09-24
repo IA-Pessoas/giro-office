@@ -1,5 +1,6 @@
 import {
   DEFAULT_ORGANIZATION_TIMEZONE,
+  holidayDayBounds,
   normalizeOrganizationDate,
   organizationDateKey,
   organizationDayBounds,
@@ -376,12 +377,12 @@ class PointService {
         throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
       }
 
-      const { start: dayStart, end: dayEnd } = organizationDayBounds(point.clock_in, timezone);
+      const holidayDay = holidayDayBounds(point.clock_in, timezone);
       const organizationDay = normalizeOrganizationDate(point.clock_in, timezone);
       const holiday = await db.holidays.findFirst({
         where: {
           organization_id: organizationId,
-          date: { gte: dayStart, lte: dayEnd },
+          date: { gte: holidayDay.start, lte: holidayDay.end },
         },
         select: { id: true },
       });

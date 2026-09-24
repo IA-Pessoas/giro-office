@@ -10,6 +10,10 @@ const publicRoutes = new Map<string, PublicRoute>([
   ["POST /user/session", { reason: "Cria uma sessão sem contexto autenticado." }],
   ["POST /platform/session", { reason: "Cria uma sessão de plataforma sem contexto autenticado." }],
   ["POST /user/start-config", { reason: "Inicializa a configuração sem contexto autenticado." }],
+  [
+    "POST /user/password-reset/confirm",
+    { reason: "Define a senha pelo link de uso único enviado por e-mail." },
+  ],
 ]);
 
 const socketIoPublicRoute: PublicRoute = {

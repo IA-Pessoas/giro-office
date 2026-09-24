@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import Head from "next/head";
+import { isAxiosError } from "axios";
 import { Lock, ShieldCheck } from "lucide-react";
 
 import { canSSRGuest } from "@modules/auth";
@@ -20,8 +21,13 @@ export default function SuperAdminLoginPage() {
 
     try {
       await signInPlatform({ email, password });
-    } catch {
-      setError("E-mail ou senha inválidos.");
+    } catch (loginError) {
+      const tooManyAttempts = isAxiosError(loginError) && loginError.response?.status === 429;
+      setError(
+        tooManyAttempts
+          ? "Muitas tentativas. Aguarde um minuto e tente novamente."
+          : "E-mail ou senha inválidos.",
+      );
     } finally {
       setLoading(false);
     }

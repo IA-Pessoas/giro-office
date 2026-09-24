@@ -583,4 +583,26 @@ describe("ProjectPlanService", () => {
 
     expect(taskCrud.calls).toEqual([]);
   });
+
+  it("hirePlan bloqueia projeto aguardando liberação Comercial", async () => {
+    const prisma = createBasePrisma();
+    prisma.projectPlan.findFirst = async () => ({ id: PLAN_ID });
+    prisma.project.findFirst = async () => ({
+      client_id: CLIENT_ID,
+      status: "Aguardando liberação do Comercial",
+    });
+    const taskCrud = new TaskCrudServiceStub();
+    const service = new ProjectPlanService(taskCrud, prisma, createAudit());
+
+    await expect(
+      service.hirePlan({
+        user_id: USER_ID,
+        organization_id: ORG_ID,
+        ...ADMIN_AUTH,
+        project_id: PROJECT_ID,
+        plan_id: PLAN_ID,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(taskCrud.calls).toEqual([]);
+  });
 });

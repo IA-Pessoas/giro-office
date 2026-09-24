@@ -35,6 +35,9 @@ export function isOrganizationOwner(subject?: number | PermissionCarrier): boole
   return false;
 }
 
+/** Papel exibido para o owner; ele ignora os níveis por módulo (ADR 0002). */
+export const OWNER_ROLE_LABEL = "Owner";
+
 export function canCreateOrganizationOwner(subject?: number | PermissionCarrier): boolean {
   return isOrganizationOwner(subject);
 }

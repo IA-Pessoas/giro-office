@@ -60,7 +60,6 @@ export interface PlatformOrganizationUser {
 export interface UpdatePlatformOrganizationUserPayload {
   name?: string;
   login?: string;
-  password?: string;
   department_id?: string;
   permission?: number;
   status?: "active" | "inactive";

@@ -32,6 +32,7 @@ export function createTaskAttachmentStorage(
 
   function client() {
     if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("task attachments: SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY ausentes");
       throw new ServiceError(503, UNAVAILABLE);
     }
     return createSupabaseStorageClient(
@@ -45,9 +46,13 @@ export function createTaskAttachmentStorage(
       .getBucket(bucket)
       .then(
         ({ public: isPublic }) => {
-          if (isPublic) throw new ServiceError(503, UNAVAILABLE);
+          if (isPublic) {
+            console.error("task attachments: bucket público recusado", bucket);
+            throw new ServiceError(503, UNAVAILABLE);
+          }
         },
         (error: unknown) => {
+          console.error("task attachments: bucket inacessível", bucket, error);
           throw new ServiceError(503, UNAVAILABLE, error);
         },
       );

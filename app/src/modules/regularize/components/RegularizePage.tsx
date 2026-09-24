@@ -34,6 +34,7 @@ import {
 } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { PaginationControls } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { useDebouncedValue } from "@shared/hooks";
 import { getLastPage } from "@shared/pagination/pagination";
@@ -2025,7 +2026,10 @@ export function RegularizePage() {
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
                       <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
+                      <td className="px-4 py-3">
+                        {formatDocument(item.cpf_cnpj)}
+                        <DocumentIssueBadge value={item.cpf_cnpj} />
+                      </td>
                       <td className="px-4 py-3">
                         <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
                       </td>
@@ -2140,7 +2144,10 @@ export function RegularizePage() {
                     >
                       <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
                       <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
+                      <td className="px-4 py-3">
+                        {formatDocument(item.cpf_cnpj)}
+                        <DocumentIssueBadge value={item.cpf_cnpj} />
+                      </td>
                       <td className="px-4 py-3">
                         <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
                       </td>
@@ -2402,7 +2409,10 @@ export function RegularizePage() {
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3">{formatText(item.code)}</td>
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                      <td className="px-4 py-3">{formatDocument(item.cpf)}</td>
+                      <td className="px-4 py-3">
+                        {formatDocument(item.cpf)}
+                        <DocumentIssueBadge value={item.cpf} />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <TableActionButton
@@ -2451,7 +2461,15 @@ export function RegularizePage() {
               ) : clientPfDetailQuery.data ? (
                 <>
                   <FieldLine label="Nome" value={formatText(clientPfDetailQuery.data.name)} />
-                  <FieldLine label="CPF" value={formatDocument(clientPfDetailQuery.data.cpf)} />
+                  <FieldLine
+                    label="CPF"
+                    value={
+                      <>
+                        {formatDocument(clientPfDetailQuery.data.cpf)}
+                        <DocumentIssueBadge value={clientPfDetailQuery.data.cpf} />
+                      </>
+                    }
+                  />
                   <FieldLine label="Cidade" value={formatText(clientPfDetailQuery.data.city)} />
                   <FieldLine label="UF" value={formatText(clientPfDetailQuery.data.state)} />
                   <FieldLine label="Status" value={formatText(clientPfDetailQuery.data.status)} />
@@ -2877,7 +2895,10 @@ export function RegularizePage() {
                     return (
                       <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                         <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                        <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
+                        <td className="px-4 py-3">
+                          {formatDocument(item.cpf_cnpj)}
+                          <DocumentIssueBadge value={item.cpf_cnpj} />
+                        </td>
                         <td className="px-4 py-3">
                           {item.city ? (
                             formatText(item.city)

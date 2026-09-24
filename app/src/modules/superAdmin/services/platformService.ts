@@ -104,6 +104,12 @@ export const platformService = {
     return unwrapData<PlatformUsersListResponse["users"][number]>(response);
   },
 
+  async sendPasswordReset(organizationId: string, userId: string): Promise<void> {
+    await api.post(
+      `/platform/organizations/${organizationId}/users/${userId}/password-reset`,
+    );
+  },
+
   async startImpersonation(organizationId: string, userId: string): Promise<void> {
     await api.post(
       `/platform/organizations/${organizationId}/users/${userId}/impersonate`,

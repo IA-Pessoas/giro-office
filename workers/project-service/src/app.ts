@@ -69,9 +69,17 @@ type ProjectPrisma = {
     delete(args: Record<string, unknown>): Promise<ProjectRow>;
   };
   client: {
-    findFirst(
-      args: Record<string, unknown>,
-    ): Promise<({ id: string } & Record<string, unknown>) | null>;
+    findFirst(args: {
+      where: { id: string; organization_id: string };
+      select: { id: true; type_registration: true; prospecting_status: true };
+    }): Promise<{
+      id: string;
+      type_registration: string;
+      prospecting_status: string;
+    } | null>;
+    findFirst(args: {
+      where: Record<string, unknown>;
+    }): Promise<({ id: string; service_unique?: boolean | null } & Record<string, unknown>) | null>;
     update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
   };
   task: {

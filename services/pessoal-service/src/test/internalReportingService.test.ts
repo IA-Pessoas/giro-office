@@ -1,5 +1,12 @@
 import "./envBootstrap.js";
 
+import {
+  MAX_REPORTING_QUERY_BYTES,
+  MAX_REPORTING_QUERY_ROWS,
+  REPORTING_QUERY_BYTE_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
+} from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { InternalReportingService } from "../reporting/internalReportingService.js";
@@ -7,6 +14,42 @@ import { InternalReportingService } from "../reporting/internalReportingService.
 const organizationId = "00000000-0000-4000-8000-000000000002";
 
 describe("pessoal internal reporting service", () => {
+  it.each([
+    100, 101, 102,
+  ])("extrai todos os %i registros ao redor do limite antigo", async (count) => {
+    const records = Array.from({ length: count }, (_, index) => ({
+      id: `row-${String(index).padStart(3, "0")}`,
+      type: `value-${index}`,
+    }));
+    const findMany = vi.fn().mockResolvedValue(records);
+    const transactionClient = { lddPessoal: { findMany } };
+    const transaction = vi.fn(async (read: (client: unknown) => Promise<unknown>) =>
+      read(transactionClient),
+    );
+    const service = new InternalReportingService({
+      ...transactionClient,
+      $transaction: transaction,
+    } as never);
+
+    const result = await service.extract({
+      organizationId,
+      source: "pessoal.ldd",
+      fields: ["type"],
+      limit: 1000,
+    });
+
+    expect(result.rows).toHaveLength(count);
+    expect(result.rows[0]).toEqual({ type: "value-0" });
+    expect(result.rows[count - 1]).toEqual({ type: `value-${count - 1}` });
+    expect(result.reachedLimit).toBe(false);
+    expect(findMany).toHaveBeenCalledOnce();
+    expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "RepeatableRead",
+      maxWait: 5000,
+      timeout: 30000,
+    });
+  });
+
   it.each([
     ["pessoal.ldd", "type"],
     ["pessoal.obligations", "competence"],
@@ -520,5 +563,74 @@ describe("pessoal internal reporting service", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
     expect(situationsFindMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["abaixo do limite", MAX_REPORTING_QUERY_ROWS - 1, false],
+    ["no limite", MAX_REPORTING_QUERY_ROWS, false],
+    ["acima do limite", MAX_REPORTING_QUERY_ROWS + 1, true],
+  ] as const)("aplica o limite global de linhas no snapshot sem query %s", async (_, count, overLimit) => {
+    const findMany = vi
+      .fn()
+      .mockImplementation(
+        async (input: { cursor?: { id: string }; skip?: number; take: number }) => {
+          const cursorIndex = input.cursor ? Number(input.cursor.id.slice(4)) : -1;
+          const start = Math.max(0, cursorIndex + (input.skip ?? 1));
+          const pageLength = Math.max(0, Math.min(input.take, count - start));
+          return Array.from({ length: pageLength }, (_, index) => ({
+            id: `row-${String(start + index).padStart(5, "0")}`,
+            type: "FGTS",
+          }));
+        },
+      );
+    const transaction = vi.fn(async (read: (client: unknown) => Promise<unknown>) =>
+      read({ lddPessoal: { findMany } }),
+    );
+    const service = new InternalReportingService({
+      lddPessoal: { findMany },
+      $transaction: transaction,
+    } as never);
+
+    const extraction = service.extract({
+      organizationId,
+      source: "pessoal.ldd",
+      fields: ["type"],
+      limit: count,
+    });
+    if (overLimit) {
+      await expect(
+        extraction.then(
+          () => "resolved",
+          (error: unknown) => error,
+        ),
+      ).resolves.toMatchObject({
+        statusCode: 422,
+        code: REPORTING_QUERY_ROW_LIMIT_CODE,
+        message: REPORTING_QUERY_ROW_LIMIT_MESSAGE,
+      });
+      expect(findMany).toHaveBeenCalledTimes(51);
+    } else {
+      const result = await extraction;
+      expect(result.rows).toHaveLength(count);
+      expect(result.reachedLimit).toBe(false);
+    }
+  });
+
+  it("retorna erro acionável quando o snapshot sem query excede 20 MiB", async () => {
+    const findMany = vi.fn().mockResolvedValue([{ type: "x".repeat(MAX_REPORTING_QUERY_BYTES) }]);
+    const service = new InternalReportingService({ lddPessoal: { findMany } } as never);
+
+    const extraction = service.extract({
+      organizationId,
+      source: "pessoal.ldd",
+      fields: ["type"],
+      limit: 1,
+    });
+    await expect(
+      extraction.then(
+        () => "resolved",
+        (error: unknown) => error,
+      ),
+    ).resolves.toMatchObject({ statusCode: 422, code: REPORTING_QUERY_BYTE_LIMIT_CODE });
   });
 });

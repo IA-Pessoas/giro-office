@@ -9,6 +9,8 @@ import type { Prisma } from "../generated/prisma/client.js";
 import { prismaClient } from "../integrations/prisma.js";
 import {
   DEFAULT_ORGANIZATION_TIMEZONE,
+  holidayDateKey,
+  holidayDayBounds,
   organizationDateKey,
   organizationDayBounds,
 } from "../utils/rhDateUtils.js";
@@ -289,7 +291,10 @@ class TimeSheetService {
       prismaClient.holidays.findMany({
         where: {
           organization_id: input.organization_id,
-          date: { gte: periodStart, lte: periodEnd },
+          date: {
+            gte: holidayDayBounds(input.start_time, timezone).start,
+            lte: holidayDayBounds(input.end_time, timezone).end,
+          },
         },
         select: { date: true },
       }),
@@ -301,9 +306,7 @@ class TimeSheetService {
       if (!pointsByDay.has(key)) pointsByDay.set(key, point);
     }
 
-    const holidayKeys = new Set(
-      holidays.map((holiday) => organizationDateKey(holiday.date, timezone)),
-    );
+    const holidayKeys = new Set(holidays.map((holiday) => holidayDateKey(holiday.date)));
     const expectedPerDay = expectedMinutesFromPointConfig(config);
     const days: TimeSheetDaySnapshot[] = [];
     const totals: TimeSheetTotals = {

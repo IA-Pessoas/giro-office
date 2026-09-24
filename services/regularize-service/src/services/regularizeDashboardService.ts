@@ -1,4 +1,5 @@
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { OPERATIONAL_PROCESS_FILTER } from "../schemas/status.schemas.js";
 
 export interface RegularizeDashboardProcess {
   id: string;
@@ -50,11 +51,12 @@ export class RegularizeDashboardService {
       this.prisma.process.count({
         where: {
           organization_id: organizationId,
+          ...OPERATIONAL_PROCESS_FILTER,
           status: { notIn: [...CLOSED_PROCESS_STATUSES] },
         },
       }),
       this.prisma.process.findMany({
-        where: { organization_id: organizationId },
+        where: { organization_id: organizationId, ...OPERATIONAL_PROCESS_FILTER },
         select: {
           id: true,
           process_type: true,
@@ -69,7 +71,8 @@ export class RegularizeDashboardService {
             select: { name: true, cpf_cnpj: true, organization_id: true },
           },
         },
-        orderBy: { entry_date: "desc" },
+        // Processo migrado sem data de entrada não pode ocupar o topo dos recentes.
+        orderBy: { entry_date: { sort: "desc", nulls: "last" } },
         take: 6,
       }),
       this.prisma.license.count({

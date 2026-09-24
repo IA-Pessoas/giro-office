@@ -24,6 +24,7 @@ import {
 import { useModuleAccess } from "@modules/auth";
 import { ConfirmationDialog, PaginationControls } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { formatCnpjInput, formatCpfInput } from "@shared/utils/inputFormatting";
 import {
   DEFAULT_CERTIFICATE_PAGE,
@@ -1557,8 +1558,15 @@ export function CertificatesWorkspace() {
                         <td className={CERTIFICATE_TABLE_NAME_CELL_CLASSNAME}>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.cnpj}</p>
+                          <DocumentIssueBadge value={item.cnpj} />
                         </td>
-                        <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>{item.responsible}</td>
+                        <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>
+                          {item.responsible}
+                          {/* Responsavel e nome, nao documento: so a mascara vira pendencia. */}
+                          {item.responsible.includes("*") ? (
+                            <DocumentIssueBadge value={item.responsible} />
+                          ) : null}
+                        </td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>{item.model}</td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>
                           <div className="space-y-1">
@@ -1689,10 +1697,12 @@ export function CertificatesWorkspace() {
                         <td className={CERTIFICATE_TABLE_NAME_CELL_CLASSNAME}>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.cpf}</p>
+                          <DocumentIssueBadge value={item.cpf} />
                         </td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>
                           <p>{item.enterprise || "-"}</p>
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.cnpj || "-"}</p>
+                          <DocumentIssueBadge value={item.cnpj} />
                         </td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>{item.model}</td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>

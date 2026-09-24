@@ -92,6 +92,12 @@ export function FiscalNcmSection({
     setPage(1);
   }
 
+  function showCreatedNcm(ncmCode: string) {
+    setFilterValue(ncmCode);
+    setSearchCodes([ncmCode]);
+    setPage(1);
+  }
+
   function handleDeleteDialogOpenChange(open: boolean) {
     if (!open && !deleteMutation.isPending) {
       setDeleteTarget(null);
@@ -158,6 +164,7 @@ export function FiscalNcmSection({
               mode={panelIntent.mode}
               ncmId={panelIntent.mode === "edit" ? panelIntent.ncmId : undefined}
               onClose={() => setPanelIntent(null)}
+              onCreated={showCreatedNcm}
               showHeader={false}
               bare
             />

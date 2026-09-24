@@ -2,8 +2,11 @@ import { Buffer } from "node:buffer";
 import {
   executeReportingQuery,
   MAX_REPORTING_QUERY_BYTES,
+  MAX_REPORTING_QUERY_ROWS,
   REPORTING_QUERY_BYTE_LIMIT_CODE,
   REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
+  REPORTING_QUERY_ROW_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
   type ReportingQuery,
   ServiceError,
   withReportingSnapshot,
@@ -56,6 +59,15 @@ function throwSnapshotByteLimit(): never {
     REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
     undefined,
     REPORTING_QUERY_BYTE_LIMIT_CODE,
+  );
+}
+
+function throwSnapshotRowLimit(): never {
+  throw new ServiceError(
+    422,
+    REPORTING_QUERY_ROW_LIMIT_MESSAGE,
+    undefined,
+    REPORTING_QUERY_ROW_LIMIT_CODE,
   );
 }
 
@@ -118,6 +130,9 @@ async function readReportingRows(
     if (!page.length) break;
     const selected = page.slice(0, requested - rows.length);
     for (const row of selected) {
+      if (!options.cursorPage && rows.length >= MAX_REPORTING_QUERY_ROWS) {
+        throwSnapshotRowLimit();
+      }
       if (rows.length < limit) {
         const projected = projectRow(row, fields);
         byteSize += (rows.length ? 1 : 0) + Buffer.byteLength(JSON.stringify(projected), "utf8");

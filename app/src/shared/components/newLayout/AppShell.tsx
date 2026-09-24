@@ -177,6 +177,8 @@ const MODULE_ACCESS_LOADING_MESSAGE = "Carregando acesso ao módulo.";
 const MODULE_NAV_LOADING_MESSAGE = "Carregando módulos";
 const NOTIFICATIONS_PANEL_ID = "app-shell-notifications-panel";
 const USER_MENU_PANEL_ID = "app-shell-user-menu";
+// O assistente ainda não tem backend de IA; fica oculto fora de ambientes de teste (#1339).
+const AI_ASSISTANT_ENABLED = process.env.NEXT_PUBLIC_AI_ASSISTANT_ENABLED === "true";
 
 function formatAppShellNotificationTime(value: string): string {
   const date = new Date(value);
@@ -935,7 +937,7 @@ export function AppShell({
                     Administração da plataforma
                   </p>
                 </div>
-              ) : (
+              ) : AI_ASSISTANT_ENABLED ? (
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-slate-400" />
                   <input
@@ -965,7 +967,7 @@ export function AppShell({
                     <Bot className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
 
             <div className="flex items-center gap-3">
@@ -1149,6 +1151,7 @@ export function AppShell({
         <main className={`flex-1 p-4 lg:p-8 ${SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME}`}>{mainContent}</main>
       </div>
 
+      {AI_ASSISTANT_ENABLED ? (
       <DialogPrimitive.Root open={showAiChat} onOpenChange={setShowAiChat}>
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/40" />
@@ -1255,6 +1258,7 @@ export function AppShell({
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
+      ) : null}
     </div>
   );
 }

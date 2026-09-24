@@ -11,7 +11,8 @@ import {
 import { Prisma } from "../generated/prisma/client.js";
 import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import { hashPassword } from "../security/passwordHashService.js";
+import { ownPasswordPolicyError } from "../schemas/user.schemas.js";
+import { hashPassword, verifyPassword } from "../security/passwordHashService.js";
 import { PermissionService } from "./permissionService.js";
 
 const USER_PUBLIC_SELECT = {
@@ -347,6 +348,26 @@ class UserManagementService {
     }
 
     return normalizeUserOrganization(user, organizationId);
+  }
+
+  /** Troca da própria senha: prova a senha atual e aplica a política mínima (#1341). */
+  async assertOwnPasswordChange(
+    id: string,
+    organizationId: string,
+    currentPassword: string | undefined,
+    nextPassword: string,
+  ): Promise<void> {
+    if (currentPassword === undefined) {
+      throw new ServiceError(400, "Informe a senha atual para trocar a senha.");
+    }
+    const user = await prismaClient.user.findFirst({
+      where: userOrganizationWhere(id, organizationId),
+      select: { password: true },
+    });
+    const { valid } = await verifyPassword(currentPassword, user?.password ?? "");
+    if (!valid) throw new ServiceError(403, "Senha atual incorreta.");
+    const policyError = ownPasswordPolicyError(currentPassword, nextPassword);
+    if (policyError) throw new ServiceError(400, policyError);
   }
 
   async getByIdWithModules(id: string, organizationId: string): Promise<UserSessionRow> {

@@ -398,6 +398,12 @@ async function runBrowserProof() {
     },
   ]);
   const page = await context.newPage();
+  await page.addInitScript(() => {
+    Object.defineProperty(Crypto.prototype, "randomUUID", {
+      configurable: true,
+      value: undefined,
+    });
+  });
   const previewRequests = [];
   const wizardRequests = [];
   const updateRequests = [];
@@ -437,6 +443,11 @@ async function runBrowserProof() {
     await expect(page.getByRole("button", { name: "Novo projeto" })).toBeDisabled();
 
     await page.goto(`/projects?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
+    assert.equal(
+      await page.evaluate(() => typeof crypto.randomUUID),
+      "undefined",
+      "O smoke deve exercitar o navegador sem crypto.randomUUID.",
+    );
     await expect(page.getByRole("heading", { name: "Projetos", level: 1 })).toBeVisible();
     await page.getByRole("button", { name: "Editar" }).first().click();
     const legacyEditDialog = page.getByRole("dialog", { name: "Editar projeto" });

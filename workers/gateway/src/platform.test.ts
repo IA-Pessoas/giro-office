@@ -156,6 +156,7 @@ describe("gateway Worker: superfície /platform", () => {
     ["PATCH", "/platform/organizations/org-9/users/u-1"],
     ["DELETE", "/platform/organizations/org-9/users/u-1"],
     ["POST", "/platform/organizations/org-9/users/u-1/reactivate"],
+    ["POST", "/platform/organizations/org-9/users/u-1/password-reset"],
     ["POST", "/platform/organizations/org-9/ownership-transfer"],
   ] as const)("%s %s vai para o user-service", async (method, path) => {
     const { app, bindings } = setup();
