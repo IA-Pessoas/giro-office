@@ -13,6 +13,7 @@ import {
 import { toast } from "react-toastify";
 
 import { Dialog, PaginationControls } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { useDebouncedValue } from "@shared/hooks";
 import { getLastPage } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
@@ -307,6 +308,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         {formatCPF_CNPJ(union.cnpj) || "-"}
+                        <DocumentIssueBadge value={union.cnpj} />
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         {formatUnionDate(union.base_date)}
