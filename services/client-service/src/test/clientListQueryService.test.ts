@@ -49,18 +49,20 @@ describe("mergeClientListSearchWhere", () => {
   });
 
   it("normaliza pontuação na busca por CPF/CNPJ", () => {
-    expect(mergeClientListSearchWhere({}, "12.345.678/0001-95")).toEqual({
-      AND: [
-        {},
-        {
-          OR: [
-            { name: { contains: "12.345.678/0001-95", mode: "insensitive" } },
-            { company_name: { contains: "12.345.678/0001-95", mode: "insensitive" } },
-            { fantasy_name: { contains: "12.345.678/0001-95", mode: "insensitive" } },
-            { cpf_cnpj: { contains: "12345678000195", mode: "insensitive" } },
-          ],
-        },
-      ],
-    });
+    for (const search of ["12.345.678/0001-95", "12345678000195"]) {
+      expect(mergeClientListSearchWhere({}, search)).toEqual({
+        AND: [
+          {},
+          {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { company_name: { contains: search, mode: "insensitive" } },
+              { fantasy_name: { contains: search, mode: "insensitive" } },
+              { cpf_cnpj: { contains: "12345678000195", mode: "insensitive" } },
+            ],
+          },
+        ],
+      });
+    }
   });
 });
