@@ -17,12 +17,17 @@ liga cada flag quando o cliente tem ao menos um registro em:
 | --- | --- |
 | `contabil` | `contabil.control`, `contabil.relationship`, `contabil.responsibles`; triagem (`configs`, `monthly`, `responsibles`) com `type = 'CONTABIL'` |
 | `fiscal` | triagem (`configs`, `monthly`, `responsibles`) com `type = 'FISCAL'` |
-| `pessoal` | `pessoal.ldd`, `pessoal.obrigations`, `pessoal.situations`, `pessoal.passwords`, `pessoal.payroll` |
+| `pessoal` | `pessoal.ldd`, `pessoal.obrigations`, `pessoal.situations`, `pessoal.payroll` |
 
-- Só liga flag (`NULL`/`false` para `true`); nunca desliga. É idempotente.
-- Não olha a data da evidência: um cliente que saiu do serviço mas ainda tem registro antigo
-  também é ligado. O relatório mostra o status do cliente e as fontes, para o negócio
-  desligar o que não for serviço vigente.
+- Só liga flag (`NULL`/`false` para `true`) e nunca desliga. É idempotente.
+- Só liga em cliente `Ativo`. A carteira não filtra status, então ligar um inativo sem
+  `competence_output` o faria aparecer nela. Inativos com evidência entram no relatório como
+  `liga? = f`.
+- `pessoal.passwords` não conta como evidência: guarda credenciais de órgãos, que um cliente só
+  contábil também pode ter.
+- Não olha a data da evidência. Um cliente ativo que saiu de um serviço, mas ainda tem registro
+  antigo dele, também tem a flag ligada. O relatório mostra as fontes, para o negócio conferir.
+- O apply trava escritas em `clients` (`lock_timeout = 5s`). O dry-run não trava.
 - Tabela de evidência ausente vira `NOTICE` e fica fora.
 
 ## Como rodar
@@ -47,5 +52,5 @@ liga cada flag quando o cliente tem ao menos um registro em:
 ## Teste
 
 `node --test infra/prisma/scripts/test/backfill-client-service-flags.test.mjs` sobe um Postgres
-descartável em Docker e cobre dry-run, apply, filtro por tipo da triagem e idempotência.
+descartável em Docker e cobre dry-run, apply, filtro por tipo da triagem, inativo sem mudança e idempotência.
 Sem Docker, o teste é pulado.

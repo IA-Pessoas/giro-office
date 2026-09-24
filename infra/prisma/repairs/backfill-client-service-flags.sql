@@ -5,7 +5,8 @@
 --   psql "$DATABASE_URL" -X -v apply=1 -f infra/prisma/repairs/backfill-client-service-flags.sql -- aplica
 --
 -- Evidencia e dado ja migrado do modulo, nao a fonte legada: o dry-run e o relatorio para o negocio
--- conferir a contagem antes do apply. So liga flag (nunca desliga) e e idempotente.
+-- conferir a contagem antes do apply. So liga flag (nunca desliga), so em cliente Ativo (a carteira
+-- nao filtra status) e e idempotente.
 \set ON_ERROR_STOP on
 \if :{?apply}
 \else
@@ -15,6 +16,9 @@
 BEGIN;
 SET LOCAL search_path = pg_catalog, public;
 SET LOCAL lock_timeout = '5s';
+\if :apply
+  LOCK TABLE clients IN SHARE ROW EXCLUSIVE MODE;
+\endif
 
 CREATE TEMP TABLE service_flag_evidence (client_id text, flag text, source text) ON COMMIT DROP;
 
@@ -24,23 +28,23 @@ DECLARE
 BEGIN
   FOR src IN
     SELECT * FROM (VALUES
-      ('contabil', '"contabil.control"', NULL), ('contabil', '"contabil.relationship"', NULL),
-      ('contabil', '"contabil.responsibles"', NULL),
-      ('contabil', '"triagem.configs"', 'CONTABIL'), ('contabil', '"triagem.monthly"', 'CONTABIL'),
-      ('contabil', '"triagem.responsibles"', 'CONTABIL'),
-      ('fiscal', '"triagem.configs"', 'FISCAL'), ('fiscal', '"triagem.monthly"', 'FISCAL'),
-      ('fiscal', '"triagem.responsibles"', 'FISCAL'),
-      ('pessoal', '"pessoal.ldd"', NULL), ('pessoal', '"pessoal.obrigations"', NULL),
-      ('pessoal', '"pessoal.situations"', NULL), ('pessoal', '"pessoal.passwords"', NULL),
-      ('pessoal', '"pessoal.payroll"', NULL)
+      ('contabil', 'contabil.control', NULL), ('contabil', 'contabil.relationship', NULL),
+      ('contabil', 'contabil.responsibles', NULL),
+      ('contabil', 'triagem.configs', 'CONTABIL'), ('contabil', 'triagem.monthly', 'CONTABIL'),
+      ('contabil', 'triagem.responsibles', 'CONTABIL'),
+      ('fiscal', 'triagem.configs', 'FISCAL'), ('fiscal', 'triagem.monthly', 'FISCAL'),
+      ('fiscal', 'triagem.responsibles', 'FISCAL'),
+      -- pessoal.passwords fica de fora: guarda credenciais de orgaos, nao prova servico contratado.
+      ('pessoal', 'pessoal.ldd', NULL), ('pessoal', 'pessoal.obrigations', NULL),
+      ('pessoal', 'pessoal.situations', NULL), ('pessoal', 'pessoal.payroll', NULL)
     ) AS t(flag, tbl, type_filter)
   LOOP
-    IF to_regclass(src.tbl) IS NULL THEN
+    IF to_regclass(format('%I', src.tbl)) IS NULL THEN
       RAISE NOTICE 'Tabela % nao existe; fora da evidencia', src.tbl;
       CONTINUE;
     END IF;
     EXECUTE format(
-      'INSERT INTO service_flag_evidence SELECT DISTINCT client_id, %L, %L FROM %s
+      'INSERT INTO service_flag_evidence SELECT DISTINCT client_id, %L, %L FROM %I
        WHERE client_id IS NOT NULL AND %s',
       src.flag, src.tbl || coalesce('[' || src.type_filter || ']', ''), src.tbl,
       CASE WHEN src.type_filter IS NULL THEN 'true' ELSE format('type = %L', src.type_filter) END);
@@ -48,28 +52,32 @@ BEGIN
 END
 $evidence$;
 
--- Clientes com evidencia cuja flag ainda nao e true.
+-- Clientes com evidencia cuja flag ainda nao e true. Inativos entram no relatorio, mas nao mudam.
 CREATE TEMP TABLE service_flag_changes ON COMMIT DROP AS
-SELECT c.id, c.organization_id, c.status, to_jsonb(c) ->> 'name' AS name, e.flag,
+SELECT c.id, c.organization_id, c.status, c.name, e.flag, c.status = 'Ativo' AS applies,
        string_agg(DISTINCT e.source, ', ') AS sources
 FROM service_flag_evidence e
 JOIN clients c ON c.id = e.client_id
-WHERE (to_jsonb(c) ->> e.flag)::boolean IS NOT TRUE
-GROUP BY c.id, c.organization_id, c.status, name, e.flag;
+WHERE CASE e.flag
+        WHEN 'contabil' THEN c.contabil
+        WHEN 'fiscal' THEN c.fiscal
+        WHEN 'pessoal' THEN c.pessoal
+      END IS NOT TRUE
+GROUP BY c.id, c.organization_id, c.status, c.name, e.flag;
 
-\echo '== Resumo (flag | status do cliente | clientes a ligar)'
-SELECT flag, status, count(*) FROM service_flag_changes GROUP BY 1, 2 ORDER BY 1, 2;
+\echo '== Resumo (flag | status do cliente | liga? | clientes)'
+SELECT flag, status, applies, count(*) FROM service_flag_changes GROUP BY 1, 2, 3 ORDER BY 1, 2;
 
-\echo '== Clientes (flag | organizacao | id | nome | status | evidencia)'
-SELECT flag, organization_id, id, name, status, sources FROM service_flag_changes
-ORDER BY flag, organization_id, name;
+\echo '== Clientes (flag | organizacao | id | nome | status | liga? | evidencia)'
+SELECT flag, organization_id, id, name, status, applies, sources FROM service_flag_changes
+ORDER BY flag, applies DESC, organization_id, name;
 
 UPDATE clients SET contabil = true
-WHERE id IN (SELECT id FROM service_flag_changes WHERE flag = 'contabil');
+WHERE id IN (SELECT id FROM service_flag_changes WHERE applies AND flag = 'contabil');
 UPDATE clients SET fiscal = true
-WHERE id IN (SELECT id FROM service_flag_changes WHERE flag = 'fiscal');
+WHERE id IN (SELECT id FROM service_flag_changes WHERE applies AND flag = 'fiscal');
 UPDATE clients SET pessoal = true
-WHERE id IN (SELECT id FROM service_flag_changes WHERE flag = 'pessoal');
+WHERE id IN (SELECT id FROM service_flag_changes WHERE applies AND flag = 'pessoal');
 
 \echo '== Clientes ativos com a flag depois do reparo (flag | clientes)'
 SELECT 'contabil', count(*) FILTER (WHERE contabil) FROM clients WHERE status = 'Ativo'
