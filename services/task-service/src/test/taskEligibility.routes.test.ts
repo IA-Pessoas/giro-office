@@ -441,6 +441,7 @@ describe("elegibilidade manual de tarefas via rotas", () => {
             charge_financeiro: false,
             client_name: "Empresa atribuída",
             project_name: "Projeto atribuído",
+            responsible_name: null,
             isOwn: true,
             isUnassigned: false,
           },

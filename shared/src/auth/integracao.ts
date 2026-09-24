@@ -137,6 +137,7 @@ const PROJECT_FIELDS = [
   "objective",
   "sponsor_id",
 ] as const;
+const PROJECT_UPDATE_FIELDS = [...PROJECT_FIELDS, "status"] as const;
 const TASK_CREATE_FIELDS = [
   "model_id",
   "project_id",
@@ -152,6 +153,7 @@ const TASK_UPDATE_FIELDS = [
   "department_id",
   "billing",
   "responsible_id",
+  "prevision_date",
 ] as const;
 const TASK_OWN_FIELDS = ["status", "observations"] as const;
 const TASK_MODEL_FIELDS = [
@@ -310,10 +312,17 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     audit: "required",
     test: "project.create",
   }),
-  routePolicy("PUT", "/project", "project", "update", [writeRule(writeUser, PROJECT_FIELDS)], {
-    audit: "required",
-    test: "project.update",
-  }),
+  routePolicy(
+    "PUT",
+    "/project",
+    "project",
+    "update",
+    [writeRule(writeUser, PROJECT_UPDATE_FIELDS)],
+    {
+      audit: "required",
+      test: "project.update",
+    },
+  ),
   routePolicy("DELETE", "/project", "project", "delete", [writeRule(admin, [])], {
     audit: "required",
     dependency: 409,

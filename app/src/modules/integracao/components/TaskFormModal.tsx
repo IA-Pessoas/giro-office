@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, FileText, LoaderCircle, Save } from "lucide-react";
+import { FileText, LoaderCircle, Save } from "lucide-react";
 import { toast } from "react-toastify";
 
 import { ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import type { ModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { isServerErrorAlreadyNotified } from "@shared/services/serverErrorToast";
 import { useFetch } from "@shared/hooks";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -25,6 +26,7 @@ import {
 } from "../hooks/queryKeys";
 import {
   useCreateIntegracaoTaskMutation,
+  useCreateProjectMutation,
   useIntegracaoTaskDetail,
   useProjectsList,
   useUpdateIntegracaoTaskMutation,
@@ -47,11 +49,13 @@ import {
   TASK_URGENCY_OPTIONS,
   type TaskUrgencyOption,
   getDefaultTaskUrgency,
+  getInitialPrevisionPatch,
   getAutomaticTaskResponsibleId,
   getProjectSelectPlaceholder,
   getTaskCreateValidationMessage,
   getTaskEditValidationMessage,
   getTaskUrgencyOptions,
+  LOOSE_TASKS_PROJECT_NAME,
   shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
 import { TaskCompletionPanel } from "./TaskCompletionPanel";
@@ -71,7 +75,7 @@ interface CreateFormState {
   client_id: string;
   project_id: string;
   model_id: string;
-  prospecting_status: ProspectingStatus;
+  prospecting_status: ProspectingStatus | "";
   name: string;
   status: IntegracaoTaskStatus | "";
   department_id: string;
@@ -98,7 +102,7 @@ const CREATE_INITIAL_STATE: CreateFormState = {
   client_id: "",
   project_id: "",
   model_id: "",
-  prospecting_status: PROSPECTING_STATUS_VALUES[0],
+  prospecting_status: "",
   name: "",
   status: "",
   department_id: "",
@@ -195,6 +199,7 @@ export function TaskFormModal({
   );
   const { user } = useAuth();
   const createMutation = useCreateIntegracaoTaskMutation();
+  const createProjectMutation = useCreateProjectMutation();
   const updateMutation = useUpdateIntegracaoTaskMutation();
 
   useEffect(() => {
@@ -279,6 +284,8 @@ export function TaskFormModal({
     projectCount: createProjectsCount,
   });
   const editUrgencyOptions = getTaskUrgencyOptions(editValues.urgency);
+  const canSetInitialPrevision =
+    !isRestrictedEdit && Boolean(taskDetailQuery.data) && !taskDetailQuery.data?.prevision_date;
   const taskEditValidationMessage = getTaskEditValidationMessage(editValues);
 
   function shouldRenderCurrentResponsibleOption(userId: string) {
@@ -366,7 +373,6 @@ export function TaskFormModal({
       projectId: createValues.project_id,
       modelId: createValues.model_id,
       departmentId: createValues.department_id,
-      prospectingStatus: createValues.prospecting_status,
       urgency: createValues.urgency,
       observations: createValues.observations,
       eligibleResponsibleCount: createResponsibleCandidates.length,
@@ -374,7 +380,7 @@ export function TaskFormModal({
     });
 
     if (validationMessage) {
-      toast.warning(validationMessage);
+      toast.warning(validationMessage, { toastId: "task-create-validation" });
       return;
     }
 
@@ -383,7 +389,7 @@ export function TaskFormModal({
         model_id: createValues.model_id,
         project_id: createValues.project_id,
         client_id: createValues.client_id,
-        prospecting_status: createValues.prospecting_status,
+        prospecting_status: createValues.prospecting_status || undefined,
         name: createValues.name.trim() || undefined,
         status: createValues.status || undefined,
         department_id: createValues.department_id,
@@ -399,7 +405,32 @@ export function TaskFormModal({
       onSuccess?.(createdTask);
       onOpenChange(false);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível criar a tarefa."));
+      if (!isServerErrorAlreadyNotified(error)) {
+        toast.error(getApiErrorMessage(error, "Não foi possível criar a tarefa."));
+      }
+    }
+  }
+
+  async function handleCreateClientProject() {
+    try {
+      const project = await createProjectMutation.mutateAsync({
+        client_id: createValues.client_id,
+        name: LOOSE_TASKS_PROJECT_NAME,
+        // sv-SE formata como YYYY-MM-DD no fuso local.
+        start_date: new Date().toLocaleDateString("sv-SE"),
+        objective: "Tarefas avulsas do cliente.",
+      });
+      updateCreateValue("project_id", project.id);
+      // Cliente "Novo" ainda em prospecção: o projeto nasce aguardando o Comercial.
+      if (project.status === "Aguardando liberação do Comercial") {
+        toast.info(
+          "Projeto criado. As tarefas dele ficam liberadas depois da validação do Comercial.",
+        );
+      }
+    } catch (error) {
+      if (!isServerErrorAlreadyNotified(error)) {
+        toast.error(getApiErrorMessage(error, "Não foi possível criar o projeto."));
+      }
     }
   }
 
@@ -460,6 +491,7 @@ export function TaskFormModal({
               ...(editValues.responsible_id !== (detail?.responsible_id ?? "")
                 ? { responsible_id: editValues.responsible_id }
                 : {}),
+              ...getInitialPrevisionPatch(detail?.prevision_date, editValues.prevision_date),
             },
       );
 
@@ -467,7 +499,9 @@ export function TaskFormModal({
       onSuccess?.(updatedTask);
       onOpenChange(false);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível atualizar a tarefa."));
+      if (!isServerErrorAlreadyNotified(error)) {
+        toast.error(getApiErrorMessage(error, "Não foi possível atualizar a tarefa."));
+      }
     }
   }
 
@@ -716,16 +750,18 @@ export function TaskFormModal({
                     Previsão atual
                   </span>
                   <div className="relative">
-                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       type="date"
                       value={editValues.prevision_date}
-                      readOnly
-                      className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                      readOnly={!canSetInitialPrevision}
+                      onChange={(event) => updateEditValue("prevision_date", event.target.value)}
+                      className={PROJECT_INPUT_CLASSNAME}
                     />
                   </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Use Prorrogações para alterar a previsão.
+                    {canSetInitialPrevision
+                      ? "Defina a primeira previsão da tarefa. Depois, use Prorrogações."
+                      : "Use Prorrogações para alterar a previsão."}
                   </span>
                 </label>
 
@@ -821,6 +857,18 @@ export function TaskFormModal({
                   </option>
                 ))}
               </ProjectSelect>
+              {hasNoProjectsForSelectedClient ? (
+                <button
+                  type="button"
+                  className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
+                  onClick={() => void handleCreateClientProject()}
+                  disabled={createProjectMutation.isPending}
+                >
+                  {createProjectMutation.isPending
+                    ? "Criando projeto..."
+                    : `Criar projeto "${LOOSE_TASKS_PROJECT_NAME}"`}
+                </button>
+              ) : null}
             </label>
           </div>
 
@@ -869,14 +917,18 @@ export function TaskFormModal({
           <div className={TASK_FORM_GRID_CLASSNAME}>
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">
-                Status de prospecção
+                Status de prospecção (opcional)
               </span>
               <ProjectSelect
                 value={createValues.prospecting_status}
                 onChange={(event) =>
-                  updateCreateValue("prospecting_status", event.target.value as ProspectingStatus)
+                  updateCreateValue(
+                    "prospecting_status",
+                    event.target.value as ProspectingStatus | "",
+                  )
                 }
               >
+                <option value="">Não se aplica</option>
                 {PROSPECTING_STATUS_VALUES.map((status) => (
                   <option key={status} value={status}>
                     {status}
@@ -949,12 +1001,11 @@ export function TaskFormModal({
             <label className={TASK_FORM_LABEL_CLASSNAME}>
               <span className="text-sm font-medium text-slate-700 dark:text-white">Previsão</span>
               <div className="relative">
-                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="date"
                   value={createValues.prevision_date}
                   onChange={(event) => updateCreateValue("prevision_date", event.target.value)}
-                  className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                  className={PROJECT_INPUT_CLASSNAME}
                 />
               </div>
             </label>

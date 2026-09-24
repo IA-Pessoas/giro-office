@@ -96,6 +96,7 @@ const TASK_LIST_SELECT = {
   charge_financeiro: true,
   client: { select: { name: true, company_name: true } },
   project: { select: { name: true, status: true } },
+  responsible: { select: { name: true } },
   responsible_id: true,
   responsible2_id: true,
   responsible3_id: true,
@@ -144,10 +145,11 @@ export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }
 type TaskListDatabaseRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
 export type TaskListRow = Omit<
   TaskListDatabaseRow,
-  "responsible_id" | "responsible2_id" | "responsible3_id" | "client" | "project"
+  "responsible_id" | "responsible2_id" | "responsible3_id" | "responsible" | "client" | "project"
 > & {
   client_name: string;
   project_name: string;
+  responsible_name: string | null;
   isOwn: boolean;
   isUnassigned: boolean;
 };
@@ -163,7 +165,7 @@ export interface CreateTaskCrudRequest {
   model_id: string;
   project_id: string;
   client_id: string;
-  prospecting_status: ProspectingStatus;
+  prospecting_status?: ProspectingStatus;
   name?: string;
   status?: IntegracaoTaskStatus;
   department_id?: string;
@@ -194,6 +196,7 @@ export interface UpdateTaskCrudRequest {
   responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
+  prevision_date?: string;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -303,6 +306,13 @@ export function resolveEligibleTaskResponsible(
   }
 
   throw new ServiceError(422, "Selecione um responsável elegível para a tarefa.");
+}
+
+/** Anexos visíveis exigem ação do usuário: removê-los antes apaga o arquivo pelo fluxo próprio. */
+function getTaskDeleteBlockMessage(attachments: number): string | null {
+  return attachments > 0
+    ? `Não é possível excluir a tarefa: ela tem ${attachments} anexo(s). Remova os anexos.`
+    : null;
 }
 
 export class TaskCrudService {
@@ -805,7 +815,15 @@ export class TaskCrudService {
 
       const hasMore = params.page * params.limit < total;
       const data = list.map(
-        ({ responsible_id, responsible2_id, responsible3_id, client, project, ...task }) => {
+        ({
+          responsible_id,
+          responsible2_id,
+          responsible3_id,
+          responsible,
+          client,
+          project,
+          ...task
+        }) => {
           const commercialValidationPending =
             isAwaitingCommercialValidation(task) ||
             project.status === PROJECT_STATUS_WAITING_COMMERCIAL;
@@ -814,6 +832,7 @@ export class TaskCrudService {
             status: commercialValidationPending ? INTEGRACAO_TASK_STATUS_WAITING : task.status,
             client_name: client.company_name?.trim() || client.name,
             project_name: project.name,
+            responsible_name: responsible?.name ?? null,
             isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
             isUnassigned: responsible_id === null,
           };
@@ -871,6 +890,20 @@ export class TaskCrudService {
       }
       if (exists.status === "Concluída" && data.status !== undefined) {
         throw new ServiceError(403, "A reabertura deve usar o fluxo de conclusão da tarefa.");
+      }
+
+      let prevision_date = exists.prevision_date;
+      if (data.prevision_date !== undefined) {
+        const requested = new Date(`${data.prevision_date}T00:00:00.000Z`);
+        if (exists.prevision_date === null) {
+          const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
+          if (requested < today) {
+            throw new ServiceError(400, "A primeira previsão não pode ser uma data passada.");
+          }
+          prevision_date = requested;
+        } else if (exists.prevision_date.getTime() !== requested.getTime()) {
+          throw new ServiceError(409, "A tarefa já tem previsão. Use Prorrogações para alterá-la.");
+        }
       }
 
       const name = data.name !== undefined ? data.name : exists.name;
@@ -958,8 +991,10 @@ export class TaskCrudService {
           : undefined,
       ]);
 
+      const settingInitialPrevision = exists.prevision_date === null && prevision_date !== null;
       const updated = await this.prisma.task.update({
-        where: { id: data.task_id },
+        // Condição fecha a corrida de duas definições simultâneas da primeira previsão (P2025).
+        where: { id: data.task_id, ...(settingInitialPrevision ? { prevision_date: null } : {}) },
         data: {
           model_id,
           name,
@@ -971,19 +1006,9 @@ export class TaskCrudService {
           responsible_id,
           responsible2_id,
           responsible3_id,
-          prevision_date: exists.prevision_date,
+          prevision_date,
         },
         select: TASK_UPDATE_SELECT,
-      });
-
-      await this.audit.logUpdateIfChanged({
-        userId: data.user_id,
-        organizationId: data.organization_id,
-        action: "Atualização",
-        referring: "integracao.tasks",
-        referringId: data.task_id,
-        oldData: exists as Record<string, unknown>,
-        updatedData: updated as Record<string, unknown>,
       });
 
       const relevantChange =
@@ -992,39 +1017,54 @@ export class TaskCrudService {
         exists.responsible_id !== updated.responsible_id ||
         exists.responsible2_id !== updated.responsible2_id ||
         exists.responsible3_id !== updated.responsible3_id;
-      if (relevantChange) {
-        await publishTaskOperationalNotifications(this.prisma, {
-          organization_id: data.organization_id,
-          task_id: data.task_id,
-          event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
-          type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
-          title: "Tarefa atualizada",
-          message: "Há uma alteração relevante em uma tarefa acompanhada por você.",
-          responsible_ids: [
-            updated.responsible_id,
-            updated.responsible2_id,
-            updated.responsible3_id,
-          ],
-          include_administrators: true,
-          exclude_user_id: data.user_id,
-        });
-      }
 
-      await this.#workflow.afterTaskUpdated({
-        taskId: data.task_id,
-        projectId: exists.project_id,
-        userId: data.user_id,
-        organizationId: data.organization_id,
-        previousStatus: exists.status ?? "",
-        newStatus: status,
-        previousBilling: exists.billing ?? "",
-      });
+      // Efeitos pós-update são independentes; em paralelo tiram ~2 idas de rede do PUT.
+      await Promise.all([
+        this.audit.logUpdateIfChanged({
+          userId: data.user_id,
+          organizationId: data.organization_id,
+          action: "Atualização",
+          referring: "integracao.tasks",
+          referringId: data.task_id,
+          oldData: exists as Record<string, unknown>,
+          updatedData: updated as Record<string, unknown>,
+        }),
+        relevantChange
+          ? publishTaskOperationalNotifications(this.prisma, {
+              organization_id: data.organization_id,
+              task_id: data.task_id,
+              event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
+              type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
+              title: "Tarefa atualizada",
+              message: "Há uma alteração relevante em uma tarefa acompanhada por você.",
+              responsible_ids: [
+                updated.responsible_id,
+                updated.responsible2_id,
+                updated.responsible3_id,
+              ],
+              include_administrators: true,
+              exclude_user_id: data.user_id,
+            })
+          : undefined,
+        this.#workflow.afterTaskUpdated({
+          taskId: data.task_id,
+          projectId: exists.project_id,
+          userId: data.user_id,
+          organizationId: data.organization_id,
+          previousStatus: exists.status ?? "",
+          newStatus: status,
+          previousBilling: exists.billing ?? "",
+        }),
+      ]);
 
       return updated;
     } catch (err: unknown) {
       logError("Erro ao atualizar tarefa", { err });
       throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
+      if (typeof err === "object" && err !== null && "code" in err && err.code === "P2025") {
+        throw new ServiceError(409, "A tarefa foi alterada simultaneamente. Tente novamente.", err);
+      }
       throw new ServiceError(500, "Não foi possível atualizar a tarefa.", err);
     }
   }
@@ -1047,12 +1087,46 @@ export class TaskCrudService {
         isOwner: data.isOwner === true,
       });
 
+      let removedDependencies: Record<string, unknown> = {};
       try {
-        await this.prisma.task.delete({
-          where: { id: data.task_id },
+        removedDependencies = await this.prisma.$transaction(async (tx) => {
+          const where = { task_id: data.task_id, organization_id: data.organization_id };
+          const attachments = await tx.taskAttachment.count({
+            where: { ...where, deleted_at: null },
+          });
+          const blockMessage = getTaskDeleteBlockMessage(attachments);
+          if (blockMessage) throw new ServiceError(409, blockMessage);
+
+          // Tudo abaixo pertence à tarefa e sai com ela; o que se perde vai para a auditoria.
+          // Anexos já removidos pelo usuário (soft delete) ainda seguram a FK.
+          // ponytail: objetos no storage não são apagados aqui; limpar se o bucket crescer.
+          const removedAttachments = await tx.taskAttachment.findMany({
+            where: { ...where, deleted_at: { not: null } },
+            select: { object_path: true },
+          });
+          const billing = await tx.commercialTaskBilling.findFirst({
+            where,
+            select: { hiring_status: true, payment: true, billing_description: true },
+          });
+          const completionRequests = await tx.taskCompletionRequest.deleteMany({ where });
+          const postponements = await tx.taskPostponement.deleteMany({ where });
+          await tx.taskAttachment.deleteMany({ where: { ...where, deleted_at: { not: null } } });
+          await tx.commercialTaskBilling.deleteMany({ where });
+          await tx.task.delete({ where: { id: data.task_id } });
+          return {
+            ...(removedAttachments.length > 0
+              ? { removed_attachment_paths: removedAttachments.map((a) => a.object_path) }
+              : {}),
+            ...(billing ? { commercial_billing: billing } : {}),
+            ...(completionRequests.count > 0
+              ? { completion_requests_removed: completionRequests.count }
+              : {}),
+            ...(postponements.count > 0 ? { postponements_removed: postponements.count } : {}),
+          };
         });
       } catch (err: unknown) {
         logError("Erro ao excluir tarefa no banco", { err });
+        if (err instanceof ServiceError) throw err;
         if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
           throw new ServiceError(
             409,
@@ -1068,7 +1142,7 @@ export class TaskCrudService {
         action: "Exclusão",
         referring: "integracao.tasks",
         referringId: data.task_id,
-        changes: "{}",
+        changes: Object.keys(removedDependencies).length > 0 ? removedDependencies : "{}",
       });
 
       return { deleted: true };

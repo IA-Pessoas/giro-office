@@ -55,14 +55,7 @@ const createTaskRequestBody = createObjectRequestBody({
     responsible_id: "user-uuid",
     prevision_date: "2026-04-10",
   },
-  required: [
-    "model_id",
-    "project_id",
-    "client_id",
-    "prospecting_status",
-    "urgency",
-    "department_id",
-  ],
+  required: ["model_id", "project_id", "client_id", "urgency", "department_id"],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
@@ -102,6 +95,11 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     urgency: { type: "string" },
     responsible_id: { type: ["string", "null"] },
+    prevision_date: {
+      type: "string",
+      format: "date",
+      description: "Só define a primeira previsão; depois, 409 e uso de prorrogação.",
+    },
   },
 });
 
@@ -751,6 +749,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                                 "id",
                                 "client_name",
                                 "project_name",
+                                "responsible_name",
                                 "isOwn",
                                 "isUnassigned",
                               ],
@@ -758,6 +757,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                                 id: { type: "string" },
                                 client_name: { type: "string" },
                                 project_name: { type: "string" },
+                                responsible_name: { type: ["string", "null"] },
                                 isOwn: { type: "boolean" },
                                 isUnassigned: { type: "boolean" },
                               },
