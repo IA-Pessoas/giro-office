@@ -17,6 +17,7 @@ import {
   mergeClientCompanyLookup,
   getIntegrationEmailError,
 } from "@modules/clients/utils/integrationForm";
+import { getClientInternalName } from "@modules/clients/utils/clientForm";
 import { useMe } from "@shared/hooks/useMe";
 import {
   validateCpfCnpjDocument,
@@ -63,7 +64,7 @@ export default function NewClientIntegrationPage() {
       return;
     }
 
-    if (!formValues.name.trim() || !formValues.cpf_cnpj.trim()) {
+    if (!getClientInternalName(formValues) || !formValues.cpf_cnpj.trim()) {
       toast.error("Preencha nome e CPF/CNPJ para continuar.");
       return;
     }

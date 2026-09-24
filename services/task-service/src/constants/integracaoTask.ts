@@ -1,5 +1,12 @@
+import { COMMERCIAL_TASK_HIRING_STATUSES } from "@workspace/shared";
+
 /** Cobrança em `integracao.tasks.billing` (legado). */
-export type TaskBilling = "Realizar" | "Não Realizar";
+export const TASK_BILLING_VALUES = ["Realizar", "Não Realizar"] as const;
+export const TASK_BILLING_REALIZE = TASK_BILLING_VALUES[0];
+export const TASK_BILLING_NOT_REALIZE = TASK_BILLING_VALUES[1];
+export const TASK_HIRING_STATUS_CONTRACTED = COMMERCIAL_TASK_HIRING_STATUSES[1];
+
+export type TaskBilling = (typeof TASK_BILLING_VALUES)[number];
 
 /**
  * Status possíveis em `integracao.tasks.status` (alinhado ao legado `TaskService` / front).

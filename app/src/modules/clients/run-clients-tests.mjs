@@ -26,6 +26,7 @@ import {
 import {
   buildCreateClientIntegrationPayload,
   buildUpdateClientIntegrationPayload,
+  createClientIntegrationInitialValues,
   createUpdateClientIntegrationInitialValues,
   getCnpjToLookup,
   getIntegrationEmailError,
@@ -36,6 +37,7 @@ import { formatPaMoneyFromApi, formatPaMoneyInput, parsePaMoneyCents } from "./u
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
+  isRegularizeCompanyClient,
   getRegularizeUnsupportedDateClearError,
   getRegularizeRegimeOptions,
   hasRegularizeChanges,
@@ -136,6 +138,95 @@ runTest("client form sends the selected tax regime on creation and update", () =
   assert.equal(buildUpdateClientPayload({ ...values, regime: "" }).regime, null);
   assert.equal(
     "regime" in buildUpdateClientPayload({ ...values, regime: "" }, "MEI"),
+    false,
+  );
+});
+
+runTest("PJ client payloads derive the required API name while PF keeps its entered name", () => {
+  const pjValues = {
+    ...createClientFormInitialValues(),
+    type: "PJ",
+    name: "",
+    company_name: "Empresa Exemplo LTDA",
+    fantasy_name: "Exemplo",
+  };
+
+  assert.equal(buildCreateClientPayload(pjValues, "organization-1").name, "Empresa Exemplo LTDA");
+  assert.equal(
+    buildCreateClientPayload(
+      { ...pjValues, company_name: "", fantasy_name: "Nome Fantasia" },
+      "organization-1",
+    ).name,
+    "Nome Fantasia",
+  );
+  assert.equal(
+    buildUpdateClientPayload({ ...pjValues, company_name: "Nova Razão Social" }).name,
+    "Nova Razão Social",
+  );
+
+  const pfValues = { ...pjValues, type: "PF", name: "Pessoa Exemplo", company_name: "" };
+  assert.equal(buildCreateClientPayload(pfValues, "organization-1").name, "Pessoa Exemplo");
+});
+
+runTest("PJ integration creation derives required API name from company identity", () => {
+  const values = {
+    ...createClientIntegrationInitialValues(),
+    type: "PJ",
+    name: "",
+    company_name: "Empresa Integração LTDA",
+    fantasy_name: "Integração",
+  };
+
+  assert.equal(
+    buildCreateClientIntegrationPayload(values, "organization-1").name,
+    "Empresa Integração LTDA",
+  );
+
+  const client = { ...values, name: "", company_name: "", fantasy_name: "" };
+  assert.equal(
+    buildUpdateClientIntegrationPayload(
+      { ...createUpdateClientIntegrationInitialValues(client), name: "", company_name: "Nova LTDA" },
+      client,
+    ).name,
+    "Nova LTDA",
+  );
+});
+
+runTest("PJ client forms hide manual name while PF forms retain it", () => {
+  const clientForm = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+  const integrationForm = readFileSync(
+    "src/modules/clients/components/ClientIntegrationForm.tsx",
+    "utf8",
+  );
+  const regularizeForm = readFileSync(
+    "src/modules/clients/components/ClientRegularizeForm.tsx",
+    "utf8",
+  );
+  assert.match(clientForm, /values\.type === "PF"[\s\S]*?name="name"/);
+  assert.match(integrationForm, /values\.type === "PF"[\s\S]*?name="name"/);
+  assert.doesNotMatch(regularizeForm, /label="Nome \/ Apelido"/);
+  assert.match(regularizeForm, /isRegularizeCompanyClient\(values\)/);
+});
+
+runTest("regularization uses client type to identify PJ despite incomplete identity fields", () => {
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PJ", cpf_cnpj: "12.345", company_name: "Empresa LTDA", fantasy_name: "" }),
+    true,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PJ", cpf_cnpj: "", company_name: "", fantasy_name: "Marca" }),
+    true,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PF", cpf_cnpj: "", company_name: "Empresa LTDA", fantasy_name: "" }),
+    false,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PJ", cpf_cnpj: "", company_name: "", fantasy_name: "" }),
+    true,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ type: "PF", cpf_cnpj: "12.345.678/0001-90", company_name: "", fantasy_name: "" }),
     false,
   );
 });
@@ -602,9 +693,13 @@ runTest("regularize hydration masks documents and phone while phone payload stay
   };
   const initialValues = createRegularizeInitialValues(client);
 
+  assert.equal(initialValues.type, "PJ");
   assert.equal(initialValues.cpf_cnpj, "12.345.678/0001-90");
   assert.equal(initialValues.cpf_responsible, "123.456.789-10");
   assert.equal(initialValues.number, "(11) 99999-9999");
+  const changedOnlyType = { ...initialValues, type: "PF" };
+  assert.deepEqual(buildRegularizePayload(changedOnlyType, client), {});
+  assert.equal(hasRegularizeChanges(changedOnlyType, client), false);
   assert.deepEqual(
     buildRegularizePayload(
       { ...initialValues, number: "11 99999.9999" },

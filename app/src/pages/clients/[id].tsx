@@ -31,6 +31,7 @@ import type { ClientFormValues } from "@modules/clients/types";
 import {
   buildUpdateClientPayload,
   createClientFormInitialValues,
+  getClientInternalName,
 } from "@modules/clients/utils/clientForm";
 import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
 import {
@@ -112,7 +113,7 @@ export default function ClientDetailPage() {
       return;
     }
 
-    if (!formValues.name.trim()) {
+    if (!getClientInternalName(formValues)) {
       toast.error("Preencha o nome do cliente para continuar.");
       return;
     }
