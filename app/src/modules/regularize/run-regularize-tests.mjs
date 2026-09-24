@@ -1285,6 +1285,30 @@ await runTest("regularize finite status and urgency fields use native selects", 
   );
 });
 
+await runTest("regularize PF uses fixed options, automatic code and field errors", async () => {
+  const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
+  const clientPfSource = await readModuleSource("components/RegularizeClientPfForm.tsx");
+
+  assert.match(controlsSource, /regularizeClientPfSexOptions/);
+  assert.match(controlsSource, /regularizeClientPfMaritalStatusOptions/);
+  assert.match(controlsSource, /regularizeClientPfStateOptions/);
+  assert.match(clientPfSource, /regularizeClientPfSexOptions\.map/);
+  assert.match(clientPfSource, /regularizeClientPfMaritalStatusOptions\.map/);
+  assert.match(clientPfSource, /regularizeClientPfStateOptions\.map/);
+  assert.match(clientPfSource, /generateClientPfCode/);
+  assert.match(clientPfSource, /Gerado automaticamente/);
+  const requiredFieldsBlock = clientPfSource.slice(
+    clientPfSource.indexOf("const REQUIRED_CLIENT_PF_FIELDS"),
+    clientPfSource.indexOf("type ClientPfFieldErrors"),
+  );
+  assert.doesNotMatch(requiredFieldsBlock, /"father"/);
+  assert.match(clientPfSource, /fieldErrors/);
+  assert.match(clientPfSource, /error=\{fieldErrors\.city\}/);
+  assert.match(clientPfSource, /aria-invalid=\{Boolean\(fieldErrors\.city\)\}/);
+  assert.match(clientPfSource, /<RegularizeFormError message=\{formError\} sticky=\{false\} \/>/);
+  assert.match(clientPfSource, /<RegularizeFormField label="Pai">/);
+});
+
 await runTest("regularize process task id uses the real task selector", async () => {
   const processSource = await readModuleSource("components/RegularizeProcessForm.tsx");
   const tasksHookSource = await readFile(

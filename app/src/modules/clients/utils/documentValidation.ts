@@ -1,4 +1,5 @@
 import { normalizeCnpjInput } from "../../../shared/utils/inputFormatting.ts";
+import { isValidCpf, isValidCpfCnpj, normalizeCpfCnpj } from "@workspace/shared";
 
 export type ClientPersonType = "PJ" | "PF";
 
@@ -62,29 +63,35 @@ export function validateCpfCnpjDocument(
   value: string,
   personType?: ClientPersonType,
 ): string | null {
-  const document = personType === "PJ" ? normalizeCnpjInput(value) : normalizeDocumentValue(value);
+  const document = personType === "PJ" ? normalizeCpfCnpj(value) : normalizeDocumentValue(value);
 
   if (document.length === 0) {
     return "CPF/CNPJ é obrigatório.";
   }
 
   if (personType === "PF") {
-    return document.length === 11 ? null : "CPF deve ter 11 dígitos.";
+    if (document.length !== 11) {
+      return "CPF deve ter 11 dígitos.";
+    }
+    return isValidCpfCnpj(document, "PF") ? null : "CPF inválido.";
   }
 
   if (personType === "PJ") {
-    return document.length === 14
-      ? null
-      : /[A-Z]/.test(document)
+    if (document.length !== 14) {
+      return /[A-Z]/.test(document)
         ? "CNPJ deve ter 14 caracteres."
         : "CNPJ deve ter 14 dígitos.";
+    }
+    return isValidCpfCnpj(document, "PJ") ? null : "CNPJ inválido.";
   }
 
-  return document.length === 11 || document.length === 14
-    ? null
-    : /[A-Z]/.test(document)
+  if (document.length !== 11 && document.length !== 14) {
+    return /[A-Z]/.test(document)
       ? "CPF/CNPJ deve ter 11 ou 14 caracteres."
       : "CPF/CNPJ deve ter 11 ou 14 dígitos.";
+  }
+
+  return isValidCpfCnpj(document) ? null : "CPF/CNPJ inválido.";
 }
 
 export function validateOptionalCpfDocument(label: string, value: string): string | null {
@@ -94,5 +101,9 @@ export function validateOptionalCpfDocument(label: string, value: string): strin
     return null;
   }
 
-  return digits.length === 11 ? null : `${label} deve ter 11 dígitos.`;
+  if (digits.length !== 11) {
+    return `${label} deve ter 11 dígitos.`;
+  }
+
+  return isValidCpf(digits) ? null : `${label} inválido.`;
 }

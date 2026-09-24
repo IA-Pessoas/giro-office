@@ -12,7 +12,7 @@ export const createClientPfBodySchema = z
     zip_code: z.string().min(1, "zip_code obrigatorio."),
     state: z.string().min(1, "state obrigatorio."),
     profession: z.string().min(1, "profession obrigatorio."),
-    father: z.string().min(1, "father obrigatorio."),
+    father: z.string().optional().default(""),
     mother: z.string().min(1, "mother obrigatorio."),
     marital_status: z.string().min(1, "marital_status obrigatorio."),
     date_of_birth: z.coerce.date(),

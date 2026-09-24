@@ -7,6 +7,7 @@ import type {
 } from "../types";
 
 import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+import { normalizeCnpjInput } from "../../../shared/utils/inputFormatting.ts";
 
 import { normalizeDocumentValue } from "./documentValidation.ts";
 import { mapClientStatusFromApi, mapClientStatusToApi } from "./statusMapper.ts";
@@ -26,6 +27,13 @@ function getClientTaxRegime(value: string | null | undefined): ClientTaxRegime |
   return isClientTaxRegime(value) ? value : "";
 }
 
+function normalizeClientDocumentValue(
+  value: string | null | undefined,
+  type: ClientFormValues["type"],
+): string {
+  return type === "PJ" ? normalizeCnpjInput(value) : normalizeDocumentValue(value);
+}
+
 export function createClientFormInitialValues(client?: Partial<Client>): ClientFormValues {
   return {
     type: client?.type ?? "PJ",
@@ -33,7 +41,7 @@ export function createClientFormInitialValues(client?: Partial<Client>): ClientF
     company_name: client?.company_name ?? "",
     fantasy_name: client?.fantasy_name ?? "",
     cpf_cnpj: client?.cpf_cnpj ?? "",
-    status: mapClientStatusFromApi(client?.status) || "Ativo",
+    status: client?.status ? mapClientStatusFromApi(client.status) : "Ativo",
     regime: getClientTaxRegime(client?.regime),
     service_unique: client?.service_unique ?? false,
   };
@@ -64,7 +72,7 @@ export function buildCreateClientPayload(
     name: getClientInternalName(values),
     company_name: values.company_name.trim() || null,
     fantasy_name: values.fantasy_name.trim() || null,
-    cpf_cnpj: normalizeDocumentValue(values.cpf_cnpj),
+    cpf_cnpj: normalizeClientDocumentValue(values.cpf_cnpj, values.type),
     status: mapClientStatusToApi(values.status),
     regime: normalizeTaxRegime(values.regime),
     service_unique: values.service_unique,
@@ -82,7 +90,7 @@ export function buildUpdateClientPayload(
     name: getClientInternalName(values),
     company_name: values.company_name.trim() || null,
     fantasy_name: values.fantasy_name.trim() || null,
-    cpf_cnpj: normalizeDocumentValue(values.cpf_cnpj),
+    cpf_cnpj: normalizeClientDocumentValue(values.cpf_cnpj, values.type),
     status: mapClientStatusToApi(values.status),
     ...(preservesLegacyRegime ? {} : { regime }),
     service_unique: values.service_unique,

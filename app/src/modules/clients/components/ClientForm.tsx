@@ -1,11 +1,15 @@
-import type { ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 
+import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import type { ClientFormValues } from "../types";
 import { CLIENT_TAX_REGIME_OPTIONS } from "../utils/clientForm";
-import { validateCpfCnpjDocument } from "../utils/documentValidation";
+import {
+  formatCpfCnpjInput,
+  validateCpfCnpjDocument,
+} from "../utils/documentValidation";
 
 interface ClientFormProps {
   values: ClientFormValues;
@@ -30,10 +34,23 @@ export function ClientForm({
   onSubmit,
   onCancel,
 }: ClientFormProps) {
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const documentLabel = showPersonType ? (values.type === "PF" ? "CPF" : "CNPJ") : "CPF/CNPJ";
-  const documentError = showDocumentError && showPersonType && values.cpf_cnpj
+  const documentError = (showDocumentError || hasSubmitted) && values.cpf_cnpj
     ? validateCpfCnpjDocument(values.cpf_cnpj, showPersonType ? values.type : undefined)
     : null;
+  const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setHasSubmitted(false);
+    forwardFormattedInputChange(
+      event,
+      (value) => formatCpfCnpjInput(value, values.type === "PF" ? "PF" : "PJ"),
+      onChange,
+    );
+  };
+  const handleSubmit = () => {
+    setHasSubmitted(true);
+    onSubmit();
+  };
 
   return (
     <div className="space-y-5">
@@ -87,12 +104,12 @@ export function ClientForm({
           <input
             name="cpf_cnpj"
             value={values.cpf_cnpj}
-            onChange={onChange}
+            onChange={handleCpfCnpjChange}
             disabled={disabled}
-            inputMode="numeric"
+            inputMode={values.type === "PJ" ? "text" : "numeric"}
             autoComplete="off"
             aria-invalid={Boolean(documentError)}
-            aria-describedby={documentError ? "client-create-document-error" : undefined}
+            aria-describedby={documentError ? "client-document-error" : undefined}
             placeholder={
               showPersonType
                 ? values.type === "PF"
@@ -105,7 +122,7 @@ export function ClientForm({
           />
           {documentError ? (
             <span
-              id="client-create-document-error"
+              id="client-document-error"
               className="block text-xs font-medium text-red-600 dark:text-red-300"
             >
               {documentError}
@@ -177,7 +194,7 @@ export function ClientForm({
         </button>
         <button
           type="button"
-          onClick={onSubmit}
+          onClick={handleSubmit}
           disabled={disabled}
           className="rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:opacity-60"
         >

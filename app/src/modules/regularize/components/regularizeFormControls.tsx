@@ -19,6 +19,55 @@ export const regularizePrimaryButtonClassName =
 
 export const regularizeClientStatusOptions = ["Ativo", "Inativo"] as const;
 
+export const regularizeClientPfSexOptions = [
+  { value: "F", label: "Feminino" },
+  { value: "M", label: "Masculino" },
+] as const;
+
+export const regularizeClientPfMaritalStatusOptions = [
+  "Solteiro",
+  "Solteira",
+  "Casado",
+  "Casada",
+  "Divorciado",
+  "Divorciada",
+  "Viúvo",
+  "Viúva",
+  "Separado",
+  "Separada",
+  "União estável",
+] as const;
+
+export const regularizeClientPfStateOptions = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
+] as const;
+
 export const regularizeProcessStatusOptions = [
   "Pendente",
   "Andamento",
@@ -166,9 +215,11 @@ export function RegularizeFormField({
 
 export function RegularizeFormError({
   message,
+  sticky = true,
   title = "Revise os campos obrigatórios",
 }: {
   message?: string | null;
+  sticky?: boolean;
   title?: string;
 }) {
   if (!message) {
@@ -178,7 +229,10 @@ export function RegularizeFormError({
   return (
     <div
       role="alert"
-      className="sticky top-0 z-20 flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg shadow-red-950/5 dark:border-red-800/80 dark:bg-red-950/80 dark:text-red-100"
+      className={cn(
+        sticky ? "sticky top-0 z-20" : "relative",
+        "flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg shadow-red-950/5 dark:border-red-800/80 dark:bg-red-950/80 dark:text-red-100",
+      )}
     >
       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-100">
         <AlertTriangle className="h-4 w-4" />
