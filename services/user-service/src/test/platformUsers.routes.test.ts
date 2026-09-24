@@ -95,7 +95,7 @@ import { getUserServiceEnv } from "../config/env.js";
 import { buildUserServiceOpenApiSpec } from "../openapi/spec.js";
 
 const platformIdentity = {
-  id: "platform-user-1",
+  id: "550e8400-e29b-41d4-a716-446655440000",
   name: "Platform Administrator",
   email: "admin@example.com",
   auth_kind: "platform" as const,
@@ -166,7 +166,7 @@ describe("platform users routes", () => {
     platformAuthMock.validateSession.mockResolvedValue(platformIdentity);
     platformUsersMock.listSuperAdmins.mockResolvedValue([
       {
-        id: "platform-user-1",
+        id: platformIdentity.id,
         name: "Platform Administrator",
         email: "admin@example.com",
         status: "active",
@@ -216,7 +216,7 @@ describe("platform users routes", () => {
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual([
       {
-        id: "platform-user-1",
+        id: platformIdentity.id,
         name: "Platform Administrator",
         email: "admin@example.com",
         status: "active",
@@ -235,7 +235,7 @@ describe("platform users routes", () => {
       can_impersonate: true,
     });
     prismaMock.platformUser.findFirst.mockResolvedValue({
-      id: "platform-user-2",
+      id: "550e8400-e29b-41d4-a716-446655440001",
       name: "Outra administradora",
       email: "outra@example.com",
       status: "active",
@@ -244,7 +244,7 @@ describe("platform users routes", () => {
     prismaMock.platformUser.updateMany.mockResolvedValue({ count: 1 });
 
     const response = await request(createApp())
-      .patch("/platform/super-admins/platform-user-2/impersonation-permission")
+      .patch("/platform/super-admins/550e8400-e29b-41d4-a716-446655440001/impersonation-permission")
       .set(platformGatewayHeaders())
       .send({ can_impersonate: true });
 
@@ -254,14 +254,14 @@ describe("platform users routes", () => {
       expect.objectContaining({
         platformActorUserId: platformIdentity.id,
         organizationId: null,
-        referringId: "platform-user-2",
+        referringId: "550e8400-e29b-41d4-a716-446655440001",
         changes: { can_impersonate: { from: false, to: true } },
         required: true,
       }),
     );
     expect(platformUsersMock.updateSuperAdminImpersonationPermission).toHaveBeenCalledWith(
       platformIdentity.id,
-      "platform-user-2",
+      "550e8400-e29b-41d4-a716-446655440001",
       true,
     );
   });
@@ -273,7 +273,7 @@ describe("platform users routes", () => {
     });
 
     const response = await request(createApp())
-      .patch("/platform/super-admins/platform-user-2/impersonation-permission")
+      .patch("/platform/super-admins/550e8400-e29b-41d4-a716-446655440001/impersonation-permission")
       .set(platformGatewayHeaders())
       .send({ can_impersonate: true });
 
@@ -309,18 +309,23 @@ describe("platform users routes", () => {
 
   it("rejeita body inválido ou CSRF ausente antes da mutação", async () => {
     const invalid = await request(createApp())
-      .patch("/platform/super-admins/platform-user-2/impersonation-permission")
+      .patch("/platform/super-admins/550e8400-e29b-41d4-a716-446655440001/impersonation-permission")
       .set(platformGatewayHeaders())
       .send({ can_impersonate: "true" });
     const headers = platformGatewayHeaders();
     delete headers[CSRF_HEADER_NAME];
     const missingCsrf = await request(createApp())
-      .patch("/platform/super-admins/platform-user-2/impersonation-permission")
+      .patch("/platform/super-admins/550e8400-e29b-41d4-a716-446655440001/impersonation-permission")
       .set(headers)
+      .send({ can_impersonate: true });
+    const invalidTargetId = await request(createApp())
+      .patch("/platform/super-admins/not-a-uuid/impersonation-permission")
+      .set(platformGatewayHeaders())
       .send({ can_impersonate: true });
 
     expect(invalid.status).toBe(400);
     expect(missingCsrf.status).toBe(403);
+    expect(invalidTargetId.status).toBe(400);
     expect(platformUsersMock.updateSuperAdminImpersonationPermission).not.toHaveBeenCalled();
   });
 
@@ -749,6 +754,7 @@ describe("platform users OpenAPI", () => {
       ],
       "boolean",
     );
+    expect(spec.paths).toHaveProperty([path, "patch", "parameters", 0, "schema", "format"], "uuid");
     expect(spec.paths).toHaveProperty([path, "patch", "parameters", 1, "name"], "x-csrf-token");
     expect(spec.paths).toHaveProperty([path, "patch", "responses", "403"]);
     expect(spec.paths).toHaveProperty([path, "patch", "responses", "409"]);

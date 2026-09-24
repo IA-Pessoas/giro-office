@@ -221,7 +221,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
               name: "superAdminId",
               in: "path",
               required: true,
-              schema: { type: "string", minLength: 1 },
+              schema: { type: "string", format: "uuid" },
             },
             csrfHeader,
           ],

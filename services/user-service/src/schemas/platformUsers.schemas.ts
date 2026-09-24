@@ -11,7 +11,7 @@ export const platformOrganizationUserParamsSchema = platformOrganizationUsersPar
   .strict();
 
 export const platformSuperAdminParamsSchema = z
-  .object({ superAdminId: z.string().trim().min(1, "superAdminId é obrigatório.") })
+  .object({ superAdminId: z.string().uuid({ message: "superAdminId inválido." }) })
   .strict();
 
 export const updatePlatformSuperAdminImpersonationPermissionSchema = z

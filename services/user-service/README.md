@@ -26,7 +26,7 @@ O endpoint `/internal/reporting/access-context` é chamado diretamente pelo repo
 
 - `POST /platform/session` autentica o administrador da plataforma e emite `cw.session` como cookie `HttpOnly`; o contrato direto exige `USER_SERVICE_INTERNAL_TOKEN` e aplica rate limit local, portanto o navegador deve chamá-lo pelo gateway. `cw.csrf` não autentica a requisição, servindo somente como prova CSRF para refresh e logout.
 - `GET /platform/super-admins` lista os super admins com nome, email, status e permissão de personificação; é uma consulta somente leitura.
-- `PATCH /platform/super-admins/:superAdminId/impersonation-permission` concede ou revoga essa permissão com `{ "can_impersonate": boolean }`. Exige sessão, CSRF e permissão do operador, impede autoalteração e registra ator, alvo e antes/depois na auditoria global da plataforma.
+- `PATCH /platform/super-admins/:superAdminId/impersonation-permission` concede ou revoga essa permissão para um alvo identificado por UUID com `{ "can_impersonate": boolean }`. Exige sessão, CSRF e permissão do operador, impede autoalteração e registra ator, alvo e antes/depois na auditoria global da plataforma.
 - `POST /platform/session/refresh`, `DELETE /platform/session` e `GET /platform/me` usam a sessão de plataforma. Nenhum endpoint retorna o JWT ou a prova CSRF no JSON.
 - `POST /platform/session/validate` é interno: exige `USER_SERVICE_INTERNAL_TOKEN` e não deve ser chamado pelo navegador.
 - `POST /platform/organizations/:organizationId/users/:userId/impersonate` inicia uma sessão de organização do usuário ativo por 60 minutos, exige CSRF e auditoria durável, revoga a sessão atual da plataforma e não retorna credenciais no JSON.
