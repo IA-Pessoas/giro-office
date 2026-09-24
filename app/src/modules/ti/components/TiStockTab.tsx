@@ -350,6 +350,10 @@ export function TiStockTab() {
   const selectedItem = selectedItemQuery.data ?? selectedListItem;
   const stockMovements = stockMovementsQuery.data ?? [];
   const isItemSubmitting = createItemMutation.isPending || updateItemMutation.isPending;
+  const initialQuantityError =
+    itemForm.quantity.trim() !== "" && toNonNegativeNumber(itemForm.quantity) === null
+      ? "Informe uma quantidade maior ou igual a zero."
+      : undefined;
   const isMovementSubmitting = createEntryMutation.isPending || createExitMutation.isPending;
   const isStockRefreshing =
     stockItemsQuery.isFetching ||
@@ -1150,6 +1154,7 @@ export function TiStockTab() {
             {!editingItemId ? (
               <TiTextField
                 label="Quantidade inicial"
+                errorText={initialQuantityError}
                 min={0}
                 onChange={(event) => updateItemField("quantity", event.target.value)}
                 type="number"

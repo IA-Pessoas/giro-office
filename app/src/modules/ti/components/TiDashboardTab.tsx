@@ -233,9 +233,8 @@ export function TiDashboardTab({ onOpenRequests }: { onOpenRequests?: () => void
             />
             <MetricTile
               icon={BarChart3}
-              label="Resolvidos"
+              label="Resolvidos em 7 dias"
               value={formatMetric(resolvedLastSevenDays)}
-              supporting="Nos últimos 7 dias"
             />
             <MetricTile
               icon={ClipboardList}
@@ -286,7 +285,11 @@ export function TiDashboardTab({ onOpenRequests }: { onOpenRequests?: () => void
           description="Leitura rápida do atendimento carregado no resumo operacional."
         >
           <div className="space-y-3">
-            <DashboardSummaryRow icon={Ticket} label="Abertos" value={formatMetric(openRequests)} />
+            <DashboardSummaryRow
+              icon={Ticket}
+              label="Em acompanhamento"
+              value={formatMetric(openRequests)}
+            />
             <DashboardSummaryRow
               icon={BarChart3}
               label="Críticos"
@@ -317,12 +320,12 @@ export function TiDashboardTab({ onOpenRequests }: { onOpenRequests?: () => void
             />
             <DashboardSummaryRow
               icon={PackageSearch}
-              label="Estoque"
+              label="Estoque crítico"
               value={formatMetric(summary?.lowStockItems)}
             />
             <DashboardSummaryRow
               icon={Bot}
-              label="Robôs"
+              label="Robôs ativos"
               value={formatMetric(summary?.activeRobots)}
             />
           </div>
