@@ -17,6 +17,15 @@ interface BuildSelfProfileUpdatePayloadOptions extends SelfPasswordDraft {
   name: string;
 }
 
+/** Política da nova senha (tamanho e confirmação), comum ao perfil e ao link de redefinição. */
+export function newPasswordError(password: string, confirmPassword: string): string | null {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+  }
+  if (password !== confirmPassword) return "As senhas não conferem.";
+  return null;
+}
+
 /** Primeiro problema da troca de senha; null quando não há troca ou ela é válida. */
 export function selfPasswordError({
   password,
@@ -26,10 +35,8 @@ export function selfPasswordError({
   const trimmedPassword = password.trim();
   if (!trimmedPassword) return null;
   if (!currentPassword) return "Informe a senha atual.";
-  if (trimmedPassword.length < MIN_PASSWORD_LENGTH) {
-    return `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`;
-  }
-  if (trimmedPassword !== confirmPassword.trim()) return "As senhas não conferem.";
+  const policyError = newPasswordError(trimmedPassword, confirmPassword.trim());
+  if (policyError) return policyError;
   if (trimmedPassword === currentPassword) return "A nova senha deve ser diferente da atual.";
   return null;
 }

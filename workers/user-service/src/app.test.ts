@@ -788,6 +788,11 @@ describe("user Worker", () => {
         where: { user_id: USER_ID, id: { not: "session-1" }, revoked_at: null },
         data: { revoked_at: expect.any(Date) },
       });
+      // Link de redefinição pendente (#1342) não sobrevive à troca feita pelo próprio usuário.
+      expect(db.passwordResetToken.updateMany).toHaveBeenCalledWith({
+        where: { user_id: USER_ID, used_at: null },
+        data: { used_at: expect.any(Date) },
+      });
       const sessionToken = /cw\.session=([^;]+)/.exec(
         response.headers.get("set-cookie") ?? "",
       )?.[1];

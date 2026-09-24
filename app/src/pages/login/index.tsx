@@ -64,6 +64,8 @@ export default function Login() {
     } catch (error: any) {
       if (error?.response?.status === 400 || error?.response?.status === 401) {
         setError("Login ou senha inválidos");
+      } else if (error?.response?.status === 429) {
+        setError("Muitas tentativas. Aguarde um minuto e tente novamente.");
       } else {
         setError("Não foi possível entrar agora. Tente novamente.");
       }
