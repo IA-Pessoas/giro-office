@@ -2,7 +2,7 @@
 
 A página `/super-admin/login` e o `POST /platform/session` continuam acessíveis a qualquer um. Esconder a rota não protege nada: o endereço já circula no bundle do app e em links. A proteção fica em três camadas.
 
-- O gateway limita cada IP a 10 tentativas por minuto nas rotas que recebem credencial (`POST /platform/session`, `POST /user/session` e `POST /user/password-reset/confirm`), com o binding `LOGIN_RATE_LIMITER` do Workers, e responde 429 ao estourar.
+- O gateway limita a 10 tentativas por minuto cada par IP + rota, nas rotas que recebem credencial (`POST /platform/session`, `POST /user/session` e `POST /user/password-reset/confirm`), com o binding `LOGIN_RATE_LIMITER` do Workers, e responde 429 ao estourar.
 - A senha do super admin segue a mesma verificação com hash dos demais logins.
 - Toda rota `/platform/*` além do login exige sessão de plataforma (`platformOnly`).
 
@@ -17,4 +17,7 @@ A página `/super-admin/login` e o `POST /platform/session` continuam acessívei
 
 - Sem o binding (dev local e testes), o limite não se aplica. O `wrangler.jsonc` do gateway o declara para produção.
 - O limite é por IP: um ataque distribuído passa. Access ou 2FA fecham isso.
-- O Node gateway mantém o próprio limite (`PLATFORM_AUTH_RATE_LIMIT_*`) no user-service.
+- A chave é `rota:IP`, então um IP pode somar até 30 tentativas por minuto nas três rotas.
+- O `namespace_id` do binding precisa ser único na conta Cloudflare; outro Worker com o mesmo id compartilharia os contadores.
+- O `PLATFORM_AUTH_RATE_LIMIT_*` vale só no user-service Node (Express); em produção (Workers) o limite é este do gateway.
+- CPFs de clientes e sócios (certificados PF, Departamento Pessoal, Regularize) continuam em claro nas listas, porque a operação contábil precisa deles. Ficam fora da #1344, que trata de colaboradores.
