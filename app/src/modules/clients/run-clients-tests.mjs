@@ -130,6 +130,13 @@ runTest("client form sends the selected tax regime on creation and update", () =
 
   assert.equal(buildCreateClientPayload(values, "organization-1").regime, "Simples Nacional");
   assert.equal(
+    buildCreateClientPayload(
+      { ...values, cpf_cnpj: "AB.123.456/7800-26" },
+      "organization-1",
+    ).cpf_cnpj,
+    "AB123456780026",
+  );
+  assert.equal(
     buildUpdateClientPayload({ ...values, regime: "Lucro Presumido" }).regime,
     "Lucro Presumido",
   );
@@ -451,16 +458,18 @@ runTest("integration edit guard blocks when normalized cpf_cnpj is missing", () 
 });
 
 runTest("document validation enforces base client cpf_cnpj length", () => {
-  assert.equal(validateCpfCnpjDocument("123.456.789-10"), null);
-  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90"), null);
+  assert.equal(validateCpfCnpjDocument("529.982.247-25"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-95"), null);
   assert.equal(validateCpfCnpjDocument("123"), "CPF/CNPJ deve ter 11 ou 14 dígitos.");
+  assert.equal(validateCpfCnpjDocument("529.982.247-26", "PF"), "CPF inválido.");
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-00", "PJ"), "CNPJ inválido.");
 });
 
 runTest("document validation enforces integration person type length", () => {
-  assert.equal(validateCpfCnpjDocument("123.456.789-10", "PF"), null);
-  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90", "PJ"), null);
-  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90", "PF"), "CPF deve ter 11 dígitos.");
-  assert.equal(validateCpfCnpjDocument("123.456.789-10", "PJ"), "CNPJ deve ter 14 dígitos.");
+  assert.equal(validateCpfCnpjDocument("529.982.247-25", "PF"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-95", "PJ"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-95", "PF"), "CPF deve ter 11 dígitos.");
+  assert.equal(validateCpfCnpjDocument("529.982.247-25", "PJ"), "CNPJ deve ter 14 dígitos.");
 });
 
 runTest("document input formatter masks and limits by person type", () => {
@@ -469,7 +478,7 @@ runTest("document input formatter masks and limits by person type", () => {
   assert.equal(formatCpfCnpjInput("abc1234", "PF"), "123.4");
   assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
   assert.equal(formatCpfCnpjInput("AB123456780001", "PJ"), "AB.123.456/7800-01");
-  assert.equal(validateCpfCnpjDocument("AB.123.456/7800-01", "PJ"), null);
+  assert.equal(validateCpfCnpjDocument("AB.123.456/7800-26", "PJ"), null);
 });
 
 runTest("client input masks forward formatted document and phone values through event-compatible targets", () => {
@@ -522,7 +531,7 @@ runTest("client Regularize fields route generic documents, CPF, and phones throu
 
 runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {
   assert.equal(validateOptionalCpfDocument("CPF do responsável", ""), null);
-  assert.equal(validateOptionalCpfDocument("CPF do responsável", "123.456.789-10"), null);
+  assert.equal(validateOptionalCpfDocument("CPF do responsável", "529.982.247-25"), null);
   assert.equal(
     validateOptionalCpfDocument("CPF do responsável", "123"),
     "CPF do responsável deve ter 11 dígitos.",
@@ -589,6 +598,22 @@ runTest("regularize payload normalizes documents, nullable text, and dates", () 
     customer_since: "2026-04-02",
   });
   assert.equal(hasRegularizeChanges(values, client), true);
+});
+
+runTest("regularize payload preserves alphanumeric CNPJ", () => {
+  const client = {
+    type: "PJ",
+    name: "Acme",
+    cpf_cnpj: "12.345.678/0001-95",
+  };
+  const values = {
+    ...createRegularizeInitialValues(client),
+    cpf_cnpj: "AB.123.456/7800-26",
+  };
+
+  assert.deepEqual(buildRegularizePayload(values, client), {
+    cpf_cnpj: "AB123456780026",
+  });
 });
 
 runTest("regularize hydration masks documents and phone while phone payload stays canonical", () => {

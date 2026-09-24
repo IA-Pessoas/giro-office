@@ -20,7 +20,7 @@ function createPrismaMock() {
     name: "Cliente Novo",
     organization_id: TEST_ORG_ID,
     status: "Ativo",
-    cpf_cnpj: "",
+    cpf_cnpj: "12345678000195",
     company_name: null,
     fantasy_name: null,
     service_unique: false,
@@ -30,7 +30,7 @@ function createPrismaMock() {
 
   return {
     organization: { findUnique: vi.fn().mockResolvedValue(organization) },
-    client: { create: clientCreate },
+    client: { create: clientCreate, findFirst: vi.fn().mockResolvedValue(null) },
   } as unknown as PrismaClient;
 }
 
@@ -38,7 +38,7 @@ const input = {
   name: "Cliente Novo",
   organization_id: TEST_ORG_ID,
   status: "Ativo",
-  cpf_cnpj: "",
+  cpf_cnpj: "12345678000195",
   prospecting_status: "Lead",
   type: "PJ",
   type_registration: "Novo",
@@ -47,6 +47,36 @@ const input = {
 };
 
 describe("ClientService.create", () => {
+  it("rejeita CPF inválido antes de persistir", async () => {
+    const prisma = createPrismaMock();
+    const service = new ClientService(prisma);
+
+    await expect(
+      service.create(
+        { ...input, type: "PF", cpf_cnpj: "52998224726" },
+        {
+          userId: "user-1",
+          level: 2,
+          isOwner: false,
+        },
+      ),
+    ).rejects.toMatchObject({ statusCode: 400, message: "CPF inválido." });
+
+    expect(prisma.client.create).not.toHaveBeenCalled();
+  });
+
+  it("rejeita documento duplicado na organização", async () => {
+    const prisma = createPrismaMock();
+    vi.mocked(prisma.client.findFirst).mockResolvedValueOnce({ id: TEST_CLIENT_ID } as never);
+    const service = new ClientService(prisma);
+
+    await expect(
+      service.create(input, { userId: "user-1", level: 2, isOwner: false }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(prisma.client.create).not.toHaveBeenCalled();
+  });
+
   it.each([
     2, 3,
   ] as const)("permite regime no nível de Integração %s e o retorna", async (level) => {
