@@ -185,3 +185,20 @@ export function unwrapProjectProgress(body: unknown): ProjectProgressResponse {
 
   return data as ProjectProgressResponse;
 }
+
+/** Espelha PROJECT_MANUAL_STATUSES do shared; o status atual fica no topo se for outro. */
+const PROJECT_MANUAL_STATUSES = ["Em andamento", "Paralisado", "Concluído"];
+
+export function getProjectStatusOptions(currentStatus: string): string[] {
+  return PROJECT_MANUAL_STATUSES.includes(currentStatus) || !currentStatus
+    ? PROJECT_MANUAL_STATUSES
+    : [currentStatus, ...PROJECT_MANUAL_STATUSES];
+}
+
+/** O PUT devolve só colunas do projeto; cliente e tarefas vêm do detalhe anterior. */
+export function mergeUpdatedProjectDetail<T extends object>(
+  previous: T | undefined,
+  updated: Partial<T>,
+): T {
+  return { ...(previous ?? {}), ...updated } as T;
+}

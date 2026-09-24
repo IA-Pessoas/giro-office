@@ -14,14 +14,17 @@ import { integracaoProjectProgressBodySchema } from "@workspace/project-service/
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   createProjectInTransaction,
+  getProgressProjectStatus,
   getProjectDeleteTasksMessage,
   PROJECT_DELETE_HIRING_MESSAGE,
+  PROJECT_STATUS_COMPLETED,
   type ProjectCrudAuthContext,
   type ProjectReportingSource,
   parseWithZod,
   projectReportingCatalog,
   type ReportingQuery,
   reportingQueryFields,
+  resolveManualProjectStatus,
   withReportingSnapshot,
 } from "@workspace/shared";
 import {
@@ -112,6 +115,7 @@ type UpdateProjectInput = ProjectAuthorization & {
   end_date: Date;
   objective: string;
   sponsor_id?: string;
+  status?: string;
 };
 type DeleteProjectInput = ProjectAuthorization & { project_id: string };
 
@@ -435,8 +439,27 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
           organizationId: data.organizationId,
           resourceOrganizationId: data.organizationId,
           isOwner: data.isOwner,
-          requestedFields: ["name", "start_date", "end_date", "objective", "sponsor_id"],
+          requestedFields: [
+            "name",
+            "start_date",
+            "end_date",
+            "objective",
+            "sponsor_id",
+            ...(data.status === undefined ? [] : ["status"]),
+          ],
         });
+        const currentStatus = String(exists.status ?? "");
+        const openTaskCount =
+          data.status === PROJECT_STATUS_COMPLETED && data.status !== currentStatus
+            ? await prisma.task.count({
+                where: {
+                  project_id: data.project_id,
+                  organization_id: data.organizationId,
+                  status: { not: "Concluída" },
+                },
+              })
+            : 0;
+        const status = resolveManualProjectStatus(currentStatus, data.status, openTaskCount);
         const updated = await prisma.project.update({
           where: { id: data.project_id },
           data: {
@@ -445,6 +468,7 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
             end_date: data.end_date,
             objective: data.objective,
             sponsor_id: data.sponsor_id ?? null,
+            status,
           },
           select: UPDATE_SELECT,
         });
@@ -513,6 +537,7 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
 const normalizeStatus = (status: string | null | undefined) =>
   status?.trim().toLocaleLowerCase("pt-BR") ?? "";
 const PROJECT_STATUS_TO_DO = new Set([
+  "a realizar",
   "análise/agendamento",
   "análise financeira",
   "envio de proposta",
@@ -617,7 +642,7 @@ function localProgressService(prisma: ProjectPrisma, audit: ProjectAudit): Progr
           async (transaction) => {
             const exists = await transaction.project.findFirst({
               where: { id: projectId, organization_id: organizationId },
-              select: { id: true, client_id: true },
+              select: { id: true, client_id: true, status: true },
             });
             if (!exists) throw new ServiceError(404, "Projeto não existe");
             requireIntegracaoRouteAccess("POST", "/project/progress", {
@@ -652,7 +677,7 @@ function localProgressService(prisma: ProjectPrisma, audit: ProjectAudit): Progr
             const completedTasks =
               statusCounts.find((group) => group.status === "Concluída")?._count.status ?? 0;
             const percentage = Math.round((completedTasks / totalTasks) * 100 * 100) / 100;
-            const newStatus = percentage === 100 ? "Concluído" : "Em andamento";
+            const newStatus = getProgressProjectStatus(exists.status, percentage);
             if (
               percentage === 100 &&
               auth.integracaoLevel !== INTEGRACAO_PERMISSION_LEVEL.ADMIN &&

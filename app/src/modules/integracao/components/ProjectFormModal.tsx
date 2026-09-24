@@ -21,7 +21,10 @@ import {
   useProjectWizardPreviewMutation,
   useUpdateProjectMutation,
 } from "../hooks/useProjects";
-import { PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE } from "../services/projectService.contract";
+import {
+  getProjectStatusOptions,
+  PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE,
+} from "../services/projectService.contract";
 import { taskModelService } from "../services/taskModelService";
 import type {
   ProjectDetail,
@@ -693,6 +696,25 @@ export function ProjectFormModal({
                   </p>
                 ) : null}
               </label>
+
+              {isEditing ? (
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
+                  <ProjectSelect
+                    value={values.status}
+                    onChange={(event) => updateValue("status", event.target.value)}
+                  >
+                    {getProjectStatusOptions(values.status).map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </ProjectSelect>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Concluir exige todas as tarefas concluídas.
+                  </span>
+                </label>
+              ) : null}
 
               <label className="space-y-2">
                 <RequiredFieldLabel

@@ -1,4 +1,5 @@
 import {
+  getProgressProjectStatus,
   INTEGRACAO_PERMISSION_LEVEL,
   type IntegracaoPermissionLevel,
   error as logError,
@@ -20,8 +21,6 @@ export const TASK_STATUSES_FOR_PROGRESS = [
 ] as const;
 
 const TASK_STATUS_COMPLETED = "Concluída";
-const PROJECT_STATUS_COMPLETED = "Concluído";
-const PROJECT_STATUS_IN_PROGRESS = "Em andamento";
 
 const PROGRESS_SELECT = {
   id: true,
@@ -122,8 +121,7 @@ export class ProjectProgressService {
 
       const percentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
       const roundedPercentage = Math.round(percentage * 100) / 100;
-      const newStatus =
-        roundedPercentage === 100 ? PROJECT_STATUS_COMPLETED : PROJECT_STATUS_IN_PROGRESS;
+      const newStatus = getProgressProjectStatus(exists.status, roundedPercentage);
 
       if (roundedPercentage === 100) {
         if (

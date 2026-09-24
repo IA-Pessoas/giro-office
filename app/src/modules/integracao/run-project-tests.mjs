@@ -162,6 +162,8 @@ import {
   unwrapProjectWizardPreview,
   unwrapUpdatedProject,
   unwrapProjectTaskProposals,
+  getProjectStatusOptions,
+  mergeUpdatedProjectDetail,
 } from "./services/projectService.contract.ts";
 import {
   buildHireProjectPlanPayload,
@@ -1814,4 +1816,32 @@ runTest("task edit form only sets the first prevision directly", () => {
   const source = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
   assert.match(source, /getInitialPrevisionPatch\(/);
   assert.match(source, /readOnly=\{!canSetInitialPrevision\}/);
+});
+
+runTest("project edit keeps client and tasks after PUT and offers manual statuses", () => {
+  const previous = {
+    id: "p1",
+    name: "Antigo",
+    status: "Em andamento",
+    client: { id: "c1", name: "Cliente" },
+    tasks: [{ id: "t1", name: "Tarefa" }],
+  };
+  const merged = mergeUpdatedProjectDetail(previous, { id: "p1", name: "Novo", status: "Paralisado" });
+
+  assert.equal(merged.name, "Novo");
+  assert.equal(merged.status, "Paralisado");
+  assert.deepEqual(merged.client, previous.client);
+  assert.deepEqual(merged.tasks, previous.tasks);
+  assert.deepEqual(mergeUpdatedProjectDetail(undefined, { id: "p1" }), { id: "p1" });
+
+  assert.deepEqual(getProjectStatusOptions("Em andamento"), ["Em andamento", "Paralisado", "Concluído"]);
+  assert.deepEqual(getProjectStatusOptions("A realizar"), [
+    "A realizar",
+    "Em andamento",
+    "Paralisado",
+    "Concluído",
+  ]);
+
+  const hooks = readFileSync("src/modules/integracao/hooks/useProjects.ts", "utf8");
+  assert.match(hooks, /mergeUpdatedProjectDetail\(/);
 });

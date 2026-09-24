@@ -23,6 +23,7 @@ import type {
   UpdateProjectData,
 } from "../types";
 import { projectService } from "../services/projectService";
+import { mergeUpdatedProjectDetail } from "../services/projectService.contract";
 import {
   INTEGRACAO_TASKS_QUERY_KEY,
   projectDetailQueryKey,
@@ -130,7 +131,9 @@ export function useUpdateProjectMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ clientId: _clientId, ...payload }) => projectService.update(payload),
     onSuccess: async (project, variables) => {
-      queryClient.setQueryData(projectDetailQueryKey(variables.project_id), project);
+      queryClient.setQueryData<ProjectDetail>(projectDetailQueryKey(variables.project_id), (previous) =>
+        mergeUpdatedProjectDetail(previous, project),
+      );
       await queryClient.invalidateQueries({
         queryKey: projectListQueryKey({ ref: "client", id: variables.clientId }),
       });
