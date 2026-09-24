@@ -40,7 +40,7 @@ export function useCreatePessoalUnionMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => pessoalService.createUnion(payload),
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: unionsKey });
     },
   });
@@ -53,7 +53,7 @@ export function useUpdatePessoalUnionMutation(
 
   return useMutation({
     mutationFn: (payload) => pessoalService.updateUnion(id, payload),
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: unionsKey });
     },
   });
@@ -64,7 +64,7 @@ export function useDeletePessoalUnionMutation(): UseMutationResult<PessoalUnion,
 
   return useMutation({
     mutationFn: (id) => pessoalService.deleteUnion(id),
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: unionsKey });
     },
   });

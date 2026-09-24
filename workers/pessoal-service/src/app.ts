@@ -57,7 +57,7 @@ import {
   isPessoalPasswordEncrypted,
 } from "@workspace/pessoal-service/src/services/pessoalPasswordCrypto.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
-import { parseWithZod } from "@workspace/shared";
+import { isValidCnpj, parseWithZod } from "@workspace/shared";
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -80,6 +80,9 @@ import {
   UnionNotificationService,
 } from "./remainderServices.js";
 import { type PessoalReportingService, registerReportingRoutes } from "./reporting.js";
+
+const DOMAIN_TRANSACTION_MAX_WAIT_MS = 5_000;
+const DOMAIN_TRANSACTION_TIMEOUT_MS = 15_000;
 
 type GroupRow = Record<string, unknown> & { organization_id: string };
 export type PessoalGroupPrisma = {
@@ -217,6 +220,7 @@ export type PessoalDomainPrisma = PessoalGroupPrisma &
       findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
     };
     obrigationsPessoal: {
+      count(args: Record<string, unknown>): Promise<number>;
       findMany(args: Record<string, unknown>): Promise<unknown[]>;
       findFirst(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
       create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -515,6 +519,13 @@ function localUnionService(
         select,
       });
       if (!current) throw new ServiceError(404, "Sindicato nao encontrado.");
+      if (
+        body.cnpj !== undefined &&
+        body.cnpj !== current.cnpj &&
+        !isValidCnpj(String(body.cnpj))
+      ) {
+        throw new ServiceError(400, "CNPJ inválido.");
+      }
       const data = {
         ...(body.name !== undefined ? { name: body.name } : {}),
         ...(body.cnpj !== undefined ? { cnpj: body.cnpj } : {}),
@@ -1445,30 +1456,57 @@ function localObligationService(
   };
 }
 
+const saoPauloDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+
+/** Dia civil em São Paulo no formato YYYY-MM-DD. */
+function saoPauloDateKey(date: Date): string {
+  return saoPauloDate.format(date);
+}
+
+/**
+ * Pago pelo status; vencido pelo status ou por vencimento anterior a hoje sem pagamento;
+ * o resto é aberto. `due_date` é gravado como data à meia-noite UTC; "hoje" é o dia em
+ * São Paulo, para um LDD que vence hoje não virar vencido às 21h.
+ */
+export function summarizeLddStatuses(
+  rows: { status?: unknown; due_date?: unknown }[],
+  today: Date,
+): { total: number; open: number; overdue: number; paid: number } {
+  const todayKey = saoPauloDateKey(today);
+  const counts = { total: rows.length, open: 0, overdue: 0, paid: 0 };
+  for (const row of rows) {
+    const status = String(row.status ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/gu, "")
+      .trim()
+      .toLowerCase();
+    const dueKey = row.due_date instanceof Date ? row.due_date.toISOString().slice(0, 10) : null;
+    if (status === "pago") counts.paid += 1;
+    else if (status === "vencido" || (dueKey !== null && dueKey < todayKey)) counts.overdue += 1;
+    else counts.open += 1;
+  }
+  return counts;
+}
+
 function localOverviewService(prisma: PessoalDomainPrisma): PessoalOverviewService {
   return {
     async getSummary(context) {
       const organizationWhere = { organization_id: context.organizationId };
-      const [unions, ldd] = await Promise.all([
+      const now = new Date();
+      const competence = saoPauloDateKey(now).slice(0, 7);
+      const [unions, ldd, payrollTotal, obligationTotal] = await Promise.all([
         prisma.unionPessoal.findMany({
           where: organizationWhere,
           select: { base_date: true, cnpj: true },
         }),
         prisma.lddPessoal.findMany({
           where: organizationWhere,
-          select: { status: true },
+          select: { status: true, due_date: true },
         }),
+        prisma.payroll.count({ where: organizationWhere }),
+        prisma.obrigationsPessoal.count({ where: { ...organizationWhere, competence } }),
       ]);
-      const lddCounts = { total: ldd.length, open: 0, overdue: 0, paid: 0 };
-      for (const row of ldd as Record<string, unknown>[]) {
-        const status = String(row.status ?? "")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/gu, "")
-          .toLowerCase();
-        if (status === "pago") lddCounts.paid += 1;
-        else if (status === "vencido") lddCounts.overdue += 1;
-        else lddCounts.open += 1;
-      }
+      const lddCounts = summarizeLddStatuses(ldd as Record<string, unknown>[], now);
       const unionRows = unions as Record<string, unknown>[];
       const withBaseDate = unionRows.filter((row) => row.base_date !== null).length;
       return {
@@ -1479,6 +1517,8 @@ function localOverviewService(prisma: PessoalDomainPrisma): PessoalOverviewServi
           withCnpj: unionRows.filter((row) => row.cnpj !== "").length,
         },
         ldd: lddCounts,
+        payroll: { total: payrollTotal },
+        obligations: { competence, total: obligationTotal },
       };
     },
   };
@@ -1507,12 +1547,22 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     c.set("auth", await authenticatePessoalRequest(c.req.raw, options.env ?? c.env));
     await next();
   });
+  // #1300: a escrita e a auditoria confirmam juntas. Se o audit-service recusar, a transação
+  // é revertida e o cliente recebe erro sem nada gravado. Vale também para GET: revelar senha
+  // grava e audita. O timeout cobre os 5s de espera pelo audit-service.
+  const withDomainClient = <T>(c: PessoalContext, callback: (client: unknown) => Promise<T>) =>
+    withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      client.$transaction((tx) => callback(tx), {
+        maxWait: DOMAIN_TRANSACTION_MAX_WAIT_MS,
+        timeout: DOMAIN_TRANSACTION_TIMEOUT_MS,
+      }),
+    );
   const withService = async <T>(
     c: PessoalContext,
     callback: (service: PessoalGroupService) => Promise<T>,
   ) => {
     if (options.groupService) return callback(options.groupService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(localService(client as unknown as PessoalGroupPrisma, options.env ?? c.env)),
     );
   };
@@ -1521,7 +1571,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalUnionService) => Promise<T>,
   ) => {
     if (options.unionService) return callback(options.unionService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(localUnionService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
     );
   };
@@ -1530,7 +1580,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalSituationService) => Promise<T>,
   ) => {
     if (options.situationService) return callback(options.situationService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(
         localSituationService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
       ),
@@ -1541,7 +1591,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalLddService) => Promise<T>,
   ) => {
     if (options.lddService) return callback(options.lddService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(localLddService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
     );
   };
@@ -1550,7 +1600,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalPasswordService) => Promise<T>,
   ) => {
     if (options.passwordService) return callback(options.passwordService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(
         localPasswordService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
       ),
@@ -1561,7 +1611,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalPayrollService) => Promise<T>,
   ) => {
     if (options.payrollService) return callback(options.payrollService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(localPayrollService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
     );
   };
@@ -1570,7 +1620,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalObligationService) => Promise<T>,
   ) => {
     if (options.obligationService) return callback(options.obligationService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(
         localObligationService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
       ),
