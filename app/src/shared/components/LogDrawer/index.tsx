@@ -214,7 +214,14 @@ export default function LogDrawer({ referring, referringId }: LogDrawerProps) {
                     Em: {format(new Date(log.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                   </p>
                   {log.userId ? (
-                    <p className={styles.text}>Usuário: {log.userId}</p>
+                    <p className={styles.text}>
+                      {scope === "organization" ? "Autor (usuário-alvo)" : "Usuário"}: {log.userId}
+                    </p>
+                  ) : null}
+                  {scope === "organization" && (log.method || log.path) ? (
+                    <p className={styles.text}>
+                      {log.method ?? "Requisição"} {log.path ?? ""}
+                    </p>
                   ) : null}
                   {log.metadata?.actorKind === "platform" &&
                   typeof log.metadata.actorPlatformUserId === "string" ? (

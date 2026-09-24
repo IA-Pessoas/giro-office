@@ -200,6 +200,7 @@ runTest("LogDrawer uses Radix Dialog primitives", () => {
 runTest("LogDrawer exposes organization audit and the impersonation operator", () => {
   assert.match(logDrawerSource, /Auditoria da organização/);
   assert.match(logDrawerSource, /nextScope === "item" \? \{ referring, referringId \} : \{\}/);
+  assert.match(logDrawerSource, /Autor \(usuário-alvo\)/);
   assert.match(logDrawerSource, /Operador na personificação: \{log\.metadata\.actorPlatformUserId\}/);
   assert.match(logDrawerSource, /Página \{page\} de \{Math\.ceil\(total \/ 20\)\}/);
 });
