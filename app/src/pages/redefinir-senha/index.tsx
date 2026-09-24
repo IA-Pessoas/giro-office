@@ -6,19 +6,10 @@ import { isAxiosError } from "axios";
 import { KeyRound } from "lucide-react";
 
 import { setupAPIClient } from "@shared/services/api";
-import { MIN_PASSWORD_LENGTH } from "@shared/utils/meProfileUpdate";
+import { MIN_PASSWORD_LENGTH, newPasswordError } from "@shared/utils/meProfileUpdate";
 
 const inputClass =
   "w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30";
-
-function passwordError(password: string, confirmPassword: string): string | null {
-  if (!password) return null;
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`;
-  }
-  if (password !== confirmPassword) return "As senhas não conferem.";
-  return null;
-}
 
 /** Destino do link enviado pelo administrador (#1342). */
 export default function RedefinirSenhaPage() {
@@ -38,7 +29,7 @@ export default function RedefinirSenhaPage() {
     window.history.replaceState(null, "", "/redefinir-senha");
   }, [router.isReady, router.query.token]);
 
-  const validationError = passwordError(password, confirmPassword);
+  const validationError = password ? newPasswordError(password, confirmPassword) : null;
   const canSubmit =
     Boolean(token) && password.length > 0 && confirmPassword.length > 0 && !validationError;
 
