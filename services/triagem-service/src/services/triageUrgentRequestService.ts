@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
-
 import { error as logError, ServiceError } from "@workspace/shared";
-
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { assertCompetenceWritable } from "./triageCompetenceGuard.js";
 
 const REQUEST_SELECT = {
   id: true,
@@ -28,7 +27,7 @@ type RequestRecord = Prisma.TriageUrgentRequestGetPayload<{
 
 export type TriageUrgentRequestPrisma = Pick<
   PrismaClient,
-  "$executeRaw" | "$transaction" | "client" | "user" | "triageUrgentRequest"
+  "$executeRaw" | "$transaction" | "client" | "user" | "triageCompetence" | "triageUrgentRequest"
 >;
 
 export interface TriageUrgentRequestAuthContext {
@@ -152,6 +151,12 @@ export class TriageUrgentRequestService {
 
     try {
       const result = await this.withOrganization(auth, async (transaction) => {
+        await assertCompetenceWritable(
+          transaction,
+          auth.organizationId,
+          input.client_id,
+          input.competence,
+        );
         const requester = await this.ensureUser(
           transaction,
           auth,

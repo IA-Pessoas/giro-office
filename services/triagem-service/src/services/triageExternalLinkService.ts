@@ -1,8 +1,8 @@
 import { ServiceError } from "@workspace/shared";
-
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "./triageCatalog.constants.js";
 import { snapshotTriageCatalogForCompetence } from "./triageCatalogService.js";
+import { assertCompetenceWritable } from "./triageCompetenceGuard.js";
 
 const externalLinkSelect = {
   id: true,
@@ -133,6 +133,12 @@ export class TriageExternalLinkService {
     assertLinkValues(input);
 
     const created = await this.withOrganization(auth, async (transaction) => {
+      await assertCompetenceWritable(
+        transaction,
+        auth.organizationId,
+        input.client_id,
+        input.competence,
+      );
       await this.assertCatalogItemForCompetence(
         transaction,
         "LINK_TYPE",
@@ -316,7 +322,7 @@ export class TriageExternalLinkService {
         select: { id: true },
       });
       if (!snapshot) {
-        throw new ServiceError(400, "Tipo de link não está disponível no snapshot da competência.");
+        throw new ServiceError(400, "Tipo de link não está disponível nesta competência.");
       }
       return;
     }

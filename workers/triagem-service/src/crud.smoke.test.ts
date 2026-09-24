@@ -151,6 +151,38 @@ describe.skipIf(!smokeState)("triagem-service CRUD smoke (banco real)", () => {
       expect.objectContaining({ competence: emptyCompetence, status: "NO_APPLICABLE_ITEMS" }),
     ]);
     expect(overview.data.indicators).toMatchObject({ complete: 0, no_applicable_items: 1 });
+
+    // Arquivada é somente leitura até restaurar; criar de novo restaura.
+    const created = expectOk(
+      await call("POST", "/triagem/competencies", {
+        client_id: clientId,
+        competence: emptyCompetence,
+      }),
+      "POST competência vazia (repetida)",
+    );
+    expectOk(
+      await call("PATCH", `/triagem/competencies/${created.data.id as string}/archive`, {}),
+      "PATCH arquivar competência vazia",
+    );
+    expectOk(
+      await call("POST", "/triagem/urgent-requests", {
+        client_id: clientId,
+        competence: emptyCompetence,
+        urgency_code: "HIGH",
+        description: `Arquivada ${suffix}`,
+        responsible_id: requireSmokeState().userId,
+      }),
+      "POST urgência em competência arquivada",
+      [409],
+    );
+    const restored = expectOk(
+      await call("POST", "/triagem/competencies", {
+        client_id: clientId,
+        competence: emptyCompetence,
+      }),
+      "POST restaura competência arquivada",
+    );
+    expect(restored.data.archived_at).toBeNull();
   });
 
   it("competência, links externos, urgências, histórico, overview e reconciliação", async () => {
