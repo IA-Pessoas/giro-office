@@ -192,7 +192,7 @@ export function RhDossierSection() {
       ) : null}
 
       {canManageRh && !selectedUserId && (listQuery.data?.length ?? 0) > 0 ? (
-        <StatusPanel text="Selecione um colaborador para ver o dossiê." />
+        <StatusPanel text="Selecione um colaborador para consultar o dossiê." />
       ) : null}
 
       {(!canManageRh || selectedUserId) && permission !== RH_DOSSIER_MANAGER_PERMISSION ? (

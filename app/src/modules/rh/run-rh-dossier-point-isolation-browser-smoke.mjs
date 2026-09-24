@@ -14,14 +14,7 @@ const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const repositoryRoot = resolve(appRoot, "..");
 const screenshotDir = resolve(repositoryRoot, "output/playwright/issue-1241");
 const pointConfigMessage = "Cadastre a configuração de ponto para visualizar o resumo.";
-const selectCollaboratorHint = "Selecione um colaborador para ver o dossiê.";
-
-async function selectCollaborator(page) {
-  const hint = page.getByText(selectCollaboratorHint, { exact: true });
-  if (await hint.isVisible()) {
-    await page.getByRole("button", { name: new RegExp(`^${user.name} Analista`) }).click();
-  }
-}
+const selectCollaboratorHint = "Selecione um colaborador para consultar o dossiê.";
 
 const user = {
   id: "rh-dossier-smoke-user",
@@ -33,6 +26,13 @@ const user = {
   type: "admin",
   modules: { rh: 3 },
 };
+
+async function selectCollaborator(page) {
+  const hint = page.getByText(selectCollaboratorHint, { exact: true });
+  if (await hint.isVisible()) {
+    await page.getByRole("button", { name: new RegExp(`^${user.name} Analista`) }).click();
+  }
+}
 
 const dossier = {
   id: user.id,
