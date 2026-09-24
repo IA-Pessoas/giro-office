@@ -9,7 +9,8 @@ import type {
   CreateIntegrationBody,
   UpdateIntegrationBody,
 } from "../schemas/clientVerticals.schemas.js";
-import { cleanCnpjDocument, cleanDocument } from "../utils/documents.js";
+import { assertValidClientDocument } from "../utils/clientDocuments.js";
+import { cleanDocument } from "../utils/documents.js";
 
 type ClientAuthorization = IntegracaoServiceAuthorization & { userId: string };
 
@@ -31,7 +32,7 @@ export async function createIntegrationClient(
     requestedFields: Object.keys(input).filter((field) => field !== "organization_id"),
   });
 
-  const cleanedCpf = cleanCnpjDocument(input.cpf_cnpj);
+  const cleanedCpf = assertValidClientDocument(input.cpf_cnpj, input.type);
   const exists = await prisma.client.findFirst({
     where: { cpf_cnpj: cleanedCpf, organization_id: input.organization_id },
     select: { id: true },
@@ -90,7 +91,7 @@ export async function updateIntegrationClient(
 ): Promise<Record<string, unknown>> {
   const exists = await prisma.client.findFirst({
     where: { id: clientId, organization_id: organizationId },
-    select: { id: true },
+    select: { id: true, type: true, cpf_cnpj: true },
   });
   if (!exists) {
     throw new ServiceError(404, "Cliente não encontrado.");
@@ -105,8 +106,13 @@ export async function updateIntegrationClient(
     requestedFields: Object.keys(input),
   });
 
+  const documentType = input.type ?? exists.type;
   const cleanedCpfCnpj =
-    input.cpf_cnpj !== undefined ? cleanCnpjDocument(input.cpf_cnpj) : undefined;
+    input.cpf_cnpj !== undefined
+      ? assertValidClientDocument(input.cpf_cnpj, documentType)
+      : input.type !== undefined
+        ? assertValidClientDocument(exists.cpf_cnpj, documentType)
+        : undefined;
   const cleanedCpfResponsible =
     input.cpf_responsible !== undefined ? cleanDocument(input.cpf_responsible) : undefined;
   const cleanedCpfAgent =
@@ -131,6 +137,17 @@ export async function updateIntegrationClient(
   }
 
   if (cleanedCpfCnpj !== undefined) {
+    const duplicate = await prisma.client.findFirst({
+      where: {
+        organization_id: organizationId,
+        cpf_cnpj: cleanedCpfCnpj,
+        id: { not: clientId },
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ServiceError(409, "Cliente já cadastrado.");
+    }
     data.cpf_cnpj = cleanedCpfCnpj;
   }
 

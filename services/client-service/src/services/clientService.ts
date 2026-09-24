@@ -16,6 +16,7 @@ import {
   buildLegacyListStatusWhere,
   mergeClientListSearchWhere,
 } from "./clientListQueryService.js";
+import { assertValidClientDocument } from "../utils/clientDocuments.js";
 
 export type OrganizationPublic = {
   id: string;
@@ -418,6 +419,14 @@ export class ClientService implements IClientService {
     if (!org) {
       throw new ServiceError(400, "Organização não encontrada.");
     }
+    const normalizedDocument = assertValidClientDocument(input.cpf_cnpj, input.type);
+    const duplicate = await this.prisma.client.findFirst({
+      where: { organization_id: input.organization_id, cpf_cnpj: normalizedDocument },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ServiceError(409, "Cliente já cadastrado.");
+    }
     const extended = takeExtendedFields(input);
 
     const [organization, row] = await Promise.all([
@@ -427,7 +436,7 @@ export class ClientService implements IClientService {
           name: input.name,
           organization_id: input.organization_id,
           status: input.status,
-          cpf_cnpj: input.cpf_cnpj,
+          cpf_cnpj: normalizedDocument,
           company_name: input.company_name ?? null,
           fantasy_name: input.fantasy_name ?? null,
           prospecting_status: input.prospecting_status,
@@ -455,7 +464,7 @@ export class ClientService implements IClientService {
   ): Promise<ClientPublic> {
     const existing = await this.prisma.client.findFirst({
       where: { id, organization_id: organizationId },
-      select: { id: true },
+      select: { id: true, type: true, cpf_cnpj: true },
     });
     if (!existing) {
       throw new ServiceError(404, "Cliente não encontrado.");
@@ -482,7 +491,22 @@ export class ClientService implements IClientService {
     }
 
     if (input.cpf_cnpj !== undefined) {
-      data.cpf_cnpj = input.cpf_cnpj;
+      const normalizedDocument = assertValidClientDocument(
+        input.cpf_cnpj,
+        input.type ?? existing.type,
+      );
+      const duplicate = await this.prisma.client.findFirst({
+        where: {
+          organization_id: organizationId,
+          cpf_cnpj: normalizedDocument,
+          id: { not: id },
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new ServiceError(409, "Cliente já cadastrado.");
+      }
+      data.cpf_cnpj = normalizedDocument;
     }
 
     if (input.company_name !== undefined) {

@@ -2,6 +2,8 @@ import {
   clientIntegrationReportingCatalog,
   executeReportingQuery,
   getClientIntegrationReportingFields,
+  isValidCpfCnpj,
+  normalizeCpfCnpj,
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
@@ -334,12 +336,23 @@ function statusWhere(filters: ClientFilters): Record<string, unknown> | undefine
   return undefined;
 }
 
-function cleanCnpj(value: string): string {
-  return value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-}
-
 function cleanDocument(value: string | null | undefined): string {
   return value?.replace(/\D/g, "") ?? "";
+}
+
+function clientDocumentType(type: unknown): "PF" | "PJ" {
+  return type === "PF" ? "PF" : "PJ";
+}
+
+function assertValidClientDocument(value: unknown, type: unknown): string {
+  const normalized = normalizeCpfCnpj(typeof value === "string" ? value : "");
+  const personType = clientDocumentType(type);
+
+  if (!isValidCpfCnpj(normalized, personType)) {
+    throw new ServiceError(400, `${personType === "PF" ? "CPF" : "CNPJ"} inválido.`);
+  }
+
+  return normalized;
 }
 
 function serialize(value: unknown): unknown {
@@ -396,12 +409,13 @@ export class ClientService implements ClientWorkerService {
     };
     if (filters.search?.trim()) {
       const term = filters.search.trim();
+      const documentTerm = /^[0-9./-]+$/u.test(term) ? normalizeCpfCnpj(term) || term : term;
       const search = {
         OR: [
           { name: { contains: term, mode: "insensitive" } },
           { company_name: { contains: term, mode: "insensitive" } },
           { fantasy_name: { contains: term, mode: "insensitive" } },
-          { cpf_cnpj: { contains: term, mode: "insensitive" } },
+          { cpf_cnpj: { contains: documentTerm, mode: "insensitive" } },
         ],
       };
       Object.assign(
@@ -448,8 +462,14 @@ export class ClientService implements ClientWorkerService {
     requirePermission(authorization, 2);
     const organizationId = String(input.organization_id);
     const organization = await this.organization(organizationId);
+    const normalizedDocument = assertValidClientDocument(input.cpf_cnpj, input.type);
+    const duplicate = await (this.prisma as any).client.findFirst({
+      where: { organization_id: organizationId, cpf_cnpj: normalizedDocument },
+      select: { id: true },
+    });
+    if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
     const row = await (this.prisma as any).client.create({
-      data: { ...input, organization_id: organizationId },
+      data: { ...input, organization_id: organizationId, cpf_cnpj: normalizedDocument },
       select: clientSelect,
     });
     return toPublic(row, organization);
@@ -462,10 +482,23 @@ export class ClientService implements ClientWorkerService {
     authorization: ClientAuthorization,
   ): Promise<unknown> {
     requirePermission(authorization, 2);
-    await this.client(id, organizationId);
+    const existing = await this.client(id, organizationId);
+    const data: Record<string, unknown> = { ...input };
+    if (data.cpf_cnpj !== undefined || data.type !== undefined) {
+      const normalizedDocument = assertValidClientDocument(
+        data.cpf_cnpj ?? existing.cpf_cnpj,
+        data.type ?? existing.type,
+      );
+      const duplicate = await (this.prisma as any).client.findFirst({
+        where: { organization_id: organizationId, cpf_cnpj: normalizedDocument, id: { not: id } },
+        select: { id: true },
+      });
+      if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
+      data.cpf_cnpj = normalizedDocument;
+    }
     const row = await (this.prisma as any).client.update({
       where: { id },
-      data: input,
+      data,
       select: clientSelect,
     });
     return toPublic(row, await this.organization(organizationId));
@@ -513,7 +546,7 @@ export class ClientService implements ClientWorkerService {
   ): Promise<unknown> {
     requirePermission(authorization, 2);
     const organizationId = String(input.organization_id);
-    const cpfCnpj = cleanCnpj(String(input.cpf_cnpj));
+    const cpfCnpj = assertValidClientDocument(input.cpf_cnpj, input.type);
     const exists = await (this.prisma as any).client.findFirst({
       where: { cpf_cnpj: cpfCnpj, organization_id: organizationId },
       select: { id: true },
@@ -554,9 +587,20 @@ export class ClientService implements ClientWorkerService {
     authorization: ClientAuthorization,
   ): Promise<unknown> {
     requirePermission(authorization, 2);
-    await this.client(id, organizationId);
+    const existing = await this.client(id, organizationId);
     const data: Record<string, unknown> = { ...input };
-    if (data.cpf_cnpj !== undefined) data.cpf_cnpj = cleanCnpj(String(data.cpf_cnpj));
+    if (data.cpf_cnpj !== undefined || data.type !== undefined) {
+      const normalizedDocument = assertValidClientDocument(
+        data.cpf_cnpj ?? existing.cpf_cnpj,
+        data.type ?? existing.type,
+      );
+      const duplicate = await (this.prisma as any).client.findFirst({
+        where: { organization_id: organizationId, cpf_cnpj: normalizedDocument, id: { not: id } },
+        select: { id: true },
+      });
+      if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
+      data.cpf_cnpj = normalizedDocument;
+    }
     if (data.cpf_responsible !== undefined)
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
     if (data.cpf_agent !== undefined) data.cpf_agent = cleanDocument(String(data.cpf_agent));
@@ -860,9 +904,21 @@ export class ClientService implements ClientWorkerService {
     _userId: string,
     input: Record<string, unknown>,
   ): Promise<unknown> {
-    await this.ensureClient(clientId, organizationId);
+    const existing = await this.client(clientId, organizationId);
     const data = { ...input };
-    if (data.cpf_cnpj !== undefined) data.cpf_cnpj = cleanDocument(String(data.cpf_cnpj));
+    if (data.cpf_cnpj !== undefined) {
+      const normalizedDocument = assertValidClientDocument(data.cpf_cnpj, existing.type);
+      const duplicate = await (this.prisma as any).client.findFirst({
+        where: {
+          organization_id: organizationId,
+          cpf_cnpj: normalizedDocument,
+          id: { not: clientId },
+        },
+        select: { id: true },
+      });
+      if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
+      data.cpf_cnpj = normalizedDocument;
+    }
     if (data.cpf_responsible !== undefined)
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
     return (this.prisma as any).client.update({
