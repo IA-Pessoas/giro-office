@@ -16,6 +16,7 @@ export const CLIENT_ENDPOINTS = {
   updatePa: (id: string) => `/client/${id}/pa`,
   histories: (id: string) => `/client/${id}/histories`,
   updateHistory: (id: string, historyId: string) => `/client/${id}/histories/${historyId}`,
+  deleteHistory: (id: string, historyId: string) => `/client/${id}/histories/${historyId}`,
   createHistoryPending: (id: string) => `/client/${id}/histories/pending`,
   listHistoryPending: "/client/histories/pending",
   deleteHistoryPending: (pendingId: string) => `/client/histories/pending/${pendingId}`,

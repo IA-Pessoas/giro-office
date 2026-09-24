@@ -32,7 +32,11 @@ import {
   createClientFormInitialValues,
 } from "@modules/clients/utils/clientForm";
 import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
-import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
+import {
+  getClientLifecycleActions,
+  mapClientStatusFromApi,
+} from "@modules/clients/utils/statusMapper";
+import { ConfirmationDialog } from "@shared/components";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -74,6 +78,10 @@ export default function ClientDetailPage() {
   const client = clientQuery.data;
   const isCompanyClient = (client?.cpf_cnpj ?? "").replace(/\D/g, "").length === 14;
   const uiStatus = mapClientStatusFromApi(client?.status);
+  const lifecycle = getClientLifecycleActions(uiStatus);
+  const [pendingLifecycleAction, setPendingLifecycleAction] = useState<
+    "activate" | "deactivate" | null
+  >(null);
   const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
   const organizationName =
     (client as { organization?: { name?: string } } | null)?.organization?.name ??
@@ -260,8 +268,8 @@ export default function ClientDetailPage() {
                     <>
                       <button
                         type="button"
-                        onClick={() => void handleActivate()}
-                        disabled={activateClientMutation.isPending || uiStatus === "Ativo"}
+                        onClick={() => setPendingLifecycleAction("activate")}
+                        disabled={activateClientMutation.isPending || !lifecycle.canActivate}
                         className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                       >
                         <RotateCcw className="h-4 w-4" />
@@ -270,8 +278,8 @@ export default function ClientDetailPage() {
 
                       <button
                         type="button"
-                        onClick={() => void handleDeactivate()}
-                        disabled={deactivateClientMutation.isPending || uiStatus === "Inativo"}
+                        onClick={() => setPendingLifecycleAction("deactivate")}
+                        disabled={deactivateClientMutation.isPending || !lifecycle.canDeactivate}
                         className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30"
                       >
                         <Power className="h-4 w-4" />
@@ -281,6 +289,29 @@ export default function ClientDetailPage() {
                       </button>
                     </>
                   ) : null}
+
+                  <ConfirmationDialog
+                    open={pendingLifecycleAction !== null}
+                    onOpenChange={(open) => {
+                      if (!open) setPendingLifecycleAction(null);
+                    }}
+                    title={
+                      pendingLifecycleAction === "activate" ? "Reativar cliente" : "Desativar cliente"
+                    }
+                    description={
+                      pendingLifecycleAction === "activate"
+                        ? `Reativar ${client.name}? O cliente volta a ficar ativo.`
+                        : `Desativar ${client.name}? O cliente fica inativo até ser reativado.`
+                    }
+                    onConfirm={() =>
+                      pendingLifecycleAction === "activate" ? handleActivate() : handleDeactivate()
+                    }
+                    isConfirming={activateClientMutation.isPending || deactivateClientMutation.isPending}
+                    errorMessage={null}
+                    confirmLabel={pendingLifecycleAction === "activate" ? "Reativar" : "Desativar"}
+                    cancelLabel="Cancelar"
+                    variant={pendingLifecycleAction === "activate" ? "neutral" : "destructive"}
+                  />
 
                   <div className="mt-auto grid gap-4 pt-1">
                     <SummaryItem label="Situação" value={uiStatus} />
@@ -379,7 +410,7 @@ export default function ClientDetailPage() {
                   icon={ShieldCheck}
                 />
 
-                {canAdminClient ? (
+                {canAdminClient && lifecycle.canTerminate ? (
                   <ClientAccessCard
                     title="Inativação"
                     description="Inicie o processo de inativação do cliente."

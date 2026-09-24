@@ -15,6 +15,7 @@ import {
   buildCreateClientIntegrationPayload,
   createClientIntegrationInitialValues,
   mergeClientCompanyLookup,
+  getIntegrationEmailError,
 } from "@modules/clients/utils/integrationForm";
 import { useMe } from "@shared/hooks/useMe";
 import {
@@ -31,6 +32,7 @@ export default function NewClientIntegrationPage() {
   const meQuery = useMe();
   const createIntegrationMutation = useCreateClientIntegrationMutation();
   const [formValues, setFormValues] = useState(createClientIntegrationInitialValues);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
   const cnpjLookup = useClientCnpjLookup(formValues.cpf_cnpj);
 
   useEffect(() => {
@@ -70,6 +72,14 @@ export default function NewClientIntegrationPage() {
 
     if (cpfCnpjError) {
       toast.error(cpfCnpjError);
+      return;
+    }
+
+    const emailError = getIntegrationEmailError(formValues.email);
+
+    if (emailError) {
+      setShowFieldErrors(true);
+      toast.error(emailError);
       return;
     }
 
@@ -153,6 +163,7 @@ export default function NewClientIntegrationPage() {
                 cnpjLookup.isFetching ? "loading" : cnpjLookup.isError ? "unavailable" : "idle"
               }
               cnpjLookupError={cnpjLookup.error}
+              showFieldErrors={showFieldErrors}
               submitLabel={createIntegrationMutation.isPending ? "Salvando..." : "Salvar"}
               disabled={createIntegrationMutation.isPending || meQuery.isLoading}
             />
