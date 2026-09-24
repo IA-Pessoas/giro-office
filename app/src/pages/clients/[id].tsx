@@ -14,6 +14,7 @@ import {
   Workflow,
   XCircle,
 } from "lucide-react";
+import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
@@ -30,9 +31,14 @@ import type { ClientFormValues } from "@modules/clients/types";
 import {
   buildUpdateClientPayload,
   createClientFormInitialValues,
+  getClientInternalName,
 } from "@modules/clients/utils/clientForm";
 import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
-import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
+import {
+  getClientLifecycleActions,
+  mapClientStatusFromApi,
+} from "@modules/clients/utils/statusMapper";
+import { ConfirmationDialog } from "@shared/components";
 import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 
 const PANEL_CLASSNAME =
@@ -75,6 +81,11 @@ export default function ClientDetailPage() {
   const client = clientQuery.data;
   const isCompanyClient = (client?.cpf_cnpj ?? "").replace(/\D/g, "").length === 14;
   const uiStatus = mapClientStatusFromApi(client?.status);
+  const lifecycle = getClientLifecycleActions(uiStatus);
+  const [pendingLifecycleAction, setPendingLifecycleAction] = useState<
+    "activate" | "deactivate" | null
+  >(null);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
   const organizationName =
     (client as { organization?: { name?: string } } | null)?.organization?.name ??
@@ -103,7 +114,7 @@ export default function ClientDetailPage() {
       return;
     }
 
-    if (!formValues.name.trim()) {
+    if (!getClientInternalName(formValues)) {
       toast.error("Preencha o nome do cliente para continuar.");
       return;
     }
@@ -134,50 +145,25 @@ export default function ClientDetailPage() {
     }
   };
 
-  const handleActivate = async () => {
-    if (!clientId) {
-      return;
-    }
-
+  // Erro fica no diálogo (mesmo padrão da exclusão de histórico): o usuário vê e tenta de novo.
+  const confirmLifecycleAction = async () => {
+    const isActivate = pendingLifecycleAction === "activate";
+    setLifecycleError(null);
     try {
-      await activateClientMutation.mutateAsync();
-      toast.success("Cliente reativado com sucesso.");
-      await clientQuery.refetch();
+      await (isActivate ? activateClientMutation : deactivateClientMutation).mutateAsync();
     } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
-          "string"
-          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Não foi possível reativar o cliente.";
-
-      toast.error(message);
+      const message = isAxiosError(error) ? error.response?.data?.error : undefined;
+      setLifecycleError(
+        typeof message === "string"
+          ? message
+          : isActivate
+            ? "Não foi possível reativar o cliente."
+            : "Não foi possível desativar o cliente.",
+      );
+      throw error;
     }
-  };
-
-  const handleDeactivate = async () => {
-    if (!clientId) {
-      return;
-    }
-
-    try {
-      await deactivateClientMutation.mutateAsync();
-      toast.success("Cliente desativado com sucesso.");
-      await clientQuery.refetch();
-    } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
-          "string"
-          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Não foi possível desativar o cliente.";
-
-      toast.error(message);
-    }
+    toast.success(isActivate ? "Cliente reativado com sucesso." : "Cliente desativado com sucesso.");
+    await clientQuery.refetch();
   };
 
   return (
@@ -263,8 +249,8 @@ export default function ClientDetailPage() {
                     <>
                       <button
                         type="button"
-                        onClick={() => void handleActivate()}
-                        disabled={activateClientMutation.isPending || uiStatus === "Ativo"}
+                        onClick={() => setPendingLifecycleAction("activate")}
+                        disabled={activateClientMutation.isPending || !lifecycle.canActivate}
                         className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                       >
                         <RotateCcw className="h-4 w-4" />
@@ -273,8 +259,8 @@ export default function ClientDetailPage() {
 
                       <button
                         type="button"
-                        onClick={() => void handleDeactivate()}
-                        disabled={deactivateClientMutation.isPending || uiStatus === "Inativo"}
+                        onClick={() => setPendingLifecycleAction("deactivate")}
+                        disabled={deactivateClientMutation.isPending || !lifecycle.canDeactivate}
                         className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30"
                       >
                         <Power className="h-4 w-4" />
@@ -284,6 +270,30 @@ export default function ClientDetailPage() {
                       </button>
                     </>
                   ) : null}
+
+                  <ConfirmationDialog
+                    open={pendingLifecycleAction !== null}
+                    onOpenChange={(open) => {
+                      if (!open) {
+                        setPendingLifecycleAction(null);
+                        setLifecycleError(null);
+                      }
+                    }}
+                    title={
+                      pendingLifecycleAction === "activate" ? "Reativar cliente" : "Desativar cliente"
+                    }
+                    description={
+                      pendingLifecycleAction === "activate"
+                        ? `Reativar ${client.name}? O cliente volta a ficar ativo.`
+                        : `Desativar ${client.name}? O cliente fica inativo até ser reativado.`
+                    }
+                    onConfirm={confirmLifecycleAction}
+                    isConfirming={activateClientMutation.isPending || deactivateClientMutation.isPending}
+                    errorMessage={lifecycleError}
+                    confirmLabel={pendingLifecycleAction === "activate" ? "Reativar" : "Desativar"}
+                    cancelLabel="Cancelar"
+                    variant={pendingLifecycleAction === "activate" ? "neutral" : "destructive"}
+                  />
 
                   <div className="mt-auto grid gap-4 pt-1">
                     <SummaryItem label="Situação" value={uiStatus} />
@@ -382,7 +392,7 @@ export default function ClientDetailPage() {
                   icon={ShieldCheck}
                 />
 
-                {canAdminClient ? (
+                {canAdminClient && lifecycle.canTerminate ? (
                   <ClientAccessCard
                     title="Inativação"
                     description="Inicie o processo de inativação do cliente."

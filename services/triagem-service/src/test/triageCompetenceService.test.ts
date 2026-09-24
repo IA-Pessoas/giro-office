@@ -157,6 +157,26 @@ describe("TriageCompetenceService", () => {
     expect(prisma.triageOutboxEvent.create).not.toHaveBeenCalled();
   });
 
+  it("criar de novo uma competência arquivada restaura e registra histórico (#1326)", async () => {
+    const prisma = createMockPrisma();
+    const archived = { ...record, archived_at: new Date("2026-09-17T01:00:00.000Z") };
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue(archived as never);
+    vi.mocked(prisma.triageCompetence.update).mockResolvedValue(record as never);
+
+    const result = await new TriageCompetenceService(prisma, undefined, vi.fn()).create(
+      { client_id: CLIENT_ID, competence: COMPETENCE },
+      editor(),
+    );
+
+    expect(result.archived_at).toBeNull();
+    expect(prisma.triageCompetence.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: COMPETENCE_ID }, data: { archived_at: null } }),
+    );
+    expect(prisma.triageCompetenceHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "restored" }),
+    });
+  });
+
   it("lista somente competências da organização autenticada", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageCompetence.findMany).mockResolvedValue([record] as never);

@@ -121,9 +121,24 @@ export function requirePlatformCsrf(
   _response: Response,
   next: NextFunction,
 ): void {
+  requireSessionCsrf(request, request.platform_session?.csrf_hash, next);
+}
+
+export function requireImpersonationCsrf(
+  request: Request,
+  _response: Response,
+  next: NextFunction,
+): void {
+  requireSessionCsrf(request, request.csrf_hash, next);
+}
+
+function requireSessionCsrf(
+  request: Request,
+  expectedHash: string | undefined,
+  next: NextFunction,
+): void {
   const cookieToken = readCookie(request.headers.cookie, CSRF_COOKIE_NAME);
   const submittedToken = request.get(CSRF_HEADER_NAME);
-  const expectedHash = request.platform_session?.csrf_hash;
   if (
     !cookieToken ||
     !submittedToken ||

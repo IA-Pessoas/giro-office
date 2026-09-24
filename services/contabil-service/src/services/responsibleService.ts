@@ -154,7 +154,7 @@ export class ResponsibleService {
   async getByClientId(
     clientId: string,
     organizationId: string,
-  ): Promise<ResponsibleContabilEntity> {
+  ): Promise<ResponsibleContabilEntity | null> {
     const responsible = await this.prisma.responsibleContabil.findFirst({
       where: {
         client_id: clientId,
@@ -162,11 +162,8 @@ export class ResponsibleService {
       },
     });
 
-    if (!responsible) {
-      throw new ServiceError(404, "Registro de responsáveis não encontrado para este cliente.");
-    }
-
-    return responsible;
+    // Sem cadastro é estado vazio: 200 com null.
+    return responsible ?? null;
   }
 
   async delete(id: string, organizationId: string): Promise<{ message: string }> {

@@ -81,6 +81,6 @@ export async function authenticatePessoalRequest(
 
 export function requirePessoalPermission(auth: WorkerAuthContext, minimum: number): void {
   if (typeof auth.claims.permission !== "number" || auth.claims.permission < minimum) {
-    throw new ServiceError(403, "Permissão insuficiente para acessar o pessoal-service.");
+    throw new ServiceError(403, "Permissão insuficiente para acessar o Departamento Pessoal.");
   }
 }

@@ -172,6 +172,7 @@ import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
   applyWizardTaskChange,
   getWizardTaskDateWarning,
+  createProjectWizardId,
   getWizardExtractionSourceValidationMessage,
   canAttemptWizardExtraction,
   WIZARD_EXTRACTION_MAX_ATTEMPTS,
@@ -613,6 +614,7 @@ runTest("task list contract maps client and assignment filters without cache col
   const filters = {
     clientId: "11111111-1111-4111-8111-111111111111",
     assignment: "unassigned",
+    uniqueServiceReleased: true,
   };
 
   assert.deepEqual(buildIntegracaoTaskListParams(filters), {
@@ -622,10 +624,22 @@ runTest("task list contract maps client and assignment filters without cache col
     search: "",
     client_id: filters.clientId,
     assignment: "unassigned",
+    unique_service_released: true,
     page: 1,
     limit: 20,
   });
   assert.notDeepEqual(integracaoTasksListQueryKey(filters), integracaoTasksListQueryKey({}));
+});
+
+runTest("task workspace oferece filtro de liberados e exibe empresa e projeto", () => {
+  const source = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /uniqueServiceReleased/);
+  assert.match(source, /Serviços únicos liberados/);
+  assert.match(source, />Empresa</);
+  assert.match(source, />Projeto</);
+  assert.match(source, /task\.client_name/);
+  assert.match(source, /task\.project_name/);
 });
 
 runTest("task list contract preserves an empty client filter for explicit rejection", () => {
@@ -1142,9 +1156,9 @@ runTest("project select placeholder keeps empty state inside the control", () =>
   );
 });
 
-runTest("tasks table uses shorter width and the shared system scrollbar", () => {
+runTest("tasks table fits the additional associations and keeps the shared system scrollbar", () => {
   assert.equal(TASK_TABLE_CLASSNAME.includes("1320px"), false);
-  assert.equal(TASK_TABLE_CLASSNAME.includes("1120px"), true);
+  assert.equal(TASK_TABLE_CLASSNAME.includes("1440px"), true);
   assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("overflow-x-auto"), true);
   assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("u-scrollbar-system"), true);
 });
@@ -1670,6 +1684,27 @@ runTest("wizard task warns about an unusable AI deadline and about one outside t
   assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, start, end), WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING);
   assert.equal(getWizardTaskDateWarning({ prevision_date: "2026-10-01" }, start, ""), null);
   assert.equal(getWizardTaskDateWarning({}, start, end), null);
+});
+
+runTest("project wizard IDs still work when crypto.randomUUID is unavailable", () => {
+  let randomValuesCalls = 0;
+  const id = createProjectWizardId({
+    getRandomValues: (values) => {
+      randomValuesCalls += 1;
+      values.fill(0xab);
+      return values;
+    },
+  });
+
+  assert.equal(randomValuesCalls, 1);
+  assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+
+  const projectForm = readFileSync(
+    new URL("./components/ProjectFormModal.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.equal((projectForm.match(/createProjectWizardId\(\)/g) ?? []).length, 3);
+  assert.doesNotMatch(projectForm, /crypto\.randomUUID\(\)/);
 });
 
 runTest("AI proposals arrive with the automatic responsible of the proposed model", () => {

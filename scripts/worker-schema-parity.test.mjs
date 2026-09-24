@@ -119,6 +119,16 @@ test("toda coluna declarada por um Worker existe na tabela canônica", () => {
   assert.deepEqual(problems, []);
 });
 
+test("user-service Worker declara a permissão de personificar", () => {
+  const canonical = parseSchema(join(repoRoot, "infra", "prisma", "schema.prisma"));
+  const userServiceWorker = parseSchema(
+    join(repoRoot, "workers", "user-service", "prisma", "schema.prisma"),
+  );
+
+  assert.ok(canonical.get("PlatformUser")?.columns.has("can_impersonate"));
+  assert.ok(userServiceWorker.get("PlatformUser")?.columns.has("can_impersonate"));
+});
+
 function createdModels({ name, schema }) {
   const source = workerSourceFiles(name)
     .map((file) => readFileSync(file, "utf8"))
