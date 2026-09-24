@@ -587,6 +587,8 @@ const baseManifest = [
     auth: "session",
     condition: "auditEnabled",
   }),
+  // Redefinição de senha (#1342): o caminho feliz manda e-mail real ou consome um token de
+  // uso único, então o smoke de produção cobre só os erros (pairCoverageExempt).
   op({
     service: "user-service",
     method: "POST",
