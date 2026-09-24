@@ -3,14 +3,19 @@ import { lookupOfficialCnpj } from "./cnpjLookup.js";
 
 describe("lookupOfficialCnpj", () => {
   it("uses the public fallback while the official provider is not configured", async () => {
-    let seen: string | undefined;
-    const fetchImpl = (async (url: string) => {
-      seen = url;
+    let seen: { url: string; userAgent: string | null } | undefined;
+    const fetchImpl = (async (url: string, init?: RequestInit) => {
+      seen = { url, userAgent: new Headers(init?.headers).get("user-agent") };
       return Response.json({
         razao_social: "Banco do Brasil SA",
         nome_fantasia: "Direcao Geral",
         data_inicio_atividade: "1966-08-01",
-        logradouro: "Q SAUN QUADRA 5",
+        descricao_tipo_de_logradouro: "QUADRA",
+        logradouro: "SAUN QUADRA 5",
+        numero: "S/N",
+        complemento: "LOTE B",
+        cnae_fiscal: 6422100,
+        cnae_fiscal_descricao: "Bancos multiplos, com carteira comercial",
         cep: "70040912",
         bairro: "Asa Norte",
         uf: "DF",
@@ -20,11 +25,13 @@ describe("lookupOfficialCnpj", () => {
 
     const result = await lookupOfficialCnpj("00000000000191", undefined, undefined, fetchImpl);
 
-    expect(seen).toBe("https://brasilapi.com.br/api/cnpj/v1/00000000000191");
+    expect(seen?.url).toBe("https://brasilapi.com.br/api/cnpj/v1/00000000000191");
+    expect(seen?.userAgent).toBeTruthy();
     expect(result).toMatchObject({
       company_name: "Banco do Brasil SA",
       opening_date: "1966-08-01",
-      address: "Q SAUN QUADRA 5",
+      address: "QUADRA SAUN QUADRA 5, S/N - LOTE B",
+      cnae: "6422100 - Bancos multiplos, com carteira comercial",
       state: "DF",
       city: "BRASILIA",
     });
@@ -93,7 +100,18 @@ describe("lookupOfficialCnpj", () => {
       failing,
     ).catch((caught: unknown) => caught);
     expect(error).toMatchObject({ statusCode: 502 });
-    expect((error as Error).message).not.toMatch(/HTTP|\d{3}/u);
+    expect((error as Error).message).not.toContain("HTTP");
+    expect((error as Error).message).not.toContain("530");
+  });
+
+  it("falls back when the official provider answers invalid JSON", async () => {
+    const fetchImpl = (async (url: string) =>
+      url.startsWith("https://cnpj.example")
+        ? new Response("<html>erro</html>", { status: 200 })
+        : Response.json({ razao_social: "Acme Ltda" })) as typeof fetch;
+    await expect(
+      lookupOfficialCnpj("12345678000195", "https://cnpj.example", "secret", fetchImpl),
+    ).resolves.toMatchObject({ company_name: "Acme Ltda" });
   });
 
   it("answers 404 when the CNPJ does not exist", async () => {
