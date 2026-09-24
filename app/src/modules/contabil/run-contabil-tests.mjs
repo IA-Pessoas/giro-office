@@ -834,3 +834,6 @@ await (async () => {
     );
   });
 })();
+
+// Testes da Triagem rodam junto (sem script próprio no package.json).
+await import("../triagem/run-triagem-tests.mjs");
