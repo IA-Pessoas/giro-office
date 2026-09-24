@@ -21,6 +21,7 @@ interface FiscalNcmFormPanelProps {
   mode: FiscalNcmFormPanelMode;
   ncmId?: string;
   onClose: () => void;
+  onCreated?: (ncmCode: string) => void;
   showHeader?: boolean;
   bare?: boolean;
 }
@@ -89,6 +90,7 @@ export function FiscalNcmFormPanel({
   mode,
   ncmId,
   onClose,
+  onCreated,
   showHeader = true,
   bare = false,
 }: FiscalNcmFormPanelProps) {
@@ -203,6 +205,7 @@ export function FiscalNcmFormPanel({
       } else {
         await createMutation.mutateAsync(basePayload);
         toast.success("NCM cadastrado com sucesso.");
+        onCreated?.(basePayload.ncm_code);
       }
 
       setFormState(DEFAULT_FORM_STATE);
