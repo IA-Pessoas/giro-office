@@ -96,6 +96,7 @@ const TASK_LIST_SELECT = {
   charge_financeiro: true,
   client: { select: { name: true, company_name: true } },
   project: { select: { name: true, status: true } },
+  responsible: { select: { name: true } },
   responsible_id: true,
   responsible2_id: true,
   responsible3_id: true,
@@ -144,10 +145,11 @@ export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }
 type TaskListDatabaseRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
 export type TaskListRow = Omit<
   TaskListDatabaseRow,
-  "responsible_id" | "responsible2_id" | "responsible3_id" | "client" | "project"
+  "responsible_id" | "responsible2_id" | "responsible3_id" | "responsible" | "client" | "project"
 > & {
   client_name: string;
   project_name: string;
+  responsible_name: string | null;
   isOwn: boolean;
   isUnassigned: boolean;
 };
@@ -813,7 +815,15 @@ export class TaskCrudService {
 
       const hasMore = params.page * params.limit < total;
       const data = list.map(
-        ({ responsible_id, responsible2_id, responsible3_id, client, project, ...task }) => {
+        ({
+          responsible_id,
+          responsible2_id,
+          responsible3_id,
+          responsible,
+          client,
+          project,
+          ...task
+        }) => {
           const commercialValidationPending =
             isAwaitingCommercialValidation(task) ||
             project.status === PROJECT_STATUS_WAITING_COMMERCIAL;
@@ -822,6 +832,7 @@ export class TaskCrudService {
             status: commercialValidationPending ? INTEGRACAO_TASK_STATUS_WAITING : task.status,
             client_name: client.company_name?.trim() || client.name,
             project_name: project.name,
+            responsible_name: responsible?.name ?? null,
             isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
             isUnassigned: responsible_id === null,
           };

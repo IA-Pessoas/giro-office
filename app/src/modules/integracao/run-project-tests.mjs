@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as taskFormUi from "./components/taskFormModalUi.ts";
+import { isServerErrorAlreadyNotified } from "../../shared/services/serverErrorToast.ts";
 
 runTest("task edit accepts an unassigned task while retaining required operational fields", () => {
   assert.equal(typeof taskFormUi.getTaskEditValidationMessage, "function");
@@ -180,6 +181,7 @@ import {
   WIZARD_EXTRACTION_MAX_ATTEMPTS,
   WIZARD_EXTRACTION_MAX_SOURCE_BYTES,
   WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING,
+  getProjectWizardSuccessMessage,
 } from "./components/projectWizardUi.ts";
 import {
   TASK_MODEL_CONFIG_ENTRY,
@@ -1844,4 +1846,38 @@ runTest("project edit keeps client and tasks after PUT and offers manual statuse
 
   const hooks = readFileSync("src/modules/integracao/hooks/useProjects.ts", "utf8");
   assert.match(hooks, /mergeUpdatedProjectDetail\(/);
+});
+
+runTest("wizard success toast speaks business language", () => {
+  assert.equal(
+    getProjectWizardSuccessMessage({ main: 2, dependencies: 1, unassigned: 0 }),
+    "Projeto criado com 3 tarefa(s).",
+  );
+  assert.equal(
+    getProjectWizardSuccessMessage({ main: 1, dependencies: 0, unassigned: 1 }),
+    "Projeto criado com 1 tarefa(s). 1 ainda sem responsável.",
+  );
+
+  const form = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  assert.doesNotMatch(form, /Dependências: \$\{/);
+  assert.doesNotMatch(form, /<CalendarDays className="pointer-events-none/);
+  assert.match(form, /formatProjectDate\(values\.start_date\)/);
+  assert.match(form, /<RequiredFieldLabel required=\{candidates\.length > 0\}>/);
+  assert.match(form, /\?\? models\[0\]\)\?\.department/);
+});
+
+runTest("task errors do not repeat the global 5xx toast", () => {
+  assert.equal(isServerErrorAlreadyNotified({ response: { status: 502 } }), true);
+  assert.equal(isServerErrorAlreadyNotified({ response: { status: 409 } }), false);
+  assert.equal(isServerErrorAlreadyNotified(new Error("network")), false);
+
+  for (const file of ["TaskFormModal.tsx", "TasksWorkspace.tsx"]) {
+    const source = readFileSync(`src/modules/integracao/components/${file}`, "utf8");
+    assert.match(source, /isServerErrorAlreadyNotified\(error\)/, file);
+    assert.doesNotMatch(source, /task-service/, file);
+  }
+  const workspace = readFileSync("src/modules/integracao/components/TasksWorkspace.tsx", "utf8");
+  assert.match(workspace, /task\.responsible_name/);
+  const page = readFileSync("src/pages/projects/index.tsx", "utf8");
+  assert.match(page, /<title>Projetos<\/title>/);
 });

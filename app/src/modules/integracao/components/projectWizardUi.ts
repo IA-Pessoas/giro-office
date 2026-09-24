@@ -119,3 +119,13 @@ export function getWizardTaskDateWarning(
     ? WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING
     : null;
 }
+
+export function getProjectWizardSuccessMessage(counts: {
+  main: number;
+  dependencies: number;
+  unassigned: number;
+}): string {
+  const total = counts.main + counts.dependencies;
+  const unassigned = counts.unassigned > 0 ? ` ${counts.unassigned} ainda sem responsável.` : "";
+  return `Projeto criado com ${total} tarefa(s).${unassigned}`;
+}
