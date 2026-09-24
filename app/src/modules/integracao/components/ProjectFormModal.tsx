@@ -703,6 +703,7 @@ export function ProjectFormModal({
                   <ProjectSelect
                     value={values.status}
                     onChange={(event) => updateValue("status", event.target.value)}
+                    disabled={values.status === "Aguardando liberação do Comercial"}
                   >
                     {getProjectStatusOptions(values.status).map((status) => (
                       <option key={status} value={status}>
@@ -711,7 +712,7 @@ export function ProjectFormModal({
                     ))}
                   </ProjectSelect>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Concluir exige todas as tarefas concluídas.
+                    Concluir exige todas as tarefas concluídas e perfil administrador.
                   </span>
                 </label>
               ) : null}

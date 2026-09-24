@@ -134,9 +134,12 @@ export function useUpdateProjectMutation(): UseMutationResult<
       queryClient.setQueryData<ProjectDetail>(projectDetailQueryKey(variables.project_id), (previous) =>
         mergeUpdatedProjectDetail(previous, project),
       );
-      await queryClient.invalidateQueries({
-        queryKey: projectListQueryKey({ ref: "client", id: variables.clientId }),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: projectListQueryKey({ ref: "client", id: variables.clientId }),
+        }),
+        queryClient.invalidateQueries({ queryKey: projectMetricsQueryKey() }),
+      ]);
     },
   });
 }

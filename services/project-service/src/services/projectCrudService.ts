@@ -169,7 +169,12 @@ export class ProjectCrudService {
               },
             })
           : 0;
-      const status = resolveManualProjectStatus(exists.status, data.status, openTaskCount);
+      const status = resolveManualProjectStatus(
+        exists.status,
+        data.status,
+        openTaskCount,
+        data.integracaoLevel === INTEGRACAO_PERMISSION_LEVEL.ADMIN || data.isOwner === true,
+      );
 
       const updated = await this.prisma.project.update({
         where: {

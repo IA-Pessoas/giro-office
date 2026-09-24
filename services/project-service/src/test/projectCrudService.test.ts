@@ -330,7 +330,7 @@ describe("ProjectCrudService", () => {
       start_date: new Date(),
       end_date: new Date(),
       objective: "O",
-      integracaoLevel: 2 as const,
+      integracaoLevel: 3 as const,
     };
 
     await expect(service.update({ ...base, status: "Paralisado" })).resolves.toMatchObject({

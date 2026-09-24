@@ -448,7 +448,7 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
             ...(data.status === undefined ? [] : ["status"]),
           ],
         });
-        const currentStatus = String(exists.status ?? "");
+        const currentStatus = exists.status;
         const openTaskCount =
           data.status === PROJECT_STATUS_COMPLETED && data.status !== currentStatus
             ? await prisma.task.count({
@@ -459,7 +459,12 @@ function localCrudService(prisma: ProjectPrisma, audit: ProjectAudit): ProjectCr
                 },
               })
             : 0;
-        const status = resolveManualProjectStatus(currentStatus, data.status, openTaskCount);
+        const status = resolveManualProjectStatus(
+          currentStatus,
+          data.status,
+          openTaskCount,
+          data.integracaoLevel === INTEGRACAO_PERMISSION_LEVEL.ADMIN || data.isOwner,
+        );
         const updated = await prisma.project.update({
           where: { id: data.project_id },
           data: {

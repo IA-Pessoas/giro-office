@@ -46,9 +46,7 @@ export const PROJECT_MANUAL_STATUSES = [
   PROJECT_STATUS_COMPLETED,
 ] as const;
 
-function toCivilDay(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
+const SAO_PAULO_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
 
 /** Cliente novo em prospecção espera o Comercial; início futuro nasce "A realizar". */
 export function getInitialProjectStatus(
@@ -59,16 +57,21 @@ export function getInitialProjectStatus(
   if (client.type_registration === "Novo" && client.prospecting_status !== "Fechado") {
     return PROJECT_STATUS_WAITING_COMMERCIAL;
   }
-  return toCivilDay(startDate) > toCivilDay(now)
+  // start_date é data civil gravada à meia-noite UTC; "hoje" é o dia em São Paulo.
+  return startDate.toISOString().slice(0, 10) > SAO_PAULO_DAY.format(now)
     ? PROJECT_STATUS_TO_DO
     : PROJECT_STATUS_IN_PROGRESS;
 }
 
-/** Transição manual pela edição; concluir exige todas as tarefas concluídas. */
+/**
+ * Transição manual pela edição. Concluir exige todas as tarefas concluídas e o mesmo
+ * nível do fechamento por progresso (ADMIN ou owner).
+ */
 export function resolveManualProjectStatus(
   current: string,
   requested: string | undefined,
   openTaskCount: number,
+  canComplete: boolean,
 ): string {
   if (requested === undefined || requested === current) return current;
   if (current === PROJECT_STATUS_WAITING_COMMERCIAL) {
@@ -76,6 +79,9 @@ export function resolveManualProjectStatus(
   }
   if (!(PROJECT_MANUAL_STATUSES as readonly string[]).includes(requested)) {
     throw new ServiceError(400, `Status inválido: ${requested}.`);
+  }
+  if (requested === PROJECT_STATUS_COMPLETED && !canComplete) {
+    throw new ServiceError(403, "Somente administradores podem concluir o projeto.");
   }
   if (requested === PROJECT_STATUS_COMPLETED && openTaskCount > 0) {
     throw new ServiceError(

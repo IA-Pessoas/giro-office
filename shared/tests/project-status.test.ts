@@ -31,23 +31,37 @@ test("projeto nasce A realizar com início futuro e Em andamento com início at�
   );
 });
 
+test("hoje é o dia civil de São Paulo, não de UTC", () => {
+  const client = { type_registration: "Existente", prospecting_status: "Fechado" };
+  // 23h de 24/09 em São Paulo já é 25/09 em UTC.
+  const lateEvening = new Date("2026-09-25T02:00:00.000Z");
+
+  assert.equal(
+    getInitialProjectStatus(client, new Date("2026-09-25T00:00:00.000Z"), lateEvening),
+    "A realizar",
+  );
+});
+
 test("status manual permite pausar, retomar e concluir sem tarefas abertas", () => {
-  assert.equal(resolveManualProjectStatus("Em andamento", undefined, 3), "Em andamento");
-  assert.equal(resolveManualProjectStatus("Em andamento", "Paralisado", 3), "Paralisado");
-  assert.equal(resolveManualProjectStatus("Paralisado", "Em andamento", 3), "Em andamento");
-  assert.equal(resolveManualProjectStatus("A realizar", "Concluído", 0), "Concluído");
+  assert.equal(resolveManualProjectStatus("Em andamento", undefined, 3, false), "Em andamento");
+  assert.equal(resolveManualProjectStatus("Em andamento", "Paralisado", 3, false), "Paralisado");
+  assert.equal(resolveManualProjectStatus("Paralisado", "Em andamento", 3, false), "Em andamento");
+  assert.equal(resolveManualProjectStatus("A realizar", "Concluído", 0, true), "Concluído");
 });
 
 test("status manual recusa concluir com tarefas abertas, valor inválido e projeto no Comercial", () => {
-  assert.throws(() => resolveManualProjectStatus("Em andamento", "Concluído", 2), {
+  assert.throws(() => resolveManualProjectStatus("Em andamento", "Concluído", 0, false), {
+    statusCode: 403,
+  });
+  assert.throws(() => resolveManualProjectStatus("Em andamento", "Concluído", 2, true), {
     statusCode: 409,
     message: "Não é possível concluir o projeto: há 2 tarefa(s) em aberto.",
   });
-  assert.throws(() => resolveManualProjectStatus("Em andamento", "Cancelado", 0), {
+  assert.throws(() => resolveManualProjectStatus("Em andamento", "Cancelado", 0, true), {
     statusCode: 400,
   });
   assert.throws(
-    () => resolveManualProjectStatus(PROJECT_STATUS_WAITING_COMMERCIAL, "Em andamento", 0),
+    () => resolveManualProjectStatus(PROJECT_STATUS_WAITING_COMMERCIAL, "Em andamento", 0, true),
     { statusCode: 409 },
   );
 });
