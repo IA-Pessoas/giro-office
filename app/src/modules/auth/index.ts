@@ -28,4 +28,5 @@ export {
   canCreateUsers,
   isAdminPermission,
   isOrganizationOwner,
+  OWNER_ROLE_LABEL,
 } from "./utils/permissions";

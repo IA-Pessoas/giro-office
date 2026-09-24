@@ -118,6 +118,7 @@ export const MAX_REPORTING_QUERY_BYTES = 20 * 1024 * 1024;
 export const REPORTING_QUERY_PAGE_SIZE = 100;
 export const REPORTING_QUERY_ROW_LIMIT_CODE = "REPORTING_QUERY_ROW_LIMIT_EXCEEDED";
 export const REPORTING_QUERY_BYTE_LIMIT_CODE = "REPORTING_QUERY_BYTE_LIMIT_EXCEEDED";
+export const REPORTING_QUERY_ROW_LIMIT_MESSAGE = `O conjunto excede o limite global de ${MAX_REPORTING_QUERY_ROWS.toLocaleString("pt-BR")} linhas do relatório. Aplique filtros mais específicos e tente novamente.`;
 export const REPORTING_QUERY_BYTE_LIMIT_MESSAGE =
   "O conjunto excede o limite global de bytes do relatório. Reduza os filtros ou as colunas e tente novamente.";
 
@@ -152,7 +153,7 @@ export async function collectReportingRows(
       if (rows.length >= MAX_REPORTING_QUERY_ROWS) {
         throw new ServiceError(
           422,
-          "O conjunto excede a capacidade de consulta do relatório.",
+          REPORTING_QUERY_ROW_LIMIT_MESSAGE,
           undefined,
           REPORTING_QUERY_ROW_LIMIT_CODE,
         );

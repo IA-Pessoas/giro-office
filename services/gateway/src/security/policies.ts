@@ -129,12 +129,9 @@ const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao"
  */
 const integracaoResponsibleTaskPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 
-const integracaoClientPolicy: AuthPolicy = {
-  modulePermission: {
-    module: "integracao",
-    minPermission: moduleAccessPermission,
-  },
-};
+const integracaoClientPolicy = createModulePolicy("integracao", moduleAccessPermission);
+/** Mutações do cadastro de clientes exigem edição; o client-service ainda cobra 3 para desativar. */
+const integracaoClientEditPolicy = createModulePolicy("integracao", moduleEditPermission);
 
 const clientListPolicy: AuthPolicy = {
   anyOf: [
@@ -179,7 +176,8 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
-  { method: "ANY", path: integracaoClientPath, policy: integracaoClientPolicy },
+  { method: "GET", path: integracaoClientPath, policy: integracaoClientPolicy },
+  { method: "ANY", path: integracaoClientPath, policy: integracaoClientEditPolicy },
   { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientEditPolicy },
   { method: "GET", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
@@ -271,6 +269,7 @@ const routePolicyMatchers: Array<{
   },
   { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "POST", path: /^\/user\/[^/]+\/password-reset$/, policy: userManagementPolicy },
   { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "GET", path: /^\/task\/financeiro\/queue$/, policy: financeiroTaskViewPolicy },
   {
@@ -340,7 +339,7 @@ const routePolicyMatchers: Array<{
   },
   {
     method: "POST",
-    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/(?:reactivate|password-reset)\/?$/,
     policy: platformOnlyPolicy,
   },
   {

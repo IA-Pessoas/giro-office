@@ -1,8 +1,6 @@
-import { useState } from "react";
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
-import { ClientPickerModal, type ClientPickerOption } from "@modules/clients";
 import {
   AccessDeniedPanel,
   ContabilShell,
@@ -11,9 +9,6 @@ import {
 
 export default function ContabilPage() {
   const { canViewContabil, canEditContabil, isLoading } = useContabilPermissions();
-  const [selectedClient, setSelectedClient] = useState<ClientPickerOption | null>(null);
-  const selectedClientId = selectedClient?.id;
-  const selectedClientName = selectedClient?.name;
 
   return (
     <>
@@ -29,19 +24,7 @@ export default function ContabilPage() {
         ) : !canViewContabil ? (
           <AccessDeniedPanel />
         ) : (
-          <ContabilShell
-            key={selectedClientId ?? "without-client"}
-            clientId={selectedClientId}
-            clientName={selectedClientName}
-            canEdit={canEditContabil}
-            headerAction={
-              <ClientPickerModal
-                selectedClient={selectedClient}
-                onSelectClient={setSelectedClient}
-                filters={{ status: "Ativo", legacyIntegrationStatusFilter: false }}
-              />
-            }
-          />
+          <ContabilShell canEdit={canEditContabil} />
         )}
       </div>
     </>

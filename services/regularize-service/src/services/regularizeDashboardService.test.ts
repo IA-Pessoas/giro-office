@@ -98,9 +98,12 @@ describe("RegularizeDashboardService", () => {
     );
     expect(prisma.process.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organization_id: organizationId },
+        where: {
+          organization_id: organizationId,
+          process_type: { not: "Processo técnico para orientação legada" },
+        },
         take: 6,
-        orderBy: { entry_date: "desc" },
+        orderBy: { entry_date: { sort: "desc", nulls: "last" } },
         select: expect.objectContaining({
           clientPF: {
             where: { organization_id: organizationId },

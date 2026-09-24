@@ -126,8 +126,17 @@ async function assertVisible(locator, page, label) {
   }
 }
 
+function passwordFields(page) {
+  return {
+    current: page.getByLabel("Senha atual", { exact: true }),
+    next: page.getByLabel("Nova Senha", { exact: true }),
+    confirm: page.getByLabel("Confirmar nova senha", { exact: true }),
+  };
+}
+
 async function assertViewerPasswordUpdate() {
   const password = "viewer-password-smoke";
+  const currentPassword = "viewer-senha-atual";
   const requests = [];
   const { browser, context, diagnostics, page } = await openProfile(viewer, { rh: 0 }, (payload) => {
     requests.push(payload);
@@ -135,17 +144,31 @@ async function assertViewerPasswordUpdate() {
 
   try {
     const nameInput = page.getByLabel("Nome");
-    const passwordInput = page.getByLabel("Nova Senha");
+    const fields = passwordFields(page);
+    const saveButton = page.getByRole("button", { name: "Salvar alterações" });
 
     assert.equal(await nameInput.isDisabled(), true, "Viewer não pode editar o nome.");
-    assert.equal(await passwordInput.getAttribute("type"), "password");
+    for (const input of Object.values(fields)) {
+      assert.equal(await input.getAttribute("type"), "password");
+    }
 
-    await passwordInput.fill(password);
-    await page.getByRole("button", { name: "Salvar alterações" }).click();
+    await fields.next.fill(password);
+    await fields.confirm.fill(password);
+    assert.equal(await saveButton.isDisabled(), true, "Sem a senha atual não pode salvar.");
+
+    await fields.current.fill(currentPassword);
+    await fields.confirm.fill(`${password}-diferente`);
+    await assertVisible(page.getByText("As senhas não conferem."), page, "aviso de confirmação");
+    assert.equal(await saveButton.isDisabled(), true, "Confirmação divergente não pode salvar.");
+
+    await fields.confirm.fill(password);
+    await saveButton.click();
 
     await page.getByText("Perfil atualizado com sucesso!").waitFor({ state: "visible" });
-    assert.deepEqual(requests, [{ password }]);
-    assert.equal(await passwordInput.inputValue(), "", "A senha deve ser limpa após sucesso.");
+    assert.deepEqual(requests, [{ password, current_password: currentPassword }]);
+    for (const input of Object.values(fields)) {
+      assert.equal(await input.inputValue(), "", "As senhas devem ser limpas após sucesso.");
+    }
     assert.equal((await page.locator("body").innerText()).includes(password), false);
     assert.equal(diagnostics.some((message) => message.includes(password)), false);
   } finally {
@@ -164,16 +187,19 @@ async function assertRhAdminProfileUpdate() {
 
   try {
     const nameInput = page.getByLabel("Nome");
-    const passwordInput = page.getByLabel("Nova Senha");
+    const fields = passwordFields(page);
+    const currentPassword = "rh-admin-senha-atual";
 
     assert.equal(await nameInput.isDisabled(), false, "Admin RH deve poder editar o nome.");
     await nameInput.fill(nextName);
-    await passwordInput.fill(password);
+    await fields.current.fill(currentPassword);
+    await fields.next.fill(password);
+    await fields.confirm.fill(password);
     await page.getByRole("button", { name: "Salvar alterações" }).click();
 
     await page.getByText("Perfil atualizado com sucesso!").waitFor({ state: "visible" });
-    assert.deepEqual(requests, [{ name: nextName, password }]);
-    assert.equal(await passwordInput.inputValue(), "", "A senha deve ser limpa após sucesso.");
+    assert.deepEqual(requests, [{ name: nextName, password, current_password: currentPassword }]);
+    assert.equal(await fields.next.inputValue(), "", "A senha deve ser limpa após sucesso.");
     assert.equal((await page.locator("body").innerText()).includes(password), false);
     assert.equal(diagnostics.some((message) => message.includes(password)), false);
   } finally {
@@ -182,7 +208,52 @@ async function assertRhAdminProfileUpdate() {
   }
 }
 
+async function assertPasswordResetLink() {
+  const token = "smoke-reset-token";
+  const password = "senha-redefinida-smoke";
+  const requests = [];
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ baseURL: baseUrl });
+  const page = await context.newPage();
+
+  await page.route("**/user/password-reset/confirm", async (route) => {
+    assert.equal(route.request().method(), "POST");
+    requests.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ success: true, data: { reset: true } }),
+    });
+  });
+  await page.route("**/user/me", (route) => route.fulfill({ status: 401, body: "{}" }));
+  await page.route("**/platform/me", (route) => route.fulfill({ status: 401, body: "{}" }));
+  await page.route("**/socket.io/**", (route) => route.fulfill({ status: 200, body: "ok" }));
+
+  try {
+    await page.goto(`/redefinir-senha?token=${token}`, { waitUntil: "networkidle" });
+    await assertVisible(page.getByRole("heading", { name: "Redefinir senha" }), page, "heading");
+    assert.equal(new URL(page.url()).search, "", "O token deve sair da barra de endereço.");
+
+    const submit = page.getByRole("button", { name: "Definir nova senha" });
+    await page.getByLabel("Nova senha", { exact: true }).fill(password);
+    await page.getByLabel("Confirmar nova senha", { exact: true }).fill("outra-senha-smoke");
+    await assertVisible(page.getByText("As senhas não conferem."), page, "aviso de confirmação");
+    assert.equal(await submit.isDisabled(), true);
+
+    await page.getByLabel("Confirmar nova senha", { exact: true }).fill(password);
+    await submit.click();
+    await assertVisible(page.getByText("Senha redefinida. Entre com a nova senha."), page, "sucesso");
+    assert.deepEqual(requests, [{ token, password }]);
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
 await withNextServer(async () => {
+  await assertPasswordResetLink();
+  console.log("PASS usuário define a senha pelo link de redefinição");
+
   await assertViewerPasswordUpdate();
   console.log("PASS Viewer atualiza a própria senha pelo componente /me");
 

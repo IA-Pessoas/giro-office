@@ -20,7 +20,11 @@ import { formatCpfCnpjInput } from "@shared/utils/inputFormatting";
 
 import { useContabilControlPortfolio } from "../hooks";
 import { getContabilErrorMessage } from "../services";
-import type { ContabilCompetence, ContabilControl } from "../types";
+import type {
+  ContabilCompetence,
+  ContabilControl,
+  ContabilControlChecklistField,
+} from "../types";
 import { CONTABIL_CONTROL_CHECKLIST_FIELDS } from "./contabilControlFields";
 import {
   filterContabilPortfolioRows,
@@ -29,6 +33,7 @@ import {
   getCurrentContabilCompetence,
 } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
+import { ContabilCompanyPicker } from "./ContabilCompanyPicker";
 import { ContabilStateBox } from "./ContabilStateBox";
 
 const TEXT_FILTER_COLUMNS = [
@@ -50,8 +55,11 @@ const BODY_BG = "bg-white dark:bg-slate-900";
 
 type ProgressSort = "none" | "asc" | "desc";
 
-function completedItems(control: ContabilControl): number {
-  return CONTABIL_CONTROL_CHECKLIST_FIELDS.filter((field) => control[field.field]).length;
+function completedItems(
+  control: ContabilControl,
+  fields: ContabilControlChecklistField[],
+): number {
+  return fields.filter((field) => control[field]).length;
 }
 
 function uniqueSorted(values: string[]) {
@@ -60,16 +68,23 @@ function uniqueSorted(values: string[]) {
 
 export function ContabilPortfolioSection() {
   const [competence, setCompetence] = useState<ContabilCompetence>(getCurrentContabilCompetence());
+  const [step, setStep] = useState<"companies" | "checklist" | "dashboard">("companies");
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const [selectedFields, setSelectedFields] = useState<ContabilControlChecklistField[]>([]);
   const portfolioQuery = useContabilControlPortfolio(competence);
   const items = portfolioQuery.data?.items ?? [];
-  const controlsStarted = items.filter((item) => item.control !== null).length;
-  const missingControls = items.length - controlsStarted;
+  const selectedItems = items.filter((item) => selectedClientIds.includes(item.client_id));
+  const controlsStarted = selectedItems.filter((item) => item.control !== null).length;
+  const missingControls = selectedItems.length - controlsStarted;
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [onlyMine, setOnlyMine] = useState(false);
   const [progressSort, setProgressSort] = useState<ProgressSort>("none");
   const { user } = useAuth();
-  const assignableUsersQuery = useAssignableUsers({ enabled: items.length > 0, module: "contabil" });
+  const assignableUsersQuery = useAssignableUsers({
+    enabled: step === "dashboard" && selectedItems.length > 0,
+    module: "contabil",
+  });
 
   const rows = useMemo(() => {
     const userNames = new Map(
@@ -77,7 +92,7 @@ export function ContabilPortfolioSection() {
     );
     const userName = (id: string | null) => (id ? userNames.get(id) ?? "Não encontrado" : "—");
 
-    return items.map((item) => {
+    return selectedItems.map((item) => {
       const cnpj = item.cpf_cnpj ? formatCpfCnpjInput(item.cpf_cnpj) : "—";
       const values: Record<string, string> = {
         regime: item.regime || "—",
@@ -91,12 +106,12 @@ export function ContabilPortfolioSection() {
         item,
         cnpj,
         values,
-        progress: item.control ? completedItems(item.control) : -1,
+        progress: item.control ? completedItems(item.control, selectedFields) : -1,
         notes: item.control?.notes?.trim() || null,
         searchText: `${item.legal_name} ${cnpj} ${item.cpf_cnpj}`,
       };
     });
-  }, [items, assignableUsersQuery.data]);
+  }, [selectedItems, selectedFields, assignableUsersQuery.data]);
 
   const filterOptions = useMemo(
     () =>
@@ -122,7 +137,10 @@ export function ContabilPortfolioSection() {
       progressSort === "asc" ? left.progress - right.progress : right.progress - left.progress,
     );
   }
-  const totalChecks = CONTABIL_CONTROL_CHECKLIST_FIELDS.length;
+  const visibleChecklistFields = CONTABIL_CONTROL_CHECKLIST_FIELDS.filter((field) =>
+    selectedFields.includes(field.field),
+  );
+  const totalChecks = visibleChecklistFields.length;
   const SortIcon = { none: ArrowUpDown, asc: ArrowUp, desc: ArrowDown }[progressSort];
   const setFilter = (key: string, value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
@@ -135,7 +153,7 @@ export function ContabilPortfolioSection() {
             Carteira operacional
           </h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-            Acompanhe todos os clientes Contábil da competência sem abrir cada ficha.
+            Selecione as empresas e os itens do checklist antes de abrir o dashboard.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -180,14 +198,160 @@ export function ContabilPortfolioSection() {
         </ContabilStateBox>
       ) : null}
 
-      {!portfolioQuery.isLoading && !portfolioQuery.isError && items.length > 0 ? (
+      {!portfolioQuery.isLoading && !portfolioQuery.isError && items.length > 0 && step === "companies" ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                Etapa 1 de 3
+              </p>
+              <h3 className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+                Selecione as empresas
+              </h3>
+            </div>
+          </div>
+          <ContabilCompanyPicker
+            companies={items}
+            selectedIds={selectedClientIds}
+            onSelectionChange={setSelectedClientIds}
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setStep("checklist")}
+              disabled={selectedClientIds.length === 0}
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Continuar para o checklist
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!portfolioQuery.isLoading && !portfolioQuery.isError && items.length > 0 && step === "checklist" ? (
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+              Etapa 2 de 3
+            </p>
+            <h3 className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+              Selecione os itens do checklist operacional
+            </h3>
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
+              Os itens selecionados serão exibidos como colunas no dashboard.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+            <p aria-live="polite" className="text-sm text-gray-700 dark:text-slate-300">
+              {formatContabilCount(selectedClientIds.length, "empresa selecionada", "empresas selecionadas")} · {formatContabilCount(selectedFields.length, "item", "itens")}
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedFields(
+                  selectedFields.length === CONTABIL_CONTROL_CHECKLIST_FIELDS.length
+                    ? []
+                    : CONTABIL_CONTROL_CHECKLIST_FIELDS.map((field) => field.field),
+                )
+              }
+              className="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300"
+            >
+              {selectedFields.length === CONTABIL_CONTROL_CHECKLIST_FIELDS.length
+                ? "Limpar seleção"
+                : "Selecionar todos"}
+            </button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {CONTABIL_CONTROL_CHECKLIST_FIELDS.map((field) => {
+              const checked = selectedFields.includes(field.field);
+              return (
+                <label
+                  key={field.field}
+                  className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                    checked
+                      ? "border-blue-300 bg-blue-50 text-blue-950 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-100"
+                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() =>
+                      setSelectedFields((current) =>
+                        checked
+                          ? current.filter((value) => value !== field.field)
+                          : [...current, field.field],
+                      )
+                    }
+                    className="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>{field.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="flex flex-col-reverse justify-between gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setStep("companies")}
+              className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Voltar às empresas
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep("dashboard")}
+              disabled={selectedFields.length === 0}
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Abrir dashboard
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!portfolioQuery.isLoading && !portfolioQuery.isError && step === "dashboard" && selectedItems.length === 0 ? (
+        <ContabilStateBox icon={CalendarDays} title="Nenhuma empresa disponível na seleção">
+          Volte à seleção de empresas para escolher uma carteira para esta competência.
+          <button
+            type="button"
+            onClick={() => setStep("companies")}
+            className="mt-3 inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Selecionar empresas
+          </button>
+        </ContabilStateBox>
+      ) : null}
+
+      {!portfolioQuery.isLoading && !portfolioQuery.isError && selectedItems.length > 0 && step === "dashboard" ? (
         <>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+            <p className="text-sm text-gray-700 dark:text-slate-300">
+              Etapa 3 de 3 · {formatContabilCount(selectedItems.length, "empresa", "empresas")} · {formatContabilCount(selectedFields.length, "item", "itens")} do checklist
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setStep("companies")}
+                className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Alterar empresas
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep("checklist")}
+                className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-white dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Alterar checklist
+              </button>
+            </div>
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p aria-live="polite" className="text-sm text-gray-600 dark:text-slate-400">
-              {formatContabilCount(items.length, "cliente", "clientes")},{" "}
+              {formatContabilCount(selectedItems.length, "empresa", "empresas")},{" "}
               {formatContabilCount(controlsStarted, "controle iniciado", "controles iniciados")} e{" "}
               {missingControls} sem controle mensal.
-              {visibleRows.length !== items.length ? ` Exibindo ${visibleRows.length}.` : null}
+              {visibleRows.length !== selectedItems.length ? ` Exibindo ${visibleRows.length}.` : null}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <button
@@ -241,7 +405,7 @@ export function ContabilPortfolioSection() {
                   ))}
                   <th scope="col" className="px-3 py-3 font-semibold">Fechamento recebido</th>
                   <th scope="col" className="px-3 py-3 font-semibold">Controle mensal</th>
-                  {CONTABIL_CONTROL_CHECKLIST_FIELDS.map((field) => (
+                  {visibleChecklistFields.map((field) => (
                     <th key={field.field} scope="col" className="min-w-[6.5rem] px-2 py-3 font-semibold">
                       {field.label}
                       <select
@@ -279,7 +443,7 @@ export function ContabilPortfolioSection() {
               <tbody className="divide-y divide-gray-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
                 {visibleRows.length === 0 ? (
                   <tr>
-                    <td colSpan={9 + CONTABIL_CONTROL_CHECKLIST_FIELDS.length} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">
+                    <td colSpan={9 + visibleChecklistFields.length} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">
                       Nenhum cliente corresponde aos filtros.
                     </td>
                   </tr>
@@ -318,7 +482,7 @@ export function ContabilPortfolioSection() {
                       <td className="px-3 py-3 text-gray-700 dark:text-slate-300">
                         {item.control ? "Iniciado" : "—"}
                       </td>
-                      {CONTABIL_CONTROL_CHECKLIST_FIELDS.map((field) => (
+                      {visibleChecklistFields.map((field) => (
                         <td key={field.field} className="px-2 py-3">
                           {!item.control ? (
                             <span className="text-gray-400">—</span>
@@ -357,7 +521,7 @@ export function ContabilPortfolioSection() {
                     </th>
                     <td className={`${STICKY_CNPJ} ${HEAD_BG} px-3 py-3`} />
                     <td colSpan={TEXT_FILTER_COLUMNS.length + 2} />
-                    {CONTABIL_CONTROL_CHECKLIST_FIELDS.map((field) => (
+                    {visibleChecklistFields.map((field) => (
                       <td key={field.field} className="px-2 py-3 tabular-nums">
                         {visibleRows.filter(({ item }) => item.control?.[field.field]).length}/{visibleRows.length}
                       </td>

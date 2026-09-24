@@ -9,6 +9,7 @@ import { canSSRAuth } from "@modules/auth";
 import { ClientRegularizeForm } from "@modules/clients/components/ClientRegularizeForm";
 import { useClient, useUpdateClientRegularizeMutation } from "@modules/clients/hooks/useClients";
 import type { ClientRegularizeFormValues } from "@modules/clients/types";
+import { getClientInternalName } from "@modules/clients/utils/clientForm";
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
@@ -67,7 +68,7 @@ export default function ClientRegularizePage() {
       return;
     }
 
-    if (!formValues.name.trim()) {
+    if (!getClientInternalName(formValues)) {
       toast.error("Preencha o nome do cliente para continuar.");
       return;
     }

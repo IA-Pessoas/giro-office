@@ -186,6 +186,26 @@ describe("ti password routes", () => {
     });
   });
 
+  it("GET /ti/passwords/:id reports decryption failure without exposing stored ciphertext", async () => {
+    const prisma = createPasswordPrismaMock();
+    prisma.passwordTecnologia.findFirst = vi.fn(async () => ({
+      ...passwordRecord(),
+      password: "invalid-ciphertext-fixture",
+    }));
+
+    const response = await request(createTestApp(prisma))
+      .get(`/ti/passwords/${passwordId}`)
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION));
+
+    expect(response.status).toBe(500);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.",
+      code: "INTERNAL_ERROR",
+    });
+    expect(JSON.stringify(response.body)).not.toContain("invalid-ciphertext-fixture");
+  });
+
   it("POST /ti/passwords/:id/deactivate requires authentication", async () => {
     const response = await request(createTestApp(createPasswordPrismaMock()))
       .post(`/ti/passwords/${passwordId}/deactivate`)

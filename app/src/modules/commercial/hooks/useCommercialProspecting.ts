@@ -23,7 +23,11 @@ export function useCreateCommercialProspecting() {
   return useMutation({
     mutationFn: (payload: CreateCommercialProspectingPayload) =>
       commercialService.createProspecting(payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospecting() }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospecting() }),
+        queryClient.invalidateQueries({ queryKey: commercialQueryKeys.prospectingClients() }),
+      ]),
   });
 }
 

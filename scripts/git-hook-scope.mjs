@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ZERO_OID = /^0+$/;
+const BIOME_MAX_COMMAND_LENGTH = 7_000;
 
 const DOCS_ROOT_FILES = new Set(["README.md"]);
 const DOCS_PREFIXES = ["docs/"];
@@ -90,11 +91,11 @@ function cloneCommands(commands) {
   return commands.map(([command, args]) => [command, [...args]]);
 }
 
-function buildBiomeCheckCommand(changedFiles) {
+function buildBiomeCheckCommands(changedFiles) {
   const existingFiles = changedFiles.filter((filePath) => existsSync(filePath));
 
   if (existingFiles.length === 0) {
-    return ["pnpm", ["check"]];
+    return [["pnpm", ["check"]]];
   }
 
   // `--files-ignore-unknown` silencia o diagnostico por arquivo, mas se a lista
@@ -102,17 +103,37 @@ function buildBiomeCheckCommand(changedFiles) {
   // exemplo) ele ainda sai 1 em "No files were processed" e derruba o push.
   // `--no-errors-on-unmatched` cobre esse caso sem esconder erro de arquivo que
   // ele de fato entende.
-  return [
-    "pnpm",
-    [
-      "exec",
-      "biome",
-      "check",
-      "--files-ignore-unknown=true",
-      "--no-errors-on-unmatched",
-      ...existingFiles,
-    ],
+  const prefix = [
+    "exec",
+    "node",
+    "node_modules/@biomejs/biome/bin/biome",
+    "check",
+    "--files-ignore-unknown=true",
+    "--no-errors-on-unmatched",
   ];
+  const baseLength = ["pnpm", ...prefix].join(" ").length + 1;
+  const commands = [];
+  let batch = [];
+  let batchLength = baseLength;
+
+  for (const filePath of existingFiles) {
+    const nextLength = filePath.length + 1;
+
+    if (batch.length > 0 && batchLength + nextLength > BIOME_MAX_COMMAND_LENGTH) {
+      commands.push(["pnpm", [...prefix, ...batch]]);
+      batch = [];
+      batchLength = baseLength;
+    }
+
+    batch.push(filePath);
+    batchLength += nextLength;
+  }
+
+  if (batch.length > 0) {
+    commands.push(["pnpm", [...prefix, ...batch]]);
+  }
+
+  return commands;
 }
 
 export function classifyChangedFiles(changedFiles) {
@@ -169,7 +190,7 @@ export function buildHookPlan(
   }
 
   if (global) {
-    commands.push(buildBiomeCheckCommand(changedFiles), ["pnpm", ["typecheck"]]);
+    commands.push(...buildBiomeCheckCommands(changedFiles), ["pnpm", ["typecheck"]]);
   } else {
     commands.push([
       "pnpm",

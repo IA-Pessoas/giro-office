@@ -437,7 +437,6 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                   properties: {
                     name: { type: "string" },
                     login: { type: "string" },
-                    password: { type: "string", writeOnly: true },
                     department_id: { type: "string" },
                     permission: { type: "integer", minimum: 0, maximum: 3 },
                     status: { type: "string", enum: ["active", "inactive"] },
@@ -513,6 +512,40 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             },
             "404": { description: "Usuário não pertence à organização do path" },
             "503": { description: "Auditoria indisponível antes de iniciar a sessão" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/users/{userId}/password-reset": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Enviar link de redefinição de senha",
+          description:
+            "Implementado no Worker. Gera um token de uso único válido por 1 hora, invalida os anteriores e envia o link por e-mail. O administrador nunca vê o token.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          responses: {
+            "200": { description: "E-mail com link de uso único enviado", ...successJson },
+            "401": { description: "Sessão ausente" },
+            "403": { description: "Sem permissão sobre o usuário ou CSRF inválido" },
+            "404": { description: "Usuário fora do tenant" },
+            "409": { description: "Usuário inativo" },
+            "422": { description: "Usuário sem e-mail cadastrado" },
+            "502": { description: "Falha no envio do e-mail" },
+            "503": { description: "Envio de e-mail não configurado" },
           },
         },
       },
@@ -832,7 +865,16 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                   properties: {
                     name: { type: "string" },
                     login: { type: "string" },
-                    password: { type: "string" },
+                    password: {
+                      type: "string",
+                      description:
+                        "Só para a própria senha; administradores enviam um link de redefinição (403).",
+                    },
+                    current_password: {
+                      type: "string",
+                      description:
+                        "Obrigatória quando o usuário troca a própria senha; a nova senha precisa de ao menos 10 caracteres e diferir da atual.",
+                    },
                     department_id: { type: "string" },
                     permission: { type: "integer" },
                     status: { type: "string" },
@@ -869,6 +911,10 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
           responses: {
             "200": { description: "Atualizado", ...successJson },
+            "400": {
+              description: "Payload inválido, senha atual ausente ou nova senha fora da política",
+            },
+            "403": { description: "Sem permissão ou senha atual incorreta" },
           },
         },
         delete: {
@@ -878,6 +924,54 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
           responses: {
             "200": { description: "Desativado", ...successJson },
+          },
+        },
+      },
+      "/user/{id}/password-reset": {
+        post: {
+          tags: ["Users"],
+          summary: "Enviar link de redefinição de senha",
+          description:
+            "Implementado no Worker. Gera um token de uso único válido por 1 hora, invalida os anteriores e envia o link por e-mail. O administrador nunca vê o token.",
+          security: bearer,
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: {
+            "200": { description: "E-mail com link de uso único enviado", ...successJson },
+            "401": { description: "Sessão ausente" },
+            "403": { description: "Sem permissão sobre o usuário ou CSRF inválido" },
+            "404": { description: "Usuário fora do tenant" },
+            "409": { description: "Usuário inativo" },
+            "422": { description: "Usuário sem e-mail cadastrado" },
+            "502": { description: "Falha no envio do e-mail" },
+            "503": { description: "Envio de e-mail não configurado" },
+          },
+        },
+      },
+      "/user/password-reset/confirm": {
+        post: {
+          tags: ["Users"],
+          summary: "Definir a senha pelo link de redefinição",
+          description:
+            "Rota pública, implementada no Worker. Consome o token uma única vez, grava a nova senha (mínimo de 10 caracteres) e revoga todas as sessões do usuário.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["token", "password"],
+                  additionalProperties: false,
+                  properties: {
+                    token: { type: "string" },
+                    password: { type: "string", writeOnly: true, minLength: 10 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Senha redefinida", ...successJson },
+            "400": { description: "Link inválido, expirado, já usado ou senha fora da política" },
           },
         },
       },

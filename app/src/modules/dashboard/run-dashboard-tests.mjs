@@ -121,6 +121,14 @@ runTest("dashboard last update uses the backend updatedAt timestamp", () => {
 });
 
 
+runTest("dashboard charts render the loaded values without an entry animation", () => {
+  const series = dashboardComponent.match(/<(Area|Bar|Pie)\s[^>]*>/gs) ?? [];
+  assert.ok(series.length >= 4);
+  for (const element of series) {
+    assert.match(element, /isAnimationActive=\{false\}/, element.slice(0, 60));
+  }
+});
+
 runTest("dashboard last update rejects future timestamps", () => {
   assert.match(dashboardComponent, /date\.getTime\(\) > Date\.now\(\)/);
   assert.match(dashboardComponent, /Sem atualização/);
