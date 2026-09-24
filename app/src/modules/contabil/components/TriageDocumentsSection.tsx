@@ -26,6 +26,7 @@ import type {
   TriageRoutineType,
 } from "../types";
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
+import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
 
 const CONTABIL_DOCUMENTS = [
@@ -116,6 +117,8 @@ export function TriageDocumentsSection({
   const [documentDrafts, setDocumentDrafts] = useState<TriageDocumentDraft>(() =>
     buildDocumentDrafts(undefined, documents),
   );
+  // Status escolhido ainda não confirmado pelo backend: em erro, o select mantém a escolha.
+  const [statusDrafts, setStatusDrafts] = useState<Record<string, TriageDocumentStatus>>({});
   const monthly = useTriageMonthly(clientId, competence, documentType);
   const justifications = useTriageCatalogs("JUSTIFICATION", clientId, competence);
   const deliveryMethods = useTriageCatalogs("DELIVERY_METHOD", clientId, competence);
@@ -140,6 +143,7 @@ export function TriageDocumentsSection({
   useEffect(() => {
     if (record) {
       setDocumentDrafts(buildDocumentDrafts(record.item_notes, documents));
+      setStatusDrafts({});
       setBillingAmount(record.billing_amount ?? "");
     }
   }, [record]);
@@ -194,26 +198,20 @@ export function TriageDocumentsSection({
           </h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
             {documentType === "FISCAL"
-              ? "Quatorze campos fiscais legados por competência; a obrigatoriedade vem do snapshot."
+              ? "Quatorze documentos fiscais por competência. A obrigatoriedade segue a configuração do cliente na competência."
               : "Dez documentos por competência. Itens não aplicáveis não entram no indicador."}
           </p>
         </div>
-        <label className="text-sm font-medium text-gray-700 dark:text-slate-300">
+        <div className="text-sm font-medium text-gray-700 dark:text-slate-300">
           Competência
-          <input
-            aria-label={
-              documentType === "FISCAL"
-                ? "Competência fiscal"
-                : "Competência documental"
-            }
-            type="month"
-            value={competence}
-            onChange={(event) =>
-              setCompetence(event.target.value as ContabilCompetence)
-            }
-            className="ml-2 h-10 rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
-          />
-        </label>
+          <span className="ml-2">
+            <ContabilCompetenceSelect
+              label={documentType === "FISCAL" ? "Competência fiscal" : "Competência documental"}
+              value={competence}
+              onChange={setCompetence}
+            />
+          </span>
+        </div>
       </div>
       {mutationError ? (
         <p
@@ -369,18 +367,20 @@ export function TriageDocumentsSection({
                   {canEdit ? (
                     <select
                       aria-label={`${label} status`}
-                      value={record.checklist[field]}
-                      onChange={(event) =>
+                      value={statusDrafts[field] ?? record.checklist[field]}
+                      onChange={(event) => {
+                        const status = event.target.value as TriageDocumentStatus;
+                        setStatusDrafts((current) => ({ ...current, [field]: status }));
                         mutations.item.mutate({
                           id: record.id,
                           field,
-                          status: event.target.value as TriageDocumentStatus,
+                          status,
                           note: documentDrafts[field].note || null,
                           justification: documentDrafts[field].justification || null,
                           delivery_method: record.item_notes[field]?.delivery_method ?? null,
                           state_site: documentDrafts[field].state_site || null,
-                        })
-                      }
+                        });
+                      }}
                       className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
                     >
                       {STATUSES.map(([value, statusLabel]) => (
@@ -440,7 +440,7 @@ export function TriageDocumentsSection({
                                 mutations.item.mutate({
                                   id: record.id,
                                   field,
-                                  status: record.checklist[field],
+                                  status: statusDrafts[field] ?? record.checklist[field],
                                   delivery_method: (event.target.value || null) as TriageDeliveryMethod | null,
                                 })
                               }
@@ -482,7 +482,7 @@ export function TriageDocumentsSection({
                           mutations.item.mutate({
                             id: record.id,
                             field,
-                            status: record.checklist[field],
+                            status: statusDrafts[field] ?? record.checklist[field],
                             note: documentDrafts[field].note || null,
                             justification: documentDrafts[field].justification || null,
                             delivery_method: record.item_notes[field]?.delivery_method ?? null,

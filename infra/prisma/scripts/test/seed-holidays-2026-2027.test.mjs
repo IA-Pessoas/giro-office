@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { after, before, test } from "node:test";
+import { test } from "node:test";
+
+import { hasDocker, usePostgres } from "./pgHarness.mjs";
 
 // Roda a carga real contra um Postgres descartavel em Docker. Sem Docker, pula.
 const SQL = readFileSync(new URL("../../repairs/seed-holidays-2026-2027.sql", import.meta.url), "utf8");
-const CONTAINER = `holidays-test-${process.pid}`;
-const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 const FIXTURE = `
 DROP TABLE IF EXISTS "rh.holidays", organizations;
@@ -19,33 +18,7 @@ INSERT INTO organizations VALUES ('org-a', 'active'), ('org-b', 'trial'), ('org-
 INSERT INTO "rh.holidays" VALUES ('h1', 'Aniversario da cidade', '2026-04-21 00:00:00', 'org-a');
 `;
 
-function psql(sql, vars = []) {
-  const args = ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-X", "-q", "-t", "-A"];
-  for (const v of vars) args.push("-v", v);
-  return spawnSync("docker", [...args, "-f", "-"], { input: sql, encoding: "utf8" });
-}
-
-function query(sql) {
-  const result = psql(sql);
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout.trim();
-}
-
-before(() => {
-  if (!hasDocker) return;
-  execFileSync("docker", [
-    "run", "-d", "--rm", "--name", CONTAINER, "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:17",
-  ]);
-  for (let i = 0; i < 60; i++) {
-    if (psql("SELECT 1").status === 0) return;
-    execFileSync("sleep", ["1"]);
-  }
-  throw new Error("Postgres de teste nao subiu");
-});
-
-after(() => {
-  if (hasDocker) spawnSync("docker", ["rm", "-f", CONTAINER], { stdio: "ignore" });
-});
+const { psql, query } = usePostgres("holidays-test");
 
 test("dry-run relata a carga sem gravar", { skip: !hasDocker }, () => {
   query(FIXTURE);

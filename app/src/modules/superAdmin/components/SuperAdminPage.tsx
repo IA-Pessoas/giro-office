@@ -1,5 +1,5 @@
 import { Activity, Building2, LayoutDashboard, ShieldCheck, Users } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { formatOrganizationCnpj } from "@modules/organizations/utils/organizationUi";
@@ -13,17 +13,53 @@ import { CreateOrganizationDialog } from "./CreateOrganizationDialog";
 import { OrganizationDirectory } from "./OrganizationDirectory";
 import { OrganizationOverviewPanel } from "./OrganizationOverviewPanel";
 import { PlatformAuditPanel } from "./PlatformAuditPanel";
+import { PlatformSuperAdminsPanel } from "./PlatformSuperAdminsPanel";
 import { PlatformUsersPanel } from "./PlatformUsersPanel";
 
 const PAGE_SIZE = 20;
+const PANEL_TABS = ["overview", "users", "superAdmins", "audit"] as const;
+type ActivePanel = (typeof PANEL_TABS)[number];
 
 export function SuperAdminPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [activePanel, setActivePanel] = useState<"overview" | "users" | "audit">("overview");
+  const [activePanel, setActivePanel] = useState<ActivePanel>("overview");
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const createButtonRef = useRef<HTMLButtonElement>(null);
+  const handleTabListKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const tabs = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    );
+    const currentIndex = tabs.indexOf(event.target as HTMLButtonElement);
+    if (currentIndex < 0) return;
+
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowRight":
+        nextIndex = (currentIndex + 1) % tabs.length;
+        break;
+      case "ArrowLeft":
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    const nextTab = tabs[nextIndex];
+    const nextPanel = PANEL_TABS[nextIndex];
+    if (!nextTab || !nextPanel) return;
+
+    event.preventDefault();
+    nextTab.focus();
+    setActivePanel(nextPanel);
+  };
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const organizationsQuery = usePlatformOrganizations({
     page,
@@ -81,31 +117,37 @@ export function SuperAdminPage() {
       </header>
 
       <div
-        className="grid gap-4 lg:h-[calc(100vh-16rem)] lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)] lg:items-stretch"
+        className={`grid gap-4 lg:h-[calc(100vh-16rem)] lg:items-stretch ${
+          activePanel === "superAdmins"
+            ? "lg:grid-cols-1"
+            : "lg:grid-cols-[minmax(19rem,23rem)_minmax(0,1fr)]"
+        }`}
       >
-        <OrganizationDirectory
-          createButtonRef={createButtonRef}
-          isError={organizationsQuery.isError}
-          isFetching={organizationsQuery.isFetching}
-          isLoading={organizationsQuery.isLoading}
-          onCreate={() => setIsCreateOpen(true)}
-          onPageChange={setPage}
-          onRetry={() => void organizationsQuery.refetch()}
-          onSearchChange={(value) => {
-            setSearch(value);
-            setPage(1);
-          }}
-          onSelect={(organizationId) => {
-            setSelectedOrganizationId(organizationId);
-            setActivePanel("overview");
-          }}
-          organizations={organizations}
-          page={page}
-          pageSize={PAGE_SIZE}
-          search={search}
-          selectedId={selectedOrganizationId}
-          total={total}
-        />
+        {activePanel !== "superAdmins" && (
+          <OrganizationDirectory
+            createButtonRef={createButtonRef}
+            isError={organizationsQuery.isError}
+            isFetching={organizationsQuery.isFetching}
+            isLoading={organizationsQuery.isLoading}
+            onCreate={() => setIsCreateOpen(true)}
+            onPageChange={setPage}
+            onRetry={() => void organizationsQuery.refetch()}
+            onSearchChange={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
+            onSelect={(organizationId) => {
+              setSelectedOrganizationId(organizationId);
+              setActivePanel("overview");
+            }}
+            organizations={organizations}
+            page={page}
+            pageSize={PAGE_SIZE}
+            search={search}
+            selectedId={selectedOrganizationId}
+            total={total}
+          />
+        )}
 
         <div
           className={`flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
@@ -113,27 +155,56 @@ export function SuperAdminPage() {
           }`}
         >
           <div className="border-b border-slate-200 p-2 dark:border-slate-800">
-            <div className="flex flex-wrap gap-1">
+            <div
+              aria-label="Seções do console Super Admin"
+              className="flex flex-wrap gap-1"
+              onKeyDown={handleTabListKeyDown}
+              role="tablist"
+            >
               <button
-                aria-pressed={activePanel === "overview"}
+                aria-controls="super-admin-panel"
+                aria-selected={activePanel === "overview"}
                 className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 ${activePanel === "overview" ? "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+                id="super-admin-tab-overview"
                 onClick={() => setActivePanel("overview")}
+                role="tab"
+                tabIndex={activePanel === "overview" ? 0 : -1}
                 type="button"
               >
                 <LayoutDashboard aria-hidden="true" className="h-4 w-4" /> Visão geral
               </button>
               <button
-                aria-pressed={activePanel === "users"}
+                aria-controls="super-admin-panel"
+                aria-selected={activePanel === "users"}
                 className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 ${activePanel === "users" ? "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+                id="super-admin-tab-users"
                 onClick={() => setActivePanel("users")}
+                role="tab"
+                tabIndex={activePanel === "users" ? 0 : -1}
                 type="button"
               >
                 <Users aria-hidden="true" className="h-4 w-4" /> Usuários
               </button>
               <button
-                aria-pressed={activePanel === "audit"}
+                aria-controls="super-admin-panel"
+                aria-selected={activePanel === "superAdmins"}
+                className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 ${activePanel === "superAdmins" ? "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+                id="super-admin-tab-superAdmins"
+                onClick={() => setActivePanel("superAdmins")}
+                role="tab"
+                tabIndex={activePanel === "superAdmins" ? 0 : -1}
+                type="button"
+              >
+                <ShieldCheck aria-hidden="true" className="h-4 w-4" /> Super admins
+              </button>
+              <button
+                aria-controls="super-admin-panel"
+                aria-selected={activePanel === "audit"}
                 className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 ${activePanel === "audit" ? "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+                id="super-admin-tab-audit"
                 onClick={() => setActivePanel("audit")}
+                role="tab"
+                tabIndex={activePanel === "audit" ? 0 : -1}
                 type="button"
               >
                 <Activity aria-hidden="true" className="h-4 w-4" /> Auditoria
@@ -141,81 +212,91 @@ export function SuperAdminPage() {
             </div>
           </div>
 
-          {selectedOrganizationId && organizationDetailQuery.isLoading ? (
-            <div className="space-y-4 p-5" role="status">
-              <span className="sr-only">Carregando detalhes da organização...</span>
-              <div className="h-16 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
-              <div className="h-64 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
-            </div>
-          ) : selectedOrganizationId &&
-            (organizationDetailQuery.isError || !selectedOrganization) ? (
-            <div
-              className="m-4 rounded-lg bg-rose-50 p-4 text-sm text-rose-900 dark:bg-rose-950/30 dark:text-rose-100"
-              role="alert"
-            >
-              <p>Não foi possível carregar os detalhes da organização.</p>
-              <button
-                className="mt-3 font-semibold underline underline-offset-4"
-                onClick={() => void organizationDetailQuery.refetch()}
-                type="button"
+          <div
+            aria-labelledby={`super-admin-tab-${activePanel}`}
+            className="min-h-0 flex-1"
+            id="super-admin-panel"
+            role="tabpanel"
+            tabIndex={0}
+          >
+            {activePanel === "superAdmins" ? (
+              <PlatformSuperAdminsPanel />
+            ) : selectedOrganizationId && organizationDetailQuery.isLoading ? (
+              <div className="space-y-4 p-5" role="status">
+                <span className="sr-only">Carregando detalhes da organização...</span>
+                <div className="h-16 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+                <div className="h-64 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+              </div>
+            ) : selectedOrganizationId &&
+              (organizationDetailQuery.isError || !selectedOrganization) ? (
+              <div
+                className="m-4 rounded-lg bg-rose-50 p-4 text-sm text-rose-900 dark:bg-rose-950/30 dark:text-rose-100"
+                role="alert"
               >
-                Tentar novamente
-              </button>
-            </div>
-          ) : activePanel === "audit" ? (
-            <PlatformAuditPanel organization={selectedOrganization} />
-          ) : !selectedOrganization ? (
-            <div className="flex min-h-[34rem] flex-col items-center justify-center px-6 text-center">
-              <Building2
-                aria-hidden="true"
-                className="h-8 w-8 text-slate-500 dark:text-slate-400"
-              />
-              <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-white">
-                Selecione ou crie uma organização
-              </p>
-              <p className="mt-1 max-w-sm text-xs text-slate-600 dark:text-slate-300">
-                O detalhe e os usuários aparecem após uma seleção no diretório.
-              </p>
-            </div>
-          ) : (
-            <>
-              <header className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-xl font-semibold text-slate-950 dark:text-white">
-                      {selectedOrganization.name}
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                      {formatOrganizationCnpj(selectedOrganization.cnpj)} ·{" "}
-                      {selectedOrganization.slug}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
-                      {PLATFORM_STATUS_LABELS[selectedOrganization.status]}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                      Plano {PLATFORM_PLAN_LABELS[selectedOrganization.subscription_plan]}
-                    </span>
-                  </div>
-                </div>
-                <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
-                  Atualizada em {new Date(selectedOrganization.updated_at).toLocaleString("pt-BR")}
+                <p>Não foi possível carregar os detalhes da organização.</p>
+                <button
+                  className="mt-3 font-semibold underline underline-offset-4"
+                  onClick={() => void organizationDetailQuery.refetch()}
+                  type="button"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            ) : activePanel === "audit" ? (
+              <PlatformAuditPanel organization={selectedOrganization} />
+            ) : !selectedOrganization ? (
+              <div className="flex min-h-[34rem] flex-col items-center justify-center px-6 text-center">
+                <Building2
+                  aria-hidden="true"
+                  className="h-8 w-8 text-slate-500 dark:text-slate-400"
+                />
+                <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-white">
+                  Selecione ou crie uma organização
                 </p>
-              </header>
-              {activePanel === "overview" ? (
-                <OrganizationOverviewPanel
-                  key={selectedOrganization.id}
-                  organization={selectedOrganization}
-                />
-              ) : (
-                <PlatformUsersPanel
-                  key={selectedOrganization.id}
-                  organization={selectedOrganization}
-                />
-              )}
-            </>
-          )}
+                <p className="mt-1 max-w-sm text-xs text-slate-600 dark:text-slate-300">
+                  O detalhe e os usuários aparecem após uma seleção no diretório.
+                </p>
+              </div>
+            ) : (
+              <>
+                <header className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-xl font-semibold text-slate-950 dark:text-white">
+                        {selectedOrganization.name}
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                        {formatOrganizationCnpj(selectedOrganization.cnpj)} ·{" "}
+                        {selectedOrganization.slug}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
+                        {PLATFORM_STATUS_LABELS[selectedOrganization.status]}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        Plano {PLATFORM_PLAN_LABELS[selectedOrganization.subscription_plan]}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
+                    Atualizada em {new Date(selectedOrganization.updated_at).toLocaleString("pt-BR")}
+                  </p>
+                </header>
+                {activePanel === "overview" ? (
+                  <OrganizationOverviewPanel
+                    key={selectedOrganization.id}
+                    organization={selectedOrganization}
+                  />
+                ) : (
+                  <PlatformUsersPanel
+                    key={selectedOrganization.id}
+                    organization={selectedOrganization}
+                  />
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 

@@ -65,6 +65,10 @@ export function getProjectStatusTone(status: string) {
     return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
   }
 
+  if (normalized.includes("aguardando") && normalized.includes("comercial")) {
+    return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
+  }
+
   if (normalized.includes("cancel") || normalized.includes("inativ")) {
     return "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
   }

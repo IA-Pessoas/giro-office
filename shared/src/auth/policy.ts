@@ -68,6 +68,14 @@ export function canAccessRoute(context: AuthContext, policy: AuthPolicy): boolea
     return context.actorKind === "platform" && context.isPlatformAdmin;
   }
 
+  if (policy.special === "impersonationOnly") {
+    return (
+      context.actorKind === "organization" &&
+      typeof context.claims.impersonator_platform_user_id === "string" &&
+      context.claims.impersonator_platform_user_id.length > 0
+    );
+  }
+
   if (context.actorKind === "platform") {
     return false;
   }

@@ -96,6 +96,25 @@ describe("ProjectProgressService", () => {
     expect(updateArg.data.porcentage).toBe(0);
   });
 
+  it("não recalcula projeto enquanto aguarda liberação do Comercial", async () => {
+    const { prisma } = createMockPrisma();
+    prisma.project.findFirst = vi.fn(async () => ({
+      id: PROJECT_ID,
+      client_id: CLIENT_ID,
+      status: "Aguardando liberação do Comercial",
+    }));
+    const service = new ProjectProgressService(prisma);
+
+    await expect(
+      service.recalculateFromTasks(PROJECT_ID, ORG_ID, {
+        userId: "user-1",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.task.groupBy).not.toHaveBeenCalled();
+    expect(prisma.project.update).not.toHaveBeenCalled();
+  });
+
   it("recalculateFromTasks calcula porcentagem parcial e atualiza status Em andamento", async () => {
     const { prisma } = createMockPrisma();
     prisma.project.findFirst = vi.fn(async () => ({

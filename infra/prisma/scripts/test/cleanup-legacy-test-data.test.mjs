@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { after, before, test } from "node:test";
+import { test } from "node:test";
+
+import { hasDocker, usePostgres } from "./pgHarness.mjs";
 
 // Roda a limpeza real contra um Postgres descartavel em Docker. Sem Docker, pula.
 const SQL = readFileSync(
@@ -12,8 +13,6 @@ const VERIFY = readFileSync(
   new URL("../../../../scripts/qa/verify-no-test-data.sql", import.meta.url),
   "utf8",
 );
-const CONTAINER = `legacy-test-data-${process.pid}`;
-const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 const FIXTURE = `
 DROP TABLE IF EXISTS "tecnologia.request_messages", "tecnologia.requests", "tecnologia.inventory",
@@ -40,38 +39,12 @@ INSERT INTO "tecnologia.terms" VALUES
   ('t1', NULL, 'testecodigo', NULL, 'org'), ('t2', 'N04CASTELO', 'Notebook', NULL, 'org');
 `;
 
-function psql(sql, vars = []) {
-  const args = ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-X", "-q", "-t", "-A"];
-  for (const v of vars) args.push("-v", v);
-  return spawnSync("docker", [...args, "-f", "-"], { input: sql, encoding: "utf8" });
-}
-
-function query(sql) {
-  const result = psql(sql);
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout.trim();
-}
+const { psql, query } = usePostgres("legacy-test-data");
 
 const REMAINING = `SELECT (SELECT string_agg(id, ',' ORDER BY id) FROM "tecnologia.requests") || '|'
   || (SELECT string_agg(id, ',' ORDER BY id) FROM "tecnologia.request_messages") || '|'
   || (SELECT string_agg(id, ',' ORDER BY id) FROM "tecnologia.inventory") || '|'
   || (SELECT string_agg(id, ',' ORDER BY id) FROM "tecnologia.terms")`;
-
-before(() => {
-  if (!hasDocker) return;
-  execFileSync("docker", [
-    "run", "-d", "--rm", "--name", CONTAINER, "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:17",
-  ]);
-  for (let i = 0; i < 60; i++) {
-    if (psql("SELECT 1").status === 0) return;
-    execFileSync("sleep", ["1"]);
-  }
-  throw new Error("Postgres de teste nao subiu");
-});
-
-after(() => {
-  if (hasDocker) spawnSync("docker", ["rm", "-f", CONTAINER], { stdio: "ignore" });
-});
 
 test("dry-run lista os alvos e nao apaga nada", { skip: !hasDocker }, () => {
   query(FIXTURE);
