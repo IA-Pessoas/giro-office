@@ -296,7 +296,8 @@ describe("fiscal internal reporting service", () => {
         error: {
           statusCode: 422,
           code: REPORTING_QUERY_ROW_LIMIT_CODE,
-          message: "O conjunto excede a capacidade de consulta do relatório.",
+          message:
+            "O conjunto excede o limite global de 50.000 linhas do relatório. Aplique filtros mais específicos e tente novamente.",
         },
       });
       expect(icms.findMany).toHaveBeenCalledTimes(501);
