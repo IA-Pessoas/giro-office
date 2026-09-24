@@ -106,7 +106,13 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
             status: {
               type: "string",
-              enum: ["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE"],
+              enum: [
+                "URGENT_OPEN",
+                "ROUTINE_PENDING",
+                "BANK_PENDING",
+                "COMPLETE",
+                "NO_APPLICABLE_ITEMS",
+              ],
             },
           },
         },

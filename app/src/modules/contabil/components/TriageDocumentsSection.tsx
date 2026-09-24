@@ -197,7 +197,7 @@ export function TriageDocumentsSection({
           </h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
             {documentType === "FISCAL"
-              ? "Quatorze campos fiscais legados por competência; a obrigatoriedade vem do snapshot."
+              ? "Quatorze documentos fiscais por competência. A obrigatoriedade segue a configuração do cliente na competência."
               : "Dez documentos por competência. Itens não aplicáveis não entram no indicador."}
           </p>
         </div>
