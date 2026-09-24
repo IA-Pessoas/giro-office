@@ -170,6 +170,12 @@ export interface FirstCreateResult {
   };
 }
 
+export interface ImpersonationSessionInfo {
+  operator: { id: string; name: string };
+  expires_at: string;
+  organization_name: string;
+}
+
 class AuthService {
   private issueSession(
     user: SessionSource,
@@ -553,6 +559,76 @@ class AuthService {
       }
       throw err;
     }
+  }
+
+  async getImpersonationSessionInfo(
+    identity: Pick<AuthIdentity, "user_id" | "organization_id" | "session_id">,
+  ): Promise<ImpersonationSessionInfo | null> {
+    if (!identity.session_id) {
+      return null;
+    }
+
+    const session = await prismaClient.authSession.findFirst({
+      where: {
+        id: identity.session_id,
+        user_id: identity.user_id,
+        impersonator_platform_user_id: { not: null },
+        revoked_at: null,
+        expires_at: { gt: new Date() },
+      },
+      select: {
+        expires_at: true,
+        impersonator_platform_user_id: true,
+        impersonatorPlatformUser: {
+          select: {
+            id: true,
+            name: true,
+            platform_role: true,
+            status: true,
+            can_impersonate: true,
+          },
+        },
+        user: {
+          select: {
+            status: true,
+            session_version: true,
+            organization_id: true,
+            organization: { select: { id: true, name: true, status: true } },
+            department: {
+              select: {
+                organization_id: true,
+                organization: { select: { id: true, name: true, status: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const operator = session?.impersonatorPlatformUser;
+    if (
+      !session?.impersonator_platform_user_id ||
+      !operator ||
+      operator.platform_role !== "super_admin" ||
+      operator.status !== "active" ||
+      !operator.can_impersonate ||
+      getActiveOrganizationId(session.user) !== identity.organization_id
+    ) {
+      return null;
+    }
+
+    const organization = session.user.organization_id
+      ? session.user.organization
+      : session.user.department.organization;
+    if (!organization) {
+      return null;
+    }
+
+    return {
+      operator: { id: operator.id, name: operator.name },
+      expires_at: session.expires_at.toISOString(),
+      organization_name: organization.name,
+    };
   }
 
   async validateSession(

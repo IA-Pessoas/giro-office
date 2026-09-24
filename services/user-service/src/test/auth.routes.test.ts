@@ -120,6 +120,7 @@ describe("auth routes", () => {
   });
 
   it("GET /user/me usa o usuario encaminhado pelo gateway", async () => {
+    authServiceMock.getImpersonationSessionInfo.mockResolvedValue(null);
     userServiceMock.getByIdWithModules.mockResolvedValue({
       id: "user-1",
       organization_id: "a0000000-0000-4000-8000-000000000001",
@@ -133,10 +134,37 @@ describe("auth routes", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.modules).toEqual({ contabil: 1, rh: 1, ti: 1 });
+    expect(res.body.data.impersonation).toBeUndefined();
     expect(userServiceMock.getByIdWithModules).toHaveBeenCalledWith(
       "user-1",
       "a0000000-0000-4000-8000-000000000001",
     );
+    expect(authServiceMock.getImpersonationSessionInfo).toHaveBeenCalledWith({
+      user_id: "user-1",
+      organization_id: "a0000000-0000-4000-8000-000000000001",
+      session_id: "session-1",
+    });
+  });
+
+  it("GET /user/me inclui o operador e a expiração somente em personificação", async () => {
+    authServiceMock.getImpersonationSessionInfo.mockResolvedValue({
+      operator: { id: "platform-1", name: "Operador" },
+      expires_at: "2026-09-24T14:00:00.000Z",
+      organization_name: "Organização Aurora",
+    });
+    userServiceMock.getByIdWithModules.mockResolvedValue({ id: "user-1", name: "Alvo" });
+    const app = createTestApp();
+
+    const res = await request(app)
+      .get("/user/me")
+      .set(gatewayAuthHeaders({ userId: "user-1", organizationId: "org-1" }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.impersonation).toEqual({
+      operator: { id: "platform-1", name: "Operador" },
+      expires_at: "2026-09-24T14:00:00.000Z",
+      organization_name: "Organização Aurora",
+    });
   });
 
   it("GET /user/session/validate confirma o contexto autenticado", async () => {

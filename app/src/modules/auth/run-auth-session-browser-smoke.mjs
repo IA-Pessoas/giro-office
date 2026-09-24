@@ -33,6 +33,7 @@ const smokeUser = {
   permission: 1,
   type: "user",
 };
+let impersonationActive = false;
 
 const dashboardStatsFixture = {
   updatedAt: "2026-09-18T15:30:00.000Z",
@@ -106,10 +107,22 @@ async function installApiMocks(page, context) {
   });
 
   await page.route("**/user/me", async (route) => {
+    const currentUser = {
+      ...smokeUser,
+      ...(impersonationActive
+        ? {
+            impersonation: {
+              operator: { id: "platform-operator-smoke", name: "Operador de teste" },
+              expires_at: "2026-09-24T14:00:00.000Z",
+              organization_name: "Organização de teste",
+            },
+          }
+        : {}),
+    };
     await route.fulfill({
       body: JSON.stringify(
         authenticated
-          ? { success: true, data: smokeUser }
+          ? { success: true, data: currentUser }
           : { success: false, error: "Não autenticado." },
       ),
       contentType: "application/json",
@@ -199,12 +212,22 @@ async function runBrowserProof() {
 
     const sessionCookie = (await context.cookies()).find((cookie) => cookie.name === "cw.session");
     assert.equal(sessionCookie?.httpOnly, true);
+    assert.equal(await page.getByText(/Você está personificando/).count(), 0);
     await page.screenshot({ path: authenticatedEvidencePath, fullPage: true });
     if (dashboardEvidencePath) {
       await page.locator(".Toastify__toast-close-button").first().click().catch(() => {});
       await mkdir(dirname(dashboardEvidencePath), { recursive: true });
       await page.screenshot({ path: dashboardEvidencePath, fullPage: true });
     }
+    impersonationActive = true;
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "Dashboard", level: 1 }).waitFor();
+    await page
+      .getByRole("status")
+      .getByText("Você está personificando Browser Session Smoke (Organização de teste)", {
+        exact: true,
+      })
+      .waitFor();
     assert.deepEqual(pageErrors, []);
   } finally {
     await browser.close();

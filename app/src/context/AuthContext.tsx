@@ -16,6 +16,12 @@ import {
 } from "./authInvalidation";
 import { clearPlatformQueryCache } from "./platformQueryCache";
 
+interface ImpersonationSessionInfo {
+    operator: { id: string; name: string };
+    expires_at: string;
+    organization_name: string;
+}
+
 interface UserProps {
     id: string;
     name: string;
@@ -31,6 +37,7 @@ interface UserProps {
     auth_kind?: "organization" | "platform";
     platform_role?: "super_admin";
     can_impersonate?: boolean;
+    impersonation?: ImpersonationSessionInfo;
 }
 
 interface SignInProps {
@@ -96,6 +103,20 @@ function isValidAuthUser(data: unknown): data is UserProps {
         typeof (data as UserProps).permission === "number";
 }
 
+function isValidImpersonationSessionInfo(value: unknown): value is ImpersonationSessionInfo {
+    if (!value || typeof value !== "object") {
+        return false;
+    }
+
+    const info = value as ImpersonationSessionInfo;
+    return (
+        typeof info.operator?.id === "string" &&
+        typeof info.operator.name === "string" &&
+        typeof info.expires_at === "string" &&
+        typeof info.organization_name === "string"
+    );
+}
+
 function isValidPlatformUser(data: unknown): data is UserProps {
     return !!data &&
         typeof data === "object" &&
@@ -131,6 +152,9 @@ function buildCurrentUser(
                 : null,
         modules,
         auth_kind: "organization",
+        impersonation: isValidImpersonationSessionInfo(data.impersonation)
+            ? data.impersonation
+            : undefined,
     };
 }
 
