@@ -98,6 +98,57 @@ describe("contabil services tenant and catalog seams", () => {
     });
   });
 
+  describe("elegibilidade para criar competências (#1323)", () => {
+    const base = { clientId: CLIENT, userId: USER, organizationId: ORG, permission: 2 };
+    function controlDb(contabil: boolean | null | undefined) {
+      return {
+        client: {
+          findFirst: vi.fn().mockResolvedValue(contabil === undefined ? null : { contabil }),
+        },
+        controlContabil: {
+          findFirst: vi.fn().mockResolvedValue(null),
+          findMany: vi.fn().mockResolvedValue([]),
+          create: vi.fn(async ({ data }) => ({ id: "control-1", ...data })),
+          createMany: vi.fn(async ({ data }) => ({ count: data.length })),
+        },
+      };
+    }
+
+    it("cria as 12 competências para cliente com contabil nulo, como a tela permite", async () => {
+      const database = controlDb(null);
+      const result = await createControlService(database as never, audit()).createYear({
+        ...base,
+        year: 2026,
+        confirmed: true,
+      });
+      expect(result).toMatchObject({ created: 12, existing: 0 });
+    });
+
+    it("bloqueia mês e ano com a mesma mensagem quando o serviço contábil não é contratado", async () => {
+      const service = createControlService(controlDb(false) as never, audit());
+      const expected = {
+        statusCode: 400,
+        message: "Serviço contábil não contratado para este cliente.",
+      };
+      await expect(service.create({ ...base, competence: "2026-09" })).rejects.toMatchObject(
+        expected,
+      );
+      await expect(
+        service.createYear({ ...base, year: 2026, confirmed: true }),
+      ).rejects.toMatchObject(expected);
+    });
+
+    it("responde 404 para cliente de outra organização nas duas ações", async () => {
+      const service = createControlService(controlDb(undefined) as never, audit());
+      await expect(service.create({ ...base, competence: "2026-09" })).rejects.toMatchObject({
+        statusCode: 404,
+      });
+      await expect(
+        service.createYear({ ...base, year: 2026, confirmed: true }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+    });
+  });
+
   it("grava responsáveis ausentes como null em vez do default '' que viola a FK", async () => {
     const database = {
       responsibleContabil: {

@@ -77,3 +77,14 @@ export function filterContabilPortfolioRows<
       Object.entries(filters).every(([key, value]) => !value || row.values[key] === value),
   );
 }
+
+// O visualizador sempre espelha o GET. O editor tem estado local (salvamentos em curso), então só
+// adota o GET quando o registro muda: carga inicial, troca de competência, arquivamento.
+export function shouldSyncRemoteContabilControl(
+  canEdit: boolean,
+  currentControlId: string | null,
+  remote: Pick<ContabilControl, "id"> | null | undefined,
+): boolean {
+  if (!canEdit) return true;
+  return (remote?.id ?? null) !== currentControlId;
+}

@@ -27,6 +27,7 @@ import {
   getContabilCompletionPercent,
   getCurrentContabilCompetence,
   rollbackContabilFieldValue,
+  shouldSyncRemoteContabilControl,
   type ContabilControlFieldSaveStatus,
   updateContabilControlFieldStatus,
 } from "./contabilControlSection.helpers";
@@ -58,8 +59,9 @@ export function ContabilControlSection({
   const archiveMutation = useArchiveContabilCompetenceMutation();
   const restoreMutation = useRestoreContabilCompetenceMutation();
   const [competence, setCompetence] = useState(() => getCurrentContabilCompetence());
-  const detailQuery = useContabilControlDetail({ clientId, competence }, { enabled: !canEdit });
-  const remoteControl = canEdit ? bootstrapMutation.data : detailQuery.data;
+  // Abrir a aba só lê (GET); criar o controle é ação explícita em "Iniciar controle".
+  const detailQuery = useContabilControlDetail({ clientId, competence });
+  const remoteControl = detailQuery.data;
   const [controlId, setControlId] = useState<string | null>(null);
   const [control, setControl] = useState<ContabilControl | null>(null);
   const [fieldStatuses, setFieldStatuses] = useState(() =>
@@ -69,6 +71,7 @@ export function ContabilControlSection({
   const [confirmYearCreation, setConfirmYearCreation] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [operationMessage, setOperationMessage] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
 
   const confirmedControlRef = useRef<ContabilControl | null>(null);
   const bootstrapRequestRef = useRef(0);
@@ -96,31 +99,23 @@ export function ContabilControlSection({
   );
 
   const notesValue = control?.notes ?? "";
-  const isLoadingControl = canEdit ? bootstrapMutation.isPending : detailQuery.isFetching;
+  const isLoadingControl = detailQuery.isLoading || bootstrapMutation.isPending;
   const isAnyFieldSaving = useMemo(
     () => Object.values(fieldStatuses).some((status) => status === "saving"),
     [fieldStatuses],
   );
 
   useEffect(() => {
-    if (!clientId) {
-      return;
-    }
+    setOperationError(null);
+  }, [clientId, competence]);
 
-    if (!canEdit) {
-      clearAllTimers();
-      setBootstrapError(null);
-      setControlId(null);
-      setControl(null);
-      setFieldStatuses(createContabilFieldStatusMap(CONTABIL_CONTROL_FIELDS));
-      confirmedControlRef.current = null;
-
-      return () => {
-        clearAllTimers();
-      };
-    }
-
-    void bootstrapControl(clientId, competence);
+  useEffect(() => {
+    clearAllTimers();
+    setBootstrapError(null);
+    setControlId(null);
+    setControl(null);
+    setFieldStatuses(createContabilFieldStatusMap(CONTABIL_CONTROL_FIELDS));
+    confirmedControlRef.current = null;
 
     return () => {
       clearAllTimers();
@@ -128,12 +123,12 @@ export function ContabilControlSection({
   }, [clientId, competence, canEdit]);
 
   useEffect(() => {
-    if (canEdit) {
-      return;
-    }
-
     if (detailQuery.error) {
       setBootstrapError(getContabilErrorMessage(detailQuery.error));
+      return;
+    }
+    const currentId = confirmedControlRef.current?.id ?? null;
+    if (detailQuery.isLoading || !shouldSyncRemoteContabilControl(canEdit, currentId, remoteControl)) {
       return;
     }
 
@@ -141,7 +136,7 @@ export function ContabilControlSection({
     setControl(remoteControl ?? null);
     setControlId(remoteControl?.id ?? null);
     confirmedControlRef.current = remoteControl ?? null;
-  }, [canEdit, detailQuery.error, remoteControl]);
+  }, [canEdit, detailQuery.error, detailQuery.isLoading, remoteControl]);
 
   useEffect(() => {
     return () => {
@@ -292,33 +287,52 @@ export function ContabilControlSection({
     queueFieldSave("notes", value);
   }
 
-  async function createYear() {
-    const year = Number(competence.slice(0, 4));
-    const result = await createYearMutation.mutateAsync({ client_id: clientId, year, confirmed: true });
-    setConfirmYearCreation(false);
-    setOperationMessage(`${result.created} competências criadas; ${result.existing} já existiam.`);
+  // Erro de qualquer ação aparece na tela e os botões de confirmação voltam ao estado normal.
+  async function runOperation(action: () => Promise<void>) {
+    setOperationError(null);
+    try {
+      await action();
+    } catch (error) {
+      setOperationMessage(null);
+      setOperationError(getContabilErrorMessage(error));
+    } finally {
+      setConfirmYearCreation(false);
+      setConfirmArchive(false);
+    }
   }
 
-  async function completeAll() {
-    if (!controlId) return;
-    const updated = await completeAllMutation.mutateAsync({ controlId, clientId, competence });
-    setControl(updated);
-    confirmedControlRef.current = updated;
-    setOperationMessage("Os 17 itens da competência foram marcados como concluídos.");
+  function createYear() {
+    return runOperation(async () => {
+      const year = Number(competence.slice(0, 4));
+      const result = await createYearMutation.mutateAsync({ client_id: clientId, year, confirmed: true });
+      setOperationMessage(`${result.created} competências criadas; ${result.existing} já existiam.`);
+    });
   }
 
-  async function archiveCompetence() {
-    await archiveMutation.mutateAsync({ client_id: clientId, competence });
-    setConfirmArchive(false);
-    setControl(null);
-    setControlId(null);
-    setOperationMessage("Competência arquivada. Os registros foram preservados e podem ser restaurados.");
+  function completeAll() {
+    return runOperation(async () => {
+      if (!controlId) return;
+      const updated = await completeAllMutation.mutateAsync({ controlId, clientId, competence });
+      setControl(updated);
+      confirmedControlRef.current = updated;
+      setOperationMessage("Os 17 itens da competência foram marcados como concluídos.");
+    });
   }
 
-  async function restoreCompetence() {
-    await restoreMutation.mutateAsync({ client_id: clientId, competence });
-    setOperationMessage("Competência restaurada. Recarregue o controle para continuar.");
-    void bootstrapControl(clientId, competence);
+  function archiveCompetence() {
+    return runOperation(async () => {
+      await archiveMutation.mutateAsync({ client_id: clientId, competence });
+      setControl(null);
+      setControlId(null);
+      setOperationMessage("Competência arquivada. Os registros foram preservados e podem ser restaurados.");
+    });
+  }
+
+  function restoreCompetence() {
+    return runOperation(async () => {
+      await restoreMutation.mutateAsync({ client_id: clientId, competence });
+      setOperationMessage("Competência restaurada.");
+    });
   }
 
   return (
@@ -348,8 +362,25 @@ export function ContabilControlSection({
       ) : null}
 
       {!isLoadingControl && !bootstrapError && !control ? (
-        <ContabilStateBox icon={AlertCircle} title="Controle indisponível" compact>
-          O backend não retornou um controle válido para esta competência.
+        <ContabilStateBox icon={AlertCircle} title="Sem controle nesta competência" compact>
+          <span>Ainda não há checklist contábil para esta competência.</span>
+          <input
+            aria-label="Competência"
+            type="month"
+            value={competence}
+            onChange={(event) => handleCompetenceChange(event.target.value)}
+            className="ml-2 h-8 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+          />
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => void bootstrapControl(clientId, competence)}
+              disabled={bootstrapMutation.isPending}
+              className="ml-2 inline-flex items-center gap-1 font-semibold text-blue-700 disabled:opacity-60 dark:text-blue-300"
+            >
+              Iniciar controle
+            </button>
+          ) : null}
         </ContabilStateBox>
       ) : null}
 
@@ -499,6 +530,12 @@ export function ContabilControlSection({
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {operationError ? (
+        <ContabilStateBox icon={AlertCircle} tone="danger" title="Não foi possível concluir a operação" compact>
+          <span role="alert">{operationError}</span>
+        </ContabilStateBox>
       ) : null}
 
       {operationMessage ? (
