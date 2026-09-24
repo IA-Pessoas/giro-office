@@ -24,6 +24,12 @@ interface PessoalOverviewSectionProps {
   onSelectTab: (tabId: PessoalTabId) => void;
 }
 
+/** "2026-09" -> "09/2026". */
+function formatCompetence(competence: string | undefined): string {
+  const [year, month] = competence?.split("-") ?? [];
+  return year && month ? `${month}/${year}` : "Competência";
+}
+
 function formatCount(value: number, isLoading: boolean) {
   return isLoading ? "..." : String(value);
 }
@@ -71,7 +77,7 @@ export function PessoalOverviewSection({ onSelectTab }: PessoalOverviewSectionPr
       label: "Obrigações",
       value: formatCount(summary?.obligations?.total ?? 0, isOverviewLoading),
       description: "Conferências da competência atual.",
-      details: [summary?.obligations?.competence ?? "Competência", "Checklist"],
+      details: [formatCompetence(summary?.obligations?.competence), "Checklist"],
       icon: CheckSquare,
       tabId: "obligations",
     },
@@ -122,7 +128,7 @@ export function PessoalOverviewSection({ onSelectTab }: PessoalOverviewSectionPr
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center gap-3 rounded-xl border border-blue-500/40 bg-gradient-to-br from-blue-700 via-sky-700 to-blue-800 px-5 py-4 text-white shadow-lg">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-500/40 bg-gradient-to-br from-blue-700 via-sky-700 to-blue-800 px-5 py-4 text-white shadow-lg">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15">
           <UserRoundCog className="h-5 w-5" />
         </span>

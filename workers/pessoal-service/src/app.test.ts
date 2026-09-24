@@ -194,6 +194,20 @@ describe("pessoal Worker", () => {
     expect(groupService.archive).toHaveBeenCalledWith(ORGANIZATION_ID, USER_ID, GROUP_ID);
   });
 
+  it("rejects a new union with an invalid CNPJ (#1301)", async () => {
+    const unions = unionService();
+    const app = createPessoalWorkerApp({ env: env(), unionService: unions });
+    for (const cnpj of ["123", "11.222.333/0001-44"]) {
+      const response = await app.request("https://pessoal.test/pessoal/unions", {
+        method: "POST",
+        headers: { ...headers(), "content-type": "application/json" },
+        body: JSON.stringify({ name: "Sindicato", cnpj }),
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(unions.create).not.toHaveBeenCalled();
+  });
+
   it("routes unions and situations through the existing domain services", async () => {
     const unions = unionService();
     const situations = situationService();
@@ -213,7 +227,7 @@ describe("pessoal Worker", () => {
     const unionCreate = await app.request("https://pessoal.test/pessoal/unions", {
       method: "POST",
       headers: jsonHeaders,
-      body: JSON.stringify({ name: "Sindicato", cnpj: "123" }),
+      body: JSON.stringify({ name: "Sindicato", cnpj: "11.222.333/0001-81" }),
     });
     const unionUpdate = await app.request(`https://pessoal.test/pessoal/unions/${UNION_ID}`, {
       method: "PATCH",
@@ -268,7 +282,7 @@ describe("pessoal Worker", () => {
     );
     expect(unions.create).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },
-      { name: "Sindicato", cnpj: "123" },
+      { name: "Sindicato", cnpj: "11.222.333/0001-81" },
     );
     expect(unions.delete).toHaveBeenCalledWith(
       { organizationId: ORGANIZATION_ID, userId: USER_ID, permission: 2 },

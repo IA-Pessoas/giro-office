@@ -201,7 +201,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
                     return (
                       <tr key={group.id} className="border-t border-gray-100 dark:border-gray-700">
                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{group.name}</td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{PESSOAL_GROUP_POLICY_LABELS[group.policy] ?? group.policy ?? "Sem política"}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{PESSOAL_GROUP_POLICY_LABELS[group.policy] ?? group.policy}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                           {isArchived ? "Arquivado" : "Ativo"}
                         </td>

@@ -139,7 +139,7 @@ function buildLddFormValues(ldd: PessoalLdd | null): LddFormValues {
     due_date: ldd.due_date ? ldd.due_date.slice(0, 10) : "",
     balance_amount:
       typeof ldd.balance_amount === "number"
-        ? formatBrlDecimalInput(ldd.balance_amount.toFixed(2).replace(".", ","))
+        ? formatBrlDecimalInput(ldd.balance_amount.toFixed(2))
         : "",
     registration_status: ldd.registration_status ?? "",
     status: ldd.status ?? "",
@@ -762,13 +762,11 @@ export function PessoalTrackingSection({
                     id="pessoal-ldd-form-title"
                     className="text-base font-semibold text-gray-900 dark:text-white"
                   >
-                    <span className="inline-flex items-center gap-1">
-                      {selectedLdd ? "Editar LDD" : "Criar LDD"}
-                      <FieldHelp label="LDD" description={LDD_DESCRIPTION} />
-                    </span>
+                    {selectedLdd ? "Editar LDD" : "Criar LDD"}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    {LDD_DESCRIPTION}
+                  <p className="mt-1 inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                    O que é LDD?
+                    <FieldHelp label="LDD" description={LDD_DESCRIPTION} />
                   </p>
                 </div>
                 <button

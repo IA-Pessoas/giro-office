@@ -57,7 +57,7 @@ import {
   isPessoalPasswordEncrypted,
 } from "@workspace/pessoal-service/src/services/pessoalPasswordCrypto.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
-import { parseWithZod } from "@workspace/shared";
+import { isValidCnpj, parseWithZod } from "@workspace/shared";
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -519,6 +519,13 @@ function localUnionService(
         select,
       });
       if (!current) throw new ServiceError(404, "Sindicato nao encontrado.");
+      if (
+        body.cnpj !== undefined &&
+        body.cnpj !== current.cnpj &&
+        !isValidCnpj(String(body.cnpj))
+      ) {
+        throw new ServiceError(400, "CNPJ inválido.");
+      }
       const data = {
         ...(body.name !== undefined ? { name: body.name } : {}),
         ...(body.cnpj !== undefined ? { cnpj: body.cnpj } : {}),
@@ -1449,15 +1456,23 @@ function localObligationService(
   };
 }
 
+const saoPauloDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+
+/** Dia civil em São Paulo no formato YYYY-MM-DD. */
+function saoPauloDateKey(date: Date): string {
+  return saoPauloDate.format(date);
+}
+
 /**
  * Pago pelo status; vencido pelo status ou por vencimento anterior a hoje sem pagamento;
- * o resto \u00e9 aberto. Datas comparadas pelo dia em UTC, como o `due_date` \u00e9 gravado.
+ * o resto é aberto. `due_date` é gravado como data à meia-noite UTC; "hoje" é o dia em
+ * São Paulo, para um LDD que vence hoje não virar vencido às 21h.
  */
 export function summarizeLddStatuses(
   rows: { status?: unknown; due_date?: unknown }[],
   today: Date,
 ): { total: number; open: number; overdue: number; paid: number } {
-  const todayKey = today.toISOString().slice(0, 10);
+  const todayKey = saoPauloDateKey(today);
   const counts = { total: rows.length, open: 0, overdue: 0, paid: 0 };
   for (const row of rows) {
     const status = String(row.status ?? "")
@@ -1478,7 +1493,7 @@ function localOverviewService(prisma: PessoalDomainPrisma): PessoalOverviewServi
     async getSummary(context) {
       const organizationWhere = { organization_id: context.organizationId };
       const now = new Date();
-      const competence = now.toISOString().slice(0, 7);
+      const competence = saoPauloDateKey(now).slice(0, 7);
       const [unions, ldd, payrollTotal, obligationTotal] = await Promise.all([
         prisma.unionPessoal.findMany({
           where: organizationWhere,
