@@ -89,8 +89,9 @@ const PROCESS_STATUS_EQUIVALENTS = {
 } as const;
 
 // A migração criou um processo técnico para cada orientação legada sem processo (a FK é
-// obrigatória). Ele segura a orientação, mas não é trabalho do Regularize: fica fora das listas
-// operacionais e continua acessível pelo id (#1377).
+// obrigatória). Ele segura a orientação, mas não é trabalho do Regularize: fica fora das listas,
+// do dashboard e dos relatórios e continua acessível pelo id (#1377). O texto vem da regra de
+// migração em docs/migration/v4/scripts/rules/v2.mjs (guidance-process-derived).
 export const LEGACY_GUIDANCE_PROCESS_TYPE = "Processo técnico para orientação legada";
 export const OPERATIONAL_PROCESS_FILTER = {
   process_type: { not: LEGACY_GUIDANCE_PROCESS_TYPE },

@@ -71,7 +71,8 @@ export class RegularizeDashboardService {
             select: { name: true, cpf_cnpj: true, organization_id: true },
           },
         },
-        orderBy: { entry_date: "desc" },
+        // Processo migrado sem data de entrada não pode ocupar o topo dos recentes.
+        orderBy: { entry_date: { sort: "desc", nulls: "last" } },
         take: 6,
       }),
       this.prisma.license.count({
