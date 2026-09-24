@@ -10,7 +10,11 @@ import {
   validateCpfCnpjDocument,
 } from "../utils/documentValidation";
 import type { Client, ClientFormValues } from "../types";
-import { buildCreateClientPayload, createClientFormInitialValues } from "../utils/clientForm";
+import {
+  buildCreateClientPayload,
+  createClientFormInitialValues,
+  getClientInternalName,
+} from "../utils/clientForm";
 import { ClientForm } from "./ClientForm";
 
 interface CreateModalProps {
@@ -84,7 +88,7 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
       setShowDocumentError(false);
     }
 
-    if (!formValues.name.trim() || !formValues.cpf_cnpj.trim()) {
+    if (!getClientInternalName(formValues) || !formValues.cpf_cnpj.trim()) {
       toast.error("Preencha nome e CPF/CNPJ para continuar.");
       return;
     }

@@ -66,7 +66,12 @@ export default function ClientRegularizePage() {
       return;
     }
 
-    if (!formValues.name.trim()) {
+    const isCompanyClient = formValues.cpf_cnpj.replace(/\D/g, "").length === 14;
+    const hasClientName = isCompanyClient
+      ? Boolean(formValues.name.trim() || formValues.company_name.trim() || formValues.fantasy_name.trim())
+      : Boolean(formValues.name.trim());
+
+    if (!hasClientName) {
       toast.error("Preencha o nome do cliente para continuar.");
       return;
     }

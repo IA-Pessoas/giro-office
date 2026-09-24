@@ -26,6 +26,7 @@ import {
 import {
   buildCreateClientIntegrationPayload,
   buildUpdateClientIntegrationPayload,
+  createClientIntegrationInitialValues,
   createUpdateClientIntegrationInitialValues,
   hasUsableIntegrationData,
 } from "./utils/integrationForm.ts";
@@ -129,6 +130,72 @@ runTest("client form sends the selected tax regime on creation and update", () =
     "regime" in buildUpdateClientPayload({ ...values, regime: "" }, "MEI"),
     false,
   );
+});
+
+runTest("PJ client payloads derive the required API name while PF keeps its entered name", () => {
+  const pjValues = {
+    ...createClientFormInitialValues(),
+    type: "PJ",
+    name: "",
+    company_name: "Empresa Exemplo LTDA",
+    fantasy_name: "Exemplo",
+  };
+
+  assert.equal(buildCreateClientPayload(pjValues, "organization-1").name, "Empresa Exemplo LTDA");
+  assert.equal(
+    buildCreateClientPayload(
+      { ...pjValues, company_name: "", fantasy_name: "Nome Fantasia" },
+      "organization-1",
+    ).name,
+    "Nome Fantasia",
+  );
+  assert.equal(
+    buildUpdateClientPayload({ ...pjValues, company_name: "Nova Razão Social" }).name,
+    "Nova Razão Social",
+  );
+
+  const pfValues = { ...pjValues, type: "PF", name: "Pessoa Exemplo", company_name: "" };
+  assert.equal(buildCreateClientPayload(pfValues, "organization-1").name, "Pessoa Exemplo");
+});
+
+runTest("PJ integration creation derives required API name from company identity", () => {
+  const values = {
+    ...createClientIntegrationInitialValues(),
+    type: "PJ",
+    name: "",
+    company_name: "Empresa Integração LTDA",
+    fantasy_name: "Integração",
+  };
+
+  assert.equal(
+    buildCreateClientIntegrationPayload(values, "organization-1").name,
+    "Empresa Integração LTDA",
+  );
+
+  const client = { ...values, name: "", company_name: "", fantasy_name: "" };
+  assert.equal(
+    buildUpdateClientIntegrationPayload(
+      { ...createUpdateClientIntegrationInitialValues(client), name: "", company_name: "Nova LTDA" },
+      client,
+    ).name,
+    "Nova LTDA",
+  );
+});
+
+runTest("PJ client forms hide manual name while PF forms retain it", () => {
+  const clientForm = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+  const integrationForm = readFileSync(
+    "src/modules/clients/components/ClientIntegrationForm.tsx",
+    "utf8",
+  );
+  const regularizeForm = readFileSync(
+    "src/modules/clients/components/ClientRegularizeForm.tsx",
+    "utf8",
+  );
+  assert.match(clientForm, /values\.type === "PF"[\s\S]*?name="name"/);
+  assert.match(integrationForm, /values\.type === "PF"[\s\S]*?name="name"/);
+  assert.doesNotMatch(regularizeForm, /label="Nome \/ Apelido"/);
+  assert.match(regularizeForm, /cpf_cnpj[\s\S]*14/);
 });
 
 runTest("client regime is constrained and bound in both shared client flows", () => {

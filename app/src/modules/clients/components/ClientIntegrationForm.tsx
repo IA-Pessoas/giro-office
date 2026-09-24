@@ -119,16 +119,18 @@ export function ClientIntegrationForm({
           ) : null}
         </label>
 
-        <label className="space-y-1.5">
-          <span className={labelClassName}>Nome / Apelido</span>
-          <input
-            name="name"
-            value={values.name}
-            onChange={onChange}
-            disabled={disabled}
-            className={clientTextFieldClassName}
-          />
-        </label>
+        {values.type === "PF" ? (
+          <label className="space-y-1.5">
+            <span className={labelClassName}>Nome</span>
+            <input
+              name="name"
+              value={values.name}
+              onChange={onChange}
+              disabled={disabled}
+              className={clientTextFieldClassName}
+            />
+          </label>
+        ) : null}
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Razão Social</span>
