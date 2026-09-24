@@ -64,7 +64,7 @@ function throwSnapshotByteLimit(): never {
 function throwSnapshotRowLimit(): never {
   throw new ServiceError(
     422,
-    "O conjunto excede a capacidade de consulta do relatório.",
+    "O conjunto excede o limite global de 50.000 linhas do relatório. Aplique filtros mais específicos e tente novamente.",
     undefined,
     REPORTING_QUERY_ROW_LIMIT_CODE,
   );
