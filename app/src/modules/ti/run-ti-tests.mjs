@@ -821,8 +821,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /Movimentacoes/);
   assert.match(tabSource, /stockMovementsQuery/);
   assert.match(tabSource, /selectedItemQuery\.isError/);
-  assert.match(tabSource, /const \[movementItemId, setMovementItemId\]/);
-  assert.match(tabSource, /stockItemOptions/);
+  assert.match(tabSource, /const \[movementItem, setMovementItem\]/);
   assert.match(tabSource, /function closeItemDialog/);
   assert.match(tabSource, /function closeEntryDialog/);
   assert.match(tabSource, /function closeExitDialog/);
@@ -836,7 +835,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /setLocationName\(""\)/);
   assert.match(tabSource, /stockCategoriesQuery\.refetch\(\)/);
   assert.match(tabSource, /stockLocationsQuery\.refetch\(\)/);
-  assert.match(tabSource, /disabled=\{!movementItemId \|\| !canEditStock \|\| isMovementSubmitting\}/);
+  assert.match(tabSource, /disabled=\{!movementItem \|\| !canEditStock \|\| isMovementSubmitting\}/);
   assert.doesNotMatch(tabSource, /disabled=\{!selectedItemId\}/);
   assert.doesNotMatch(tabSource, /Ações do estoque/);
   assert.doesNotMatch(tabSource, /Movimentação/);
@@ -2453,4 +2452,35 @@ await runTest("new TI request discloses required fields before submission", asyn
   assert.match(source, /id="ti-request-title"[\s\S]*aria-required/);
   assert.match(source, /value=\{requestDraft\.category_id\}[\s\S]*aria-required/);
   assert.match(source, /<textarea[\s\S]*aria-required/);
+});
+
+await runTest("ti stock movement item options keep the chosen item outside the search results", async () => {
+  const { buildTiStockMovementItemOptions } = await import("./utils/stockMovementItems.ts");
+  const results = [
+    { id: "a", name: "Mouse" },
+    { id: "b", name: "" },
+  ];
+
+  assert.deepEqual(buildTiStockMovementItemOptions(results, null), [
+    { value: "", label: "Selecione" },
+    { value: "a", label: "Mouse" },
+    { value: "b", label: "Item sem nome" },
+  ]);
+  assert.deepEqual(
+    buildTiStockMovementItemOptions(results, { id: "z", name: "Teclado" }).map((option) => option.value),
+    ["", "z", "a", "b"],
+  );
+  assert.equal(buildTiStockMovementItemOptions(results, { id: "a", name: "Mouse" }).length, 3);
+});
+
+await runTest("ti stock movement dialogs search every stock item on the server", async () => {
+  const tab = await readFile(join(moduleRoot, "components/TiStockTab.tsx"), "utf8");
+  const picker = await readFile(join(moduleRoot, "components/TiStockItemSelect.tsx"), "utf8");
+
+  assert.match(picker, /useTiStockItems\(\s*\{\s*name: deferredSearch \|\| undefined, page: 1, page_size: MOVEMENT_ITEM_PAGE_SIZE \}/);
+  assert.match(picker, /MOVEMENT_ITEM_PAGE_SIZE = 100/);
+  assert.match(picker, /Mostrando \$\{items\.length\} de \$\{total\} itens/);
+  assert.equal(tab.match(/<TiStockItemSelect/g)?.length, 2);
+  assert.match(picker, /Nenhum item encontrado\./);
+  assert.match(picker, /itemsQuery\.isError/);
 });
