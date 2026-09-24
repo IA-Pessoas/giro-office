@@ -50,6 +50,11 @@ function prisma() {
       create: vi.fn(async () => ({ id: "session-created" })),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
+    passwordResetToken: {
+      findFirst: vi.fn(async () => null as Record<string, unknown> | null),
+      create: vi.fn(async () => ({ id: "reset-1" })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
     platformAuthSession: {
       findFirst: vi.fn(async () => ({
         csrf_hash: "b".repeat(64),
@@ -1729,4 +1734,278 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
 
     expect(response.status).toBe(403);
   });
+
+  describe("redefinição de senha pelo administrador (#1342)", () => {
+    const OTHER_USER_ID = "c0000000-0000-4000-8000-000000000002";
+    const resetEnv = () => ({ ...env(), APP_PUBLIC_URL: "https://app.test" });
+
+    function withTarget(db: ReturnType<typeof prisma>, overrides: Record<string, unknown> = {}) {
+      db.user.findFirst.mockResolvedValue({
+        ...user(),
+        id: OTHER_USER_ID,
+        name: "Alvo <b>",
+        login: "alvo",
+        email: "alvo@example.com",
+        type: "user",
+        first_owner_flag: false,
+        permission: 1,
+        ...overrides,
+      } as never);
+    }
+
+    function resetRequest(app: ReturnType<typeof createUserWorkerApp>, headers: HeadersInit) {
+      return app.request(`https://user.test/user/${OTHER_USER_ID}/password-reset`, {
+        method: "POST",
+        headers,
+      });
+    }
+
+    function confirmRequest(app: ReturnType<typeof createUserWorkerApp>, password: string) {
+      return app.request("https://user.test/user/password-reset/confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: "t".repeat(43), password }),
+      });
+    }
+
+    it("não deixa o administrador definir a senha de outro usuário", async () => {
+      const db = prisma();
+      withTarget(db);
+      const app = createUserWorkerApp({ env: env(), prisma: db });
+
+      const response = await app.request(`https://user.test/user/${OTHER_USER_ID}`, {
+        method: "PUT",
+        headers: { ...forwardedHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ password: "senha-escolhida-pelo-admin" }),
+      });
+
+      expect(response.status).toBe(403);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("não aceita senha no PATCH de usuário da plataforma", async () => {
+      const db = prisma();
+      const app = createUserWorkerApp({ env: env(), prisma: db });
+
+      const response = await app.request(
+        `https://user.test/platform/organizations/${ORGANIZATION_ID}/users/${OTHER_USER_ID}`,
+        {
+          method: "PATCH",
+          headers: { ...(await platformHeaders(db)), "content-type": "application/json" },
+          body: JSON.stringify({ password: "senha-escolhida-pelo-admin", expected_version: 1 }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("envia link de uso único e registra auditoria", async () => {
+      const db = prisma();
+      withTarget(db);
+      const sendPasswordResetEmail = vi.fn(async () => {});
+      const audit = vi.fn(async () => {});
+      const app = createUserWorkerApp({
+        env: resetEnv(),
+        prisma: db,
+        sendPasswordResetEmail,
+        audit,
+      } as never);
+
+      const response = await resetRequest(app, forwardedHeaders());
+
+      expect(response.status).toBe(200);
+      expect(JSON.stringify(await response.json())).not.toMatch(/token/i);
+      expect(db.passwordResetToken.updateMany).toHaveBeenCalledWith({
+        where: { user_id: OTHER_USER_ID, used_at: null },
+        data: { used_at: expect.any(Date) },
+      });
+      const [{ data: created }] = db.passwordResetToken.create.mock.calls[0] as unknown as [
+        { data: { user_id: string; token_hash: string; expires_at: Date } },
+      ];
+      expect(created.user_id).toBe(OTHER_USER_ID);
+      expect(created.expires_at.getTime()).toBeGreaterThan(Date.now());
+      expect(created.expires_at.getTime()).toBeLessThanOrEqual(Date.now() + 60 * 60 * 1000);
+      const [message] = sendPasswordResetEmail.mock.calls[0] as unknown as [
+        { to: string; name: string; link: string },
+      ];
+      expect(message.to).toBe("alvo@example.com");
+      const link = new URL(message.link);
+      expect(link.origin + link.pathname).toBe("https://app.test/redefinir-senha");
+      expect(await hashCsrfToken(String(link.searchParams.get("token")))).toBe(created.token_hash);
+      expect(audit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorUserId: USER_ID,
+          action: "PASSWORD_RESET_REQUESTED",
+          referring: "user",
+          referringId: OTHER_USER_ID,
+        }),
+      );
+    });
+
+    it("usa o login como destino quando ele é um e-mail", async () => {
+      const db = prisma();
+      withTarget(db, { email: null, login: "alvo.login@example.com" });
+      const sendPasswordResetEmail = vi.fn(async () => {});
+      const app = createUserWorkerApp({
+        env: resetEnv(),
+        prisma: db,
+        sendPasswordResetEmail,
+      } as never);
+
+      expect((await resetRequest(app, forwardedHeaders())).status).toBe(200);
+      expect(sendPasswordResetEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "alvo.login@example.com" }),
+      );
+    });
+
+    it("recusa usuário sem e-mail", async () => {
+      const db = prisma();
+      withTarget(db, { email: null, login: "alvo" });
+      const app = createUserWorkerApp({
+        env: resetEnv(),
+        prisma: db,
+        sendPasswordResetEmail: vi.fn(async () => {}),
+      } as never);
+
+      expect((await resetRequest(app, forwardedHeaders())).status).toBe(422);
+      expect(db.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it("responde 503 quando o envio de e-mail não está configurado", async () => {
+      const db = prisma();
+      withTarget(db);
+      const app = createUserWorkerApp({ env: env(), prisma: db });
+
+      expect((await resetRequest(app, forwardedHeaders())).status).toBe(503);
+      expect(db.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it("exige gestão de usuários para pedir a redefinição", async () => {
+      const db = prisma();
+      withTarget(db);
+      const app = createUserWorkerApp({
+        env: resetEnv(),
+        prisma: db,
+        sendPasswordResetEmail: vi.fn(async () => {}),
+      } as never);
+
+      const response = await resetRequest(
+        app,
+        forwardedHeaders({ "x-auth-type": "user", "x-auth-modules": "{}" }),
+      );
+
+      expect(response.status).toBe(403);
+      expect(db.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it("super admin envia a redefinição pela plataforma", async () => {
+      const db = prisma();
+      withTarget(db);
+      const sendPasswordResetEmail = vi.fn(async () => {});
+      const app = createUserWorkerApp({
+        env: resetEnv(),
+        prisma: db,
+        sendPasswordResetEmail,
+      } as never);
+
+      const response = await app.request(
+        `https://user.test/platform/organizations/${ORGANIZATION_ID}/users/${OTHER_USER_ID}/password-reset`,
+        { method: "POST", headers: await platformHeaders(db) },
+      );
+
+      expect(response.status).toBe(200);
+      expect(sendPasswordResetEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "alvo@example.com" }),
+      );
+    });
+
+    it("define a nova senha pelo link e derruba as sessões", async () => {
+      const db = prisma();
+      db.passwordResetToken.findFirst.mockResolvedValue({ id: "reset-1", user_id: OTHER_USER_ID });
+      const hashPassword = vi.fn(async () => "reset-argon2id-hash");
+      const audit = vi.fn(async () => {});
+      const app = createUserWorkerApp({ env: env(), prisma: db, hashPassword, audit } as never);
+
+      const response = await confirmRequest(app, "nova-senha-forte");
+
+      expect(response.status).toBe(200);
+      expect(db.passwordResetToken.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            token_hash: await hashCsrfToken("t".repeat(43)),
+            used_at: null,
+            expires_at: { gt: expect.any(Date) },
+          },
+        }),
+      );
+      expect(db.passwordResetToken.updateMany).toHaveBeenCalledWith({
+        where: { id: "reset-1", used_at: null },
+        data: { used_at: expect.any(Date) },
+      });
+      expect(db.user.updateMany).toHaveBeenCalledWith({
+        where: { id: OTHER_USER_ID },
+        data: {
+          password: "reset-argon2id-hash",
+          session_version: { increment: 1 },
+          version: { increment: 1 },
+        },
+      });
+      expect(db.authSession.updateMany).toHaveBeenCalledWith({
+        where: { user_id: OTHER_USER_ID, revoked_at: null },
+        data: { revoked_at: expect.any(Date) },
+      });
+      expect(audit).toHaveBeenCalledWith(
+        expect.objectContaining({ actorUserId: OTHER_USER_ID, action: "PASSWORD_RESET_COMPLETED" }),
+      );
+    });
+
+    it("recusa link inválido, expirado ou já usado", async () => {
+      const db = prisma();
+      const app = createUserWorkerApp({ env: env(), prisma: db });
+
+      expect((await confirmRequest(app, "nova-senha-forte")).status).toBe(400);
+
+      db.passwordResetToken.findFirst.mockResolvedValue({ id: "reset-1", user_id: OTHER_USER_ID });
+      db.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
+      expect((await confirmRequest(app, "nova-senha-forte")).status).toBe(400);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("recusa nova senha curta no link", async () => {
+      const db = prisma();
+      db.passwordResetToken.findFirst.mockResolvedValue({ id: "reset-1", user_id: OTHER_USER_ID });
+      const app = createUserWorkerApp({ env: env(), prisma: db });
+
+      expect((await confirmRequest(app, "curta")).status).toBe(400);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+  });
 });
+
+async function platformHeaders(db: ReturnType<typeof prisma>): Promise<Record<string, string>> {
+  const csrfToken = "C".repeat(43);
+  const csrfHash = await hashCsrfToken(csrfToken);
+  const token = await sign({
+    user_id: PLATFORM_USER_ID,
+    auth_kind: "platform",
+    platform_role: "super_admin",
+    session_version: 1,
+    session_id: "platform-session-1",
+    csrf_hash: csrfHash,
+  });
+  db.platformAuthSession.findFirst.mockResolvedValue({
+    csrf_hash: csrfHash,
+    platformUser: platformUser(),
+  });
+  return {
+    ...(forwardedHeaders({
+      "x-auth-kind": "platform",
+      "x-auth-platform-role": "super_admin",
+      "x-auth-user-id": PLATFORM_USER_ID,
+      "x-auth-organization-id": "",
+    }) as Record<string, string>),
+    cookie: `cw.session=${token}; cw.csrf=${csrfToken}`,
+    "x-csrf-token": csrfToken,
+  };
+}

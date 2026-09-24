@@ -271,6 +271,7 @@ const routePolicyMatchers: Array<{
   },
   { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "POST", path: /^\/user\/[^/]+\/password-reset$/, policy: userManagementPolicy },
   { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "GET", path: /^\/task\/financeiro\/queue$/, policy: financeiroTaskViewPolicy },
   {
@@ -340,7 +341,7 @@ const routePolicyMatchers: Array<{
   },
   {
     method: "POST",
-    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/(?:reactivate|password-reset)\/?$/,
     policy: platformOnlyPolicy,
   },
   {

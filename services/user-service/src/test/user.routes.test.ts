@@ -411,6 +411,18 @@ describe("user routes", () => {
     );
   });
 
+  it("PUT /user/:id bloqueia administrador definindo a senha de outro usuario", async () => {
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/user-2")
+      .set(gatewayAuthHeaders())
+      .send({ password: "senha-escolhida-pelo-admin" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
+  });
+
   it("PUT /user/:id nao troca a propria senha quando a verificacao falha", async () => {
     userServiceMock.assertOwnPasswordChange.mockRejectedValueOnce(
       new ServiceError(403, "Senha atual incorreta."),

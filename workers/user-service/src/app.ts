@@ -34,6 +34,7 @@ import {
   updatePlatformUserBodySchema,
 } from "../../../services/user-service/src/schemas/platformUsers.schemas.js";
 import {
+  confirmPasswordResetBodySchema,
   createUserBodySchema,
   listUsersQuerySchema,
   ownPasswordPolicyError,
@@ -66,6 +67,12 @@ import {
   verifyPassword as defaultVerifyPassword,
   isLegacyBcryptHash,
 } from "./passwordHash.js";
+import {
+  confirmPasswordReset,
+  httpPasswordResetEmailSender,
+  type PasswordResetEmailSender,
+  requestPasswordReset,
+} from "./passwordReset.js";
 import type { Row, UserPrismaClient } from "./types.js";
 
 interface HonoEnv {
@@ -80,6 +87,7 @@ interface UserWorkerOptions {
   verifyPassword?: (password: string, hash: string) => Promise<boolean>;
   hashPassword?: (password: string) => Promise<string>;
   audit?: UserAuditRecorder;
+  sendPasswordResetEmail?: PasswordResetEmailSender;
 }
 
 const USER_PHOTO_BUCKET = "Fotos";
@@ -1655,6 +1663,12 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
       const { id } = parse(userIdParamsSchema, c.req.param());
       const body = parse(updateUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
+      if (body.password !== undefined && auth.userId !== id) {
+        throw new ServiceError(
+          403,
+          "Administradores não definem a senha de outro usuário. Envie um link de redefinição.",
+        );
+      }
       const ownPasswordChange = auth.userId === id && body.password !== undefined;
       const selfPasswordUpdate =
         ownPasswordChange &&
@@ -1694,6 +1708,87 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       });
       if (ownPasswordChange) await keepOnlyCurrentSession(c, db, auth, envOf(c, options));
       return c.json(createSuccessResponse(user));
+    }),
+  );
+
+  const passwordResetSender = (c: { env: UserWorkerEnv }) =>
+    options.sendPasswordResetEmail ?? httpPasswordResetEmailSender(envOf(c, options));
+
+  app.post("/user/password-reset/confirm", async (c) =>
+    withDb(c, options, async (db) => {
+      const input = parse(confirmPasswordResetBodySchema, await jsonBody(c));
+      const { userId } = await confirmPasswordReset(
+        db,
+        input,
+        options.hashPassword ?? defaultHashPassword,
+      );
+      await options.audit?.({
+        actorUserId: userId,
+        organizationId: null,
+        action: "PASSWORD_RESET_COMPLETED",
+        referring: "user",
+        referringId: userId,
+        changes: {},
+      });
+      return c.json(createSuccessResponse({ reset: true }));
+    }),
+  );
+
+  app.post("/user/:id/password-reset", async (c) =>
+    withDb(c, options, async (db) => {
+      const { auth } = await requireUserDb(c, { ...options, prisma: db });
+      requireManageUsers(auth);
+      await requireCsrf(c.req.raw, auth);
+      const { id } = parse(userIdParamsSchema, c.req.param());
+      const target = await db.user.findFirst({
+        where: organizationUserWhere(id, auth.organizationId),
+        select: { ...userSelect(), email: true },
+      });
+      if (!target) throw new ServiceError(404, "Usuario nao encontrado.");
+      assertCanManageTarget(auth, target);
+      const { expiresAt } = await requestPasswordReset(
+        db,
+        target,
+        envOf(c, options),
+        passwordResetSender(c),
+      );
+      await options.audit?.({
+        actorUserId: auth.userId,
+        organizationId: auth.organizationId,
+        action: "PASSWORD_RESET_REQUESTED",
+        referring: "user",
+        referringId: id,
+        changes: { expires_at: expiresAt.toISOString() },
+      });
+      return c.json(createSuccessResponse({ sent: true, expires_at: expiresAt.toISOString() }));
+    }),
+  );
+
+  app.post("/platform/organizations/:organizationId/users/:userId/password-reset", async (c) =>
+    withDb(c, options, async (db) => {
+      const { auth } = await platformContext(c, options, db);
+      await requireCsrf(c.req.raw, auth);
+      const { organizationId, userId } = parse(platformOrganizationUserParamsSchema, c.req.param());
+      const target = await db.user.findFirst({
+        where: organizationUserWhere(userId, organizationId),
+        select: { ...userSelect(), email: true },
+      });
+      if (!target) throw new ServiceError(404, "Usuário não encontrado.");
+      const { expiresAt } = await requestPasswordReset(
+        db,
+        target,
+        envOf(c, options),
+        passwordResetSender(c),
+      );
+      await options.audit?.({
+        platformActorUserId: auth.userId,
+        organizationId,
+        action: "PASSWORD_RESET_REQUESTED",
+        referring: "user",
+        referringId: userId,
+        changes: { expires_at: expiresAt.toISOString() },
+      });
+      return c.json(createSuccessResponse({ sent: true, expires_at: expiresAt.toISOString() }));
     }),
   );
 

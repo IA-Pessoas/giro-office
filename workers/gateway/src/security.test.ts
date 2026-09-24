@@ -215,6 +215,7 @@ describe("gateway Worker: fluxo de sessão", () => {
   it.each([
     ["POST", "/user/session"],
     ["POST", "/user/start-config"],
+    ["POST", "/user/password-reset/confirm"],
   ] as const)("%s %s é pública e não exige JWT", async (method, path) => {
     const { app, bindings, forwarded } = setup();
     const response = await app.request(`https://gateway.test${path}`, { method });
