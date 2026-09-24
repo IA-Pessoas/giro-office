@@ -20,18 +20,23 @@ CREATE TABLE clients (
   name text NOT NULL,
   email text,
   city text,
-  register_date_prospecting timestamp NOT NULL
+  register_date_prospecting timestamp NOT NULL,
+  deletion_date timestamp,
+  contabil boolean
 );
 CREATE TABLE tasks (id text PRIMARY KEY, client_id text REFERENCES clients(id));
 CREATE TABLE pa (id text PRIMARY KEY, client_id text UNIQUE REFERENCES clients(id));
-INSERT INTO clients VALUES
+INSERT INTO clients (id, organization_id, cpf_cnpj, name, email, city, register_date_prospecting)
+VALUES
   ('keep', 'org-1', '19.526.662/0001-28', 'Antigo', NULL, '', '2024-01-01'),
-  ('dup', 'org-1', '19526662000128', 'Novo', 'novo@x.com', 'Recife', '2025-01-01'),
   ('other-org', 'org-2', '19526662000128', 'Outra org', NULL, NULL, '2023-01-01'),
   ('zeros-a', 'org-1', '00.000.000/0000-00', 'Zeros A', NULL, NULL, '2024-01-01'),
   ('zeros-b', 'org-1', '00000000000000', 'Zeros B', NULL, NULL, '2024-01-01'),
   ('masked-a', 'org-1', '***.123.456-**', 'Mascara A', NULL, NULL, '2024-01-01'),
   ('masked-b', 'org-1', '***.123.456-**', 'Mascara B', NULL, NULL, '2024-01-01');
+-- Estado do duplicado (exclusao, flag de servico) nao pode passar para o mantido.
+INSERT INTO clients VALUES
+  ('dup', 'org-1', '19526662000128', 'Novo', 'novo@x.com', 'Recife', '2025-01-01', '2025-06-01', true);
 INSERT INTO tasks VALUES ('t1', 'dup'), ('t2', 'keep');
 -- Vinculo sem FK, remapeado pela lista explicita do reparo.
 CREATE TABLE "pessoal.payroll" (id text PRIMARY KEY, client_id text);
@@ -87,6 +92,7 @@ test("apply mantem o mais antigo, move vinculos e preenche campos vazios", { ski
   assert.equal(query(`SELECT client_id FROM "pessoal.payroll"`), "keep");
   assert.equal(query("SELECT name || '|' || email || '|' || city FROM clients WHERE id = 'keep'"),
     "Antigo|novo@x.com|Recife");
+  assert.equal(query("SELECT deletion_date IS NULL AND contabil IS NULL FROM clients WHERE id = 'keep'"), "t");
   // Idempotente: segunda execucao nao encontra nada.
   const again = psql(SQL, ["apply=1"]);
   assert.equal(again.status, 0, again.stderr);
@@ -96,6 +102,9 @@ test("apply mantem o mais antigo, move vinculos e preenche campos vazios", { ski
 test("conflito de unicidade em vinculo aborta o apply sem alterar nada", { skip: !hasDocker }, () => {
   query(FIXTURE);
   query("INSERT INTO pa VALUES ('pa-keep', 'keep'), ('pa-dup', 'dup')");
+  const dryRun = psql(SQL);
+  assert.equal(dryRun.status, 0, dryRun.stderr);
+  assert.match(dryRun.stderr, /WARNING:.*o apply vai falhar/);
   const result = psql(SQL, ["apply=1"]);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /pa\.client_id/);

@@ -4,10 +4,10 @@
 --   psql "$DATABASE_URL" -X -f infra/prisma/repairs/dedupe-clients-by-document.sql            -- dry-run (padrao)
 --   psql "$DATABASE_URL" -X -v apply=1 -f infra/prisma/repairs/dedupe-clients-by-document.sql -- aplica
 --
--- Regra: fica o cliente mais antigo (register_date_prospecting, depois id). Todo vinculo
--- (FK para clients.id) dos duplicados passa a apontar para ele, campos vazios dele recebem o
--- primeiro valor preenchido dos duplicados e os duplicados sao removidos. Documentos com
--- tamanho diferente de 11/14 digitos ou com um digito so (mascarados, placeholders) ficam de fora.
+-- Regra: fica o cliente mais antigo (register_date_prospecting, depois id). Todo vinculo dos
+-- duplicados passa a apontar para ele, campos de cadastro vazios dele recebem o primeiro valor
+-- preenchido dos duplicados e os duplicados sao removidos. Documentos com tamanho diferente de
+-- 11/14 digitos ou com um digito so (mascarados, placeholders) ficam de fora.
 -- Idempotente: sem duplicados, nao altera nada.
 \set ON_ERROR_STOP on
 \if :{?apply}
@@ -16,26 +16,44 @@
 \endif
 
 BEGIN;
+SET LOCAL search_path = pg_catalog, public;
 SET LOCAL lock_timeout = '5s';
-LOCK TABLE clients IN SHARE ROW EXCLUSIVE MODE;
-SELECT set_config('client_dedupe.apply', :'apply', true) \gset
+SET LOCAL client_dedupe.apply = :'apply';
+-- O dry-run e o relatorio para revisao: le sem bloquear escritas em clients.
+\if :apply
+  LOCK TABLE clients IN SHARE ROW EXCLUSIVE MODE;
+\endif
+
+-- Documento so com digitos, ou NULL quando nao pode identificar o cliente.
+CREATE FUNCTION pg_temp.client_doc(raw text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT d FROM (SELECT regexp_replace(raw, '\D', '', 'g') AS d) n
+  WHERE length(d) IN (11, 14) AND d !~ '^(\d)\1*$'
+$$;
+
+DO $guard$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE contype = 'f' AND confrelid = 'clients'::regclass AND cardinality(conkey) > 1
+  ) THEN
+    RAISE EXCEPTION 'FK composta para clients: o reparo nao sabe remapear, revise o script';
+  END IF;
+END
+$guard$;
 
 CREATE TEMP TABLE client_dedupe_map ON COMMIT DROP AS
-WITH normalized AS (
-  SELECT id, organization_id, name, register_date_prospecting,
-         regexp_replace(cpf_cnpj, '\D', '', 'g') AS doc
-  FROM clients
-), ranked AS (
-  SELECT *,
-         row_number() OVER w AS rn,
+WITH ranked AS (
+  SELECT id, organization_id, name, pg_temp.client_doc(cpf_cnpj) AS doc,
+         row_number() OVER w AS dup_rank,
          first_value(id) OVER w AS keep_id
-  FROM normalized
-  WHERE length(doc) IN (11, 14) AND doc !~ '^(\d)\1*$'
-  WINDOW w AS (PARTITION BY organization_id, doc ORDER BY register_date_prospecting, id)
+  FROM clients
+  WHERE pg_temp.client_doc(cpf_cnpj) IS NOT NULL
+  WINDOW w AS (PARTITION BY organization_id, pg_temp.client_doc(cpf_cnpj)
+               ORDER BY register_date_prospecting, id)
 )
-SELECT organization_id, doc, keep_id, id AS dup_id, name AS dup_name, rn
+SELECT organization_id, doc, keep_id, id AS dup_id, name AS dup_name, dup_rank
 FROM ranked
-WHERE rn > 1;
+WHERE dup_rank > 1;
 
 CREATE TEMP TABLE client_dedupe_refs (
   table_name text, column_name text, rows_moved bigint, conflict text
@@ -43,7 +61,8 @@ CREATE TEMP TABLE client_dedupe_refs (
 CREATE TEMP TABLE client_dedupe_fills (column_name text, rows_filled bigint) ON COMMIT DROP;
 
 \echo '== Duplicados (organizacao | documento | mantido | removido | nome removido)'
-SELECT organization_id, doc, keep_id, dup_id, dup_name FROM client_dedupe_map ORDER BY organization_id, doc, rn;
+SELECT organization_id, doc, keep_id, dup_id, dup_name FROM client_dedupe_map
+ORDER BY organization_id, doc, dup_rank;
 
 -- Move os vinculos. Cada UPDATE roda em subtransacao: conflito de unicidade vira linha do
 -- relatorio em vez de abortar o dry-run inteiro.
@@ -56,7 +75,7 @@ BEGIN
     SELECT c.conrelid::regclass AS tbl, a.attname AS col
     FROM pg_constraint c
     JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
-    WHERE c.contype = 'f' AND c.confrelid = 'clients'::regclass AND cardinality(c.conkey) = 1
+    WHERE c.contype = 'f' AND c.confrelid = 'clients'::regclass
     UNION
     -- Vinculos a clients.id sem FK no banco; mantenha em dia com o schema.prisma.
     SELECT to_regclass(t), 'client_id'
@@ -81,22 +100,29 @@ BEGIN
 END
 $refs$;
 
--- Preenche campos vazios (NULL ou '') do mantido com o primeiro duplicado preenchido.
+-- Preenche campos de cadastro vazios (NULL ou '') do mantido com o primeiro duplicado
+-- preenchido. Datas de ciclo de vida (exclusao, saida, greve) e flags de servico ficam de fora:
+-- herdar esses valores mudaria o estado do cliente mantido.
 DO $fills$
 DECLARE
   col text;
   filled bigint;
 BEGIN
-  FOR col IN
-    SELECT attname FROM pg_attribute
-    WHERE attrelid = 'clients'::regclass AND attnum > 0 AND NOT attisdropped AND NOT attnotnull
-    ORDER BY attnum
-  LOOP
+  FOREACH col IN ARRAY ARRAY[
+    'dominio_code', 'company_name', 'fantasy_name', 'cnae', 'cnae_secondary', 'responsible',
+    'cpf_responsible', 'agent', 'cpf_agent', 'number', 'email', 'address', 'cep', 'neighborhood',
+    'state', 'city', 'municipal_registration', 'state_registration',
+    'commercial_board_registration', 'opening_date', 'instagram', 'indication', 'regime',
+    'size', 'segment'
+  ] LOOP
+    CONTINUE WHEN NOT EXISTS (
+      SELECT 1 FROM pg_attribute
+      WHERE attrelid = 'clients'::regclass AND attname = col AND NOT attisdropped);
     EXECUTE format(
       'UPDATE clients k SET %1$I = (
          SELECT d.%1$I FROM client_dedupe_map m JOIN clients d ON d.id = m.dup_id
          WHERE m.keep_id = k.id AND NULLIF(d.%1$I::text, %2$L) IS NOT NULL
-         ORDER BY m.rn LIMIT 1)
+         ORDER BY m.dup_rank LIMIT 1)
        WHERE NULLIF(k.%1$I::text, %2$L) IS NULL
          AND EXISTS (
            SELECT 1 FROM client_dedupe_map m JOIN clients d ON d.id = m.dup_id
@@ -132,10 +158,8 @@ BEGIN
     RETURN;
   END IF;
   IF EXISTS (
-    SELECT 1 FROM clients
-    WHERE length(regexp_replace(cpf_cnpj, '\D', '', 'g')) IN (11, 14)
-      AND regexp_replace(cpf_cnpj, '\D', '', 'g') !~ '^(\d)\1*$'
-    GROUP BY organization_id, regexp_replace(cpf_cnpj, '\D', '', 'g')
+    SELECT 1 FROM clients WHERE pg_temp.client_doc(cpf_cnpj) IS NOT NULL
+    GROUP BY organization_id, pg_temp.client_doc(cpf_cnpj)
     HAVING count(*) > 1
   ) THEN
     RAISE EXCEPTION 'Ainda ha clientes duplicados apos o merge';
