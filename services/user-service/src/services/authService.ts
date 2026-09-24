@@ -15,6 +15,7 @@ import {
 import jwt from "jsonwebtoken";
 
 import { getUserServiceEnv } from "../config/env.js";
+import { PlatformRole } from "../generated/prisma/enums.js";
 import prismaClient from "../prisma/index.js";
 import {
   hashPassword,
@@ -86,6 +87,16 @@ function normalizeAuthUserType(value: unknown): AuthUserType | undefined {
 
 function allowsOrganizationAuthentication(status: string): boolean {
   return status === "active" || status === "trial";
+}
+
+function hasActiveImpersonationPermission<
+  T extends { platform_role: string; status: string; can_impersonate: boolean },
+>(operator: T | null | undefined): operator is T {
+  return (
+    operator?.platform_role === PlatformRole.super_admin &&
+    operator.status === "active" &&
+    operator.can_impersonate
+  );
 }
 
 function getActiveOrganizationId(user: PersistedAuthContext): string | undefined {
@@ -319,12 +330,7 @@ class AuthService {
           where: { id: input.platformUserId },
           select: { id: true, platform_role: true, status: true, can_impersonate: true },
         });
-        if (
-          !operator ||
-          operator.platform_role !== "super_admin" ||
-          operator.status !== "active" ||
-          !operator.can_impersonate
-        ) {
+        if (!hasActiveImpersonationPermission(operator)) {
           throw new ServiceError(403, "Você não tem permissão para personificar usuários.");
         }
 
@@ -608,10 +614,7 @@ class AuthService {
     const operator = session?.impersonatorPlatformUser;
     if (
       !session?.impersonator_platform_user_id ||
-      !operator ||
-      operator.platform_role !== "super_admin" ||
-      operator.status !== "active" ||
-      !operator.can_impersonate ||
+      !hasActiveImpersonationPermission(operator) ||
       getActiveOrganizationId(session.user) !== identity.organization_id
     ) {
       return null;
@@ -686,9 +689,7 @@ class AuthService {
       }
       if (
         identity.impersonator_platform_user_id &&
-        (session?.impersonatorPlatformUser?.platform_role !== "super_admin" ||
-          session.impersonatorPlatformUser.status !== "active" ||
-          !session.impersonatorPlatformUser.can_impersonate)
+        !hasActiveImpersonationPermission(session?.impersonatorPlatformUser)
       ) {
         throw new ServiceError(401, "Sessão de personificação inválida.");
       }
