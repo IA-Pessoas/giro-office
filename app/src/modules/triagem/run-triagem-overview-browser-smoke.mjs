@@ -98,6 +98,7 @@ async function runBrowserProof() {
     await expect(page.getByText("Cliente Urgente")).toBeVisible();
     await expect(page.getByLabel("Urgente aberta: 1")).toBeVisible();
     await expect(page.getByLabel("Completa: 0")).toBeVisible();
+    await expect(page.getByLabel("Sem itens aplicáveis: 0")).toBeVisible();
     assert.ok(
       requestLog.some(
         ({ method, path, url }) =>

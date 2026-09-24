@@ -1,4 +1,6 @@
+import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
+import { documentItemSchema } from "./schemas.js";
 import {
   createClosingService,
   createControlService,
@@ -140,6 +142,35 @@ describe("contabil services tenant and catalog seams", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
+  it("GET mensal sem registro devolve null em vez de 404 (#1322)", async () => {
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue(null);
+    const service = createDocumentsService(database as never, audit());
+
+    await expect(
+      service.getMonthly({ client_id: CLIENT, competence: "2026-09" }, auth),
+    ).resolves.toBeNull();
+  });
+
+  it("GET mensal sem competência na Triagem devolve resumo null em vez de 502 (#1322)", async () => {
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue({
+      id: MONTHLY,
+      client_id: CLIENT,
+      competence: "2026-09",
+      checklist: {},
+      item_notes: {},
+    });
+    const getSummary = vi
+      .fn()
+      .mockRejectedValue(new ServiceError(404, "Resumo da Triagem não encontrado."));
+    const service = createDocumentsService(database as never, audit(), { getSummary });
+
+    await expect(
+      service.getMonthly({ client_id: CLIENT, competence: "2026-09" }, auth),
+    ).resolves.toMatchObject({ id: MONTHLY, triagem_summary: null });
+  });
+
   it("recusa marcador bancário de cliente fora do tenant", async () => {
     const database = prisma();
     database.client.findFirst.mockResolvedValue(null);
@@ -180,6 +211,48 @@ describe("contabil services tenant and catalog seams", () => {
       ),
     ).rejects.toMatchObject({ statusCode: 400 });
     expect(database.triageMonthly.update).not.toHaveBeenCalled();
+  });
+
+  it("aceita chaves fiscais nulas na rotina contábil e ignora no update", async () => {
+    const body = {
+      type: "CONTABIL",
+      field: "financial_transactions",
+      status: "PENDING",
+      note: "Aguardando extrato",
+      delivery_method: null,
+      state_site: null,
+    };
+    expect(documentItemSchema.safeParse(body).success).toBe(true);
+    expect(documentItemSchema.safeParse({ ...body, state_site: "SP" }).success).toBe(false);
+    expect(
+      documentItemSchema.safeParse({
+        ...body,
+        type: "FISCAL",
+        field: "nfce_documents",
+        state_site: "SP",
+      }).success,
+    ).toBe(true);
+
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue({
+      id: MONTHLY,
+      client_id: CLIENT,
+      checklist: {},
+      item_notes: {},
+    });
+    database.triageCompetence.findFirst.mockResolvedValue(null);
+    database.triageCatalogItem.findMany.mockResolvedValue([]);
+    database.triageMonthly.update.mockImplementation(async ({ data }) => ({
+      id: MONTHLY,
+      client_id: CLIENT,
+      ...data,
+    }));
+    const service = createDocumentsService(database as never, audit());
+
+    await service.updateItem(MONTHLY, body, auth);
+    const notes = database.triageMonthly.update.mock.calls[0][0].data.item_notes;
+    expect(notes?.financial_transactions).not.toHaveProperty("state_site");
+    expect(notes?.financial_transactions).not.toHaveProperty("delivery_method");
   });
 
   it("envia timestamps obrigatórios nos creates e upserts físicos da triagem", async () => {

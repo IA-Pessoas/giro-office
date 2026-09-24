@@ -238,6 +238,14 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     expectOk(await call("GET", `/contabil/controls?${query}`), "GET restaurado");
   });
 
+  it("pendência mensal inexistente: GET devolve 200 com null (#1322)", async () => {
+    const empty = expectOk(
+      await call("GET", `/triagem/monthly?client_id=${clientId}&competence=2001-01&type=CONTABIL`),
+      "GET monthly sem registro",
+    );
+    expect(empty.data).toBeNull();
+  });
+
   it("relacionamento: cria, lê por cliente, atualiza todos os campos e remove", async () => {
     const created = expectOk(
       await call("POST", "/contabil/relationships", {

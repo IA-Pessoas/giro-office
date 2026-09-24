@@ -109,7 +109,7 @@ export type DocumentsService = {
     auth: AuthContext,
     type?: "CONTABIL" | "FISCAL",
   ): Promise<JsonRecord>;
-  getMonthly(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  getMonthly(input: JsonRecord, auth: AuthContext): Promise<JsonRecord | null>;
   getOrCreateMonthly(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   updateItem(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   updateAll(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
@@ -1023,7 +1023,8 @@ export function createDocumentsService(
           archived_at: null,
         },
       });
-      if (!row) throw new ServiceError(404, "Pendência documental mensal não encontrada.");
+      // Estado vazio é 200 com null: a tela oferece "Iniciar pendências".
+      if (!row) return null;
       const result = monthlyDto(row, type);
       if (!overviewClient) return { ...result, triagem_summary: null };
       try {
@@ -1039,7 +1040,7 @@ export function createDocumentsService(
           }),
         };
       } catch (error) {
-        if (error instanceof ServiceError && [403, 503, 504].includes(error.statusCode))
+        if (error instanceof ServiceError && [403, 404, 503, 504].includes(error.statusCode))
           return { ...result, triagem_summary: null };
         throw error;
       }
@@ -1170,21 +1171,22 @@ export function createDocumentsService(
       const fields = type === "FISCAL" ? triageFiscalFields : triageDocumentFields;
       if (!fields.includes(field as never) || (!billing && !validStatus(input.status)))
         throw new ServiceError(400, "Item ou status documental inválido.");
-      if (
-        type !== "FISCAL" &&
-        (input.delivery_method !== undefined || input.state_site !== undefined)
-      )
+      if (type !== "FISCAL" && (input.delivery_method != null || input.state_site != null))
         throw new ServiceError(400, "Campos fiscais não aceitos na rotina contábil.");
       const note = normalizeOptionalNote(input.note, "Nota documental");
       const justification = normalizeOptionalCatalogCode(
         input.justification,
         "Justificativa documental",
       );
-      const delivery = normalizeOptionalCatalogCode(
-        input.delivery_method,
-        "Método de entrega fiscal",
-      );
-      const site = normalizeOptionalCatalogCode(input.state_site, "Site estadual");
+      // Na rotina contábil, chaves fiscais nulas são ignoradas (o front antigo as envia).
+      const delivery =
+        type === "FISCAL"
+          ? normalizeOptionalCatalogCode(input.delivery_method, "Método de entrega fiscal")
+          : undefined;
+      const site =
+        type === "FISCAL"
+          ? normalizeOptionalCatalogCode(input.state_site, "Site estadual")
+          : undefined;
       const value = billing
         ? normalizeOptionalNote(input.value, "Valor de faturamento")
         : undefined;
