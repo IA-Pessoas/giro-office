@@ -9,7 +9,10 @@ import type {
   CreateIntegrationBody,
   UpdateIntegrationBody,
 } from "../schemas/clientVerticals.schemas.js";
-import { assertValidClientDocument } from "../utils/clientDocuments.js";
+import {
+  assertValidClientDocument,
+  isClientDocumentUniqueConstraintError,
+} from "../utils/clientDocuments.js";
 import { cleanDocument } from "../utils/documents.js";
 
 type ClientAuthorization = IntegracaoServiceAuthorization & { userId: string };
@@ -44,38 +47,45 @@ export async function createIntegrationClient(
   const cleanedCpfResponsible = cleanDocument(input.cpf_responsible);
   const cleanedCpfAgent = cleanDocument(input.cpf_agent);
 
-  const client = await prisma.client.create({
-    data: {
-      organization_id: input.organization_id,
-      type: input.type,
-      name: input.name,
-      company_name: input.company_name ?? null,
-      fantasy_name: input.fantasy_name ?? null,
-      cpf_cnpj: cleanedCpf,
-      opening_date: input.opening_date ?? null,
-      responsible: input.responsible ?? null,
-      cpf_responsible: cleanedCpfResponsible,
-      number: input.number ?? null,
-      email: input.email ?? null,
-      agent: input.agent ?? null,
-      cpf_agent: cleanedCpfAgent,
-      instagram: input.instagram ?? null,
-      indication: input.indication ?? null,
-      participants_meet: input.participants_meet ?? null,
-      meet_type: input.meet_type ?? null,
-      type_registration: input.type_registration,
-      service_unique: input.service_unique ?? false,
-      status: input.type_registration === "Novo" ? "Prospecção" : "Ativo",
-      prospecting_status: input.type_registration === "Novo" ? "Análise/Agendamento" : "Fechado",
-    },
-    select: {
-      id: true,
-      name: true,
-      cpf_cnpj: true,
-    },
-  });
+  try {
+    const client = await prisma.client.create({
+      data: {
+        organization_id: input.organization_id,
+        type: input.type,
+        name: input.name,
+        company_name: input.company_name ?? null,
+        fantasy_name: input.fantasy_name ?? null,
+        cpf_cnpj: cleanedCpf,
+        opening_date: input.opening_date ?? null,
+        responsible: input.responsible ?? null,
+        cpf_responsible: cleanedCpfResponsible,
+        number: input.number ?? null,
+        email: input.email ?? null,
+        agent: input.agent ?? null,
+        cpf_agent: cleanedCpfAgent,
+        instagram: input.instagram ?? null,
+        indication: input.indication ?? null,
+        participants_meet: input.participants_meet ?? null,
+        meet_type: input.meet_type ?? null,
+        type_registration: input.type_registration,
+        service_unique: input.service_unique ?? false,
+        status: input.type_registration === "Novo" ? "Prospecção" : "Ativo",
+        prospecting_status: input.type_registration === "Novo" ? "Análise/Agendamento" : "Fechado",
+      },
+      select: {
+        id: true,
+        name: true,
+        cpf_cnpj: true,
+      },
+    });
 
-  return client;
+    return client;
+  } catch (error) {
+    if (isClientDocumentUniqueConstraintError(error)) {
+      throw new ServiceError(409, "Cliente já cadastrado.", error);
+    }
+    throw error;
+  }
 }
 
 export async function updateIntegrationClient(
@@ -239,11 +249,18 @@ export async function updateIntegrationClient(
     service_unique: true,
   };
 
-  const updated = await prisma.client.update({
-    where: { id: clientId },
-    data,
-    select,
-  });
+  try {
+    const updated = await prisma.client.update({
+      where: { id: clientId },
+      data,
+      select,
+    });
 
-  return updated as Record<string, unknown>;
+    return updated as Record<string, unknown>;
+  } catch (error) {
+    if (isClientDocumentUniqueConstraintError(error)) {
+      throw new ServiceError(409, "Cliente já cadastrado.", error);
+    }
+    throw error;
+  }
 }

@@ -1,7 +1,10 @@
 import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { UpdateRegularizeBody } from "../schemas/clientVerticals.schemas.js";
-import { assertValidClientDocument } from "../utils/clientDocuments.js";
+import {
+  assertValidClientDocument,
+  isClientDocumentUniqueConstraintError,
+} from "../utils/clientDocuments.js";
 import { cleanDocument } from "../utils/documents.js";
 
 export async function updateRegularizeClient(
@@ -204,11 +207,18 @@ export async function updateRegularizeClient(
     deletion_date: true,
   };
 
-  const updated = await prisma.client.update({
-    where: { id: clientId },
-    data,
-    select,
-  });
+  try {
+    const updated = await prisma.client.update({
+      where: { id: clientId },
+      data,
+      select,
+    });
 
-  return updated as Record<string, unknown>;
+    return updated as Record<string, unknown>;
+  } catch (error) {
+    if (isClientDocumentUniqueConstraintError(error)) {
+      throw new ServiceError(409, "Cliente já cadastrado.", error);
+    }
+    throw error;
+  }
 }

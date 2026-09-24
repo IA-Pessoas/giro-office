@@ -355,6 +355,10 @@ function assertValidClientDocument(value: unknown, type: unknown): string {
   return normalized;
 }
 
+function isClientDocumentUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
 function serialize(value: unknown): unknown {
   return value instanceof Date ? value.toISOString() : value;
 }
@@ -468,11 +472,18 @@ export class ClientService implements ClientWorkerService {
       select: { id: true },
     });
     if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
-    const row = await (this.prisma as any).client.create({
-      data: { ...input, organization_id: organizationId, cpf_cnpj: normalizedDocument },
-      select: clientSelect,
-    });
-    return toPublic(row, organization);
+    try {
+      const row = await (this.prisma as any).client.create({
+        data: { ...input, organization_id: organizationId, cpf_cnpj: normalizedDocument },
+        select: clientSelect,
+      });
+      return toPublic(row, organization);
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error)) {
+        throw new ServiceError(409, "Cliente já cadastrado.", error);
+      }
+      throw error;
+    }
   }
 
   async update(
@@ -496,12 +507,19 @@ export class ClientService implements ClientWorkerService {
       if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
       data.cpf_cnpj = normalizedDocument;
     }
-    const row = await (this.prisma as any).client.update({
-      where: { id },
-      data,
-      select: clientSelect,
-    });
-    return toPublic(row, await this.organization(organizationId));
+    try {
+      const row = await (this.prisma as any).client.update({
+        where: { id },
+        data,
+        select: clientSelect,
+      });
+      return toPublic(row, await this.organization(organizationId));
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error)) {
+        throw new ServiceError(409, "Cliente já cadastrado.", error);
+      }
+      throw error;
+    }
   }
 
   async deactivate(
@@ -552,32 +570,40 @@ export class ClientService implements ClientWorkerService {
       select: { id: true },
     });
     if (exists) throw new ServiceError(409, "Cliente já cadastrado.");
-    return (this.prisma as any).client.create({
-      data: {
-        organization_id: organizationId,
-        type: input.type,
-        name: input.name,
-        company_name: input.company_name ?? null,
-        fantasy_name: input.fantasy_name ?? null,
-        cpf_cnpj: cpfCnpj,
-        opening_date: input.opening_date ?? null,
-        responsible: input.responsible ?? null,
-        cpf_responsible: cleanDocument(input.cpf_responsible as string | null | undefined),
-        number: input.number ?? null,
-        email: input.email ?? null,
-        agent: input.agent ?? null,
-        cpf_agent: cleanDocument(input.cpf_agent as string | null | undefined),
-        instagram: input.instagram ?? null,
-        indication: input.indication ?? null,
-        participants_meet: input.participants_meet ?? null,
-        meet_type: input.meet_type ?? null,
-        type_registration: input.type_registration ?? "Novo",
-        service_unique: input.service_unique ?? false,
-        status: input.type_registration === "Novo" ? "Prospecção" : "Ativo",
-        prospecting_status: input.type_registration === "Novo" ? "Análise/Agendamento" : "Fechado",
-      },
-      select: { id: true, name: true, cpf_cnpj: true },
-    });
+    try {
+      return await (this.prisma as any).client.create({
+        data: {
+          organization_id: organizationId,
+          type: input.type,
+          name: input.name,
+          company_name: input.company_name ?? null,
+          fantasy_name: input.fantasy_name ?? null,
+          cpf_cnpj: cpfCnpj,
+          opening_date: input.opening_date ?? null,
+          responsible: input.responsible ?? null,
+          cpf_responsible: cleanDocument(input.cpf_responsible as string | null | undefined),
+          number: input.number ?? null,
+          email: input.email ?? null,
+          agent: input.agent ?? null,
+          cpf_agent: cleanDocument(input.cpf_agent as string | null | undefined),
+          instagram: input.instagram ?? null,
+          indication: input.indication ?? null,
+          participants_meet: input.participants_meet ?? null,
+          meet_type: input.meet_type ?? null,
+          type_registration: input.type_registration ?? "Novo",
+          service_unique: input.service_unique ?? false,
+          status: input.type_registration === "Novo" ? "Prospecção" : "Ativo",
+          prospecting_status:
+            input.type_registration === "Novo" ? "Análise/Agendamento" : "Fechado",
+        },
+        select: { id: true, name: true, cpf_cnpj: true },
+      });
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error)) {
+        throw new ServiceError(409, "Cliente já cadastrado.", error);
+      }
+      throw error;
+    }
   }
 
   async updateIntegration(
@@ -604,33 +630,40 @@ export class ClientService implements ClientWorkerService {
     if (data.cpf_responsible !== undefined)
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
     if (data.cpf_agent !== undefined) data.cpf_agent = cleanDocument(String(data.cpf_agent));
-    return (this.prisma as any).client.update({
-      where: { id },
-      data,
-      select: {
-        id: true,
-        type: true,
-        name: true,
-        company_name: true,
-        fantasy_name: true,
-        cpf_cnpj: true,
-        responsible: true,
-        cpf_responsible: true,
-        agent: true,
-        cpf_agent: true,
-        number: true,
-        email: true,
-        address: true,
-        cep: true,
-        neighborhood: true,
-        state: true,
-        city: true,
-        instagram: true,
-        indication: true,
-        type_registration: true,
-        service_unique: true,
-      },
-    });
+    try {
+      return await (this.prisma as any).client.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          type: true,
+          name: true,
+          company_name: true,
+          fantasy_name: true,
+          cpf_cnpj: true,
+          responsible: true,
+          cpf_responsible: true,
+          agent: true,
+          cpf_agent: true,
+          number: true,
+          email: true,
+          address: true,
+          cep: true,
+          neighborhood: true,
+          state: true,
+          city: true,
+          instagram: true,
+          indication: true,
+          type_registration: true,
+          service_unique: true,
+        },
+      });
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error)) {
+        throw new ServiceError(409, "Cliente já cadastrado.", error);
+      }
+      throw error;
+    }
   }
 
   private async ensureClient(id: string, organizationId: string): Promise<void> {
@@ -921,46 +954,53 @@ export class ClientService implements ClientWorkerService {
     }
     if (data.cpf_responsible !== undefined)
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
-    return (this.prisma as any).client.update({
-      where: { id: clientId },
-      data,
-      select: {
-        id: true,
-        dominio_code: true,
-        name: true,
-        company_name: true,
-        fantasy_name: true,
-        cpf_cnpj: true,
-        cnae_secondary: true,
-        cnae: true,
-        responsible: true,
-        cpf_responsible: true,
-        address: true,
-        cep: true,
-        neighborhood: true,
-        state: true,
-        city: true,
-        customer_since: true,
-        municipal_registration: true,
-        state_registration: true,
-        commercial_board_registration: true,
-        status: true,
-        competence_entry: true,
-        competence_output: true,
-        opening_date: true,
-        regime: true,
-        size: true,
-        segment: true,
-        contabil: true,
-        fiscal: true,
-        pessoal: true,
-        infoproduto: true,
-        consultoria: true,
-        start_strike: true,
-        end_strike: true,
-        deletion_date: true,
-      },
-    });
+    try {
+      return await (this.prisma as any).client.update({
+        where: { id: clientId },
+        data,
+        select: {
+          id: true,
+          dominio_code: true,
+          name: true,
+          company_name: true,
+          fantasy_name: true,
+          cpf_cnpj: true,
+          cnae_secondary: true,
+          cnae: true,
+          responsible: true,
+          cpf_responsible: true,
+          address: true,
+          cep: true,
+          neighborhood: true,
+          state: true,
+          city: true,
+          customer_since: true,
+          municipal_registration: true,
+          state_registration: true,
+          commercial_board_registration: true,
+          status: true,
+          competence_entry: true,
+          competence_output: true,
+          opening_date: true,
+          regime: true,
+          size: true,
+          segment: true,
+          contabil: true,
+          fiscal: true,
+          pessoal: true,
+          infoproduto: true,
+          consultoria: true,
+          start_strike: true,
+          end_strike: true,
+          deletion_date: true,
+        },
+      });
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error)) {
+        throw new ServiceError(409, "Cliente já cadastrado.", error);
+      }
+      throw error;
+    }
   }
 
   async runCompetenceOutputUpdate(): Promise<unknown> {

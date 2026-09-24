@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertValidClientDocument,
   getClientDocumentType,
+  isClientDocumentUniqueConstraintError,
   normalizeClientDocument,
 } from "../utils/clientDocuments.js";
 
@@ -25,5 +26,10 @@ describe("client document validation", () => {
 
   it("trata tipos desconhecidos como PJ no contrato legado", () => {
     expect(getClientDocumentType("empresa")).toBe("PJ");
+  });
+
+  it("identifica a colisão de unicidade do Prisma", () => {
+    expect(isClientDocumentUniqueConstraintError({ code: "P2002" })).toBe(true);
+    expect(isClientDocumentUniqueConstraintError({ code: "P2025" })).toBe(false);
   });
 });
