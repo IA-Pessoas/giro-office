@@ -42,6 +42,14 @@ export function canAttemptWizardExtraction(consumedAttempts: number): boolean {
   );
 }
 
+export const WIZARD_EXTRACTION_UNAVAILABLE_MESSAGE = "Extração por IA indisponível no momento.";
+
+// Só gasta tentativa o que chegou ao provedor: 422 (IA não achou tarefas), 502/504 (erro ou
+// timeout do provedor) e falha sem resposta. 4xx de validação, 500 e 503 vêm antes da chamada.
+export function wizardExtractionConsumesAttempt(status: number | undefined): boolean {
+  return status === undefined || status === 422 || status === 502 || status === 504;
+}
+
 interface WizardExtractionSourceValidationInput {
   text?: string;
   file?: Pick<File, "name" | "size" | "type"> | null;

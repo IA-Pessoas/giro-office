@@ -30,14 +30,20 @@ function positiveInteger(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+// O 503 diz ao front que a chamada não chegou ao provedor; o motivo fica só no log.
+function extractionUnavailable(reason: string): never {
+  console.error(`Extração de tarefas indisponível: ${reason}`);
+  throw new ServiceError(503, "Extração por IA indisponível no momento.");
+}
+
 /** No Node, `AI_EXTRACTION_MODE=fake` é recusado em produção; aqui o fake só vem explícito. */
 function extractionProvider(env: TaskWorkerEnv) {
   const mode = (env.AI_EXTRACTION_MODE ?? "openai") as AiTaskExtractionMode;
   if (!AI_TASK_EXTRACTION_MODES.includes(mode)) {
-    throw new ServiceError(503, "Extração de tarefas indisponível: AI_EXTRACTION_MODE inválido.");
+    extractionUnavailable("AI_EXTRACTION_MODE inválido.");
   }
   if (mode === "openai" && !env.OPENAI_API_KEY) {
-    throw new ServiceError(503, "Extração de tarefas indisponível: configure OPENAI_API_KEY.");
+    extractionUnavailable("configure o secret OPENAI_API_KEY.");
   }
   return createAiTaskExtractionProvider({
     mode,
