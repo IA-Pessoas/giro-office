@@ -4,6 +4,7 @@ import {
   usePlatformSuperAdmins,
   useUpdatePlatformSuperAdminImpersonationPermission,
 } from "../hooks/usePlatformSuperAdmins";
+import { formatImpersonationPermission } from "../utils/platformManagement";
 
 export function PlatformSuperAdminsPanel() {
   const { user: currentUser } = useAuth();
@@ -110,7 +111,7 @@ export function PlatformSuperAdminsPanel() {
                           : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
                       }`}
                     >
-                      {admin.can_impersonate ? "Pode personificar" : "Não pode personificar"}
+                      {formatImpersonationPermission(admin.can_impersonate)}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">

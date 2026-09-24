@@ -93,10 +93,8 @@ export function formatAuditChanges(changes: PlatformAuditRecord["changes"]): str
     );
   }
   if (changes.can_impersonate) {
-    const permissionLabel = (allowed: boolean) =>
-      allowed ? "Pode personificar" : "Não pode personificar";
     lines.push(
-      `Permissão de personificação: ${permissionLabel(changes.can_impersonate.from)} → ${permissionLabel(changes.can_impersonate.to)}`,
+      `Permissão de personificação: ${formatImpersonationPermission(changes.can_impersonate.from)} → ${formatImpersonationPermission(changes.can_impersonate.to)}`,
     );
   }
   if (changes.modules) {
@@ -122,4 +120,8 @@ export function formatAuditChanges(changes: PlatformAuditRecord["changes"]): str
     lines.push(`Justificativa: ${justification}`);
   }
   return lines;
+}
+
+export function formatImpersonationPermission(canImpersonate: boolean): string {
+  return canImpersonate ? "Pode personificar" : "Não pode personificar";
 }
