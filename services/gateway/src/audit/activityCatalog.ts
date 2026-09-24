@@ -180,6 +180,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate$/,
+    description: { action: "iniciou", item: "uma personificação de usuário da organização" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/platform\/organizations\/[^/]+\/ownership-transfer$/,
     description: { action: "transferiu", item: "o ownership da organização" },
   },

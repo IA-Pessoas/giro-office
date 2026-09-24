@@ -516,7 +516,7 @@ const baseManifest = [
     action: "platformUserImpersonate",
     target: "gateway",
     auth: "session",
-    condition: "auditEnabled",
+    condition: "platformImpersonationSmokeEnabled",
   }),
   op({
     service: "user-service",

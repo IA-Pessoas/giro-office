@@ -44,11 +44,12 @@ describe("createUserAudit", () => {
   });
 
   it("persiste eventos obrigatórios ou retorna indisponibilidade", async () => {
+    const logger = { error: vi.fn() };
     const audit = createUserAudit({
       enabled: true,
       serviceUrl: "http://audit.test",
       serviceToken: "test-token",
-      logger: {} as never,
+      logger: logger as never,
     });
     recordRequiredMock.mockResolvedValueOnce(undefined);
 
@@ -83,5 +84,9 @@ describe("createUserAudit", () => {
         required: true,
       }),
     ).rejects.toMatchObject({ statusCode: 503 });
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: expect.any(Error) },
+      "Falha na auditoria obrigatória para personificação.",
+    );
   });
 });
