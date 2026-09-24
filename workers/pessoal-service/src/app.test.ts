@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createPessoalWorkerApp,
-  summarizeLddStatuses,
   type PessoalGroupPrisma,
   type PessoalGroupService,
   type PessoalLddService,
@@ -12,6 +11,7 @@ import {
   type PessoalSituationService,
   type PessoalUnionService,
   type PessoalWorkerEnv,
+  summarizeLddStatuses,
 } from "./app.js";
 
 const USER_ID = "b0000000-0000-4000-8000-000000000001";
