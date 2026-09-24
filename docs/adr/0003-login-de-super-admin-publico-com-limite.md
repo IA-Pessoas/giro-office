@@ -20,4 +20,3 @@ A página `/super-admin/login` e o `POST /platform/session` continuam acessívei
 - A chave é `rota:IP`, então um IP pode somar até 30 tentativas por minuto nas três rotas.
 - O `namespace_id` do binding precisa ser único na conta Cloudflare; outro Worker com o mesmo id compartilharia os contadores.
 - O `PLATFORM_AUTH_RATE_LIMIT_*` vale só no user-service Node (Express); em produção (Workers) o limite é este do gateway.
-- CPFs de clientes e sócios (certificados PF, Departamento Pessoal, Regularize) continuam em claro nas listas, porque a operação contábil precisa deles. Ficam fora da #1344, que trata de colaboradores.

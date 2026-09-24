@@ -552,6 +552,10 @@ async function keepOnlyCurrentSession(
     where: { user_id: auth.userId, id: { not: auth.claims.session_id }, revoked_at: null },
     data: { revoked_at: new Date() },
   });
+  await db.passwordResetToken.updateMany({
+    where: { user_id: auth.userId, used_at: null },
+    data: { used_at: new Date() },
+  });
   const issued = await refreshOrganizationSession(
     db,
     auth,
