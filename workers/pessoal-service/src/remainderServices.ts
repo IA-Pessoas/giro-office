@@ -100,6 +100,9 @@ const PROCESSING_AUDIT_OUTBOX_STATUS = "processing";
 const PROCESSED_AUDIT_OUTBOX_STATUS = "processed";
 const AUDIT_OUTBOX_RECONCILIATION_LIMIT = 100;
 const AUDIT_SERVICE_TIMEOUT_MS = 5_000;
+// Exibida ao usuário: sem nome de serviço interno. O detalhe técnico fica no log.
+const AUDIT_FAILURE_MESSAGE =
+  "Não foi possível registrar a auditoria da operação. Tente novamente em instantes.";
 const UNION_REGARDING = "union";
 const NOTIFICATION_CREATE_CHUNK_SIZE = 100;
 
@@ -240,15 +243,19 @@ export async function sendPessoalAudit(
       { signal: controller.signal },
     );
     if (!response.ok) {
-      throw new ServiceError(502, `AUDIT_SERVICE respondeu com HTTP ${response.status}.`);
+      console.error({ event: "pessoal.audit.failed", status: response.status });
+      throw new ServiceError(502, AUDIT_FAILURE_MESSAGE, { auditStatus: response.status });
     }
     return true;
   } catch (error) {
     if (error instanceof ServiceError) throw error;
-    if (controller.signal.aborted) {
-      throw new ServiceError(504, "Tempo esgotado ao chamar AUDIT_SERVICE.", error);
-    }
-    throw new ServiceError(502, "Falha ao chamar AUDIT_SERVICE.", error);
+    const timedOut = controller.signal.aborted;
+    console.error({
+      event: "pessoal.audit.failed",
+      timedOut,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new ServiceError(timedOut ? 504 : 502, AUDIT_FAILURE_MESSAGE, error);
   } finally {
     clearTimeout(timeout);
   }

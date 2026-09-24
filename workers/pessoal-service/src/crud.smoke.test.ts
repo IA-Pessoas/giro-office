@@ -472,6 +472,48 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     expectOk(await call("DELETE", `/pessoal/passwords/${id}`), "DELETE passwords");
   });
 
+  // #1300: com o audit-service fora, a escrita é revertida; o cliente nunca recebe erro
+  // para um dado que ficou gravado.
+  it("auditoria recusada reverte a escrita e não expõe o serviço interno", async () => {
+    const failingAudit = () => {
+      const instance = createPessoalWorkerApp({
+        env: {
+          ...env(),
+          AUDIT_SERVICE_TOKEN: "crud-smoke-audit-token",
+          AUDIT_SERVICE: { fetch: async () => new Response(null, { status: 401 }) },
+        },
+      });
+      return instance;
+    };
+    const name = `QA_audit_${stamp}`;
+    const refused = await smokeCall(failingAudit(), undefined, "POST", "/pessoal/unions", {
+      name,
+      cnpj: "11.222.333/0001-44",
+      base_date: null,
+    });
+    expect(refused.status).toBeGreaterThanOrEqual(500);
+    expect(refused.text).not.toMatch(/AUDIT_SERVICE|audit-service/iu);
+    const afterCreate = expectOk(
+      await call("GET", `/pessoal/unions?search=${encodeURIComponent(name)}&page=1&limit=20`),
+      "GET unions após criação recusada",
+    ).data;
+    expect(afterCreate.total).toBe(0);
+
+    const kept = expectOk(
+      await call("POST", "/pessoal/unions", { name, cnpj: "11.222.333/0001-44", base_date: null }),
+      "POST union sem auditoria",
+    ).data.id;
+    const refusedDelete = await smokeCall(
+      failingAudit(),
+      undefined,
+      "DELETE",
+      `/pessoal/unions/${kept}`,
+    );
+    expect(refusedDelete.status).toBeGreaterThanOrEqual(500);
+    expectOk(await call("GET", `/pessoal/unions/${kept}`), "union continua após remoção recusada");
+    expectOk(await call("DELETE", `/pessoal/unions/${kept}`), "DELETE union");
+  });
+
   it("notificações de sindicato: data base amanhã notifica quem tem Pessoal", async () => {
     const result = expectOk(
       await call("POST", "/internal/pessoal/union-notifications/run", undefined, {

@@ -81,6 +81,8 @@ import {
 } from "./remainderServices.js";
 import { type PessoalReportingService, registerReportingRoutes } from "./reporting.js";
 
+const DOMAIN_TRANSACTION_TIMEOUT_MS = 15_000;
+
 type GroupRow = Record<string, unknown> & { organization_id: string };
 export type PessoalGroupPrisma = {
   $queryRaw: (query: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
@@ -1507,12 +1509,19 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     c.set("auth", await authenticatePessoalRequest(c.req.raw, options.env ?? c.env));
     await next();
   });
+  // #1300: a escrita e a auditoria confirmam juntas. Se o audit-service recusar, a transação
+  // é revertida e o cliente recebe erro sem nada gravado. Vale também para GET: revelar senha
+  // grava e audita. O timeout cobre os 5s de espera pelo audit-service.
+  const withDomainClient = <T>(c: PessoalContext, callback: (client: unknown) => Promise<T>) =>
+    withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      client.$transaction((tx) => callback(tx), { timeout: DOMAIN_TRANSACTION_TIMEOUT_MS }),
+    );
   const withService = async <T>(
     c: PessoalContext,
     callback: (service: PessoalGroupService) => Promise<T>,
   ) => {
     if (options.groupService) return callback(options.groupService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(localService(client as unknown as PessoalGroupPrisma, options.env ?? c.env)),
     );
   };
@@ -1521,7 +1530,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalUnionService) => Promise<T>,
   ) => {
     if (options.unionService) return callback(options.unionService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(localUnionService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
     );
   };
@@ -1530,7 +1539,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalSituationService) => Promise<T>,
   ) => {
     if (options.situationService) return callback(options.situationService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(
         localSituationService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
       ),
@@ -1541,7 +1550,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalLddService) => Promise<T>,
   ) => {
     if (options.lddService) return callback(options.lddService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(localLddService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
     );
   };
@@ -1550,7 +1559,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalPasswordService) => Promise<T>,
   ) => {
     if (options.passwordService) return callback(options.passwordService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(
         localPasswordService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
       ),
@@ -1561,7 +1570,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalPayrollService) => Promise<T>,
   ) => {
     if (options.payrollService) return callback(options.payrollService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(localPayrollService(client as unknown as PessoalDomainPrisma, options.env ?? c.env)),
     );
   };
@@ -1570,7 +1579,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
     callback: (service: PessoalObligationService) => Promise<T>,
   ) => {
     if (options.obligationService) return callback(options.obligationService);
-    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+    return withDomainClient(c, (client) =>
       callback(
         localObligationService(client as unknown as PessoalDomainPrisma, options.env ?? c.env),
       ),
