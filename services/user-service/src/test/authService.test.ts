@@ -14,6 +14,7 @@ const { prismaMock, passwordHashMock, jwtMock } = vi.hoisted(() => ({
     authSession: {
       create: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       updateMany: vi.fn(),
     },
     platformUser: {
@@ -453,6 +454,50 @@ describe("AuthService", () => {
     ).rejects.toMatchObject({ statusCode: 401 });
     expect(prismaMock.authSession.updateMany).not.toHaveBeenCalled();
     expect(recordExitEvent).not.toHaveBeenCalled();
+  });
+
+  it("revoga e audita sessão de personificação expirada com a organização-alvo", async () => {
+    const startedAt = new Date(Date.now() - 3_660_000);
+    const expiresAt = new Date(startedAt.getTime() + 3_600_000);
+    prismaMock.authSession.findMany.mockResolvedValue([
+      {
+        id: "expired-impersonation-session",
+        user_id: "user-1",
+        created_at: startedAt,
+        expires_at: expiresAt,
+        impersonator_platform_user_id: "platform-1",
+        user: {
+          name: "Ana",
+          organization_id: null,
+          department: { organization_id: "org-1" },
+        },
+      },
+    ]);
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+    const recordEndEvent = vi.fn(async () => {});
+
+    const expiredCount = await new AuthService().expireImpersonationSessions(recordEndEvent);
+
+    expect(expiredCount).toBe(1);
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: "expired-impersonation-session",
+        impersonator_platform_user_id: "platform-1",
+        revoked_at: null,
+        expires_at: { lte: expect.any(Date) },
+      }),
+      data: { revoked_at: expect.any(Date) },
+    });
+    expect(recordEndEvent).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      targetUserId: "user-1",
+      targetName: "Ana",
+      platformUserId: "platform-1",
+      startedAt,
+      endedAt: expiresAt,
+      durationMs: 3_600_000,
+      reason: "expiração",
+    });
   });
 
   it("recusa operador sem permissão e alvo ou organização inativos", async () => {

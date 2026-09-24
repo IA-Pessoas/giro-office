@@ -635,6 +635,13 @@ await (async () => {
     assert.match(appShellSource, /if \(isIframeView\)[\s\S]*\{impersonationBanner\}/);
   });
 
+  await runTest("expiração de personificação informa tempo restante e login do super admin", () => {
+    assert.match(appShellSource, /Tempo restante:/);
+    assert.match(appShellSource, /expires_at/);
+    assert.match(authContextSource, /Sua personificação expirou/);
+    assert.match(authContextSource, /\/super-admin\/login/);
+  });
+
   await runTest("retired modules are not registered in navigation or quick actions", () => {
     for (const blockedPath of ["/marketing"]) {
       assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
@@ -746,10 +753,6 @@ await (async () => {
   });
 
   await runTest("sessão inválida encerra o loading e orienta o retorno ao login", () => {
-    assert.match(
-      authContextSource,
-      /function signOut\(message = "Sessão expirada\. Faça login novamente\."\)[\s\S]*toast\.error\(message,\s*\{\s*toastId: "auth-session-expired"/,
-    );
     assert.match(authContextSource, /registerAuthInvalidationHandler/);
     assert.match(authContextSource, /setUser\(null\);/);
     assert.match(

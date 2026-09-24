@@ -6,6 +6,7 @@ import {
   createAuditRecorder,
 } from "@workspace/shared/audit";
 import type { Logger } from "@workspace/shared/logger";
+import type { ImpersonationEndEvent } from "../services/authService.js";
 
 export interface CreateUserAuditParams {
   actorUserId?: string;
@@ -27,6 +28,30 @@ export interface UserAuditOptions {
 }
 
 export type UserAuditRecorder = (params: CreateUserAuditParams) => Promise<void>;
+
+export function recordImpersonationEndEvent(
+  audit: UserAuditRecorder,
+  event: ImpersonationEndEvent,
+): Promise<void> {
+  return audit({
+    actorUserId: event.targetUserId,
+    platformActorUserId: event.platformUserId,
+    organizationId: event.organizationId,
+    action: "platform.impersonation.ended",
+    referring: "user",
+    referringId: event.targetUserId,
+    changes: {
+      operatorPlatformUserId: event.platformUserId,
+      target: { id: event.targetUserId, name: event.targetName },
+      startedAt: event.startedAt.toISOString(),
+      endedAt: event.endedAt.toISOString(),
+      durationMs: event.durationMs,
+      reason: event.reason,
+    },
+    outcome: "success",
+    required: true,
+  });
+}
 
 export function createUserAudit(options: UserAuditOptions): UserAuditRecorder {
   const recordAudit = createAuditRecorder(options);

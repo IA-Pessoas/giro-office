@@ -176,6 +176,19 @@ export interface ExitedImpersonationSession {
   platformSession: IssuedPlatformSession | null;
 }
 
+export interface ImpersonationEndEvent {
+  organizationId: string;
+  targetUserId: string;
+  targetName: string;
+  platformUserId: string;
+  startedAt: Date;
+  endedAt: Date;
+  durationMs: number;
+  reason: "saída" | "expiração";
+}
+
+export type ImpersonationEndEventRecorder = (event: ImpersonationEndEvent) => Promise<void>;
+
 export interface FirstCreateResult {
   user: {
     id: string;
@@ -295,6 +308,7 @@ class AuthService {
         SELECT "id"
         FROM "auth_sessions"
         WHERE "expires_at" <= ${new Date()}
+          AND "impersonator_platform_user_id" IS NULL
         ORDER BY "expires_at"
         LIMIT 100
       )
@@ -420,16 +434,7 @@ class AuthService {
 
   async exitImpersonation(
     identity: Pick<AuthIdentity, "user_id" | "organization_id" | "session_id" | "csrf_hash">,
-    recordExitEvent: (event: {
-      organizationId: string;
-      targetUserId: string;
-      targetName: string;
-      platformUserId: string;
-      startedAt: Date;
-      endedAt: Date;
-      durationMs: number;
-      reason: "saída";
-    }) => Promise<void>,
+    recordExitEvent: ImpersonationEndEventRecorder,
   ): Promise<ExitedImpersonationSession> {
     if (
       !identity.session_id ||
@@ -533,6 +538,80 @@ class AuthService {
       },
       { timeout: 10_000 },
     );
+  }
+
+  async expireImpersonationSessions(
+    recordEndEvent: ImpersonationEndEventRecorder,
+  ): Promise<number> {
+    const now = new Date();
+    const expiredSessions = await prismaClient.authSession.findMany({
+      where: {
+        impersonator_platform_user_id: { not: null },
+        revoked_at: null,
+        expires_at: { lte: now },
+      },
+      orderBy: { expires_at: "asc" },
+      take: 100,
+      select: {
+        id: true,
+        user_id: true,
+        created_at: true,
+        expires_at: true,
+        impersonator_platform_user_id: true,
+        user: {
+          select: {
+            name: true,
+            organization_id: true,
+            department: { select: { organization_id: true } },
+          },
+        },
+      },
+    });
+    let expiredCount = 0;
+
+    for (const session of expiredSessions) {
+      const platformUserId = session.impersonator_platform_user_id;
+      const organizationId =
+        session.user.organization_id ?? session.user.department.organization_id;
+      if (!platformUserId || !organizationId) {
+        continue;
+      }
+
+      const expired = await prismaClient.$transaction(
+        async (transaction) => {
+          const revoked = await transaction.authSession.updateMany({
+            where: {
+              id: session.id,
+              impersonator_platform_user_id: platformUserId,
+              revoked_at: null,
+              expires_at: { lte: now },
+            },
+            data: { revoked_at: now },
+          });
+          if (revoked.count !== 1) {
+            return false;
+          }
+
+          await recordEndEvent({
+            organizationId,
+            targetUserId: session.user_id,
+            targetName: session.user.name,
+            platformUserId,
+            startedAt: session.created_at,
+            endedAt: session.expires_at,
+            durationMs: Math.max(0, session.expires_at.getTime() - session.created_at.getTime()),
+            reason: "expiração",
+          });
+          return true;
+        },
+        { timeout: 10_000 },
+      );
+      if (expired) {
+        expiredCount += 1;
+      }
+    }
+
+    return expiredCount;
   }
 
   async refreshSession(
