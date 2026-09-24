@@ -54,7 +54,7 @@ describe("regularize license routes", () => {
     const protocolStorage = {
       upload: vi.fn(async () => objectPath),
       deleteObject: vi.fn(async () => undefined),
-      createSignedAccessUrl: vi.fn(),
+      createSignedAccessUrl: vi.fn(async () => "https://storage.example/signed-protocol"),
     };
     const app = createTestApp(prisma, undefined, undefined, protocolStorage as never);
 
@@ -106,5 +106,16 @@ describe("regularize license routes", () => {
       mime_type: "application/pdf",
       size_bytes: 8,
     });
+
+    const access = await request(app)
+      .get(`/regularize/license/${licenseId}/protocol`)
+      .set(gatewayHeaders({ permission: 1 }));
+
+    expect(access.status).toBe(200);
+    expect(access.body.data).toEqual({
+      url: "https://storage.example/signed-protocol",
+      expires_in_seconds: 300,
+    });
+    expect(JSON.stringify(access.body)).not.toContain(objectPath);
   });
 });
