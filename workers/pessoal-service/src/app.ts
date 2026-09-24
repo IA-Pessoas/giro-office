@@ -81,6 +81,7 @@ import {
 } from "./remainderServices.js";
 import { type PessoalReportingService, registerReportingRoutes } from "./reporting.js";
 
+const DOMAIN_TRANSACTION_MAX_WAIT_MS = 5_000;
 const DOMAIN_TRANSACTION_TIMEOUT_MS = 15_000;
 
 type GroupRow = Record<string, unknown> & { organization_id: string };
@@ -1514,7 +1515,10 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
   // grava e audita. O timeout cobre os 5s de espera pelo audit-service.
   const withDomainClient = <T>(c: PessoalContext, callback: (client: unknown) => Promise<T>) =>
     withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
-      client.$transaction((tx) => callback(tx), { timeout: DOMAIN_TRANSACTION_TIMEOUT_MS }),
+      client.$transaction((tx) => callback(tx), {
+        maxWait: DOMAIN_TRANSACTION_MAX_WAIT_MS,
+        timeout: DOMAIN_TRANSACTION_TIMEOUT_MS,
+      }),
     );
   const withService = async <T>(
     c: PessoalContext,

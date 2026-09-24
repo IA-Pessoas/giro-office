@@ -762,7 +762,7 @@ export function PessoalTrackingSection({
                     {selectedLdd ? "Editar LDD" : "Criar LDD"}
                   </h3>
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Campos seguem o contrato do pessoal-service.
+                    Preencha os dados do lançamento de LDD.
                   </p>
                 </div>
                 <button

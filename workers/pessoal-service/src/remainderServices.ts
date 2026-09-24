@@ -138,7 +138,7 @@ function toPage<T>(data: T[], total: number, page: number, limit: number) {
 
 function requirePermission(context: { permission?: number }, minimum: number): void {
   if (typeof context.permission !== "number" || context.permission < minimum) {
-    throw new ServiceError(403, "Permissao insuficiente para acessar o pessoal-service.");
+    throw new ServiceError(403, "Permissao insuficiente para acessar o Departamento Pessoal.");
   }
 }
 
@@ -243,18 +243,16 @@ export async function sendPessoalAudit(
       { signal: controller.signal },
     );
     if (!response.ok) {
-      console.error({ event: "pessoal.audit.failed", status: response.status });
       throw new ServiceError(502, AUDIT_FAILURE_MESSAGE, { auditStatus: response.status });
     }
     return true;
   } catch (error) {
-    if (error instanceof ServiceError) throw error;
     const timedOut = controller.signal.aborted;
-    console.error({
-      event: "pessoal.audit.failed",
+    logError("Falha ao enviar auditoria do Pessoal", {
       timedOut,
-      error: error instanceof Error ? error.message : String(error),
+      error: error instanceof ServiceError ? error.cause : error,
     });
+    if (error instanceof ServiceError) throw error;
     throw new ServiceError(timedOut ? 504 : 502, AUDIT_FAILURE_MESSAGE, error);
   } finally {
     clearTimeout(timeout);

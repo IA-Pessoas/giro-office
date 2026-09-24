@@ -160,6 +160,9 @@ runTest("pessoal error message never shows internal service names (#1300)", () =
     "AUDIT_SERVICE respondeu com HTTP 401.",
     "Falha ao chamar audit-service.",
     "USER_SERVICE_INTERNAL_TOKEN ausente.",
+    "AUDIT_SERVICE_URL inválida.",
+    "Falha no Audit-Service.",
+    "Binding HYPERDRIVE indisponível.",
   ]) {
     assert.equal(
       getPessoalErrorMessage({ response: { data: { error: internal } } }, "Fallback"),
@@ -167,6 +170,13 @@ runTest("pessoal error message never shows internal service names (#1300)", () =
     );
   }
   assert.equal(getPessoalErrorMessage(new Error("AUDIT_SERVICE fora"), "Fallback"), "Fallback");
+  assert.equal(
+    getPessoalErrorMessage(
+      { response: { data: { error: "Portal self-service indisponível." } } },
+      "Fallback",
+    ),
+    "Portal self-service indisponível.",
+  );
 });
 
 runTest("pessoal write mutations refresh lists on success and on error (#1300)", () => {

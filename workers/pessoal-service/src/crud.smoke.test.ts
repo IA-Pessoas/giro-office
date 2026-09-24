@@ -475,22 +475,17 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
   // #1300: com o audit-service fora, a escrita é revertida; o cliente nunca recebe erro
   // para um dado que ficou gravado.
   it("auditoria recusada reverte a escrita e não expõe o serviço interno", async () => {
-    const failingAudit = () => {
-      const instance = createPessoalWorkerApp({
+    const failingAudit = () =>
+      createPessoalWorkerApp({
         env: {
           ...env(),
           AUDIT_SERVICE_TOKEN: "crud-smoke-audit-token",
           AUDIT_SERVICE: { fetch: async () => new Response(null, { status: 401 }) },
         },
       });
-      return instance;
-    };
     const name = `QA_audit_${stamp}`;
-    const refused = await smokeCall(failingAudit(), undefined, "POST", "/pessoal/unions", {
-      name,
-      cnpj: "11.222.333/0001-44",
-      base_date: null,
-    });
+    const union = { name, cnpj: "11.222.333/0001-44", base_date: null };
+    const refused = await smokeCall(failingAudit(), undefined, "POST", "/pessoal/unions", union);
     expect(refused.status).toBeGreaterThanOrEqual(500);
     expect(refused.text).not.toMatch(/AUDIT_SERVICE|audit-service/iu);
     const afterCreate = expectOk(
@@ -500,7 +495,7 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
     expect(afterCreate.total).toBe(0);
 
     const kept = expectOk(
-      await call("POST", "/pessoal/unions", { name, cnpj: "11.222.333/0001-44", base_date: null }),
+      await call("POST", "/pessoal/unions", union),
       "POST union sem auditoria",
     ).data.id;
     const refusedDelete = await smokeCall(
