@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Smoke real (banco de verdade) dos Workers contabil, fiscal, triagem, parcelamento e gateway.
+// Smoke real (banco de verdade) dos Workers contabil, fiscal, triagem, parcelamento, pessoal e gateway.
 // Modo padrão: banco LOCAL descartável em Docker. Ver o runbook em
 // .superpowers/sdd/2026-09-21-cloudflare-migration/reports/smoke-real-db-runbook.md
 import { randomUUID } from "node:crypto";
@@ -58,6 +58,7 @@ const CLEANUP_TABLES = [
   "parcelamento.installmentsCompetencies",
   "parcelamento.installments",
   "parcelamento.panorama",
+  "pessoal.union",
   "clients",
   "permissions",
   "users",
@@ -946,6 +947,45 @@ async function runChecks({ db, sql, baseUrls, secrets, runId, mode, migrationWor
     throw new Error(
       "a mutação não gerou ENTITY_CHANGE de fiscal.ncm em audit_requests (auditoria de entidade perdida)",
     );
+  });
+
+  // #1299: o pessoal-service autenticava no audit-service com o token errado; o audit
+  // respondia 401 e toda escrita do DP voltava 502 depois de gravar.
+  await check("auditoria.entity_change_do_pessoal", async () => {
+    const auditRows = (id) =>
+      sql(
+        "select action from audit_requests where organization_id = $1 and method = 'ENTITY_CHANGE' and referring = 'pessoal.union' and referring_id = $2",
+        [fixtures.orgA, id],
+      );
+    const waitForAction = async (id, action) => {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const { rows } = await auditRows(id);
+        if (rows.some((row) => row.action === action)) return;
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+      throw new Error(`a escrita do DP não gerou ENTITY_CHANGE ${action} de pessoal.union`);
+    };
+    const created = expectStatus(
+      await http(baseUrls.pessoal, "/pessoal/unions", {
+        method: "POST",
+        token: tokenA,
+        body: { name: `QA_${runId} sindicato`, cnpj: "12.345.678/0001-90", base_date: null },
+      }),
+      [200, 201],
+      "POST /pessoal/unions",
+    );
+    const unionId = created.data.id;
+    await waitForAction(unionId, "Cadastro");
+    expectStatus(
+      await http(baseUrls.pessoal, `/pessoal/unions/${unionId}`, {
+        method: "DELETE",
+        token: tokenA,
+      }),
+      200,
+      "DELETE /pessoal/unions/:id",
+    );
+    await waitForAction(unionId, "Exclusao");
+    return "POST e DELETE de pessoal.union auditados";
   });
 
   await check("outbox.triagem_reconcile_despacha", async () => {
