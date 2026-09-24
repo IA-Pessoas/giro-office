@@ -4,6 +4,7 @@ import { type KeyboardEvent, useDeferredValue, useEffect, useId, useRef, useStat
 
 import { useClients } from "../hooks/useClients";
 import type { ClientListFilters } from "../types";
+import { getClientDisplayName } from "../utils/clientDisplayName";
 
 const CLIENT_PICKER_LIMIT = 50;
 const FIRST_CLIENT_PAGE = 1;
@@ -19,6 +20,7 @@ interface ClientPickerModalProps {
   filters: Omit<ClientListFilters, "search" | "page" | "limit">;
   onSelectClient: (client: ClientPickerOption | null) => void;
   selectedClient: ClientPickerOption | null;
+  triggerLabel?: string;
 }
 
 export function ClientPickerModal({
@@ -26,6 +28,7 @@ export function ClientPickerModal({
   filters,
   onSelectClient,
   selectedClient,
+  triggerLabel = "Selecionar cliente",
 }: ClientPickerModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -41,7 +44,7 @@ export function ClientPickerModal({
   });
   const clients = (clientsQuery.data?.items ?? []).map((client) => ({
     id: client.id,
-    name: client.company_name || client.name,
+    name: getClientDisplayName(client),
     document: client.cpf_cnpj,
   }));
   const total = clientsQuery.data?.total ?? 0;
@@ -97,7 +100,7 @@ export function ClientPickerModal({
       >
         <span className="min-w-0 text-center">
           <span className="block truncate text-sm font-semibold">
-            {selectedClient?.name || "Selecionar cliente"}
+            {selectedClient?.name || triggerLabel}
           </span>
           {selectedClient?.document ? (
             <span className="mt-0.5 block truncate text-xs text-blue-100">

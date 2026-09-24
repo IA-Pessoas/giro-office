@@ -30,6 +30,7 @@ export { useClientFormRegularize } from './hooks/useFormRegularize';
 
 export { clientService } from './services/clientService';
 export { ClientIntegrationForm } from './components/ClientIntegrationForm';
+export { getClientDisplayName } from './utils/clientDisplayName';
 export {
   mapClientStatusFromApi,
   mapClientStatusToApi,
