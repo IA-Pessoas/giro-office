@@ -208,6 +208,11 @@ export async function sendPessoalAudit(
   input: Record<string, unknown>,
 ): Promise<boolean> {
   if (!env?.AUDIT_SERVICE) return false;
+  // O audit-service valida o mesmo segredo que os chamadores guardam em AUDIT_SERVICE_TOKEN;
+  // INTERNAL_SERVICE_TOKEN é o do gateway e o audit-service responde 401 a ele.
+  if (!env.AUDIT_SERVICE_TOKEN) {
+    throw new ServiceError(503, "Auditoria externa não configurada.");
+  }
   const binding: ServiceBinding = env.AUDIT_SERVICE;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AUDIT_SERVICE_TIMEOUT_MS);
@@ -218,7 +223,7 @@ export async function sendPessoalAudit(
         method: "POST",
         headers: {
           "content-type": "application/json",
-          [INTERNAL_SERVICE_TOKEN_HEADER]: env.INTERNAL_SERVICE_TOKEN,
+          [INTERNAL_SERVICE_TOKEN_HEADER]: env.AUDIT_SERVICE_TOKEN,
         },
         body: JSON.stringify(input),
       }),
