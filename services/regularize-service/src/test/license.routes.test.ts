@@ -1,3 +1,5 @@
+import "./envBootstrap.js";
+
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
