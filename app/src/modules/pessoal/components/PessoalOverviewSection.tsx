@@ -61,15 +61,17 @@ export function PessoalOverviewSection({ onSelectTab }: PessoalOverviewSectionPr
     },
     {
       label: "Folha",
-      description: "Por cliente.",
+      value: formatCount(summary?.payroll?.total ?? 0, isOverviewLoading),
+      description: "Clientes com folha configurada.",
       details: ["Cadastro", "Parâmetros"],
       icon: WalletCards,
       tabId: "payroll",
     },
     {
       label: "Obrigações",
-      description: "Conferência mensal.",
-      details: ["Competência", "Checklist"],
+      value: formatCount(summary?.obligations?.total ?? 0, isOverviewLoading),
+      description: "Conferências da competência atual.",
+      details: [summary?.obligations?.competence ?? "Competência", "Checklist"],
       icon: CheckSquare,
       tabId: "obligations",
     },
@@ -119,39 +121,27 @@ export function PessoalOverviewSection({ onSelectTab }: PessoalOverviewSectionPr
   }
 
   return (
-    <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-      <div className="relative min-h-[260px] overflow-hidden rounded-xl border border-blue-500/40 bg-gradient-to-br from-blue-700 via-sky-700 to-blue-800 p-5 text-white shadow-lg">
-        <div className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-lg bg-white/15">
+    <section className="space-y-4">
+      <div className="flex items-center gap-3 rounded-xl border border-blue-500/40 bg-gradient-to-br from-blue-700 via-sky-700 to-blue-800 px-5 py-4 text-white shadow-lg">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15">
           <UserRoundCog className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold leading-tight">Resumo operacional</h2>
+          <p className="text-sm text-blue-100">
+            Folha, obrigações, sindicatos e acompanhamentos do Departamento Pessoal.
+          </p>
         </div>
-
-        <div className="flex min-h-[210px] max-w-xl flex-col justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-100">
-              Resumo operacional
-            </p>
-            <h2 className="mt-4 max-w-lg text-3xl font-bold leading-tight">
-              Departamento Pessoal
-            </h2>
-            <p className="mt-4 max-w-lg text-sm leading-6 text-blue-100">
-              Rotinas de folha, obrigações, sindicatos, acompanhamentos e acessos no mesmo fluxo.
-            </p>
+        {hasError ? (
+          <div className="ml-auto flex items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-xs text-white">
+            <AlertCircle className="h-4 w-4" />
+            Não foi possível carregar todos os indicadores agora.
           </div>
-
-          {hasError ? (
-            <div className="flex items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-xs text-white">
-              <AlertCircle className="h-4 w-4" />
-              Não foi possível carregar todos os indicadores agora.
-            </div>
-          ) : null}
-        </div>
+        ) : null}
       </div>
 
-      <div className="grid gap-3">
-        {featureCards.slice(0, 2).map(renderCard)}
-        <div className="grid grid-cols-2 gap-3">
-          {featureCards.slice(2).map(renderCard)}
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {featureCards.map(renderCard)}
       </div>
     </section>
   );

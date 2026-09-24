@@ -10,6 +10,7 @@ import {
 } from "../hooks/usePessoalGroups";
 import {
   PESSOAL_GROUP_POLICIES,
+  PESSOAL_GROUP_POLICY_LABELS,
   type PessoalGroup,
   type PessoalGroupPolicy,
 } from "../types/groups";
@@ -151,7 +152,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
                 >
                   {PESSOAL_GROUP_POLICIES.map((option) => (
                     <option key={option} value={option}>
-                      {option === "NORMAL" ? "Normal" : "Sem obrigações"}
+                      {PESSOAL_GROUP_POLICY_LABELS[option]}
                     </option>
                   ))}
                 </select>
@@ -200,7 +201,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
                     return (
                       <tr key={group.id} className="border-t border-gray-100 dark:border-gray-700">
                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{group.name}</td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{group.policy ?? "Sem política"}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{PESSOAL_GROUP_POLICY_LABELS[group.policy] ?? group.policy ?? "Sem política"}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                           {isArchived ? "Arquivado" : "Ativo"}
                         </td>

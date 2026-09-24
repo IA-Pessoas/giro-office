@@ -6,7 +6,10 @@ import {
   formatCnpjInput,
   formatCpfCnpjInput,
   formatCpfInput,
+  formatBrlDecimalInput,
+  isValidCnpj,
   normalizeDigits,
+  parseBrlDecimalInput,
   parseBrlInput,
 } from "./utils/inputFormatting.ts";
 
@@ -46,3 +49,26 @@ assert.equal(parseBrlInput("R$ 12,34"), 12.34);
 assert.equal(parseBrlInput("9007199254740992"), null);
 
 console.log("input formatting tests passed");
+
+// CNPJ com dígito verificador, inclusive o formato alfanumérico (exemplo oficial da Receita).
+assert.equal(isValidCnpj("11.222.333/0001-81"), true);
+assert.equal(isValidCnpj("11222333000181"), true);
+assert.equal(isValidCnpj("12.ABC.345/01DE-35"), true);
+assert.equal(isValidCnpj("11.222.333/0001-44"), false);
+assert.equal(isValidCnpj("123"), false);
+assert.equal(isValidCnpj("00.000.000/0000-00"), false);
+assert.equal(isValidCnpj("12.ABC.345/01DE-3A"), false);
+
+// Valor em reais digitado como decimal: "100" é R$ 100,00, não R$ 1,00.
+assert.equal(parseBrlDecimalInput("100"), 100);
+assert.equal(parseBrlDecimalInput("100,5"), 100.5);
+assert.equal(parseBrlDecimalInput("1.234,56"), 1234.56);
+assert.equal(parseBrlDecimalInput("R$ 1.234,56"), 1234.56);
+assert.equal(parseBrlDecimalInput("1.000"), 1000);
+assert.equal(parseBrlDecimalInput("10.5"), 10.5);
+assert.equal(parseBrlDecimalInput(""), null);
+assert.equal(parseBrlDecimalInput("R$"), null);
+assert.equal(formatBrlDecimalInput("100"), "R$ 100,00");
+assert.equal(formatBrlDecimalInput("1234,5"), "R$ 1.234,50");
+assert.equal(formatBrlDecimalInput(formatBrlDecimalInput("100")), "R$ 100,00");
+assert.equal(formatBrlDecimalInput(""), "");
