@@ -161,6 +161,12 @@ function serviceError(error: unknown, fallback: string): ServiceError {
   return error instanceof ServiceError ? error : new ServiceError(500, fallback, error);
 }
 
+function isForeignKeyViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2003"
+  );
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
@@ -547,7 +553,7 @@ function createSimpleEntityService(
   audit: Audit,
   delegateName: "relationshipContabil" | "responsibleContabil",
   referring: string,
-  messages: { get: string },
+  messages: { get: string; foreignKey: string },
 ): RelationshipService {
   const delegate = prisma[delegateName];
   return {
@@ -565,6 +571,7 @@ function createSimpleEntityService(
       } catch (error) {
         if (isUniqueViolation(error))
           throw new ServiceError(409, "Já está cadastrado para esta organização.", error);
+        if (isForeignKeyViolation(error)) throw new ServiceError(400, messages.foreignKey, error);
         throw serviceError(error, `Erro ao criar ${referring}.`);
       }
     },
@@ -616,13 +623,35 @@ export function createRelationshipService(
 ): RelationshipService {
   return createSimpleEntityService(prisma, audit, "relationshipContabil", "contabil.relationship", {
     get: "Registro de relacionamento não encontrado para este cliente.",
+    foreignKey: "Cliente não encontrado.",
   });
 }
 
 export function createResponsibleService(prisma: ContabilPrisma, audit: Audit): ResponsibleService {
-  return createSimpleEntityService(prisma, audit, "responsibleContabil", "contabil.responsibles", {
-    get: "Registro de responsáveis não encontrado para este cliente.",
-  });
+  const service = createSimpleEntityService(
+    prisma,
+    audit,
+    "responsibleContabil",
+    "contabil.responsibles",
+    {
+      get: "Registro de responsáveis não encontrado para este cliente.",
+      foreignKey: "Cliente, responsável ou lançado por não encontrado.",
+    },
+  );
+  return {
+    ...service,
+    // O banco tem DEFAULT '' nessas colunas com FK para users: omitir o campo viola a FK.
+    create: (input, auth) =>
+      service.create(
+        {
+          ...input,
+          person_responsible_id: input.person_responsible_id ?? null,
+          posted_by_id: input.posted_by_id ?? null,
+          customer_with_movement: input.customer_with_movement ?? false,
+        },
+        auth,
+      ),
+  };
 }
 
 const CLOSING_STATUSES = new Set([
