@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   buildContabilPortfolioParams,
   buildContabilControlParams,
+  buildTriageItemPayload,
   CONTABIL_ENDPOINTS,
   executeNullableContabilRequest,
   isNotFoundError,
@@ -831,6 +832,39 @@ await (async () => {
     assert.equal(
       getContabilErrorMessage(new Error("boom")),
       "boom",
+    );
+  });
+  await runTest("payload do item da Triagem omite chaves fiscais na rotina contábil", () => {
+    const notes = {
+      note: "Aguardando extrato",
+      justification: null,
+      delivery_method: null,
+      state_site: null,
+    };
+    assert.deepEqual(
+      buildTriageItemPayload("financial_transactions", "PENDING", notes, "CONTABIL"),
+      {
+        field: "financial_transactions",
+        status: "PENDING",
+        note: "Aguardando extrato",
+        justification: null,
+      },
+    );
+    assert.deepEqual(
+      buildTriageItemPayload("nfe_entrada", "PENDING", { ...notes, state_site: "SP" }, "FISCAL"),
+      {
+        field: "nfe_entrada",
+        status: "PENDING",
+        type: "FISCAL",
+        note: "Aguardando extrato",
+        justification: null,
+        delivery_method: null,
+        state_site: "SP",
+      },
+    );
+    assert.deepEqual(
+      buildTriageItemPayload("billing_amount", undefined, undefined, "FISCAL", "10,00"),
+      { field: "billing_amount", type: "FISCAL", value: "10,00" },
     );
   });
 })();

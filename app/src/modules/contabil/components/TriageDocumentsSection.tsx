@@ -116,6 +116,8 @@ export function TriageDocumentsSection({
   const [documentDrafts, setDocumentDrafts] = useState<TriageDocumentDraft>(() =>
     buildDocumentDrafts(undefined, documents),
   );
+  // Status escolhido ainda não confirmado pelo backend: em erro, o select mantém a escolha.
+  const [statusDrafts, setStatusDrafts] = useState<Record<string, TriageDocumentStatus>>({});
   const monthly = useTriageMonthly(clientId, competence, documentType);
   const justifications = useTriageCatalogs("JUSTIFICATION", clientId, competence);
   const deliveryMethods = useTriageCatalogs("DELIVERY_METHOD", clientId, competence);
@@ -140,6 +142,7 @@ export function TriageDocumentsSection({
   useEffect(() => {
     if (record) {
       setDocumentDrafts(buildDocumentDrafts(record.item_notes, documents));
+      setStatusDrafts({});
       setBillingAmount(record.billing_amount ?? "");
     }
   }, [record]);
@@ -369,18 +372,20 @@ export function TriageDocumentsSection({
                   {canEdit ? (
                     <select
                       aria-label={`${label} status`}
-                      value={record.checklist[field]}
-                      onChange={(event) =>
+                      value={statusDrafts[field] ?? record.checklist[field]}
+                      onChange={(event) => {
+                        const status = event.target.value as TriageDocumentStatus;
+                        setStatusDrafts((current) => ({ ...current, [field]: status }));
                         mutations.item.mutate({
                           id: record.id,
                           field,
-                          status: event.target.value as TriageDocumentStatus,
+                          status,
                           note: documentDrafts[field].note || null,
                           justification: documentDrafts[field].justification || null,
                           delivery_method: record.item_notes[field]?.delivery_method ?? null,
                           state_site: documentDrafts[field].state_site || null,
-                        })
-                      }
+                        });
+                      }}
                       className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
                     >
                       {STATUSES.map(([value, statusLabel]) => (
@@ -440,7 +445,7 @@ export function TriageDocumentsSection({
                                 mutations.item.mutate({
                                   id: record.id,
                                   field,
-                                  status: record.checklist[field],
+                                  status: statusDrafts[field] ?? record.checklist[field],
                                   delivery_method: (event.target.value || null) as TriageDeliveryMethod | null,
                                 })
                               }
@@ -482,7 +487,7 @@ export function TriageDocumentsSection({
                           mutations.item.mutate({
                             id: record.id,
                             field,
-                            status: record.checklist[field],
+                            status: statusDrafts[field] ?? record.checklist[field],
                             note: documentDrafts[field].note || null,
                             justification: documentDrafts[field].justification || null,
                             delivery_method: record.item_notes[field]?.delivery_method ?? null,
