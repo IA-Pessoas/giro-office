@@ -344,12 +344,22 @@ describe("task crud routes", () => {
     expect(taskCrudServiceMock.updateTask).toHaveBeenCalledTimes(1);
   });
 
-  it("PUT /task rejeita alteração direta da previsão", async () => {
-    const app = createTestApp();
-
-    const res = await request(app).put("/task").send({
+  it("PUT /task encaminha a previsão ao serviço, que só aceita a primeira data", async () => {
+    const res = await request(createTestApp()).put("/task").send({
       task_id: "task-1",
       prevision_date: "2026-09-20",
+    });
+
+    expect(res.status).toBe(200);
+    expect(taskCrudServiceMock.updateTask).toHaveBeenCalledWith(
+      expect.objectContaining({ prevision_date: "2026-09-20" }),
+    );
+  });
+
+  it("PUT /task rejeita previsão fora do formato YYYY-MM-DD", async () => {
+    const res = await request(createTestApp()).put("/task").send({
+      task_id: "task-1",
+      prevision_date: "20/09/2026",
     });
 
     expect(res.status).toBe(400);

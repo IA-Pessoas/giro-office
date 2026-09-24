@@ -143,3 +143,11 @@ export function getProjectSelectPlaceholder({
 
   return "Selecione um projeto";
 }
+
+/** Previsão só é definida direto quando a tarefa ainda não tem; depois, via prorrogação. */
+export function getInitialPrevisionPatch(
+  currentPrevision: string | null | undefined,
+  value: string,
+): { prevision_date?: string } {
+  return !currentPrevision && value ? { prevision_date: value } : {};
+}

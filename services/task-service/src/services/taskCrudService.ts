@@ -194,6 +194,7 @@ export interface UpdateTaskCrudRequest {
   responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
+  prevision_date?: string;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -880,6 +881,16 @@ export class TaskCrudService {
         throw new ServiceError(403, "A reabertura deve usar o fluxo de conclusão da tarefa.");
       }
 
+      let prevision_date = exists.prevision_date;
+      if (data.prevision_date !== undefined) {
+        const requested = new Date(`${data.prevision_date}T00:00:00.000Z`);
+        if (exists.prevision_date === null) {
+          prevision_date = requested;
+        } else if (exists.prevision_date.getTime() !== requested.getTime()) {
+          throw new ServiceError(409, "A tarefa já tem previsão. Use Prorrogações para alterá-la.");
+        }
+      }
+
       const name = data.name !== undefined ? data.name : exists.name;
       const status = data.status !== undefined ? data.status : exists.status;
       const model_id = data.model_id !== undefined ? data.model_id : exists.model_id;
@@ -978,7 +989,7 @@ export class TaskCrudService {
           responsible_id,
           responsible2_id,
           responsible3_id,
-          prevision_date: exists.prevision_date,
+          prevision_date,
         },
         select: TASK_UPDATE_SELECT,
       });
