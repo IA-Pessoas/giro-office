@@ -195,6 +195,10 @@ await runTest("NCM create and edit keep codes numeric while search keeps eight-d
   assert.match(fiscalSources.ncmForm, /inputMode="numeric"/);
   assert.match(fiscalSources.ncmForm, /pattern="\[0-9\]\*"/);
   assert.match(fiscalSources.ncmForm, /Informe apenas números no código NCM\./);
+  assert.match(fiscalSources.ncmForm, /ncm_code\.trim\(\)\.length !== 8[\s\S]*O código NCM deve ter 8 dígitos\./);
+  assert.match(fiscalSources.ncmForm, /endDateIso && endDateIso < startDateIso[\s\S]*A vigência final não pode ser anterior à vigência inicial\./);
+  assert.match(fiscalSources.ncmSchema, /O código NCM deve ter 8 dígitos\./);
+  assert.doesNotMatch(fiscalSources.ncmSchema, /validity_end_date não pode/);
   assert.match(fiscalSources.ncmSchema, /\.regex\(\/\^\\d\+\$\//);
   assert.match(fiscalSources.searchSection, /\.replace\(\/\\D\/g, ""\)\s*\.slice\(0, NCM_CODE_LENGTH\)/);
   assert.match(fiscalSources.searchSection, /trimmedCode\.length !== NCM_CODE_LENGTH/);

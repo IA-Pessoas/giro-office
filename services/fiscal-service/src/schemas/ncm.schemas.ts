@@ -7,7 +7,7 @@ import { commaSeparatedListSchema, paginationQuerySchema } from "./pagination.sc
 const ncmIdSchema = z.string().uuid({ message: "ncm_id inválido." });
 const ncmCodeSchema = zNonEmptyText("ncm_code")
   .regex(/^\d+$/, { message: "ncm_code deve conter apenas números." })
-  .length(8, { message: "ncm_code deve ter 8 dígitos." });
+  .length(8, { message: "O código NCM deve ter 8 dígitos." });
 
 // Nome de regime vira o código que a tela lê; outros valores seguem como vieram
 // para não quebrar registros herdados.
@@ -26,7 +26,7 @@ function refineValidity(
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["validity_end_date"],
-      message: "validity_end_date não pode ser anterior a validity_start_date.",
+      message: "A vigência final não pode ser anterior à vigência inicial.",
     });
   }
 }
