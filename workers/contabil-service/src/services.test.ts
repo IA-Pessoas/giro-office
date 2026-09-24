@@ -130,6 +130,14 @@ describe("contabil services tenant and catalog seams", () => {
     await expect(
       service.create({ client_id: CLIENT, posted_by_id: USER }, auth),
     ).rejects.toMatchObject({ statusCode: 400 });
+
+    database.responsibleContabil.findFirst.mockResolvedValue({ id: "responsible-1" });
+    Object.assign(database.responsibleContabil, {
+      update: vi.fn().mockRejectedValue(Object.assign(new Error("fk"), { code: "P2003" })),
+    });
+    await expect(
+      service.update("responsible-1", { posted_by_id: USER }, auth),
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("recusa marcador bancário de cliente fora do tenant", async () => {

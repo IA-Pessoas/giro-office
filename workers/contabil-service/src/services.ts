@@ -594,6 +594,7 @@ function createSimpleEntityService(
         });
         return updated;
       } catch (error) {
+        if (isForeignKeyViolation(error)) throw new ServiceError(400, messages.foreignKey, error);
         throw serviceError(error, `Erro ao atualizar ${referring}.`);
       }
     },
