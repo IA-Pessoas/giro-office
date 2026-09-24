@@ -774,6 +774,72 @@ describe("AuthService", () => {
     ).rejects.toMatchObject({ statusCode: 401 });
   });
 
+  it("retorna operador, organização e expiração da sessão de personificação ativa", async () => {
+    const expiresAt = new Date("2026-09-24T14:00:00.000Z");
+    prismaMock.authSession.findFirst.mockResolvedValue({
+      expires_at: expiresAt,
+      impersonator_platform_user_id: "platform-1",
+      impersonatorPlatformUser: {
+        id: "platform-1",
+        name: "Operador",
+        platform_role: "super_admin",
+        status: "active",
+        can_impersonate: true,
+      },
+      user: activeUser({
+        organization: { id: "org-1", name: "Organização Aurora", status: "active" },
+        department: {
+          organization_id: "org-1",
+          organization: { id: "org-1", name: "Organização Aurora", status: "active" },
+        },
+      }),
+    });
+
+    const result = await new AuthService().getImpersonationSessionInfo({
+      user_id: "user-1",
+      organization_id: "org-1",
+      session_id: "session-1",
+    });
+
+    expect(result).toEqual({
+      operator: { id: "platform-1", name: "Operador" },
+      expires_at: expiresAt.toISOString(),
+      organization_name: "Organização Aurora",
+    });
+    expect(prismaMock.authSession.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "session-1",
+          user_id: "user-1",
+          impersonator_platform_user_id: { not: null },
+          revoked_at: null,
+        }),
+      }),
+    );
+  });
+
+  it("não retorna contexto de personificação sem uma sessão ativa", async () => {
+    const service = new AuthService();
+
+    await expect(
+      service.getImpersonationSessionInfo({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_id: undefined,
+      }),
+    ).resolves.toBeNull();
+    expect(prismaMock.authSession.findFirst).not.toHaveBeenCalled();
+
+    prismaMock.authSession.findFirst.mockResolvedValue(null);
+    await expect(
+      service.getImpersonationSessionInfo({
+        user_id: "user-1",
+        organization_id: "org-1",
+        session_id: "session-1",
+      }),
+    ).resolves.toBeNull();
+  });
+
   it.each([
     ["perde permissão", { platform_role: "super_admin", status: "active", can_impersonate: false }],
     ["é desativado", { platform_role: "super_admin", status: "inactive", can_impersonate: true }],

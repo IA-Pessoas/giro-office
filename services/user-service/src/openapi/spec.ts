@@ -718,7 +718,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           tags: ["Auth"],
           summary: "Usuário autenticado (JWT ou contexto encaminhado pelo gateway)",
           description:
-            "Retorna o usuário e o mapa de permissões modulares da organização autenticada. O mapa contém somente módulos ativos e níveis 0 a 3.",
+            "Retorna o usuário e o mapa de permissões modulares da organização autenticada. O mapa contém somente módulos ativos e níveis 0 a 3. Em sessões de personificação ativas, acrescenta `impersonation` com operador, organização e expiração; o campo é omitido nas sessões comuns.",
           security: bearer,
           responses: {
             "200": { description: "Dados do usuário", ...successJson },

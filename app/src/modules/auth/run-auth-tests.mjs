@@ -602,7 +602,7 @@ await (async () => {
     assert.match(appSource, /<AppLayout isIframeView=\{isIframeView\}>/);
     assert.match(
       appShellSource,
-      /if \(isIframeView\) \{\s*return <div[^>]*>\{mainContent\}<\/div>;/,
+      /if \(isIframeView\) \{\s*return \([\s\S]*?\{impersonationBanner\}[\s\S]*?\{mainContent\}[\s\S]*?\);\s*\}/,
     );
   });
 
@@ -620,6 +620,20 @@ await (async () => {
       assert.match(appShellSource, /getNavigationModuleName\(module, moduleAccessUser\)/);
     },
   );
+
+  await runTest("mostra banner fixo apenas com contexto de personificação", () => {
+    assert.match(authContextSource, /interface ImpersonationSessionInfo/);
+    assert.match(authContextSource, /isValidImpersonationSessionInfo\(data\.impersonation\)/);
+    assert.match(appShellSource, /const impersonation = user\?\.impersonation/);
+    assert.match(appShellSource, /const impersonationBanner = impersonation \?/);
+    assert.match(appShellSource, /role="status"/);
+    assert.match(appShellSource, /fixed inset-x-0 top-0/);
+    assert.match(
+      appShellSource,
+      /Você está personificando \{user\.name\} \(\{impersonation\.organization_name\}\)/,
+    );
+    assert.match(appShellSource, /if \(isIframeView\)[\s\S]*\{impersonationBanner\}/);
+  });
 
   await runTest("retired modules are not registered in navigation or quick actions", () => {
     for (const blockedPath of ["/marketing"]) {
