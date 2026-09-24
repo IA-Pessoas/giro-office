@@ -96,6 +96,7 @@ const TASK_LIST_SELECT = {
   charge_financeiro: true,
   client: { select: { name: true, company_name: true } },
   project: { select: { name: true, status: true } },
+  responsible: { select: { name: true } },
   responsible_id: true,
   responsible2_id: true,
   responsible3_id: true,
@@ -144,10 +145,11 @@ export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }
 type TaskListDatabaseRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
 export type TaskListRow = Omit<
   TaskListDatabaseRow,
-  "responsible_id" | "responsible2_id" | "responsible3_id" | "client" | "project"
+  "responsible_id" | "responsible2_id" | "responsible3_id" | "responsible" | "client" | "project"
 > & {
   client_name: string;
   project_name: string;
+  responsible_name: string | null;
   isOwn: boolean;
   isUnassigned: boolean;
 };
@@ -813,7 +815,15 @@ export class TaskCrudService {
 
       const hasMore = params.page * params.limit < total;
       const data = list.map(
-        ({ responsible_id, responsible2_id, responsible3_id, client, project, ...task }) => {
+        ({
+          responsible_id,
+          responsible2_id,
+          responsible3_id,
+          responsible,
+          client,
+          project,
+          ...task
+        }) => {
           const commercialValidationPending =
             isAwaitingCommercialValidation(task) ||
             project.status === PROJECT_STATUS_WAITING_COMMERCIAL;
@@ -822,6 +832,7 @@ export class TaskCrudService {
             status: commercialValidationPending ? INTEGRACAO_TASK_STATUS_WAITING : task.status,
             client_name: client.company_name?.trim() || client.name,
             project_name: project.name,
+            responsible_name: responsible?.name ?? null,
             isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
             isUnassigned: responsible_id === null,
           };
@@ -1000,49 +1011,51 @@ export class TaskCrudService {
         select: TASK_UPDATE_SELECT,
       });
 
-      await this.audit.logUpdateIfChanged({
-        userId: data.user_id,
-        organizationId: data.organization_id,
-        action: "Atualização",
-        referring: "integracao.tasks",
-        referringId: data.task_id,
-        oldData: exists as Record<string, unknown>,
-        updatedData: updated as Record<string, unknown>,
-      });
-
       const relevantChange =
         exists.status !== updated.status ||
         exists.observations !== updated.observations ||
         exists.responsible_id !== updated.responsible_id ||
         exists.responsible2_id !== updated.responsible2_id ||
         exists.responsible3_id !== updated.responsible3_id;
-      if (relevantChange) {
-        await publishTaskOperationalNotifications(this.prisma, {
-          organization_id: data.organization_id,
-          task_id: data.task_id,
-          event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
-          type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
-          title: "Tarefa atualizada",
-          message: "Há uma alteração relevante em uma tarefa acompanhada por você.",
-          responsible_ids: [
-            updated.responsible_id,
-            updated.responsible2_id,
-            updated.responsible3_id,
-          ],
-          include_administrators: true,
-          exclude_user_id: data.user_id,
-        });
-      }
 
-      await this.#workflow.afterTaskUpdated({
-        taskId: data.task_id,
-        projectId: exists.project_id,
-        userId: data.user_id,
-        organizationId: data.organization_id,
-        previousStatus: exists.status ?? "",
-        newStatus: status,
-        previousBilling: exists.billing ?? "",
-      });
+      // Efeitos pós-update são independentes; em paralelo tiram ~2 idas de rede do PUT.
+      await Promise.all([
+        this.audit.logUpdateIfChanged({
+          userId: data.user_id,
+          organizationId: data.organization_id,
+          action: "Atualização",
+          referring: "integracao.tasks",
+          referringId: data.task_id,
+          oldData: exists as Record<string, unknown>,
+          updatedData: updated as Record<string, unknown>,
+        }),
+        relevantChange
+          ? publishTaskOperationalNotifications(this.prisma, {
+              organization_id: data.organization_id,
+              task_id: data.task_id,
+              event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
+              type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
+              title: "Tarefa atualizada",
+              message: "Há uma alteração relevante em uma tarefa acompanhada por você.",
+              responsible_ids: [
+                updated.responsible_id,
+                updated.responsible2_id,
+                updated.responsible3_id,
+              ],
+              include_administrators: true,
+              exclude_user_id: data.user_id,
+            })
+          : undefined,
+        this.#workflow.afterTaskUpdated({
+          taskId: data.task_id,
+          projectId: exists.project_id,
+          userId: data.user_id,
+          organizationId: data.organization_id,
+          previousStatus: exists.status ?? "",
+          newStatus: status,
+          previousBilling: exists.billing ?? "",
+        }),
+      ]);
 
       return updated;
     } catch (err: unknown) {
