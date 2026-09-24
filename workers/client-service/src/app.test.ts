@@ -79,6 +79,7 @@ function service(): ClientWorkerService {
     createPending: vi.fn(async () => ({ id: PENDING_ID, client_id: CLIENT_ID, reason: "Retorno" })),
     listPending: vi.fn(async () => ({ list: [] })),
     deletePending: vi.fn(async () => undefined),
+    deleteHistory: vi.fn(async () => undefined),
     createPA: vi.fn(async () => ({ client_id: CLIENT_ID })),
     getPADetail: vi.fn(async () => ({ client_id: CLIENT_ID })),
     updatePA: vi.fn(async () => ({ client_id: CLIENT_ID })),
@@ -309,6 +310,38 @@ describe("client Worker", () => {
       "Informe data e hora com fuso horário (ISO 8601).",
     );
     expect(clientService.updateHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletes a history passing whether the caller manages the organization", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const remove = (extra: Record<string, string>) =>
+      app.request(`https://client.test/client/${CLIENT_ID}/histories/${HISTORY_ID}`, {
+        method: "DELETE",
+        headers: headers(extra),
+      });
+
+    const byOwner = await remove({});
+    const byUser = await remove({ "x-auth-type": "user", "x-auth-permission": "1" });
+
+    expect(byOwner.status).toBe(200);
+    expect(byUser.status).toBe(200);
+    expect(clientService.deleteHistory).toHaveBeenNthCalledWith(
+      1,
+      CLIENT_ID,
+      HISTORY_ID,
+      ORGANIZATION_ID,
+      USER_ID,
+      true,
+    );
+    expect(clientService.deleteHistory).toHaveBeenNthCalledWith(
+      2,
+      CLIENT_ID,
+      HISTORY_ID,
+      ORGANIZATION_ID,
+      USER_ID,
+      false,
+    );
   });
 
   it("rejects unknown multipart fields with a Portuguese message", async () => {

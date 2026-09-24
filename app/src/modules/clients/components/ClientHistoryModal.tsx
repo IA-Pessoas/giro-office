@@ -50,11 +50,12 @@ export function ClientHistoryModal({
     }
 
     return {
-      date: "",
+      date: toDatetimeLocalValue(new Date().toISOString()),
       history: "",
       file: null,
     };
-  }, [history, mode]);
+    // isOpen recalcula o "agora" a cada abertura do modal de criação.
+  }, [history, mode, isOpen]);
 
   const [form, setForm] = useState<HistoryFormState>(initialState);
 
@@ -95,6 +96,7 @@ export function ClientHistoryModal({
           await queryClient.invalidateQueries({ queryKey: ["clients", clientId, "histories"] });
           await queryClient.invalidateQueries({ queryKey: historyPendingQueryKey(pendingUserId) });
         }
+        toast.dismiss();
         toast.success("Histórico criado com sucesso.");
         onClose();
         return;
@@ -111,6 +113,7 @@ export function ClientHistoryModal({
         date: dateUnchanged ? history.date : form.date,
         history: form.history.trim(),
       });
+      toast.dismiss();
       toast.success("Histórico atualizado com sucesso.");
       onClose();
     } catch (error) {
@@ -194,9 +197,14 @@ export function ClientHistoryModal({
               className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-100 dark:hover:file:bg-slate-700"
             />
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Até 10 MB: PDF, imagem, texto, Word ou Excel. Atualização de arquivo não é suportada na edição.
+              Até 10 MB: PDF, imagem, texto, Word ou Excel.
             </p>
           </label>
+        ) : null}
+        {mode === "edit" ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Atualização de arquivo não é suportada na edição.
+          </p>
         ) : null}
       </div>
     </Dialog>
