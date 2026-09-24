@@ -147,6 +147,18 @@ runTest("client form sends the selected tax regime on creation and update", () =
   );
 });
 
+runTest("new client defaults to Ativo and keeps status display and payload aligned", () => {
+  const initialValues = createClientFormInitialValues();
+
+  assert.equal(initialValues.status, "Ativo");
+  assert.equal(
+    buildCreateClientPayload({ ...initialValues, name: "Acme", cpf_cnpj: "12.345.678/0001-95" }, "organization-1").status,
+    "Ativo",
+  );
+  assert.equal(mapClientStatusToApi("Prospect"), "Prospecção");
+  assert.equal(mapClientStatusToApi("Inativo"), "Inativo");
+});
+
 runTest("client regime is constrained and bound in both shared client flows", () => {
   const types = readFileSync("src/modules/clients/types/index.ts", "utf8");
   const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
