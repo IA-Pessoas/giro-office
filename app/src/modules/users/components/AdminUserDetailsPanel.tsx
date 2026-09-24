@@ -3,7 +3,7 @@ import { isAxiosError } from "axios";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
-import { canAccessAdministration } from "@modules/auth";
+import { canAccessAdministration, isOrganizationOwner } from "@modules/auth";
 import { useAuth } from "@/context/AuthContext";
 import { PasswordResetButton } from "@shared/components/PasswordResetButton";
 import { CREATE_USER_PERMISSION_OPTIONS } from "../constants/createUserConfig";
@@ -141,6 +141,8 @@ export function AdminUserDetailsPanel({
     return isSaving || isLoadingUser || !userId || departmentsError || departments.length === 0 || !formData;
   }, [departments.length, departmentsError, formData, isLoadingUser, isSaving, userId]);
 
+  const isOwner = isOrganizationOwner(user);
+
   const hasKnownPermission = useMemo(() => {
     if (!formData) {
       return true;
@@ -175,7 +177,8 @@ export function AdminUserDetailsPanel({
     const payload: UpdateUserData = {
       name: formData.name,
       department_id: formData.department_id,
-      permission: Number(formData.permission),
+      // O papel do owner não é um nível de permissão (ADR 0002): não sobrescrever.
+      ...(isOwner ? {} : { permission: Number(formData.permission) }),
       status: formData.status,
     };
 
@@ -318,23 +321,41 @@ export function AdminUserDetailsPanel({
             </div>
 
             <div className="space-y-2">
-              <label className={LABEL_CLASSNAME}>Permissão</label>
-              <select
-                name="permission"
-                value={formData.permission}
-                onChange={handleInputChange}
-                className={SELECT_FIELD_CLASSNAME}
-                style={SELECT_ARROW_STYLE}
-              >
-                {!hasKnownPermission ? (
-                  <option value={formData.permission}>Permissão atual ({formData.permission})</option>
-                ) : null}
-                {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <label className={LABEL_CLASSNAME} htmlFor="admin-user-permission">
+                Permissão
+              </label>
+              {isOwner ? (
+                <input
+                  id="admin-user-permission"
+                  value="Owner"
+                  readOnly
+                  aria-describedby="admin-user-owner-hint"
+                  className={`${FIELD_CLASSNAME} bg-slate-100 dark:bg-slate-800`}
+                />
+              ) : (
+                <select
+                  id="admin-user-permission"
+                  name="permission"
+                  value={formData.permission}
+                  onChange={handleInputChange}
+                  className={SELECT_FIELD_CLASSNAME}
+                  style={SELECT_ARROW_STYLE}
+                >
+                  {!hasKnownPermission ? (
+                    <option value={formData.permission}>Permissão atual ({formData.permission})</option>
+                  ) : null}
+                  {CREATE_USER_PERMISSION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {isOwner ? (
+                <p id="admin-user-owner-hint" className={MUTED_CLASSNAME}>
+                  Acesso total à organização, independente dos níveis por módulo.
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2 md:col-span-2">

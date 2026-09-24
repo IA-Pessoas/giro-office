@@ -135,6 +135,8 @@ const integracaoClientPolicy: AuthPolicy = {
     minPermission: moduleAccessPermission,
   },
 };
+/** Mutações do cadastro de clientes exigem edição; o client-service ainda cobra 3 para desativar. */
+const integracaoClientEditPolicy = createModulePolicy("integracao", moduleEditPermission);
 
 const clientListPolicy: AuthPolicy = {
   anyOf: [
@@ -179,7 +181,8 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
-  { method: "ANY", path: integracaoClientPath, policy: integracaoClientPolicy },
+  { method: "GET", path: integracaoClientPath, policy: integracaoClientPolicy },
+  { method: "ANY", path: integracaoClientPath, policy: integracaoClientEditPolicy },
   { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientEditPolicy },
   { method: "GET", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
