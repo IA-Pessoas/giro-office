@@ -2520,3 +2520,11 @@ await runTest("ti form controls follow the app form look (sentence-case labels, 
   assert.match(input, /focus:border-blue-500/);
   assert.doesNotMatch(input, /dark:bg-slate-950/);
 });
+
+await runTest("ti terms list masks the employee CPF (#1344)", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(source, /import \{ maskCPF \} from "@shared\/utils\/formatters";/);
+  assert.match(source, /maskCPF\(term\.user_cpf\)/);
+  assert.doesNotMatch(source, /<p[^>]*>\s*\{getText\(term\.user_cpf\)\}/);
+});

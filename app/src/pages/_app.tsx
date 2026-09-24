@@ -22,7 +22,8 @@ function AppLayout({ children, isIframeView = false }) {
     router.pathname === "/login" ||
     router.pathname === "/super-admin/login" ||
     router.pathname === "/" ||
-    router.pathname === "/solicitar-acesso";
+    router.pathname === "/solicitar-acesso" ||
+    router.pathname === "/redefinir-senha";
 
   useEffect(() => {
     if (isPublicRoute || loading || user) {

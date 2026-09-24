@@ -43,7 +43,6 @@ export const updatePlatformUserBodySchema = z
   .object({
     name: z.string().trim().min(1).max(255).optional(),
     login: z.string().trim().toLowerCase().min(1).max(255).optional(),
-    password: z.string().min(8).max(255).optional(),
     department_id: z.string().trim().min(1).optional(),
     permission: z.number().int().min(0).max(3).optional(),
     status: z.enum(["active", "inactive"]).optional(),
@@ -54,7 +53,6 @@ export const updatePlatformUserBodySchema = z
     (input) =>
       input.name !== undefined ||
       input.login !== undefined ||
-      input.password !== undefined ||
       input.department_id !== undefined ||
       input.permission !== undefined ||
       input.status !== undefined,

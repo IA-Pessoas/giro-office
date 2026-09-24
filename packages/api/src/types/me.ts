@@ -25,9 +25,11 @@ export interface MeApiResponse {
 export type UpdateCurrentUserPayload =
   | {
       password: string;
+      currentPassword: string;
       name?: never;
     }
   | {
       name: string;
       password?: string;
+      currentPassword?: string;
     };

@@ -143,6 +143,17 @@ runTest("client form sends the selected tax regime on creation and update", () =
   );
 });
 
+runTest("new client form sends Ativo when status remains unchanged", () => {
+  const values = {
+    ...createClientFormInitialValues(),
+    name: "Acme",
+    cpf_cnpj: "12.345.678/0001-90",
+  };
+
+  assert.equal(values.status, "Ativo");
+  assert.equal(buildCreateClientPayload(values, "organization-1").status, "Ativo");
+});
+
 runTest("PJ client payloads derive the required API name while PF keeps its entered name", () => {
   const pjValues = {
     ...createClientFormInitialValues(),
