@@ -2444,3 +2444,11 @@ await runTest("new TI request discloses required fields before submission", asyn
   assert.match(source, /value=\{requestDraft\.category_id\}[\s\S]*aria-required/);
   assert.match(source, /<textarea[\s\S]*aria-required/);
 });
+
+await runTest("ti terms list masks the employee CPF (#1344)", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(source, /import \{ maskCPF \} from "@shared\/utils\/formatters";/);
+  assert.match(source, /maskCPF\(term\.user_cpf\)/);
+  assert.doesNotMatch(source, /<p[^>]*>\s*\{getText\(term\.user_cpf\)\}/);
+});

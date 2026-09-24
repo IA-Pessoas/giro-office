@@ -26,5 +26,13 @@
   ],
   // Só para GET /dashboard/stats, servido pelo próprio gateway como no Node.
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
+  // Login, login de plataforma e link de redefinição: 10 tentativas por minuto por IP e rota (#1344).
+  "ratelimits": [
+    {
+      "name": "LOGIN_RATE_LIMITER",
+      "namespace_id": "1344",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "observability": { "enabled": true }
 }

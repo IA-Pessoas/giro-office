@@ -163,12 +163,6 @@ export function RhDossierSection() {
   const deleteContactMutation = useDeleteRhContactMutation();
   const replaceAllergiesMutation = useReplaceRhAllergiesMutation();
 
-  useEffect(() => {
-    if (canManageRh && !selectedUserId && listQuery.data?.[0]) {
-      setSelectedUserId(listQuery.data[0].id);
-    }
-  }, [canManageRh, listQuery.data, selectedUserId]);
-
   if (permissionQuery.isLoading) return <StatusPanel text="Validando acesso ao dossiê..." />;
   if (!canAccessRhPortal) return <StatusPanel text="Seu perfil não possui acesso ao dossiê de RH." />;
 
@@ -195,6 +189,10 @@ export function RhDossierSection() {
           selectedUserId={selectedUserId}
           onSelect={canManageRh ? setSelectedUserId : undefined}
         />
+      ) : null}
+
+      {canManageRh && !selectedUserId && (listQuery.data?.length ?? 0) > 0 ? (
+        <StatusPanel text="Selecione um colaborador para ver o dossiê." />
       ) : null}
 
       {(!canManageRh || selectedUserId) && permission !== RH_DOSSIER_MANAGER_PERMISSION ? (
