@@ -3,8 +3,10 @@ import "./envBootstrap.js";
 import { Buffer } from "node:buffer";
 import {
   MAX_REPORTING_QUERY_BYTES,
+  MAX_REPORTING_QUERY_ROWS,
   REPORTING_QUERY_BYTE_LIMIT_CODE,
   REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
+  REPORTING_QUERY_ROW_LIMIT_CODE,
 } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
@@ -248,6 +250,59 @@ describe("fiscal internal reporting service", () => {
       orderBy: { id: "asc" },
       take: 100,
     });
+  });
+
+  it.each([
+    ["no limite global", MAX_REPORTING_QUERY_ROWS, false],
+    ["acima do limite global", MAX_REPORTING_QUERY_ROWS + 1, true],
+  ] as const)("aplica o limite global de linhas a snapshots fiscais %s", async (_, count, overLimit) => {
+    const rows = Array.from({ length: count }, (_, index) => ({
+      id: `fiscal-${String(index + 1).padStart(5, "0")}`,
+      state: "SP",
+    }));
+    const icms = {
+      findMany: vi
+        .fn()
+        .mockImplementation(async (input: { cursor?: { id: string }; take: number }) => {
+          const start = input.cursor ? Number(input.cursor.id.split("-")[1]) : 0;
+          return rows.slice(start, start + input.take);
+        }),
+    };
+    const prisma: Record<string, unknown> = {
+      icms,
+      ncm: { findMany: vi.fn() },
+      ipi: { findMany: vi.fn() },
+    };
+    prisma.$transaction = vi.fn(
+      async (read: (client: unknown) => Promise<unknown>, _options: unknown) => read(prisma),
+    );
+    const service = new InternalReportingService(prisma as never);
+    const outcome = await service
+      .extract({
+        organizationId: ORGANIZATION_ID,
+        source: "fiscal.icms",
+        fields: ["state"],
+        limit: MAX_REPORTING_QUERY_ROWS,
+      })
+      .then(
+        (result) => ({ rows: result.rows.length, reachedLimit: result.reachedLimit }),
+        (error: { statusCode?: number; code?: string; message?: string }) => ({
+          error: { statusCode: error.statusCode, code: error.code, message: error.message },
+        }),
+      );
+
+    if (overLimit) {
+      expect(outcome).toEqual({
+        error: {
+          statusCode: 422,
+          code: REPORTING_QUERY_ROW_LIMIT_CODE,
+          message: "O conjunto excede a capacidade de consulta do relatório.",
+        },
+      });
+      expect(icms.findMany).toHaveBeenCalledTimes(501);
+    } else {
+      expect(outcome).toEqual({ rows: MAX_REPORTING_QUERY_ROWS, reachedLimit: false });
+    }
   });
 
   it("continua critérios com cursor sem expor o ID interno", async () => {
