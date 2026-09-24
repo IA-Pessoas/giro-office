@@ -101,9 +101,9 @@ function pathParam(c: ClientContext, schema: z.ZodType<{ id: string }>): string 
 async function saveHistoryFile(
   storage: WorkerHistoryStorageLike | undefined,
   clientId: string,
-  body: Record<string, unknown>,
+  value: unknown,
 ): Promise<string | undefined> {
-  const file = body.file instanceof File ? body.file : undefined;
+  const file = value instanceof File ? value : undefined;
   if (!file) return undefined;
   if (!storage) throw new ServiceError(503, "Armazenamento de históricos não configurado.");
   return storage.upload(clientId, file);
@@ -454,24 +454,25 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
   app.post("/client/:id/histories", async (c) =>
     withService(c, async (service) => {
       const id = pathParam(c, clientIdParamsSchema);
-      const body = await formOrJsonBody(c);
-      const parsed = parse(createHistoryBodySchema, body);
-      const file = await saveHistoryFile(
-        options.historyStorage ?? WorkerHistoryStorage.fromEnv(options.env ?? c.env),
-        id,
-        body,
-      );
-      return c.json(
-        createSuccessResponse(
-          await service.createHistory(id, organizationId(c), c.get("auth").userId, {
-            date: parsed.date,
-            history: parsed.history,
-            ...(parsed.pending_id ? { pending_id: parsed.pending_id } : {}),
-            ...(file ? { file } : {}),
-          }),
-        ),
-        201,
-      );
+      const { file: attachment, ...fields } = await formOrJsonBody(c);
+      const parsed = parse(createHistoryBodySchema, fields);
+      if (attachment !== undefined && !(attachment instanceof File))
+        throw new ServiceError(400, "Anexo inválido: envie o arquivo como upload.");
+      const storage = options.historyStorage ?? WorkerHistoryStorage.fromEnv(options.env ?? c.env);
+      const file = await saveHistoryFile(storage, id, attachment);
+      try {
+        const created = await service.createHistory(id, organizationId(c), c.get("auth").userId, {
+          date: parsed.date,
+          history: parsed.history,
+          ...(parsed.pending_id ? { pending_id: parsed.pending_id } : {}),
+          ...(file ? { file } : {}),
+        });
+        return c.json(createSuccessResponse(created), 201);
+      } catch (error) {
+        // Sem histórico gravado, o anexo enviado não pode ficar órfão no bucket.
+        if (file) await storage?.remove(file).catch(() => undefined);
+        throw error;
+      }
     }),
   );
 

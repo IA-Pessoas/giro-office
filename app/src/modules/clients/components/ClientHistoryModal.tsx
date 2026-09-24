@@ -198,11 +198,12 @@ export function ClientHistoryModal({
             <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Arquivo (opcional)</span>
             <input
               type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx"
               onChange={handleFileChange}
               className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-100 dark:hover:file:bg-slate-700"
             />
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Atualização de arquivo não é suportada na edição.
+              Até 10 MB: PDF, imagem, texto, Word ou Excel. Atualização de arquivo não é suportada na edição.
             </p>
           </label>
         ) : null}
