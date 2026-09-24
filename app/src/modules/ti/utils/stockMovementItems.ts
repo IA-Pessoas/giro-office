@@ -1,6 +1,6 @@
 import type { TiStockItem } from "../types";
 
-type StockItemLike = Pick<TiStockItem, "id" | "name" | "quantity">;
+type StockItemLike = Pick<TiStockItem, "id" | "name">;
 
 // O item escolhido continua como opção mesmo quando a busca atual não o traz.
 export function buildTiStockMovementItemOptions(
@@ -19,13 +19,4 @@ export function buildTiStockMovementItemOptions(
     ...(selectedMissing ? [toOption(selected)] : []),
     ...results.map(toOption),
   ];
-}
-
-// Saldo disponível quando a saída passa dele; null quando cabe ou o saldo é desconhecido.
-export function getTiStockExitShortage(item: StockItemLike | null, quantity: number): number | null {
-  if (typeof item?.quantity !== "number") {
-    return null;
-  }
-
-  return quantity > item.quantity ? item.quantity : null;
 }

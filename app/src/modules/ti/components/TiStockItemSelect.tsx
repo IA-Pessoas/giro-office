@@ -35,9 +35,13 @@ export function TiStockItemSelect({ selectedItem, onSelect }: TiStockItemSelectP
       <TiNativeSelect
         disabled={itemsQuery.isLoading}
         helperText={
-          total > items.length
-            ? `Mostrando ${items.length} de ${total} itens. Busque pelo nome para encontrar os demais.`
-            : undefined
+          itemsQuery.isError
+            ? "Não foi possível carregar os itens. Tente buscar de novo."
+            : !itemsQuery.isLoading && items.length === 0
+              ? "Nenhum item encontrado."
+              : total > items.length
+                ? `Mostrando ${items.length} de ${total} itens. Busque pelo nome para encontrar os demais.`
+                : undefined
         }
         label="Item"
         onChange={(event) =>

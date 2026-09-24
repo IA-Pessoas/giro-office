@@ -57,7 +57,6 @@ import {
   resolveTiStockLocationName,
 } from "../utils/stockDisplay";
 import { getTiStockMutationErrorMessage } from "../utils/stockMutationError";
-import { getTiStockExitShortage } from "../utils/stockMovementItems";
 import { TiNativeSelect } from "./TiNativeSelect";
 import { TiStockItemSelect } from "./TiStockItemSelect";
 import {
@@ -491,7 +490,7 @@ export function TiStockTab() {
   }
 
   function openMovementDialog(nextDialog: "entry" | "exit") {
-    setMovementItem(selectedItemId ? (selectedItem ?? null) : null);
+    setMovementItem(selectedItem ?? null);
     setStockDialog(nextDialog);
   }
 
@@ -622,7 +621,7 @@ export function TiStockTab() {
       return;
     }
 
-    const itemId = toOptionalId(getId(movementItem?.id));
+    const itemId = movementItem?.id;
 
     if (!itemId) {
       toast.error("Selecione o item da entrada.");
@@ -653,7 +652,7 @@ export function TiStockTab() {
       return;
     }
 
-    const itemId = toOptionalId(getId(movementItem?.id));
+    const itemId = movementItem?.id;
 
     if (!itemId) {
       toast.error("Selecione o item da saída.");
@@ -664,13 +663,6 @@ export function TiStockTab() {
 
     if (quantity === null) {
       toast.error("Informe uma quantidade de saída válida.");
-      return;
-    }
-
-    const available = getTiStockExitShortage(movementItem, quantity);
-
-    if (available !== null) {
-      toast.error(`Saldo insuficiente: há ${available} em estoque.`);
       return;
     }
 

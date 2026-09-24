@@ -2455,7 +2455,7 @@ await runTest("new TI request discloses required fields before submission", asyn
 });
 
 await runTest("ti stock movement item options keep the chosen item outside the search results", async () => {
-  const { buildTiStockMovementItemOptions, getTiStockExitShortage } = await import("./utils/stockMovementItems.ts");
+  const { buildTiStockMovementItemOptions } = await import("./utils/stockMovementItems.ts");
   const results = [
     { id: "a", name: "Mouse" },
     { id: "b", name: "" },
@@ -2471,11 +2471,6 @@ await runTest("ti stock movement item options keep the chosen item outside the s
     ["", "z", "a", "b"],
   );
   assert.equal(buildTiStockMovementItemOptions(results, { id: "a", name: "Mouse" }).length, 3);
-
-  assert.equal(getTiStockExitShortage({ id: "a", quantity: 2 }, 3), 2);
-  assert.equal(getTiStockExitShortage({ id: "a", quantity: 3 }, 3), null);
-  assert.equal(getTiStockExitShortage({ id: "a" }, 3), null);
-  assert.equal(getTiStockExitShortage(null, 3), null);
 });
 
 await runTest("ti stock movement dialogs search every stock item on the server", async () => {
@@ -2486,6 +2481,6 @@ await runTest("ti stock movement dialogs search every stock item on the server",
   assert.match(picker, /MOVEMENT_ITEM_PAGE_SIZE = 100/);
   assert.match(picker, /Mostrando \$\{items\.length\} de \$\{total\} itens/);
   assert.equal(tab.match(/<TiStockItemSelect/g)?.length, 2);
-  assert.match(tab, /getTiStockExitShortage\(movementItem, quantity\)/);
-  assert.match(tab, /Saldo insuficiente: há \$\{available\} em estoque\./);
+  assert.match(picker, /Nenhum item encontrado\./);
+  assert.match(picker, /itemsQuery\.isError/);
 });
