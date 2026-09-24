@@ -1851,11 +1851,11 @@ runTest("project edit keeps client and tasks after PUT and offers manual statuse
 runTest("wizard success toast speaks business language", () => {
   assert.equal(
     getProjectWizardSuccessMessage({ main: 2, dependencies: 1, unassigned: 0 }),
-    "Projeto criado com 3 tarefa(s).",
+    "Projeto criado com 3 tarefas.",
   );
   assert.equal(
     getProjectWizardSuccessMessage({ main: 1, dependencies: 0, unassigned: 1 }),
-    "Projeto criado com 1 tarefa(s). 1 ainda sem responsável.",
+    "Projeto criado com 1 tarefa. 1 ainda sem responsável.",
   );
 
   const form = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");

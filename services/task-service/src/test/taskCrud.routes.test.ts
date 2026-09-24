@@ -264,7 +264,7 @@ describe("task crud routes", () => {
     expect(pathSpec).toContain('"client_name":{"type":"string"}');
     expect(pathSpec).toContain('"project_name":{"type":"string"}');
     expect(pathSpec).toContain(
-      '"required":["id","client_name","project_name","isOwn","isUnassigned"]',
+      '"required":["id","client_name","project_name","responsible_name","isOwn","isUnassigned"]',
     );
   });
 

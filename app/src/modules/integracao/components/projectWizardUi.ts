@@ -127,5 +127,5 @@ export function getProjectWizardSuccessMessage(counts: {
 }): string {
   const total = counts.main + counts.dependencies;
   const unassigned = counts.unassigned > 0 ? ` ${counts.unassigned} ainda sem responsável.` : "";
-  return `Projeto criado com ${total} tarefa(s).${unassigned}`;
+  return `Projeto criado com ${total} ${total === 1 ? "tarefa" : "tarefas"}.${unassigned}`;
 }
