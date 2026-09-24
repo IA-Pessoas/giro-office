@@ -795,7 +795,7 @@ runTest("client picker keeps paginated remote search and accessible feedback", (
   assert.match(moduleIndex, /ClientPickerModal/);
   assert.match(picker, /useDeferredValue/);
   assert.match(picker, /useClients\(\{[\s\S]*?\.\.\.filters,[\s\S]*?search: deferredSearch,[\s\S]*?page,[\s\S]*?limit: CLIENT_PICKER_LIMIT/);
-  assert.match(picker, /client\.company_name \|\| client\.name/);
+  assert.match(picker, /name: getClientDisplayName\(client\)/);
   assert.match(picker, /role="dialog"/);
   assert.match(picker, /role="alert"/);
   assert.match(picker, /htmlFor=\{searchInputId\}/);
