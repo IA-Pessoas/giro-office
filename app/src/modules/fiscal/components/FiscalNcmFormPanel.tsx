@@ -21,6 +21,7 @@ interface FiscalNcmFormPanelProps {
   mode: FiscalNcmFormPanelMode;
   ncmId?: string;
   onClose: () => void;
+  onCreated?: (ncmCode: string) => void;
   showHeader?: boolean;
   bare?: boolean;
 }
@@ -89,6 +90,7 @@ export function FiscalNcmFormPanel({
   mode,
   ncmId,
   onClose,
+  onCreated,
   showHeader = true,
   bare = false,
 }: FiscalNcmFormPanelProps) {
@@ -209,6 +211,9 @@ export function FiscalNcmFormPanel({
       createMutation.reset();
       updateMutation.reset();
       onClose();
+      if (!isEditing) {
+        onCreated?.(basePayload.ncm_code);
+      }
     } catch {
       // Inline feedback is rendered below.
     }
