@@ -1,3 +1,4 @@
+import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 import { createClosingService, createControlService, createDocumentsService } from "./services.js";
 
@@ -89,6 +90,35 @@ describe("contabil services tenant and catalog seams", () => {
       person_responsible_id: null,
       posted_by_id: null,
     });
+  });
+
+  it("GET mensal sem registro devolve null em vez de 404 (#1322)", async () => {
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue(null);
+    const service = createDocumentsService(database as never, audit());
+
+    await expect(
+      service.getMonthly({ client_id: CLIENT, competence: "2026-09" }, auth),
+    ).resolves.toBeNull();
+  });
+
+  it("GET mensal sem competência na Triagem devolve resumo null em vez de 502 (#1322)", async () => {
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue({
+      id: MONTHLY,
+      client_id: CLIENT,
+      competence: "2026-09",
+      checklist: {},
+      item_notes: {},
+    });
+    const getSummary = vi
+      .fn()
+      .mockRejectedValue(new ServiceError(404, "Resumo da Triagem não encontrado."));
+    const service = createDocumentsService(database as never, audit(), { getSummary });
+
+    await expect(
+      service.getMonthly({ client_id: CLIENT, competence: "2026-09" }, auth),
+    ).resolves.toMatchObject({ id: MONTHLY, triagem_summary: null });
   });
 
   it("recusa marcador bancário de cliente fora do tenant", async () => {

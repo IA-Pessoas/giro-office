@@ -109,7 +109,7 @@ export type DocumentsService = {
     auth: AuthContext,
     type?: "CONTABIL" | "FISCAL",
   ): Promise<JsonRecord>;
-  getMonthly(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  getMonthly(input: JsonRecord, auth: AuthContext): Promise<JsonRecord | null>;
   getOrCreateMonthly(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   updateItem(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   updateAll(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
@@ -993,7 +993,8 @@ export function createDocumentsService(
           archived_at: null,
         },
       });
-      if (!row) throw new ServiceError(404, "Pendência documental mensal não encontrada.");
+      // Estado vazio é 200 com null: a tela oferece "Iniciar pendências".
+      if (!row) return null;
       const result = monthlyDto(row, type);
       if (!overviewClient) return { ...result, triagem_summary: null };
       try {
@@ -1009,7 +1010,7 @@ export function createDocumentsService(
           }),
         };
       } catch (error) {
-        if (error instanceof ServiceError && [403, 503, 504].includes(error.statusCode))
+        if (error instanceof ServiceError && [403, 404, 503, 504].includes(error.statusCode))
           return { ...result, triagem_summary: null };
         throw error;
       }
