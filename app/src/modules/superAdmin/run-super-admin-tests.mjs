@@ -456,8 +456,10 @@ await runTest("usa abas acessíveis e controla permissões de personificação p
   assert.match(superAdminPageSource, />\s*Super admins\s*</);
   assert.match(superAdminPageSource, />\s*Auditoria\s*</);
   assert.match(superAdminPageSource, /<PlatformSuperAdminsPanel\s*\/>/);
-  assert.match(superAdminsPanelSource, /Pode personificar/);
-  assert.match(superAdminsPanelSource, /Não pode personificar/);
+  assert.match(superAdminsPanelSource, /formatImpersonationPermission/);
+  assert.match(managementUtilsSource, /formatImpersonationPermission/);
+  assert.match(managementUtilsSource, /Pode personificar/);
+  assert.match(managementUtilsSource, /Não pode personificar/);
   assert.match(superAdminsPanelSource, /role="switch"/);
   assert.match(superAdminsPanelSource, /currentUser\.can_impersonate === true/);
   assert.match(superAdminsPanelSource, /admin\.id === currentUser\?\.id/);
