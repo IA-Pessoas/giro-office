@@ -178,6 +178,16 @@ export function FiscalNcmFormPanel({
       return;
     }
 
+    if (formState.ncm_code.trim().length !== 8) {
+      setValidationMessage("O código NCM deve ter 8 dígitos.");
+      return;
+    }
+
+    if (endDateIso && endDateIso < startDateIso) {
+      setValidationMessage("A vigência final não pode ser anterior à vigência inicial.");
+      return;
+    }
+
     setValidationMessage(null);
 
     const basePayload: CreateFiscalNcmPayload = {
