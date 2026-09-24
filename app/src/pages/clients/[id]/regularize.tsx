@@ -14,6 +14,7 @@ import {
   createRegularizeInitialValues,
   getRegularizeUnsupportedDateClearError,
   hasRegularizeChanges,
+  isRegularizeCompanyClient,
 } from "@modules/clients/utils/regularizeForm";
 import {
   validateCpfCnpjDocument,
@@ -66,7 +67,7 @@ export default function ClientRegularizePage() {
       return;
     }
 
-    const isCompanyClient = formValues.cpf_cnpj.replace(/\D/g, "").length === 14;
+    const isCompanyClient = isRegularizeCompanyClient(formValues);
     const hasClientName = isCompanyClient
       ? Boolean(formValues.name.trim() || formValues.company_name.trim() || formValues.fantasy_name.trim())
       : Boolean(formValues.name.trim());

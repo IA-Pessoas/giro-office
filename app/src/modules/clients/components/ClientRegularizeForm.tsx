@@ -10,6 +10,7 @@ import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientRegularizeFormValues } from "../types";
+import { isRegularizeCompanyClient } from "../utils/regularizeForm";
 import {
   REGULARIZE_REGIME_OPTIONS,
   REGULARIZE_SEGMENT_OPTIONS,
@@ -100,7 +101,7 @@ export function ClientRegularizeForm({
   onSubmit,
   onCancel,
 }: ClientRegularizeFormProps) {
-  const isCompanyClient = values.cpf_cnpj.replace(/\D/g, "").length === 14;
+  const isCompanyClient = isRegularizeCompanyClient(values);
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
     forwardFormattedInputChange(event, formatCpfCnpjInput, onChange);
   };

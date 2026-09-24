@@ -33,6 +33,7 @@ import {
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
+  isRegularizeCompanyClient,
   getRegularizeUnsupportedDateClearError,
   hasRegularizeChanges,
 } from "./utils/regularizeForm.ts";
@@ -195,7 +196,22 @@ runTest("PJ client forms hide manual name while PF forms retain it", () => {
   assert.match(clientForm, /values\.type === "PF"[\s\S]*?name="name"/);
   assert.match(integrationForm, /values\.type === "PF"[\s\S]*?name="name"/);
   assert.doesNotMatch(regularizeForm, /label="Nome \/ Apelido"/);
-  assert.match(regularizeForm, /cpf_cnpj[\s\S]*14/);
+  assert.match(regularizeForm, /isRegularizeCompanyClient\(values\)/);
+});
+
+runTest("regularization recognizes PJ when CNPJ is incomplete but company names exist", () => {
+  assert.equal(
+    isRegularizeCompanyClient({ cpf_cnpj: "12.345", company_name: "Empresa LTDA", fantasy_name: "" }),
+    true,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ cpf_cnpj: "", company_name: "", fantasy_name: "Marca" }),
+    true,
+  );
+  assert.equal(
+    isRegularizeCompanyClient({ cpf_cnpj: "123.456.789-00", company_name: "", fantasy_name: "" }),
+    false,
+  );
 });
 
 runTest("client regime is constrained and bound in both shared client flows", () => {

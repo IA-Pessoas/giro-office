@@ -153,6 +153,16 @@ export function createRegularizeInitialValues(client: Client): ClientRegularizeF
   };
 }
 
+export function isRegularizeCompanyClient(
+  values: Pick<ClientRegularizeFormValues, "cpf_cnpj" | "company_name" | "fantasy_name">,
+): boolean {
+  return (
+    normalizeDocumentValue(values.cpf_cnpj).length === 14 ||
+    values.company_name.trim().length > 0 ||
+    values.fantasy_name.trim().length > 0
+  );
+}
+
 export function buildRegularizePayload(
   values: ClientRegularizeFormValues,
   client: Client,
