@@ -783,7 +783,13 @@ describe("user Worker", () => {
         where: { user_id: USER_ID, id: { not: "session-1" }, revoked_at: null },
         data: { revoked_at: expect.any(Date) },
       });
-      expect(response.headers.get("set-cookie")).toContain("cw.session=");
+      const sessionToken = /cw\.session=([^;]+)/.exec(
+        response.headers.get("set-cookie") ?? "",
+      )?.[1];
+      const claims = JSON.parse(
+        Buffer.from(String(sessionToken).split(".")[1], "base64url").toString(),
+      );
+      expect(claims).toMatchObject({ session_id: "session-1", session_version: 2 });
     });
   });
 

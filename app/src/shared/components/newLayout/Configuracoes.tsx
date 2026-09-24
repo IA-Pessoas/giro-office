@@ -532,6 +532,25 @@ export function Configuracoes() {
                     <div className="space-y-2">
                       <label
                         className={SETTINGS_LABEL_CLASSNAME}
+                        htmlFor="settings-access-current-password"
+                      >
+                        Senha atual
+                      </label>
+                      <input
+                        id="settings-access-current-password"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(event) => setCurrentPassword(event.target.value)}
+                        placeholder="Necessária para trocar a senha"
+                        autoComplete="current-password"
+                        className={SETTINGS_INPUT_CLASSNAME}
+                        disabled={isSaving}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label
+                        className={SETTINGS_LABEL_CLASSNAME}
                         htmlFor="settings-access-password"
                       >
                         Nova senha
@@ -548,58 +567,35 @@ export function Configuracoes() {
                       />
                     </div>
 
-                    {password.trim() ? (
-                      <>
-                        <div className="space-y-2">
-                          <label
-                            className={SETTINGS_LABEL_CLASSNAME}
-                            htmlFor="settings-access-confirm-password"
-                          >
-                            Confirmar nova senha
-                          </label>
-                          <input
-                            id="settings-access-confirm-password"
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(event) => setConfirmPassword(event.target.value)}
-                            placeholder="Repita a nova senha"
-                            autoComplete="new-password"
-                            className={SETTINGS_INPUT_CLASSNAME}
-                            disabled={isSaving}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label
-                            className={SETTINGS_LABEL_CLASSNAME}
-                            htmlFor="settings-access-current-password"
-                          >
-                            Senha atual
-                          </label>
-                          <input
-                            id="settings-access-current-password"
-                            type="password"
-                            value={currentPassword}
-                            onChange={(event) => setCurrentPassword(event.target.value)}
-                            placeholder="Confirme com a senha atual"
-                            autoComplete="current-password"
-                            className={SETTINGS_INPUT_CLASSNAME}
-                            disabled={isSaving}
-                            aria-describedby={
-                              passwordError ? "settings-access-password-error" : undefined
-                            }
-                          />
-                          {passwordError ? (
-                            <p
-                              id="settings-access-password-error"
-                              className="text-sm text-red-600 dark:text-red-400"
-                            >
-                              {passwordError}
-                            </p>
-                          ) : null}
-                        </div>
-                      </>
-                    ) : null}
+                    <div className="space-y-2">
+                      <label
+                        className={SETTINGS_LABEL_CLASSNAME}
+                        htmlFor="settings-access-confirm-password"
+                      >
+                        Confirmar nova senha
+                      </label>
+                      <input
+                        id="settings-access-confirm-password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        placeholder="Repita a nova senha"
+                        autoComplete="new-password"
+                        className={SETTINGS_INPUT_CLASSNAME}
+                        disabled={isSaving}
+                        aria-describedby={
+                          passwordError ? "settings-access-password-error" : undefined
+                        }
+                      />
+                      {passwordError ? (
+                        <p
+                          id="settings-access-password-error"
+                          className="text-sm text-red-600 dark:text-red-400"
+                        >
+                          {passwordError}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </Dialog>
