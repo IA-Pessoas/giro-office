@@ -4,14 +4,16 @@ import {
   type TiRequestsReportingSource,
   tiRequestsReportingCatalog,
 } from "@workspace/shared";
+import { createReportingPage, cursorOptions, type ReportingPage } from "./reportingPagination.js";
 
 type ReportingDelegate = {
   findMany(input: {
     where: { organization_id: string };
     select: Record<string, unknown>;
     take: number;
+    cursor?: { id: string };
     skip?: number;
-    orderBy?: { id: "asc" };
+    orderBy: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -52,12 +54,12 @@ export class TiRequestsReportingService {
   constructor(private readonly prisma: { tIRequest: ReportingDelegate }) {}
 
   async extract(input: {
-    offset?: number;
+    cursorId?: string;
     organizationId: string;
     source: TiRequestsReportingSource;
     fields: readonly string[];
     limit: number;
-  }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+  }): Promise<ReportingPage> {
     const allowedFields = getTiRequestsReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
@@ -65,16 +67,15 @@ export class TiRequestsReportingService {
 
     const rows = await this.prisma.tIRequest.findMany({
       where: { organization_id: input.organizationId },
-      select: Object.assign({}, ...input.fields.map((field) => fieldSelects[field])),
-      ...(input.offset !== undefined
-        ? { skip: input.offset, orderBy: { id: "asc" as const } }
-        : {}),
+      select: Object.assign({ id: true }, ...input.fields.map((field) => fieldSelects[field])),
+      ...cursorOptions(input.cursorId),
       take: input.limit + 1,
     });
+    const page = createReportingPage(rows, input.limit);
 
     return {
-      rows: projectRows(rows.slice(0, input.limit), input.fields),
-      reachedLimit: rows.length > input.limit,
+      ...page,
+      rows: projectRows(page.rows, input.fields),
     };
   }
 }

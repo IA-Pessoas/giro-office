@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 
 import { INTEGRACAO_PERMISSION_LEVEL, error as logError, ServiceError } from "@workspace/shared";
 import type { Prisma } from "../generated/prisma/client.js";
-import * as audit from "../integrations/audit.js";
-import prismaClient from "../prisma/index.js";
+import type { TaskAudit } from "../integrations/audit.js";
+import type prismaClient from "../prisma/index.js";
 
 export interface SettleFinanceiroRequest {
   user_id: string;
@@ -87,6 +87,11 @@ function effectivePermission(data: {
 }
 
 export class TaskFinanceiroService {
+  constructor(
+    private readonly prisma: typeof prismaClient,
+    private readonly audit: TaskAudit,
+  ) {}
+
   async listCollectors(data: ListCollectorsRequest) {
     const isPrivileged =
       data.is_owner === true || effectivePermission(data) === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
@@ -96,7 +101,7 @@ export class TaskFinanceiroService {
         "Apenas administradores podem consultar a configuração de cobradores.",
       );
     }
-    const collectors = await prismaClient.departmentCollector.findMany({
+    const collectors = await this.prisma.departmentCollector.findMany({
       where: {
         organization_id: data.organization_id,
         department_id: data.department_id,
@@ -115,7 +120,7 @@ export class TaskFinanceiroService {
       data.is_owner === true || effectivePermission(data) === INTEGRACAO_PERMISSION_LEVEL.ADMIN;
     let departmentIds: string[] | undefined;
     if (!isPrivileged) {
-      const actor = await prismaClient.user.findFirst({
+      const actor = await this.prisma.user.findFirst({
         where: {
           id: data.user_id,
           status: "active",
@@ -129,7 +134,7 @@ export class TaskFinanceiroService {
       if (!actor) {
         throw new ServiceError(403, "Você não é cobrador ativo.");
       }
-      const assignments = await prismaClient.departmentCollector.findMany({
+      const assignments = await this.prisma.departmentCollector.findMany({
         where: {
           organization_id: data.organization_id,
           user_id: data.user_id,
@@ -146,7 +151,7 @@ export class TaskFinanceiroService {
       }
     }
 
-    return prismaClient.task.findMany({
+    return this.prisma.task.findMany({
       where: {
         organization_id: data.organization_id,
         charge_financeiro: true,
@@ -169,7 +174,7 @@ export class TaskFinanceiroService {
     if (data.is_owner !== true && effectivePermission(data) < INTEGRACAO_PERMISSION_LEVEL.VIEWER) {
       throw new ServiceError(403, "Você não possui acesso à Integração.");
     }
-    const tasks = await prismaClient.task.findMany({
+    const tasks = await this.prisma.task.findMany({
       where: {
         organization_id: data.organization_id,
         client_id: data.client_id,
@@ -193,7 +198,7 @@ export class TaskFinanceiroService {
       }
 
       const collectorIds = [...new Set(data.collector_ids)].sort();
-      const response = await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
+      const response = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const department = await tx.department.findFirst({
           where: { id: data.department_id, organization_id: data.organization_id, status: "Ativo" },
           select: { id: true },
@@ -244,7 +249,7 @@ export class TaskFinanceiroService {
         return { department_id: data.department_id, collector_ids: collectorIds };
       });
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         permission: effectivePermission(data),
@@ -275,7 +280,7 @@ export class TaskFinanceiroService {
         throw new ServiceError(400, "Informe ao menos uma tarefa para baixa.");
       }
       const commandHash = data.command_hash ?? settlementCommandHash(taskIds);
-      const result = await prismaClient.$transaction(async (tx: Prisma.TransactionClient) => {
+      const result = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const lockKey = JSON.stringify([data.organization_id, data.idempotency_key]);
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
         const isPrivileged =
@@ -436,7 +441,7 @@ export class TaskFinanceiroService {
       });
       if (result.audit_pending) {
         try {
-          await audit.createLog({
+          await this.audit.createLog({
             userId: data.user_id,
             organizationId: data.organization_id,
             permission: effectivePermission(data),
@@ -448,7 +453,7 @@ export class TaskFinanceiroService {
           });
         } catch (auditError: unknown) {
           // Libera a reivindicação para que uma repetição posterior audite de novo.
-          await prismaClient.taskFinanceiroCommand.update({
+          await this.prisma.taskFinanceiroCommand.update({
             where: {
               organization_id_idempotency_key: {
                 organization_id: data.organization_id,

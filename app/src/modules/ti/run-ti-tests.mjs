@@ -548,6 +548,16 @@ await runTest("ti stock list preserves server pagination metadata", async () => 
   assert.match(hookSource, /UseQueryResult<PaginatedResult<TiStockItem>, Error>/);
 });
 
+await runTest("ti term matches each asset code it cites", async () => {
+  const { termCitesAsset } = await import("./utils/termAssetCodes.ts");
+
+  assert.equal(termCitesAsset({ asset_code: "MS27CASTELO, N30CASTELO" }, "n30castelo"), true);
+  assert.equal(termCitesAsset({ asset_code: " N04CASTELO " }, "N04CASTELO"), true);
+  assert.equal(termCitesAsset({ asset_code: "N04CASTELO" }, "N04"), false);
+  assert.equal(termCitesAsset({ equipament_list: "Notebook N04CASTELO" }, "N04CASTELO"), true);
+  assert.equal(termCitesAsset({ asset_code: null }, ""), false);
+});
+
 await runTest("ti stock location display never falls back to a raw id", async () => {
   const { resolveTiStockLocationName } = await import("./utils/stockDisplay.ts");
   const locations = [{ id: 24, name: "Almoxarifado TI" }];
@@ -1222,7 +1232,7 @@ await runTest("ti user selects reuse the operational users source where still in
   }
 });
 
-await runTest("ti extension numbers use an exact four-digit contract", async () => {
+await runTest("ti extension numbers accept three or four digits", async () => {
   const {
     TI_EXTENSION_NUMBER_LENGTH,
     isValidTiExtensionNumber,
@@ -1232,8 +1242,9 @@ await runTest("ti extension numbers use an exact four-digit contract", async () 
   assert.equal(TI_EXTENSION_NUMBER_LENGTH, 4);
   assert.equal(isValidTiExtensionNumber("1001"), true);
   assert.equal(isValidTiExtensionNumber("0007"), true);
+  assert.equal(isValidTiExtensionNumber("123"), true);
 
-  for (const invalid of ["", "123", "12345", "12A4", "12-4", " 1234 "]) {
+  for (const invalid of ["", "12", "12345", "12A4", "12-4", " 1234 "]) {
     assert.equal(isValidTiExtensionNumber(invalid), false);
   }
 
@@ -1252,7 +1263,7 @@ await runTest("ti extension form validates digits and hides the internal id", as
   assert.equal(
     [
       ...tabSource.matchAll(
-        /toast\.error\("Informe um ramal com exatamente 4 dígitos\."\)/g,
+        /toast\.error\("Informe um ramal com 3 ou 4 dígitos\."\)/g,
       ),
     ].length,
     2,
@@ -1301,7 +1312,7 @@ await runTest("ti extension hooks and tab expose ramal mutations", async () => {
   assert.match(tabSource, /selectedExtensionId\s*\?\s*\(/);
   assert.doesNotMatch(tabSource, /Selecione um ramal para ver detalhes\./);
   assert.match(tabSource, /Criar ramal/);
-  assert.match(tabSource, /placeholder="Ex: 1001"/);
+  assert.match(tabSource, /placeholder="Ex: 101 ou 1001"/);
   assert.doesNotMatch(tabSource, /placeholder="1001"/);
   assert.match(tabSource, /className=\{tiFiveRowTableClassName\}/);
 });
@@ -1418,6 +1429,43 @@ await runTest("ti requests tab consumes live hooks instead of rendering only an 
   assert.match(tabSource, /isLoading|isFetching/);
   assert.match(tabSource, /isError/);
   assert.doesNotMatch(tabSource, /const\s+(requests|messages|categories)\s*=\s*\[/);
+});
+
+await runTest("ti requests queue splits open and closed tickets and detects unseen new ones", async () => {
+  const { findUnseenTiRequestIds, isClosedTiRequestStatus, splitTiRequestsByQueue } =
+    await import("./utils/requestQueue.ts");
+
+  const { open, closed } = splitTiRequestsByQueue([
+    { id: "1", status: "New" },
+    { id: "2", status: "In_Progress" },
+    { id: "3", status: "Waiting" },
+    { id: "4", status: "Resolved" },
+    { id: "5", status: "Closed" },
+  ]);
+  assert.deepEqual(open.map((request) => request.id), ["1", "2", "3"]);
+  assert.deepEqual(closed.map((request) => request.id), ["4", "5"]);
+  assert.equal(isClosedTiRequestStatus(undefined), false);
+
+  assert.deepEqual(findUnseenTiRequestIds(null, [{ id: "1" }]), []);
+  assert.deepEqual(findUnseenTiRequestIds(new Set(["1"]), [{ id: "1" }, { id: "2" }]), ["2"]);
+});
+
+await runTest("ti requests tab requires AnyDesk and the app shell polls new tickets with sound", async () => {
+  const tabSource = await readModuleSource("components/TiRequestsTab.tsx");
+  const shellSource = await readAppSource("src/shared/components/newLayout/AppShell.tsx");
+  const alertSource = await readModuleSource("hooks/useNewTiRequestAlerts.ts");
+
+  assert.match(tabSource, /Código AnyDesk/);
+  assert.match(tabSource, /anydesk_code: requestDraft\.anydesk_code\.trim\(\)/);
+  assert.match(tabSource, /Informe o código AnyDesk para criar o chamado\./);
+  assert.match(
+    shellSource,
+    /useNewTiRequestAlerts\(!isPlatformSuperAdmin && moduleAccessMap\.ti\?\.isAdmin === true\)/,
+  );
+  assert.match(alertSource, /refetchInterval: NEW_REQUESTS_POLL_INTERVAL_MS/);
+  assert.match(alertSource, /playNewTiRequestSound\(\)/);
+  assert.match(tabSource, /renderRequestsTable\(requestQueues\.open/);
+  assert.match(tabSource, /renderRequestsTable\(\s*requestQueues\.closed/);
 });
 
 await runTest("ti requests creation opens in a dialog and leaves filters spanning the workspace", async () => {
@@ -1710,27 +1758,32 @@ await runTest("ti inventory tab exposes assets, categories, departments, assignm
   assert.match(source, /useTiInventory\(/);
   assert.match(source, /useTiInventoryAsset\(/);
   assert.match(source, /useTiInventoryCategories\(/);
-  assert.match(source, /departmentService\.list\(\)/);
-  assert.match(source, /useFetch<DepItem\[\]>/);
-  assert.doesNotMatch(source, /useTiInventoryLocations\(/);
+  assert.match(source, /useTiInventoryLocations\(\)/);
+  assert.doesNotMatch(source, /departmentService\.list\(\)/);
   assert.match(source, /<ConfirmationDialog/);
   assert.doesNotMatch(source, /\bconfirm\(/);
 });
 
-await runTest("ti inventory department options come from the global department endpoint", async () => {
+await runTest("ti inventory department options come from inventory locations, the asset FK", async () => {
   const source = await readModuleSource("components/TiInventoryTab.tsx");
 
-  assert.match(source, /import \{ departmentService, type DepItem \} from "@modules\/departments"/);
-  assert.match(source, /const departmentsQuery = useFetch<DepItem\[\]>/);
-  assert.match(source, /\["ti-inventory", "departments"\]/);
-  assert.match(source, /\(\) => departmentService\.list\(\)/);
-  assert.doesNotMatch(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
+  // location_id referencia tecnologia.inventoryLocations; id de departamento de RH dava
+  // "Departamento/local de inventario nao encontrado" no cadastro.
+  assert.doesNotMatch(source, /@modules\/departments/);
+  assert.match(source, /const departmentsQuery = useTiInventoryLocations\(\)/);
   assert.match(source, /departmentsById/);
   assert.match(source, /departmentFilterOptions/);
   assert.match(source, /departmentFormOptions/);
-  assert.doesNotMatch(source, /const locationsQuery = useTiInventoryLocations\(\)/);
-  assert.doesNotMatch(source, /const locationsById/);
-  assert.doesNotMatch(source, /const locationOptions/);
+  assert.match(source, /\.filter\(isCatalogActive\)/);
+});
+
+await runTest("ti inventory categories can be deleted through soft deactivation", async () => {
+  const source = await readModuleSource("components/TiInventoryTab.tsx");
+
+  assert.match(source, /label="Excluir"/);
+  assert.match(source, /payload: \{ active: false \}/);
+  assert.match(source, /categories\.filter\(isCatalogActive\)/);
+  assert.doesNotMatch(source, /NÃ£o/);
 });
 
 await runTest("ti inventory keeps primary actions clear and opens asset detail in a dialog", async () => {
@@ -2076,6 +2129,49 @@ await runTest("ti inventory mutation errors preserve domain feedback and hide te
     getTiInventoryMutationErrorMessage(new Error("O ativo já está atribuído a outro usuário.")),
     "O ativo já está atribuído a outro usuário.",
   );
+});
+
+await runTest("ti password reveal errors give safe recovery guidance", async () => {
+  const { getTiPasswordRevealErrorMessage } = await import(
+    "./utils/passwordRevealError.ts"
+  );
+  const failureMessage =
+    "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.";
+
+  assert.equal(
+    getTiPasswordRevealErrorMessage({
+      response: {
+        status: 500,
+        data: {
+          error: "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.",
+        },
+      },
+    }),
+    failureMessage,
+  );
+  assert.equal(
+    getTiPasswordRevealErrorMessage({
+      response: { status: 500, data: { error: "Falha de banco de dados." } },
+    }),
+    "Não foi possível revelar esta senha. Tente novamente mais tarde.",
+  );
+  assert.equal(
+    getTiPasswordRevealErrorMessage({ response: { status: 403 } }),
+    "Você não tem permissão para revelar esta senha.",
+  );
+  assert.equal(
+    getTiPasswordRevealErrorMessage({ response: { status: 404 } }),
+    "Esta senha não está mais disponível. Atualize a lista e tente novamente.",
+  );
+  assert.equal(getTiPasswordRevealErrorMessage(new Error("Network Error")),
+    "Não foi possível revelar esta senha. Tente novamente mais tarde.");
+});
+
+await runTest("ti password reveal modal uses safe error guidance", async () => {
+  const source = await readModuleSource("components/TiPasswordsTab.tsx");
+
+  assert.match(source, /getTiPasswordRevealErrorMessage\(revealQuery\.error\)/);
+  assert.doesNotMatch(source, /Acesso negado ou indisponível\./);
 });
 
 await runTest("ti inventory category status supports is_active fallback", async () => {

@@ -39,6 +39,7 @@ import {
   getTiRequestMessageActionError,
   validateTiRequestMessageImage,
 } from "../utils/requestMessageAttachment";
+import { splitTiRequestsByQueue } from "../utils/requestQueue";
 import { TiNativeSelect } from "./TiNativeSelect";
 import { TiEmptyState, TiIconAction, TiPanel, TiSectionHeader } from "./tiFormControls";
 import {
@@ -73,6 +74,7 @@ type RequestDraft = {
   description: string;
   category_id: string;
   urgency: string;
+  anydesk_code: string;
 };
 
 type CategoryDraft = {
@@ -84,6 +86,7 @@ const INITIAL_REQUEST_DRAFT: RequestDraft = {
   description: "",
   category_id: "",
   urgency: "Medium",
+  anydesk_code: "",
 };
 
 const INITIAL_CATEGORY_DRAFT: CategoryDraft = {
@@ -407,7 +410,12 @@ export function TiRequestsTab() {
     ];
   }, [activeCategories]);
 
-  const isRequestsLoading = requestsQuery.isLoading || requestsQuery.isFetching;
+  const requestQueues = useMemo(
+    () => splitTiRequestsByQueue(filteredRequests),
+    [filteredRequests],
+  );
+
+  const isRequestsLoading = requestsQuery.isLoading;
   const isDetailLoading = requestDetailQuery.isLoading || requestDetailQuery.isFetching;
   const isMessagesLoading = messagesQuery.isLoading || messagesQuery.isFetching;
   const isTransferAssigneeOptionsLoading = transferCandidatesQuery.isLoading;
@@ -505,12 +513,18 @@ export function TiRequestsTab() {
       return;
     }
 
+    if (!requestDraft.anydesk_code.trim()) {
+      setCreateFormError("Informe o código AnyDesk para criar o chamado.");
+      return;
+    }
+
     try {
       const createdRequest = await createRequestMutation.mutateAsync({
         title: requestDraft.title.trim(),
         description: requestDraft.description.trim(),
         category_id: requestDraft.category_id,
         urgency: requestDraft.urgency,
+        anydesk_code: requestDraft.anydesk_code.trim(),
       });
 
       resetMessageComposer();
@@ -678,6 +692,75 @@ export function TiRequestsTab() {
 
   function handleRemoveMessageAttachment() {
     setMessageAttachment(null);
+  }
+
+  function renderRequestsTable(rows: TiRequest[], emptyMessage: string) {
+    if (rows.length === 0) {
+      return (
+        <p className="rounded-lg border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+          {emptyMessage}
+        </p>
+      );
+    }
+
+    return (
+      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+        <div className="overflow-x-auto u-scrollbar-system">
+          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-normal text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+              <tr>
+                <th className="px-4 py-3">Chamado</th>
+                <th className="px-4 py-3">Categoria</th>
+                <th className="px-4 py-3">Urgência</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Criado em</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
+              {rows.map((request) => {
+                const isSelected = request.id === activeRequestId;
+
+                return (
+                  <tr
+                    key={request.id}
+                    className={cn(
+                      "cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-800/70",
+                      isSelected ? "bg-blue-50 dark:bg-blue-950/30" : null,
+                    )}
+                    onClick={() => {
+                      resetMessageComposer();
+                      setSelectedRequestId(request.id);
+                      setIsDetailDialogOpen(true);
+                    }}
+                  >
+                    <td className="min-w-64 px-4 py-3">
+                      <span className="block font-medium text-slate-950 dark:text-white">
+                        {getRequestTitle(request)}
+                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {getRequesterLabel(request, currentUser)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      {getCategoryLabel(request, categoriesById)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      {getUrgencyLabel(request.urgency)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge config={getStatusBadgeConfig(request.status)} size="sm" />
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      {formatDate(request.created_at)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -911,6 +994,27 @@ export function TiRequestsTab() {
             />
             <label className="flex min-w-0 flex-col gap-2 md:col-span-2">
               <RequiredFieldLabel className={tiLabelClassName} required>
+                Código AnyDesk
+              </RequiredFieldLabel>
+              <input
+                id="ti-request-anydesk-code"
+                className={tiInputClassName}
+                value={requestDraft.anydesk_code}
+                placeholder="Ex.: 123 456 789"
+                maxLength={64}
+                inputMode="numeric"
+                autoComplete="off"
+                onChange={(event) =>
+                  setRequestDraft((currentDraft) => ({
+                    ...currentDraft,
+                    anydesk_code: event.target.value,
+                  }))
+                }
+                aria-required="true"
+              />
+            </label>
+            <label className="flex min-w-0 flex-col gap-2 md:col-span-2">
+              <RequiredFieldLabel className={tiLabelClassName} required>
                 Descrição
               </RequiredFieldLabel>
               <textarea
@@ -1010,62 +1114,32 @@ export function TiRequestsTab() {
           ) : null}
 
           {!isRequestsLoading && !requestsQuery.isError && filteredRequests.length > 0 ? (
-            <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-              <div className="overflow-x-auto u-scrollbar-system">
-                <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-normal text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3">Chamado</th>
-                      <th className="px-4 py-3">Categoria</th>
-                      <th className="px-4 py-3">Urgência</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Criado em</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
-                    {filteredRequests.map((request) => {
-                      const isSelected = request.id === activeRequestId;
-
-                      return (
-                        <tr
-                          key={request.id}
-                          className={cn(
-                            "cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-800/70",
-                            isSelected ? "bg-blue-50 dark:bg-blue-950/30" : null,
-                          )}
-                          onClick={() => {
-                            resetMessageComposer();
-                            setSelectedRequestId(request.id);
-                            setIsDetailDialogOpen(true);
-                          }}
-                        >
-                          <td className="min-w-64 px-4 py-3">
-                            <span className="block font-medium text-slate-950 dark:text-white">
-                              {getRequestTitle(request)}
-                            </span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                              {getRequesterLabel(request, currentUser)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                            {getCategoryLabel(request, categoriesById)}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                            {getUrgencyLabel(request.urgency)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <StatusBadge config={getStatusBadgeConfig(request.status)} size="sm" />
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                            {formatDate(request.created_at)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <>
+              <section className="space-y-2" aria-labelledby="ti-requests-open-title">
+                <h3
+                  id="ti-requests-open-title"
+                  className="text-sm font-semibold text-slate-950 dark:text-white"
+                >
+                  {`Em aberto (${requestQueues.open.length})`}
+                  <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">
+                    Novo, em atendimento e aguardando
+                  </span>
+                </h3>
+                {renderRequestsTable(requestQueues.open, "Nenhum chamado em aberto.")}
+              </section>
+              <section className="space-y-2" aria-labelledby="ti-requests-closed-title">
+                <h3
+                  id="ti-requests-closed-title"
+                  className="text-sm font-semibold text-slate-950 dark:text-white"
+                >
+                  {`Solucionados e fechados (${requestQueues.closed.length})`}
+                </h3>
+                {renderRequestsTable(
+                  requestQueues.closed,
+                  "Nenhum chamado solucionado ou fechado.",
+                )}
+              </section>
+            </>
           ) : null}
         </div>
 
@@ -1113,7 +1187,7 @@ export function TiRequestsTab() {
                     </p>
                   </div>
 
-                  <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
                       <dt className={tiLabelClassName}>Categoria</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
@@ -1170,6 +1244,12 @@ export function TiRequestsTab() {
                       <dt className={tiLabelClassName}>Urgência</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
                         {getUrgencyLabel(activeRequest.urgency)}
+                      </dd>
+                    </div>
+                    <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
+                      <dt className={tiLabelClassName}>AnyDesk</dt>
+                      <dd className="mt-1 break-all text-slate-700 dark:text-slate-200">
+                        {getStringField(activeRequest, ["anydesk_code"])}
                       </dd>
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">

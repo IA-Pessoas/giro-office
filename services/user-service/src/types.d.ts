@@ -29,6 +29,7 @@ declare global {
         email: string;
         auth_kind: "platform";
         platform_role: "super_admin";
+        can_impersonate: boolean;
       };
       platform_session?: {
         user_id: string;

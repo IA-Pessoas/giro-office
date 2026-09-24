@@ -125,7 +125,7 @@ describe("UnionNotificationService", () => {
         pessoal: { gte: 1 },
         user: {
           organization_id: organizationId,
-          status: "Ativo",
+          status: "active",
         },
       },
       select: { user_id: true },

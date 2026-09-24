@@ -12,6 +12,7 @@ import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { FiscalServiceEnv } from "./config/env.js";
+import { createLog, logUpdateIfChanged } from "./integrations/audit.js";
 import prismaClient from "./integrations/prisma.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
@@ -56,7 +57,8 @@ export function createFiscalApp(options: {
 }): express.Express {
   const { env, logger } = options;
   const fiscalSearchRouteDeps = options.fiscalSearchRouteDeps ?? new FiscalSearchService();
-  const icmsRouteDeps = options.icmsRouteDeps ?? new IcmsService();
+  const icmsRouteDeps =
+    options.icmsRouteDeps ?? new IcmsService(prismaClient, { createLog, logUpdateIfChanged });
   const ipiRouteDeps = options.ipiRouteDeps ?? new IpiService();
   const ncmRouteDeps = options.ncmRouteDeps ?? new NcmService();
   const internalReportingService =

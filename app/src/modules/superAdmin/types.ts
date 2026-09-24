@@ -87,6 +87,18 @@ export interface PlatformUsersListResponse {
   hasMore: boolean;
 }
 
+export interface PlatformSuperAdmin {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  can_impersonate: boolean;
+}
+
+export interface UpdatePlatformSuperAdminPermissionPayload {
+  can_impersonate: boolean;
+}
+
 export interface PlatformDepartmentOption {
   id: string;
   name: string;
@@ -131,6 +143,7 @@ export interface PlatformAuditRecord {
       before: Partial<Record<string, 0 | 1 | 2 | 3>>;
       after: Partial<Record<string, 0 | 1 | 2 | 3>>;
     };
+    can_impersonate?: { from: boolean; to: boolean };
   };
 }
 

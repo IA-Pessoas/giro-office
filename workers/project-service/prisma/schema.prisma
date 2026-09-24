@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client"
+  runtime  = "workerd"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id              String   @id @default(uuid())
+  name            String
+  client_id       String
+  status          String
+  start_date      DateTime?
+  end_date        DateTime?
+  objective       String?
+  sponsor_id      String?
+  porcentage      Float
+  organization_id String
+  client          Client   @relation(fields: [client_id], references: [id])
+  tasks           Task[]
+
+  @@map("integracao.projects")
+}
+
+model Client {
+  id              String    @id @default(uuid())
+  name            String
+  company_name    String?
+  fantasy_name    String?
+  cpf_cnpj        String    @default("")
+  organization_id String
+  status          String
+  service_unique  Boolean?
+  deletion_date   DateTime?
+  projects        Project[]
+  tasks           Task[]
+
+  @@map("clients")
+}
+
+model Task {
+  id              String     @id @default(uuid())
+  model_id        String
+  project_id      String
+  client_id       String
+  name            String
+  status          String
+  department_id   String
+  observations    String?
+  billing         String
+  urgency         String
+  organization_id String
+  project         Project    @relation(fields: [project_id], references: [id])
+  client          Client     @relation(fields: [client_id], references: [id])
+  department      Department @relation(fields: [department_id], references: [id])
+  taskModel       TaskModel  @relation(fields: [model_id], references: [id])
+
+  @@map("integracao.tasks")
+}
+
+model Department {
+  id           String      @id @default(uuid())
+  name         String
+  color        String
+  status       String
+  organization_id String
+  tasks        Task[]
+  tasksModel   TaskModel[]
+
+  @@map("departments")
+}
+
+model TaskModel {
+  id              String     @id @default(uuid())
+  name            String
+  department_id   String
+  responsible_id  String
+  billing         String
+  prevision       Int
+  organization_id String
+  department      Department @relation(fields: [department_id], references: [id])
+  tasks           Task[]
+
+  @@map("integracao.tasksModel")
+}

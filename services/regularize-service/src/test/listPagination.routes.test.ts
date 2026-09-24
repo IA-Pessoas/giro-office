@@ -24,6 +24,20 @@ function createPrismaMock() {
 }
 
 describe("regularize list pagination", () => {
+  it("deixa os processos placeholder de orientacao legada fora da lista", async () => {
+    const prisma = createPrismaMock();
+    const app = createTestApp(prisma as unknown as PrismaClient);
+
+    await request(app)
+      .get("/regularize/processes")
+      .query({ status: "Todos" })
+      .set(gatewayHeaders());
+
+    expect(prisma.process.findMany.mock.calls[0]?.[0]).toMatchObject({
+      where: { process_type: { not: "Processo técnico para orientação legada" } },
+    });
+  });
+
   it("mantem array legado de processos sem page/limit", async () => {
     const prisma = createPrismaMock();
     const app = createTestApp(prisma as unknown as PrismaClient);
@@ -49,6 +63,7 @@ describe("regularize list pagination", () => {
 
     const where = {
       organization_id: "a0000000-0000-4000-8000-000000000001",
+      process_type: { not: "Processo técnico para orientação legada" },
       status: { in: ["Andamento", "Aberto", "Em andamento"] },
       OR: [
         { process_type: { contains: "acme", mode: "insensitive" } },

@@ -32,6 +32,11 @@ import type {
 } from "./integracaoTasksService.contract";
 import { unwrapServiceEnvelope } from "./envelope.contract";
 
+// O painel de anexos já avisa cada falha; sem o toast genérico de 5xx, o erro aparece uma vez só.
+function attachmentApi() {
+  return setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+}
+
 export const integracaoTasksService = {
   async listFinanceiroQueue(params: { departmentId?: string; clientId?: string } = {}) {
     const api = setupAPIClient();
@@ -196,7 +201,7 @@ export const integracaoTasksService = {
   },
 
   async uploadAttachment(taskId: string, file: File): Promise<void> {
-    const api = setupAPIClient();
+    const api = attachmentApi();
     const payload = new FormData();
     payload.append("task_id", taskId);
     payload.append("file", file);
@@ -204,7 +209,7 @@ export const integracaoTasksService = {
   },
 
   async listAttachments(taskId: string) {
-    const api = setupAPIClient();
+    const api = attachmentApi();
     const response = await api.get(INTEGRACAO_TASKS_ENDPOINTS.attachmentList, {
       params: { task_id: taskId },
     });
@@ -212,7 +217,7 @@ export const integracaoTasksService = {
   },
 
   async getAttachmentAccessUrl(taskId: string, attachmentId: string): Promise<string> {
-    const api = setupAPIClient();
+    const api = attachmentApi();
     const response = await api.get(INTEGRACAO_TASKS_ENDPOINTS.attachmentAccess, {
       params: { task_id: taskId, attachment_id: attachmentId },
     });
@@ -220,7 +225,7 @@ export const integracaoTasksService = {
   },
 
   async deleteAttachment(taskId: string, attachmentId: string): Promise<void> {
-    const api = setupAPIClient();
+    const api = attachmentApi();
     await api.delete(INTEGRACAO_TASKS_ENDPOINTS.attachment, {
       data: { task_id: taskId, attachment_id: attachmentId },
     });

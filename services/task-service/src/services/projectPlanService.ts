@@ -9,9 +9,10 @@ import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import type * as Prisma from "../generated/prisma/internal/prismaNamespace.js";
 import type { ProjectPlanGetPayload } from "../generated/prisma/models/ProjectPlan.js";
 import type { ProjectPlanTasksGetPayload } from "../generated/prisma/models/ProjectPlanTasks.js";
-import * as audit from "../integrations/audit.js";
-import prismaClient from "../prisma/index.js";
-import { type TaskCreateRow, TaskCrudService } from "./taskCrudService.js";
+import type * as audit from "../integrations/audit.js";
+import type prismaClient from "../prisma/index.js";
+import { assertProjectCommercialValidationReleased } from "./commercialValidationGateService.js";
+import type { TaskCreateRow, TaskCrudService } from "./taskCrudService.js";
 
 const HIRE_TRANSACTION_MAX_WAIT_MS = 20_000;
 const HIRE_TRANSACTION_TIMEOUT_MS = 60_000;
@@ -169,9 +170,9 @@ export class ProjectPlanService {
   readonly #audit: ProjectPlanAudit;
 
   constructor(
-    taskCrudService: TaskCrudService = new TaskCrudService(),
-    prisma: ProjectPlanPrisma = prismaClient,
-    auditIntegration: ProjectPlanAudit = audit,
+    taskCrudService: TaskCrudService,
+    prisma: ProjectPlanPrisma,
+    auditIntegration: ProjectPlanAudit,
   ) {
     this.#taskCrudService = taskCrudService;
     this.#prisma = prisma;
@@ -658,11 +659,12 @@ export class ProjectPlanService {
 
           const project = await tx.project.findFirst({
             where: { id: data.project_id, organization_id: data.organization_id },
-            select: { client_id: true },
+            select: { client_id: true, status: true },
           });
           if (!project) {
             throw new ServiceError(404, "Projeto nao encontrado.");
           }
+          assertProjectCommercialValidationReleased(project);
 
           const client = await tx.client.findFirst({
             where: { id: project.client_id, organization_id: data.organization_id },

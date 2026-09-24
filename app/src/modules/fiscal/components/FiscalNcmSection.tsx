@@ -19,6 +19,7 @@ import { FISCAL_LIST_PAGE_SIZE } from "../hooks/queryKeys";
 import type { FiscalNcm } from "../types";
 import {
   formatFiscalDateLabel,
+  formatFiscalTaxRegime,
   getFiscalErrorMessage,
   parseCommaSeparatedCodes,
 } from "../utils";
@@ -405,7 +406,7 @@ function FiscalNcmTable({
                 {item.description}
               </td>
               <td className={TABLE_TEXT_CELL_CLASSNAME}>
-                {item.tax_regime}
+                {formatFiscalTaxRegime(item.tax_regime)}
               </td>
               <td className={TABLE_TEXT_CELL_CLASSNAME}>
                 {item.federal_taxation_type}

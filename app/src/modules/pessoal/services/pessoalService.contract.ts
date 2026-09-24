@@ -27,7 +27,7 @@ export const PESSOAL_ENDPOINTS = {
 } as const;
 
 export const PESSOAL_TABS: PessoalTab[] = [
-  { id: "overview", label: "Visao geral" },
+  { id: "overview", label: "Visão geral" },
   { id: "groups", label: "Grupos" },
   { id: "groupAssignments", label: "Atribuição em lote" },
   { id: "unions", label: "Sindicatos" },

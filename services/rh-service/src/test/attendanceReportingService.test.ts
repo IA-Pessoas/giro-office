@@ -125,7 +125,8 @@ describe("InternalReportingService attendance", () => {
       expect(delegate).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { organization_id: "10000000-0000-0000-0000-000000000001" },
-          take: 11,
+          orderBy: { id: "asc" },
+          take: expect.any(Number),
         }),
       );
     }

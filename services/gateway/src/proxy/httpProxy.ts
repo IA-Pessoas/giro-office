@@ -7,6 +7,7 @@ import {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
   FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -83,6 +84,45 @@ interface SessionCookieRule {
 }
 
 const SESSION_COOKIE_RULES: SessionCookieRule[] = [
+  // As mutações User usam o vínculo de sessão encaminhado ao Worker. O token
+  // CSRF continua sendo obrigatório no transporte mesmo quando a autenticação
+  // chega por Bearer, pois o Worker valida o token contra a sessão no banco.
+  {
+    method: "POST",
+    path: "/user",
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "PUT",
+    path: /^\/user\/[^/]+$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "DELETE",
+    path: /^\/user\/[^/]+$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "POST",
+    path: /^\/user\/[^/]+\/photo$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "DELETE",
+    path: /^\/user\/[^/]+\/photo$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "PUT",
+    path: /^\/user\/permission\/[^/]+$/u,
+    inbound: [CSRF_COOKIE_NAME],
+    outbound: [],
+  },
   {
     method: "POST",
     path: "/user/session",
@@ -126,9 +166,33 @@ const SESSION_COOKIE_RULES: SessionCookieRule[] = [
     outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
   },
   {
+    method: "POST",
+    path: "/platform/impersonation/exit",
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+  },
+  {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+  },
+  {
     method: "GET",
     path: "/platform/me",
     inbound: [AUTH_SESSION_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "GET",
+    path: "/platform/super-admins",
+    inbound: [AUTH_SESSION_COOKIE_NAME],
+    outbound: [],
+  },
+  {
+    method: "PATCH",
+    path: /^\/platform\/super-admins\/[^/]+\/impersonation-permission$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
     outbound: [],
   },
   {
@@ -294,6 +358,7 @@ export function buildForwardHeaders(
     FORWARDED_AUTH_SESSION_VERSION_HEADER,
     FORWARDED_AUTH_SESSION_ID_HEADER,
     FORWARDED_AUTH_CSRF_HASH_HEADER,
+    FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
     FORWARDED_AUTH_KIND_HEADER,
     FORWARDED_AUTH_PLATFORM_ROLE_HEADER,
     "authorization",
@@ -326,9 +391,10 @@ export function buildForwardHeaders(
 
   if (sessionCookieRule?.inbound.includes(CSRF_COOKIE_NAME)) {
     const csrfToken = request.get(CSRF_HEADER_NAME);
-    if (csrfToken) {
-      headers.set(CSRF_HEADER_NAME, csrfToken);
+    if (!csrfToken) {
+      throw new ServiceError(403, "Token CSRF obrigatório para mutação User.");
     }
+    headers.set(CSRF_HEADER_NAME, csrfToken);
   }
 
   headers.set("x-forwarded-host", request.headers.host ?? "");
@@ -346,6 +412,12 @@ export function buildForwardHeaders(
 
     headers.set(FORWARDED_AUTH_USER_ID_HEADER, request.auth.userId);
     headers.set(FORWARDED_AUTH_KIND_HEADER, request.auth.actorKind);
+    if (request.auth.claims.impersonator_platform_user_id) {
+      headers.set(
+        FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
+        request.auth.claims.impersonator_platform_user_id,
+      );
+    }
 
     if (request.auth.actorKind === "platform") {
       if (request.auth.isPlatformAdmin) {
@@ -433,6 +505,34 @@ function getForwardedCookie(
     ? request.headers.cookie.join("; ")
     : request.headers.cookie;
   const isPlatformPath = normalizedPath?.toLowerCase().startsWith("/platform/") ?? false;
+  const isImpersonationExit =
+    request.method.toUpperCase() === "POST" &&
+    normalizedPath?.toLowerCase() === "/platform/impersonation/exit" &&
+    request.auth?.actorKind === "organization" &&
+    typeof request.auth.claims.impersonator_platform_user_id === "string" &&
+    request.auth.claims.impersonator_platform_user_id.length > 0;
+
+  if (
+    isImpersonationExit &&
+    options.forwardPlatformSessionCredentials &&
+    options.forwardSessionBinding &&
+    rule
+  ) {
+    const sessionToken = request.auth?.token;
+    if (!sessionToken) {
+      return undefined;
+    }
+    const cookies = rule.inbound.includes(AUTH_SESSION_COOKIE_NAME)
+      ? [`${AUTH_SESSION_COOKIE_NAME}=${encodeURIComponent(sessionToken)}`]
+      : [];
+    if (rule.inbound.includes(CSRF_COOKIE_NAME)) {
+      const csrfToken = readCookie(cookieHeader, CSRF_COOKIE_NAME);
+      if (csrfToken) {
+        cookies.push(`${CSRF_COOKIE_NAME}=${encodeURIComponent(csrfToken)}`);
+      }
+    }
+    return cookies.join("; ");
+  }
 
   if (
     (request.auth?.actorKind === "platform" ||

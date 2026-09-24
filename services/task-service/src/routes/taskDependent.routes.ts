@@ -9,10 +9,11 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import { TaskDependentService } from "../services/taskDependentService.js";
 
 const router: ReturnType<typeof Router> = Router();
-const taskDependentService = new TaskDependentService();
+const taskDependentService = new TaskDependentService(nodeDeps.prisma, nodeDeps.audit);
 
 router.post(
   "/model/dependent",

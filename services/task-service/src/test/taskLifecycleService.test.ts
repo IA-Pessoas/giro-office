@@ -14,6 +14,9 @@ const { prismaMock, auditMock, workflowMock, operationalNotificationMock } = vi.
       updateMany: vi.fn(),
       findMany: vi.fn(),
     },
+    project: {
+      findFirst: vi.fn(async () => ({ status: "Em andamento" })),
+    },
     user: {
       findMany: vi.fn(),
     },
@@ -53,6 +56,66 @@ vi.mock("../services/taskOperationalNotificationService.js", () => ({
 import { TaskLifecycleService } from "../services/taskLifecycleService.js";
 
 describe("TaskLifecycleService", () => {
+  it("impede solicitar conclusão antes da validação Comercial", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      status: "Em Espera",
+      billing: "Realizar",
+      hiring_status: "A Realizar",
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+
+    await expect(
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        reason: "Pronta.",
+        integracaoLevel: 0,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.taskCompletionRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("impede solicitar conclusão quando o projeto ainda aguarda o Comercial", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      project_id: "project-1",
+      status: "Em Andamento",
+      billing: "Não Realizar",
+      hiring_status: null,
+      responsible_id: "user-1",
+      responsible2_id: null,
+      responsible3_id: null,
+    });
+    prismaMock.project.findFirst.mockResolvedValue({
+      status: "Aguardando liberação do Comercial",
+    });
+
+    await expect(
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        reason: "Pronta.",
+        integracaoLevel: 0,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.taskCompletionRequest.create).not.toHaveBeenCalled();
+  });
+
   it("cria uma única solicitação pendente e marca a tarefa na mesma transação", async () => {
     prismaMock.task.findFirst.mockResolvedValue({
       id: "task-1",
@@ -69,7 +132,11 @@ describe("TaskLifecycleService", () => {
     prismaMock.task.update.mockResolvedValue({ id: "task-1", pending_approval: true });
 
     await expect(
-      new TaskLifecycleService().requestTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -104,7 +171,11 @@ describe("TaskLifecycleService", () => {
     });
     prismaMock.task.update.mockResolvedValue({ id: "task-1", pending_approval: true });
 
-    await new TaskLifecycleService().requestTaskCompletion({
+    await new TaskLifecycleService(
+      prismaMock as never,
+      auditMock as never,
+      {} as never,
+    ).requestTaskCompletion({
       user_id: "user-1",
       organization_id: "org-1",
       task_id: "task-1",
@@ -137,7 +208,11 @@ describe("TaskLifecycleService", () => {
     prismaMock.taskCompletionRequest.create.mockRejectedValue({ code: "P2002" });
 
     await expect(
-      new TaskLifecycleService().requestTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -169,7 +244,11 @@ describe("TaskLifecycleService", () => {
       });
 
     await expect(
-      new TaskLifecycleService().requestTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).requestTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -195,7 +274,11 @@ describe("TaskLifecycleService", () => {
     prismaMock.taskCompletionRequest.findMany.mockResolvedValue([]);
 
     await expect(
-      new TaskLifecycleService().listTaskCompletionRequests({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).listTaskCompletionRequests({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -224,7 +307,7 @@ describe("TaskLifecycleService", () => {
     prismaMock.task.update.mockImplementation(async ({ data }) => ({ id: "task-1", ...data }));
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
     await expect(
-      new TaskLifecycleService().concludeTask({
+      new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never).concludeTask({
         user_id: "user-1",
         organization_id: "org-1",
         integracaoLevel: 1,
@@ -249,11 +332,12 @@ describe("TaskLifecycleService", () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.project.findFirst.mockResolvedValue({ status: "Em andamento" });
   });
 
   it("concludeTask lança 404 quando tarefa não existe", async () => {
     prismaMock.task.findFirst.mockResolvedValue(null);
-    const service = new TaskLifecycleService();
+    const service = new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.concludeTask({
@@ -279,7 +363,7 @@ describe("TaskLifecycleService", () => {
       billing: "Realizar",
     });
     prismaMock.permission.findFirst.mockResolvedValue({ integracao: 1 });
-    const service = new TaskLifecycleService();
+    const service = new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.approveTaskCompletion({
@@ -299,6 +383,7 @@ describe("TaskLifecycleService", () => {
       status: "Em Andamento",
       pending_approval: true,
       billing: "Realizar",
+      hiring_status: "Contratado",
     });
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
     prismaMock.taskCompletionRequest.findFirst.mockResolvedValue({
@@ -316,7 +401,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().approveTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -349,6 +438,7 @@ describe("TaskLifecycleService", () => {
       status: "Em Andamento",
       pending_approval: true,
       billing: "Realizar",
+      hiring_status: "Contratado",
     });
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
     prismaMock.taskCompletionRequest.findFirst.mockResolvedValue({
@@ -366,7 +456,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().approveTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -395,6 +489,7 @@ describe("TaskLifecycleService", () => {
       status: "Concluída",
       pending_approval: false,
       billing: "Realizar",
+      hiring_status: "Contratado",
     });
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
     prismaMock.taskCompletionRequest.findFirst.mockResolvedValue({
@@ -411,7 +506,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().approveTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -433,6 +532,7 @@ describe("TaskLifecycleService", () => {
       status: "Concluída",
       pending_approval: false,
       billing: "Realizar",
+      hiring_status: "Contratado",
     });
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
     prismaMock.taskCompletionRequest.findFirst
@@ -452,7 +552,11 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().approveTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -463,6 +567,48 @@ describe("TaskLifecycleService", () => {
 
     expect(prismaMock.task.update).not.toHaveBeenCalled();
     expect(auditMock.createLog).not.toHaveBeenCalled();
+  });
+
+  it("revalida a cobrança Comercial dentro da transação antes de aprovar", async () => {
+    prismaMock.task.findFirst
+      .mockResolvedValueOnce({
+        id: "task-1",
+        organization_id: "org-1",
+        project_id: "project-1",
+        status: "Em Andamento",
+        pending_approval: true,
+        billing: "Realizar",
+        hiring_status: "Contratado",
+      })
+      .mockResolvedValueOnce({
+        id: "task-1",
+        billing: "Realizar",
+        hiring_status: "A Realizar",
+      });
+    prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
+    prismaMock.taskCompletionRequest.findFirst.mockResolvedValue({
+      id: "request-1",
+      task_id: "task-1",
+      organization_id: "org-1",
+      requester_id: "user-2",
+      status: "pending",
+    });
+
+    await expect(
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).approveTaskCompletion({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        request_id: "request-1",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prismaMock.taskCompletionRequest.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
   });
 
   it("permite ao solicitante cancelar uma pendência e reenviar depois", async () => {
@@ -484,7 +630,11 @@ describe("TaskLifecycleService", () => {
     prismaMock.task.update.mockResolvedValue({ id: "task-1", pending_approval: false });
 
     await expect(
-      new TaskLifecycleService().cancelTaskCompletion({
+      new TaskLifecycleService(
+        prismaMock as never,
+        auditMock as never,
+        {} as never,
+      ).cancelTaskCompletion({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -513,6 +663,7 @@ describe("TaskLifecycleService", () => {
       status: "Concluída",
       pending_approval: false,
       billing: "Realizar",
+      hiring_status: "Contratado",
       responsible_id: "user-2",
       responsible2_id: null,
       responsible3_id: null,
@@ -524,7 +675,7 @@ describe("TaskLifecycleService", () => {
     });
 
     await expect(
-      new TaskLifecycleService().reopenTask({
+      new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never).reopenTask({
         user_id: "admin-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -565,6 +716,7 @@ describe("TaskLifecycleService", () => {
       prevision_date: null,
       end_date: null,
       billing: "Realizar",
+      hiring_status: "Contratado",
     });
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: true });
     prismaMock.task.update.mockResolvedValue({
@@ -584,7 +736,7 @@ describe("TaskLifecycleService", () => {
       id: "request-1",
       status: "pending",
     });
-    const service = new TaskLifecycleService();
+    const service = new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never);
 
     await service.concludeTask({
       user_id: "user-1",
@@ -629,6 +781,7 @@ describe("TaskLifecycleService", () => {
       prevision_date: null,
       end_date: null,
       billing: "Realizar",
+      hiring_status: "Contratado",
     };
     prismaMock.task.findFirst
       .mockResolvedValueOnce(activeTask)
@@ -636,7 +789,7 @@ describe("TaskLifecycleService", () => {
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: false });
 
     await expect(
-      new TaskLifecycleService().concludeTask({
+      new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never).concludeTask({
         user_id: "user-1",
         organization_id: "org-1",
         integracaoLevel: 1,
@@ -671,6 +824,7 @@ describe("TaskLifecycleService", () => {
       prevision_date: null,
       end_date: null,
       billing: "Realizar",
+      hiring_status: "Contratado",
     };
     prismaMock.task.findFirst
       .mockResolvedValueOnce(activeTask)
@@ -678,7 +832,7 @@ describe("TaskLifecycleService", () => {
     prismaMock.permissionSpecific.findFirst.mockResolvedValue({ task_completion: false });
 
     await expect(
-      new TaskLifecycleService().concludeTask({
+      new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never).concludeTask({
         user_id: "user-1",
         organization_id: "org-1",
         integracaoLevel: 0,
@@ -711,7 +865,7 @@ describe("TaskLifecycleService", () => {
       billing: "Realizar",
     });
     prismaMock.user.findMany.mockResolvedValue([]);
-    const service = new TaskLifecycleService();
+    const service = new TaskLifecycleService(prismaMock as never, auditMock as never, {} as never);
 
     await expect(
       service.concludeTask({

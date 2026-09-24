@@ -135,12 +135,14 @@ export type RegularizeFormOption = {
 export function RegularizeFormField({
   children,
   className,
+  error,
   help,
   label,
   required,
 }: {
   children: ReactNode;
   className?: string;
+  error?: string;
   help?: string;
   label: string;
   required?: boolean;
@@ -153,11 +155,22 @@ export function RegularizeFormField({
         {help ? <FieldHelp label={label} description={help} /> : null}
       </span>
       {children}
+      {error ? (
+        <span role="alert" className="text-xs text-red-700 dark:text-red-300">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
 
-export function RegularizeFormError({ message }: { message?: string | null }) {
+export function RegularizeFormError({
+  message,
+  title = "Revise os campos obrigatórios",
+}: {
+  message?: string | null;
+  title?: string;
+}) {
   if (!message) {
     return null;
   }
@@ -171,7 +184,7 @@ export function RegularizeFormError({ message }: { message?: string | null }) {
         <AlertTriangle className="h-4 w-4" />
       </span>
       <span className="min-w-0">
-        <span className="block font-semibold">Revise os campos obrigatórios</span>
+        <span className="block font-semibold">{title}</span>
         <span className="mt-0.5 block">{message}</span>
       </span>
     </div>

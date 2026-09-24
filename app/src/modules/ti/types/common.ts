@@ -48,4 +48,5 @@ export type TiEnvelope<TPayload> =
 export interface TiReadQueryOptions {
   enabled?: boolean;
   staleTime?: number;
+  refetchInterval?: number;
 }

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   buildContabilPortfolioParams,
   buildContabilControlParams,
+  buildTriageItemPayload,
   CONTABIL_ENDPOINTS,
   executeNullableContabilRequest,
   isNotFoundError,
@@ -29,9 +30,15 @@ import { CONTABIL_RELATIONSHIP_FIELDS } from "./components/contabilRelationshipF
 import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
+  filterContabilPortfolioRows,
+  getContabilCompletionPercent,
   getCurrentContabilCompetence,
   rollbackContabilFieldValue,
+  shouldSyncRemoteContabilControl,
   updateContabilControlFieldStatus,
+  formatContabilCount,
+  getContabilCompetenceYears,
+  CONTABIL_MONTH_OPTIONS,
 } from "./components/contabilControlSection.helpers.ts";
 import {
   buildContabilRelationshipFormValues,
@@ -95,11 +102,37 @@ await (async () => {
   await runTest("carteira operacional mostra competência, resumo, ausência e recuperação", () => {
     const source = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
 
-    assert.match(source, /type="month"/);
+    assert.match(source, /<ContabilCompetenceSelect/);
+    assert.doesNotMatch(source, /type="month"/);
     assert.match(source, /Carteira operacional/);
     assert.match(source, /sem controle mensal/i);
     assert.match(source, /Tentar novamente/);
     assert.match(source, /—/);
+  });
+
+  await runTest("dashboard contábil filtra por busca sem acento e por coluna", () => {
+    const rows = [
+      { id: 1, searchText: "ART TOLDO INDÚSTRIA 49.791.761/0003-80", values: { regime: "Lucro Real", depreciation: "done" } },
+      { id: 2, searchText: "FARMANUTRI LTDA 20630454000153", values: { regime: "Lucro Real", depreciation: "pending" } },
+      { id: 3, searchText: "AXISVIA LOGISTICA", values: { regime: "Simples Nacional", depreciation: "done" } },
+    ];
+
+    assert.deepEqual(filterContabilPortfolioRows(rows, " industria ", {}).map((row) => row.id), [1]);
+    assert.deepEqual(filterContabilPortfolioRows(rows, "2063045", {}).map((row) => row.id), [2]);
+    assert.deepEqual(
+      filterContabilPortfolioRows(rows, "", { regime: "Lucro Real", depreciation: "done" }).map((row) => row.id),
+      [1],
+    );
+    assert.equal(filterContabilPortfolioRows(rows, "", { regime: "" }).length, 3);
+  });
+
+  await runTest("checklist mensal expõe porcentagem de conclusão e grafia Regerar", () => {
+    assert.equal(getContabilCompletionPercent(0, 17), 0);
+    assert.equal(getContabilCompletionPercent(5, 17), 29);
+    assert.equal(getContabilCompletionPercent(17, 17), 100);
+    assert.equal(getContabilCompletionPercent(0, 0), 0);
+    assert.equal(CONTABIL_CONTROL_FIELDS[0].label, "Regerar lançamentos contábeis");
+    assert.match(readWorkspaceSource("./components/ContabilControlSection.tsx"), /% concluído/);
   });
 
   await runTest("carteira associa o fechamento e o controle às colunas corretas", () => {
@@ -115,18 +148,17 @@ await (async () => {
     );
   });
 
-  await runTest("contabil page preserva o seletor de cliente da organização", () => {
-    const source = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
+  await runTest("carteira contábil exige seleção de empresas e checklist antes do dashboard", () => {
+    const page = readFileSync(new URL("../../pages/contabil.tsx", import.meta.url), "utf8");
+    const portfolio = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
 
-    assert.match(source, /ClientPickerModal/);
-    assert.match(source, /headerAction=\{/);
-    assert.doesNotMatch(source, /clientPickerContent=/);
-    assert.match(source, /status:\s*"Ativo"/);
-    assert.match(source, /legacyIntegrationStatusFilter:\s*false/);
-    assert.doesNotMatch(source, /ref:\s*"deps"/);
-    assert.doesNotMatch(source, /Departamento contabil/);
-    assert.doesNotMatch(source, /useClients\(/);
-    assert.doesNotMatch(source, /page:\s*1/);
+    assert.doesNotMatch(page, /ClientPickerModal/);
+    assert.match(page, /<ContabilShell canEdit=\{canEditContabil\} \/>/);
+    assert.match(portfolio, /step === "companies"/);
+    assert.match(portfolio, /step === "checklist"/);
+    assert.match(portfolio, /step === "dashboard"/);
+    assert.match(portfolio, /disabled=\{selectedClientIds\.length === 0\}/);
+    assert.match(portfolio, /disabled=\{selectedFields\.length === 0\}/);
   });
 
   await runTest("contabil endpoints use the expected contract", () => {
@@ -309,7 +341,7 @@ await (async () => {
     );
   });
 
-  await runTest("viewer control section reads existing control without bootstrap write", () => {
+  await runTest("control section reads existing control via GET for viewer and editor", () => {
     const componentSource = readFileSync(
       new URL("./components/ContabilControlSection.tsx", import.meta.url),
       "utf8",
@@ -320,9 +352,8 @@ await (async () => {
     );
 
     assert.match(hookSource, /useContabilControlDetail/);
-    assert.match(componentSource, /enabled:\s*!canEdit/);
-    assert.match(componentSource, /canEdit\s*\?\s*bootstrapMutation\.data\s*:\s*detailQuery\.data/);
-    assert.match(componentSource, /if\s*\(!canEdit\)\s*\{/);
+    assert.match(componentSource, /useContabilControlDetail\(\{ clientId, competence \}\)/);
+    assert.match(componentSource, /const remoteControl = detailQuery\.data;/);
     assert.match(hookSource, /contabilControlService\.getControl/);
   });
 
@@ -806,4 +837,71 @@ await (async () => {
       "boom",
     );
   });
+  await runTest("controle contábil carregado por GET só sobrescreve o editor ao trocar de registro (#1324)", () => {
+    const control = { id: "control-1" };
+    assert.equal(shouldSyncRemoteContabilControl(false, "control-1", control), true);
+    assert.equal(shouldSyncRemoteContabilControl(true, null, control), true);
+    assert.equal(shouldSyncRemoteContabilControl(true, "control-1", null), true);
+    assert.equal(shouldSyncRemoteContabilControl(true, "control-1", control), false);
+    assert.equal(shouldSyncRemoteContabilControl(true, null, null), false);
+  });
+
+  await runTest("abrir a aba Contábil não cria controle: POST só no botão Iniciar controle (#1324)", () => {
+    const source = readWorkspaceSource("./components/ContabilControlSection.tsx");
+    const effects = source.split("useEffect(").slice(1).map((chunk) => chunk.split("}, [")[0]);
+    assert.ok(effects.every((effect) => !effect.includes("bootstrapControl(")));
+    assert.match(source, /Iniciar controle/);
+  });
+  await runTest("pluraliza a contagem da carteira (#1325)", () => {
+    assert.equal(formatContabilCount(1, "cliente", "clientes"), "1 cliente");
+    assert.equal(formatContabilCount(0, "cliente", "clientes"), "0 clientes");
+    assert.equal(formatContabilCount(2, "controle iniciado", "controles iniciados"), "2 controles iniciados");
+  });
+
+  await runTest("seletor de competência lista meses em português (#1325)", () => {
+    assert.equal(CONTABIL_MONTH_OPTIONS.length, 12);
+    assert.deepEqual(CONTABIL_MONTH_OPTIONS[0], { value: "01", label: "Janeiro" });
+    assert.deepEqual(CONTABIL_MONTH_OPTIONS[8], { value: "09", label: "Setembro" });
+    const years = getContabilCompetenceYears("2019-03", new Date(2026, 8, 1));
+    assert.equal(years[0], 2019);
+    assert.equal(years.at(-1), 2027);
+  });
+
+
+  await runTest("payload do item da Triagem omite chaves fiscais na rotina contábil", () => {
+    const notes = {
+      note: "Aguardando extrato",
+      justification: null,
+      delivery_method: null,
+      state_site: null,
+    };
+    assert.deepEqual(
+      buildTriageItemPayload("financial_transactions", "PENDING", notes, "CONTABIL"),
+      {
+        field: "financial_transactions",
+        status: "PENDING",
+        note: "Aguardando extrato",
+        justification: null,
+      },
+    );
+    assert.deepEqual(
+      buildTriageItemPayload("nfe_entrada", "PENDING", { ...notes, state_site: "SP" }, "FISCAL"),
+      {
+        field: "nfe_entrada",
+        status: "PENDING",
+        type: "FISCAL",
+        note: "Aguardando extrato",
+        justification: null,
+        delivery_method: null,
+        state_site: "SP",
+      },
+    );
+    assert.deepEqual(
+      buildTriageItemPayload("billing_amount", undefined, undefined, "FISCAL", "10,00"),
+      { field: "billing_amount", type: "FISCAL", value: "10,00" },
+    );
+  });
 })();
+
+// Testes da Triagem rodam junto (sem script próprio no package.json).
+await import("../triagem/run-triagem-tests.mjs");

@@ -17,7 +17,8 @@
       "!services/src",
       "!app",
       "!infra",
-      "!**/.vscode"
+      "!**/.vscode",
+      "!**/.claude"
     ]
   },
   "formatter": {

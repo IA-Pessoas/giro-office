@@ -13,6 +13,7 @@ import {
 import { toast } from "react-toastify";
 
 import { Dialog, PaginationControls } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { useDebouncedValue } from "@shared/hooks";
 import { getLastPage } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
@@ -44,6 +45,7 @@ import {
   buildPessoalUnionFormPayload,
   buildPessoalUnionFormValues,
   formatPessoalUnionCnpjInput,
+  validatePessoalUnionPayload,
 } from "./pessoalFormValueHelpers";
 
 const UNIONS_PAGE_SIZE = 20;
@@ -172,6 +174,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
       ...current,
       [field]: field === "cnpj" ? formatPessoalUnionCnpjInput(value) : value,
     }));
+    setFormError(null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -183,8 +186,9 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
 
     const payload = buildPessoalUnionFormPayload(formValues);
 
-    if (!payload.name || !payload.cnpj) {
-      setFormError("Informe nome e CNPJ.");
+    const validationError = validatePessoalUnionPayload(payload, selectedUnion?.cnpj);
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
 
@@ -307,6 +311,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         {formatCPF_CNPJ(union.cnpj) || "-"}
+                        <DocumentIssueBadge value={union.cnpj} />
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         {formatUnionDate(union.base_date)}

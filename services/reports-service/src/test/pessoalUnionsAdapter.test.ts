@@ -72,7 +72,7 @@ describe("PessoalUnionsAdapter", () => {
     });
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "pessoal.unions", fields: ["name", "base_date"], limit: 101 };
+    const body = { source: "pessoal.unions", fields: ["name", "base_date"], limit: 50_001 };
     const grant = String((request.headers as Record<string, string>)["x-reports-grant"]);
     const payload = JSON.parse(Buffer.from(grant, "base64url").toString("utf8"));
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(

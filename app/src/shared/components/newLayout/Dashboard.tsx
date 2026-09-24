@@ -427,6 +427,8 @@ export function Dashboard() {
                 stroke="#10b981"
                 fill="#10b981"
                 fillOpacity={0.6}
+                // Sem animação de entrada nos gráficos: ela parte do zero, e a 1ª carga parecia zerada (#1384).
+                isAnimationActive={false}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -453,6 +455,7 @@ export function Dashboard() {
                   outerRadius={80}
                   paddingAngle={5}
                   dataKey="value"
+                  isAnimationActive={false}
                 >
                   {projectsData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -571,8 +574,8 @@ export function Dashboard() {
                   color: "#fff",
                 }}
               />
-              <Bar dataKey="tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="completed" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="completed" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </div>

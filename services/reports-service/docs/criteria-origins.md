@@ -8,7 +8,7 @@ Os adapters encaminham `query` para `POST /internal/reporting/extract`. Sem opç
 
 Cada área executa isoladamente. Prisma aplica o escopo organizacional; páginas de 100 registros em ordem de id são lidas em uma transação RepeatableRead (espera máxima 5 s, duração máxima 30 s). As quatro origens derivadas de frequência compartilham o mesmo snapshot. O processamento completo usa até 50.000 registros e 20 MiB de valores serializados; exceder capacidade falha com 422 sem devolver uma amostra como total. Falha/timeout da leitura não produz resultado parcial. Origem sem transação consistente falha com 503.
 
-A implementação usa consultas Prisma parametrizadas e allowlists; não concatena SQL. Nesta etapa o motor processa critérios em memória na origem sobre o conjunto autorizado completo e limitado por capacidade, inclusive campos diretos. Organizações acima dessa capacidade recebem erro explícito e demandam futura execução com critérios no banco. O limite de saída (até 101) é aplicado depois de filtros, agrupamento, resumo e ordenação.
+A implementação usa consultas Prisma parametrizadas e allowlists; não concatena SQL. Nesta etapa o motor processa critérios em memória na origem sobre o conjunto autorizado completo e limitado por capacidade, inclusive campos diretos. Organizações acima dessa capacidade recebem erro explícito e demandam futura execução com critérios no banco. O limite interno da extração (até 50.001, incluindo o registro sentinela) é aplicado depois de filtros, agrupamento, resumo e ordenação; o snapshot nunca processa mais de 50.000 linhas nem 20 MiB.
 
 ## Semântica
 

@@ -10,6 +10,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import { taskModelOptionsQuerySchema } from "../schemas/taskModelList.schemas.js";
 import {
   DepsTasksService,
@@ -71,5 +72,5 @@ export function createDepsTasksRoutes(service: DepsTasksRouteDeps): ReturnType<t
 }
 
 export const depsTasksRoutes: ReturnType<typeof Router> = createDepsTasksRoutes(
-  new DepsTasksService(),
+  new DepsTasksService(nodeDeps.prisma),
 );

@@ -8,6 +8,7 @@ import { useTriageAudit } from "../hooks/useTriageAudit";
 const ACTION_LABELS: Record<string, string> = {
   created: "Competência criada",
   archived: "Competência arquivada",
+  restored: "Competência restaurada",
 };
 
 function actionLabel(action: string): string {

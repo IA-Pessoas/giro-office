@@ -1,4 +1,5 @@
 import {
+  MAX_REPORTING_QUERY_LIMIT,
   reportingQuerySchema,
   TI_EXTENSIONS_REPORTING_SOURCES,
   TI_INVENTORY_REPORTING_SOURCES,
@@ -20,7 +21,7 @@ export const internalReportingExtractBodySchema = z
     query: reportingQuerySchema.optional(),
     source: z.enum(TI_REPORTING_SOURCES),
     fields: z.array(reportingFieldSchema).min(1).max(25),
-    limit: z.number().int().min(1).max(101),
+    limit: z.number().int().min(1).max(MAX_REPORTING_QUERY_LIMIT),
   })
   .strict()
   .superRefine((value, context) => {

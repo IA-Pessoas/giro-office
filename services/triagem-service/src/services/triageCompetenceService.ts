@@ -142,7 +142,20 @@ export class TriageCompetenceService {
         });
         if (existing) {
           await this.snapshotCatalog?.(transaction, auth.organizationId, existing.id);
-          return existing;
+          if (!existing.archived_at) return existing;
+          const restored = await transaction.triageCompetence.update({
+            where: { id: existing.id },
+            data: { archived_at: null },
+            select: competenceSelect,
+          });
+          await this.recordChange(transaction, {
+            competence: restored,
+            auth,
+            action: "restored",
+            beforeData: snapshotRecord(existing),
+            idempotencyKey: `competence:${existing.id}:restored:${this.clock().toISOString()}`,
+          });
+          return restored;
         }
 
         const client = await transaction.client.findFirst({
@@ -275,7 +288,8 @@ export class TriageCompetenceService {
           auth,
           action: "archived",
           beforeData: snapshotRecord(existing),
-          idempotencyKey: `competence:${id}:archived`,
+          // Com restauração, a mesma competência pode ser arquivada mais de uma vez.
+          idempotencyKey: `competence:${id}:archived:${archivedRecord.archived_at?.toISOString()}`,
         });
         return archivedRecord;
       });
@@ -316,7 +330,7 @@ export class TriageCompetenceService {
     input: {
       competence: CompetenceRecord;
       auth: TriageCompetenceAuthContext;
-      action: "created" | "archived";
+      action: "created" | "archived" | "restored";
       beforeData: Record<string, unknown> | null;
       idempotencyKey: string;
     },
