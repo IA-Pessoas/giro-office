@@ -27,6 +27,10 @@ function normalizeOptionalText(value: unknown): unknown {
 
 const optionalTextZod = z.preprocess(normalizeOptionalText, z.string().optional());
 const optionalStatusZod = z.preprocess(normalizeOptionalText, integracaoTaskStatusZod.optional());
+const optionalProspectingStatusZod = z.preprocess(
+  normalizeOptionalText,
+  prospectingStatusZod.optional(),
+);
 const optionalBillingZod = z.preprocess(normalizeOptionalText, taskBillingZod.optional());
 const optionalResponsibleIdZod = z.preprocess(
   normalizeOptionalText,
@@ -45,7 +49,7 @@ export const integracaoTaskCreateBodySchema = z
     model_id: zNonEmptyText("model_id"),
     project_id: zNonEmptyText("project_id"),
     client_id: zNonEmptyText("client_id"),
-    prospecting_status: z.preprocess(normalizeOptionalText, prospectingStatusZod.optional()),
+    prospecting_status: optionalProspectingStatusZod,
     name: optionalTextZod,
     status: optionalStatusZod,
     department_id: zNonEmptyText("department_id"),

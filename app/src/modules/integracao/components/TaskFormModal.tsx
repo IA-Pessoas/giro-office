@@ -53,6 +53,7 @@ import {
   getTaskCreateValidationMessage,
   getTaskEditValidationMessage,
   getTaskUrgencyOptions,
+  LOOSE_TASKS_PROJECT_NAME,
   shouldBlockTaskEditForm,
 } from "./taskFormModalUi";
 import { TaskCompletionPanel } from "./TaskCompletionPanel";
@@ -368,7 +369,6 @@ export function TaskFormModal({
       projectId: createValues.project_id,
       modelId: createValues.model_id,
       departmentId: createValues.department_id,
-      prospectingStatus: createValues.prospecting_status,
       urgency: createValues.urgency,
       observations: createValues.observations,
       eligibleResponsibleCount: createResponsibleCandidates.length,
@@ -409,11 +409,18 @@ export function TaskFormModal({
     try {
       const project = await createProjectMutation.mutateAsync({
         client_id: createValues.client_id,
-        name: "Tarefas avulsas",
+        name: LOOSE_TASKS_PROJECT_NAME,
+        // sv-SE formata como YYYY-MM-DD no fuso local.
         start_date: new Date().toLocaleDateString("sv-SE"),
         objective: "Tarefas avulsas do cliente.",
       });
       updateCreateValue("project_id", project.id);
+      // Cliente "Novo" ainda em prospecção: o projeto nasce aguardando o Comercial.
+      if (project.status === "Aguardando liberação do Comercial") {
+        toast.info(
+          "Projeto criado. As tarefas dele ficam liberadas depois da validação do Comercial.",
+        );
+      }
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Não foi possível criar o projeto."));
     }
@@ -846,7 +853,7 @@ export function TaskFormModal({
                 >
                   {createProjectMutation.isPending
                     ? "Criando projeto..."
-                    : "Criar projeto \"Tarefas avulsas\""}
+                    : `Criar projeto "${LOOSE_TASKS_PROJECT_NAME}"`}
                 </button>
               ) : null}
             </label>
@@ -902,7 +909,10 @@ export function TaskFormModal({
               <ProjectSelect
                 value={createValues.prospecting_status}
                 onChange={(event) =>
-                  updateCreateValue("prospecting_status", event.target.value as ProspectingStatus)
+                  updateCreateValue(
+                    "prospecting_status",
+                    event.target.value as ProspectingStatus | "",
+                  )
                 }
               >
                 <option value="">Não se aplica</option>

@@ -16,6 +16,9 @@ export const TASK_FORM_TEXTAREA_CLASSNAME = "min-h-20 resize-y pl-10";
 export const TASK_FORM_AUXILIARY_WARNING_CLASSNAME =
   "rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200";
 
+/** Projeto criado no modal "Nova tarefa" quando o cliente ainda não tem nenhum. */
+export const LOOSE_TASKS_PROJECT_NAME = "Tarefas avulsas";
+
 export function getAutomaticTaskResponsibleId(
   modelDefaultId: string | null | undefined,
   candidates: Array<{ id: string }>,
@@ -78,7 +81,6 @@ interface GetTaskCreateValidationMessageParams {
   projectId: string;
   modelId: string;
   departmentId: string;
-  prospectingStatus: string;
   urgency: string;
   observations: string;
   eligibleResponsibleCount: number;

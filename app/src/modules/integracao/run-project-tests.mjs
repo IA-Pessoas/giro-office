@@ -1208,7 +1208,6 @@ runTest("task create validation accepts blank observations before submit", () =>
     projectId: "project-1",
     modelId: "model-1",
     departmentId: "department-1",
-    prospectingStatus: "Fechado",
     urgency: "Normal",
     observations: "Detalhes da tarefa",
     eligibleResponsibleCount: 0,
@@ -1225,7 +1224,6 @@ runTest("task create validation names only the missing fields and skips prospect
     projectId: "project-1",
     modelId: "model-1",
     departmentId: "department-1",
-    prospectingStatus: "",
     urgency: "Normal",
     observations: "",
     eligibleResponsibleCount: 0,
@@ -1256,7 +1254,6 @@ runTest("task responsible selection follows default, sole, explicit and unassign
     projectId: "project-1",
     modelId: "model-1",
     departmentId: "department-1",
-    prospectingStatus: "Fechado",
     urgency: "Normal",
     observations: "",
   };
