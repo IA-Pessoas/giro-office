@@ -111,10 +111,13 @@ export const updateRegularizeBodySchema = z
   .strict()
   .refine((d) => Object.keys(d).length > 0, "Informe ao menos um campo para atualizar.");
 
-// Valor monetário em texto: "R$ 1.234,56", "1234,56" ou "1234.56".
+// Valor monetário em texto: "R$ 1.234,56", "1234,56", "1500" ou "1234.56" (espelha app/.../utils/paForm.ts).
 const moneyTextSchema = z
   .string()
-  .regex(/^(R\$\s?)?\d[\d.]*(,\d{1,2})?$/, "Informe um valor numérico (ex.: R$ 1.234,56).")
+  .regex(
+    /^(R\$\s?)?((\d{1,3}(\.\d{3})+|\d+)(,\d{1,2})?|\d+\.\d{1,2})$/,
+    "Informe um valor numérico (ex.: R$ 1.234,56).",
+  )
   .nullable()
   .optional();
 

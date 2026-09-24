@@ -29,7 +29,7 @@ import {
   createUpdateClientIntegrationInitialValues,
   hasUsableIntegrationData,
 } from "./utils/integrationForm.ts";
-import { formatPaMoneyInput } from "./utils/paForm.ts";
+import { formatPaMoneyFromApi, formatPaMoneyInput, parsePaMoneyCents } from "./utils/paForm.ts";
 import {
   buildRegularizePayload,
   createRegularizeInitialValues,
@@ -789,6 +789,19 @@ runTest("PA money fields accept only BRL amounts", () => {
   assert.equal(formatPaMoneyInput("123456"), "R$ 1.234,56");
   assert.equal(formatPaMoneyInput("QA_abc"), "");
   assert.equal(formatPaMoneyInput(""), "");
+});
+
+runTest("PA legacy money values are read as reais, not cents", () => {
+  assert.equal(parsePaMoneyCents("1500"), 150000);
+  assert.equal(parsePaMoneyCents("1500.5"), 150050);
+  assert.equal(parsePaMoneyCents("1.500,00"), 150000);
+  assert.equal(parsePaMoneyCents("R$ 1.234,56"), 123456);
+  assert.equal(parsePaMoneyCents("R$ 12,3"), 1230);
+  assert.equal(parsePaMoneyCents("QA_abc"), null);
+  assert.equal(parsePaMoneyCents("1.2.3"), null);
+  assert.equal(formatPaMoneyFromApi("1500"), "R$ 1.500,00");
+  assert.equal(formatPaMoneyFromApi("QA_abc"), "QA_abc");
+  assert.equal(formatPaMoneyFromApi(null), "");
 });
 
 runTest("PA section relies on mutation invalidation instead of a second GET", () => {
