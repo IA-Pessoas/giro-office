@@ -635,6 +635,19 @@ await (async () => {
     assert.match(appShellSource, /if \(isIframeView\)[\s\S]*\{impersonationBanner\}/);
   });
 
+  await runTest("expiração encerra personificação com aviso e mostra tempo restante", () => {
+    assert.match(appShellSource, /Tempo restante: \{timeRemaining\}/);
+    assert.match(appShellSource, /<ImpersonationCountdown[\s\S]*expiresAt=\{impersonation\.expires_at\}/);
+    assert.match(appShellSource, /setInterval\(updateRemainingTime, 1000\)/);
+    assert.match(authContextSource, /giro-office:impersonation-expires-at/);
+    assert.match(authContextSource, /function expireImpersonation\(\)/);
+    assert.match(authContextSource, /Sua personificação expirou/);
+    assert.match(
+      authContextSource,
+      /Router\.push\(impersonationExpired \? "\/super-admin\/login" : destination\)/,
+    );
+  });
+
   await runTest("retired modules are not registered in navigation or quick actions", () => {
     for (const blockedPath of ["/marketing"]) {
       assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
@@ -746,9 +759,10 @@ await (async () => {
   });
 
   await runTest("sessão inválida encerra o loading e orienta o retorno ao login", () => {
+    assert.match(authContextSource, /export function signOut\(/);
     assert.match(
       authContextSource,
-      /function signOut\(message = "Sessão expirada\. Faça login novamente\."\)[\s\S]*toast\.error\(message,\s*\{\s*toastId: "auth-session-expired"/,
+      /toast\.error\(showImpersonationExpiry \? "Sua personificação expirou" : message,[\s\S]*toastId: showImpersonationExpiry[\s\S]*"auth-session-expired"/,
     );
     assert.match(authContextSource, /registerAuthInvalidationHandler/);
     assert.match(authContextSource, /setUser\(null\);/);

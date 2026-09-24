@@ -9,7 +9,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import type { UserAuditRecorder } from "../integrations/audit.js";
+import { recordImpersonationEndEvent, type UserAuditRecorder } from "../integrations/audit.js";
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import { updatePermissionBodySchema } from "../schemas/permission.schemas.js";
 import {
@@ -65,25 +65,7 @@ export function createPlatformUsersRoutes(options: {
             session_id: request.session_id,
             csrf_hash: request.csrf_hash,
           },
-          (event) =>
-            audit({
-              actorUserId: event.targetUserId,
-              platformActorUserId: event.platformUserId,
-              organizationId: event.organizationId,
-              action: "platform.impersonation.ended",
-              referring: "user",
-              referringId: event.targetUserId,
-              changes: {
-                operatorPlatformUserId: event.platformUserId,
-                target: { id: event.targetUserId, name: event.targetName },
-                startedAt: event.startedAt.toISOString(),
-                endedAt: event.endedAt.toISOString(),
-                durationMs: event.durationMs,
-                reason: event.reason,
-              },
-              outcome: "success",
-              required: true,
-            }),
+          (event) => recordImpersonationEndEvent(audit, event),
         );
 
         const session = exited.platformSession;

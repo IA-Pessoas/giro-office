@@ -327,6 +327,54 @@ type AppShellNotification = {
   createdAt: string;
 };
 
+function ImpersonationCountdown({
+  expiresAt,
+  onExpired,
+}: {
+  expiresAt: string;
+  onExpired: () => void;
+}) {
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const onExpiredRef = useRef(onExpired);
+  const handledExpiryRef = useRef<string | null>(null);
+  onExpiredRef.current = onExpired;
+
+  useEffect(() => {
+    const expiresAtMs = Date.parse(expiresAt);
+    if (!Number.isFinite(expiresAtMs)) {
+      setRemainingSeconds(null);
+      handledExpiryRef.current = null;
+      return;
+    }
+
+    const updateRemainingTime = () => {
+      const remaining = Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000));
+      setRemainingSeconds(remaining);
+      if (remaining === 0 && handledExpiryRef.current !== expiresAt) {
+        handledExpiryRef.current = expiresAt;
+        onExpiredRef.current();
+      }
+    };
+
+    updateRemainingTime();
+    const interval = window.setInterval(updateRemainingTime, 1000);
+    return () => window.clearInterval(interval);
+  }, [expiresAt]);
+
+  const timeRemaining =
+    remainingSeconds === null
+      ? "--:--"
+      : `${Math.floor(remainingSeconds / 60)
+          .toString()
+          .padStart(2, "0")}:${(remainingSeconds % 60).toString().padStart(2, "0")}`;
+
+  return (
+    <span className="shrink-0 tabular-nums text-xs" aria-live="off">
+      Tempo restante: {timeRemaining}
+    </span>
+  );
+}
+
 export function AppShell({
   children,
   isIframeView = false,
@@ -335,7 +383,7 @@ export function AppShell({
   isIframeView?: boolean;
 }) {
   const router = useRouter();
-  const { user, logoutUser, exitImpersonation } = useAuth();
+  const { user, logoutUser, exitImpersonation, expireImpersonation } = useAuth();
   const [isExitingImpersonation, setIsExitingImpersonation] = useState(false);
   const impersonation = user?.impersonation;
   const impersonationBanner = impersonation ? (
@@ -346,6 +394,10 @@ export function AppShell({
       <span className="min-w-0 truncate">
         Você está personificando {user.name} ({impersonation.organization_name})
       </span>
+      <ImpersonationCountdown
+        expiresAt={impersonation.expires_at}
+        onExpired={expireImpersonation}
+      />
       <button
         type="button"
         className="shrink-0 rounded-md border border-amber-500 px-3 py-1 text-xs font-bold hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-amber-900"

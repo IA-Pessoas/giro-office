@@ -58,6 +58,7 @@ interface AuthContextData {
     logoutUser: () => Promise<void>;
     logoutPlatform: () => Promise<void>;
     exitImpersonation: () => Promise<void>;
+    expireImpersonation: () => void;
     refreshSession: () => Promise<UserProps | null>;
     refreshPlatformSession: () => Promise<UserProps | null>;
     loading: boolean;
@@ -71,6 +72,50 @@ export const AuthContext = createContext({} as AuthContextData);
 const SESSION_TRANSITION_MIN_DURATION_MS = 380;
 const AUTH_DIAGNOSTIC_LOGS_ENABLED = process.env.NODE_ENV !== "production";
 const REGULARIZE_QUERY_ROOT = ["regularize"] as const;
+const IMPERSONATION_EXPIRY_STORAGE_KEY = "giro-office:impersonation-expires-at";
+
+function rememberImpersonationExpiry(expiresAt?: string) {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    try {
+        if (expiresAt) {
+            window.sessionStorage.setItem(IMPERSONATION_EXPIRY_STORAGE_KEY, expiresAt);
+        } else {
+            window.sessionStorage.removeItem(IMPERSONATION_EXPIRY_STORAGE_KEY);
+        }
+    } catch {
+        // A sessão continua segura mesmo se o navegador bloquear sessionStorage.
+    }
+}
+
+function consumeExpiredImpersonationExpiry(): boolean {
+    if (typeof window === "undefined") {
+        return false;
+    }
+
+    try {
+        const expiresAt = window.sessionStorage.getItem(IMPERSONATION_EXPIRY_STORAGE_KEY);
+        if (!expiresAt) {
+            return false;
+        }
+
+        const expiresAtMs = Date.parse(expiresAt);
+        if (!Number.isFinite(expiresAtMs)) {
+            window.sessionStorage.removeItem(IMPERSONATION_EXPIRY_STORAGE_KEY);
+            return false;
+        }
+        if (expiresAtMs > Date.now()) {
+            return false;
+        }
+
+        window.sessionStorage.removeItem(IMPERSONATION_EXPIRY_STORAGE_KEY);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 function clearRegularizeQueryCache(queryClient: ReturnType<typeof useQueryClient>) {
     queryClient.removeQueries({ queryKey: REGULARIZE_QUERY_ROOT });
@@ -114,6 +159,7 @@ function isValidImpersonationSessionInfo(value: unknown): value is Impersonation
         typeof info.operator?.id === "string" &&
         typeof info.operator.name === "string" &&
         typeof info.expires_at === "string" &&
+        Number.isFinite(Date.parse(info.expires_at)) &&
         typeof info.organization_name === "string"
     );
 }
@@ -184,13 +230,23 @@ function isAccessDenied(error: unknown): boolean {
     return status === 401 || status === 403;
 }
 
-export function signOut(message = "Sessão expirada. Faça login novamente.") {
+export function signOut(
+    message = "Sessão expirada. Faça login novamente.",
+    destination = "/login",
+) {
     try {
+        const impersonationExpired = consumeExpiredImpersonationExpiry();
+        const showImpersonationExpiry =
+            impersonationExpired ||
+            (message === "Sua personificação expirou" && destination === "/super-admin/login");
+        rememberImpersonationExpiry();
         invalidateAuthSession();
-        toast.error(message, {
-            toastId: "auth-session-expired",
+        toast.error(showImpersonationExpiry ? "Sua personificação expirou" : message, {
+            toastId: showImpersonationExpiry
+                ? "impersonation-session-expired"
+                : "auth-session-expired",
         });
-        void Router.push("/login");
+        void Router.push(impersonationExpired ? "/super-admin/login" : destination);
     } catch (error) {
         logAuthError("Erro ao deslogar", error);
     }
@@ -253,6 +309,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             const currentUser = buildCurrentUser(userData);
+            rememberImpersonationExpiry(currentUser.impersonation?.expires_at);
             setUser(currentUser);
             await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
 
@@ -287,6 +344,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             const currentUser = buildPlatformUser(userData);
+            rememberImpersonationExpiry();
             setUser(currentUser);
             await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
             return currentUser;
@@ -314,7 +372,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 const userData = response.data?.data;
 
                 if (isCurrentAuthTransition(requestVersion) && isValidAuthUser(userData)) {
-                    setUser(buildCurrentUser(userData));
+                    const currentUser = buildCurrentUser(userData);
+                    rememberImpersonationExpiry(currentUser.impersonation?.expires_at);
+                    setUser(currentUser);
                 }
             } catch (error) {
                 if (!isAccessDenied(error)) {
@@ -327,11 +387,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     const userData = response.data?.data;
 
                     if (isCurrentAuthTransition(requestVersion) && isValidPlatformUser(userData)) {
+                        rememberImpersonationExpiry();
                         setUser(buildPlatformUser(userData));
                     }
                 } catch (platformError) {
                     if (!isAccessDenied(platformError)) {
                         logAuthError("Erro ao verificar sessão da plataforma:", platformError);
+                    } else if (consumeExpiredImpersonationExpiry()) {
+                        toast.error("Sua personificação expirou", {
+                            toastId: "impersonation-session-expired",
+                        });
+                        void Router.replace("/super-admin/login");
                     }
                 }
             } finally {
@@ -365,6 +431,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             const currentUser = buildCurrentUser(sessionData);
+            rememberImpersonationExpiry(currentUser.impersonation?.expires_at);
             setUser(currentUser);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             clearRegularizeQueryCache(queryClient);
@@ -420,6 +487,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         setUser(buildPlatformUser(userData));
+        rememberImpersonationExpiry();
         queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
         clearRegularizeQueryCache(queryClient);
         await clearPlatformQueryCache(queryClient);
@@ -441,6 +509,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             toast.error("Erro ao sair!");
             logAuthError("Erro ao sair:", err);
         } finally {
+            rememberImpersonationExpiry();
             setUser(null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             clearRegularizeQueryCache(queryClient);
@@ -460,6 +529,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             toast.error("Erro ao sair!");
             logAuthError("Erro ao sair da plataforma:", err);
         } finally {
+            rememberImpersonationExpiry();
             setUser(null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             clearRegularizeQueryCache(queryClient);
@@ -478,6 +548,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             const identity = response.data?.data?.identity;
+            rememberImpersonationExpiry();
             setUser(isValidPlatformUser(identity) ? buildPlatformUser(identity) : null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             clearRegularizeQueryCache(queryClient);
@@ -490,6 +561,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
             throw error;
         }
+    }
+
+    function expireImpersonation() {
+        if (!user?.impersonation) {
+            return;
+        }
+        signOut("Sua personificação expirou", "/super-admin/login");
     }
 
     if (loading) {
@@ -510,6 +588,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             logoutUser,
             logoutPlatform,
             exitImpersonation,
+            expireImpersonation,
             refreshSession,
             refreshPlatformSession,
             loading,
