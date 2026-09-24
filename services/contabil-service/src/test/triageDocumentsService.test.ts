@@ -217,6 +217,33 @@ describe("TriageDocumentsService", () => {
     expect(prisma.triageCatalogItem.findMany).not.toHaveBeenCalled();
   });
 
+  it("ignora chaves fiscais nulas na rotina contábil", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue(monthly as never);
+
+    await new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+      MONTHLY_ID,
+      {
+        field: "financial_transactions",
+        status: "PENDING",
+        note: "Aguardando extrato",
+        delivery_method: null,
+        state_site: null,
+      },
+      contabilEditor(),
+    );
+
+    const data = vi.mocked(prisma.triageMonthly.update).mock.calls[0]?.[0].data as {
+      item_notes: Record<string, Record<string, unknown>>;
+    };
+    expect(data.item_notes.financial_transactions).toEqual(
+      expect.objectContaining({ note: "Aguardando extrato" }),
+    );
+    expect(data.item_notes.financial_transactions).not.toHaveProperty("state_site");
+    expect(data.item_notes.financial_transactions).not.toHaveProperty("delivery_method");
+  });
+
   it("valida o catálogo no mesmo transaction serializable que grava o mensal", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);

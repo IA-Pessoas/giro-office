@@ -445,7 +445,7 @@ export function TriageDocumentsSection({
                                 mutations.item.mutate({
                                   id: record.id,
                                   field,
-                                  status: record.checklist[field],
+                                  status: statusDrafts[field] ?? record.checklist[field],
                                   delivery_method: (event.target.value || null) as TriageDeliveryMethod | null,
                                 })
                               }
