@@ -197,6 +197,13 @@ runTest("LogDrawer uses Radix Dialog primitives", () => {
   assert.equal(logDrawerSource.includes(legacyLogDrawerOverlay), false);
 });
 
+runTest("LogDrawer exposes organization audit and the impersonation operator", () => {
+  assert.match(logDrawerSource, /Auditoria da organização/);
+  assert.match(logDrawerSource, /nextScope === "item" \? \{ referring, referringId \} : \{\}/);
+  assert.match(logDrawerSource, /Operador na personificação: \{log\.metadata\.actorPlatformUserId\}/);
+  assert.match(logDrawerSource, /Página \{page\} de \{Math\.ceil\(total \/ 20\)\}/);
+});
+
 runTest("Integracao task modals remain on shared Dialog", () => {
   assert.match(tasksSource, /<TaskFormModal/);
   assert.match(taskFormModalSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog";/);
