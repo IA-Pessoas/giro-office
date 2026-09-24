@@ -885,6 +885,10 @@ export class TaskCrudService {
       if (data.prevision_date !== undefined) {
         const requested = new Date(`${data.prevision_date}T00:00:00.000Z`);
         if (exists.prevision_date === null) {
+          const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
+          if (requested < today) {
+            throw new ServiceError(400, "A primeira previsão não pode ser uma data passada.");
+          }
           prevision_date = requested;
         } else if (exists.prevision_date.getTime() !== requested.getTime()) {
           throw new ServiceError(409, "A tarefa já tem previsão. Use Prorrogações para alterá-la.");
@@ -976,8 +980,10 @@ export class TaskCrudService {
           : undefined,
       ]);
 
+      const settingInitialPrevision = exists.prevision_date === null && prevision_date !== null;
       const updated = await this.prisma.task.update({
-        where: { id: data.task_id },
+        // Condição fecha a corrida de duas definições simultâneas da primeira previsão (P2025).
+        where: { id: data.task_id, ...(settingInitialPrevision ? { prevision_date: null } : {}) },
         data: {
           model_id,
           name,
@@ -1043,6 +1049,9 @@ export class TaskCrudService {
       logError("Erro ao atualizar tarefa", { err });
       throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
+      if (typeof err === "object" && err !== null && "code" in err && err.code === "P2025") {
+        throw new ServiceError(409, "A tarefa foi alterada simultaneamente. Tente novamente.", err);
+      }
       throw new ServiceError(500, "Não foi possível atualizar a tarefa.", err);
     }
   }
