@@ -57,7 +57,9 @@ import {
   resolveTiStockLocationName,
 } from "../utils/stockDisplay";
 import { getTiStockMutationErrorMessage } from "../utils/stockMutationError";
+import { getTiStockExitShortage } from "../utils/stockMovementItems";
 import { TiNativeSelect } from "./TiNativeSelect";
+import { TiStockItemSelect } from "./TiStockItemSelect";
 import {
   TiDataTable,
   TiEmptyState,
@@ -303,7 +305,7 @@ export function TiStockTab() {
   const [itemForm, setItemForm] = useState<StockItemFormState>(initialItemFormState);
   const [editingItemId, setEditingItemId] = useState<TiId | undefined>();
   const [stockDialog, setStockDialog] = useState<StockDialogState>(null);
-  const [movementItemId, setMovementItemId] = useState("");
+  const [movementItem, setMovementItem] = useState<TiStockItem | null>(null);
   const [entryQuantity, setEntryQuantity] = useState("");
   const [exitForm, setExitForm] = useState<StockExitFormState>(initialExitFormState);
   const [pendingExitConfirmation, setPendingExitConfirmation] =
@@ -415,17 +417,6 @@ export function TiStockTab() {
     [stockLocations],
   );
 
-  const stockItemOptions = useMemo(
-    () => [
-      { value: "", label: "Selecione" },
-      ...stockItems.map((item) => ({
-        value: getId(item.id),
-        label: formatText(item.name, "Item sem nome"),
-      })),
-    ],
-    [stockItems],
-  );
-
   const userOptions = useMemo(
     () => [
       { value: "", label: "Selecione" },
@@ -500,18 +491,18 @@ export function TiStockTab() {
   }
 
   function openMovementDialog(nextDialog: "entry" | "exit") {
-    setMovementItemId(getId(selectedItemId));
+    setMovementItem(selectedItemId ? (selectedItem ?? null) : null);
     setStockDialog(nextDialog);
   }
 
   function closeEntryDialog() {
-    setMovementItemId("");
+    setMovementItem(null);
     setEntryQuantity("");
     setStockDialog(null);
   }
 
   function closeExitDialog() {
-    setMovementItemId("");
+    setMovementItem(null);
     setExitForm(initialExitFormState);
     setStockDialog(null);
   }
@@ -631,7 +622,7 @@ export function TiStockTab() {
       return;
     }
 
-    const itemId = toOptionalId(movementItemId);
+    const itemId = toOptionalId(getId(movementItem?.id));
 
     if (!itemId) {
       toast.error("Selecione o item da entrada.");
@@ -662,7 +653,7 @@ export function TiStockTab() {
       return;
     }
 
-    const itemId = toOptionalId(movementItemId);
+    const itemId = toOptionalId(getId(movementItem?.id));
 
     if (!itemId) {
       toast.error("Selecione o item da saída.");
@@ -673,6 +664,13 @@ export function TiStockTab() {
 
     if (quantity === null) {
       toast.error("Informe uma quantidade de saída válida.");
+      return;
+    }
+
+    const available = getTiStockExitShortage(movementItem, quantity);
+
+    if (available !== null) {
+      toast.error(`Saldo insuficiente: há ${available} em estoque.`);
       return;
     }
 
@@ -1221,13 +1219,7 @@ export function TiStockTab() {
         contentClassName="w-[min(92vw,520px)]"
       >
         <form className="space-y-4" onSubmit={handleSubmitEntry}>
-          <TiNativeSelect
-            disabled={stockItemsQuery.isLoading}
-            label="Item"
-            onChange={(event) => setMovementItemId(event.target.value)}
-            options={stockItemOptions}
-            value={movementItemId}
-          />
+          <TiStockItemSelect selectedItem={movementItem} onSelect={setMovementItem} />
           <TiTextField
             label="Quantidade"
             min={0}
@@ -1248,7 +1240,7 @@ export function TiStockTab() {
               type="submit"
               label={createEntryMutation.isPending ? "Registrando..." : "Registrar entrada"}
               variant="primary"
-              disabled={!movementItemId || !canEditStock || isMovementSubmitting}
+              disabled={!movementItem || !canEditStock || isMovementSubmitting}
             />
           </div>
         </form>
@@ -1267,13 +1259,7 @@ export function TiStockTab() {
       >
         <form className="space-y-4" onSubmit={handleSubmitExit}>
           <div className="grid gap-3 md:grid-cols-2">
-            <TiNativeSelect
-              disabled={stockItemsQuery.isLoading}
-              label="Item"
-              onChange={(event) => setMovementItemId(event.target.value)}
-              options={stockItemOptions}
-              value={movementItemId}
-            />
+            <TiStockItemSelect selectedItem={movementItem} onSelect={setMovementItem} />
             <TiTextField
               label="Quantidade"
               min={0}
@@ -1328,7 +1314,7 @@ export function TiStockTab() {
               type="submit"
               label={createExitMutation.isPending ? "Registrando..." : "Registrar saída"}
               variant="primary"
-              disabled={!movementItemId || !canEditStock || isMovementSubmitting}
+              disabled={!movementItem || !canEditStock || isMovementSubmitting}
             />
           </div>
         </form>
