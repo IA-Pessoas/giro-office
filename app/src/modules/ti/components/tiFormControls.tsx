@@ -56,6 +56,7 @@ type TiListQuery<T> = {
 type TiTextFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
   helperText?: string;
+  errorText?: string;
 };
 
 type TiTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
@@ -108,12 +109,26 @@ export function TiPanel({ children, className, ...props }: TiPanelProps) {
   );
 }
 
-export function TiTextField({ className, helperText, label, ...props }: TiTextFieldProps) {
+export function TiTextField({
+  className,
+  errorText,
+  helperText,
+  label,
+  ...props
+}: TiTextFieldProps) {
   return (
     <label className="flex min-w-0 flex-col gap-2">
       {label ? <span className={tiLabelClassName}>{label}</span> : null}
-      <input className={cn(tiInputClassName, className)} {...props} />
-      {helperText ? (
+      <input
+        aria-invalid={errorText ? true : undefined}
+        className={cn(tiInputClassName, errorText && "border-red-500 focus:border-red-500", className)}
+        {...props}
+      />
+      {errorText ? (
+        <span role="alert" className="text-xs leading-5 text-red-600 dark:text-red-400">
+          {errorText}
+        </span>
+      ) : helperText ? (
         <span className="text-xs leading-5 text-slate-500 dark:text-slate-400">{helperText}</span>
       ) : null}
     </label>

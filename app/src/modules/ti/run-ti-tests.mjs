@@ -2484,3 +2484,36 @@ await runTest("ti stock movement dialogs search every stock item on the server",
   assert.match(picker, /Nenhum item encontrado\./);
   assert.match(picker, /itemsQuery\.isError/);
 });
+
+await runTest("ti stock item form explains an invalid initial quantity on the field", async () => {
+  const tab = await readFile(join(moduleRoot, "components/TiStockTab.tsx"), "utf8");
+  const controls = await readFile(join(moduleRoot, "components/tiFormControls.tsx"), "utf8");
+
+  assert.match(controls, /errorText\?: string/);
+  assert.match(controls, /aria-invalid=\{errorText \? true : undefined\}/);
+  assert.match(controls, /role="alert"/);
+  assert.match(tab, /const initialQuantityError =/);
+  assert.match(tab, /Informe uma quantidade maior ou igual a zero\./);
+  assert.match(tab, /label="Quantidade inicial"[\s\S]*errorText=\{initialQuantityError\}/);
+});
+
+await runTest("ti dashboard uses the same KPI labels in tiles and summary rows", async () => {
+  const dashboard = await readFile(join(moduleRoot, "components/TiDashboardTab.tsx"), "utf8");
+
+  assert.equal(dashboard.match(/label="Estoque crítico"/g)?.length, 2);
+  assert.equal(dashboard.match(/label="Robôs ativos"/g)?.length, 2);
+  assert.doesNotMatch(dashboard, /label="Estoque"\s/);
+  assert.doesNotMatch(dashboard, /label="Robôs"\s/);
+});
+
+await runTest("ti form controls follow the app form look (sentence-case labels, blue focus)", async () => {
+  const ui = await readFile(join(moduleRoot, "components/tiWorkspaceUi.ts"), "utf8");
+  const label = ui.match(/export const tiLabelClassName =\s*"([^"]+)"/)?.[1] ?? "";
+  const input = ui.match(/export const tiInputClassName =\s*"([^"]+)"/)?.[1] ?? "";
+
+  assert.doesNotMatch(label, /uppercase/);
+  assert.match(label, /text-sm font-medium/);
+  assert.match(input, /rounded-lg/);
+  assert.match(input, /focus:border-blue-500/);
+  assert.doesNotMatch(input, /dark:bg-slate-950/);
+});

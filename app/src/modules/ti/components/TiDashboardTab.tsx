@@ -317,12 +317,12 @@ export function TiDashboardTab({ onOpenRequests }: { onOpenRequests?: () => void
             />
             <DashboardSummaryRow
               icon={PackageSearch}
-              label="Estoque"
+              label="Estoque crítico"
               value={formatMetric(summary?.lowStockItems)}
             />
             <DashboardSummaryRow
               icon={Bot}
-              label="Robôs"
+              label="Robôs ativos"
               value={formatMetric(summary?.activeRobots)}
             />
           </div>
