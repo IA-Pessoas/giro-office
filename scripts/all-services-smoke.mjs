@@ -4094,6 +4094,14 @@ const handlers = {
     });
   },
 
+  // Roda depois de Get/File/Patch no manifesto: o histórico do smoke some aqui.
+  async clientHistoriesDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/${requireState("primaryClientId")}/histories/${requireState("clientHistoryId")}`,
+    });
+  },
+
   async clientHistoriesPendingCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

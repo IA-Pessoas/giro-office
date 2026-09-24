@@ -90,9 +90,12 @@ function organizationId(c: ClientContext): string {
   return auth.organizationId;
 }
 
+// Mesma regra do isAdminPermission do Express: owner ou permissão de admin.
+const ADMIN_PERMISSION = 2;
+
 function managesOrganization(c: ClientContext): boolean {
-  const { claims } = c.get("auth");
-  return claims.type === "owner" || (claims.permission ?? 0) >= 2;
+  const { isOwner, permission } = authz(c);
+  return isOwner || (permission ?? 0) >= ADMIN_PERMISSION;
 }
 
 function authz(c: ClientContext) {

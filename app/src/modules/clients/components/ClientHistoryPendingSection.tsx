@@ -23,7 +23,7 @@ export function ClientHistoryPendingSection({
 }) {
   const { user } = useAuth();
   const userId = user?.id;
-  const isAdmin = canManageClientHistories(user);
+  const canManage = canManageClientHistories(user);
 
   const listQuery = useHistoryPendingList(userId);
   const createMutation = useCreateHistoryPendingMutation(clientId);
@@ -65,7 +65,7 @@ export function ClientHistoryPendingSection({
       return;
     }
 
-    if (!isAdmin) {
+    if (!canManage) {
       toast.warning("Você não tem permissão para remover esta pendência.");
       return;
     }
@@ -73,6 +73,7 @@ export function ClientHistoryPendingSection({
     try {
       setDeletingId(pendingId);
       await deleteMutation.mutateAsync({ pendingId, userId: user.id });
+      toast.dismiss();
       toast.success("Pendência removida com sucesso.");
     } catch (error) {
       const message =
@@ -161,7 +162,7 @@ export function ClientHistoryPendingSection({
                       {activePendingId === item.id ? "Criando..." : "Criar histórico"}
                     </button>
 
-                    {isAdmin ? (
+                    {canManage ? (
                       <button
                         type="button"
                         onClick={() => setConfirmingId(item.id)}

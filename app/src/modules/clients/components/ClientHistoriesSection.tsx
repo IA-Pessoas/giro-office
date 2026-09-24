@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 
 import { ConfirmationDialog } from "@shared/components";
@@ -30,9 +31,19 @@ export function ClientHistoriesSection({ clientId }: { clientId: string }) {
   const [deleting, setDeleting] = useState<ClientHistoryItem | null>(null);
   const deleteMutation = useDeleteClientHistoryMutation(clientId);
 
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const confirmDelete = async () => {
     if (!deleting) return;
-    await deleteMutation.mutateAsync(deleting.id);
+    setDeleteError(null);
+    try {
+      await deleteMutation.mutateAsync(deleting.id);
+    } catch (error) {
+      const message = isAxiosError(error) ? error.response?.data?.error : undefined;
+      setDeleteError(typeof message === "string" ? message : "Não foi possível excluir o histórico.");
+      throw error;
+    }
+    toast.dismiss();
     toast.success("Histórico excluído com sucesso.");
   };
 
@@ -137,13 +148,16 @@ export function ClientHistoriesSection({ clientId }: { clientId: string }) {
       <ConfirmationDialog
         open={Boolean(deleting)}
         onOpenChange={(open) => {
-          if (!open) setDeleting(null);
+          if (!open) {
+            setDeleting(null);
+            setDeleteError(null);
+          }
         }}
         title="Excluir histórico"
-        description="O histórico e o anexo, se houver, serão excluídos. Essa ação não pode ser desfeita."
+        description="O histórico será excluído. Essa ação não pode ser desfeita."
         onConfirm={confirmDelete}
         isConfirming={deleteMutation.isPending}
-        errorMessage={null}
+        errorMessage={deleteError}
         confirmLabel="Excluir"
         cancelLabel="Cancelar"
       />
