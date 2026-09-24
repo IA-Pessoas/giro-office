@@ -2,8 +2,6 @@ import { createHash, createHmac } from "node:crypto";
 
 import type { ReportCatalogSource } from "../catalog/types.js";
 
-export const MAX_REGULARIZE_REPORTING_LIMIT = 101;
-
 export function publicReportingSources<T extends { keys?: unknown }>(
   sources: readonly T[],
 ): readonly ReportCatalogSource[] {

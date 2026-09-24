@@ -8,6 +8,7 @@ import { Dialog } from "@shared/components/ui/Dialog";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { Input } from "@shared/ui/newLayout/input";
+import { useAuth } from "@/context/AuthContext";
 import { CreateUserModal } from "@modules/users/components/CreateUserModal";
 import { AdminPermissionsEditor } from "@modules/users/components/AdminPermissionsEditor";
 import type { AdminUserPermissionsDataSource } from "@modules/users/types/adminUserContracts";
@@ -41,9 +42,12 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [isOwnershipTransferOpen, setIsOwnershipTransferOpen] = useState(false);
+  const [isImpersonationOpen, setIsImpersonationOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<"deactivate" | "reactivate" | null>(null);
   const lifecycleActionRef = useRef<HTMLButtonElement>(null);
   const permissionActionRef = useRef<HTMLButtonElement>(null);
+  const impersonationActionRef = useRef<HTMLButtonElement>(null);
+  const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const usersQuery = usePlatformUsers(organization.id, {
@@ -60,6 +64,10 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const userLifecycleMutation = usePlatformUserLifecycleMutation();
   const ownershipTransferMutation = usePlatformOwnershipTransferMutation();
   const userUpdateMutation = usePlatformUserUpdateMutation();
+  const impersonationMutation = useMutation({
+    mutationFn: (userId: string) => platformService.startImpersonation(organization.id, userId),
+    onSuccess: () => window.location.assign("/"),
+  });
   const [editMode, setEditMode] = useState(false);
   const [passwordConfirmationOpen, setPasswordConfirmationOpen] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -387,6 +395,27 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                 >
                   Editar permissões
                 </button>
+                {currentUser?.can_impersonate ? (
+                  <>
+                    <button
+                      ref={impersonationActionRef}
+                      aria-describedby={
+                        selectedUser.status !== "active" ? "impersonation-unavailable" : undefined
+                      }
+                      className="rounded-lg border border-amber-700 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-200 dark:hover:bg-amber-950/30"
+                      disabled={selectedUser.status !== "active"}
+                      onClick={() => setIsImpersonationOpen(true)}
+                      type="button"
+                    >
+                      Personificar
+                    </button>
+                    {selectedUser.status !== "active" ? (
+                      <p className="text-xs text-slate-500" id="impersonation-unavailable">
+                        Disponível somente para usuários ativos.
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
                 {selectedUser.status === "active" && selectedUser.type === "owner" ? (
                   <button
                     className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
@@ -490,6 +519,31 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
         open={pendingAction !== null}
         title={pendingAction === "deactivate" ? "Desativar usuário" : "Reativar usuário"}
         variant={pendingAction === "deactivate" ? "destructive" : "neutral"}
+      />
+      <ConfirmationDialog
+        cancelLabel="Cancelar"
+        confirmLabel="Iniciar personificação"
+        description={`Você vai entrar como ${selectedUser?.name ?? "este usuário"} em ${organization.name}. Sua sessão de plataforma será encerrada e a sessão passará a usar as permissões dessa pessoa.`}
+        errorMessage={null}
+        isConfirming={impersonationMutation.isPending}
+        onConfirm={async () => {
+          if (
+            !currentUser?.can_impersonate ||
+            !selectedUser ||
+            selectedUser.status !== "active"
+          ) {
+            return;
+          }
+          await impersonationMutation.mutateAsync(selectedUser.id);
+        }}
+        onOpenChange={setIsImpersonationOpen}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          impersonationActionRef.current?.focus();
+        }}
+        open={isImpersonationOpen}
+        title="Confirmar personificação"
+        variant="neutral"
       />
       <ConfirmationDialog
         cancelLabel="Cancelar"

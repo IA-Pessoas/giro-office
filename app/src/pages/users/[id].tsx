@@ -34,12 +34,13 @@ export const getServerSideProps = canSSRAdmin<UserDetailsPageProps>(
       const apiClient = setupAPIClient(ctx);
       const [meResponse, userResponse, deps] = await Promise.all([
         apiClient.get("/user/me"),
-        apiClient.get("/users-detail", { params: { user_id: id } }),
+        apiClient.get(`/user/${encodeURIComponent(id)}`),
         departmentService.list(undefined, ctx),
       ]);
 
-      const user = userResponse.data.user;
-      const me = meResponse.data.user;
+      // Envelope atual: { success, data }. /users-detail era do legacy-api.
+      const user = userResponse.data?.data;
+      const me = meResponse.data?.data;
 
       if (!user) {
         return { redirect: { destination: "/dashboard", permanent: false } };

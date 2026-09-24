@@ -84,7 +84,7 @@ describe("PessoalSituationsAdapter", () => {
     const body = {
       source: "pessoal.situations",
       fields: ["status", "title"],
-      limit: 101,
+      limit: 50_001,
     };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://pessoal.test/internal/reporting/extract",

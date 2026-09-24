@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 
+import { error as logError } from "@workspace/shared";
 import {
   bootstrapPlatformAdmin,
   parsePlatformAdminBootstrapInput,
@@ -8,29 +9,22 @@ import {
 export function getPlatformAdminBootstrapInput(environment: NodeJS.ProcessEnv): {
   name: string;
   email: string;
+  password: string;
 } {
   const name = environment.PLATFORM_ADMIN_NAME?.trim();
   const email = environment.PLATFORM_ADMIN_EMAIL?.trim();
+  const password = environment.PLATFORM_ADMIN_PASSWORD;
 
-  if (!name || !email) {
-    throw new Error("PLATFORM_ADMIN_NAME e PLATFORM_ADMIN_EMAIL são obrigatórias.");
+  if (!name || !email || !password || !password.trim()) {
+    throw new Error(
+      "PLATFORM_ADMIN_NAME, PLATFORM_ADMIN_EMAIL e PLATFORM_ADMIN_PASSWORD são obrigatórias.",
+    );
   }
 
-  if (environment.PLATFORM_ADMIN_PASSWORD !== undefined) {
-    throw new Error("PLATFORM_ADMIN_PASSWORD não é aceita; a senha é gerada pelo próprio comando.");
-  }
-
-  return parsePlatformAdminBootstrapInput({ name, email });
-}
-
-export function assertInteractiveSecretOutput(isTTY: boolean | undefined): void {
-  if (isTTY !== true) {
-    throw new Error("Execute o bootstrap em um terminal interativo para receber o segredo.");
-  }
+  return parsePlatformAdminBootstrapInput({ name, email, password });
 }
 
 async function main(): Promise<void> {
-  assertInteractiveSecretOutput(process.stdout.isTTY);
   const input = getPlatformAdminBootstrapInput(process.env);
   const { prismaClient } = await import("../prisma/index.js");
 
@@ -55,8 +49,18 @@ async function main(): Promise<void> {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(() => {
-    process.stderr.write("Não foi possível criar o administrador da plataforma.\n");
+  main().catch((error: unknown) => {
+    logError("Falha ao criar administrador da plataforma", {
+      errorName: error instanceof Error ? error.name : typeof error,
+      ...(error && typeof error === "object" && "code" in error && typeof error.code === "string"
+        ? { errorCode: error.code }
+        : {}),
+    });
+    const errorMessage =
+      error instanceof Error && /PLATFORM_ADMIN_(?:NAME|EMAIL|PASSWORD)/u.test(error.message)
+        ? error.message
+        : "Não foi possível criar o administrador da plataforma.";
+    process.stderr.write(`${errorMessage}\n`);
     process.exitCode = 1;
   });
 }

@@ -46,7 +46,7 @@ describe("TaskAttachmentService", () => {
     prismaMock.taskAttachment.create.mockRejectedValueOnce(new Error("database unavailable"));
 
     await expect(
-      new TaskAttachmentService(storage).upload({
+      new TaskAttachmentService(storage, prismaMock as never, auditMock as never).upload({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -73,7 +73,7 @@ describe("TaskAttachmentService", () => {
     storage.createSignedAccessUrl.mockResolvedValue("https://signed.example/file");
 
     await expect(
-      new TaskAttachmentService(storage).createAccessUrl({
+      new TaskAttachmentService(storage, prismaMock as never, auditMock as never).createAccessUrl({
         user_id: "user-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -97,7 +97,7 @@ describe("TaskAttachmentService", () => {
     prismaMock.task.findFirst.mockResolvedValueOnce(null);
 
     await expect(
-      new TaskAttachmentService(storage).upload({
+      new TaskAttachmentService(storage, prismaMock as never, auditMock as never).upload({
         user_id: "user-1",
         organization_id: "org-2",
         task_id: "task-1",
@@ -114,7 +114,7 @@ describe("TaskAttachmentService", () => {
 
   it("não revela tarefa a usuário básico que não é responsável", async () => {
     await expect(
-      new TaskAttachmentService(storage).upload({
+      new TaskAttachmentService(storage, prismaMock as never, auditMock as never).upload({
         user_id: "other-user",
         organization_id: "org-1",
         task_id: "task-1",
@@ -134,7 +134,7 @@ describe("TaskAttachmentService", () => {
     prismaMock.taskAttachment.updateMany.mockResolvedValue({ count: 1 });
 
     await expect(
-      new TaskAttachmentService(storage).remove({
+      new TaskAttachmentService(storage, prismaMock as never, auditMock as never).remove({
         user_id: "admin-1",
         organization_id: "org-1",
         task_id: "task-1",
@@ -152,7 +152,7 @@ describe("TaskAttachmentService", () => {
       expect.objectContaining({ action: "Remoção de Anexo de Tarefa", required: true }),
     );
 
-    await new TaskAttachmentService(storage).list({
+    await new TaskAttachmentService(storage, prismaMock as never, auditMock as never).list({
       user_id: "user-1",
       organization_id: "org-1",
       task_id: "task-1",

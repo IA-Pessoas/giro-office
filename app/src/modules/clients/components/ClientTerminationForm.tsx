@@ -1,5 +1,7 @@
 import type { ChangeEvent } from "react";
 
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
+
 import { clientTextFieldClassName, clientTextareaClassName } from "../form/clientFormControls";
 import type { ClientTerminationFormValues } from "../types";
 
@@ -35,7 +37,9 @@ export function ClientTerminationForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1.5">
-          <span className={labelClassName}>Motivo</span>
+          <RequiredFieldLabel className={labelClassName} required>
+            Motivo
+          </RequiredFieldLabel>
           <input
             name="reason"
             value={values.reason}
@@ -46,7 +50,9 @@ export function ClientTerminationForm({
         </label>
 
         <label className="space-y-1.5">
-          <span className={labelClassName}>Competência de Saída</span>
+          <RequiredFieldLabel className={labelClassName} required>
+            Competência de Saída
+          </RequiredFieldLabel>
           <input
             type="month"
             name="competence_output"
@@ -58,7 +64,9 @@ export function ClientTerminationForm({
         </label>
 
         <label className="space-y-1.5 md:col-span-2">
-          <span className={labelClassName}>Descrição</span>
+          <RequiredFieldLabel className={labelClassName} required>
+            Descrição
+          </RequiredFieldLabel>
           <textarea
             name="description"
             value={values.description}
@@ -69,7 +77,12 @@ export function ClientTerminationForm({
         </label>
       </div>
 
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {submitDisabled ? (
+          <p className="mr-auto text-xs text-slate-500 dark:text-slate-400">
+            Preencha os campos obrigatórios (*) para confirmar.
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={onCancel}

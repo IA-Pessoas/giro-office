@@ -10,8 +10,9 @@ Serviço responsável pelo catálogo de propostas e pela operação de prospecç
 - Projeção de Cliente: `CLIENT_SERVICE_URL`, `CLIENT_SERVICE_INTERNAL_TOKEN`.
 - Contrato de fechamento e projeção de Tarefa: `TASK_SERVICE_URL`, `TASK_SERVICE_INTERNAL_TOKEN`.
 - Adaptador de e-mail: `COMMERCIAL_EMAIL_ADAPTER_URL`, `COMMERCIAL_EMAIL_ADAPTER_TOKEN`,
-  `COMMERCIAL_EMAIL_FROM` e `COMMERCIAL_EMAIL_ADAPTER_TIMEOUT_MS`. Em produção, o endpoint deve
-  usar HTTPS e token interno; sem adaptador configurado o worker falha de modo reprocessável.
+  `COMMERCIAL_EMAIL_FROM` e `COMMERCIAL_EMAIL_ADAPTER_TIMEOUT_MS`. Em produção, URL HTTPS, token
+  interno e remetente válido são obrigatórios; sem adaptador configurado o worker falha de modo
+  reprocessável. Consulte [o contrato e o runbook do adaptador](docs/commercial-email-adapter.md).
 - Worker da outbox: `COMMERCIAL_OUTBOX_WORKER_POLL_INTERVAL_MS`, `COMMERCIAL_OUTBOX_WORKER_MAX_ATTEMPTS` e `COMMERCIAL_OUTBOX_WORKER_RETRY_BASE_MS`.
 - CORS e documentação: `SERVICE_ALLOWED_ORIGINS`, `ENABLE_API_DOCS`.
 

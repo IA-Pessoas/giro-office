@@ -42,3 +42,16 @@ export function useUpdateClientHistoryMutation(
   });
 }
 
+
+export function useDeleteClientHistoryMutation(
+  clientId: string,
+): UseMutationResult<{ ok: boolean }, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (historyId) => clientService.deleteHistory(clientId, historyId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: clientHistoriesQueryKey(clientId) });
+    },
+  });
+}

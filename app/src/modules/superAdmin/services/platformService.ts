@@ -7,8 +7,10 @@ import type {
   PlatformOrganization,
   PlatformOrganizationsListResponse,
   PlatformOwnershipTransferResult,
+  PlatformSuperAdmin,
   PlatformUsersListResponse,
   TransferPlatformOwnershipPayload,
+  UpdatePlatformSuperAdminPermissionPayload,
   UpdatePlatformOrganizationUserPayload,
   UpdatePlatformOrganizationLogoPayload,
   UpdatePlatformOrganizationPlanPayload,
@@ -29,6 +31,22 @@ export const platformService = {
   }): Promise<PlatformOrganizationsListResponse> {
     const response = await api.get("/platform/organizations", { params });
     return unwrapData<PlatformOrganizationsListResponse>(response);
+  },
+
+  async listSuperAdmins(): Promise<PlatformSuperAdmin[]> {
+    const response = await api.get("/platform/super-admins");
+    return unwrapData<PlatformSuperAdmin[]>(response);
+  },
+
+  async updateSuperAdminImpersonationPermission(
+    superAdminId: string,
+    payload: UpdatePlatformSuperAdminPermissionPayload,
+  ): Promise<PlatformSuperAdmin> {
+    const response = await api.patch(
+      `/platform/super-admins/${superAdminId}/impersonation-permission`,
+      payload,
+    );
+    return unwrapData<PlatformSuperAdmin>(response);
   },
 
   async listUsers(
@@ -84,6 +102,12 @@ export const platformService = {
       `/platform/organizations/${organizationId}/users/${userId}/reactivate`,
     );
     return unwrapData<PlatformUsersListResponse["users"][number]>(response);
+  },
+
+  async startImpersonation(organizationId: string, userId: string): Promise<void> {
+    await api.post(
+      `/platform/organizations/${organizationId}/users/${userId}/impersonate`,
+    );
   },
 
   async transferOwnership(

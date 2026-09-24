@@ -166,7 +166,9 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["POST /user", userManagementPolicy],
   ["POST /platform/session/refresh", platformOnlyPolicy],
   ["DELETE /platform/session", platformOnlyPolicy],
+  ["POST /platform/impersonation/exit", { special: "impersonationOnly" }],
   ["GET /platform/me", platformOnlyPolicy],
+  ["GET /platform/super-admins", platformOnlyPolicy],
   ["GET /platform/organizations", platformOnlyPolicy],
   ["POST /platform/organizations", platformOnlyPolicy],
   ["GET /platform/audit/requests", platformOnlyPolicy],
@@ -240,6 +242,16 @@ const routePolicyMatchers: Array<{
   {
     method: "POST",
     path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "PATCH",
+    path: /^\/platform\/super-admins\/[^/]+\/impersonation-permission\/?$/,
     policy: platformOnlyPolicy,
   },
   {

@@ -81,7 +81,7 @@ const reportsServiceEnvSchema = z
     workerConcurrency: z.coerce.number().int().positive().default(2),
     workerLeaseSeconds: z.coerce.number().int().positive().default(120),
     adapterTimeoutMs: z.coerce.number().int().positive().default(10000),
-    sourceTimeoutMs: z.coerce.number().int().positive().default(10000),
+    sourceTimeoutMs: z.coerce.number().int().min(100).max(60_000).default(10_000),
     previewRowLimit: z.coerce.number().int().positive().max(1000).default(100),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z

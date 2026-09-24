@@ -11,6 +11,7 @@ import type {
   TriageRoutineType,
 } from "../types";
 import {
+  buildTriageItemPayload,
   CONTABIL_ENDPOINTS,
   executeNullableContabilRequest,
   unwrapContabilEnvelope,
@@ -61,13 +62,7 @@ export const triageDocumentsService = {
   ): Promise<TriageDocumentsMonthly> {
     const response = await setupAPIClient().patch(
       CONTABIL_ENDPOINTS.triageMonthlyItem(monthlyId),
-      {
-        field,
-        ...(status ? { status } : {}),
-        ...(type === "FISCAL" ? { type } : {}),
-        ...(value !== undefined ? { value } : {}),
-        ...itemNotes,
-      },
+      buildTriageItemPayload(field, status, itemNotes, type, value),
     );
     return unwrapContabilEnvelope(response.data);
   },

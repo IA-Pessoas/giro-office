@@ -3,6 +3,7 @@ import {
   createSecurityHeadersMiddleware,
   createServiceCorsOptions,
   createSuccessResponse,
+  error as logError,
 } from "@workspace/shared";
 import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
@@ -12,9 +13,11 @@ import express, { type Express, type Request } from "express";
 import "express-async-errors";
 
 import type { DepartmentServiceEnv } from "./config/env.js";
+import * as departmentAudit from "./integrations/audit.js";
+import prismaClient from "./integrations/prisma.js";
 import { buildDepartmentServiceOpenApiSpec } from "./openapi/spec.js";
 import { createDepartmentRoutes, type DepartmentRouteDeps } from "./routes/department.routes.js";
-import { DepartmentService } from "./services/departmentService.js";
+import { type DepartmentPrismaDeps, DepartmentService } from "./services/departmentService.js";
 
 function departmentServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -40,7 +43,13 @@ interface CreateDepartmentAppOptions {
 
 export function createDepartmentApp(options: CreateDepartmentAppOptions): Express {
   const { env, logger } = options;
-  const departmentService = options.departmentService ?? new DepartmentService();
+  const departmentService =
+    options.departmentService ??
+    new DepartmentService(
+      prismaClient as unknown as DepartmentPrismaDeps,
+      departmentAudit,
+      logError,
+    );
   const app = express();
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));

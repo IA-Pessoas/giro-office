@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
+import { isAxiosError } from "axios";
+import { toast } from "react-toastify";
 
-import { useClientHistories } from "../hooks/useClientHistories";
+import { ConfirmationDialog } from "@shared/components";
+import { useClientHistories, useDeleteClientHistoryMutation } from "../hooks/useClientHistories";
 import type { ClientHistoryItem } from "../types";
+import { canDeleteClientHistory } from "../utils/historyAccess";
 import { ClientHistoryModal } from "./ClientHistoryModal";
 import { ClientHistoryPendingSection } from "./ClientHistoryPendingSection";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +28,24 @@ export function ClientHistoriesSection({ clientId }: { clientId: string }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ClientHistoryItem | null>(null);
   const [pendingToCreate, setPendingToCreate] = useState<{ id: string } | null>(null);
+  const [deleting, setDeleting] = useState<ClientHistoryItem | null>(null);
+  const deleteMutation = useDeleteClientHistoryMutation(clientId);
+
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    setDeleteError(null);
+    try {
+      await deleteMutation.mutateAsync(deleting.id);
+    } catch (error) {
+      const message = isAxiosError(error) ? error.response?.data?.error : undefined;
+      setDeleteError(typeof message === "string" ? message : "Não foi possível excluir o histórico.");
+      throw error;
+    }
+    toast.dismiss();
+    toast.success("Histórico excluído com sucesso.");
+  };
 
   const ordered = useMemo(() => {
     const list = historiesQuery.data ?? [];
@@ -96,20 +118,49 @@ export function ClientHistoriesSection({ clientId }: { clientId: string }) {
                     ) : null}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setEditing(item)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Editar
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(item)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </button>
+                    {canDeleteClientHistory(user, item) ? (
+                      <button
+                        type="button"
+                        onClick={() => setDeleting(item)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <ConfirmationDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleting(null);
+            setDeleteError(null);
+          }
+        }}
+        title="Excluir histórico"
+        description="O histórico será excluído. Essa ação não pode ser desfeita."
+        onConfirm={confirmDelete}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={deleteError}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+      />
 
       <ClientHistoryModal
         clientId={clientId}

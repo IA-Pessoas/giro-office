@@ -325,3 +325,40 @@ async function expectHangingRefreshWaitIsBounded() {
 await expectHangingRefreshWaitIsBounded();
 
 console.log("PASS API client bounds conflict waits when a peer refresh hangs");
+
+async function expectLoginFailureIsNotSessionExpiry() {
+  let unauthorizedCalls = 0;
+  const server = createServer((_request, response) => {
+    response.writeHead(401, { "content-type": "application/json" });
+    response.end(JSON.stringify({ success: false, error: "Login ou senha inválidos" }));
+  });
+
+  await new Promise((resolve) => server.listen(0, resolve));
+  const address = server.address();
+
+  try {
+    assert.ok(address && typeof address !== "string");
+    globalThis.window = {};
+    const api = createApiClient({
+      baseURL: `http://127.0.0.1:${address.port}`,
+      onUnauthorized: () => {
+        unauthorizedCalls += 1;
+      },
+    });
+
+    await assert.rejects(api.post("/user/session", {}), { status: 401 });
+    assert.equal(unauthorizedCalls, 0);
+    await assert.rejects(api.get("/user/session"), { status: 401 });
+    await assert.rejects(api.post("/user/session/refresh"), { status: 401 });
+    assert.equal(unauthorizedCalls, 2);
+  } finally {
+    delete globalThis.window;
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+}
+
+await expectLoginFailureIsNotSessionExpiry();
+
+console.log("PASS API client treats a rejected login as bad credentials, not an expired session");

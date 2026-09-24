@@ -64,6 +64,8 @@ describe("platform default deny", () => {
       ["POST", "/platform/session/refresh"],
       ["DELETE", "/platform/session"],
       ["GET", "/platform/me"],
+      ["GET", "/platform/super-admins"],
+      ["PATCH", "/platform/super-admins/platform-user-2/impersonation-permission"],
       ["GET", "/platform/organizations"],
       ["POST", "/platform/organizations"],
       ["GET", "/platform/organizations/org-1"],
@@ -73,6 +75,7 @@ describe("platform default deny", () => {
       ["GET", "/platform/organizations/org-1/users"],
       ["POST", "/platform/organizations/org-1/users"],
       ["GET", "/platform/organizations/org-1/users/user-1"],
+      ["POST", "/platform/organizations/org-1/users/user-1/impersonate"],
       ["DELETE", "/platform/organizations/org-1/users/user-1"],
       ["POST", "/platform/organizations/org-1/users/user-1/reactivate"],
       ["PATCH", "/platform/organizations/org-1/users/user-1"],
@@ -83,6 +86,10 @@ describe("platform default deny", () => {
         special: "platformOnly",
       });
     }
+
+    expect(getRoutePolicy("POST", "/platform/impersonation/exit")).toEqual({
+      special: "impersonationOnly",
+    });
 
     for (const [method, path] of [
       ["DELETE", "/platform/organizations"],

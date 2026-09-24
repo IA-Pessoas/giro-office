@@ -8,8 +8,8 @@ import {
 
 import { INTEGRACAO_TASK_STATUS_IN_PROGRESS } from "../constants/integracaoTask.js";
 import { Prisma } from "../generated/prisma/client.js";
-import * as audit from "../integrations/audit.js";
-import prismaClient from "../prisma/index.js";
+import type { TaskAudit } from "../integrations/audit.js";
+import type prismaClient from "../prisma/index.js";
 import {
   publishTaskOperationalNotifications,
   TASK_OPERATIONAL_NOTIFICATION_TYPE,
@@ -53,7 +53,11 @@ function utcDay(value: Date): Date {
 }
 
 export class TaskPostponementService {
-  constructor(private readonly now: () => Date = () => new Date()) {}
+  constructor(
+    private readonly prisma: typeof prismaClient,
+    private readonly audit: TaskAudit,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
 
   async create(
     input: TaskPostponementAccessInput & { new_prevision_date: string; justification: string },
@@ -63,7 +67,7 @@ export class TaskPostponementService {
     if (!justification) throw new ServiceError(400, "Justificativa é obrigatória.");
 
     try {
-      return await prismaClient.$transaction(
+      return await this.prisma.$transaction(
         async (tx) => {
           const task = await tx.task.findFirst({
             where: { id: input.task_id, organization_id: input.organization_id },
@@ -137,7 +141,7 @@ export class TaskPostponementService {
             include_administrators: true,
             exclude_user_id: input.user_id,
           });
-          await audit.createLog({
+          await this.audit.createLog({
             userId: input.user_id,
             organizationId: task.organization_id,
             action: "Prorrogação de Tarefa",
@@ -165,7 +169,7 @@ export class TaskPostponementService {
   }
 
   async list(input: TaskPostponementAccessInput): Promise<TaskPostponement[]> {
-    const task = await prismaClient.task.findFirst({
+    const task = await this.prisma.task.findFirst({
       where: { id: input.task_id, organization_id: input.organization_id },
       select: {
         id: true,
@@ -186,7 +190,7 @@ export class TaskPostponementService {
       responsible3Id: task.responsible3_id,
       isOwner: input.isOwner === true,
     });
-    const postponements = await prismaClient.taskPostponement.findMany({
+    const postponements = await this.prisma.taskPostponement.findMany({
       where: { task_id: task.id, organization_id: task.organization_id },
       orderBy: { created_at: "asc" },
       select: {
@@ -198,7 +202,7 @@ export class TaskPostponementService {
         created_at: true,
       },
     });
-    const authors = await prismaClient.user.findMany({
+    const authors = await this.prisma.user.findMany({
       where: { id: { in: [...new Set(postponements.map(({ author_id }) => author_id))] } },
       select: { id: true, name: true },
     });

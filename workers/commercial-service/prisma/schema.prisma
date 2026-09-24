@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client"
+  runtime  = "workerd"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ProposalConfig {
+  id              String @id @default(uuid())
+  name            String
+  contract_value  Float
+  organization_id String
+
+  @@unique([organization_id, name], map: "uq_proposal_config_org_name")
+  @@map("proposal.config")
+}
+
+model Client {
+  id                String  @id @default(uuid())
+  name              String
+  company_name      String?
+  fantasy_name      String?
+  service_unique    Boolean?
+  type_registration String  @default("Novo")
+  organization_id   String
+
+  @@map("clients")
+}
+
+model CommercialProspecting {
+  id              String    @id @default(uuid())
+  client_id       String
+  organization_id String
+  status          String
+  status_date     DateTime?
+  description     String?
+  archived_at     DateTime?
+  registered_at   DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  @@unique([organization_id, client_id], map: "uq_commercial_prospecting_org_client")
+  @@index([organization_id, archived_at, updated_at], map: "idx_commercial_prospecting_org_archived_updated")
+  @@map("commercial.prospecting")
+}
+
+model Task {
+  id              String @id @default(uuid())
+  name            String
+  status          String
+  billing         String
+  organization_id String
+
+  @@map("integracao.tasks")
+}
+
+model CommercialTaskBilling {
+  id                  String   @id @default(uuid())
+  task_id             String   @unique
+  organization_id     String
+  hiring_status       String
+  payment             String?
+  billing_description String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  @@index([organization_id, updated_at], map: "idx_commercial_task_billing_org_updated")
+  @@map("commercial.task_billing")
+}
+
+model CommercialOutboxEvent {
+  id                   String    @id @default(uuid())
+  organization_id      String
+  aggregate_id         String
+  event_type           String
+  event_version        Int       @default(1)
+  payload              Json
+  audit_correlation_id String
+  status               String    @default("pending")
+  attempts             Int       @default(0)
+  available_at         DateTime  @default(now())
+  locked_at            DateTime?
+  processed_at         DateTime?
+  last_error           String?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  @@index([status, available_at, created_at], map: "idx_commercial_outbox_dispatch")
+  @@index([organization_id, aggregate_id, created_at], map: "idx_commercial_outbox_aggregate")
+  @@map("commercial.outbox_events")
+}
+
+model CommercialEmailNotification {
+  id              String   @id @default(uuid())
+  event_id        String   @unique
+  organization_id String
+  client_id       String
+  status          String   @default("pending")
+  attempts        Int      @default(0)
+  message         Json
+  locked_at       DateTime?
+  sent_at         DateTime?
+  last_error      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([organization_id, status, updated_at], map: "idx_commercial_email_notification_status")
+  @@map("commercial.email_notifications")
+}
+
+model Emails {
+  id                    String  @id @default(uuid())
+  email                 String
+  responsible           String
+  new_client_sending    Boolean
+  task_stalled_sending  Boolean
+  organization_id       String
+
+  @@map("emails")
+}

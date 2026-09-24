@@ -2,8 +2,8 @@ name: Quality
 
 # Substitui os seis workflows *-cicd.yml removidos em 2026-09-18, que estavam
 # 100% comentados desde 2026-06-01 e falhavam na validacao a cada push.
-# Cobre so qualidade de codigo; o deploy continua manual
-# (`pnpm deploy:production`, ver docs/production-deploy.md).
+# Cobre so qualidade de codigo. O deploy e na Cloudflare, feito a partir da
+# cloudflare-migration; nao ha mais deploy na VPS.
 
 on:
   pull_request:
@@ -63,11 +63,10 @@ jobs:
       - name: Script and policy tests
         run: corepack pnpm test:scripts
 
-      - name: Harness, smoke coverage and compose gates
+      - name: Harness and smoke coverage gates
         run: |
           corepack pnpm harness:test
           corepack pnpm smoke:coverage
-          corepack pnpm security:compose
 
   # Os testes unitarios dos servicos sao instaveis por causa da suite, nao do codigo:
   # o supertest sobe um servidor efemero POR REQUISICAO, e sob carga uma porta recem

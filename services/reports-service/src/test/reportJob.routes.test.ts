@@ -89,6 +89,43 @@ describe("reportJob routes", () => {
     });
   });
 
+  it("encaminha Idempotency-Key e o hash do comando ao criar job", async () => {
+    const createFromDefinition = vi.fn().mockResolvedValue({ id: jobId, status: "queued" });
+    const definition = {
+      version: 2,
+      areas: [{ source: "regularize.licenses", fields: ["protocol"] }],
+    };
+    const app = express();
+    app.use(express.json());
+    app.use(
+      "/reports",
+      createReportJobRouter({
+        jobService: { createFromDefinition } as never,
+        snapshotService: {} as never,
+        authorizationService: {
+          validateComposition: vi.fn().mockResolvedValue({ definition }),
+        } as never,
+        lifecycleService: {} as never,
+        accessContextClient: { getAccessContext: vi.fn() },
+      }),
+    );
+
+    await request(app)
+      .post("/reports/jobs")
+      .set(FORWARDED_AUTH_USER_ID_HEADER, userId)
+      .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, organizationId)
+      .set("Idempotency-Key", "job-key")
+      .send({ definition })
+      .expect(201);
+
+    expect(createFromDefinition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: "job-key",
+        idempotencyHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      }),
+    );
+  });
+
   it("valida e enfileira uma composição sem exigir formato", async () => {
     const validateComposition = vi.fn().mockResolvedValue({
       definition: {

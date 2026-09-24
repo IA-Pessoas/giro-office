@@ -1,4 +1,5 @@
 import {
+  MAX_REPORTING_QUERY_LIMIT,
   REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCES,
   reportingQuerySchema,
 } from "@workspace/shared";
@@ -17,7 +18,7 @@ export const internalReportingExtractBodySchema = z
     query: reportingQuerySchema.optional(),
     source: z.enum(regularizeReportingSources),
     fields: z.array(reportingFieldSchema).min(1).max(25),
-    limit: z.number().int().min(1).max(101),
+    limit: z.number().int().min(1).max(MAX_REPORTING_QUERY_LIMIT),
   })
   .strict()
   .superRefine((value, context) => {

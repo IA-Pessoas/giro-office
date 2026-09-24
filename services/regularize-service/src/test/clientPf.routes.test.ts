@@ -179,6 +179,7 @@ describe("regularize client PF and partners routes", () => {
       },
       partners: {
         findFirst: vi.fn(async () => null),
+        aggregate: vi.fn(async () => ({ _sum: { part: 30 } })),
         create: vi.fn(async () => ({
           id: "partner-1",
           pj_id: "d0000000-0000-4000-8000-000000000001",

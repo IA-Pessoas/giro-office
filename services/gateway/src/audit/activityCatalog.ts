@@ -120,6 +120,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/platform\/super-admins$/,
+    description: { action: "consultou", item: "a lista de super admins da plataforma" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/super-admins\/[^/]+\/impersonation-permission$/,
+    description: { action: "alterou", item: "a permissão de personificação de um super admin" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },
   },
@@ -177,6 +187,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["POST"],
     pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/,
     description: { action: "reativou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate$/,
+    description: { action: "iniciou", item: "uma personificação de usuário da organização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/impersonation\/exit$/,
+    description: { action: "encerrou", item: "uma personificação de usuário da organização" },
   },
   {
     methods: ["POST"],

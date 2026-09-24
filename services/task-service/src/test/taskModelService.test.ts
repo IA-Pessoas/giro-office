@@ -33,7 +33,7 @@ describe("TaskModelService", () => {
 
   it("createModel lança 409 quando já existe modelo com mesmo nome", async () => {
     prismaMock.taskModel.findFirst.mockResolvedValue({ id: "model-1" });
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     await expect(
       service.createModel({
@@ -50,7 +50,7 @@ describe("TaskModelService", () => {
   });
 
   it("createModel rejeita responsável 3 sem responsável 2 antes de consultar o banco", async () => {
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     await expect(
       service.createModel({
@@ -74,7 +74,7 @@ describe("TaskModelService", () => {
   });
 
   it("updateModel rejeita responsável 2 quando o responsável principal está ausente", async () => {
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     await expect(
       service.updateModel({
@@ -99,7 +99,7 @@ describe("TaskModelService", () => {
 
   it("detailModel lança 404 quando modelo não existe", async () => {
     prismaMock.taskModel.findFirst.mockResolvedValue(null);
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     await expect(service.detailModel("model-1", "org-1")).rejects.toMatchObject({
       statusCode: 404,
@@ -110,7 +110,7 @@ describe("TaskModelService", () => {
     prismaMock.taskModel.findFirst.mockResolvedValue(null);
     prismaMock.taskModel.create.mockResolvedValue({ id: "model-1" });
     prismaMock.user.findMany.mockResolvedValue([]);
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     await expect(
       service.createModel({
@@ -128,7 +128,7 @@ describe("TaskModelService", () => {
 
   it("listModel lista todos os modelos da organizacao quando filtros nao sao informados", async () => {
     prismaMock.taskModel.findMany.mockResolvedValue([{ id: "model-1", name: "Modelo" }]);
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     const result = await service.listModel({
       organizationId: "org-1",
@@ -185,7 +185,7 @@ describe("TaskModelService", () => {
     const row = { id: "model-21", name: "Fiscal 21", department_id: "dep-1" };
     prismaMock.taskModel.findMany.mockResolvedValue([row]);
     prismaMock.taskModel.count.mockResolvedValue(21);
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     const result = await service.listModel({
       organizationId: "org-1",
@@ -219,7 +219,7 @@ describe("TaskModelService", () => {
 
   it("listModel limita modelos de projeto a departamentos ativos", async () => {
     prismaMock.taskModel.findMany.mockResolvedValue([]);
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     await service.listModel({
       organizationId: "org-1",
@@ -246,7 +246,7 @@ describe("TaskModelService", () => {
   it("createModel lança 403 quando usuário não tem permissão", async () => {
     prismaMock.taskModel.findFirst.mockResolvedValueOnce(null);
     prismaMock.user.findFirst.mockResolvedValue({ id: "user-1", permission: 1 });
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     await expect(
       service.createModel({
@@ -268,7 +268,7 @@ describe("TaskModelService", () => {
       organization_id: "org-1",
     });
     prismaMock.user.findFirst.mockResolvedValue({ id: "user-1", permission: 1 });
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     await expect(
       service.updateModel({
@@ -291,7 +291,7 @@ describe("TaskModelService", () => {
       organization_id: "org-1",
     });
     prismaMock.user.findFirst.mockResolvedValue({ id: "user-1", permission: 1 });
-    const service = new TaskModelService();
+    const service = new TaskModelService(prismaMock as never, auditMock as never);
 
     await expect(
       service.deleteModel({

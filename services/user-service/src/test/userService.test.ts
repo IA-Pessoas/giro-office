@@ -61,6 +61,7 @@ import { UserService } from "../services/userService.js";
 describe("UserService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.user.findFirst.mockResolvedValue(null);
     prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.permission.create.mockResolvedValue({ id: "permission-1" });
     prismaMock.permission.updateMany.mockResolvedValue({ count: 1 });
@@ -452,6 +453,28 @@ describe("UserService", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
 
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
+  });
+
+  it("create rejeita login que já existe com outra caixa", async () => {
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1", organization_id: "org-1" });
+    prismaMock.user.findFirst.mockResolvedValue({ id: "user-legacy" });
+    const service = new UserService();
+
+    await expect(
+      service.create({
+        name: "Ana",
+        login: "ana",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        organization_id: "org-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 409, message: "Login ja cadastrado." });
+
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { login: { equals: "ana", mode: "insensitive" } } }),
+    );
     expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
 

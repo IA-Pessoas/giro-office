@@ -23,6 +23,9 @@ const financeScreenshotPath =
 const financeMobileScreenshotPath =
   process.env.TASKS_FINANCEIRO_MOBILE_SCREENSHOT_PATH ??
   "output/playwright/issue-301-finance-task-mobile.png";
+const releasedServicesScreenshotPath =
+  process.env.TASKS_RELEASED_SERVICES_SCREENSHOT_PATH ??
+  "output/playwright/issue-1243-released-services.png";
 
 const smokeUser = {
   id: "user-task-smoke",
@@ -40,6 +43,8 @@ const task = {
   isOwn: false,
   isUnassigned: true,
   name: "Tarefa sem responsável",
+  client_name: "Cliente Filtro",
+  project_name: "Projeto migração",
   status: "Em Andamento",
   billing: "Não Realizar",
   charge_comercial: false,
@@ -55,6 +60,14 @@ const assignedTask = {
   isOwn: true,
   isUnassigned: false,
   name: "Tarefa com responsável",
+};
+
+const uniqueServiceTask = {
+  ...task,
+  id: "task-unique-released",
+  name: "Serviço único liberado",
+  client_name: "Empresa serviço único",
+  project_name: "Projeto serviço único",
 };
 
 const legacyTaskDetail = {
@@ -137,8 +150,11 @@ async function installApiMocks(
         json: { success: false, error: "Cliente não encontrado.", code: "NOT_FOUND" },
       });
     }
-    const filteredTasks =
-      requestUrl.searchParams.get("assignment") === "assigned" ? [assignedTask] : [task];
+    const filteredTasks = requestUrl.searchParams.get("unique_service_released") === "true"
+      ? [uniqueServiceTask]
+      : requestUrl.searchParams.get("assignment") === "assigned"
+        ? [assignedTask]
+        : [task];
     return route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -557,12 +573,30 @@ async function runBrowserProof() {
   );
 
   try {
-    await page.goto(`/tasks?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/tasks?clientId=${clientId}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
     await expect(page.getByRole("heading", { name: "Tarefas", level: 1 })).toBeVisible();
     await expect(page.getByText("Tarefa sem responsável", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Fila financeira", level: 2 })).toBeVisible();
     await expect(page.getByText("Tarefa financeira pendente", { exact: true })).toBeVisible();
     await expect(page.getByText("Tarefa financeira individual", { exact: true })).toBeVisible();
+
+    const releasedServicesFilter = page.getByLabel("Liberação do Comercial");
+    await releasedServicesFilter.selectOption("true");
+    await expect
+      .poll(() =>
+        taskListRequests.some((url) => url.searchParams.get("unique_service_released") === "true"),
+      )
+      .toBe(true);
+    await expect(page.getByText(uniqueServiceTask.name, { exact: true })).toBeVisible();
+    await expect(page.getByText(uniqueServiceTask.client_name, { exact: true })).toBeVisible();
+    await expect(page.getByText(uniqueServiceTask.project_name, { exact: true })).toBeVisible();
+    await page.screenshot({ path: releasedServicesScreenshotPath, fullPage: true });
+    await releasedServicesFilter.selectOption("");
+    await expect(page.getByText(task.name, { exact: true })).toBeVisible();
+
     await page.screenshot({ path: financeScreenshotPath, fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByRole("heading", { name: "Fila financeira", level: 2 })).toBeVisible();
@@ -572,7 +606,7 @@ async function runBrowserProof() {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole("checkbox", { name: "Selecionar Tarefa financeira pendente" }).check();
     await page.getByRole("button", { name: "Baixar selecionadas (1)" }).click();
-    await expect(page.getByText("1 tarefa(s) baixada(s).", { exact: true })).toBeVisible();
+    await expect(page.getByText("1 tarefa(s) baixada(s).", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Tarefa financeira individual", { exact: true })).toBeVisible();
     const individualFinanceRow = page
       .getByText("Tarefa financeira individual", { exact: true })

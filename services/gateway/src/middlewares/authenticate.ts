@@ -155,7 +155,9 @@ export function buildAuthenticateMiddleware(
         failureReason = "session_validation";
         // Só leitura reaproveita a validação. Todo método que altera estado revalida
         // no user-service e derruba a entrada, então logout e revogação valem na hora.
-        const cacheable = request.method === "GET" || request.method === "HEAD";
+        const cacheable =
+          (request.method === "GET" || request.method === "HEAD") &&
+          !request.auth.claims.impersonator_platform_user_id;
         const key = sessionCacheKey(request.auth, request.authTransport);
         const now = Date.now();
 

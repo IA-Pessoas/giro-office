@@ -10,7 +10,7 @@ import {
 
 import { useFiscalNcmSearch } from "../hooks";
 import type { FiscalNcmSearchResult } from "../types";
-import { getFiscalErrorMessage } from "../utils";
+import { formatFiscalTaxRegime, getFiscalErrorMessage } from "../utils";
 import { FiscalStateBox } from "./FiscalStateBox";
 
 const ncmFieldLabels: Array<{
@@ -288,7 +288,11 @@ export function FiscalSearchSection() {
                     <FieldCard
                       key={field.key}
                       label={field.label}
-                      value={displayedResult.ncm[field.key] ?? null}
+                      value={
+                        field.key === "tax_regime"
+                          ? formatFiscalTaxRegime(displayedResult.ncm.tax_regime)
+                          : displayedResult.ncm[field.key] ?? null
+                      }
                     />
                   ))}
                 </div>

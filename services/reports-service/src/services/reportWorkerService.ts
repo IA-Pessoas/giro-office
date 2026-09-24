@@ -16,7 +16,11 @@ import type { ReportComposition } from "../schemas/reportComposition.schemas.js"
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import type { ReportModelDefinition } from "../schemas/reportModel.schemas.js";
 import { DEFAULT_REPORT_RETENTION_DAYS } from "../schemas/reportRetention.schemas.js";
-import { ReportAreaExecutionError, type ReportExecutionService } from "./reportExecutionService.js";
+import {
+  REPORT_SNAPSHOT_LIMIT_MESSAGE,
+  ReportAreaExecutionError,
+  type ReportExecutionService,
+} from "./reportExecutionService.js";
 import type { ReportLifecycleService } from "./reportLifecycleService.js";
 
 export class ReportWorkerService {
@@ -181,7 +185,9 @@ export class ReportWorkerService {
         error_message:
           cause instanceof ReportAreaExecutionError
             ? cause.userMessage
-            : "Não foi possível gerar o relatório. Confira o acesso e os critérios e tente novamente.",
+            : cause instanceof ServiceError && cause.message === REPORT_SNAPSHOT_LIMIT_MESSAGE
+              ? REPORT_SNAPSHOT_LIMIT_MESSAGE
+              : "Não foi possível gerar o relatório. Confira o acesso e os critérios e tente novamente.",
       });
     } catch (error) {
       if (!(error instanceof ServiceError && error.statusCode === 409)) throw error;

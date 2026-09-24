@@ -15,7 +15,7 @@ export const TASK_TABLE_NAME_CELL_CLASSNAME = `${TASK_TABLE_CELL_CLASSNAME} pl-5
 export const TASK_TABLE_BADGE_CLASSNAME =
   "inline-flex min-h-6 items-center justify-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold";
 
-export const TASK_TABLE_CLASSNAME = "w-[1120px] min-w-full table-fixed";
+export const TASK_TABLE_CLASSNAME = "w-[1440px] min-w-full table-fixed";
 
 export const TASK_TABLE_SCROLL_AREA_CLASSNAME =
   SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME;

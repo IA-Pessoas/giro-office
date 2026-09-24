@@ -1,7 +1,7 @@
 import { INTEGRACAO_PERMISSION_LEVEL, ServiceError } from "@workspace/shared";
 
 import type { Prisma } from "../generated/prisma/client.js";
-import prismaClient from "../prisma/index.js";
+import type prismaClient from "../prisma/index.js";
 
 const RETENTION_DAYS = 90;
 
@@ -101,6 +101,8 @@ export async function publishTaskOperationalNotifications(
 }
 
 export class TaskOperationalNotificationService {
+  constructor(private readonly prisma: typeof prismaClient) {}
+
   async list(input: {
     user_id: string;
     organization_id: string;
@@ -108,7 +110,7 @@ export class TaskOperationalNotificationService {
     const now = new Date();
     const retentionDate = new Date(now);
     retentionDate.setUTCDate(retentionDate.getUTCDate() - RETENTION_DAYS);
-    await prismaClient.taskOperationalNotification.updateMany({
+    await this.prisma.taskOperationalNotification.updateMany({
       where: {
         organization_id: input.organization_id,
         recipient_id: input.user_id,
@@ -123,7 +125,7 @@ export class TaskOperationalNotificationService {
       archived_at: null,
     };
     const [items, unread_count] = await Promise.all([
-      prismaClient.taskOperationalNotification.findMany({
+      this.prisma.taskOperationalNotification.findMany({
         where,
         orderBy: { created_at: "desc" },
         take: 50,
@@ -137,7 +139,7 @@ export class TaskOperationalNotificationService {
           created_at: true,
         },
       }),
-      prismaClient.taskOperationalNotification.count({ where: { ...where, read_at: null } }),
+      this.prisma.taskOperationalNotification.count({ where: { ...where, read_at: null } }),
     ]);
     return { items, unread_count };
   }
@@ -147,7 +149,7 @@ export class TaskOperationalNotificationService {
     organization_id: string;
     notification_id: string;
   }): Promise<{ id: string; read_at: Date }> {
-    const notification = await prismaClient.taskOperationalNotification.findFirst({
+    const notification = await this.prisma.taskOperationalNotification.findFirst({
       where: {
         id: input.notification_id,
         organization_id: input.organization_id,
@@ -159,7 +161,7 @@ export class TaskOperationalNotificationService {
     if (!notification) throw new ServiceError(404, "Notificação não encontrada.");
     const read_at = notification.read_at ?? new Date();
     if (!notification.read_at) {
-      await prismaClient.taskOperationalNotification.updateMany({
+      await this.prisma.taskOperationalNotification.updateMany({
         where: { id: notification.id, recipient_id: input.user_id, read_at: null },
         data: { read_at },
       });

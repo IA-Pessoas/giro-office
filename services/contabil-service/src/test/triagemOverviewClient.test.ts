@@ -139,6 +139,30 @@ describe("TriagemOverviewClient", () => {
     ).rejects.toMatchObject({ statusCode: 502 });
   });
 
+  it("trata overview vazio (cliente sem competência na Triagem) como 404 (#1322)", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      response({
+        success: true,
+        data: {
+          items: [],
+          total: 0,
+          page: 1,
+          page_size: 1,
+          indicators: { urgent_open: 0, routine_pending: 0, bank_pending: 0, complete: 0 },
+        },
+      }),
+    );
+
+    await expect(
+      createClient(fetchImpl).getSummary({
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        clientId: CLIENT_ID,
+        competence: COMPETENCE,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
   it("mapeia HTTP não bem-sucedido para indisponibilidade explícita", async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(response({}, 503));
 

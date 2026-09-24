@@ -1,14 +1,14 @@
-import { createHash, createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
+  MAX_REPORTING_QUERY_LIMIT,
   REQUEST_ID_HEADER,
   regularizeProcessReportingCatalog,
   ServiceError,
 } from "@workspace/shared";
 import type {
   ReportCatalogRelation,
-  ReportCatalogSource,
   ReportPreviewAdapterInput,
   ReportPreviewAdapterResult,
   ReportSourceAdapter,
@@ -16,7 +16,13 @@ import type {
 import type { ReportsServiceEnv } from "../config/env.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import {
-  assertReportSourceResponse,
+  createRegularizeReportingGrant,
+  isRegularizeExtractResponse,
+  projectRegularizeReportingRows,
+  publicReportingSources,
+} from "./regularizeReportingProtocol.js";
+import {
+  readReportSourcePayload,
   reportCriteria,
   reportingQueryFields,
   reportResultFields,
@@ -24,75 +30,8 @@ import {
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
-const MAX_REGULARIZE_REPORTING_LIMIT = 101;
-
-const sources = regularizeProcessReportingCatalog.sources.map(
-  ({ keys: _keys, ...source }) => source,
-) as readonly ReportCatalogSource[];
+const sources = publicReportingSources(regularizeProcessReportingCatalog.sources);
 const relations: readonly ReportCatalogRelation[] = [];
-
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function createGrant(input: {
-  secret: string;
-  source: string;
-  fields: readonly string[];
-  organizationId: string;
-  requestId: string;
-  body: unknown;
-}): { grant: string; signature: string } {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const payload = {
-    audience: "regularize-service",
-    body_sha256: createHash("sha256").update(canonicalJson(input.body)).digest("hex"),
-    expires_at: issuedAt + 60,
-    fields: input.fields,
-    issued_at: issuedAt,
-    operation: "extract",
-    organization_id: input.organizationId,
-    request_id: input.requestId,
-    source: input.source,
-    version: 1,
-  };
-  const grant = Buffer.from(canonicalJson(payload)).toString("base64url");
-  return { grant, signature: createHmac("sha256", input.secret).update(grant).digest("hex") };
-}
-
-function isExtractResponse(value: unknown): value is {
-  success: true;
-  data: { rows: readonly Record<string, unknown>[]; reachedLimit: boolean };
-} {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    (value as { success?: unknown }).success === true &&
-    Array.isArray((value as { data?: { rows?: unknown } }).data?.rows) &&
-    typeof (value as { data?: { reachedLimit?: unknown } }).data?.reachedLimit === "boolean" &&
-    (value as { data: { rows: unknown[] } }).data.rows.every(
-      (row) => typeof row === "object" && row !== null && !Array.isArray(row),
-    )
-  );
-}
-
-function projectRows(
-  rows: readonly Record<string, unknown>[],
-  fields: readonly string[],
-): readonly Record<string, unknown>[] {
-  return rows.map((row) =>
-    Object.fromEntries(
-      fields.map((field) => [field, row[field]]).filter(([, value]) => value !== undefined),
-    ),
-  );
-}
 
 export class RegularizeProcessAdapter implements ReportSourceAdapter {
   readonly sources = sources;
@@ -132,10 +71,10 @@ export class RegularizeProcessAdapter implements ReportSourceAdapter {
       ...reportCriteria(definition, input.parameter_values),
       source,
       fields,
-      limit: Math.min(input.limit, MAX_REGULARIZE_REPORTING_LIMIT),
+      limit: Math.min(input.limit, MAX_REPORTING_QUERY_LIMIT),
     };
     const requestId = input.request_id || randomUUID();
-    const signed = createGrant({
+    const signed = createRegularizeReportingGrant({
       secret: this.env.regularizeReportingGrantSecret,
       source,
       fields: reportingQueryFields(fields, body.query),
@@ -160,13 +99,15 @@ export class RegularizeProcessAdapter implements ReportSourceAdapter {
           signal: AbortSignal.timeout(this.env.sourceTimeoutMs),
         },
       );
-      assertReportSourceResponse(response);
-      const payload: unknown = await response.json();
-      if (!response.ok || !isExtractResponse(payload)) {
+      const payload = await readReportSourcePayload(response);
+      if (!response.ok || !isRegularizeExtractResponse(payload)) {
         throw new Error("Resposta interna inválida.");
       }
       return {
-        rows: projectRows(payload.data.rows, reportResultFields(fields, body.query)),
+        rows: projectRegularizeReportingRows(
+          payload.data.rows,
+          reportResultFields(fields, body.query),
+        ),
         reachedLimit: payload.data.reachedLimit,
       };
     } catch (err: unknown) {

@@ -9,6 +9,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import {
   taskIntegrationRegularizeBodySchema,
   taskIntegrationRegularizeDeleteBodySchema,
@@ -17,7 +18,10 @@ import {
 import { TaskIntegrationRegularizeService } from "../services/taskIntegrationRegularizeService.js";
 
 const router: ReturnType<typeof Router> = Router();
-const taskIntegrationRegularizeService = new TaskIntegrationRegularizeService();
+const taskIntegrationRegularizeService = new TaskIntegrationRegularizeService(
+  nodeDeps.prisma,
+  nodeDeps.audit,
+);
 
 router.post(
   "/integration",

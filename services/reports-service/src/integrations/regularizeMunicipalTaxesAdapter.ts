@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   error as logError,
+  MAX_REPORTING_QUERY_LIMIT,
   REQUEST_ID_HEADER,
   regularizeMunicipalTaxesReportingCatalog,
   ServiceError,
@@ -17,12 +18,11 @@ import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import {
   createRegularizeReportingGrant,
   isRegularizeExtractResponse,
-  MAX_REGULARIZE_REPORTING_LIMIT,
   projectRegularizeReportingRows,
   publicReportingSources,
 } from "./regularizeReportingProtocol.js";
 import {
-  assertReportSourceResponse,
+  readReportSourcePayload,
   reportCriteria,
   reportingQueryFields,
   reportResultFields,
@@ -71,7 +71,7 @@ export class RegularizeMunicipalTaxesAdapter implements ReportSourceAdapter {
       ...reportCriteria(definition, input.parameter_values),
       source,
       fields,
-      limit: Math.min(input.limit, MAX_REGULARIZE_REPORTING_LIMIT),
+      limit: Math.min(input.limit, MAX_REPORTING_QUERY_LIMIT),
     };
     const requestId = input.request_id || randomUUID();
     const signed = createRegularizeReportingGrant({
@@ -99,8 +99,7 @@ export class RegularizeMunicipalTaxesAdapter implements ReportSourceAdapter {
           signal: AbortSignal.timeout(this.env.sourceTimeoutMs),
         },
       );
-      assertReportSourceResponse(response);
-      const payload: unknown = await response.json();
+      const payload = await readReportSourcePayload(response);
       if (!response.ok || !isRegularizeExtractResponse(payload)) {
         throw new Error("Resposta interna inválida.");
       }

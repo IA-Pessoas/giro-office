@@ -19,6 +19,7 @@ interface UserRouteMocks {
     login: Mock;
     firstCreate: Mock;
     validateSession: Mock;
+    getImpersonationSessionInfo: Mock;
     refreshSession: Mock;
     revokeSession: Mock;
   };
@@ -48,6 +49,7 @@ const userRouteMocks: UserRouteMocks = vi.hoisted(
       login: vi.fn(),
       firstCreate: vi.fn(),
       validateSession: vi.fn(),
+      getImpersonationSessionInfo: vi.fn(),
       refreshSession: vi.fn(),
       revokeSession: vi.fn(),
     },

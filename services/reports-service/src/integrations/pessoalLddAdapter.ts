@@ -15,7 +15,7 @@ import type {
 import type { ReportsServiceEnv } from "../config/env.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import {
-  assertReportSourceResponse,
+  readReportSourcePayload,
   reportCriteria,
   reportingQueryFields,
   reportResultFields,
@@ -23,7 +23,6 @@ import {
 
 const REPORTS_GRANT_HEADER = "x-reports-grant";
 const REPORTS_GRANT_SIGNATURE_HEADER = "x-reports-grant-signature";
-const MAX_PESSOAL_LDD_REPORTING_LIMIT = 101;
 
 const sources = pessoalLddReportingCatalog.sources.map(
   ({ keys: _keys, ...source }) => source,
@@ -125,7 +124,7 @@ export class PessoalLddAdapter implements ReportSourceAdapter {
       ...reportCriteria(definition, input.parameter_values),
       source,
       fields,
-      limit: Math.min(input.limit, MAX_PESSOAL_LDD_REPORTING_LIMIT),
+      limit: input.limit,
     };
     const requestId = input.request_id || randomUUID();
     const signed = createGrant({
@@ -153,8 +152,7 @@ export class PessoalLddAdapter implements ReportSourceAdapter {
           signal: AbortSignal.timeout(this.env.sourceTimeoutMs),
         },
       );
-      assertReportSourceResponse(response);
-      const payload: unknown = await response.json();
+      const payload: unknown = await readReportSourcePayload(response);
       if (!response.ok || !isExtractResponse(payload)) {
         throw new Error("Resposta interna inválida.");
       }

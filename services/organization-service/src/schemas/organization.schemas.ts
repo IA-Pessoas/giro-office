@@ -1,8 +1,23 @@
-import { getSingleQueryValue, zNonEmptyText } from "@workspace/shared";
+import { zNonEmptyText } from "@workspace/shared/schemas";
 import { z } from "zod";
 
 import { isValidCnpj, normalizeCnpj } from "../domain/cnpj.js";
-import { status as statusEnum } from "../generated/prisma/client.js";
+
+// Mantido como contrato puro para que o Worker possa reutilizar os schemas sem
+// carregar o cliente Prisma/Node no bundle de borda.
+const statusEnum = {
+  trial: "trial",
+  past_due: "past_due",
+  active: "active",
+  suspended: "suspended",
+  cancelled: "cancelled",
+} as const;
+
+function getSingleQueryValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return undefined;
+}
 
 const cnpjSchema = z
   .string()

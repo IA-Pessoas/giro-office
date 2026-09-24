@@ -1,9 +1,6 @@
 import { debug, error as logError } from "@workspace/shared";
 
-import {
-  createHttpProjectProgressIntegration,
-  type ProjectProgressIntegration,
-} from "../integrations/projectProgress.js";
+import type { ProjectProgressIntegration } from "../integrations/projectProgress.js";
 
 /**
  * Efeitos colaterais de fluxo apos CRUD de tarefas de integracao (legado `TaskService` +
@@ -13,9 +10,7 @@ import {
 export class TaskWorkflowService {
   readonly #projectProgressIntegration: ProjectProgressIntegration;
 
-  constructor(
-    projectProgressIntegration: ProjectProgressIntegration = createHttpProjectProgressIntegration(),
-  ) {
+  constructor(projectProgressIntegration: ProjectProgressIntegration) {
     this.#projectProgressIntegration = projectProgressIntegration;
   }
 

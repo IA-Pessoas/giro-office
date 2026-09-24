@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { Archive, Loader2, Pencil, Plus, Save, X } from "lucide-react";
+import { toast } from "react-toastify";
 
 import { getContabilErrorMessage } from "@modules/contabil";
 
 import { useTriageCatalogMutations, useTriageCatalogs } from "../hooks";
 import type { TriageCatalogInput, TriageCatalogItem, TriageCatalogKind } from "../services";
+import { validateTriageCatalogForm } from "./triagem.helpers";
 
 const CATALOG_KINDS: Array<{ value: TriageCatalogKind; label: string }> = [
   { value: "JUSTIFICATION", label: "Justificativas" },
@@ -74,7 +76,6 @@ function CatalogFormFields({
         Código
         <input
           aria-label="Código do catálogo"
-          required
           maxLength={100}
           value={values.code}
           onChange={(event) => onChange("code", event.target.value)}
@@ -85,7 +86,6 @@ function CatalogFormFields({
         Rótulo
         <input
           aria-label="Rótulo do catálogo"
-          required
           maxLength={255}
           value={values.label}
           onChange={(event) => onChange("label", event.target.value)}
@@ -96,8 +96,8 @@ function CatalogFormFields({
         URL HTTPS (opcional)
         <input
           aria-label="URL HTTPS do catálogo"
-          type="url"
-          pattern="https://.*"
+          type="text"
+          inputMode="url"
           value={values.url}
           onChange={(event) => onChange("url", event.target.value)}
           className="mt-1 block h-10 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
@@ -114,6 +114,7 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
   const [createValues, setCreateValues] = useState<CatalogFormValues>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<CatalogFormValues>(EMPTY_FORM);
+  const [formError, setFormError] = useState<string | null>(null);
   const actionError =
     catalogs.error ?? mutations.create.error ?? mutations.update.error ?? mutations.archive.error;
   const isMutating =
@@ -133,17 +134,39 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
     setEditValues((current) => ({ ...current, [field]: value }));
   }
 
+  // Erro da API fica em actionError; aqui só evitamos a promessa rejeitada sem tratamento.
+  async function submit(values: CatalogFormValues, save: () => Promise<unknown>, done: string) {
+    const invalid = validateTriageCatalogForm(values);
+    setFormError(invalid);
+    if (invalid) return false;
+    try {
+      await save();
+      toast.success(done);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function createCatalog(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    await mutations.create.mutateAsync(toPayload({ ...createValues, kind }));
-    setCreateValues({ ...EMPTY_FORM, kind });
+    const saved = await submit(
+      createValues,
+      () => mutations.create.mutateAsync(toPayload({ ...createValues, kind })),
+      "Item adicionado ao catálogo.",
+    );
+    if (saved) setCreateValues({ ...EMPTY_FORM, kind });
   }
 
   async function updateCatalog(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!editingId) return;
-    await mutations.update.mutateAsync({ id: editingId, input: toPayload(editValues, true) });
-    setEditingId(null);
+    const saved = await submit(
+      editValues,
+      () => mutations.update.mutateAsync({ id: editingId, input: toPayload(editValues, true) }),
+      "Item do catálogo atualizado.",
+    );
+    if (saved) setEditingId(null);
   }
 
   function archiveCatalog(id: string): void {
@@ -160,10 +183,11 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="triage-catalogs-title" className="text-lg font-semibold text-gray-900 dark:text-white">
-            Catálogos operacionais
+            Itens do catálogo
           </h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
-            Justificativas, tipos de link e sites estaduais controlados por organização.
+            Os itens valem para a organização inteira. Itens arquivados deixam de aparecer nas
+            novas competências.
           </p>
         </div>
         <label className="text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -184,7 +208,7 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
       </div>
 
       {canEdit ? (
-        <form className="mt-4 space-y-3" onSubmit={createCatalog}>
+        <form className="mt-4 space-y-3" onSubmit={createCatalog} noValidate>
           <CatalogFormFields values={{ ...createValues, kind }} onChange={updateCreateValue} />
           <button type="submit" disabled={isMutating} className={PRIMARY_BUTTON_CLASSNAME}>
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -211,7 +235,7 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
           {(catalogs.data ?? []).map((item) => (
             <li key={item.id} className="p-3">
               {editingId === item.id ? (
-                <form className="space-y-3" onSubmit={updateCatalog}>
+                <form className="space-y-3" onSubmit={updateCatalog} noValidate>
                   <CatalogFormFields values={editValues} onChange={updateEditValue} />
                   <div className="flex flex-wrap gap-2">
                     <button type="submit" disabled={isMutating} className={PRIMARY_BUTTON_CLASSNAME}>
@@ -276,6 +300,11 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
         </ul>
       )}
 
+      {formError ? (
+        <p className="mt-3 text-sm text-red-700 dark:text-red-300" role="alert">
+          {formError}
+        </p>
+      ) : null}
       {actionError ? (
         <p className="mt-3 text-sm text-red-700 dark:text-red-300" role="alert">
           Não foi possível concluir a alteração. {getContabilErrorMessage(actionError)}

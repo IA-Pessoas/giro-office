@@ -189,6 +189,29 @@ export async function updateClientHistory(
   return updated as Record<string, unknown>;
 }
 
+// ponytail: só a linha sai; o anexo fica no storage local/Firebase do Node. O Worker (prod) limpa o bucket.
+export async function deleteClientHistory(
+  prisma: PrismaClient,
+  organizationId: string,
+  clientId: string,
+  historyId: string,
+  userId: string,
+  canManage: boolean,
+): Promise<void> {
+  const exists = await prisma.clientHistory.findFirst({
+    where: { id: historyId, client_id: clientId, organization_id: organizationId },
+    select: { id: true, user_id: true },
+  });
+  if (!exists) {
+    throw new ServiceError(404, "Histórico não encontrado.");
+  }
+  if (!canManage && exists.user_id !== userId) {
+    throw new ServiceError(403, "Usuário não tem permissão para excluir este histórico.");
+  }
+
+  await prisma.clientHistory.delete({ where: { id: historyId } });
+}
+
 export async function createHistoryPending(
   prisma: PrismaClient,
   organizationId: string,

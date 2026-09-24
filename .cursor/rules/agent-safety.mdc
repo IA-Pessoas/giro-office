@@ -61,7 +61,7 @@ Sinais praticos, tirados do incidente e cobertos por `scripts/supply-chain-secur
 
 ## Verificacao
 
-- `pnpm test:policies` roda as politicas, incluindo a varredura de configs executaveis.
+- `pnpm test:scripts` roda os testes de politica em `scripts/`, incluindo a varredura de configs executaveis.
 - `node --test scripts/supply-chain-security.test.mjs` roda so essa varredura.
 - Depois de um `git fetch` e antes de buildar, confira o tamanho de
   `app/postcss.config.js` (94 bytes) e `lint-staged.config.mjs` (766 bytes).

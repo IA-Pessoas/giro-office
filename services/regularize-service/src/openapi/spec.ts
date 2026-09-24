@@ -1,4 +1,5 @@
 import {
+  MAX_REPORTING_QUERY_LIMIT,
   REGULARIZE_GUIDANCE_CHECKLIST_CODES,
   REGULARIZE_GUIDANCE_CHECKLIST_STATUSES,
   REGULARIZE_GUIDANCE_TARGET_TYPES,
@@ -1398,7 +1399,7 @@ export function buildRegularizeServiceOpenApiSpec(
                       maxItems: 25,
                       items: { type: "string" },
                     },
-                    limit: { type: "integer", minimum: 1, maximum: 101 },
+                    limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
                     query: reportingQueryOpenApiSchema,
                   },
                 },

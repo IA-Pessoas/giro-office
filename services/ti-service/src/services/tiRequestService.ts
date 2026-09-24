@@ -145,6 +145,7 @@ export class TiRequestService {
           assigned_to_id: body.assigned_to_id,
           urgency: body.urgency,
           attachment: body.attachment,
+          anydesk_code: body.anydesk_code,
           status: "New",
           organization_id: context.organizationId,
         },

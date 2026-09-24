@@ -1,0 +1,787 @@
+// Subconjunto de infra/prisma/schema.prisma com os models que os serviços do
+// task-service Node acessam, o fecho das relações muitos-para-um (includes
+// aninhados) e as listas de um salto a partir deles (exceto dos hubs User,
+// Organization, Department e Client). Relações para fora do conjunto saem.
+generator client {
+  provider        = "prisma-client"
+  runtime         = "workerd"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Organization {
+  id                            String                        @id @default(uuid())
+  name                          String
+  slug                          String                        @unique
+  created_at                    DateTime                      @default(now())
+  updated_at                    DateTime                      @updatedAt
+  cnpj                          String                        @unique
+  email_created_by              String
+  logo_url                      String?
+  subscription_plan             String                        @default("trial")
+  status                        status                        @default(active)
+  timezone                      String                        @default("UTC")
+  agendas                       Agenda[]
+  clients                       Client[]
+  pas                           PA[]
+  clientsPF                     ClientPF[]
+  departments                   Department[]
+  projectPlans                  ProjectPlan[]
+  projectPlanHirings            ProjectPlanHiring[]
+  projectPlanTasks              ProjectPlanTasks[]
+  projects                      Project[]
+  projectWizardConfirmations    ProjectWizardConfirmation[]
+  tasks                         Task[]
+  taskDependents                TaskDependent[]
+  tasksIntegrationRegularize    TasksIntegrationRegularize[]
+  taskModels                    TaskModel[]
+  completionRequests            TaskCompletionRequest[]
+  taskAttachments               TaskAttachment[]
+  taskPostponements             TaskPostponement[]
+  taskOperationalNotifications  TaskOperationalNotification[]
+  usersWithOrg                  User[]              @relation("UserOrganization")
+  permissions                   Permission[]
+  permissionsSpecifics          PermissionSpecific[]
+  commercialTaskBillings        CommercialTaskBilling[]
+  licenses                      License[]
+  proceduralGuidances           ProceduralGuidance[]
+  processes                     Process[]
+  pointsConfig                  PointsConfig[]
+
+  @@index([name, id], map: "idx_organizations_name_id")
+  @@map("organizations")
+}
+
+model Department {
+  id                        String            @id @default(uuid())
+  name                      String
+  color                     String
+  status                    String
+  solution                  Boolean?
+  organization_id           String
+  agenda_controls           Agenda[]          @relation("department_control")
+  organization              Organization      @relation(fields: [organization_id], references: [id])
+  tasks                     Task[]
+  tasksModel                TaskModel[]
+  users                     User[]
+  financeiroCollectors      DepartmentCollector[]
+
+  @@index([organization_id, name], map: "idx_departments_org_name")
+  @@unique([organization_id, name], map: "uq_departments_org_name")
+  @@map("departments")
+}
+
+model User {
+  id                          String                 @id @default(uuid())
+  name                        String
+  login                       String
+  password                    String
+  permission                  Int
+  status                      String
+  organization_id             String?
+  type                        enumType?
+  first_owner_flag            Boolean?               @default(false)
+  session_version             Int                    @default(0)
+  version                     Int                    @default(1)
+  permission_id               String?                @unique
+  department_id               String
+  invited_by                  String?
+  joined_at                   DateTime?              @default(now())
+  photo_url                   String?
+  full_name                   String?
+  gender                      String?
+  birth_date                  DateTime?
+  cpf                         String?                 @unique
+  rg                          String?                 @unique
+  address                     String?
+  job_title                   String?
+  email                       String?
+  phone                       String?
+  hire_date                   DateTime?
+  dominio_hire_date           DateTime?
+  termination_date            DateTime?
+  allergies                   Json?
+  emergency_contacts          Json?
+  agenda2                     Agenda[]               @relation("participant2")
+  agenda3                     Agenda[]               @relation("participant3")
+  agenda                      Agenda[]               @relation("participant")
+  sponso                      Project[]              @relation("sponsor")
+  tasks2                      Task[]                 @relation("responsible2")
+  tasks3                      Task[]                 @relation("responsible3")
+  tasks                       Task[]                 @relation("responsible")
+  tasksModel2                 TaskModel[]            @relation("responsible2")
+  tasksModel3                 TaskModel[]            @relation("responsible3")
+  tasksModel                  TaskModel[]            @relation("responsible")
+  organization                Organization?         @relation("UserOrganization", fields: [organization_id], references: [id])
+  permissionRef               Permission?           @relation("UserPrimaryPermission", fields: [permission_id], references: [id])
+  permissions                 Permission[]
+  permissionsSpecifics        PermissionSpecific?
+  licensesResp                License[]
+  processResp1                Process[]              @relation("responsible1")
+  processResp2                Process[]              @relation("responsible2")
+  processResp3                Process[]              @relation("responsible3")
+  pointConfig                 PointsConfig?
+  financeiroCollectorAssignments DepartmentCollector[]
+  taskOperationalNotifications TaskOperationalNotification[]
+  department                  Department             @relation(fields: [department_id], references: [id])
+
+  @@unique([login], map: "users_login_key")
+  @@index([organization_id, name, id])
+  @@map("users")
+}
+
+model Permission {
+  id              String       @id @default(uuid())
+  user_id         String
+  certificado     Int      @default(0)
+  comercial       Int      @default(0)
+  contabil        Int      @default(0)
+  financeiro      Int      @default(0)
+  fiscal          Int      @default(0)
+  integracao      Int      @default(0)
+  marketing       Int      @default(0)
+  parcelamento    Int      @default(0)
+  pessoal         Int      @default(0)
+  regularize      Int      @default(0)
+  rh              Int      @default(0)
+  ti              Int      @default(0)
+  triagem         Int      @default(0)
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+  userPrimary     User?        @relation("UserPrimaryPermission")
+
+  @@unique([user_id, organization_id], map: "uq_permissions_user_org")
+  @@map("permissions")
+}
+
+model PermissionSpecific {
+  user_id         String       @id
+  task_completion Boolean?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+
+  @@map("permissions.specific")
+}
+
+model TaskOperationalNotification {
+  id              String       @id @default(uuid())
+  organization_id String
+  recipient_id    String
+  task_id         String
+  event_key       String       @db.VarChar(191)
+  type            String
+  title           String
+  message         String
+  read_at         DateTime?
+  archived_at     DateTime?
+  created_at      DateTime     @default(now())
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  recipient       User         @relation(fields: [recipient_id], references: [id])
+
+  @@unique([organization_id, recipient_id, task_id, event_key], map: "uq_task_operational_notification_event")
+  @@index([organization_id, recipient_id, archived_at, read_at, created_at], map: "idx_task_operational_notification_inbox")
+  @@index([archived_at, created_at], map: "idx_task_operational_notification_retention")
+  @@map("notification.task_operational")
+}
+
+model Client {
+  id                            String                      @id @default(uuid())
+  dominio_code                  String?
+  name                          String
+  company_name                  String?
+  fantasy_name                  String?
+  cnae                          String?
+  responsible                   String?
+  cpf_responsible               String?
+  agent                         String?
+  cpf_agent                     String?
+  number                        String?
+  email                         String?
+  address                       String?
+  cep                           String?
+  neighborhood                  String?
+  state                         String?
+  city                          String?
+  customer_since                DateTime?
+  municipal_registration        String?
+  state_registration            String?
+  commercial_board_registration String?
+  status                        String
+  competence_entry              DateTime?
+  competence_output             DateTime?
+  opening_date                  DateTime?
+  instagram                     String?
+  indication                    String?
+  regime                        String?
+  size                          String?
+  segment                       String?
+  start_strike                  DateTime?
+  end_strike                    DateTime?
+  deletion_date                 DateTime?
+  contract                      Boolean?
+  prospecting_status            String
+  date_status                   DateTime?
+  description_prospecting       String?
+  participants_meet             String?
+  meet_type                     String?
+  closing_date                  DateTime?
+  register_date_prospecting     DateTime                    @default(now())
+  contabil                      Boolean?
+  fiscal                        Boolean?
+  pessoal                       Boolean?
+  infoproduto                   Boolean?
+  consultoria                   Boolean?
+  castelo_med                   Boolean?
+  cnae_secondary                String?
+  service_unique                Boolean?
+  cpf_cnpj                      String                      @default("")
+  type                          String                      @default("PJ")
+  type_registration             String                      @default("Novo")
+  organization_id               String
+  agenda                        Agenda[]
+  organization                  Organization                @relation(fields: [organization_id], references: [id])
+  pa                            PA?
+  projects                      Project[]
+  tasks                         Task[]
+  licenses                      License[]
+  process                       Process[]
+  proceduralGuidances           ProceduralGuidance[]       @relation("proceduralGuidanceClientPJ")
+
+  @@map("clients")
+}
+
+model PA {
+  client_id                 String       @id
+  activities                String?
+  tax_billing               String?
+  management_billing        String?
+  works_bidding             Boolean?
+  dissatisfaction           String?
+  registered_collabortors   Int?
+  unregistered_collabortors Int?
+  esocial                   Boolean?
+  how_many_banks            Boolean?
+  whitch_banks              String?
+  responsible_departments   String?
+  works_system              Boolean?
+  system_name               String?
+  system_usage_time         String?
+  system_value              String?
+  system_contact            String?
+  system_operations         String?
+  cloud_storage             Boolean?
+  which_cloud_storage       String?
+  rental_agreement          Boolean?
+  assessment_regime         String?
+  permit                    String?
+  services                  String?
+  organization_id           String
+  client                    Client       @relation(fields: [client_id], references: [id])
+  organization              Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("clients.pa")
+}
+
+model ClientPF {
+  id                   String       @id @default(uuid())
+  code                 String
+  name                 String
+  sex                  String
+  address              String
+  city                 String
+  zip_code             String
+  state                String
+  profession           String
+  father               String
+  mother               String
+  marital_status       String
+  date_of_birth        DateTime
+  cpf                  String
+  rg                   String
+  rg_expedition        DateTime?
+  rg_validity          DateTime?
+  military_certificate String
+  ctps                 String
+  cnh                  String
+  cnh_expedition       DateTime?
+  cnh_validity         DateTime?
+  spouse               String
+  status               String
+  notes                String
+  organization_id      String
+  organization         Organization @relation(fields: [organization_id], references: [id])
+  process              Process[]
+  proceduralGuidances  ProceduralGuidance[] @relation("proceduralGuidanceClientPF")
+
+  @@map("clients.pf")
+}
+
+model TaskModel {
+  id               String                       @id @default(uuid())
+  name             String
+  department_id    String
+  responsible_id   String
+  responsible2_id  String?
+  responsible3_id  String?
+  observations     String?
+  billing          String
+  prevision        Int
+  type             String?
+  organization_id  String
+  plans            ProjectPlanTasks[]
+  tasks            Task[]
+  isDependenciesOf TaskDependent[]              @relation("DependentTask")
+  dependencies     TaskDependent[]              @relation("ParentTask")
+  taskRegularize   TasksIntegrationRegularize[]
+  department       Department                   @relation(fields: [department_id], references: [id])
+  organization     Organization                 @relation(fields: [organization_id], references: [id])
+  responsible2     User?                        @relation("responsible2", fields: [responsible2_id], references: [id])
+  responsible3     User?                        @relation("responsible3", fields: [responsible3_id], references: [id])
+  responsible      User                         @relation("responsible", fields: [responsible_id], references: [id])
+
+  @@map("integracao.tasksModel")
+}
+
+model TaskDependent {
+  id              String       @id @default(uuid())
+  task_id         String
+  dependent_id    String
+  wait            Boolean
+  observation     String
+  organization_id String
+  dependent       TaskModel    @relation("DependentTask", fields: [dependent_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  task            TaskModel    @relation("ParentTask", fields: [task_id], references: [id])
+
+  @@map("integracao.tasksDependent")
+}
+
+model ProjectPlan {
+  id              String             @id @default(uuid())
+  name            String
+  color           String
+  organization_id String
+  organization    Organization       @relation(fields: [organization_id], references: [id])
+  hirings         ProjectPlanHiring[]
+  tasks           ProjectPlanTasks[]
+
+  @@map("integracao.projectPlan")
+}
+
+model ProjectPlanTasks {
+  id              String       @id @default(uuid())
+  plan_id         String
+  task_id         String
+  order           Int
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  plans           ProjectPlan  @relation(fields: [plan_id], references: [id])
+  tasks           TaskModel    @relation(fields: [task_id], references: [id])
+
+  @@unique([organization_id, plan_id, task_id], map: "uq_project_plan_task_model")
+  @@map("integracao.projectPlanTasks")
+}
+
+model ProjectPlanHiring {
+  id                String      @id @default(uuid())
+  plan_id           String
+  project_id        String
+  organization_id   String
+  response_snapshot Json
+  created_at        DateTime    @default(now())
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  plan              ProjectPlan @relation(fields: [plan_id], references: [id])
+  project           Project     @relation(fields: [project_id], references: [id])
+
+  @@unique([organization_id, plan_id, project_id], map: "uq_project_plan_hiring_org_plan_project")
+  @@index([plan_id], map: "idx_project_plan_hiring_plan")
+  @@index([project_id], map: "idx_project_plan_hiring_project")
+  @@map("integracao.project_plan_hirings")
+}
+
+model Project {
+  id              String       @id @default(uuid())
+  name            String
+  client_id       String
+  status          String
+  start_date      DateTime?
+  end_date        DateTime?
+  objective       String?
+  sponsor_id      String?
+  porcentage      Float
+  organization_id String
+  client          Client       @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  sponsor         User?        @relation("sponsor", fields: [sponsor_id], references: [id])
+  tasks           Task[]
+  wizardConfirmations ProjectWizardConfirmation[]
+  planHirings         ProjectPlanHiring[]
+
+  @@map("integracao.projects")
+}
+
+model ProjectWizardConfirmation {
+  id                String       @id @default(uuid())
+  project_id        String?
+  organization_id   String
+  idempotency_key   String       @db.VarChar(255)
+  command_hash      String       @db.Char(64)
+  response_snapshot Json
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  project           Project?     @relation(fields: [project_id], references: [id], onDelete: SetNull)
+
+  @@unique([organization_id, idempotency_key], map: "uq_project_wizard_confirmation_org_idempotency_key")
+  @@index([organization_id], map: "idx_project_wizard_confirmation_org")
+  @@index([project_id], map: "idx_project_wizard_confirmation_project")
+  @@map("integracao.project_wizard_confirmations")
+}
+
+model Task {
+  id                  String       @id @default(uuid())
+  model_id            String
+  project_id          String
+  client_id           String
+  name                String
+  status              String
+  department_id       String
+  observations        String?
+  billing             String
+  urgency             String
+  responsible_id      String?
+  responsible2_id     String?
+  responsible3_id     String?
+  start_date          DateTime?
+  prevision_date      DateTime?
+  end_date            DateTime?
+  date_created        DateTime?    @default(now())
+  date_updated        DateTime?    @updatedAt
+  pending_approval    Boolean?
+  charge_comercial    Boolean?
+  charge_financeiro   Boolean?
+  billing_description String?
+  hiring_status       String?
+  payment             String?
+  justification       String?
+  meeting             String?
+  organization_id     String
+  agenda              Agenda[]
+  client              Client       @relation(fields: [client_id], references: [id])
+  department          Department   @relation(fields: [department_id], references: [id])
+  taskModel           TaskModel    @relation(fields: [model_id], references: [id])
+  organization        Organization @relation(fields: [organization_id], references: [id])
+  project             Project      @relation(fields: [project_id], references: [id])
+  responsible2        User?        @relation("responsible2", fields: [responsible2_id], references: [id])
+  responsible3        User?        @relation("responsible3", fields: [responsible3_id], references: [id])
+  responsible         User?        @relation("responsible", fields: [responsible_id], references: [id], onDelete: Restrict)
+  license             License[]
+  process             Process[]
+  commercialTaskBilling CommercialTaskBilling?
+  completionRequests    TaskCompletionRequest[]
+  attachments           TaskAttachment[]
+  postponements         TaskPostponement[]
+
+  @@map("integracao.tasks")
+}
+
+model TaskFinanceiroCommand {
+  id                String   @id @default(uuid())
+  organization_id   String
+  requested_by_user_id String
+  idempotency_key   String   @db.VarChar(255)
+  command_hash      String   @db.Char(64)
+  response_snapshot Json
+  created_at        DateTime @default(now())
+  audited_at        DateTime?
+
+  @@unique([organization_id, idempotency_key], map: "uq_task_financeiro_command_org_key")
+  @@index([organization_id], map: "idx_task_financeiro_command_org")
+  @@map("integracao.task_financeiro_commands")
+}
+
+model DepartmentCollector {
+  id              String     @id @default(uuid())
+  organization_id String
+  department_id   String
+  user_id         String
+  created_at      DateTime   @default(now())
+  department      Department @relation(fields: [department_id], references: [id])
+  user            User       @relation(fields: [user_id], references: [id])
+
+  @@unique([organization_id, department_id, user_id], map: "uq_department_collector")
+  @@index([organization_id, user_id], map: "idx_department_collector_user")
+  @@map("integracao.department_collectors")
+}
+
+model TaskCompletionRequest {
+  id              String   @id @default(uuid())
+  task_id         String
+  organization_id String
+  requester_id    String
+  status          String   @default("pending")
+  reason          String?
+  decision_reason String?
+  decided_by      String?
+  created_at      DateTime @default(now())
+  resolved_at     DateTime?
+  task            Task     @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, created_at], map: "idx_task_completion_requests_org_task_created")
+  @@index([organization_id, requester_id, created_at], map: "idx_task_completion_requests_org_requester_created")
+  @@map("integracao.task_completion_requests")
+}
+
+model TaskAttachment {
+  id              String       @id @default(uuid())
+  task_id         String
+  organization_id String
+  uploaded_by     String
+  original_name   String
+  mime_type       String
+  size_bytes      Int
+  object_path     String       @unique
+  created_at      DateTime     @default(now())
+  deleted_at      DateTime?
+  deleted_by      String?
+  task            Task         @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, deleted_at, created_at], map: "idx_task_attachments_org_task_visible")
+  @@map("integracao.task_attachments")
+}
+
+model TaskPostponement {
+  id                      String       @id @default(uuid())
+  task_id                 String
+  organization_id         String
+  previous_prevision_date DateTime
+  new_prevision_date      DateTime
+  justification           String
+  author_id               String
+  created_at              DateTime     @default(now())
+  task                    Task         @relation(fields: [task_id], references: [id], onDelete: Restrict)
+  organization            Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, task_id, created_at], map: "idx_task_postponements_org_task_created")
+  @@index([organization_id, author_id, created_at], map: "idx_task_postponements_org_author_created")
+  @@map("integracao.task_postponements")
+}
+
+model CommercialTaskBilling {
+  id                  String   @id @default(uuid())
+  task_id             String   @unique
+  organization_id     String
+  hiring_status       String
+  payment             String?
+  billing_description String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  task                Task     @relation(fields: [task_id], references: [id])
+  organization        Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, updated_at], map: "idx_commercial_task_billing_org_updated")
+  @@map("commercial.task_billing")
+}
+
+model CommercialProspectingCloseEvent {
+  event_id        String   @id
+  organization_id String
+  client_id       String
+  competence      String
+  applied_at      DateTime @default(now())
+  created_at      DateTime @default(now())
+
+  @@index([organization_id, client_id, applied_at], map: "idx_commercial_prospecting_close_client")
+  @@map("commercial.prospecting_close_events")
+}
+
+model CommercialTaskBillingProjectionEvent {
+  id                   String   @id
+  organization_id      String
+  task_id              String
+  event_type           String
+  audit_correlation_id String
+  applied_at           DateTime @default(now())
+  created_at           DateTime @default(now())
+
+  @@index([organization_id, task_id, applied_at], map: "idx_commercial_task_billing_projection_task")
+  @@map("integracao.commercial_task_billing_projection_events")
+}
+
+model Agenda {
+  id                    String       @id @default(uuid())
+  agenda                String
+  date                  DateTime
+  client_id             String?
+  location              String?
+  participant_id        String?
+  participant_id_2      String?
+  participant_id_3      String?
+  task_id               String?
+  status                String?
+  obs                   String?
+  department_control_id String
+  organization_id       String
+  client                Client?      @relation(fields: [client_id], references: [id])
+  department_control    Department   @relation("department_control", fields: [department_control_id], references: [id])
+  organization          Organization @relation(fields: [organization_id], references: [id])
+  participant2          User?        @relation("participant2", fields: [participant_id_2], references: [id])
+  participant3          User?        @relation("participant3", fields: [participant_id_3], references: [id])
+  participant           User?        @relation("participant", fields: [participant_id], references: [id])
+  task                  Task?        @relation(fields: [task_id], references: [id])
+
+  @@map("agenda")
+}
+
+model License {
+  id                                String       @id @default(uuid())
+  client_id                         String?
+  has                               Boolean
+  type_license                      String
+  entry_date                        DateTime
+  protocol                          String
+  responsible_id                    String?
+  status                            String
+  date_last_consultation            DateTime?
+  current_situation                 String
+  contact                           String
+  observation                       String?
+  urgency                           String
+  type                              String
+  due_date                          DateTime?
+  task_id                           String?
+  organization_id                   String
+  protocol_file_path                String?
+  protocol_file_original_name       String?
+  protocol_file_mime_type           String?
+  protocol_file_size_bytes          Int?
+  protocol_file_uploaded_at         DateTime?
+  protocol_file_uploaded_by_user_id String?
+  client                            Client?      @relation(fields: [client_id], references: [id])
+  organization                      Organization @relation(fields: [organization_id], references: [id])
+  responsible                       User?        @relation(fields: [responsible_id], references: [id])
+  task                              Task?        @relation(fields: [task_id], references: [id])
+
+  @@index([organization_id, due_date], map: "idx_regularize_license_org_due_date")
+  @@index([organization_id, status], map: "idx_regularize_license_org_status")
+  @@map("regularize.license")
+}
+
+model Process {
+  id              String               @id @default(uuid())
+  client_pj_id    String?
+  client_pf_id    String?
+  cpf_cnpj        String
+  process_type    String
+  description     String
+  entry_date      DateTime?
+  completion_date DateTime?
+  expected_date   DateTime?
+  client_notice_date DateTime?
+  status          String
+  financial_status String            @default("Pendente")
+  observation     String?
+  responsible1_id String?
+  responsible2_id String?
+  responsible3_id String?
+  locking_type    String?
+  urgency         String?
+  task_id         String?
+  organization_id String
+  guidances       ProceduralGuidance[]
+  clientPF        ClientPF?            @relation(fields: [client_pf_id], references: [id])
+  clientPJ        Client?              @relation(fields: [client_pj_id], references: [id])
+  organization    Organization         @relation(fields: [organization_id], references: [id])
+  responsible1    User?                @relation("responsible1", fields: [responsible1_id], references: [id])
+  responsible2    User?                @relation("responsible2", fields: [responsible2_id], references: [id])
+  responsible3    User?                @relation("responsible3", fields: [responsible3_id], references: [id])
+  task            Task?                @relation(fields: [task_id], references: [id])
+
+  @@map("regularize.process")
+}
+
+model ProceduralGuidance {
+  id                   String       @id @default(uuid())
+  process_id           String?
+  type                 String?
+  request              String?
+  framework_obs        String?
+  legal_nature         String?
+  company_name         String?
+  trade_name           String?
+  cpf_cnpj             String?
+  share_capital        Float?
+  iptu                 String?
+  address              String?
+  comporate_purpose    String?
+  carryng              String?
+  regime               String?
+  legal_representative String?
+  status               String
+  economic_activities  Json?
+  partners             Json?
+  target_type          String
+  client_pj_id         String?
+  client_pf_id         String?
+  target_snapshot      Json
+  branch_data          Json?
+  organization_id      String
+  clientPJ             Client?      @relation("proceduralGuidanceClientPJ", fields: [client_pj_id], references: [id])
+  clientPF             ClientPF?    @relation("proceduralGuidanceClientPF", fields: [client_pf_id], references: [id])
+  organization         Organization @relation(fields: [organization_id], references: [id])
+  process              Process?     @relation(fields: [process_id], references: [id])
+
+  @@map("regularize.proceduralGuidances")
+}
+
+model TasksIntegrationRegularize {
+  id              String       @id @default(uuid())
+  task_model_id   String
+  referring       String
+  referring_type  String
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  task_model      TaskModel    @relation(fields: [task_model_id], references: [id])
+
+  @@unique([organization_id, task_model_id, referring_type, referring], map: "uq_task_regularize_link")
+  @@map("integracao.tasksIntegrationRegularize")
+}
+
+model PointsConfig {
+  id              String       @id @default(uuid())
+  user_id         String       @unique
+  start_time      DateTime
+  lunch_break     DateTime
+  lunch_return    DateTime
+  end_time        DateTime
+  signature       String?
+  bank_balance    Int          @default(0)
+  work_days       String       @default("1,2,3,4,5")
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User         @relation(fields: [user_id], references: [id])
+
+  @@map("rh.pointConfig")
+}
+
+enum enumType {
+  admin
+  owner
+  user
+}
+
+enum status {
+  trial
+  past_due
+  active
+  suspended
+  cancelled
+}

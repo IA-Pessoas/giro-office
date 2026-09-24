@@ -29,8 +29,9 @@ describe("InternalReportingService para feriados", () => {
 
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: "10000000-0000-4000-8000-000000000001" },
-      select: { name: true, date: true },
-      take: 2,
+      select: { name: true, date: true, id: true },
+      orderBy: { id: "asc" },
+      take: 3,
     });
   });
 

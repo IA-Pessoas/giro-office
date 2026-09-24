@@ -1,106 +1,124 @@
 generator infraClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator userServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/user-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator taskServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/task-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator projectServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/project-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator clientServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/client-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator organizationClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/organization-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 generator audit_service_client {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/audit-service/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator rh_service_client {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/rh-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator regularize_service_client {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/regularize-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator department_service_client {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/department-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator fiscalServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/fiscal-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator contabilServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/contabil-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator tiServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/ti-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator certificateServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/certificate-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator pessoalServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/pessoal-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator parcelamentoServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/parcelamento-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator reportsServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/reports-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
 generator commercialServiceClient {
   provider        = "prisma-client"
+  runtime         = "workerd"
   output          = "../../services/commercial-service/src/generated/prisma"
   previewFeatures = ["fullTextSearchPostgres"]
 }
@@ -398,14 +416,17 @@ model User {
 model AuthSession {
   id         String    @id @default(uuid())
   user_id    String
+  impersonator_platform_user_id String?
   csrf_hash  String
   expires_at DateTime
   revoked_at DateTime?
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  impersonatorPlatformUser PlatformUser? @relation("PlatformImpersonationSessions", fields: [impersonator_platform_user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
+  @@index([impersonator_platform_user_id], map: "idx_auth_sessions_impersonator_platform_user_id")
   @@index([expires_at])
   @@map("auth_sessions")
 }
@@ -417,10 +438,12 @@ model PlatformUser {
   password        String
   platform_role   PlatformRole          @default(super_admin)
   status          String                @default("active")
+  can_impersonate Boolean               @default(false)
   session_version Int                   @default(0)
   created_at      DateTime              @default(now())
   updated_at      DateTime              @updatedAt
   authSessions    PlatformAuthSession[]
+  impersonationSessions AuthSession[]   @relation("PlatformImpersonationSessions")
 
   @@map("platform_users")
 }
@@ -437,6 +460,22 @@ model PlatformAuthSession {
   @@index([platform_user_id, revoked_at, expires_at], map: "idx_platform_auth_sessions_user_state")
   @@index([expires_at], map: "idx_platform_auth_sessions_expiry")
   @@map("platform_auth_sessions")
+}
+
+model UserAuditOutboxEvent {
+  id           String                  @id @default(uuid())
+  payload      Json
+  status       UserAuditOutboxStatus   @default(pending)
+  attempts     Int                     @default(0)
+  available_at DateTime                @default(now())
+  locked_at    DateTime?
+  processed_at DateTime?
+  last_error   String?
+  created_at   DateTime                @default(now())
+  updated_at   DateTime                @updatedAt
+
+  @@index([status, available_at, created_at], map: "idx_user_audit_outbox_dispatch")
+  @@map("user_audit_outbox_events")
 }
 
 model Permission {
@@ -2575,6 +2614,7 @@ model TIRequest {
   urgency         String
   status          String
   attachment      String?
+  anydesk_code    String?
   created_at      DateTime          @default(now())
   updated_at      DateTime          @updatedAt
   organization_id String
@@ -2941,6 +2981,8 @@ model ReportJob {
   report_model_version_id String
   status                  String   @default("queued")
   payload_json            Json?
+  idempotency_key         String?  @db.VarChar(255)
+  idempotency_hash        String?  @db.Char(64)
   requested_at            DateTime @default(now())
   started_at              DateTime?
   finished_at             DateTime?
@@ -2953,6 +2995,7 @@ model ReportJob {
   updated_at              DateTime @updatedAt
 
   @@index([organization_id, requester_id, requested_at])
+  @@unique([organization_id, requester_id, idempotency_key], map: "uq_reports_jobs_org_requester_idempotency_key")
   @@map("reports.jobs")
 }
 
@@ -3041,6 +3084,13 @@ enum status {
 
 enum PlatformRole {
   super_admin
+}
+
+enum UserAuditOutboxStatus {
+  pending
+  processing
+  delivered
+  failed
 }
 
 enum enumType {

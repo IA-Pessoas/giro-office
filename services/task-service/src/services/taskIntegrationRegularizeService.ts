@@ -6,8 +6,8 @@ import {
 } from "@workspace/shared";
 import type { TasksIntegrationRegularizeGetPayload } from "../generated/prisma/models/TasksIntegrationRegularize.js";
 
-import * as audit from "../integrations/audit.js";
-import prismaClient from "../prisma/index.js";
+import type { TaskAudit } from "../integrations/audit.js";
+import type prismaClient from "../prisma/index.js";
 
 export interface CreateLinkRequest {
   user_id: string;
@@ -58,11 +58,16 @@ function isUniqueConstraintError(err: unknown): boolean {
 }
 
 export class TaskIntegrationRegularizeService {
+  constructor(
+    private readonly prisma: typeof prismaClient,
+    private readonly audit: TaskAudit,
+  ) {}
+
   async createLink(
     data: CreateLinkRequest,
   ): Promise<{ integration: TaskIntegrationRegularizeRow }> {
     try {
-      const taskModel = await prismaClient.taskModel.findFirst({
+      const taskModel = await this.prisma.taskModel.findFirst({
         where: { id: data.task_model_id, organization_id: data.organization_id },
         select: { name: true },
       });
@@ -83,11 +88,11 @@ export class TaskIntegrationRegularizeService {
       }
 
       const destination = await (data.referring_type === "process"
-        ? prismaClient.process.findFirst({
+        ? this.prisma.process.findFirst({
             where: { id: data.referring, organization_id: data.organization_id },
             select: { id: true },
           })
-        : prismaClient.license.findFirst({
+        : this.prisma.license.findFirst({
             where: { id: data.referring, organization_id: data.organization_id },
             select: { id: true },
           }));
@@ -95,7 +100,7 @@ export class TaskIntegrationRegularizeService {
         throw new ServiceError(404, "Destino Regularize não encontrado.");
       }
 
-      const alreadyExists = await prismaClient.tasksIntegrationRegularize.findFirst({
+      const alreadyExists = await this.prisma.tasksIntegrationRegularize.findFirst({
         where: {
           task_model_id: data.task_model_id,
           referring: data.referring,
@@ -111,7 +116,7 @@ export class TaskIntegrationRegularizeService {
         );
       }
 
-      const integration = await prismaClient.tasksIntegrationRegularize.create({
+      const integration = await this.prisma.tasksIntegrationRegularize.create({
         data: {
           task_model_id: data.task_model_id,
           referring: data.referring,
@@ -121,7 +126,7 @@ export class TaskIntegrationRegularizeService {
         select: TASK_INTEGRATION_SELECT,
       });
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Vincular Tarefa",
@@ -155,12 +160,12 @@ export class TaskIntegrationRegularizeService {
         resourceOrganizationId: data.organization_id,
         isOwner: data.isOwner === true,
       });
-      const existing = await prismaClient.tasksIntegrationRegularize.findFirst({
+      const existing = await this.prisma.tasksIntegrationRegularize.findFirst({
         where: { id: data.integration_id, organization_id: data.organization_id },
         select: { task_model_id: true, referring: true, referring_type: true },
       });
       const deleted = existing
-        ? await prismaClient.tasksIntegrationRegularize.deleteMany({
+        ? await this.prisma.tasksIntegrationRegularize.deleteMany({
             where: { id: data.integration_id, organization_id: data.organization_id },
           })
         : { count: 0 };
@@ -169,7 +174,7 @@ export class TaskIntegrationRegularizeService {
         throw new ServiceError(404, "Vínculo não encontrado.");
       }
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Desvincular Tarefa",
@@ -205,7 +210,7 @@ export class TaskIntegrationRegularizeService {
         isOwner: access.isOwner === true,
       });
       if (taskModelId) {
-        const taskModel = await prismaClient.taskModel.findFirst({
+        const taskModel = await this.prisma.taskModel.findFirst({
           where: { id: taskModelId, organization_id: organizationId },
           select: { id: true },
         });
@@ -213,7 +218,7 @@ export class TaskIntegrationRegularizeService {
           throw new ServiceError(404, "Modelo de Tarefa não encontrado.");
         }
       }
-      const list = await prismaClient.tasksIntegrationRegularize.findMany({
+      const list = await this.prisma.tasksIntegrationRegularize.findMany({
         where: {
           organization_id: organizationId,
           ...(taskModelId ? { task_model_id: taskModelId } : {}),
@@ -230,13 +235,13 @@ export class TaskIntegrationRegularizeService {
         .map((link) => link.referring);
       const [processes, licenses] = await Promise.all([
         processIds.length
-          ? prismaClient.process.findMany({
+          ? this.prisma.process.findMany({
               where: { organization_id: organizationId, id: { in: processIds } },
               select: { id: true },
             })
           : [],
         licenseIds.length
-          ? prismaClient.license.findMany({
+          ? this.prisma.license.findMany({
               where: { organization_id: organizationId, id: { in: licenseIds } },
               select: { id: true },
             })

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { executeReportingQuery } from "../src/reporting/reportingQuery.js";
+import {
+  executeReportingQuery,
+  REPORTING_QUERY_BYTE_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
+} from "../src/reporting/reportingQuery.js";
 
 test("combines an AND group with ungrouped criteria before limiting", async () => {
   const result = await executeReportingQuery(
@@ -237,11 +241,66 @@ test("stops loading pages as soon as the byte budget is exceeded", async () => {
         };
       },
     ),
-    { statusCode: 422 },
+    (error: unknown) =>
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === REPORTING_QUERY_BYTE_LIMIT_CODE,
   );
   assert.equal(calls, 2);
 });
 
+test("supports stable cursor pages while loading report query rows", async () => {
+  const cursors: (string | undefined)[] = [];
+  const result = await executeReportingQuery(
+    { source: "integracao.projects", fields: ["name"], limit: 1, query: {} },
+    {
+      loadPage: async (_fields, limit, cursor) => {
+        cursors.push(cursor);
+        assert.equal(limit, 100);
+        return cursor === undefined
+          ? {
+              rows: Array.from({ length: 100 }, (_, index) => ({ name: `Project ${index}` })),
+              reachedLimit: true,
+              nextCursor: "row-0099",
+            }
+          : { rows: [{ name: "Project 100" }], reachedLimit: false };
+      },
+    },
+  );
+
+  assert.deepEqual(cursors, [undefined, "row-0099"]);
+  assert.deepEqual(result.rows, [{ name: "Project 0" }]);
+});
+
+test("tags raw result sets beyond the global row limit", async () => {
+  let loadedRows = 0;
+  await assert.rejects(
+    executeReportingQuery(
+      { source: "integracao.projects", fields: ["name"], limit: 1, query: {} },
+      {
+        loadPage: async (_fields, limit) => {
+          const count = Math.min(limit, 50_001 - loadedRows);
+          const rows = Array.from({ length: count }, () => ({ name: "x" }));
+          loadedRows += count;
+          return {
+            rows,
+            reachedLimit: loadedRows < 50_001,
+            ...(loadedRows < 50_001 ? { nextCursor: `row-${loadedRows}` } : {}),
+          };
+        },
+      },
+    ),
+    (error: unknown) =>
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "REPORTING_QUERY_ROW_LIMIT_EXCEEDED" &&
+      "message" in error &&
+      error.message === REPORTING_QUERY_ROW_LIMIT_MESSAGE,
+  );
+  assert.equal(loadedRows, 50_001);
+});
 test("rejects numeric overflow instead of serializing a false null summary", async () => {
   await assert.rejects(
     executeReportingQuery(

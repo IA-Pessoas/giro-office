@@ -1,5 +1,5 @@
 import { error as logError, ServiceError } from "@workspace/shared";
-import prismaClient from "../prisma/index.js";
+import type prismaClient from "../prisma/index.js";
 import { taskResponsibleEligibilityWhere } from "./responsibleUserContext.js";
 
 export type DepsTasksPrisma = Pick<typeof prismaClient, "department" | "user">;
@@ -15,7 +15,7 @@ export interface TaskModelOptions {
 }
 
 export class DepsTasksService {
-  constructor(private readonly prisma: DepsTasksPrisma = prismaClient) {}
+  constructor(private readonly prisma: DepsTasksPrisma) {}
 
   async listDepartmentsWithTaskModels(organizationId: string) {
     try {

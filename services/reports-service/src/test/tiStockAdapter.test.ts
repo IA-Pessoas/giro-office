@@ -73,7 +73,7 @@ describe("TiStockAdapter", () => {
       adapter.preview({
         definition: bodyDefinition,
         organization_id: "10000000-0000-0000-0000-000000000001",
-        limit: 10,
+        limit: 102,
         request_id: "request-ti-stock",
       }),
     ).resolves.toEqual({
@@ -82,7 +82,7 @@ describe("TiStockAdapter", () => {
     });
 
     const [, requestInit] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "ti.stock", fields: ["name", "category"], limit: 10 };
+    const body = { source: "ti.stock", fields: ["name", "category"], limit: 102 };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://ti.test/internal/reporting/extract",
     );

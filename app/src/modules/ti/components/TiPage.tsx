@@ -41,7 +41,7 @@ type TiTabConfig = {
   id: TiTabId;
   label: string;
   icon: LucideIcon;
-  panel: ComponentType;
+  panel: ComponentType<{ onOpenRequests?: () => void }>;
 };
 
 const TI_TABS: TiTabConfig[] = [
@@ -223,7 +223,7 @@ export function TiPage() {
             id={`ti-panel-${visibleActiveTab}`}
             aria-labelledby={`ti-tab-${visibleActiveTab}`}
           >
-            <ActivePanel />
+            <ActivePanel onOpenRequests={() => setActiveTab("requests")} />
           </div>
         </>
       ) : null}

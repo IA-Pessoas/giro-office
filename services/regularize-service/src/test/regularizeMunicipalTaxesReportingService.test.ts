@@ -31,8 +31,9 @@ describe("RegularizeMunicipalTaxesReportingService", () => {
 
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: "10000000-0000-4000-8000-000000000001" },
-      select: { year: true, tff_amount: true },
-      take: 2,
+      select: { id: true, year: true, tff_amount: true },
+      orderBy: { id: "asc" },
+      take: 3,
     });
   });
 

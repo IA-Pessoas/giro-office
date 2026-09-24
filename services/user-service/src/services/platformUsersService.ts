@@ -1,6 +1,8 @@
 import { ACTIVE_MODULE_KEYS, type ModulePermissions, ServiceError } from "@workspace/shared";
 import { Prisma } from "../generated/prisma/client.js";
-import type { UserAuditRecorder } from "../integrations/audit.js";
+import { PlatformRole } from "../generated/prisma/enums.js";
+import { impersonationEndAuditParams, type UserAuditRecorder } from "../integrations/audit.js";
+import { enqueueUserAuditEvent } from "../integrations/auditOutbox.js";
 import prismaClient from "../prisma/index.js";
 import { PlatformUserManagementAdapter } from "./userManagementService.js";
 import { type CreateUserInput, UserManagementService, UserService } from "./userService.js";
@@ -36,6 +38,18 @@ export interface TransferPlatformOwnershipInput {
 
 type PlatformUserListRow = Prisma.UserGetPayload<{ select: typeof PLATFORM_USER_LIST_SELECT }>;
 
+const PLATFORM_SUPER_ADMIN_LIST_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  status: true,
+  can_impersonate: true,
+} as const;
+
+type PlatformSuperAdminListRow = Prisma.PlatformUserGetPayload<{
+  select: typeof PLATFORM_SUPER_ADMIN_LIST_SELECT;
+}>;
+
 const PLATFORM_OWNERSHIP_SELECT = {
   ...PLATFORM_USER_LIST_SELECT,
   permission: true,
@@ -54,6 +68,145 @@ export class PlatformUsersService {
   private readonly userService = new UserService();
 
   constructor(private readonly audit?: UserAuditRecorder) {}
+
+  async listSuperAdmins(): Promise<PlatformSuperAdminListRow[]> {
+    return prismaClient.platformUser.findMany({
+      where: { platform_role: PlatformRole.super_admin },
+      select: PLATFORM_SUPER_ADMIN_LIST_SELECT,
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    });
+  }
+
+  async updateSuperAdminImpersonationPermission(
+    platformActorUserId: string,
+    superAdminId: string,
+    canImpersonate: boolean,
+  ): Promise<PlatformSuperAdminListRow> {
+    const audit = this.audit;
+    if (!audit) {
+      throw new ServiceError(503, "Auditoria indisponível para alterar a permissão.");
+    }
+
+    return prismaClient.$transaction(
+      async (transaction) => {
+        const lockedIds = [platformActorUserId, superAdminId].sort();
+        await transaction.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "platform_users"
+          WHERE "id" IN (${Prisma.join(lockedIds)})
+          ORDER BY "id"
+          FOR UPDATE
+        `;
+        const actor = await transaction.platformUser.findUnique({
+          where: { id: platformActorUserId },
+          select: { id: true, platform_role: true, status: true, can_impersonate: true },
+        });
+        if (
+          !actor ||
+          actor.platform_role !== PlatformRole.super_admin ||
+          actor.status !== "active" ||
+          !actor.can_impersonate
+        ) {
+          throw new ServiceError(403, "Você não tem permissão para alterar essa permissão.");
+        }
+        if (platformActorUserId === superAdminId) {
+          throw new ServiceError(409, "Não é permitido alterar a própria permissão.");
+        }
+
+        const target = await transaction.platformUser.findFirst({
+          where: { id: superAdminId, platform_role: PlatformRole.super_admin },
+          select: PLATFORM_SUPER_ADMIN_LIST_SELECT,
+        });
+        if (!target) throw new ServiceError(404, "Super admin não encontrado.");
+        if (target.can_impersonate === canImpersonate) return target;
+
+        const updated = await transaction.platformUser.updateMany({
+          where: {
+            id: target.id,
+            platform_role: PlatformRole.super_admin,
+            can_impersonate: target.can_impersonate,
+          },
+          data: {
+            can_impersonate: canImpersonate,
+            ...(canImpersonate ? {} : { session_version: { increment: 1 } }),
+          },
+        });
+        if (updated.count !== 1) {
+          throw new ServiceError(
+            409,
+            "A permissão mudou durante a operação. Atualize e tente novamente.",
+          );
+        }
+
+        if (!canImpersonate) {
+          const endedAt = new Date();
+          const sessions = await transaction.authSession.findMany({
+            where: {
+              impersonator_platform_user_id: target.id,
+              revoked_at: null,
+              expires_at: { gt: endedAt },
+            },
+            select: {
+              id: true,
+              user_id: true,
+              created_at: true,
+              user: {
+                select: {
+                  name: true,
+                  organization_id: true,
+                  department: { select: { organization_id: true } },
+                },
+              },
+            },
+          });
+
+          for (const session of sessions) {
+            const organizationId =
+              session.user.organization_id ?? session.user.department.organization_id;
+            const revoked = await transaction.authSession.updateMany({
+              where: {
+                id: session.id,
+                user_id: session.user_id,
+                impersonator_platform_user_id: target.id,
+                revoked_at: null,
+                expires_at: { gt: endedAt },
+              },
+              data: { revoked_at: endedAt },
+            });
+
+            if (revoked.count === 1) {
+              await enqueueUserAuditEvent(
+                transaction,
+                impersonationEndAuditParams({
+                  organizationId,
+                  targetUserId: session.user_id,
+                  targetName: session.user.name,
+                  platformUserId: target.id,
+                  startedAt: session.created_at,
+                  endedAt,
+                  durationMs: Math.max(0, endedAt.getTime() - session.created_at.getTime()),
+                  reason: "revogação",
+                }),
+              );
+            }
+          }
+        }
+
+        await enqueueUserAuditEvent(transaction, {
+          platformActorUserId,
+          organizationId: null,
+          action: "platform.super_admin.impersonation_permission.updated",
+          referring: "platform_user",
+          referringId: target.id,
+          changes: { can_impersonate: { from: target.can_impersonate, to: canImpersonate } },
+          outcome: "success",
+          required: true,
+        });
+
+        return { ...target, can_impersonate: canImpersonate };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 10_000 },
+    );
+  }
 
   async create(
     organizationId: string,

@@ -52,8 +52,8 @@ export function useCreatePessoalPasswordMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => pessoalService.createPassword(payload),
-    onSuccess: async (password) => {
-      await queryClient.invalidateQueries({ queryKey: passwordsKey(password.client_id) });
+    onSettled: async (_password, _error, payload) => {
+      await queryClient.invalidateQueries({ queryKey: passwordsKey(payload.client_id) });
     },
   });
 }
@@ -66,7 +66,7 @@ export function useUpdatePessoalPasswordMutation(
 
   return useMutation({
     mutationFn: (payload) => pessoalService.updatePassword(id, payload),
-    onSuccess: async () => {
+    onSettled: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: passwordsKey(clientId) }),
         queryClient.removeQueries({ queryKey: passwordDetailKey(id) }),
@@ -82,7 +82,7 @@ export function useDeletePessoalPasswordMutation(
 
   return useMutation({
     mutationFn: (id) => pessoalService.deletePassword(id),
-    onSuccess: async (_password, id) => {
+    onSettled: async (_password, _error, id) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: passwordsKey(clientId) }),
         queryClient.removeQueries({ queryKey: passwordDetailKey(id) }),

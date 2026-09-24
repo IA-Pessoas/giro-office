@@ -1,3 +1,4 @@
+import { MAX_REPORTING_QUERY_LIMIT } from "@workspace/shared";
 import { describe, expect, it } from "vitest";
 
 import { buildRegularizeServiceOpenApiSpec } from "../openapi/spec.js";
@@ -34,7 +35,12 @@ describe("regularize internal reporting OpenAPI", () => {
         requestBody: {
           content: {
             "application/json": {
-              schema: { properties: { source: { enum: string[] } } };
+              schema: {
+                properties: {
+                  source: { enum: string[] };
+                  limit: { maximum: number };
+                };
+              };
             };
           };
         };
@@ -47,5 +53,8 @@ describe("regularize internal reporting OpenAPI", () => {
     expect(
       operation.post.requestBody.content["application/json"].schema.properties.source.enum,
     ).toEqual(["regularize.licenses", "regularize.processes", "regularize.municipal_taxes"]);
+    expect(
+      operation.post.requestBody.content["application/json"].schema.properties.limit.maximum,
+    ).toBe(MAX_REPORTING_QUERY_LIMIT);
   });
 });

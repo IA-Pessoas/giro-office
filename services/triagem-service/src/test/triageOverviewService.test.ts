@@ -86,6 +86,20 @@ describe("deriveTriageOverviewStatus", () => {
       },
       "COMPLETE",
     ],
+    [
+      "não marca como completa quando nada é aplicável (#1326)",
+      {
+        urgentStatuses: [],
+        routineChecklists: [{ first: "NOT_APPLICABLE" }, {}],
+        bankStatuses: ["NOT_APPLICABLE"],
+      },
+      "NO_APPLICABLE_ITEMS",
+    ],
+    [
+      "competência sem checklist nem extratos não tem itens aplicáveis (#1326)",
+      { urgentStatuses: [], routineChecklists: [], bankStatuses: [] },
+      "NO_APPLICABLE_ITEMS",
+    ],
   ])("%s", (_name, sources, expected) => {
     expect(deriveTriageOverviewStatus(sources)).toBe(expected);
   });

@@ -6,14 +6,13 @@ import type {
   UpdateClientPayload,
 } from "../types";
 
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+
 import { normalizeDocumentValue } from "./documentValidation.ts";
 import { mapClientStatusFromApi, mapClientStatusToApi } from "./statusMapper.ts";
 
-export const CLIENT_TAX_REGIME_OPTIONS = [
-  "Simples Nacional",
-  "Lucro Presumido",
-  "Lucro Real",
-] as const satisfies readonly ClientTaxRegime[];
+// Fonte única com Regularize e Fiscal (TAX_REGIME_OPTIONS em shared/src/regularize/guidance.ts).
+export const CLIENT_TAX_REGIME_OPTIONS = TAX_REGIME_OPTIONS satisfies readonly ClientTaxRegime[];
 
 function isClientTaxRegime(value: string | null | undefined): value is ClientTaxRegime {
   return CLIENT_TAX_REGIME_OPTIONS.includes(value as ClientTaxRegime);
@@ -40,6 +39,21 @@ export function createClientFormInitialValues(client?: Partial<Client>): ClientF
   };
 }
 
+export function getClientInternalName(values: {
+  type?: "PJ" | "PF";
+  name: string;
+  company_name: string;
+  fantasy_name: string;
+}): string {
+  const name = values.name.trim();
+
+  if (name || values.type !== "PJ") {
+    return name;
+  }
+
+  return values.company_name.trim() || values.fantasy_name.trim();
+}
+
 export function buildCreateClientPayload(
   values: ClientFormValues,
   organizationId: string,
@@ -47,7 +61,7 @@ export function buildCreateClientPayload(
   return {
     organization_id: organizationId,
     type: values.type ?? "PJ",
-    name: values.name.trim(),
+    name: getClientInternalName(values),
     company_name: values.company_name.trim() || null,
     fantasy_name: values.fantasy_name.trim() || null,
     cpf_cnpj: normalizeDocumentValue(values.cpf_cnpj),
@@ -65,7 +79,7 @@ export function buildUpdateClientPayload(
   const preservesLegacyRegime = regime === null && currentRegime && !isClientTaxRegime(currentRegime);
 
   return {
-    name: values.name.trim(),
+    name: getClientInternalName(values),
     company_name: values.company_name.trim() || null,
     fantasy_name: values.fantasy_name.trim() || null,
     cpf_cnpj: normalizeDocumentValue(values.cpf_cnpj),

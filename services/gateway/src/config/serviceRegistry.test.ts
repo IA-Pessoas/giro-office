@@ -140,12 +140,18 @@ describe("user-service gateway registry", () => {
     } as GatewayEnv;
 
     expect(resolveGatewayService(env, "/platform/me/", "GET")?.key).toBe("user-service");
+    expect(resolveGatewayService(env, "/platform/impersonation/exit", "POST")?.key).toBe(
+      "user-service",
+    );
     expect(resolveGatewayService(env, "/platform/../user/me", "GET")).toBeNull();
   });
 
   it.each([
+    ["GET", "/platform/super-admins"],
+    ["PATCH", "/platform/super-admins/platform-user-1/impersonation-permission"],
     ["GET", "/platform/organizations/org-1/users/user-1"],
     ["GET", "/platform/organizations/org-1/users/user-1/permissions"],
+    ["POST", "/platform/organizations/org-1/users/user-1/impersonate"],
     ["PUT", "/platform/organizations/org-1/users/user-1/permissions"],
     ["GET", "/platform/organizations/org-1/departments"],
     ["DELETE", "/platform/organizations/org-1/users/user-1"],
@@ -226,5 +232,20 @@ describe("organization-service platform registry", () => {
     ["GET", "/platform/organizations/../organizations"],
   ])("mantém default-deny para %s %s", (method, path) => {
     expect(resolveGatewayService(env, path, method)).toBeNull();
+  });
+});
+
+describe("project-service gateway registry", () => {
+  it("encaminha o token interno junto da identidade autenticada", () => {
+    const env = {
+      projectServiceUrl: "http://project-service:3033",
+      auditServiceToken: "gateway-project-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/project", "POST")).toMatchObject({
+      key: "project-service",
+      targetUrl: "http://project-service:3033",
+      internalServiceToken: "gateway-project-token",
+    });
   });
 });

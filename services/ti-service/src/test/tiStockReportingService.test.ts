@@ -58,6 +58,7 @@ describe("TI stock internal reporting service", () => {
         location: { is: { organization_id: organizationId, department_id: "department-ti" } },
       },
       select: {
+        id: true,
         name: true,
         category: { select: { name: true } },
         location: { select: { name: true } },
@@ -65,7 +66,8 @@ describe("TI stock internal reporting service", () => {
         description: true,
         status: true,
       },
-      take: 2,
+      orderBy: { id: "asc" },
+      take: 3,
     });
   });
 
@@ -110,8 +112,9 @@ describe("TI stock internal reporting service", () => {
 
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: organizationId },
-      select: { asset_code: true },
-      take: 2,
+      select: { id: true, asset_code: true },
+      orderBy: { id: "asc" },
+      take: 3,
     });
   });
 });

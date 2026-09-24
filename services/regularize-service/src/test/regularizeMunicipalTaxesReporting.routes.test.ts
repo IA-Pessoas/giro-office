@@ -4,6 +4,7 @@ import { createHash, createHmac } from "node:crypto";
 
 import {
   INTERNAL_SERVICE_TOKEN_HEADER,
+  MAX_REPORTING_QUERY_LIMIT,
   REGULARIZE_MUNICIPAL_TAXES_REPORTING_SOURCE,
   REQUEST_ID_HEADER,
 } from "@workspace/shared";
@@ -101,7 +102,7 @@ describe("regularize municipal taxes internal reporting route", () => {
       .expect(400);
     await request(app)
       .post("/internal/reporting/extract")
-      .send({ ...body, limit: 102 })
+      .send({ ...body, limit: MAX_REPORTING_QUERY_LIMIT + 1 })
       .expect(400);
     await request(app)
       .post("/internal/reporting/extract")

@@ -1,3 +1,4 @@
+import { setupAPIClient } from "@shared/services/api";
 import { api } from "@shared/services/apiClient";
 
 import type {
@@ -128,7 +129,11 @@ export const reportsService = {
     id: string,
     format: "pdf" | "csv" | "xlsx",
   ): Promise<ReportDownloadResult> {
-    const response = await api.get(REPORTS_ENDPOINTS.download(id), {
+    // O botão de download já mostra a falha; sem o toast global o erro não aparece duas vezes.
+    const downloadApi = setupAPIClient(undefined, undefined, undefined, {
+      notifyServerErrors: false,
+    });
+    const response = await downloadApi.get(REPORTS_ENDPOINTS.download(id), {
       params: { format },
       responseType: "blob",
     });

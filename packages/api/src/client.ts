@@ -20,6 +20,14 @@ export interface CreateApiClientOptions {
   onCsrfFailure?: () => void;
 }
 
+// POST /user/session e o proprio login: 401 ali e credencial invalida, nao sessao expirada.
+function isLoginAttempt(error: AxiosError): boolean {
+  return (
+    error.config?.method?.toUpperCase() === "POST" &&
+    !!error.config.url?.split(/[?#]/u, 1)[0]?.endsWith("/user/session")
+  );
+}
+
 function isCsrfFailure(error: AxiosError): boolean {
   const data = error.response?.data;
   return (
@@ -175,6 +183,7 @@ export function createApiClient(options: CreateApiClientOptions): AxiosInstance 
       }
       if (error.response?.status === 401) {
         if (typeof window !== "undefined") {
+          if (isLoginAttempt(error)) return Promise.reject(error);
           onUnauthorized?.();
         } else if (getUnauthorizedErrorForSsr) {
           return Promise.reject(getUnauthorizedErrorForSsr());

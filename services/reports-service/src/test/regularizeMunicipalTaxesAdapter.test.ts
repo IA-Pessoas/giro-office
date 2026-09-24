@@ -50,7 +50,7 @@ describe("RegularizeMunicipalTaxesAdapter", () => {
           order_by: [],
         },
         organization_id: "10000000-0000-4000-8000-000000000001",
-        limit: 101,
+        limit: 102,
         request_id: "request-849",
       }),
     ).resolves.toEqual({
@@ -64,7 +64,7 @@ describe("RegularizeMunicipalTaxesAdapter", () => {
     expect(JSON.parse(fetchMock.mock.calls[0]?.[1].body as string)).toEqual({
       source: "regularize.municipal_taxes",
       fields: ["year", "tff_amount"],
-      limit: 101,
+      limit: 102,
     });
   });
 

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "giro-fiscal-service",
+  "main": "src/index.ts",
+  "workers_dev": false,
+  "compatibility_date": "2026-09-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "services": [
+    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" },
+    { "binding": "USER_SERVICE", "service": "giro-user-service" }
+  ],
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
+  "observability": { "enabled": true }
+}

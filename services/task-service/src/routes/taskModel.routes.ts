@@ -10,12 +10,13 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import { taskModelListQuerySchema } from "../schemas/taskModelList.schemas.js";
 import { parseTaskModelResponsibleSequence } from "../schemas/taskModelResponsibleSequence.schemas.js";
 import { TaskModelService } from "../services/taskModelService.js";
 
 const router: ReturnType<typeof Router> = Router();
-const taskModelService = new TaskModelService();
+const taskModelService = new TaskModelService(nodeDeps.prisma, nodeDeps.audit);
 
 router.post("/model", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {

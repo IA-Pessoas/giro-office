@@ -1,9 +1,9 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
 
-import { INTERNAL_SERVICE_TOKEN_HEADER } from "@workspace/shared";
+import { INTERNAL_SERVICE_TOKEN_HEADER, MAX_REPORTING_QUERY_LIMIT } from "@workspace/shared";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
-
+import { internalReportingExtractBodySchema } from "../schemas/internalReporting.schemas.js";
 import { createPrismaMock, createTestApp } from "./tiServiceTestUtils.js";
 
 const grantSecret = "test-reports-grant-secret";
@@ -61,6 +61,22 @@ function reportingHeaders(signed: ReturnType<typeof createGrant>) {
 }
 
 describe("ti internal reporting routes", () => {
+  it("aceita até o limite global de extração e rejeita valores acima dele", () => {
+    const valid = internalReportingExtractBodySchema.safeParse({
+      source: "ti.inventory",
+      fields: ["asset_code"],
+      limit: MAX_REPORTING_QUERY_LIMIT,
+    });
+    const invalid = internalReportingExtractBodySchema.safeParse({
+      source: "ti.inventory",
+      fields: ["asset_code"],
+      limit: MAX_REPORTING_QUERY_LIMIT + 1,
+    });
+
+    expect(valid.success).toBe(true);
+    expect(invalid.success).toBe(false);
+  });
+
   it("publica o catálogo combinado sem expor chaves internas", async () => {
     const signed = createGrant({
       operation: "catalog",
@@ -105,7 +121,11 @@ describe("ti internal reporting routes", () => {
     }
 
     expect(prisma.inventoryTecnologia.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { organization_id: organizationId }, take: 2 }),
+      expect.objectContaining({
+        where: { organization_id: organizationId },
+        orderBy: { id: "asc" },
+        take: 3,
+      }),
     );
     expect(prisma.stock.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -113,7 +133,8 @@ describe("ti internal reporting routes", () => {
           organization_id: organizationId,
           department_id: "50000000-0000-4000-8000-000000000001",
         },
-        take: 2,
+        orderBy: { id: "asc" },
+        take: 3,
       }),
     );
   });
@@ -239,7 +260,9 @@ describe("ti internal reporting routes", () => {
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { organization_id: "10000000-0000-4000-8000-000000000001" },
-        take: 2,
+        select: expect.objectContaining({ id: true }),
+        orderBy: { id: "asc" },
+        take: 3,
       }),
     );
   });
@@ -293,8 +316,9 @@ describe("ti internal reporting routes", () => {
     });
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: "10000000-0000-4000-8000-000000000001" },
-      select: { number: true, createdAt: true, updatedAt: true },
-      take: 2,
+      select: { id: true, number: true, createdAt: true, updatedAt: true },
+      orderBy: { id: "asc" },
+      take: 3,
     });
   });
 

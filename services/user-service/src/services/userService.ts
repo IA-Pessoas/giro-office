@@ -433,6 +433,7 @@ class UserManagementService {
     const department = data.organization_id
       ? await this.#requireDepartmentInOrganization(data.department_id, data.organization_id)
       : null;
+    await this.#ensureLoginAvailable(data.login);
     const normalizedType = normalizeUserType(data.type);
     const normalizedPermission = normalizePermissionForType(normalizedType, data.permission);
     const modulesToApply =
@@ -541,7 +542,10 @@ class UserManagementService {
     const requestedType = data.type !== undefined ? normalizeUserType(data.type) : currentType;
 
     if (data.name !== undefined) updateData.name = data.name;
-    if (data.login !== undefined) updateData.login = data.login;
+    if (data.login !== undefined) {
+      await this.#ensureLoginAvailable(data.login, id);
+      updateData.login = data.login;
+    }
     if (data.department_id !== undefined) {
       departmentForAccess = await this.#requireDepartmentInOrganization(
         data.department_id,
@@ -854,6 +858,21 @@ class UserManagementService {
         throw new ServiceError(409, "Nao e possivel desativar: usuario possui vinculos.");
       }
       throw new ServiceError(500, "Erro ao desativar usuario.", err);
+    }
+  }
+
+  // users_login_key is case-sensitive; login is matched case-insensitively, so block "Ana" vs "ana".
+  async #ensureLoginAvailable(login: string, exceptUserId?: string): Promise<void> {
+    const conflict = await prismaClient.user.findFirst({
+      where: {
+        login: { equals: login, mode: "insensitive" },
+        ...(exceptUserId ? { id: { not: exceptUserId } } : {}),
+      },
+      select: { id: true },
+    });
+
+    if (conflict) {
+      throw new ServiceError(409, "Login ja cadastrado.");
     }
   }
 

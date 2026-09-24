@@ -7,6 +7,7 @@ import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal
 import { useClients } from "@modules/clients/hooks/useClients";
 import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
 import { PaginationControls } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 
 const CLIENTS_GRADIENT_ICON_CLASSNAME =
@@ -64,6 +65,7 @@ export function Clients() {
     () => ({
       search: deferredSearch.trim() || undefined,
       status: status || undefined,
+      legacyIntegrationStatusFilter: false,
       page,
       limit,
     }),
@@ -221,6 +223,7 @@ export function Clients() {
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
                         {formatCpfCnpj(client.cpf_cnpj)}
+                        <DocumentIssueBadge value={client.cpf_cnpj} />
                       </td>
                       <td className="px-6 py-4">
                         <span

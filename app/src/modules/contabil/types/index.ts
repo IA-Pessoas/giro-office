@@ -79,6 +79,10 @@ export interface ContabilControlFilters {
 export interface ContabilControlPortfolioItem {
   client_id: string;
   legal_name: string;
+  cpf_cnpj: string;
+  regime: string | null;
+  person_responsible_id: string | null;
+  posted_by_id: string | null;
   control: ContabilControl | null;
   closing: TriageClosing;
 }

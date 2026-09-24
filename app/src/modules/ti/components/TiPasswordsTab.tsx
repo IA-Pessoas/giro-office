@@ -34,6 +34,7 @@ import type {
   TiPasswordUpdatePayload,
 } from "../types";
 import { copySensitiveText } from "../utils/copySensitiveText";
+import { getTiPasswordRevealErrorMessage } from "../utils/passwordRevealError";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -599,7 +600,7 @@ export function TiPasswordsTab() {
           ) : null}
           {revealPasswordId && revealQuery.isError ? (
             <p className="text-sm text-red-600 dark:text-red-300">
-              Acesso negado ou indisponível.
+              {getTiPasswordRevealErrorMessage(revealQuery.error)}
             </p>
           ) : null}
           {revealedPassword ? (

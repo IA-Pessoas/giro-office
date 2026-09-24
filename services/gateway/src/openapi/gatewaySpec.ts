@@ -301,6 +301,10 @@ function getGatewayOperationSecurity(
     return undefined;
   }
 
+  if (path === "/platform/impersonation/exit" && method.toLowerCase() === "post") {
+    return browserAuthentication;
+  }
+
   if (path.startsWith("/platform/") && security) {
     return platformBrowserAuthentication;
   }

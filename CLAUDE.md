@@ -37,3 +37,17 @@ Instrucoes do Claude para este repositorio.
 - Use `rg --files`, `rg -n`, leitura direta dos arquivos, regras do repo e validacoes escopadas.
 - Antes de editar, identifique arquivos provaveis, fluxo principal, dependencias afetadas e testes.
 - Depois de editar, revise impacto com `git diff --stat`, `git diff`, busca de call sites com `rg` e testes relevantes.
+
+## Agent skills
+
+### Issue tracker
+
+Issues e specs no GitHub Issues de `iapessoastecnologia/workspace`, via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Labels padrão: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` e `docs/adr/` na raiz. See `docs/agents/domain.md`.

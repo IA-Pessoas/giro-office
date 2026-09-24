@@ -217,6 +217,33 @@ describe("TriageDocumentsService", () => {
     expect(prisma.triageCatalogItem.findMany).not.toHaveBeenCalled();
   });
 
+  it("ignora chaves fiscais nulas na rotina contábil", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue(monthly as never);
+
+    await new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+      MONTHLY_ID,
+      {
+        field: "financial_transactions",
+        status: "PENDING",
+        note: "Aguardando extrato",
+        delivery_method: null,
+        state_site: null,
+      },
+      contabilEditor(),
+    );
+
+    const data = vi.mocked(prisma.triageMonthly.update).mock.calls[0]?.[0].data as {
+      item_notes: Record<string, Record<string, unknown>>;
+    };
+    expect(data.item_notes.financial_transactions).toEqual(
+      expect.objectContaining({ note: "Aguardando extrato" }),
+    );
+    expect(data.item_notes.financial_transactions).not.toHaveProperty("state_site");
+    expect(data.item_notes.financial_transactions).not.toHaveProperty("delivery_method");
+  });
+
   it("valida o catálogo no mesmo transaction serializable que grava o mensal", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
@@ -773,7 +800,7 @@ describe("TriageDocumentsService", () => {
       overviewClient,
     ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
 
-    expect(result.triagem_summary).toEqual(
+    expect(result?.triagem_summary).toEqual(
       expect.objectContaining({ client_id: CLIENT_ID, competence: COMPETENCE }),
     );
     expect(overviewClient.getSummary).toHaveBeenCalledWith({
@@ -791,6 +818,24 @@ describe("TriageDocumentsService", () => {
     vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
     const overviewClient = {
       getSummary: vi.fn().mockRejectedValue(new ServiceError(503, "Triagem indisponível.")),
+    };
+
+    const result = await new TriageDocumentsService(
+      prisma,
+      { logUpdateIfChanged: vi.fn() },
+      overviewClient,
+    ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
+
+    expect(result).toEqual(expect.objectContaining({ id: MONTHLY_ID, triagem_summary: null }));
+  });
+
+  it("cliente sem competência na Triagem mantém resposta mensal com resumo null (#1322)", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const overviewClient = {
+      getSummary: vi
+        .fn()
+        .mockRejectedValue(new ServiceError(404, "Resumo da Triagem não encontrado.")),
     };
 
     const result = await new TriageDocumentsService(
@@ -931,7 +976,7 @@ describe("TriageDocumentsService", () => {
     expect(prisma.triageBankStatement.upsert).toHaveBeenCalledTimes(2);
     await expect(
       service.getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, OTHER_ORG_ID),
-    ).rejects.toMatchObject({ statusCode: 404 });
+    ).resolves.toBeNull();
   });
 
   it("não cria marcador bancário para cliente de outra organização", async () => {

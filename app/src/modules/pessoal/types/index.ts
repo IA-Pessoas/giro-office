@@ -32,6 +32,8 @@ export interface PessoalOverviewSummary {
     overdue: number;
     paid: number;
   };
+  payroll?: { total: number };
+  obligations?: { competence: string; total: number };
 }
 
 export interface PessoalSuccessEnvelope<T> {

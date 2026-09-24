@@ -11,6 +11,7 @@ import {
 
 import { ContabilControlSection } from "./ContabilControlSection";
 import { ContabilPortfolioSection } from "./ContabilPortfolioSection";
+import { ContabilResponsiblePortfolioSection } from "./ContabilResponsiblePortfolioSection";
 import { ContabilResponsibleSection } from "./ContabilResponsibleSection";
 import { ContabilRelationshipSection } from "./ContabilRelationshipSection";
 import { ContabilStateBox } from "./ContabilStateBox";
@@ -139,6 +140,18 @@ function ContabilActiveTabPanel({
       return (
         <div role="tabpanel" id="contabil-panel-control" aria-labelledby="contabil-tab-control">
           <ContabilPortfolioSection />
+        </div>
+      );
+    }
+
+    if (activeTab === "responsible") {
+      return (
+        <div
+          role="tabpanel"
+          id="contabil-panel-responsible"
+          aria-labelledby="contabil-tab-responsible"
+        >
+          <ContabilResponsiblePortfolioSection canEdit={canEdit} />
         </div>
       );
     }

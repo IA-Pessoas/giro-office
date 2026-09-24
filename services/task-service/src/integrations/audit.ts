@@ -108,3 +108,9 @@ export async function logUpdateIfChanged(params: LogUpdateParams): Promise<void>
 
   await recordAudit(payload);
 }
+
+/** O que os serviços recebem por injeção (o Node passa este módulo; o Worker, o dele). */
+export interface TaskAudit {
+  createLog: typeof createLog;
+  logUpdateIfChanged: typeof logUpdateIfChanged;
+}

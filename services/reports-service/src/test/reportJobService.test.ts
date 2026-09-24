@@ -1,5 +1,5 @@
+import type { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
-
 import { ReportJobService } from "../services/reportJobService.js";
 
 const organizationId = "00000000-0000-4000-8000-000000000002";
@@ -7,6 +7,52 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const modelVersionId = "00000000-0000-4000-8000-000000000003";
 
 describe("ReportJobService", () => {
+  it("reutiliza o job existente para a mesma chave e comando", async () => {
+    const reportJob = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "job-existing",
+        status: "queued",
+        idempotency_hash: "hash-1",
+      }),
+      create: vi.fn(),
+    };
+    const service = new ReportJobService({ reportJob } as never);
+
+    await expect(
+      service.create({
+        organizationId,
+        userId,
+        modelVersionId,
+        payload: { format: "json" },
+        idempotencyKey: "job-key",
+        idempotencyHash: "hash-1",
+      } as never),
+    ).resolves.toEqual({ id: "job-existing", status: "queued" });
+    expect(reportJob.create).not.toHaveBeenCalled();
+  });
+
+  it("rejeita a reutilização da chave com outro comando", async () => {
+    const reportJob = {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "job-existing",
+        status: "queued",
+        idempotency_hash: "hash-1",
+      }),
+    };
+    const service = new ReportJobService({ reportJob } as never);
+
+    await expect(
+      service.create({
+        organizationId,
+        userId,
+        modelVersionId,
+        payload: { format: "csv" },
+        idempotencyKey: "job-key",
+        idempotencyHash: "hash-2",
+      } as never),
+    ).rejects.toEqual(expect.objectContaining<ServiceError>({ statusCode: 409 }));
+  });
+
   it("cria job queued ligado à versão e ao solicitante", async () => {
     const reportJob = { create: vi.fn().mockResolvedValue({ id: "job-1", status: "queued" }) };
     const service = new ReportJobService({ reportJob } as never);

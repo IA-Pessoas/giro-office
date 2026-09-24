@@ -33,8 +33,8 @@ export function useCreatePessoalPayrollMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => pessoalService.createPayroll(payload),
-    onSuccess: async (payroll) => {
-      await queryClient.invalidateQueries({ queryKey: payrollKey(payroll.client_id) });
+    onSettled: async (_payroll, _error, payload) => {
+      await queryClient.invalidateQueries({ queryKey: payrollKey(payload.client_id) });
     },
   });
 }
@@ -46,7 +46,7 @@ export function useUpdatePessoalPayrollMutation(
 
   return useMutation({
     mutationFn: (payload) => pessoalService.updatePayroll(clientId, payload),
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: payrollKey(clientId) });
     },
   });

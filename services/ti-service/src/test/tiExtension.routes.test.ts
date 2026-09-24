@@ -125,26 +125,26 @@ describe("ti extension routes", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      error: "number deve conter exatamente 4 dígitos.",
+      error: "number deve conter 3 ou 4 dígitos.",
       code: "BAD_REQUEST",
     });
     expect(prisma.extensionsTecnologia.create).not.toHaveBeenCalled();
   });
 
-  it("PATCH /ti/extensions/:id rejects a non-four-digit number before persistence", async () => {
+  it("PATCH /ti/extensions/:id rejects a number outside 3-4 digits before persistence", async () => {
     const prisma = createExtensionPrismaMock();
 
     const response = await request(createTestApp(prisma as never))
       .patch(`/ti/extensions/${extensionId}`)
       .set(gatewayHeaders(TI_ADMIN_PERMISSION))
       .send({
-        number: "123",
+        number: "12",
       });
 
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      error: "number deve conter exatamente 4 dígitos.",
+      error: "number deve conter 3 ou 4 dígitos.",
       code: "BAD_REQUEST",
     });
     expect(prisma.extensionsTecnologia.update).not.toHaveBeenCalled();

@@ -1,28 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  assertInteractiveSecretOutput,
-  getPlatformAdminBootstrapInput,
-} from "../scripts/bootstrapPlatformAdmin.js";
+import { getPlatformAdminBootstrapInput } from "../scripts/bootstrapPlatformAdmin.js";
 
 describe("getPlatformAdminBootstrapInput", () => {
-  it("requires only administrator identity", () => {
-    expect(() =>
-      getPlatformAdminBootstrapInput({
-        PLATFORM_ADMIN_NAME: "",
-        PLATFORM_ADMIN_EMAIL: "admin@example.com",
-      }),
-    ).toThrow("PLATFORM_ADMIN_NAME e PLATFORM_ADMIN_EMAIL são obrigatórias.");
-  });
+  it("requires name, email, and password environment variables", () => {
+    const required = {
+      PLATFORM_ADMIN_NAME: "Platform Administrator",
+      PLATFORM_ADMIN_EMAIL: "admin@example.com",
+      PLATFORM_ADMIN_PASSWORD: "test-only-password",
+    };
 
-  it("rejects an operator-chosen password", () => {
+    for (const missing of Object.keys(required)) {
+      const environment: NodeJS.ProcessEnv = { ...required };
+      delete environment[missing];
+      expect(() => getPlatformAdminBootstrapInput(environment)).toThrow(missing);
+    }
+
     expect(() =>
-      getPlatformAdminBootstrapInput({
-        PLATFORM_ADMIN_NAME: "Platform Administrator",
-        PLATFORM_ADMIN_EMAIL: "admin@example.com",
-        PLATFORM_ADMIN_PASSWORD: "passwordpassword",
-      }),
-    ).toThrow(/gerada pelo próprio comando/i);
+      getPlatformAdminBootstrapInput({ ...required, PLATFORM_ADMIN_PASSWORD: "   " }),
+    ).toThrow(
+      "PLATFORM_ADMIN_NAME, PLATFORM_ADMIN_EMAIL e PLATFORM_ADMIN_PASSWORD são obrigatórias.",
+    );
   });
 
   it("normalizes and validates the administrator email", () => {
@@ -30,19 +28,24 @@ describe("getPlatformAdminBootstrapInput", () => {
       getPlatformAdminBootstrapInput({
         PLATFORM_ADMIN_NAME: "Platform Administrator",
         PLATFORM_ADMIN_EMAIL: " Admin@Example.COM ",
+        PLATFORM_ADMIN_PASSWORD: "test-only-password",
       }).email,
     ).toBe("admin@example.com");
+
+    expect(
+      getPlatformAdminBootstrapInput({
+        PLATFORM_ADMIN_NAME: "Platform Administrator",
+        PLATFORM_ADMIN_EMAIL: "admin@example.com",
+        PLATFORM_ADMIN_PASSWORD: "test-only-password",
+      }).password,
+    ).toBe("test-only-password");
 
     expect(() =>
       getPlatformAdminBootstrapInput({
         PLATFORM_ADMIN_NAME: "Platform Administrator",
         PLATFORM_ADMIN_EMAIL: "not-an-email",
+        PLATFORM_ADMIN_PASSWORD: "test-only-password",
       }),
     ).toThrow(/email/i);
-  });
-
-  it("refuses to print a generated secret outside an interactive terminal", () => {
-    expect(() => assertInteractiveSecretOutput(false)).toThrow(/terminal interativo/i);
-    expect(() => assertInteractiveSecretOutput(true)).not.toThrow();
   });
 });

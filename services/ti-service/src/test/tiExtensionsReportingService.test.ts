@@ -51,11 +51,13 @@ describe("TiExtensionsReportingService", () => {
         },
       ],
       reachedLimit: true,
+      nextCursor: "never-returned",
     });
 
     expect(findMany).toHaveBeenCalledWith({
       where: { organization_id: "10000000-0000-4000-8000-000000000001" },
-      select: { number: true, createdAt: true, updatedAt: true },
+      select: { id: true, number: true, createdAt: true, updatedAt: true },
+      orderBy: { id: "asc" },
       take: 2,
     });
   });

@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client"
+  runtime  = "workerd"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Installment {
+  id                               String    @id @default(uuid())
+  client_id                        String
+  type                             String
+  jurisdiction                     String
+  is_automatic_debit               Boolean
+  consolidated_total_amount        Float
+  first_installment_amount         Float
+  current_month_installment_amount Float
+  outstanding_balance              Float
+  paid_installments_count          Int
+  agreed_installments_count        Int
+  remaining_installments_count     Int
+  overdue_installments_count       Int
+  enrollment_date                  DateTime?
+  document_url                     String
+  status                           String
+  completion_date                  DateTime?
+  down_payment_installments_count  Int
+  legal_nature                     String
+  situation_shutdown               String?
+  agreement_number                 String?
+  organization_id                  String
+
+  @@unique([organization_id, agreement_number], map: "parcelamento_installments_org_agreement_number_unique")
+  @@map("parcelamento.installments")
+}
+
+model InstallmentCompetencies {
+  id                 String   @id @default(uuid())
+  installment_id     String
+  how_many_paid      Int
+  how_many_overdue   Int
+  download           Boolean
+  download_notes     String?
+  upload_file        Boolean?
+  is_sent            Boolean?
+  submission_type    String?
+  notes              String?
+  installment_amount Float
+  competence         String
+  organization_id    String
+
+  @@unique([organization_id, installment_id, competence], map: "parcelamento_installment_competencies_unique")
+  @@map("parcelamento.installmentsCompetencies")
+}
+
+model PanoramaParcelameto {
+  id                    String  @id @default(uuid())
+  competence            String
+  cnd_municipal         Boolean
+  cnd_state             Boolean
+  cnd_federal           Boolean
+  cnd_fgts              Boolean
+  cnd_labor             Boolean
+  protests              Boolean
+  state_tax_situation   Boolean
+  federal_tax_situation Boolean
+  responsavel_id        String?
+  client_id             String
+  organization_id       String
+
+  @@unique([organization_id, client_id, competence], map: "parcelamento_panorama_client_competence_unique")
+  @@map("parcelamento.panorama")
+}
+
+// Somente leitura: escopo de cliente/responsável e geração de panoramas.
+model Client {
+  id              String @id @default(uuid())
+  status          String
+  organization_id String
+
+  @@map("clients")
+}
+
+model User {
+  id              String  @id @default(uuid())
+  organization_id String?
+
+  @@map("users")
+}

@@ -29,6 +29,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [showPasswordHelp, setShowPasswordHelp] = useState(false);
 
   const features = [
     {
@@ -273,13 +274,26 @@ export default function Login() {
                           Lembrar-me
                         </span>
                       </label>
-                      <a
-                        href="#"
+                      {/* Nao ha recuperacao self-service: a senha e redefinida pelo administrador. */}
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordHelp(true)}
+                        aria-controls="password-help"
+                        aria-expanded={showPasswordHelp}
                         className="font-semibold text-blue-600 transition-all hover:text-blue-700 hover:underline"
                       >
                         Esqueceu a senha?
-                      </a>
+                      </button>
                     </div>
+
+                    <p
+                      id="password-help"
+                      role="status"
+                      className={`text-xs ${LOGIN_CARD_SECONDARY_TEXT_CLASSNAME}`}
+                      hidden={!showPasswordHelp}
+                    >
+                      Peça ao administrador da sua empresa para redefinir sua senha.
+                    </p>
 
                     <button
                       type="submit"

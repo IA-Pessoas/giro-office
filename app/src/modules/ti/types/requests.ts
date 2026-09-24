@@ -12,6 +12,7 @@ export interface TiRequest {
   category_name?: string | null;
   urgency?: string | null;
   status?: TiStatus;
+  anydesk_code?: string | null;
   created_at?: string;
   updated_at?: string;
   [key: string]: unknown;
@@ -43,6 +44,7 @@ export interface TiRequestPayload {
   category_id?: TiId | null;
   urgency?: string | null;
   status?: string | null;
+  anydesk_code?: string;
   [key: string]: unknown;
 }
 

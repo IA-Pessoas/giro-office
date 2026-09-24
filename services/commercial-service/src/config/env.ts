@@ -40,7 +40,7 @@ const envSchema = z
     taskServiceInternalToken: z.string().default("audit-service-token"),
     emailAdapterUrl: z.string().url().optional(),
     emailAdapterToken: z.string().min(1).optional(),
-    emailFrom: z.string().trim().email().default("no-reply@girooffice.local"),
+    emailFrom: z.string().trim().email().optional(),
     emailAdapterTimeoutMs: z.coerce.number().int().positive().default(10_000),
     outboxWorkerPollIntervalMs: z.coerce.number().int().positive().default(1000),
     outboxWorkerMaxAttempts: z.coerce.number().int().positive().default(5),
@@ -72,6 +72,13 @@ const envSchema = z
           code: z.ZodIssueCode.custom,
           message: "COMMERCIAL_EMAIL_ADAPTER_TOKEN é obrigatório em produção.",
           path: ["emailAdapterToken"],
+        });
+      }
+      if (!env.emailFrom) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "COMMERCIAL_EMAIL_FROM é obrigatória em produção.",
+          path: ["emailFrom"],
         });
       }
     }
@@ -106,7 +113,12 @@ const envSchema = z
       allowedOrigins: env.allowedOrigins,
     });
 
-    return { ...env, enableApiDocs, logPretty: env.nodeEnv !== "production" && env.logPretty };
+    return {
+      ...env,
+      emailFrom: env.emailFrom ?? "no-reply@girooffice.local",
+      enableApiDocs,
+      logPretty: env.nodeEnv !== "production" && env.logPretty,
+    };
   });
 
 export type CommercialServiceEnv = z.infer<typeof envSchema>;

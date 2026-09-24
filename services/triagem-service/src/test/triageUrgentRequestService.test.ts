@@ -38,6 +38,7 @@ function createMockPrisma(): TriageUrgentRequestPrisma {
     $executeRaw: vi.fn().mockResolvedValue(0),
     client: { findFirst: vi.fn() },
     user: { findFirst: vi.fn() },
+    triageCompetence: { findFirst: vi.fn() },
     triageUrgentRequest: {
       findFirst: vi.fn(),
       findMany: vi.fn(),
@@ -97,6 +98,27 @@ describe("TriageUrgentRequestService", () => {
     });
   });
 
+  it("recusa solicitação urgente em competência arquivada (#1326)", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({
+      archived_at: new Date("2026-09-20T00:00:00.000Z"),
+    } as never);
+
+    await expect(
+      new TriageUrgentRequestService(prisma).create(
+        {
+          client_id: CLIENT_ID,
+          competence: COMPETENCE,
+          urgency_code: "HIGH",
+          description: "Validar documento urgente.",
+          responsible_id: RESPONSIBLE_ID,
+        },
+        editor(),
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.triageUrgentRequest.create).not.toHaveBeenCalled();
+  });
+
   it("repete a mesma solicitação sem criar duplicidade na competência", async () => {
     const prisma = createMockPrisma();
     vi.mocked(prisma.user.findFirst)
@@ -139,6 +161,23 @@ describe("TriageUrgentRequestService", () => {
       orderBy: [{ urgency_code: "desc" }, { created_at: "desc" }],
       select: expect.any(Object),
     });
+  });
+
+  it("não fecha, reabre nem edita urgência de competência arquivada (#1326)", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageUrgentRequest.findFirst).mockResolvedValue(record as never);
+    vi.mocked(prisma.triageCompetence.findFirst).mockResolvedValue({
+      archived_at: new Date("2026-09-20T00:00:00.000Z"),
+    } as never);
+    const service = new TriageUrgentRequestService(prisma);
+
+    await expect(service.close(REQUEST_ID, "Documento validado.", editor())).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    await expect(
+      service.update(REQUEST_ID, { description: "Nova descrição." }, editor()),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.triageUrgentRequest.update).not.toHaveBeenCalled();
   });
 
   it("fecha somente com nota de resolução e reabre limpando a resolução", async () => {

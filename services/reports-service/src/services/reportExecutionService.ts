@@ -2,7 +2,10 @@ import { MAX_REPORTING_QUERY_LIMIT, ServiceError } from "@workspace/shared";
 
 import type { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import { normalizeReportPreviewAdapterOutput, type ReportCatalogScope } from "../catalog/types.js";
-import { reportAggregationAlias } from "../integrations/reportCriteria.js";
+import {
+  REPORT_SNAPSHOT_LIMIT_MESSAGE,
+  reportAggregationAlias,
+} from "../integrations/reportCriteria.js";
 import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import { MAX_SNAPSHOT_ROWS } from "../schemas/reportSnapshot.schemas.js";
@@ -16,6 +19,8 @@ export type ReportResultBlock = {
   rows: readonly Record<string, unknown>[];
 };
 
+export { REPORT_SNAPSHOT_LIMIT_MESSAGE };
+
 export class ReportAreaExecutionError extends Error {
   readonly userMessage: string;
 
@@ -25,7 +30,9 @@ export class ReportAreaExecutionError extends Error {
     cause: unknown,
   ) {
     super(
-      `Não foi possível gerar o bloco ${label}. Confira o acesso e os critérios e tente novamente.`,
+      cause instanceof ServiceError && cause.message === REPORT_SNAPSHOT_LIMIT_MESSAGE
+        ? REPORT_SNAPSHOT_LIMIT_MESSAGE
+        : `Não foi possível gerar o bloco ${label}. Confira o acesso e os critérios e tente novamente.`,
     );
     this.name = "ReportAreaExecutionError";
     this.userMessage = this.message;
@@ -53,11 +60,8 @@ export class ReportExecutionService {
       requestId: input.requestId,
       limit: MAX_REPORTING_QUERY_LIMIT,
     });
-    if (result.reachedLimit) {
-      throw new ServiceError(400, "A origem excedeu seu limite de linhas para o snapshot.");
-    }
-    if (result.rows.length > MAX_SNAPSHOT_ROWS) {
-      throw new ServiceError(400, "O resultado excede o limite de linhas do snapshot.");
+    if (result.reachedLimit || result.rows.length > MAX_SNAPSHOT_ROWS) {
+      throw new ServiceError(400, REPORT_SNAPSHOT_LIMIT_MESSAGE);
     }
     return result.rows;
   }
@@ -107,7 +111,7 @@ export class ReportExecutionService {
           limit: remaining + 1,
         });
         if (result.reachedLimit || result.rows.length > remaining) {
-          throw new ServiceError(400, "O resultado excede o limite de linhas do snapshot.");
+          throw new ServiceError(400, REPORT_SNAPSHOT_LIMIT_MESSAGE);
         }
         const columns = this.presentationColumns(item.prepared.definition, item.source);
         blocks.push({
