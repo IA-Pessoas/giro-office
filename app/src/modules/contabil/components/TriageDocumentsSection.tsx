@@ -26,6 +26,7 @@ import type {
   TriageRoutineType,
 } from "../types";
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
+import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
 
 const CONTABIL_DOCUMENTS = [
@@ -201,22 +202,16 @@ export function TriageDocumentsSection({
               : "Dez documentos por competência. Itens não aplicáveis não entram no indicador."}
           </p>
         </div>
-        <label className="text-sm font-medium text-gray-700 dark:text-slate-300">
+        <div className="text-sm font-medium text-gray-700 dark:text-slate-300">
           Competência
-          <input
-            aria-label={
-              documentType === "FISCAL"
-                ? "Competência fiscal"
-                : "Competência documental"
-            }
-            type="month"
-            value={competence}
-            onChange={(event) =>
-              setCompetence(event.target.value as ContabilCompetence)
-            }
-            className="ml-2 h-10 rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
-          />
-        </label>
+          <span className="ml-2">
+            <ContabilCompetenceSelect
+              label={documentType === "FISCAL" ? "Competência fiscal" : "Competência documental"}
+              value={competence}
+              onChange={setCompetence}
+            />
+          </span>
+        </div>
       </div>
       {mutationError ? (
         <p
