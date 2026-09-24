@@ -11,15 +11,22 @@ decidiu (24/09/2026) criar os itens a partir dos termos.
 
 O arquivo [backfill-ti-inventory-from-terms.sql](../../infra/prisma/repairs/backfill-ti-inventory-from-terms.sql):
 
-- Lê `tecnologia.terms.asset_code` e separa códigos por vírgula, ponto e vírgula ou barra.
-  A comparação ignora caixa e espaços; o item é gravado em maiúsculas.
+- Lê `tecnologia.terms.asset_code` e separa códigos por vírgula ou ponto e vírgula. A barra
+  não separa, porque pode fazer parte do código. A comparação ignora caixa e espaços, e o item
+  guarda a grafia do termo.
 - Para cada código sem item no inventário, cria um item na categoria **"Migrado dos termos"**
-  (criada por organização se faltar). O item recebe o usuário e a data do termo mais recente
-  daquele código como responsável e entrega. Equipamento, marca e id do termo vão para as notas.
+  (criada por organização se faltar). Usuário e entrega vêm do termo **assinado** mais recente
+  daquele código, ou do mais recente quando nenhum foi assinado. Usuário ausente ou inativo
+  deixa o item sem atribuição e sem data de entrega. Equipamento, marca e id do termo vão para
+  as notas.
+- `reason` é texto livre: uma devolução não é detectável. O relatório mostra motivo e assinatura
+  de cada termo usado, para a TI conferir.
 - Não preenche local, data de devolução nem responsável de TI. O termo não tem esses dados.
-- Não altera item que já existe nem os termos. O vínculo termo↔ativo é pelo `asset_code`.
+- Não altera item que já existe nem os termos. O vínculo termo↔ativo é pelo `asset_code`. A
+  tela de termos passou a separar os códigos (`app/src/modules/ti/utils/termAssetCodes.ts`) para
+  o filtro por ativo achar termos que citam vários.
 - Termo com mais de um código atribui todos ao mesmo usuário.
-- O apply trava escritas no inventário (`lock_timeout = 5s`). É idempotente, e o relatório
+- O apply trava escritas no inventário e nas categorias (`lock_timeout = 5s`). É idempotente, e o relatório
   final confere que não sobrou código citado sem item.
 
 Depois de aplicar, a TI deve reclassificar os itens da categoria "Migrado dos termos" e
@@ -43,5 +50,5 @@ completar local e devoluções.
 ## Teste
 
 `node --test infra/prisma/scripts/test/backfill-ti-inventory-from-terms.test.mjs` sobe um
-Postgres descartável em Docker e cobre dry-run, códigos múltiplos, termo mais recente, item já
-existente com outra caixa e idempotência. Sem Docker, o teste é pulado.
+Postgres descartável em Docker e cobre dry-run, códigos múltiplos, termo assinado antes do pendente,
+usuário inativo, item já existente com outra caixa e idempotência. Sem Docker, o teste é pulado.

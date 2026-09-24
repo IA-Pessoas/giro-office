@@ -28,6 +28,7 @@ import type {
   TiTermSignPayload,
   TiTermUpdatePayload,
 } from "../types";
+import { termCitesAsset } from "../utils/termAssetCodes";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -358,10 +359,7 @@ export function TiTermsTab() {
 
     return (termsQuery.data ?? []).filter((term) => {
       const statusMatches = !termStatus || getTermStatus(term) === termStatus;
-      const assetMatches =
-        !assetId ||
-        normalizeStatus(term.asset_code) === normalizeStatus(selectedAssetCode) ||
-        normalizeStatus(term.equipament_list).includes(normalizeStatus(selectedAssetCode));
+      const assetMatches = !assetId || termCitesAsset(term, selectedAssetCode);
       const searchableText = getSearchableText([
         getTermTitle(term),
         getTermUser(term),

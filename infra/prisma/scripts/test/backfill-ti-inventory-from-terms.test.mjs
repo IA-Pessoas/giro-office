@@ -12,7 +12,11 @@ const CONTAINER = `ti-inventory-test-${process.pid}`;
 const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0;
 
 const FIXTURE = `
-DROP TABLE IF EXISTS "tecnologia.inventory", "tecnologia.inventoryCategories", "tecnologia.terms";
+DROP TABLE IF EXISTS "tecnologia.inventory", "tecnologia.inventoryCategories", "tecnologia.terms", users;
+CREATE TABLE users (id text PRIMARY KEY, organization_id text NOT NULL, status text NOT NULL);
+INSERT INTO users VALUES
+  ('u-old', 'org', 'active'), ('u-new', 'org', 'active'), ('u3', 'org', 'inactive'),
+  ('u4', 'org', 'active'), ('u5', 'org', 'active');
 CREATE TABLE "tecnologia.inventoryCategories" (
   id text PRIMARY KEY, name text NOT NULL, tag text, active boolean NOT NULL DEFAULT true,
   organization_id text NOT NULL
@@ -25,18 +29,20 @@ CREATE TABLE "tecnologia.inventory" (
   UNIQUE (organization_id, asset_code)
 );
 CREATE TABLE "tecnologia.terms" (
-  id text PRIMARY KEY, user_id text, date timestamp NOT NULL, user_name text NOT NULL,
-  equipament_list text, brand text, asset_code text, organization_id text NOT NULL
+  id text PRIMARY KEY, user_id text, date timestamp NOT NULL, signed_at timestamp, reason text,
+  user_name text NOT NULL, equipament_list text, brand text, asset_code text,
+  organization_id text NOT NULL
 );
 INSERT INTO "tecnologia.inventoryCategories" VALUES ('cat', 'Notebook', NULL, true, 'org');
 INSERT INTO "tecnologia.inventory" (id, category_id, asset_code, updated_at, organization_id)
 VALUES ('i1', 'cat', 'MS18CASTELO', now(), 'org');
+-- t1 assinado vence t2 pendente mais novo; u3 inativo nao recebe atribuicao.
 INSERT INTO "tecnologia.terms" VALUES
-  ('t1', 'u-old', '2024-01-01', 'Ana', 'Notebook', 'Dell', 'N04CASTELO', 'org'),
-  ('t2', 'u-new', '2025-01-01', 'Bia', 'Notebook', 'Dell', ' n04castelo ', 'org'),
-  ('t3', 'u3', '2024-05-01', 'Caio', 'Monitor, Mouse', 'LG', 'MS27CASTELO, N30CASTELO', 'org'),
-  ('t4', 'u4', '2024-05-01', 'Davi', 'Notebook', 'HP', 'ms18castelo', 'org'),
-  ('t5', 'u5', '2024-05-01', 'Eva', 'Kit', NULL, NULL, 'org');
+  ('t1', 'u-old', '2024-01-01', '2024-01-02', 'Entrega', 'Ana', 'Notebook', 'Dell', 'N04castelo', 'org'),
+  ('t2', 'u-new', '2025-01-01', NULL, NULL, 'Bia', 'Notebook', 'Dell', ' n04castelo ', 'org'),
+  ('t3', 'u3', '2024-05-01', '2024-05-02', NULL, 'Caio', 'Monitor', 'LG', 'MS27CASTELO; N30CASTELO', 'org'),
+  ('t4', 'u4', '2024-05-01', '2024-05-02', NULL, 'Davi', 'Notebook', 'HP', 'ms18castelo', 'org'),
+  ('t5', 'u5', '2024-05-01', NULL, NULL, 'Eva', 'Kit', NULL, NULL, 'org');
 `;
 
 function psql(sql, vars = []) {
@@ -75,21 +81,21 @@ test("dry-run relata os ativos a criar sem gravar", { skip: !hasDocker }, () => 
   query(FIXTURE);
   const result = psql(SQL);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /N04CASTELO\|u-new\|2025-01-01/);
-  assert.match(result.stdout, /MS27CASTELO\|u3/);
-  assert.doesNotMatch(result.stdout, /MS18CASTELO\|u4/);
+  assert.match(result.stdout, /N04castelo\|u-old\|2024-01-01\|t/);
+  assert.match(result.stdout, /MS27CASTELO\|-\|2024-05-01/);
+  assert.doesNotMatch(result.stdout, /ms18castelo\|u4/);
   assert.match(result.stdout, /DRY-RUN/);
   assert.equal(query(INVENTORY), "MS18CASTELO:-:-:Notebook");
 });
 
-test("apply cria um item por codigo citado, com o termo mais recente, e e idempotente", {
+test("apply cria um item por codigo citado, pelo termo assinado mais recente, e e idempotente", {
   skip: !hasDocker,
 }, () => {
   query(FIXTURE);
   assert.equal(psql(SQL, ["apply=1"]).status, 0);
   const expected =
-    "MS18CASTELO:-:-:Notebook,MS27CASTELO:u3:2024-05-01:Migrado dos termos," +
-    "N04CASTELO:u-new:2025-01-01:Migrado dos termos,N30CASTELO:u3:2024-05-01:Migrado dos termos";
+    "MS18CASTELO:-:-:Notebook,MS27CASTELO:-:-:Migrado dos termos," +
+    "N04castelo:u-old:2024-01-01:Migrado dos termos,N30CASTELO:-:-:Migrado dos termos";
   assert.equal(query(INVENTORY), expected);
   assert.equal(psql(SQL, ["apply=1"]).status, 0);
   assert.equal(query(INVENTORY), expected);
