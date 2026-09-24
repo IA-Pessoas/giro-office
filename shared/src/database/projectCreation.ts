@@ -34,6 +34,69 @@ export interface ProjectCreateRow {
 }
 
 export const PROJECT_STATUS_WAITING_COMMERCIAL = "Aguardando liberação do Comercial";
+export const PROJECT_STATUS_TO_DO = "A realizar";
+export const PROJECT_STATUS_IN_PROGRESS = "Em andamento";
+export const PROJECT_STATUS_PAUSED = "Paralisado";
+export const PROJECT_STATUS_COMPLETED = "Concluído";
+
+/** Status que o usuário pode escolher na edição do projeto. */
+export const PROJECT_MANUAL_STATUSES = [
+  PROJECT_STATUS_IN_PROGRESS,
+  PROJECT_STATUS_PAUSED,
+  PROJECT_STATUS_COMPLETED,
+] as const;
+
+const SAO_PAULO_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+
+/** Cliente novo em prospecção espera o Comercial; início futuro nasce "A realizar". */
+export function getInitialProjectStatus(
+  client: { type_registration: string | null; prospecting_status: string | null },
+  startDate: Date,
+  now: Date = new Date(),
+): string {
+  if (client.type_registration === "Novo" && client.prospecting_status !== "Fechado") {
+    return PROJECT_STATUS_WAITING_COMMERCIAL;
+  }
+  // start_date é data civil gravada à meia-noite UTC; "hoje" é o dia em São Paulo.
+  return startDate.toISOString().slice(0, 10) > SAO_PAULO_DAY.format(now)
+    ? PROJECT_STATUS_TO_DO
+    : PROJECT_STATUS_IN_PROGRESS;
+}
+
+/**
+ * Transição manual pela edição. Concluir exige todas as tarefas concluídas e o mesmo
+ * nível do fechamento por progresso (ADMIN ou owner).
+ */
+export function resolveManualProjectStatus(
+  current: string,
+  requested: string | undefined,
+  openTaskCount: number,
+  canComplete: boolean,
+): string {
+  if (requested === undefined || requested === current) return current;
+  if (current === PROJECT_STATUS_WAITING_COMMERCIAL) {
+    throw new ServiceError(409, "O projeto aguarda liberação do Comercial.");
+  }
+  if (!(PROJECT_MANUAL_STATUSES as readonly string[]).includes(requested)) {
+    throw new ServiceError(400, `Status inválido: ${requested}.`);
+  }
+  if (requested === PROJECT_STATUS_COMPLETED && !canComplete) {
+    throw new ServiceError(403, "Somente administradores podem concluir o projeto.");
+  }
+  if (requested === PROJECT_STATUS_COMPLETED && openTaskCount > 0) {
+    throw new ServiceError(
+      409,
+      `Não é possível concluir o projeto: há ${openTaskCount} tarefa(s) em aberto.`,
+    );
+  }
+  return requested;
+}
+
+/** Recalculo de progresso: 100% conclui; abaixo disso, pausa manual é preservada. */
+export function getProgressProjectStatus(current: string, percentage: number): string {
+  if (percentage === 100) return PROJECT_STATUS_COMPLETED;
+  return current === PROJECT_STATUS_PAUSED ? PROJECT_STATUS_PAUSED : PROJECT_STATUS_IN_PROGRESS;
+}
 
 /** Tarefas bloqueiam a exclusão do projeto; a regra da tarefa decide o que cai em cascata. */
 export function getProjectDeleteTasksMessage(taskCount: number): string {
@@ -120,10 +183,7 @@ export async function createProjectInTransaction(
       name: data.name,
       client_id: data.client_id,
       organization_id: data.organizationId,
-      status:
-        client.type_registration === "Novo" && client.prospecting_status !== "Fechado"
-          ? PROJECT_STATUS_WAITING_COMMERCIAL
-          : "Em andamento",
+      status: getInitialProjectStatus(client, data.start_date),
       start_date: data.start_date,
       end_date: data.end_date ?? null,
       objective: data.objective,

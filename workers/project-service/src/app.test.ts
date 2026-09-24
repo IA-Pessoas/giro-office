@@ -337,6 +337,52 @@ describe("project Worker", () => {
     expect(response.status).toBe(409);
   });
 
+  it("PUT aplica status manual e recusa concluir com tarefas abertas", async () => {
+    const findFirst = vi.fn(async () => ({
+      id: PROJECT_ID,
+      organization_id: ORG,
+      status: "Em andamento",
+    }));
+    const update = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: PROJECT_ID,
+      ...data,
+    }));
+    const count = vi.fn(async () => 1);
+    const app = createProjectWorkerApp({
+      env: env(),
+      prisma: {
+        project: { findFirst, update },
+        client: { findFirst: vi.fn(), update: vi.fn() },
+        task: { findMany: vi.fn(), groupBy: vi.fn(), count },
+        $transaction: vi.fn(),
+        $disconnect: vi.fn(async () => undefined),
+      } as never,
+    });
+    const put = (status: string) =>
+      app.request(`https://project.test/project?project_id=${PROJECT_ID}`, {
+        method: "PUT",
+        headers: jsonHeaders(),
+        body: JSON.stringify({
+          project_id: PROJECT_ID,
+          name: "Implantação",
+          start_date: "2026-04-02T00:00:00.000Z",
+          end_date: "2026-05-10T00:00:00.000Z",
+          objective: "Rollout",
+          status,
+        }),
+      });
+
+    const paused = await put("Paralisado");
+    expect(paused.status).toBe(200);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "Paralisado" }) }),
+    );
+
+    const completed = await put("Concluído");
+    expect(completed.status).toBe(409);
+    expect(JSON.stringify(await completed.json())).toContain("há 1 tarefa(s) em aberto");
+  });
+
   it("treats a DELETE P2025 after the existence check as idempotent success", async () => {
     const findFirst = vi.fn(async () => ({ id: PROJECT_ID, organization_id: ORG }));
     const deleteProject = vi.fn(async () => {

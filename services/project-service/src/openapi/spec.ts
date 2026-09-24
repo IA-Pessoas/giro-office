@@ -20,6 +20,7 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
     end_date: "2026-05-10T00:00:00.000Z",
     objective: "Concluir rollout e treinamento da equipe.",
     sponsor_id: "user-uuid",
+    status: "Paralisado",
   };
   const progressExample = {
     project_id: "project-uuid",
@@ -287,6 +288,11 @@ export function buildProjectServiceOpenApiSpec(env: ProjectServiceEnv): OpenApiD
                     end_date: { type: "string", format: "date-time" },
                     objective: { type: "string" },
                     sponsor_id: { type: "string", format: "uuid" },
+                    status: {
+                      type: "string",
+                      description:
+                        "Em andamento, Paralisado ou Concluído (exige tarefas concluídas). O status atual é aceito sem mudança.",
+                    },
                   },
                   required: ["project_id", "name", "start_date", "end_date", "objective"],
                   additionalProperties: true,

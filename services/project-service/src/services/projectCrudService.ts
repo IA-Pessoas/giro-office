@@ -5,9 +5,11 @@ import {
   INTEGRACAO_PERMISSION_LEVEL,
   error as logError,
   PROJECT_DELETE_HIRING_MESSAGE,
+  PROJECT_STATUS_COMPLETED,
   type ProjectCreateRow,
   type ProjectCrudAuthContext,
   requireIntegracaoRouteAccess,
+  resolveManualProjectStatus,
   ServiceError,
 } from "@workspace/shared";
 
@@ -36,6 +38,7 @@ export interface UpdateProjectCrudRequest extends ProjectCrudAuthContext {
   end_date: Date;
   objective: string;
   sponsor_id?: string;
+  status?: string;
 }
 
 export interface DeleteProjectCrudRequest extends ProjectCrudAuthContext {
@@ -146,8 +149,32 @@ export class ProjectCrudService {
         organizationId: data.organizationId,
         resourceOrganizationId: data.organizationId,
         isOwner: data.isOwner === true,
-        requestedFields: ["name", "start_date", "end_date", "objective", "sponsor_id"],
+        requestedFields: [
+          "name",
+          "start_date",
+          "end_date",
+          "objective",
+          "sponsor_id",
+          ...(data.status === undefined ? [] : ["status"]),
+        ],
       });
+
+      const openTaskCount =
+        data.status === PROJECT_STATUS_COMPLETED && data.status !== exists.status
+          ? await this.prisma.task.count({
+              where: {
+                project_id: data.project_id,
+                organization_id: data.organizationId,
+                status: { not: "Concluída" },
+              },
+            })
+          : 0;
+      const status = resolveManualProjectStatus(
+        exists.status,
+        data.status,
+        openTaskCount,
+        data.integracaoLevel === INTEGRACAO_PERMISSION_LEVEL.ADMIN || data.isOwner === true,
+      );
 
       const updated = await this.prisma.project.update({
         where: {
@@ -159,6 +186,7 @@ export class ProjectCrudService {
           end_date: data.end_date,
           objective: data.objective,
           sponsor_id: data.sponsor_id ?? null,
+          status,
         },
         select: UPDATE_SELECT,
       });
