@@ -2832,6 +2832,50 @@ const handlers = {
     });
   },
 
+  async platformUserImpersonate(op) {
+    const session = requireState("session");
+    const path = `/platform/organizations/${session.organization_id}/users/${session.id}/impersonate`;
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, { path, expectedStatus: [401] });
+      return;
+    }
+
+    const originalPlatformCookie = requireState("platformSessionCookies")["cw.session"];
+    const response = await platformHttpRequest(op, { path, expectedStatus: [200] });
+    if (response.body?.data?.id !== session.id) {
+      throw new Error("Platform impersonation did not return the requested organization user.");
+    }
+    if (response.body?.data?.token !== undefined || response.body?.data?.csrfToken !== undefined) {
+      throw new Error("Platform impersonation response exposed session credentials.");
+    }
+    if (
+      !state.platformSessionCookies?.["cw.session"] ||
+      state.platformSessionCookies["cw.session"] === originalPlatformCookie
+    ) {
+      throw new Error("Platform impersonation did not replace the platform session cookie.");
+    }
+
+    const organizationSessionCookies = state.sessionCookies;
+    state.sessionCookies = { "cw.csrf": "", "cw.session": "" };
+    try {
+      await helperCall("platform-session-after-impersonation", {
+        method: "POST",
+        path: "/platform/session",
+        target: "gateway",
+        service: "user-service",
+        auth: "public",
+        json: { email: env.platformAdminEmail, password: env.platformAdminPassword },
+        expectedStatus: [200],
+      });
+      if (!state.sessionCookies["cw.session"] || !state.sessionCookies["cw.csrf"]) {
+        throw new Error("Platform login after impersonation did not issue session cookies.");
+      }
+      state.platformSessionCookies = { ...state.sessionCookies };
+    } finally {
+      state.sessionCookies = organizationSessionCookies;
+    }
+  },
+
   async platformUserCreate(op) {
     const organizationId = requireState("session").organization_id;
     const departments = await platformHttpRequest(op, {

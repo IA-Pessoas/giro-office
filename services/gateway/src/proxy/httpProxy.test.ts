@@ -1,7 +1,7 @@
 import {
   CSRF_HEADER_NAME,
   FORWARDED_AUTH_CSRF_HASH_HEADER,
-  FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER,
+  FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -409,7 +409,7 @@ describe("buildForwardHeaders", () => {
     const request = {
       ...authenticatedRequest,
       headers: {
-        [FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER]: "attacker-platform-user",
+        [FORWARDED_AUTH_IMPERSONATOR_ID_HEADER]: "attacker-platform-user",
       },
       auth: {
         ...authenticatedRequest.auth,
@@ -422,22 +422,20 @@ describe("buildForwardHeaders", () => {
 
     const headers = buildForwardHeaders(request, { internalServiceToken: "trusted-token" });
 
-    expect(headers.get(FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER)).toBe(
-      "real-platform-user",
-    );
+    expect(headers.get(FORWARDED_AUTH_IMPERSONATOR_ID_HEADER)).toBe("real-platform-user");
   });
 
   it("não encaminha operador spoofado sem claim de personificação", () => {
     const request = {
       ...authenticatedRequest,
       headers: {
-        [FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER]: "attacker-platform-user",
+        [FORWARDED_AUTH_IMPERSONATOR_ID_HEADER]: "attacker-platform-user",
       },
     } as Request;
 
     expect(
       buildForwardHeaders(request, { internalServiceToken: "trusted-token" }).get(
-        FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER,
+        FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
       ),
     ).toBeNull();
   });
