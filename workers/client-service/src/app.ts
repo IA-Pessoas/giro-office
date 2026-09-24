@@ -101,9 +101,9 @@ function pathParam(c: ClientContext, schema: z.ZodType<{ id: string }>): string 
 async function saveHistoryFile(
   storage: WorkerHistoryStorageLike | undefined,
   clientId: string,
-  body: Record<string, unknown>,
+  value: unknown,
 ): Promise<string | undefined> {
-  const file = body.file instanceof File ? body.file : undefined;
+  const file = value instanceof File ? value : undefined;
   if (!file) return undefined;
   if (!storage) throw new ServiceError(503, "Armazenamento de históricos não configurado.");
   return storage.upload(clientId, file);
@@ -454,12 +454,12 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
   app.post("/client/:id/histories", async (c) =>
     withService(c, async (service) => {
       const id = pathParam(c, clientIdParamsSchema);
-      const body = await formOrJsonBody(c);
-      const parsed = parse(createHistoryBodySchema, body);
+      const { file: attachment, ...fields } = await formOrJsonBody(c);
+      const parsed = parse(createHistoryBodySchema, fields);
       const file = await saveHistoryFile(
         options.historyStorage ?? WorkerHistoryStorage.fromEnv(options.env ?? c.env),
         id,
-        body,
+        attachment,
       );
       return c.json(
         createSuccessResponse(

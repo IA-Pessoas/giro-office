@@ -152,20 +152,25 @@ export const updateClientPABodySchema = z
   .strict()
   .refine((d) => Object.keys(d).length > 0, "Informe ao menos um campo para atualizar.");
 
+const historyFields = {
+  date: z.coerce.date({ errorMap: () => ({ message: "Informe uma data válida." }) }),
+  history: z
+    .string({ required_error: "Informe o texto do histórico." })
+    .min(1, "Informe o texto do histórico."),
+};
+const HISTORY_UNKNOWN_FIELD_MESSAGE = "Campo não permitido no histórico.";
+
+// O anexo `file` chega fora do corpo validado (multer no Node, removido antes do parse no Worker).
 export const createHistoryBodySchema = z
   .object({
-    date: z.coerce.date(),
-    history: z.string().min(1),
-    pending_id: z.string().uuid().optional(),
+    ...historyFields,
+    pending_id: z.string().uuid("Pendência inválida.").optional(),
   })
-  .strict();
+  .strict(HISTORY_UNKNOWN_FIELD_MESSAGE);
 
 export const updateHistoryBodySchema = z
-  .object({
-    date: z.coerce.date(),
-    history: z.string().min(1),
-  })
-  .strict();
+  .object(historyFields)
+  .strict(HISTORY_UNKNOWN_FIELD_MESSAGE);
 
 export const createHistoryPendingBodySchema = z
   .object({

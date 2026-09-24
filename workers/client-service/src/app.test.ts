@@ -209,4 +209,55 @@ describe("client Worker", () => {
       "Retorno",
     );
   });
+
+  it("creates a history with a multipart attachment", async () => {
+    const clientService = service();
+    const historyStorage = {
+      upload: vi.fn(async () => `clients/historys/${CLIENT_ID}/doc.pdf`),
+      createSignedAccessUrl: vi.fn(),
+      download: vi.fn(),
+      remove: vi.fn(),
+    };
+    const app = createClientWorkerApp({ env: env(), clientService, historyStorage });
+    const form = new FormData();
+    form.append("date", "2026-09-23T12:00:00.000Z");
+    form.append("history", "Contato com anexo");
+    form.append("file", new File(["%PDF-1.4"], "doc.pdf", { type: "application/pdf" }));
+
+    const response = await app.request(`https://client.test/client/${CLIENT_ID}/histories`, {
+      method: "POST",
+      headers: headers(),
+      body: form,
+    });
+
+    expect(response.status).toBe(201);
+    expect(historyStorage.upload).toHaveBeenCalledWith(CLIENT_ID, expect.any(File));
+    expect(clientService.createHistory).toHaveBeenCalledWith(
+      CLIENT_ID,
+      ORGANIZATION_ID,
+      USER_ID,
+      expect.objectContaining({
+        history: "Contato com anexo",
+        file: `clients/historys/${CLIENT_ID}/doc.pdf`,
+      }),
+    );
+  });
+
+  it("rejects unknown multipart fields with a Portuguese message", async () => {
+    const app = createClientWorkerApp({ env: env(), clientService: service() });
+    const form = new FormData();
+    form.append("date", "2026-09-23T12:00:00.000Z");
+    form.append("history", "Contato");
+    form.append("extra", "x");
+
+    const response = await app.request(`https://client.test/client/${CLIENT_ID}/histories`, {
+      method: "POST",
+      headers: headers(),
+      body: form,
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).not.toMatch(/Unrecognized key/);
+  });
 });
