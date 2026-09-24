@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-
+import { ServiceError } from "@workspace/shared";
 import {
   type AuditOutcome,
   type CreateAuditRequestPayload,
@@ -16,6 +16,7 @@ export interface CreateUserAuditParams {
   referringId: string;
   changes: Record<string, unknown>;
   outcome: AuditOutcome;
+  required?: boolean;
 }
 
 export interface UserAuditOptions {
@@ -50,6 +51,15 @@ export function createUserAudit(options: UserAuditOptions): UserAuditRecorder {
         ? { metadata: { actorPlatformUserId: params.platformActorUserId } }
         : {}),
     };
+
+    if (params.required) {
+      try {
+        await recordAudit.recordRequired(payload);
+      } catch {
+        throw new ServiceError(503, "Auditoria indisponível para iniciar personificação.");
+      }
+      return;
+    }
 
     await recordAudit(payload);
   };

@@ -416,14 +416,17 @@ model User {
 model AuthSession {
   id         String    @id @default(uuid())
   user_id    String
+  impersonator_platform_user_id String?
   csrf_hash  String
   expires_at DateTime
   revoked_at DateTime?
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  impersonatorPlatformUser PlatformUser? @relation("PlatformImpersonationSessions", fields: [impersonator_platform_user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
+  @@index([impersonator_platform_user_id], map: "idx_auth_sessions_impersonator_platform_user_id")
   @@index([expires_at])
   @@map("auth_sessions")
 }
@@ -440,6 +443,7 @@ model PlatformUser {
   created_at      DateTime              @default(now())
   updated_at      DateTime              @updatedAt
   authSessions    PlatformAuthSession[]
+  impersonationSessions AuthSession[]   @relation("PlatformImpersonationSessions")
 
   @@map("platform_users")
 }

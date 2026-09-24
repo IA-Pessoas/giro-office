@@ -1,6 +1,7 @@
 import {
   CSRF_HEADER_NAME,
   FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -402,6 +403,43 @@ describe("buildForwardHeaders", () => {
     expect(headers.get(FORWARDED_AUTH_ORGANIZATION_ID_HEADER)).toBeNull();
     expect(headers.get(FORWARDED_AUTH_KIND_HEADER)).toBe("platform");
     expect(headers.get(FORWARDED_AUTH_PLATFORM_ROLE_HEADER)).toBe("super_admin");
+  });
+
+  it("descarta o operador enviado pelo cliente e encaminha somente o claim assinado", () => {
+    const request = {
+      ...authenticatedRequest,
+      headers: {
+        [FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER]: "attacker-platform-user",
+      },
+      auth: {
+        ...authenticatedRequest.auth,
+        claims: {
+          ...authenticatedRequest.auth?.claims,
+          impersonator_platform_user_id: "real-platform-user",
+        },
+      },
+    } as Request;
+
+    const headers = buildForwardHeaders(request, { internalServiceToken: "trusted-token" });
+
+    expect(headers.get(FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER)).toBe(
+      "real-platform-user",
+    );
+  });
+
+  it("não encaminha operador spoofado sem claim de personificação", () => {
+    const request = {
+      ...authenticatedRequest,
+      headers: {
+        [FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER]: "attacker-platform-user",
+      },
+    } as Request;
+
+    expect(
+      buildForwardHeaders(request, { internalServiceToken: "trusted-token" }).get(
+        FORWARDED_AUTH_IMPERSONATOR_PLATFORM_USER_ID_HEADER,
+      ),
+    ).toBeNull();
   });
 });
 

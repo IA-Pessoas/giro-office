@@ -13,7 +13,9 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
+const { auditMock, authServiceMock, platformAuthMock, platformUsersMock } = vi.hoisted(() => ({
+  auditMock: vi.fn(async () => {}),
+  authServiceMock: { startImpersonation: vi.fn() },
   platformAuthMock: { validateSession: vi.fn() },
   platformUsersMock: {
     list: vi.fn(),
@@ -61,6 +63,12 @@ vi.mock("../services/platformAuthService.js", () => ({
     return platformAuthMock;
   }),
 }));
+vi.mock("../services/authService.js", () => ({
+  IMPERSONATION_SESSION_MAX_AGE_SECONDS: 3600,
+  AuthService: vi.fn(function AuthService() {
+    return authServiceMock;
+  }),
+}));
 vi.mock("../services/platformUsersService.js", () => ({
   PlatformUsersService: vi.fn(function PlatformUsersService() {
     return platformUsersMock;
@@ -103,6 +111,7 @@ function createApp() {
       level: "silent",
       destination: new MemoryLogStream(),
     }),
+    { audit: auditMock },
   );
 }
 
@@ -245,6 +254,94 @@ describe("platform users routes", () => {
       }),
       platformIdentity.id,
     );
+  });
+
+  it("inicia personificação emitindo cookies sem expor credenciais no JSON", async () => {
+    const issued = {
+      id: "user-1",
+      name: "Ana",
+      login: "ana",
+      permission: 2,
+      modules: { rh: 2 },
+      department_id: "dep-1",
+      organization_id: "org-2",
+      token: "organization.jwt",
+      csrfToken: "B".repeat(43),
+      impersonationStartedAt: new Date("2026-09-23T15:00:00.000Z"),
+    };
+    authServiceMock.startImpersonation.mockImplementation(async (_input, recordStartEvent) => {
+      await recordStartEvent({
+        organizationId: "org-2",
+        targetUserId: "user-1",
+        targetName: "Ana",
+        platformUserId: platformIdentity.id,
+        startedAt: issued.impersonationStartedAt,
+      });
+      return issued;
+    });
+
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/users/user-1/impersonate")
+      .set(platformGatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(authServiceMock.startImpersonation).toHaveBeenCalledWith(
+      {
+        organizationId: "org-2",
+        targetUserId: "user-1",
+        platformUserId: platformIdentity.id,
+        platformSessionId: "platform-session-1",
+        platformSessionCsrfHash: hashCsrfToken(csrfToken),
+      },
+      expect.any(Function),
+    );
+    expect(response.body.data).toMatchObject({ id: "user-1", name: "Ana" });
+    expect(response.body.data).not.toHaveProperty("token");
+    expect(response.body.data).not.toHaveProperty("csrfToken");
+    expect(response.headers["set-cookie"]).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("cw.session=organization.jwt"),
+        expect.stringContaining("Max-Age=3600"),
+        expect.stringContaining("cw.csrf="),
+      ]),
+    );
+    expect(auditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: "user-1",
+        platformActorUserId: platformIdentity.id,
+        organizationId: "org-2",
+        action: "platform.impersonation.started",
+        outcome: "success",
+        required: true,
+        changes: {
+          operatorPlatformUserId: platformIdentity.id,
+          target: { id: "user-1", name: "Ana" },
+          startedAt: issued.impersonationStartedAt.toISOString(),
+        },
+      }),
+    );
+  });
+
+  it("exige CSRF antes de iniciar a personificação", async () => {
+    const headers = platformGatewayHeaders();
+    delete headers[CSRF_HEADER_NAME];
+
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/users/user-1/impersonate")
+      .set(headers);
+
+    expect(response.status).toBe(403);
+    expect(authServiceMock.startImpersonation).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  it("recusa uma identidade organizacional na rota de personificação", async () => {
+    const response = await request(createApp())
+      .post("/platform/organizations/org-2/users/user-1/impersonate")
+      .set(platformGatewayHeaders({ authKind: "organization", platformRole: "" }));
+
+    expect(response.status).toBe(403);
+    expect(authServiceMock.startImpersonation).not.toHaveBeenCalled();
   });
 
   it("transfers ownership only after platform session and CSRF validation", async () => {
@@ -459,6 +556,22 @@ describe("platform users OpenAPI", () => {
       "/platform/organizations/{organizationId}/users/{userId}/reactivate",
       "post",
     ]);
+  });
+
+  it("documents the protected session and audit contract for impersonation", () => {
+    const spec = buildUserServiceOpenApiSpec(testEnv);
+    const path = "/platform/organizations/{organizationId}/users/{userId}/impersonate";
+
+    expect(spec).toHaveProperty(
+      ["paths", path, "post", "description"],
+      expect.stringContaining("60 minutos"),
+    );
+    expect(spec).toHaveProperty(
+      ["paths", path, "post", "parameters"],
+      expect.arrayContaining([expect.objectContaining({ name: "x-csrf-token", required: true })]),
+    );
+    expect(spec).toHaveProperty(["paths", path, "post", "responses", "403"]);
+    expect(spec).toHaveProperty(["paths", path, "post", "responses", "503"]);
   });
 
   it("documents the shared modular permissions contract with CSRF and 422 validation", () => {

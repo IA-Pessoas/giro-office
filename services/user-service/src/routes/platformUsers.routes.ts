@@ -1,4 +1,5 @@
 import {
+  createSessionCookieHeaders,
   createSuccessResponse,
   error as logError,
   parseWithZod,
@@ -22,13 +23,16 @@ import {
   requirePlatformGatewayAuth,
   requirePlatformSession,
 } from "../security/platformAuth.js";
+import { AuthService, IMPERSONATION_SESSION_MAX_AGE_SECONDS } from "../services/authService.js";
 import { PlatformUsersService } from "../services/platformUsersService.js";
 
-export function createPlatformUsersRoutes(
-  options: { audit?: UserAuditRecorder } = {},
-): ReturnType<typeof Router> {
+export function createPlatformUsersRoutes(options: {
+  audit?: UserAuditRecorder;
+  authCookieSecure: boolean;
+}): ReturnType<typeof Router> {
   const router = Router();
   const platformUsersService = new PlatformUsersService(options.audit);
+  const authService = new AuthService();
 
   function parsePlatformPermissionUpdate(body: unknown): Record<string, number> {
     const result = updatePermissionBodySchema.safeParse(body);
@@ -102,6 +106,73 @@ export function createPlatformUsersRoutes(
         );
       } catch (err) {
         logError("Erro ao consultar usuario da organizacao pela plataforma", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/organizations/:organizationId/users/:userId/impersonate",
+    requirePlatformGatewayAuth,
+    requirePlatformSession,
+    requirePlatformCsrf,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organizationId, userId } = parseWithZod(
+          platformOrganizationUserParamsSchema,
+          request.params,
+        );
+        const operator = request.platform_identity;
+        const platformSession = request.platform_session;
+        if (!operator || !platformSession) {
+          throw new ServiceError(401, "Não autenticado.");
+        }
+        const audit = options.audit;
+        if (!audit) {
+          throw new ServiceError(503, "Auditoria indisponível para iniciar personificação.");
+        }
+
+        const issued = await authService.startImpersonation(
+          {
+            organizationId,
+            targetUserId: userId,
+            platformUserId: operator.id,
+            platformSessionId: platformSession.session_id,
+            platformSessionCsrfHash: platformSession.csrf_hash,
+          },
+          (event) =>
+            audit({
+              actorUserId: event.targetUserId,
+              platformActorUserId: event.platformUserId,
+              organizationId: event.organizationId,
+              action: "platform.impersonation.started",
+              referring: "user",
+              referringId: event.targetUserId,
+              changes: {
+                operatorPlatformUserId: event.platformUserId,
+                target: { id: event.targetUserId, name: event.targetName },
+                startedAt: event.startedAt.toISOString(),
+              },
+              outcome: "success",
+              required: true,
+            }),
+        );
+        const {
+          token,
+          csrfToken,
+          impersonationStartedAt: _impersonationStartedAt,
+          ...target
+        } = issued;
+        response.append(
+          "Set-Cookie",
+          createSessionCookieHeaders(token, csrfToken, {
+            secure: options.authCookieSecure,
+            maxAgeSeconds: IMPERSONATION_SESSION_MAX_AGE_SECONDS,
+          }),
+        );
+        response.json(createSuccessResponse(target));
+      } catch (err) {
+        logError("Erro ao iniciar personificação de usuário", { err });
         next(err);
       }
     },

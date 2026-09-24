@@ -28,6 +28,7 @@ interface LoginRequest {
 }
 
 const MODULE_PERMISSION_KEYS: readonly ModulePermissionKey[] = ACTIVE_MODULE_KEYS;
+export const IMPERSONATION_SESSION_MAX_AGE_SECONDS = 60 * 60;
 const GENERIC_LOGIN_ERROR_MESSAGE = "Login ou senha inválidos.";
 const DUMMY_PASSWORD_HASH =
   "$argon2id$v=19$m=19456,p=1,t=2$lktGNqJmnbIyj6tMoe+a8Q$HRtIIMh3LPpaIs9yyun/WOjqfivhgr4Nt3m9wsIkTsQ";
@@ -155,6 +156,10 @@ export interface IssuedSession extends SessionUser {
   csrfToken: string;
 }
 
+export interface IssuedImpersonationSession extends IssuedSession {
+  impersonationStartedAt: Date;
+}
+
 export interface FirstCreateResult {
   user: {
     id: string;
@@ -171,6 +176,7 @@ class AuthService {
     organizationId: string,
     sessionId: string,
     csrfToken: string,
+    options: { impersonatorPlatformUserId?: string; expiresInSeconds?: number } = {},
   ): IssuedSession {
     const permissionRecord = user.permissions.find(
       (permission) => permission.organization_id === organizationId,
@@ -192,11 +198,14 @@ class AuthService {
         session_id: sessionId,
         modules,
         csrf_hash: hashCsrfToken(csrfToken),
+        ...(options.impersonatorPlatformUserId
+          ? { impersonator_platform_user_id: options.impersonatorPlatformUserId }
+          : {}),
       },
       getUserServiceEnv().jwtSecret,
       {
         subject: user.id,
-        expiresIn: SESSION_MAX_AGE_SECONDS,
+        expiresIn: options.expiresInSeconds ?? SESSION_MAX_AGE_SECONDS,
       },
     );
 
@@ -282,10 +291,125 @@ class AuthService {
     return this.issueSession(user, organizationId, sessionId, csrfToken);
   }
 
+  async startImpersonation(
+    input: {
+      organizationId: string;
+      targetUserId: string;
+      platformUserId: string;
+      platformSessionId: string;
+      platformSessionCsrfHash: string;
+    },
+    recordStartEvent: (event: {
+      organizationId: string;
+      targetUserId: string;
+      targetName: string;
+      platformUserId: string;
+      startedAt: Date;
+    }) => Promise<void>,
+  ): Promise<IssuedImpersonationSession> {
+    return prismaClient.$transaction(
+      async (transaction) => {
+        const operator = await transaction.platformUser.findUnique({
+          where: { id: input.platformUserId },
+          select: { id: true, platform_role: true, status: true, can_impersonate: true },
+        });
+        if (
+          !operator ||
+          operator.platform_role !== "super_admin" ||
+          operator.status !== "active" ||
+          !operator.can_impersonate
+        ) {
+          throw new ServiceError(403, "Você não tem permissão para personificar usuários.");
+        }
+
+        const target = await transaction.user.findUnique({
+          where: { id: input.targetUserId },
+          include: {
+            organization: { select: { id: true, status: true } },
+            department: {
+              select: {
+                organization_id: true,
+                organization: { select: { id: true, status: true } },
+              },
+            },
+            permissions: true,
+          },
+        });
+        if (!target) {
+          throw new ServiceError(404, "Usuário não encontrado.");
+        }
+
+        const targetOrganizationId = target.organization_id ?? target.department.organization_id;
+        if (targetOrganizationId !== input.organizationId) {
+          throw new ServiceError(404, "Usuário não encontrado nesta organização.");
+        }
+        if (
+          target.status !== "active" ||
+          getActiveOrganizationId(target) !== input.organizationId
+        ) {
+          throw new ServiceError(
+            403,
+            "Não é possível personificar usuário ou organização inativa.",
+          );
+        }
+
+        const startedAt = new Date();
+        const sessionId = randomUUID();
+        const csrfToken = createCsrfToken();
+        const issued = this.issueSession(target, input.organizationId, sessionId, csrfToken, {
+          impersonatorPlatformUserId: input.platformUserId,
+          expiresInSeconds: IMPERSONATION_SESSION_MAX_AGE_SECONDS,
+        });
+
+        await transaction.authSession.create({
+          data: {
+            id: sessionId,
+            user_id: target.id,
+            impersonator_platform_user_id: input.platformUserId,
+            csrf_hash: hashCsrfToken(csrfToken),
+            expires_at: new Date(
+              startedAt.getTime() + IMPERSONATION_SESSION_MAX_AGE_SECONDS * 1000,
+            ),
+          },
+        });
+
+        const { count } = await transaction.platformAuthSession.updateMany({
+          where: {
+            id: input.platformSessionId,
+            platform_user_id: input.platformUserId,
+            csrf_hash: input.platformSessionCsrfHash,
+            revoked_at: null,
+            expires_at: { gt: startedAt },
+          },
+          data: { revoked_at: startedAt },
+        });
+        if (count !== 1) {
+          throw new ServiceError(401, "Sessão da plataforma expirada ou substituída.");
+        }
+
+        await recordStartEvent({
+          organizationId: input.organizationId,
+          targetUserId: target.id,
+          targetName: target.name,
+          platformUserId: input.platformUserId,
+          startedAt,
+        });
+
+        return { ...issued, impersonationStartedAt: startedAt };
+      },
+      { timeout: 10_000 },
+    );
+  }
+
   async refreshSession(
     identity: Pick<
       AuthIdentity,
-      "user_id" | "organization_id" | "session_version" | "session_id" | "csrf_hash"
+      | "user_id"
+      | "organization_id"
+      | "session_version"
+      | "session_id"
+      | "csrf_hash"
+      | "impersonator_platform_user_id"
     >,
   ): Promise<IssuedSession> {
     const sessionVersion = identity.session_version;
@@ -328,6 +452,7 @@ class AuthService {
       where: {
         id: identity.session_id,
         user_id: user.id,
+        impersonator_platform_user_id: null,
         csrf_hash: identity.csrf_hash,
         revoked_at: null,
         expires_at: { gt: new Date() },
@@ -346,8 +471,11 @@ class AuthService {
           revoked_at: null,
           expires_at: { gt: new Date() },
         },
-        select: { csrf_hash: true },
+        select: { csrf_hash: true, impersonator_platform_user_id: true },
       });
+      if (currentSession?.impersonator_platform_user_id) {
+        throw new ServiceError(403, "Sessões de personificação não podem ser renovadas.");
+      }
       if (currentSession && currentSession.csrf_hash !== identity.csrf_hash) {
         throw new ServiceError(409, "Sessão substituída por uma renovação mais recente.");
       }
@@ -430,7 +558,12 @@ class AuthService {
   async validateSession(
     identity: Pick<
       AuthIdentity,
-      "user_id" | "organization_id" | "session_version" | "session_id" | "csrf_hash"
+      | "user_id"
+      | "organization_id"
+      | "session_version"
+      | "session_id"
+      | "csrf_hash"
+      | "impersonator_platform_user_id"
     >,
     options: { allowLegacyBearer?: boolean } = {},
   ): Promise<void> {
@@ -442,6 +575,7 @@ class AuthService {
       !identity.organization_id ||
       hasSessionId !== hasCsrfHash ||
       (!hasBoundSession && !options.allowLegacyBearer) ||
+      (!hasBoundSession && identity.impersonator_platform_user_id !== undefined) ||
       (identity.csrf_hash !== undefined && !CSRF_HASH_PATTERN.test(identity.csrf_hash))
     ) {
       throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
@@ -458,11 +592,29 @@ class AuthService {
         },
         select: {
           csrf_hash: true,
+          impersonator_platform_user_id: true,
+          impersonatorPlatformUser: {
+            select: { platform_role: true, status: true, can_impersonate: true },
+          },
           user: { select: SESSION_VALIDATION_USER_SELECT },
         },
       });
       if (session && session.csrf_hash !== identity.csrf_hash) {
         throw new ServiceError(409, "Sessão substituída por uma renovação mais recente.");
+      }
+      if (
+        (session?.impersonator_platform_user_id ?? undefined) !==
+        identity.impersonator_platform_user_id
+      ) {
+        throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
+      }
+      if (
+        identity.impersonator_platform_user_id &&
+        (session?.impersonatorPlatformUser?.platform_role !== "super_admin" ||
+          session.impersonatorPlatformUser.status !== "active" ||
+          !session.impersonatorPlatformUser.can_impersonate)
+      ) {
+        throw new ServiceError(401, "Sessão de personificação inválida.");
       }
       user = session?.user;
     } else {
