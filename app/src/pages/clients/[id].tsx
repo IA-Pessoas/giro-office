@@ -33,10 +33,7 @@ import {
   createClientFormInitialValues,
   getClientInternalName,
 } from "@modules/clients/utils/clientForm";
-import {
-  formatCpfCnpjInput,
-  validateCpfCnpjDocument,
-} from "@modules/clients/utils/documentValidation";
+import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
 import {
   getClientLifecycleActions,
   mapClientStatusFromApi,
@@ -54,6 +51,20 @@ const statusClassNames: Record<string, string> = {
   Fechado: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
 };
 
+function formatCpfCnpj(value: string): string {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length === 11) {
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  }
+
+  if (digits.length === 14) {
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+  }
+
+  return value;
+}
+
 export default function ClientDetailPage() {
   const router = useRouter();
   const clientId = typeof router.query.id === "string" ? router.query.id : undefined;
@@ -68,14 +79,13 @@ export default function ClientDetailPage() {
   const canEditClient = integracaoAccess.canEdit;
   const canAdminClient = integracaoAccess.isAdmin;
   const client = clientQuery.data;
-  const isCompanyClient = (client?.cpf_cnpj ?? "").replace(/[^a-zA-Z0-9]/g, "").length === 14;
+  const isCompanyClient = (client?.cpf_cnpj ?? "").replace(/\D/g, "").length === 14;
   const uiStatus = mapClientStatusFromApi(client?.status);
   const lifecycle = getClientLifecycleActions(uiStatus);
   const [pendingLifecycleAction, setPendingLifecycleAction] = useState<
     "activate" | "deactivate" | null
   >(null);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
-  const [showDocumentError, setShowDocumentError] = useState(false);
   const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
   const organizationName =
     (client as { organization?: { name?: string } } | null)?.organization?.name ??
@@ -91,16 +101,6 @@ export default function ClientDetailPage() {
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = event.target;
-
-    if (name === "cpf_cnpj") {
-      setShowDocumentError(false);
-      setFormValues((current) => ({
-        ...current,
-        cpf_cnpj: formatCpfCnpjInput(value, current.type ?? (isCompanyClient ? "PJ" : "PF")),
-      }));
-      return;
-    }
-
     const nextValue = type === "checkbox" ? (event.target as HTMLInputElement).checked : value;
 
     setFormValues((current) => ({
@@ -122,12 +122,9 @@ export default function ClientDetailPage() {
     const documentError = validateCpfCnpjDocument(formValues.cpf_cnpj);
 
     if (documentError) {
-      setShowDocumentError(true);
       toast.error(documentError);
       return;
     }
-
-    setShowDocumentError(false);
 
     try {
       await updateClientMutation.mutateAsync(buildUpdateClientPayload(formValues, client.regime));
@@ -223,10 +220,7 @@ export default function ClientDetailPage() {
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Resumo</h2>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <SummaryItem label="Nome" value={client.name} />
-                  <SummaryItem
-                    label="CPF/CNPJ"
-                    value={formatCpfCnpjInput(client.cpf_cnpj, client.type === "PF" ? "PF" : "PJ")}
-                  >
+                  <SummaryItem label="CPF/CNPJ" value={formatCpfCnpj(client.cpf_cnpj)}>
                     <DocumentIssueBadge value={client.cpf_cnpj} />
                   </SummaryItem>
                   <SummaryItem label="Regime" value={client.regime || "A definir"} />
@@ -335,7 +329,6 @@ export default function ClientDetailPage() {
                   }
                   submitLabel={updateClientMutation.isPending ? "Salvando..." : "Salvar alterações"}
                   disabled={updateClientMutation.isPending}
-                  showDocumentError={showDocumentError}
                 />
               </section>
             ) : null}
