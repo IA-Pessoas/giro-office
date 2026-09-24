@@ -68,6 +68,10 @@ const { prismaMock } = vi.hoisted(() => ({
       findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
+    authSession: {
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
     $transaction: vi.fn(async (callback: (transaction: { platformUser: unknown }) => unknown) =>
       callback(prismaMock),
     ),
@@ -166,6 +170,8 @@ describe("platform users routes", () => {
     prismaMock.platformUser.findUnique.mockReset();
     prismaMock.platformUser.findFirst.mockReset();
     prismaMock.platformUser.updateMany.mockReset();
+    prismaMock.authSession.findMany.mockReset();
+    prismaMock.authSession.updateMany.mockReset();
     platformAuthMock.validateSession.mockResolvedValue(platformIdentity);
     platformUsersMock.listSuperAdmins.mockResolvedValue([
       {
@@ -267,6 +273,98 @@ describe("platform users routes", () => {
       "550e8400-e29b-41d4-a716-446655440001",
       true,
     );
+  });
+
+  it("revoga por HTTP as personificações ativas e registra o motivo", async () => {
+    await useActualPermissionService();
+    const targetId = "550e8400-e29b-41d4-a716-446655440001";
+    const startedAt = new Date("2026-09-24T10:00:00.000Z");
+    prismaMock.platformUser.findUnique.mockResolvedValue({
+      id: platformIdentity.id,
+      platform_role: "super_admin",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.platformUser.findFirst.mockResolvedValue({
+      id: targetId,
+      name: "Outra administradora",
+      email: "outra@example.com",
+      status: "active",
+      can_impersonate: true,
+    });
+    prismaMock.platformUser.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.authSession.findMany.mockResolvedValue([
+      {
+        id: "impersonation-session-1",
+        user_id: "target-user-1",
+        created_at: startedAt,
+        user: {
+          name: "Usuário alvo",
+          organization_id: "org-1",
+          department: { organization_id: "org-1" },
+        },
+      },
+      {
+        id: "impersonation-session-2",
+        user_id: "target-user-2",
+        created_at: startedAt,
+        user: {
+          name: "Outro usuário alvo",
+          organization_id: "org-2",
+          department: { organization_id: "org-2" },
+        },
+      },
+    ]);
+    prismaMock.authSession.updateMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(createApp())
+      .patch(`/platform/super-admins/${targetId}/impersonation-permission`)
+      .set(platformGatewayHeaders())
+      .send({ can_impersonate: false });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.can_impersonate).toBe(false);
+    expect(prismaMock.authSession.findMany).toHaveBeenCalledWith({
+      where: {
+        impersonator_platform_user_id: targetId,
+        revoked_at: null,
+        expires_at: { gt: expect.any(Date) },
+      },
+      select: {
+        id: true,
+        user_id: true,
+        created_at: true,
+        user: {
+          select: {
+            name: true,
+            organization_id: true,
+            department: { select: { organization_id: true } },
+          },
+        },
+      },
+    });
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "impersonation-session-1",
+        user_id: "target-user-1",
+        impersonator_platform_user_id: targetId,
+        revoked_at: null,
+        expires_at: { gt: expect.any(Date) },
+      },
+      data: { revoked_at: expect.any(Date) },
+    });
+    expect(prismaMock.authSession.updateMany).toHaveBeenCalledTimes(2);
+    expect(auditMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "platform.impersonation.ended",
+        platformActorUserId: targetId,
+        organizationId: "org-1",
+        referringId: "target-user-1",
+        changes: expect.objectContaining({ reason: "revogação" }),
+        required: true,
+      }),
+    );
+    expect(auditMock).toHaveBeenCalledTimes(3);
   });
 
   it("nega por HTTP o operador sem permissão de personificação", async () => {

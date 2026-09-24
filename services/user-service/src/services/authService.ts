@@ -184,7 +184,7 @@ export interface ImpersonationEndEvent {
   startedAt: Date;
   endedAt: Date;
   durationMs: number;
-  reason: "saída" | "expiração";
+  reason: "saída" | "expiração" | "revogação";
 }
 
 export type ImpersonationEndEventRecorder = (event: ImpersonationEndEvent) => Promise<void>;
