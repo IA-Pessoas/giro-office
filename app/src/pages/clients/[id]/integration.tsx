@@ -37,6 +37,7 @@ export default function ClientIntegrationPage() {
   const updateIntegrationMutation = useUpdateClientIntegrationMutation(clientId ?? "");
   const client = clientQuery.data;
   const [formValues, setFormValues] = useState<UpdateClientIntegrationFormValues | null>(null);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
   const cnpjLookup = useClientCnpjLookup(
     formValues ? getCnpjToLookup(formValues.cpf_cnpj, client?.cpf_cnpj) : "",
   );
@@ -108,9 +109,11 @@ export default function ClientIntegrationPage() {
       return;
     }
 
-    const emailError = getIntegrationEmailError(formValues.email);
+    // Só valida o e-mail enviado: um e-mail antigo inválido não trava a edição de outros campos.
+    const emailError = "email" in updatePayload ? getIntegrationEmailError(formValues.email) : null;
 
     if (emailError) {
+      setShowFieldErrors(true);
       toast.error(emailError);
       return;
     }
@@ -212,6 +215,7 @@ export default function ClientIntegrationPage() {
                 cnpjLookup.isFetching ? "loading" : cnpjLookup.isError ? "unavailable" : "idle"
               }
               cnpjLookupError={cnpjLookup.error}
+              showFieldErrors={showFieldErrors}
               submitLabel={
                 updateIntegrationMutation.isPending ? "Salvando..." : "Salvar alterações"
               }

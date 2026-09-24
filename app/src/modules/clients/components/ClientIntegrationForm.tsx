@@ -36,6 +36,8 @@ interface ClientIntegrationFormProps {
   onCancel: () => void;
   cnpjLookupStatus?: "idle" | "loading" | "success" | "unavailable";
   cnpjLookupError?: unknown;
+  /** Liga os erros de campo depois de uma tentativa de salvar, mesmo sem blur. */
+  showFieldErrors?: boolean;
 }
 
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-white";
@@ -57,6 +59,7 @@ export function ClientIntegrationForm({
   onCancel,
   cnpjLookupStatus = "idle",
   cnpjLookupError,
+  showFieldErrors = false,
 }: ClientIntegrationFormProps) {
   const cnpjLookupReason = (cnpjLookupError as { response?: { data?: { error?: unknown } } })
     ?.response?.data?.error;
@@ -73,7 +76,8 @@ export function ClientIntegrationForm({
   };
   const [phoneHint, setPhoneHint] = useState<string | null>(null);
   const [emailTouched, setEmailTouched] = useState(false);
-  const emailError = emailTouched ? getIntegrationEmailError(values.email) : null;
+  const emailError =
+    emailTouched || showFieldErrors ? getIntegrationEmailError(values.email) : null;
   const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
     setPhoneHint(getPhoneInputHint(event.target.value));
     forwardFormattedInputChange(event, formatBrazilianPhoneInput, onChange);
@@ -128,9 +132,10 @@ export function ClientIntegrationForm({
             {cnpjLookupStatus === "loading" ? (
               <span className="text-slate-500 dark:text-slate-400">Consultando dados oficiais...</span>
             ) : cnpjLookupStatus === "unavailable" ? (
-              <span className="text-amber-700 dark:text-amber-300">
+              <span className="line-clamp-3 text-amber-700 dark:text-amber-300">
                 {typeof cnpjLookupReason === "string" ? `${cnpjLookupReason} ` : null}
-                Consulta automática indisponível. Preencha os dados manualmente.
+                Consulta automática indisponível. Preencha os dados manualmente; você pode salvar
+                normalmente.
               </span>
             ) : null}
           </span>
