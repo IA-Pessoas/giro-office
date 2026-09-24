@@ -1,5 +1,13 @@
+import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
-import { createClosingService, createControlService, createDocumentsService } from "./services.js";
+import { documentItemSchema } from "./schemas.js";
+import {
+  createClosingService,
+  createControlService,
+  createDocumentsService,
+  createRelationshipService,
+  createResponsibleService,
+} from "./services.js";
 
 const ORG = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -91,6 +99,143 @@ describe("contabil services tenant and catalog seams", () => {
     });
   });
 
+  describe("elegibilidade para criar competências (#1323)", () => {
+    const base = { clientId: CLIENT, userId: USER, organizationId: ORG, permission: 2 };
+    function controlDb(contabil: boolean | null | undefined) {
+      return {
+        client: {
+          findFirst: vi.fn().mockResolvedValue(contabil === undefined ? null : { contabil }),
+        },
+        controlContabil: {
+          findFirst: vi.fn().mockResolvedValue(null),
+          findMany: vi.fn().mockResolvedValue([]),
+          create: vi.fn(async ({ data }) => ({ id: "control-1", ...data })),
+          createMany: vi.fn(async ({ data }) => ({ count: data.length })),
+        },
+      };
+    }
+
+    it("cria as 12 competências para cliente com contabil nulo, como a tela permite", async () => {
+      const database = controlDb(null);
+      const result = await createControlService(database as never, audit()).createYear({
+        ...base,
+        year: 2026,
+        confirmed: true,
+      });
+      expect(result).toMatchObject({ created: 12, existing: 0 });
+    });
+
+    it("bloqueia mês e ano com a mesma mensagem quando o serviço contábil não é contratado", async () => {
+      const service = createControlService(controlDb(false) as never, audit());
+      const expected = {
+        statusCode: 400,
+        message: "Serviço contábil não contratado para este cliente.",
+      };
+      await expect(service.create({ ...base, competence: "2026-09" })).rejects.toMatchObject(
+        expected,
+      );
+      await expect(
+        service.createYear({ ...base, year: 2026, confirmed: true }),
+      ).rejects.toMatchObject(expected);
+    });
+
+    it("responde 404 para cliente de outra organização nas duas ações", async () => {
+      const service = createControlService(controlDb(undefined) as never, audit());
+      await expect(service.create({ ...base, competence: "2026-09" })).rejects.toMatchObject({
+        statusCode: 404,
+      });
+      await expect(
+        service.createYear({ ...base, year: 2026, confirmed: true }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+    });
+  });
+
+  it("responsável e relacionamento sem registro devolvem null (#1325)", async () => {
+    const database = {
+      responsibleContabil: { findFirst: vi.fn().mockResolvedValue(null) },
+      relationshipContabil: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    await expect(
+      createResponsibleService(database as never, audit()).getByClientId(CLIENT, ORG),
+    ).resolves.toBeNull();
+    await expect(
+      createRelationshipService(database as never, audit()).getByClientId(CLIENT, ORG),
+    ).resolves.toBeNull();
+  });
+
+  it("grava responsáveis ausentes como null em vez do default '' que viola a FK", async () => {
+    const database = {
+      responsibleContabil: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn(async ({ data }) => ({ id: "responsible-1", ...data })),
+      },
+    };
+    const service = createResponsibleService(database as never, audit());
+
+    await service.create({ client_id: CLIENT, customer_with_movement: false }, auth);
+
+    expect(database.responsibleContabil.create).toHaveBeenCalledWith({
+      data: {
+        client_id: CLIENT,
+        organization_id: ORG,
+        person_responsible_id: null,
+        posted_by_id: null,
+        customer_with_movement: false,
+      },
+    });
+  });
+
+  it("devolve 400 quando responsável ou lançado por não existe", async () => {
+    const database = {
+      responsibleContabil: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockRejectedValue(Object.assign(new Error("fk"), { code: "P2003" })),
+      },
+    };
+    const service = createResponsibleService(database as never, audit());
+
+    await expect(
+      service.create({ client_id: CLIENT, posted_by_id: USER }, auth),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    database.responsibleContabil.findFirst.mockResolvedValue({ id: "responsible-1" });
+    Object.assign(database.responsibleContabil, {
+      update: vi.fn().mockRejectedValue(Object.assign(new Error("fk"), { code: "P2003" })),
+    });
+    await expect(
+      service.update("responsible-1", { posted_by_id: USER }, auth),
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it("GET mensal sem registro devolve null em vez de 404 (#1322)", async () => {
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue(null);
+    const service = createDocumentsService(database as never, audit());
+
+    await expect(
+      service.getMonthly({ client_id: CLIENT, competence: "2026-09" }, auth),
+    ).resolves.toBeNull();
+  });
+
+  it("GET mensal sem competência na Triagem devolve resumo null em vez de 502 (#1322)", async () => {
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue({
+      id: MONTHLY,
+      client_id: CLIENT,
+      competence: "2026-09",
+      checklist: {},
+      item_notes: {},
+    });
+    const getSummary = vi
+      .fn()
+      .mockRejectedValue(new ServiceError(404, "Resumo da Triagem não encontrado."));
+    const service = createDocumentsService(database as never, audit(), { getSummary });
+
+    await expect(
+      service.getMonthly({ client_id: CLIENT, competence: "2026-09" }, auth),
+    ).resolves.toMatchObject({ id: MONTHLY, triagem_summary: null });
+  });
+
   it("recusa marcador bancário de cliente fora do tenant", async () => {
     const database = prisma();
     database.client.findFirst.mockResolvedValue(null);
@@ -131,6 +276,48 @@ describe("contabil services tenant and catalog seams", () => {
       ),
     ).rejects.toMatchObject({ statusCode: 400 });
     expect(database.triageMonthly.update).not.toHaveBeenCalled();
+  });
+
+  it("aceita chaves fiscais nulas na rotina contábil e ignora no update", async () => {
+    const body = {
+      type: "CONTABIL",
+      field: "financial_transactions",
+      status: "PENDING",
+      note: "Aguardando extrato",
+      delivery_method: null,
+      state_site: null,
+    };
+    expect(documentItemSchema.safeParse(body).success).toBe(true);
+    expect(documentItemSchema.safeParse({ ...body, state_site: "SP" }).success).toBe(false);
+    expect(
+      documentItemSchema.safeParse({
+        ...body,
+        type: "FISCAL",
+        field: "nfce_documents",
+        state_site: "SP",
+      }).success,
+    ).toBe(true);
+
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue({
+      id: MONTHLY,
+      client_id: CLIENT,
+      checklist: {},
+      item_notes: {},
+    });
+    database.triageCompetence.findFirst.mockResolvedValue(null);
+    database.triageCatalogItem.findMany.mockResolvedValue([]);
+    database.triageMonthly.update.mockImplementation(async ({ data }) => ({
+      id: MONTHLY,
+      client_id: CLIENT,
+      ...data,
+    }));
+    const service = createDocumentsService(database as never, audit());
+
+    await service.updateItem(MONTHLY, body, auth);
+    const notes = database.triageMonthly.update.mock.calls[0][0].data.item_notes;
+    expect(notes?.financial_transactions).not.toHaveProperty("state_site");
+    expect(notes?.financial_transactions).not.toHaveProperty("delivery_method");
   });
 
   it("envia timestamps obrigatórios nos creates e upserts físicos da triagem", async () => {

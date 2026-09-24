@@ -100,6 +100,9 @@ const PROCESSING_AUDIT_OUTBOX_STATUS = "processing";
 const PROCESSED_AUDIT_OUTBOX_STATUS = "processed";
 const AUDIT_OUTBOX_RECONCILIATION_LIMIT = 100;
 const AUDIT_SERVICE_TIMEOUT_MS = 5_000;
+// Exibida ao usuário: sem nome de serviço interno. O detalhe técnico fica no log.
+const AUDIT_FAILURE_MESSAGE =
+  "Não foi possível registrar a auditoria da operação. Tente novamente em instantes.";
 const UNION_REGARDING = "union";
 const NOTIFICATION_CREATE_CHUNK_SIZE = 100;
 
@@ -135,7 +138,7 @@ function toPage<T>(data: T[], total: number, page: number, limit: number) {
 
 function requirePermission(context: { permission?: number }, minimum: number): void {
   if (typeof context.permission !== "number" || context.permission < minimum) {
-    throw new ServiceError(403, "Permissao insuficiente para acessar o pessoal-service.");
+    throw new ServiceError(403, "Permissao insuficiente para acessar o Departamento Pessoal.");
   }
 }
 
@@ -208,7 +211,22 @@ export async function sendPessoalAudit(
   input: Record<string, unknown>,
 ): Promise<boolean> {
   if (!env?.AUDIT_SERVICE) return false;
+  // O audit-service valida o mesmo segredo que os chamadores guardam em AUDIT_SERVICE_TOKEN;
+  // INTERNAL_SERVICE_TOKEN é o do gateway e o audit-service responde 401 a ele.
+  if (!env.AUDIT_SERVICE_TOKEN) {
+    throw new ServiceError(503, "Auditoria externa não configurada.");
+  }
   const binding: ServiceBinding = env.AUDIT_SERVICE;
+  // As rotas de domínio mandam só o evento; o audit-service exige requestId e createdAt.
+  const now = new Date().toISOString();
+  const referring = typeof input.referring === "string" ? input.referring : "";
+  const payload = {
+    ...input,
+    requestId: input.requestId ?? crypto.randomUUID(),
+    path: input.path ?? `/${referring.replace(/\./gu, "/")}`,
+    createdAt: input.createdAt ?? now,
+    finishedAt: input.finishedAt ?? now,
+  };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AUDIT_SERVICE_TIMEOUT_MS);
 
@@ -218,22 +236,24 @@ export async function sendPessoalAudit(
         method: "POST",
         headers: {
           "content-type": "application/json",
-          [INTERNAL_SERVICE_TOKEN_HEADER]: env.INTERNAL_SERVICE_TOKEN,
+          [INTERNAL_SERVICE_TOKEN_HEADER]: env.AUDIT_SERVICE_TOKEN,
         },
-        body: JSON.stringify(input),
+        body: JSON.stringify(payload),
       }),
       { signal: controller.signal },
     );
     if (!response.ok) {
-      throw new ServiceError(502, `AUDIT_SERVICE respondeu com HTTP ${response.status}.`);
+      throw new ServiceError(502, AUDIT_FAILURE_MESSAGE, { auditStatus: response.status });
     }
     return true;
   } catch (error) {
+    const timedOut = controller.signal.aborted;
+    logError("Falha ao enviar auditoria do Pessoal", {
+      timedOut,
+      error: error instanceof ServiceError ? error.cause : error,
+    });
     if (error instanceof ServiceError) throw error;
-    if (controller.signal.aborted) {
-      throw new ServiceError(504, "Tempo esgotado ao chamar AUDIT_SERVICE.", error);
-    }
-    throw new ServiceError(502, "Falha ao chamar AUDIT_SERVICE.", error);
+    throw new ServiceError(timedOut ? 504 : 502, AUDIT_FAILURE_MESSAGE, error);
   } finally {
     clearTimeout(timeout);
   }

@@ -1550,3 +1550,43 @@ await runTest("regularize selects clients in the header and shows the bound clie
     assert.doesNotMatch(formSource, /RegularizeClientPickerField/);
   });
 });
+
+await runTest("partner form validates each field before submitting", async () => {
+  const { validatePartnerForm } = await import("./utils/partnerForm.ts");
+  const valid = { pf_id: "pf", part: "50", entry: "2024-01-15", exit: "" };
+
+  assert.deepEqual(validatePartnerForm(valid), {});
+  assert.deepEqual(validatePartnerForm({ ...valid, part: "150" }), {
+    part: "Participação deve ser maior que 0% e no máximo 100%.",
+  });
+  assert.deepEqual(validatePartnerForm({ ...valid, part: "" }), {
+    part: "Informe a participação em %.",
+  });
+  assert.deepEqual(validatePartnerForm({ ...valid, exit: "2020-01-15" }), {
+    exit: "Data de saída não pode ser anterior à entrada.",
+  });
+  assert.deepEqual(
+    validatePartnerForm({ ...valid, entry: "" }, { entryIncomplete: true, exitIncomplete: true }),
+    {
+      entry: "Informe a data de entrada completa (dd/mm/aaaa).",
+      exit: "Informe a data de saída completa (dd/mm/aaaa).",
+    },
+  );
+  assert.deepEqual(validatePartnerForm({ ...valid, pf_id: "" }), {
+    pf_id: "Selecione a pessoa física.",
+  });
+});
+
+await runTest("partner table shows masked CPF and distinct action tooltips", async () => {
+  const source = await readFile(
+    join(appRoot, "src/modules/clients/components/ClientPartnersSection.tsx"),
+    "utf8",
+  );
+
+  assert.match(source, /formatCPF_CNPJ\(item\.clientPF\.cpf\)/);
+  assert.match(source, /title="Editar pessoa física"/);
+  assert.match(source, /title="Editar vínculo"/);
+  assert.match(source, /excludePfIds=/);
+  assert.match(source, /<ConfirmationDialog/);
+  assert.doesNotMatch(source, /window\.confirm/);
+});

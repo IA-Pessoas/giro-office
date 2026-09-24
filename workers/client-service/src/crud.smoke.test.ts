@@ -376,6 +376,12 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
     expect(
       expectOk(await call("GET", `/client/${id}/pa`), "GET PA após PATCH").data.detail,
     ).toMatchObject(pa);
+
+    // #1310: um POST repetido não pode recriar o PA com campos nulos.
+    expect((await call("POST", `/client/${id}/pa`, {})).status).toBe(409);
+    expect(
+      expectOk(await call("GET", `/client/${id}/pa`), "GET PA após POST repetido").data.detail,
+    ).toMatchObject(pa);
   });
 
   it("históricos e pendências", async () => {
@@ -436,6 +442,9 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
     ).data;
     expectOk(await call("DELETE", `/client/histories/pending/${other.id}`), "DELETE pending");
     expect((await call("DELETE", `/client/histories/pending/${other.id}`)).status).toBe(404);
+
+    expectOk(await call("DELETE", `/client/${id}/histories/${history.id}`), "DELETE history");
+    expect((await call("GET", `/client/${id}/histories/${history.id}`)).status).toBe(404);
   });
 
   it("rescisão, job de competência e projeção comercial", async () => {

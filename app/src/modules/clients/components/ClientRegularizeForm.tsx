@@ -12,7 +12,7 @@ import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientRegularizeFormValues } from "../types";
 import { isRegularizeCompanyClient } from "../utils/regularizeForm";
 import {
-  REGULARIZE_REGIME_OPTIONS,
+  getRegularizeRegimeOptions,
   REGULARIZE_SEGMENT_OPTIONS,
   REGULARIZE_SIZE_OPTIONS,
 } from "../utils/regularizeForm";
@@ -159,7 +159,7 @@ export function ClientRegularizeForm({
             <span className={labelClassName}>Regime</span>
             <ClientNativeSelect name="regime" value={values.regime} onChange={onChange} disabled={disabled}>
               <option value="">Selecione um regime</option>
-              {REGULARIZE_REGIME_OPTIONS.map((option) => (
+              {getRegularizeRegimeOptions(values.regime).map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>

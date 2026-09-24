@@ -38,6 +38,7 @@ export function TriageUrgentRequestsSection({
   const [urgencyCode, setUrgencyCode] = useState<TriageUrgencyCode>("MEDIUM");
   const [description, setDescription] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState("");
   const users = usersQuery.data ?? [];
@@ -57,11 +58,22 @@ export function TriageUrgentRequestsSection({
 
   async function createRequest(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    await mutations.create.mutateAsync({
-      urgency_code: urgencyCode,
-      description: description.trim(),
-      responsible_id: responsibleId,
-    });
+    const invalid = !responsibleId
+      ? "Selecione o responsável da solicitação."
+      : !description.trim()
+        ? "Descreva a solicitação."
+        : null;
+    setFormError(invalid);
+    if (invalid) return;
+    try {
+      await mutations.create.mutateAsync({
+        urgency_code: urgencyCode,
+        description: description.trim(),
+        responsible_id: responsibleId,
+      });
+    } catch {
+      return; // mensagem da API aparece no alerta da seção
+    }
     setDescription("");
     setResponsibleId("");
   }
@@ -101,7 +113,7 @@ export function TriageUrgentRequestsSection({
       </div>
 
       {canEdit ? (
-        <form className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={createRequest}>
+        <form className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={createRequest} noValidate>
           <label className="text-sm font-medium text-gray-700 dark:text-slate-300">
             Código de urgência
             <select
@@ -126,6 +138,9 @@ export function TriageUrgentRequestsSection({
               onChange={(event) => setResponsibleId(event.target.value)}
               className="mt-1 block h-10 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-800"
             >
+              <option value="" disabled>
+                Selecione o responsável
+              </option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.name}
@@ -148,6 +163,11 @@ export function TriageUrgentRequestsSection({
             <AlertTriangle className="h-4 w-4" aria-hidden="true" />
             Registrar solicitação
           </button>
+          {formError ? (
+            <p className="text-sm text-red-700 dark:text-red-300 sm:col-span-2" role="alert">
+              {formError}
+            </p>
+          ) : null}
         </form>
       ) : null}
 

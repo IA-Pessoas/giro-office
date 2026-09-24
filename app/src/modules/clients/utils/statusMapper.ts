@@ -35,3 +35,20 @@ export function mapClientStatusToApi(
 
   return status ?? "";
 }
+
+export type ClientLifecycleActions = {
+  canActivate: boolean;
+  canDeactivate: boolean;
+  canTerminate: boolean;
+};
+
+const REACTIVATABLE_STATUSES = new Set(["Inativo", "Processo de Inativação", "Paralisado"]);
+
+// Nega por padrão: Prospect, Não Contratado e status desconhecido não têm ação de ciclo de vida.
+export function getClientLifecycleActions(uiStatus: string): ClientLifecycleActions {
+  if (uiStatus === "Ativo") {
+    return { canActivate: false, canDeactivate: true, canTerminate: true };
+  }
+
+  return { canActivate: REACTIVATABLE_STATUSES.has(uiStatus), canDeactivate: false, canTerminate: false };
+}
