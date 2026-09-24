@@ -103,6 +103,48 @@ describe("PointService", () => {
     });
   });
 
+  it("calculateDailyHours procura o feriado pelo dia civil gravado a meia-noite UTC", async () => {
+    prismaMock.point.findUnique.mockResolvedValue({
+      id: "point-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+      clock_in: new Date("2026-04-21T12:00:00.000Z"),
+      lunch_out: new Date("2026-04-21T13:00:00.000Z"),
+      lunch_in: new Date("2026-04-21T14:00:00.000Z"),
+      clock_out: new Date("2026-04-21T16:00:00.000Z"),
+      time_bank_balance: null,
+    });
+    prismaMock.timeSheets.findFirst.mockResolvedValue(null);
+    prismaMock.pointsConfig.findUnique.mockResolvedValue({
+      organization_id: "org-1",
+      start_time: new Date("2026-04-21T11:00:00.000Z"),
+      lunch_break: new Date("2026-04-21T15:00:00.000Z"),
+      lunch_return: new Date("2026-04-21T16:00:00.000Z"),
+      end_time: new Date("2026-04-21T20:00:00.000Z"),
+      work_days: "1,2,3,4,5",
+    });
+    prismaMock.holidays.findFirst.mockResolvedValue({ id: "tiradentes" });
+    const result = await new PointService().calculateDailyHours(
+      "point-1",
+      "org-1",
+      prismaMock as never,
+      "America/Sao_Paulo",
+    );
+
+    expect(prismaMock.holidays.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: "org-1",
+          date: {
+            gte: new Date("2026-04-21T00:00:00.000Z"),
+            lte: new Date("2026-04-21T23:59:59.999Z"),
+          },
+        },
+      }),
+    );
+    expect(result.expected_minutes).toBe(0);
+  });
+
   it("listPoints aplica filtro por periodo e usuario", async () => {
     prismaMock.point.findMany.mockResolvedValue([
       {
