@@ -1819,12 +1819,10 @@ export function RegularizePage() {
             : currentForm,
         );
       }
-      const message = getRegularizeMutationErrorMessage(
-        error,
-        savedLicenseId
-          ? "A licença foi salva, mas não foi possível armazenar o protocolo."
-          : "Não foi possível salvar a licença.",
-      );
+      const message =
+        savedLicenseId && protocolFile
+          ? `A licença foi salva, mas não foi possível armazenar o protocolo. ${getRegularizeMutationErrorMessage(error, "Tente novamente.")}`
+          : getRegularizeMutationErrorMessage(error, "Não foi possível salvar a licença.");
       toast.error(message);
       throw new Error(message);
     }
