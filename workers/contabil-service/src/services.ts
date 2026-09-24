@@ -161,6 +161,21 @@ function serviceError(error: unknown, fallback: string): ServiceError {
   return error instanceof ServiceError ? error : new ServiceError(500, fallback, error);
 }
 
+// Mesma regra da tela (clients/[id]/contabil): só `contabil === false` bloqueia; nulo é elegível.
+async function assertContabilEligible(
+  prisma: ContabilPrisma,
+  clientId: string,
+  organizationId: string,
+): Promise<void> {
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, organization_id: organizationId },
+    select: { contabil: true },
+  });
+  if (!client) throw new ServiceError(404, "Cliente não encontrado.");
+  if (client.contabil === false)
+    throw new ServiceError(400, "Serviço contábil não contratado para este cliente.");
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
@@ -290,6 +305,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
     async create(input) {
       const auth = authData(input);
       try {
+        await assertContabilEligible(prisma, String(input.clientId), auth.organizationId);
         const identity = {
           client_id: String(input.clientId),
           competence: String(input.competence),
@@ -336,15 +352,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         (_, index) => `${year}-${String(index + 1).padStart(2, "0")}`,
       );
       try {
-        const client = await prisma.client.findFirst({
-          where: {
-            id: String(input.clientId),
-            organization_id: auth.organizationId,
-            contabil: true,
-          },
-          select: { id: true },
-        });
-        if (!client) throw new ServiceError(404, "Cliente contábil não encontrado.");
+        await assertContabilEligible(prisma, String(input.clientId), auth.organizationId);
         const existing = await prisma.controlContabil.findMany({
           where: {
             client_id: String(input.clientId),

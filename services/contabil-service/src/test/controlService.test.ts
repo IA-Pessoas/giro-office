@@ -39,7 +39,7 @@ const baseRow = {
 function createMockPrisma(): ControlServicePrisma {
   return {
     client: {
-      findFirst: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue({ contabil: null }),
       findMany: vi.fn(),
     },
     controlContabil: {
@@ -195,6 +195,33 @@ describe("ControlService", () => {
     );
     expect(prisma.controlContabil.create).not.toHaveBeenCalled();
     expect(prisma.controlContabil.update).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia mês e ano com a mesma mensagem quando o serviço contábil não é contratado (#1323)", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.client.findFirst).mockResolvedValue({ contabil: false } as never);
+    const service = new ControlService(prisma, { createLog: vi.fn(), logUpdateIfChanged: vi.fn() });
+    const identity = {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      permission: 2,
+      clientId: CLIENT_ID,
+    };
+    const expected = {
+      statusCode: 400,
+      message: "Serviço contábil não contratado para este cliente.",
+    };
+
+    await expect(service.create({ ...identity, competence: "2024-01" })).rejects.toMatchObject(
+      expected,
+    );
+    await expect(
+      service.createYear({ ...identity, year: 2024, confirmed: true }),
+    ).rejects.toMatchObject(expected);
+    expect(prisma.client.findFirst).toHaveBeenCalledWith({
+      where: { id: CLIENT_ID, organization_id: ORG_ID },
+      select: { contabil: true },
+    });
   });
 
   it("create retorna existente sem auditar quando já há registro", async () => {

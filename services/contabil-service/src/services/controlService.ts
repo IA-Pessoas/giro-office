@@ -199,10 +199,25 @@ export class ControlService {
     }
   }
 
+  // Mesma regra da tela (clients/[id]/contabil): só `contabil === false` bloqueia; nulo é elegível.
+  private async assertContabilEligible(clientId: string, organizationId: string): Promise<void> {
+    const client = await this.prisma.client.findFirst({
+      where: { id: clientId, organization_id: organizationId },
+      select: { contabil: true },
+    });
+    if (!client) {
+      throw new ServiceError(404, "Cliente não encontrado.");
+    }
+    if (client.contabil === false) {
+      throw new ServiceError(400, "Serviço contábil não contratado para este cliente.");
+    }
+  }
+
   async create(
     data: CreateControlRequest,
   ): Promise<{ control: ControlContabilEntity; created: boolean }> {
     try {
+      await this.assertContabilEligible(data.clientId, data.organizationId);
       const existing = await this.prisma.controlContabil.findFirst({
         where: {
           client_id: data.clientId,
@@ -274,13 +289,7 @@ export class ControlService {
 
     const competences = getYearCompetences(data.year);
     try {
-      const client = await this.prisma.client.findFirst({
-        where: { id: data.clientId, organization_id: data.organizationId, contabil: true },
-        select: { id: true },
-      });
-      if (!client) {
-        throw new ServiceError(404, "Cliente contábil não encontrado.");
-      }
+      await this.assertContabilEligible(data.clientId, data.organizationId);
 
       const existing = await this.prisma.controlContabil.findMany({
         where: {

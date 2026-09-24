@@ -69,6 +69,7 @@ export function ContabilControlSection({
   const [confirmYearCreation, setConfirmYearCreation] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [operationMessage, setOperationMessage] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
 
   const confirmedControlRef = useRef<ContabilControl | null>(null);
   const bootstrapRequestRef = useRef(0);
@@ -292,33 +293,53 @@ export function ContabilControlSection({
     queueFieldSave("notes", value);
   }
 
-  async function createYear() {
-    const year = Number(competence.slice(0, 4));
-    const result = await createYearMutation.mutateAsync({ client_id: clientId, year, confirmed: true });
-    setConfirmYearCreation(false);
-    setOperationMessage(`${result.created} competências criadas; ${result.existing} já existiam.`);
+  // Erro de qualquer ação aparece na tela e os botões de confirmação voltam ao estado normal.
+  async function runOperation(action: () => Promise<void>) {
+    setOperationError(null);
+    try {
+      await action();
+    } catch (error) {
+      setOperationMessage(null);
+      setOperationError(getContabilErrorMessage(error));
+    } finally {
+      setConfirmYearCreation(false);
+      setConfirmArchive(false);
+    }
   }
 
-  async function completeAll() {
-    if (!controlId) return;
-    const updated = await completeAllMutation.mutateAsync({ controlId, clientId, competence });
-    setControl(updated);
-    confirmedControlRef.current = updated;
-    setOperationMessage("Os 17 itens da competência foram marcados como concluídos.");
+  function createYear() {
+    return runOperation(async () => {
+      const year = Number(competence.slice(0, 4));
+      const result = await createYearMutation.mutateAsync({ client_id: clientId, year, confirmed: true });
+      setOperationMessage(`${result.created} competências criadas; ${result.existing} já existiam.`);
+    });
   }
 
-  async function archiveCompetence() {
-    await archiveMutation.mutateAsync({ client_id: clientId, competence });
-    setConfirmArchive(false);
-    setControl(null);
-    setControlId(null);
-    setOperationMessage("Competência arquivada. Os registros foram preservados e podem ser restaurados.");
+  function completeAll() {
+    return runOperation(async () => {
+      if (!controlId) return;
+      const updated = await completeAllMutation.mutateAsync({ controlId, clientId, competence });
+      setControl(updated);
+      confirmedControlRef.current = updated;
+      setOperationMessage("Os 17 itens da competência foram marcados como concluídos.");
+    });
   }
 
-  async function restoreCompetence() {
-    await restoreMutation.mutateAsync({ client_id: clientId, competence });
-    setOperationMessage("Competência restaurada. Recarregue o controle para continuar.");
-    void bootstrapControl(clientId, competence);
+  function archiveCompetence() {
+    return runOperation(async () => {
+      await archiveMutation.mutateAsync({ client_id: clientId, competence });
+      setControl(null);
+      setControlId(null);
+      setOperationMessage("Competência arquivada. Os registros foram preservados e podem ser restaurados.");
+    });
+  }
+
+  function restoreCompetence() {
+    return runOperation(async () => {
+      await restoreMutation.mutateAsync({ client_id: clientId, competence });
+      setOperationMessage("Competência restaurada. Recarregue o controle para continuar.");
+      void bootstrapControl(clientId, competence);
+    });
   }
 
   return (
@@ -499,6 +520,12 @@ export function ContabilControlSection({
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {operationError ? (
+        <ContabilStateBox icon={AlertCircle} tone="danger" title="Não foi possível concluir a operação" compact>
+          <span role="alert">{operationError}</span>
+        </ContabilStateBox>
       ) : null}
 
       {operationMessage ? (
