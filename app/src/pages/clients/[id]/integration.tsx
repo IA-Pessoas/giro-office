@@ -18,6 +18,8 @@ import {
   createUpdateClientIntegrationInitialValues,
   hasUsableIntegrationData,
   mergeClientCompanyLookup,
+  getCnpjToLookup,
+  getIntegrationEmailError,
 } from "@modules/clients/utils/integrationForm";
 import {
   validateCpfCnpjDocument,
@@ -35,7 +37,9 @@ export default function ClientIntegrationPage() {
   const updateIntegrationMutation = useUpdateClientIntegrationMutation(clientId ?? "");
   const client = clientQuery.data;
   const [formValues, setFormValues] = useState<UpdateClientIntegrationFormValues | null>(null);
-  const cnpjLookup = useClientCnpjLookup(formValues?.cpf_cnpj ?? "");
+  const cnpjLookup = useClientCnpjLookup(
+    formValues ? getCnpjToLookup(formValues.cpf_cnpj, client?.cpf_cnpj) : "",
+  );
 
   useEffect(() => {
     if (
@@ -101,6 +105,13 @@ export default function ClientIntegrationPage() {
 
     if (cpfCnpjError) {
       toast.error(cpfCnpjError);
+      return;
+    }
+
+    const emailError = getIntegrationEmailError(formValues.email);
+
+    if (emailError) {
+      toast.error(emailError);
       return;
     }
 

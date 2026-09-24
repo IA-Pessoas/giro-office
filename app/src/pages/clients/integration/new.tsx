@@ -15,6 +15,7 @@ import {
   buildCreateClientIntegrationPayload,
   createClientIntegrationInitialValues,
   mergeClientCompanyLookup,
+  getIntegrationEmailError,
 } from "@modules/clients/utils/integrationForm";
 import { useMe } from "@shared/hooks/useMe";
 import {
@@ -70,6 +71,13 @@ export default function NewClientIntegrationPage() {
 
     if (cpfCnpjError) {
       toast.error(cpfCnpjError);
+      return;
+    }
+
+    const emailError = getIntegrationEmailError(formValues.email);
+
+    if (emailError) {
+      toast.error(emailError);
       return;
     }
 

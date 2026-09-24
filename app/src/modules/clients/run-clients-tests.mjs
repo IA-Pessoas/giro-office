@@ -27,6 +27,9 @@ import {
   buildCreateClientIntegrationPayload,
   buildUpdateClientIntegrationPayload,
   createUpdateClientIntegrationInitialValues,
+  getCnpjToLookup,
+  getIntegrationEmailError,
+  getPhoneInputHint,
   hasUsableIntegrationData,
 } from "./utils/integrationForm.ts";
 import { formatPaMoneyFromApi, formatPaMoneyInput, parsePaMoneyCents } from "./utils/paForm.ts";
@@ -855,4 +858,29 @@ runTest("history modal defaults the date and keeps the file note to edit mode", 
 
   assert.match(modal, /date: toDatetimeLocalValue\(new Date\(\)\.toISOString\(\)\)/);
   assert.match(modal, /mode === "edit" \? \(\s*<p[^>]*>\s*Atualização de arquivo não é suportada na edição\./);
+});
+
+runTest("integration email is validated before saving", () => {
+  assert.equal(getIntegrationEmailError("QA_email_invalido"), "Informe um e-mail válido.");
+  assert.equal(getIntegrationEmailError("sem@dominio"), "Informe um e-mail válido.");
+  assert.equal(getIntegrationEmailError("contato@acme.com.br"), null);
+  assert.equal(getIntegrationEmailError("  "), null);
+});
+
+runTest("integration phone warns when letters are dropped", () => {
+  assert.equal(getPhoneInputHint("(11) 9abc"), "Telefone aceita apenas números.");
+  assert.equal(getPhoneInputHint("(11) 91234-5678"), null);
+});
+
+runTest("integration only looks up a CNPJ that differs from the saved one", () => {
+  assert.equal(getCnpjToLookup("12.345.678/0001-95", "12345678000195"), "");
+  assert.equal(getCnpjToLookup("98.765.432/0001-10", "12345678000195"), "98.765.432/0001-10");
+  assert.equal(getCnpjToLookup("98.765.432/0001-10", null), "98.765.432/0001-10");
+});
+
+runTest("integration form marks required fields and reserves the CNPJ notice slot", () => {
+  const form = readFileSync("src/modules/clients/components/ClientIntegrationForm.tsx", "utf8");
+
+  assert.equal(form.match(/<RequiredFieldLabel[^>]*required>/g)?.length, 3);
+  assert.match(form, /min-h-12/);
 });

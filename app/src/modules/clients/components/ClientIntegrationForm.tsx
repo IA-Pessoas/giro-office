@@ -1,4 +1,6 @@
-import type { ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
+
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
 import {
   formatBrazilianPhoneInput,
@@ -13,6 +15,7 @@ import type {
   CreateClientIntegrationFormValues,
   UpdateClientIntegrationFormValues,
 } from "../types";
+import { getIntegrationEmailError, getPhoneInputHint } from "../utils/integrationForm";
 
 type IntegrationFormMode = "create" | "edit";
 
@@ -68,7 +71,11 @@ export function ClientIntegrationForm({
   const handleCpfChange = (event: ChangeEvent<HTMLInputElement>) => {
     forwardFormattedInputChange(event, formatCpfInput, onChange);
   };
+  const [phoneHint, setPhoneHint] = useState<string | null>(null);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const emailError = emailTouched ? getIntegrationEmailError(values.email) : null;
   const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setPhoneHint(getPhoneInputHint(event.target.value));
     forwardFormattedInputChange(event, formatBrazilianPhoneInput, onChange);
   };
 
@@ -76,7 +83,9 @@ export function ClientIntegrationForm({
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <label className="space-y-1.5">
-          <span className={labelClassName}>Tipo de Pessoa</span>
+          <RequiredFieldLabel className={labelClassName} required>
+            Tipo de Pessoa
+          </RequiredFieldLabel>
           <ClientNativeSelect
             name="type"
             value={values.type}
@@ -103,7 +112,9 @@ export function ClientIntegrationForm({
         </label>
 
         <label className="space-y-1.5">
-          <span className={labelClassName}>{values.type === "PJ" ? "CNPJ" : "CPF"}</span>
+          <RequiredFieldLabel className={labelClassName} required>
+            {values.type === "PJ" ? "CNPJ" : "CPF"}
+          </RequiredFieldLabel>
           <input
             name="cpf_cnpj"
             value={values.cpf_cnpj}
@@ -112,21 +123,23 @@ export function ClientIntegrationForm({
             placeholder="Somente números"
             className={clientTextFieldClassName}
           />
-          {cnpjLookupStatus === "loading" ? (
-            <span className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
-              Consultando dados oficiais...
-            </span>
-          ) : cnpjLookupStatus === "unavailable" ? (
-            <span className="text-xs text-amber-700 dark:text-amber-300" role="status">
-              {typeof cnpjLookupReason === "string" ? `${cnpjLookupReason} ` : null}
-              Não foi possível consultar o CNPJ automaticamente. Preencha os dados manualmente;
-              você pode salvar normalmente.
-            </span>
-          ) : null}
+          {/* Espaço reservado: o aviso da consulta chega depois e não pode empurrar os campos. */}
+          <span className="block min-h-12 text-xs" aria-live="polite">
+            {cnpjLookupStatus === "loading" ? (
+              <span className="text-slate-500 dark:text-slate-400">Consultando dados oficiais...</span>
+            ) : cnpjLookupStatus === "unavailable" ? (
+              <span className="text-amber-700 dark:text-amber-300">
+                {typeof cnpjLookupReason === "string" ? `${cnpjLookupReason} ` : null}
+                Consulta automática indisponível. Preencha os dados manualmente.
+              </span>
+            ) : null}
+          </span>
         </label>
 
         <label className="space-y-1.5">
-          <span className={labelClassName}>Nome / Apelido</span>
+          <RequiredFieldLabel className={labelClassName} required>
+            Nome / Apelido
+          </RequiredFieldLabel>
           <input
             name="name"
             value={values.name}
@@ -179,8 +192,14 @@ export function ClientIntegrationForm({
             value={values.number}
             onChange={handlePhoneChange}
             disabled={disabled}
+            inputMode="tel"
             className={clientTextFieldClassName}
           />
+          {phoneHint ? (
+            <span className="block text-xs text-amber-700 dark:text-amber-300" role="status">
+              {phoneHint}
+            </span>
+          ) : null}
         </label>
 
         <label className="space-y-1.5 md:col-span-2 xl:col-span-2">
@@ -190,9 +209,16 @@ export function ClientIntegrationForm({
             name="email"
             value={values.email}
             onChange={onChange}
+            onBlur={() => setEmailTouched(true)}
             disabled={disabled}
+            aria-invalid={Boolean(emailError)}
             className={clientTextFieldClassName}
           />
+          {emailError ? (
+            <span className="block text-xs text-red-700 dark:text-red-300" role="alert">
+              {emailError}
+            </span>
+          ) : null}
         </label>
 
         <label className="space-y-1.5">
