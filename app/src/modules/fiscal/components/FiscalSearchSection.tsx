@@ -59,9 +59,12 @@ export function FiscalSearchSection() {
 
   const searchQuery = useFiscalNcmSearch(submittedCode);
   const hasSearched = Boolean(submittedCode);
-  // keepPreviousData mantém o último resultado mesmo com a busca desativada.
-  const activeResult = submittedCode ? searchQuery.data : undefined;
-  const displayedResult = activeResult ?? storedSearch?.result ?? null;
+  // keepPreviousData devolve o resultado de outro código como placeholder: não exibir.
+  const activeResult =
+    submittedCode && !searchQuery.isPlaceholderData ? searchQuery.data : undefined;
+  const storedResult =
+    !submittedCode || storedSearch?.code === submittedCode ? storedSearch?.result : undefined;
+  const displayedResult = activeResult ?? storedResult ?? null;
   const hasResultData = Boolean(displayedResult);
   const displayedLastSearch = submittedCode ?? storedSearch?.code ?? null;
   const errorMessage = searchQuery.error
@@ -105,6 +108,7 @@ export function FiscalSearchSection() {
       };
 
       setStoredSearch(restoredSearch);
+      setInputValue(restoredSearch.code);
     } catch {
       window.localStorage.removeItem(LAST_FISCAL_SEARCH_STORAGE_KEY);
     }

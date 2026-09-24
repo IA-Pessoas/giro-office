@@ -205,15 +205,13 @@ export function FiscalNcmFormPanel({
       } else {
         await createMutation.mutateAsync(basePayload);
         toast.success("NCM cadastrado com sucesso.");
+        onCreated?.(basePayload.ncm_code);
       }
 
       setFormState(DEFAULT_FORM_STATE);
       createMutation.reset();
       updateMutation.reset();
       onClose();
-      if (!isEditing) {
-        onCreated?.(basePayload.ncm_code);
-      }
     } catch {
       // Inline feedback is rendered below.
     }
