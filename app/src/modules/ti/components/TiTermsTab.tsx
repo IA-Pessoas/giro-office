@@ -6,6 +6,7 @@ import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { useAssignableUsers } from "@modules/rh";
 import { ConfirmationDialog, PaginationControls } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
@@ -27,6 +28,7 @@ import type {
   TiTermSignPayload,
   TiTermUpdatePayload,
 } from "../types";
+import { termCitesAsset } from "../utils/termAssetCodes";
 import { TiNativeSelect } from "./TiNativeSelect";
 import {
   TiDataTable,
@@ -357,10 +359,7 @@ export function TiTermsTab() {
 
     return (termsQuery.data ?? []).filter((term) => {
       const statusMatches = !termStatus || getTermStatus(term) === termStatus;
-      const assetMatches =
-        !assetId ||
-        normalizeStatus(term.asset_code) === normalizeStatus(selectedAssetCode) ||
-        normalizeStatus(term.equipament_list).includes(normalizeStatus(selectedAssetCode));
+      const assetMatches = !assetId || termCitesAsset(term, selectedAssetCode);
       const searchableText = getSearchableText([
         getTermTitle(term),
         getTermUser(term),
@@ -605,6 +604,7 @@ export function TiTermsTab() {
                           <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">
                             {getText(term.user_cpf)}
                           </p>
+                          <DocumentIssueBadge value={term.user_cpf} />
                         </td>
                         <td className="max-w-56 break-all px-4 py-3 align-top">{getTermAsset(term)}</td>
                         <td className="max-w-40 break-words px-4 py-3 align-top">{getTermUser(term)}</td>
@@ -701,7 +701,15 @@ export function TiTermsTab() {
               <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
                 <TiFieldLine label="Termo" value={getTermTitle(selectedTerm)} />
                 <TiFieldLine label="Usuário" value={getTermUser(selectedTerm)} />
-                <TiFieldLine label="CPF" value={getText(selectedTerm.user_cpf)} />
+                <TiFieldLine
+                  label="CPF"
+                  value={
+                    <>
+                      {getText(selectedTerm.user_cpf)}
+                      <DocumentIssueBadge value={selectedTerm.user_cpf} />
+                    </>
+                  }
+                />
                 <TiFieldLine label="Departamento" value={getDepartmentName(selectedTerm.department_id)} />
                 <TiFieldLine label="Data" value={formatDate(selectedTerm.date)} />
                 <TiFieldLine label="Endereço" value={getText(selectedTerm.address)} />

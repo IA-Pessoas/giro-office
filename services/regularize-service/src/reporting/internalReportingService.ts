@@ -6,7 +6,7 @@ import {
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
-
+import { OPERATIONAL_PROCESS_FILTER } from "../schemas/status.schemas.js";
 import {
   getRegularizeLicenseReportingFields,
   type RegularizeLicenseReportingSource,
@@ -24,9 +24,12 @@ type RegularizePrimaryReportingSource =
   | RegularizeLicenseReportingSource
   | RegularizeProcessReportingSource;
 
+// Filtro opcional da fonte de processos (placeholders de orientação legada, #1377).
+type ReportingFilter = Partial<typeof OPERATIONAL_PROCESS_FILTER>;
+
 type ReportingDelegate = {
   findMany(input: {
-    where: { organization_id: string };
+    where: { organization_id: string } & ReportingFilter;
     select: Record<string, true>;
     take: number;
     cursor?: { id: string };
@@ -47,9 +50,10 @@ async function loadReportingPage(
   fields: readonly string[],
   limit: number,
   cursor?: string,
+  filter: ReportingFilter = {},
 ): Promise<ReportingPage> {
   const rows = await delegate.findMany({
-    where: { organization_id: organizationId },
+    where: { organization_id: organizationId, ...filter },
     select: Object.fromEntries(["id", ...fields].map((field) => [field, true])),
     ...(cursor === undefined ? {} : { cursor: { id: cursor }, skip: 1 }),
     orderBy: { id: "asc" },
@@ -111,8 +115,9 @@ export class RegularizeLicenseReportingService {
       throw new ServiceError(500, "Fonte interna de relatórios não configurada.");
     }
 
+    const filter = input.source === "regularize.licenses" ? {} : OPERATIONAL_PROCESS_FILTER;
     const loadPage = (fields: readonly string[], limit: number, cursor?: string) =>
-      loadReportingPage(delegate, input.organizationId, fields, limit, cursor);
+      loadReportingPage(delegate, input.organizationId, fields, limit, cursor, filter);
     if (input.query) {
       return executeReportingQuery(
         { ...input, query: input.query },

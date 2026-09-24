@@ -125,6 +125,20 @@ export function organizationDayBounds(
   return { start, end: new Date(nextStart.getTime() - 1) };
 }
 
+// Feriado é data civil sem fuso: o holidayService grava à meia-noite UTC. Para achar o feriado de
+// um instante, use o dia civil da organização e procure esse dia em UTC, não os limites locais.
+export function holidayDayBounds(
+  date: Date,
+  timezone = DEFAULT_ORGANIZATION_TIMEZONE,
+): { start: Date; end: Date } {
+  const key = organizationDateKey(date, timezone);
+  return { start: new Date(`${key}T00:00:00.000Z`), end: new Date(`${key}T23:59:59.999Z`) };
+}
+
+export function holidayDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 export function assertSameOrganizationDay(
   times: PointTimes,
   timezone = DEFAULT_ORGANIZATION_TIMEZONE,

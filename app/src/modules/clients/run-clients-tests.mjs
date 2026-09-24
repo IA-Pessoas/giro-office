@@ -59,6 +59,7 @@ import {
   CLIENT_TAX_REGIME_OPTIONS,
   createClientFormInitialValues,
 } from "./utils/clientForm.ts";
+import { getDocumentIssue } from "../../shared/utils/documentIssue.ts";
 import { toDatetimeLocalValue, toHistoryIsoDate } from "./utils/historyDate.ts";
 import { canDeleteClientHistory, canManageClientHistories } from "./utils/historyAccess.ts";
 
@@ -886,6 +887,20 @@ runTest("legacy client tabs use toast warnings for validation", () => {
   assert.match(integrationSource, /toast\.warn\('Preencha todos os campos'\)/);
   assert.doesNotMatch(regularizeSource, /\balert\(/);
   assert.doesNotMatch(integrationSource, /\balert\(/);
+});
+
+runTest("getDocumentIssue flags masked, wrong-length and bad check digit documents", () => {
+  assert.equal(getDocumentIssue("529.982.247-25"), null);
+  assert.equal(getDocumentIssue("11.222.333/0001-81"), null);
+  assert.equal(getDocumentIssue("12.ABC.345/01DE-35"), null);
+  assert.equal(getDocumentIssue(""), null);
+  assert.equal(getDocumentIssue(null), null);
+  assert.equal(getDocumentIssue("\n\t"), null);
+  assert.equal(getDocumentIssue("******"), "Documento mascarado");
+  assert.equal(getDocumentIssue("3231794528"), "Tamanho inválido");
+  assert.equal(getDocumentIssue("529.982.247-26"), "Dígito verificador inválido");
+  assert.equal(getDocumentIssue("11.222.333/0001-82"), "Dígito verificador inválido");
+  assert.equal(getDocumentIssue("000.000.000-00"), "Dígito verificador inválido");
 });
 
 runTest("PA money fields accept only BRL amounts", () => {
