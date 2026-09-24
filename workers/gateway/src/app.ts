@@ -139,7 +139,7 @@ const platformMatchers: RouteMatcher[] = [
   },
   {
     methods: ["POST"],
-    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/u,
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/(?:reactivate|password-reset)\/?$/u,
     binding: "USER_SERVICE",
   },
   {

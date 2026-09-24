@@ -509,29 +509,12 @@ runTest("organization owner scope field uses a checkbox toggle", () => {
   assert.equal(createUserModalSource.includes('name="isOrganizationOwner"'), false);
 });
 
-runTest("admin user password update asks for explicit confirmation", () => {
-  const dialogStart = adminUserDetailsPanelSource.indexOf("<Dialog");
-  const dialogEnd = adminUserDetailsPanelSource.indexOf("</Dialog>", dialogStart);
-  const dialogSource = adminUserDetailsPanelSource.slice(dialogStart, dialogEnd);
-  const confirmHandlerBody = adminUserDetailsPanelSource.match(
-    /const handleConfirmPasswordUpdate = async \(\) => \{[\s\S]*?\n  \};/,
-  )?.[0] ?? "";
-
-  assert.match(adminUserDetailsPanelSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog";/);
-  assert.match(adminUserDetailsPanelSource, /isPasswordConfirmationOpen/);
-  assert.match(adminUserDetailsPanelSource, /Confirmar alteração de senha/);
-  assert.match(adminUserDetailsPanelSource, /A senha do usuário selecionado será alterada/);
-  assert.doesNotMatch(adminUserDetailsPanelSource, /O valor digitado não será exibido nesta confirmação/);
-  assert.match(adminUserDetailsPanelSource, /!w-\[min\(92vw,520px\)\]/);
-  assert.match(adminUserDetailsPanelSource, /!rounded-lg/);
-  assert.match(adminUserDetailsPanelSource, /bodyClassName="!px-4 !py-3"/);
-  assert.match(dialogSource, /onClick=\{\(\) => setIsPasswordConfirmationOpen\(false\)\}/);
-  assert.match(dialogSource, /onClick=\{\(\) => void handleConfirmPasswordUpdate\(\)\}/);
-  assert.doesNotMatch(dialogSource, /formData\.password/);
-  assert.match(confirmHandlerBody, /await persistUserUpdate\(\)/);
+runTest("admin user details sends a reset link instead of setting a password", () => {
+  assert.doesNotMatch(adminUserDetailsPanelSource, /name="password"/);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /formData\.password/);
   assert.match(
     adminUserDetailsPanelSource,
-    /formData\.password\.trim\(\)[\s\S]*setIsPasswordConfirmationOpen\(true\)[\s\S]*return;/,
+    /<PasswordResetButton[\s\S]*onSend=\{\(\) => dataSource\.sendPasswordReset\(userId\)\}/,
   );
 });
 

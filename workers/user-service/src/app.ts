@@ -34,13 +34,14 @@ import {
   updatePlatformUserBodySchema,
 } from "../../../services/user-service/src/schemas/platformUsers.schemas.js";
 import {
+  confirmPasswordResetBodySchema,
   createUserBodySchema,
   listUsersQuerySchema,
   ownPasswordPolicyError,
   updateUserBodySchema,
   userIdParamsSchema,
 } from "../../../services/user-service/src/schemas/user.schemas.js";
-import type { UserAuditRecorder } from "./audit.js";
+import type { UserAuditParams, UserAuditRecorder } from "./audit.js";
 import {
   ACTIVE_MODULE_KEYS,
   activeOrganizationId,
@@ -66,6 +67,12 @@ import {
   verifyPassword as defaultVerifyPassword,
   isLegacyBcryptHash,
 } from "./passwordHash.js";
+import {
+  confirmPasswordReset,
+  httpPasswordResetEmailSender,
+  issuePasswordReset,
+  type PasswordResetEmailSender,
+} from "./passwordReset.js";
 import type { Row, UserPrismaClient } from "./types.js";
 
 interface HonoEnv {
@@ -80,6 +87,7 @@ interface UserWorkerOptions {
   verifyPassword?: (password: string, hash: string) => Promise<boolean>;
   hashPassword?: (password: string) => Promise<string>;
   audit?: UserAuditRecorder;
+  sendPasswordResetEmail?: PasswordResetEmailSender;
 }
 
 const USER_PHOTO_BUCKET = "Fotos";
@@ -1655,7 +1663,13 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
       const { id } = parse(userIdParamsSchema, c.req.param());
       const body = parse(updateUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
-      const ownPasswordChange = auth.userId === id && body.password !== undefined;
+      if (body.password !== undefined && auth.userId !== id) {
+        throw new ServiceError(
+          403,
+          "Administradores não definem a senha de outro usuário. Envie um link de redefinição.",
+        );
+      }
+      const ownPasswordChange = body.password !== undefined;
       const selfPasswordUpdate =
         ownPasswordChange &&
         Object.keys(body).every((key) => key === "password" || key === "current_password");
@@ -1694,6 +1708,85 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       });
       if (ownPasswordChange) await keepOnlyCurrentSession(c, db, auth, envOf(c, options));
       return c.json(createSuccessResponse(user));
+    }),
+  );
+
+  /** Pedido de link (#1342): o alvo já passou pela checagem de tenant e de hierarquia. */
+  async function sendPasswordResetLink(
+    c: { env: UserWorkerEnv; json: (body: unknown) => Response },
+    db: UserPrismaClient,
+    targetWhere: Record<string, unknown>,
+    actor: Pick<UserAuditParams, "actorUserId" | "platformActorUserId" | "organizationId">,
+    assertTarget: (target: Row) => void = () => {},
+  ): Promise<Response> {
+    const target = await db.user.findFirst({
+      where: targetWhere,
+      select: { ...userSelect(), email: true },
+    });
+    if (!target) throw new ServiceError(404, "Usuário não encontrado.");
+    assertTarget(target);
+    const { expiresAt, deliver } = await issuePasswordReset(
+      db,
+      target,
+      envOf(c, options),
+      options.sendPasswordResetEmail ?? httpPasswordResetEmailSender(envOf(c, options)),
+    );
+    await options.audit?.({
+      ...actor,
+      action: "PASSWORD_RESET_REQUESTED",
+      referring: "user",
+      referringId: String(target.id),
+      changes: { expires_at: expiresAt.toISOString() },
+    });
+    await deliver();
+    return c.json(createSuccessResponse({ sent: true, expires_at: expiresAt.toISOString() }));
+  }
+
+  app.post("/user/password-reset/confirm", async (c) =>
+    withDb(c, options, async (db) => {
+      const input = parse(confirmPasswordResetBodySchema, await jsonBody(c));
+      const { userId } = await confirmPasswordReset(
+        db,
+        input,
+        options.hashPassword ?? defaultHashPassword,
+      );
+      await options.audit?.({
+        actorUserId: userId,
+        organizationId: null,
+        action: "PASSWORD_RESET_COMPLETED",
+        referring: "user",
+        referringId: userId,
+        changes: {},
+      });
+      return c.json(createSuccessResponse({ reset: true }));
+    }),
+  );
+
+  app.post("/user/:id/password-reset", async (c) =>
+    withDb(c, options, async (db) => {
+      const { auth } = await requireUserDb(c, { ...options, prisma: db });
+      requireManageUsers(auth);
+      await requireCsrf(c.req.raw, auth);
+      const { id } = parse(userIdParamsSchema, c.req.param());
+      return sendPasswordResetLink(
+        c,
+        db,
+        organizationUserWhere(id, auth.organizationId),
+        { actorUserId: auth.userId, organizationId: auth.organizationId },
+        (target) => assertCanManageTarget(auth, target),
+      );
+    }),
+  );
+
+  app.post("/platform/organizations/:organizationId/users/:userId/password-reset", async (c) =>
+    withDb(c, options, async (db) => {
+      const { auth } = await platformContext(c, options, db);
+      await requireCsrf(c.req.raw, auth);
+      const { organizationId, userId } = parse(platformOrganizationUserParamsSchema, c.req.param());
+      return sendPasswordResetLink(c, db, organizationUserWhere(userId, organizationId), {
+        platformActorUserId: auth.userId,
+        organizationId,
+      });
     }),
   );
 

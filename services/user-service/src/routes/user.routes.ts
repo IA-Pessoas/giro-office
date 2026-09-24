@@ -167,7 +167,13 @@ export function createUserRoutes(
         }
 
         const { current_password: currentPassword, ...changes } = body;
-        if (request.user_id === id && changes.password !== undefined) {
+        if (changes.password !== undefined && request.user_id !== id) {
+          throw new ServiceError(
+            403,
+            "Administradores não definem a senha de outro usuário. Envie um link de redefinição.",
+          );
+        }
+        if (changes.password !== undefined) {
           await userService.assertOwnPasswordChange(
             id,
             auth.organization_id,

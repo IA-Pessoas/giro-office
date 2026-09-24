@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 
 import { canAccessAdministration } from "@modules/auth";
 import { useAuth } from "@/context/AuthContext";
-import { Dialog } from "@shared/components/ui/Dialog";
+import { PasswordResetButton } from "@shared/components/PasswordResetButton";
 import { CREATE_USER_PERMISSION_OPTIONS } from "../constants/createUserConfig";
 import { ADMIN_USER_STATUS_LABELS, type AdminUserStatus, normalizeAdminUserStatus } from "../services/adminUsersService";
 import type { UpdateUserData, UserItem } from "../types";
@@ -37,11 +37,6 @@ const PRIMARY_ACTION_CLASSNAME =
 const SECONDARY_ACTION_CLASSNAME =
   "rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
 
-const PASSWORD_CONFIRM_DIALOG_CLASSNAME =
-  "!w-[min(92vw,520px)] !rounded-lg [&_footer]:!px-4 [&_footer]:!py-3 [&_h2]:!text-base [&_header]:!px-4 [&_header]:!py-3";
-
-const PASSWORD_CONFIRM_ACTION_CLASSNAME = "!rounded-lg !px-3.5 !py-2";
-
 const PANEL_CLASSNAME =
   "rounded-2xl bg-slate-50/70 dark:bg-slate-950/40";
 
@@ -60,7 +55,6 @@ const MUTED_CLASSNAME = "dialog-neutral-muted text-sm text-slate-500 dark:text-s
 interface FormState {
   login: string;
   name: string;
-  password: string;
   department_id: string;
   permission: string;
   status: AdminUserStatus;
@@ -70,7 +64,6 @@ function buildFormState(user: UserItem): FormState {
   return {
     login: user.login ?? "",
     name: user.name ?? "",
-    password: "",
     department_id: user.department_id ?? "",
     permission: String(user.permission ?? 0),
     status: normalizeAdminUserStatus(user.status) ?? "active",
@@ -92,7 +85,6 @@ export function AdminUserDetailsPanel({
   const [formData, setFormData] = useState<FormState | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isPasswordConfirmationOpen, setIsPasswordConfirmationOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -185,7 +177,6 @@ export function AdminUserDetailsPanel({
       department_id: formData.department_id,
       permission: Number(formData.permission),
       status: formData.status,
-      ...(formData.password.trim() ? { password: formData.password } : {}),
     };
 
     try {
@@ -214,16 +205,6 @@ export function AdminUserDetailsPanel({
       return;
     }
 
-    if (formData.password.trim()) {
-      setIsPasswordConfirmationOpen(true);
-      return;
-    }
-
-    await persistUserUpdate();
-  };
-
-  const handleConfirmPasswordUpdate = async () => {
-    setIsPasswordConfirmationOpen(false);
     await persistUserUpdate();
   };
 
@@ -328,14 +309,11 @@ export function AdminUserDetailsPanel({
             </div>
 
             <div className="space-y-2">
-              <label className={LABEL_CLASSNAME}>Nova senha</label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                placeholder="Deixe em branco para manter"
-                className={FIELD_CLASSNAME}
+              <p className={LABEL_CLASSNAME}>Senha</p>
+              <PasswordResetButton
+                onSend={() => dataSource.sendPasswordReset(userId)}
+                className={SECONDARY_ACTION_CLASSNAME}
+                disabled={isSaving}
               />
             </div>
 
@@ -401,42 +379,6 @@ export function AdminUserDetailsPanel({
         </div>
       </div>
 
-      <Dialog
-        open={isPasswordConfirmationOpen}
-        onOpenChange={(open) => {
-          if (!isSaving) {
-            setIsPasswordConfirmationOpen(open);
-          }
-        }}
-        title="Confirmar alteração de senha"
-        description="Confirme antes de atualizar as credenciais do usuário."
-        contentClassName={PASSWORD_CONFIRM_DIALOG_CLASSNAME}
-        bodyClassName="!px-4 !py-3"
-        footer={(
-          <>
-            <button
-              type="button"
-              className={`${SECONDARY_ACTION_CLASSNAME} ${PASSWORD_CONFIRM_ACTION_CLASSNAME}`}
-              disabled={isSaving}
-              onClick={() => setIsPasswordConfirmationOpen(false)}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className={`${PRIMARY_ACTION_CLASSNAME} ${PASSWORD_CONFIRM_ACTION_CLASSNAME}`}
-              disabled={isSaving}
-              onClick={() => void handleConfirmPasswordUpdate()}
-            >
-              {isSaving ? "Salvando..." : "Confirmar alteração"}
-            </button>
-          </>
-        )}
-      >
-        <p className={TEXT_CLASSNAME}>
-          A senha do usuário selecionado será alterada.
-        </p>
-      </Dialog>
     </div>
   );
 }
