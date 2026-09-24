@@ -8,6 +8,7 @@
 -- Corpus Christi como folga. Estaduais e municipais o RH cadastra na tela. Datas moveis a partir da
 -- Pascoa (05/04/2026 e 28/03/2027). A data fica a meia-noite UTC, como o holidayService grava, e o
 -- dia que ja tem feriado na organizacao e pulado (o servico recusa dois feriados no mesmo dia).
+-- Organizacao cancelada fica de fora: a FK ON DELETE RESTRICT travaria a exclusao dela.
 -- Idempotente.
 \set ON_ERROR_STOP on
 \if :{?apply}
@@ -55,7 +56,8 @@ CREATE TEMP TABLE holiday_inserts ON COMMIT DROP AS
 SELECT o.id AS organization_id, h.day, h.name
 FROM organizations o
 CROSS JOIN holiday_calendar h
-WHERE NOT EXISTS (
+WHERE o.status <> 'cancelled'
+  AND NOT EXISTS (
   SELECT 1 FROM "rh.holidays" x
   WHERE x.organization_id = o.id AND x.date >= h.day AND x.date < h.day + 1
 );
