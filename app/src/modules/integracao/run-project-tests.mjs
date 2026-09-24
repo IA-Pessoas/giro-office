@@ -195,6 +195,7 @@ import {
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
   canEditIntegracaoTask,
   formatTasksFooterSummary,
+  getProjectTaskCardLabels,
 } from "./components/taskWorkspaceUi.ts";
 import {
   TASK_FORM_BODY_CLASSNAME,
@@ -1758,4 +1759,25 @@ runTest("step 2 accepts DOCX and PDF meeting minutes alongside TXT and Markdown"
     /accept="[^"]*\.docx[^"]*application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/,
   );
   assert.match(projectForm, /accept="[^"]*\.pdf[^"]*application\/pdf"/);
+});
+
+runTest("project detail task card shows the task name, model only as secondary info", () => {
+  const model = { id: "model-1", name: "Teste" };
+
+  assert.deepEqual(getProjectTaskCardLabels({ id: "t1", name: "QA_Tarefa_Projeto", model }), {
+    title: "QA_Tarefa_Projeto",
+    modelName: "Teste",
+  });
+  assert.deepEqual(getProjectTaskCardLabels({ id: "t2", name: "Teste", model }), {
+    title: "Teste",
+    modelName: null,
+  });
+  assert.deepEqual(getProjectTaskCardLabels({ id: "t3", name: "  ", model }), {
+    title: "Teste",
+    modelName: null,
+  });
+  assert.deepEqual(getProjectTaskCardLabels({ id: "t4" }), {
+    title: "Tarefa sem nome",
+    modelName: null,
+  });
 });
