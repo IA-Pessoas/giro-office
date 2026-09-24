@@ -427,6 +427,8 @@ export function Dashboard() {
                 stroke="#10b981"
                 fill="#10b981"
                 fillOpacity={0.6}
+                // A animação de entrada parte do zero: uma captura na 1ª carga mostrava o gráfico zerado (#1384).
+                isAnimationActive={false}
               />
             </AreaChart>
           </ResponsiveContainer>
