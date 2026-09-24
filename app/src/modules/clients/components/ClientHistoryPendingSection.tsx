@@ -1,5 +1,6 @@
 import { useMemo, useState, type ChangeEvent } from "react";
 import { Plus, Trash2, NotebookPen } from "lucide-react";
+import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 
 import { useAuth } from "@/context/AuthContext";
@@ -32,6 +33,7 @@ export function ClientHistoryPendingSection({
   const [reason, setReason] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const scopedList = useMemo(() => {
     const list = listQuery.data ?? [];
@@ -70,20 +72,17 @@ export function ClientHistoryPendingSection({
       return;
     }
 
+    setDeleteError(null);
     try {
       setDeletingId(pendingId);
       await deleteMutation.mutateAsync({ pendingId, userId: user.id });
       toast.dismiss();
       toast.success("Pendência removida com sucesso.");
     } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error === "string"
-          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Não foi possível remover a pendência.";
-      toast.error(message);
+      // Erro fica no diálogo, como na exclusão de histórico e no ciclo de vida do cliente.
+      const message = isAxiosError(error) ? error.response?.data?.error : undefined;
+      setDeleteError(typeof message === "string" ? message : "Não foi possível remover a pendência.");
+      throw error;
     } finally {
       setDeletingId(null);
     }
@@ -184,13 +183,16 @@ export function ClientHistoryPendingSection({
       <ConfirmationDialog
         open={Boolean(confirmingId)}
         onOpenChange={(open) => {
-          if (!open) setConfirmingId(null);
+          if (!open) {
+            setConfirmingId(null);
+            setDeleteError(null);
+          }
         }}
         title="Remover pendência"
         description="A pendência será removida e não aparecerá mais para o responsável."
         onConfirm={() => (confirmingId ? handleDelete(confirmingId) : undefined)}
         isConfirming={deleteMutation.isPending}
-        errorMessage={null}
+        errorMessage={deleteError}
         confirmLabel="Remover"
         cancelLabel="Cancelar"
       />

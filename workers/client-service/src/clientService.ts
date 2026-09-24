@@ -5,6 +5,7 @@ import {
   ServiceError,
   withReportingSnapshot,
 } from "@workspace/shared";
+import { ACTIVE_CLIENT_STATUS } from "../../../services/client-service/src/schemas/client.schemas.js";
 import { lookupOfficialCnpj } from "./cnpjLookup.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import type { WorkerHistoryStorageLike } from "./historyStorage.js";
@@ -145,8 +146,6 @@ const organizationSelect = {
   status: true,
   subscription_plan: true,
 } as const;
-
-const TERMINATED_STATUSES = new Set(["Inativo", "Processo de Inativação"]);
 
 const clientSelect = {
   id: true,
@@ -802,8 +801,8 @@ export class ClientService implements ClientWorkerService {
     input: Record<string, unknown>,
   ): Promise<unknown> {
     const client = await this.client(clientId, organizationId);
-    if (TERMINATED_STATUSES.has(String(client.status ?? "")))
-      throw new ServiceError(409, "Cliente já está inativo ou em processo de inativação.");
+    if (client.status !== ACTIVE_CLIENT_STATUS)
+      throw new ServiceError(409, "Só é possível inativar cliente ativo.");
     const competence = String(input.competence_output);
     const [year, month] = competence.split("-").map(Number);
     const competenceDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));

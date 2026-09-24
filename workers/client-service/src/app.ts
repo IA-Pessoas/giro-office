@@ -14,6 +14,7 @@ import { ZodError, type z } from "zod";
 import {
   clientIdParamsSchema,
   createClientBodySchema,
+  isAdminPermission,
   listClientsQuerySchema,
   updateClientBodySchema,
 } from "../../../services/client-service/src/schemas/client.schemas.js";
@@ -90,12 +91,9 @@ function organizationId(c: ClientContext): string {
   return auth.organizationId;
 }
 
-// Mesma regra do isAdminPermission do Express: owner ou permissão de admin.
-const ADMIN_PERMISSION = 2;
-
 function managesOrganization(c: ClientContext): boolean {
   const { isOwner, permission } = authz(c);
-  return isOwner || (permission ?? 0) >= ADMIN_PERMISSION;
+  return isOwner || isAdminPermission(permission ?? undefined);
 }
 
 function authz(c: ClientContext) {

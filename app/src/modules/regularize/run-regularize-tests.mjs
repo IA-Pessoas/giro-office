@@ -1587,4 +1587,6 @@ await runTest("partner table shows masked CPF and distinct action tooltips", asy
   assert.match(source, /title="Editar pessoa física"/);
   assert.match(source, /title="Editar vínculo"/);
   assert.match(source, /excludePfIds=/);
+  assert.match(source, /<ConfirmationDialog/);
+  assert.doesNotMatch(source, /window\.confirm/);
 });

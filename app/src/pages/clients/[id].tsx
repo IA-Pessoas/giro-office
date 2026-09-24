@@ -14,6 +14,7 @@ import {
   Workflow,
   XCircle,
 } from "lucide-react";
+import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
@@ -82,6 +83,7 @@ export default function ClientDetailPage() {
   const [pendingLifecycleAction, setPendingLifecycleAction] = useState<
     "activate" | "deactivate" | null
   >(null);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
   const organizationName =
     (client as { organization?: { name?: string } } | null)?.organization?.name ??
@@ -141,50 +143,25 @@ export default function ClientDetailPage() {
     }
   };
 
-  const handleActivate = async () => {
-    if (!clientId) {
-      return;
-    }
-
+  // Erro fica no diálogo (mesmo padrão da exclusão de histórico): o usuário vê e tenta de novo.
+  const confirmLifecycleAction = async () => {
+    const isActivate = pendingLifecycleAction === "activate";
+    setLifecycleError(null);
     try {
-      await activateClientMutation.mutateAsync();
-      toast.success("Cliente reativado com sucesso.");
-      await clientQuery.refetch();
+      await (isActivate ? activateClientMutation : deactivateClientMutation).mutateAsync();
     } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
-          "string"
-          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Não foi possível reativar o cliente.";
-
-      toast.error(message);
+      const message = isAxiosError(error) ? error.response?.data?.error : undefined;
+      setLifecycleError(
+        typeof message === "string"
+          ? message
+          : isActivate
+            ? "Não foi possível reativar o cliente."
+            : "Não foi possível desativar o cliente.",
+      );
+      throw error;
     }
-  };
-
-  const handleDeactivate = async () => {
-    if (!clientId) {
-      return;
-    }
-
-    try {
-      await deactivateClientMutation.mutateAsync();
-      toast.success("Cliente desativado com sucesso.");
-      await clientQuery.refetch();
-    } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
-          "string"
-          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Não foi possível desativar o cliente.";
-
-      toast.error(message);
-    }
+    toast.success(isActivate ? "Cliente reativado com sucesso." : "Cliente desativado com sucesso.");
+    await clientQuery.refetch();
   };
 
   return (
@@ -293,7 +270,10 @@ export default function ClientDetailPage() {
                   <ConfirmationDialog
                     open={pendingLifecycleAction !== null}
                     onOpenChange={(open) => {
-                      if (!open) setPendingLifecycleAction(null);
+                      if (!open) {
+                        setPendingLifecycleAction(null);
+                        setLifecycleError(null);
+                      }
                     }}
                     title={
                       pendingLifecycleAction === "activate" ? "Reativar cliente" : "Desativar cliente"
@@ -303,11 +283,9 @@ export default function ClientDetailPage() {
                         ? `Reativar ${client.name}? O cliente volta a ficar ativo.`
                         : `Desativar ${client.name}? O cliente fica inativo até ser reativado.`
                     }
-                    onConfirm={() =>
-                      pendingLifecycleAction === "activate" ? handleActivate() : handleDeactivate()
-                    }
+                    onConfirm={confirmLifecycleAction}
                     isConfirming={activateClientMutation.isPending || deactivateClientMutation.isPending}
-                    errorMessage={null}
+                    errorMessage={lifecycleError}
                     confirmLabel={pendingLifecycleAction === "activate" ? "Reativar" : "Desativar"}
                     cancelLabel="Cancelar"
                     variant={pendingLifecycleAction === "activate" ? "neutral" : "destructive"}

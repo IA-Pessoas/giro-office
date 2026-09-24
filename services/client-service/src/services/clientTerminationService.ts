@@ -1,10 +1,10 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { ACTIVE_CLIENT_STATUS } from "../schemas/client.schemas.js";
 import type { TerminationBody } from "../schemas/clientVerticals.schemas.js";
 
 const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
-const TERMINATED_STATUSES = new Set(["Inativo", "Processo de Inativação"]);
 
 function parseCompetenceEndOfMonth(competence: string): Date {
   const [yearRaw, monthRaw] = competence.split("-");
@@ -31,10 +31,11 @@ export async function terminateClient(
   });
 
   if (!exists) {
-    throw new ServiceError(404, "Cliente nao encontrado.");
+    throw new ServiceError(404, "Cliente não encontrado.");
   }
-  if (TERMINATED_STATUSES.has(exists.status ?? "")) {
-    throw new ServiceError(409, "Cliente já está inativo ou em processo de inativação.");
+  // Mesma regra da UI (getClientLifecycleActions): só cliente ativo entra em inativação.
+  if (exists.status !== ACTIVE_CLIENT_STATUS) {
+    throw new ServiceError(409, "Só é possível inativar cliente ativo.");
   }
 
   const competenceDate = parseCompetenceEndOfMonth(input.competence_output);

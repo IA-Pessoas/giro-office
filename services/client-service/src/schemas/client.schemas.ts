@@ -231,6 +231,9 @@ export type UpdateClientBody = z.output<typeof updateClientBodySchema>;
 /** Permissao minima de administrador no legado (`user.permission >= 2`). */
 export const ADMIN_PERMISSION = 2;
 
+/** Status de cliente ativo: único que pode entrar em inativação. */
+export const ACTIVE_CLIENT_STATUS = "Ativo";
+
 export function isAdminPermission(permission?: number): boolean {
   return typeof permission === "number" && permission >= ADMIN_PERMISSION;
 }
