@@ -7,6 +7,7 @@ import type {
   PlatformOrganization,
   PlatformOrganizationsListResponse,
   PlatformOwnershipTransferResult,
+  PlatformSuperAdmin,
   PlatformUsersListResponse,
   TransferPlatformOwnershipPayload,
   UpdatePlatformOrganizationUserPayload,
@@ -29,6 +30,11 @@ export const platformService = {
   }): Promise<PlatformOrganizationsListResponse> {
     const response = await api.get("/platform/organizations", { params });
     return unwrapData<PlatformOrganizationsListResponse>(response);
+  },
+
+  async listSuperAdmins(): Promise<PlatformSuperAdmin[]> {
+    const response = await api.get("/platform/super-admins");
+    return unwrapData<PlatformSuperAdmin[]>(response);
   },
 
   async listUsers(

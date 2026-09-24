@@ -1,5 +1,6 @@
 import { ACTIVE_MODULE_KEYS, type ModulePermissions, ServiceError } from "@workspace/shared";
 import { Prisma } from "../generated/prisma/client.js";
+import { PlatformRole } from "../generated/prisma/enums.js";
 import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
 import { PlatformUserManagementAdapter } from "./userManagementService.js";
@@ -36,6 +37,18 @@ export interface TransferPlatformOwnershipInput {
 
 type PlatformUserListRow = Prisma.UserGetPayload<{ select: typeof PLATFORM_USER_LIST_SELECT }>;
 
+const PLATFORM_SUPER_ADMIN_LIST_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  status: true,
+  can_impersonate: true,
+} as const;
+
+type PlatformSuperAdminListRow = Prisma.PlatformUserGetPayload<{
+  select: typeof PLATFORM_SUPER_ADMIN_LIST_SELECT;
+}>;
+
 const PLATFORM_OWNERSHIP_SELECT = {
   ...PLATFORM_USER_LIST_SELECT,
   permission: true,
@@ -54,6 +67,14 @@ export class PlatformUsersService {
   private readonly userService = new UserService();
 
   constructor(private readonly audit?: UserAuditRecorder) {}
+
+  async listSuperAdmins(): Promise<PlatformSuperAdminListRow[]> {
+    return prismaClient.platformUser.findMany({
+      where: { platform_role: PlatformRole.super_admin },
+      select: PLATFORM_SUPER_ADMIN_LIST_SELECT,
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    });
+  }
 
   async create(
     organizationId: string,

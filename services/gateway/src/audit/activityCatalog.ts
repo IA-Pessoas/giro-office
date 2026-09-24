@@ -120,6 +120,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/platform\/super-admins$/,
+    description: { action: "consultou", item: "a lista de super admins da plataforma" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },
   },

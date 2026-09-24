@@ -126,6 +126,7 @@ const [
   usersPanelSource,
   ownershipTransferDialogSource,
   auditPanelSource,
+  superAdminsPanelSource,
   superAdminPageSource,
   pageSource,
   appShellSource,
@@ -146,6 +147,7 @@ const [
   source("./components/PlatformUsersPanel.tsx"),
   source("./components/OwnershipTransferDialog.tsx"),
   source("./components/PlatformAuditPanel.tsx"),
+  source("./components/PlatformSuperAdminsPanel.tsx"),
   source("./components/SuperAdminPage.tsx"),
   source("../../pages/super-admin/index.tsx"),
   source("../../shared/components/newLayout/AppShell.tsx"),
@@ -168,6 +170,7 @@ const allSuperAdminSources = [
   usersPanelSource,
   ownershipTransferDialogSource,
   auditPanelSource,
+  superAdminsPanelSource,
   superAdminPageSource,
   pageSource,
 ].join("\n");
@@ -442,16 +445,18 @@ await runTest("mantém lista e painel de detalhe isolados pela organização sel
   assert.match(usersPanelSource, /departmentsQuery\.refetch/);
 });
 
-await runTest("usa três botões nativos simples para alternar painéis", () => {
-  assert.doesNotMatch(superAdminPageSource, /role="tab(?:list|panel)?"/);
-  assert.doesNotMatch(
-    superAdminPageSource,
-    /aria-controls=|aria-selected=|aria-labelledby="platform-(?:users|audit)-tab"/,
-  );
+await runTest("usa abas acessíveis e mostra a lista somente leitura de super admins", () => {
+  assert.match(superAdminPageSource, /role="tablist"/);
+  assert.equal((superAdminPageSource.match(/^\s+role="tab"$/gm) ?? []).length, 4);
+  assert.match(superAdminPageSource, /aria-selected=\{activePanel === "superAdmins"\}/);
+  assert.match(superAdminPageSource, /aria-labelledby=\{`super-admin-tab-\$\{activePanel\}`\}/);
   assert.match(superAdminPageSource, />\s*Visão geral\s*</);
   assert.match(superAdminPageSource, />\s*Usuários\s*</);
+  assert.match(superAdminPageSource, />\s*Super admins\s*</);
   assert.match(superAdminPageSource, />\s*Auditoria\s*</);
-  assert.match(superAdminPageSource, /aria-pressed=\{activePanel === "overview"\}/);
+  assert.match(superAdminPageSource, /<PlatformSuperAdminsPanel\s*\/>/);
+  assert.match(superAdminsPanelSource, /Pode personificar/);
+  assert.match(superAdminsPanelSource, /Não pode personificar/);
 });
 
 await runTest("mantém seleção por id e detalhe independente da página do diretório", () => {
@@ -539,7 +544,7 @@ await runTest("não cria segunda entrada de navegação para o Super Admin", () 
 
 await runTest("não converte detalhe pendente ou falho em auditoria global", () => {
   const detailRendering = superAdminPageSource.slice(
-    superAdminPageSource.indexOf("{selectedOrganizationId && organizationDetailQuery.isLoading"),
+    superAdminPageSource.indexOf("selectedOrganizationId && organizationDetailQuery.isLoading"),
   );
   assert.ok(detailRendering.indexOf("organizationDetailQuery.isError") >= 0);
   assert.ok(

@@ -160,6 +160,25 @@ const upstream = createServer(async (request, response) => {
     });
   }
   if (url.pathname === "/platform/me") return reply(response, 200, identity);
+  if (url.pathname === "/platform/super-admins" && request.method === "GET") {
+    assert.equal(request.headers.authorization, undefined);
+    return reply(response, 200, [
+      {
+        id: identity.id,
+        name: identity.name,
+        email: identity.email,
+        status: "active",
+        can_impersonate: true,
+      },
+      {
+        id: "b4bc983b-1c5c-43d8-80f0-dab220f0c501",
+        name: "Administradora sem permissão",
+        email: "sem-permissao@example.test",
+        status: "inactive",
+        can_impersonate: false,
+      },
+    ]);
+  }
   if (url.pathname === "/platform/organizations" && request.method === "GET") {
     const search = (url.searchParams.get("search") ?? "").toLowerCase();
     const filtered = organizations.filter((item) =>
@@ -617,13 +636,63 @@ try {
     requests.length = 0;
     await page.goto("/super-admin", { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
-    await page.getByRole("button", { name: "Usuários", exact: true }).click();
+    await page.getByRole("tab", { name: "Super admins", exact: true }).click();
+    await page.getByRole("cell", { name: "operador@example.test", exact: true }).waitFor();
+    await page.getByText("Pode personificar", { exact: true }).waitFor();
+    await page.getByText("Não pode personificar", { exact: true }).waitFor();
+    assert.ok(
+      requests.some(
+        (request) => request.method === "GET" && request.path === "/platform/super-admins",
+      ),
+    );
+    await page.keyboard.press("ArrowRight");
+    assert.equal(
+      await page.getByRole("tab", { name: "Auditoria", exact: true }).getAttribute("aria-selected"),
+      "true",
+    );
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(
+      await page
+        .getByRole("tab", { name: "Super admins", exact: true })
+        .getAttribute("aria-selected"),
+      "true",
+    );
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await page.screenshot({
+        path: join(
+          screenshotDirectory,
+          viewport.width > 1000
+            ? "issue-1281-super-admins.png"
+            : "issue-1281-super-admins-mobile.png",
+        ),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("table").waitFor();
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      ),
+      false,
+    );
+    if (screenshotDirectory) {
+      await page.screenshot({
+        path: join(screenshotDirectory, "issue-1281-super-admins-mobile.png"),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
+    await page.setViewportSize(viewport);
+    await page.getByRole("tab", { name: "Usuários", exact: true }).click();
     await page.getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ }).waitFor();
     await page.getByRole("button", { name: "Personificar", exact: true }).waitFor();
     assert.equal(await page.getByRole("button", { name: "Personificar", exact: true }).count(), 1);
     identity.can_impersonate = false;
     await page.reload({ waitUntil: "networkidle" });
-    await page.getByRole("button", { name: "Usuários", exact: true }).click();
+    await page.getByRole("tab", { name: "Usuários", exact: true }).click();
     await page.getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ }).waitFor();
     assert.equal(await page.getByRole("button", { name: "Personificar", exact: true }).count(), 0);
     identity.can_impersonate = true;
@@ -640,7 +709,7 @@ try {
       try {
         await page.getByRole("button", { name: /Organização Horizonte/ }).click();
         await page.getByText("Carregando detalhes da organização...", { exact: true }).waitFor();
-        await page.getByRole("button", { name: "Auditoria", exact: true }).click();
+        await page.getByRole("tab", { name: "Auditoria", exact: true }).click();
         assert.equal(
           await page.getByText("Carregando detalhes da organização...", { exact: true }).count(),
           1,
@@ -675,7 +744,7 @@ try {
     await page
       .getByText("Não foi possível carregar os detalhes da organização.", { exact: true })
       .waitFor();
-    await page.getByRole("button", { name: "Auditoria", exact: true }).click();
+    await page.getByRole("tab", { name: "Auditoria", exact: true }).click();
     assert.equal(
       await page
         .getByText("Não foi possível carregar os detalhes da organização.", { exact: true })
@@ -695,7 +764,7 @@ try {
     failedDetailId = null;
     await page.getByRole("button", { name: "Tentar novamente", exact: true }).click();
     await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
-    await page.getByRole("button", { name: "Visão geral", exact: true }).click();
+    await page.getByRole("tab", { name: "Visão geral", exact: true }).click();
     await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
     console.log(`PASS ${viewport.width}px detalhe atrasado/falho não consulta auditoria global`);
     const directory = page
@@ -721,7 +790,7 @@ try {
       );
     }
     assert.equal(await page.getByRole("link", { name: "Super Admin", exact: true }).count(), 1);
-    await page.getByRole("button", { name: "Usuários", exact: true }).click();
+    await page.getByRole("tab", { name: "Usuários", exact: true }).click();
     await page
       .getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ })
       .waitFor();
@@ -1022,7 +1091,7 @@ try {
             `/platform/organizations/${organization.id}/users/${platformUser.id}/reactivate`,
       ),
     );
-    await page.getByRole("button", { name: "Auditoria", exact: true }).click();
+    await page.getByRole("tab", { name: "Auditoria", exact: true }).click();
     await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
     const auditContent = page.locator('[aria-labelledby="platform-audit-title"] [aria-busy]');
     const auditDimensions = await auditContent.evaluate((element) => ({
@@ -1457,7 +1526,7 @@ try {
     if (viewport.width > 1000) {
       await page.getByRole("button", { name: /Organização Aurora/ }).click();
       await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
-      await page.getByRole("button", { name: "Usuários", exact: true }).click();
+      await page.getByRole("tab", { name: "Usuários", exact: true }).click();
       await page.getByRole("button", { name: /pessoa@example\.test/ }).click();
       await page.getByRole("button", { name: "Personificar", exact: true }).click();
       const impersonationDialog = page.getByRole("dialog", {

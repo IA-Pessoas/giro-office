@@ -64,6 +64,7 @@ describe("platform default deny", () => {
       ["POST", "/platform/session/refresh"],
       ["DELETE", "/platform/session"],
       ["GET", "/platform/me"],
+      ["GET", "/platform/super-admins"],
       ["GET", "/platform/organizations"],
       ["POST", "/platform/organizations"],
       ["GET", "/platform/organizations/org-1"],

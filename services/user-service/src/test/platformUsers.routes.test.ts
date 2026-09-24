@@ -18,6 +18,7 @@ const { auditMock, authServiceMock, platformAuthMock, platformUsersMock } = vi.h
   authServiceMock: { startImpersonation: vi.fn() },
   platformAuthMock: { validateSession: vi.fn() },
   platformUsersMock: {
+    listSuperAdmins: vi.fn(),
     list: vi.fn(),
     getById: vi.fn(),
     listDepartments: vi.fn(),
@@ -133,6 +134,15 @@ describe("platform users routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     platformAuthMock.validateSession.mockResolvedValue(platformIdentity);
+    platformUsersMock.listSuperAdmins.mockResolvedValue([
+      {
+        id: "platform-user-1",
+        name: "Platform Administrator",
+        email: "admin@example.com",
+        status: "active",
+        can_impersonate: true,
+      },
+    ]);
     platformUsersMock.list.mockResolvedValue({
       users: [{ id: "user-1", name: "Ana", login: "ana@example.com", status: "active" }],
       total: 1,
@@ -166,6 +176,24 @@ describe("platform users routes", () => {
       take: 20,
       search: "ana",
     });
+  });
+
+  it("lists platform super admins without credentials", async () => {
+    const response = await request(createApp())
+      .get("/platform/super-admins")
+      .set(platformGatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([
+      {
+        id: "platform-user-1",
+        name: "Platform Administrator",
+        email: "admin@example.com",
+        status: "active",
+        can_impersonate: true,
+      },
+    ]);
+    expect(platformUsersMock.listSuperAdmins).toHaveBeenCalledOnce();
   });
 
   it("returns 401 without a platform session", async () => {
