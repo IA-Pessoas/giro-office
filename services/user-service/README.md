@@ -19,6 +19,7 @@ O endpoint `/internal/reporting/access-context` é chamado diretamente pelo repo
 - `POST /user/session` emite `cw.session` (`HttpOnly`, `SameSite=Lax`, um dia) e `cw.csrf`, sem retornar o JWT no JSON.
 - `POST /user/session/refresh` rotaciona os dois cookies mantendo a versão ativa da sessão.
 - `DELETE /user/session` revoga a sessão atual no servidor e expira os dois cookies.
+- `GET /user/me` inclui `impersonation` com operador (`id`, `name`), `expires_at` e `organization_name` somente enquanto a sessão de personificação estiver ativa; sessões comuns omitem esse campo.
 - Mutações autenticadas por cookie exigem `x-csrf-token`; o gateway valida a prova antes de encaminhar a chamada.
 - Validações internas diretas podem usar Bearer, enquanto chamadas vindas do gateway usam os headers `x-auth-*` protegidos pelo token interno.
 
