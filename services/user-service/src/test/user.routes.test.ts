@@ -1,3 +1,4 @@
+import { ServiceError } from "@workspace/shared";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -393,15 +394,36 @@ describe("user routes", () => {
     const res = await request(app)
       .put("/user/user-1")
       .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
-      .send({ password: "nova-senha-segura" });
+      .send({ password: "nova-senha-segura", current_password: "senha-atual" });
 
     expect(res.status).toBe(200);
+    expect(userServiceMock.assertOwnPasswordChange).toHaveBeenCalledWith(
+      "user-1",
+      "a0000000-0000-4000-8000-000000000001",
+      "senha-atual",
+      "nova-senha-segura",
+    );
     expect(userServiceMock.update).toHaveBeenCalledWith(
       "user-1",
       { password: "nova-senha-segura" },
       "a0000000-0000-4000-8000-000000000001",
       "user-1",
     );
+  });
+
+  it("PUT /user/:id nao troca a propria senha quando a verificacao falha", async () => {
+    userServiceMock.assertOwnPasswordChange.mockRejectedValueOnce(
+      new ServiceError(403, "Senha atual incorreta."),
+    );
+    const app = createTestApp();
+
+    const res = await request(app)
+      .put("/user/user-1")
+      .set(gatewayAuthHeaders({ userId: "user-1", permission: 0, type: "user" }))
+      .send({ password: "nova-senha-segura", current_password: "errada" });
+
+    expect(res.status).toBe(403);
+    expect(userServiceMock.update).not.toHaveBeenCalled();
   });
 
   it("PUT /user/:id permite a propria senha com Authorization Bearer direto", async () => {
@@ -411,7 +433,7 @@ describe("user routes", () => {
     const res = await request(app)
       .put("/user/user-1")
       .set(bearerAuthHeaders({ userId: "user-1" }))
-      .send({ password: "nova-senha-segura" });
+      .send({ password: "nova-senha-segura", current_password: "senha-atual" });
 
     expect(res.status).toBe(200);
     expect(userServiceMock.update).toHaveBeenCalledWith(

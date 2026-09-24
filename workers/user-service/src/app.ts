@@ -36,6 +36,7 @@ import {
 import {
   createUserBodySchema,
   listUsersQuerySchema,
+  ownPasswordPolicyError,
   updateUserBodySchema,
   userIdParamsSchema,
 } from "../../../services/user-service/src/schemas/user.schemas.js";
@@ -439,9 +440,10 @@ async function refreshOrganizationSession(
   db: UserPrismaClient,
   auth: UserAuthContext,
   env: UserWorkerEnv,
+  nextSessionVersion?: number,
 ): Promise<Row & { token: string; csrfToken: string }> {
   const sessionId = auth.claims.session_id;
-  const sessionVersion = auth.claims.session_version;
+  const sessionVersion = nextSessionVersion ?? auth.claims.session_version;
   const csrfHash = auth.claims.csrf_hash;
   if (
     !sessionId ||
@@ -530,6 +532,32 @@ async function revokeSession(
   if (revoked.count !== 1) throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
 }
 
+/** Senha trocada: derruba as outras sessões e reemite a atual na nova session_version. */
+async function keepOnlyCurrentSession(
+  c: Parameters<typeof sessionCookies>[0],
+  db: UserPrismaClient,
+  auth: UserAuthContext,
+  env: UserWorkerEnv,
+): Promise<void> {
+  if (!db.authSession.updateMany) throw new ServiceError(503, "Sessão não configurada.");
+  await db.authSession.updateMany({
+    where: { user_id: auth.userId, id: { not: auth.claims.session_id }, revoked_at: null },
+    data: { revoked_at: new Date() },
+  });
+  const issued = await refreshOrganizationSession(
+    db,
+    auth,
+    env,
+    Number(auth.claims.session_version) + 1,
+  );
+  sessionCookies(
+    c,
+    createSessionCookieHeaders(issued.token, issued.csrfToken, {
+      secure: env.AUTH_COOKIE_SECURE ?? false,
+    }),
+  );
+}
+
 async function refreshPlatformSession(
   db: UserPrismaClient,
   auth: UserAuthContext,
@@ -613,6 +641,29 @@ async function assertPhotoTarget(
 /** Criar ou promover owner é só do owner. Módulos seguem o teto de assertModulesWithinActor. */
 function isOwnerMutation(input: Record<string, unknown>): boolean {
   return input.type === "owner" || input.first_owner_flag === true;
+}
+
+/** Troca da própria senha: prova a senha atual e aplica a política mínima (#1341). */
+async function assertOwnPasswordChange(
+  db: UserPrismaClient,
+  auth: UserAuthContext,
+  input: Record<string, unknown>,
+  verifyPassword: (password: string, hash: string) => Promise<boolean>,
+): Promise<void> {
+  const currentPassword = input.current_password;
+  const nextPassword = String(input.password);
+  if (typeof currentPassword !== "string") {
+    throw new ServiceError(400, "Informe a senha atual para trocar a senha.");
+  }
+  const row = await db.user.findFirst({
+    where: organizationUserWhere(auth.userId, auth.organizationId),
+    select: { password: true },
+  });
+  if (!(await verifyPassword(currentPassword, String(row?.password ?? "")))) {
+    throw new ServiceError(403, "Senha atual incorreta.");
+  }
+  const policyError = ownPasswordPolicyError(currentPassword, nextPassword);
+  if (policyError) throw new ServiceError(400, policyError);
 }
 
 async function updateOrganizationUser(
@@ -1604,11 +1655,21 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
       const { id } = parse(userIdParamsSchema, c.req.param());
       const body = parse(updateUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
+      const ownPasswordChange = auth.userId === id && body.password !== undefined;
       const selfPasswordUpdate =
-        auth.userId === id && Object.keys(body).every((key) => key === "password");
+        ownPasswordChange &&
+        Object.keys(body).every((key) => key === "password" || key === "current_password");
       if (!selfPasswordUpdate) requireManageUsers(auth);
       if (isOwnerMutation(body)) requireOwner(auth);
       await requireCsrf(c.req.raw, auth);
+      if (ownPasswordChange) {
+        await assertOwnPasswordChange(
+          db,
+          auth,
+          body,
+          options.verifyPassword ?? defaultVerifyPassword,
+        );
+      }
       const user = await updateOrganizationUser(
         db,
         id,
@@ -1623,8 +1684,15 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         action: "UPDATE",
         referring: "user",
         referringId: id,
-        changes: { input: { ...body, password: body.password ? "[REDACTED]" : undefined } },
+        changes: {
+          input: {
+            ...body,
+            password: body.password ? "[REDACTED]" : undefined,
+            current_password: undefined,
+          },
+        },
       });
+      if (ownPasswordChange) await keepOnlyCurrentSession(c, db, auth, envOf(c, options));
       return c.json(createSuccessResponse(user));
     }),
   );
