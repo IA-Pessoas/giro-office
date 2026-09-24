@@ -21,8 +21,8 @@ function partnerDate(label: string) {
 
 const partnerFields = z
   .object({
-    pj_id: z.string().uuid("pj_id invalido."),
-    pf_id: z.string().uuid("pf_id invalido."),
+    pj_id: z.string().uuid("Cliente PJ inválido."),
+    pf_id: z.string().uuid("Pessoa física inválida."),
     part: z.coerce
       .number({ invalid_type_error: "Informe a participação em %." })
       .gt(0, PART_RANGE_MESSAGE)
@@ -46,7 +46,7 @@ export const createPartnerBodySchema = partnerFields.superRefine(exitNotBeforeEn
 
 export const updatePartnerBodySchema = partnerFields
   .extend({
-    id: z.string().uuid("id invalido."),
+    id: z.string().uuid("Vínculo inválido."),
   })
   .strict()
   .superRefine(exitNotBeforeEntry);
@@ -55,14 +55,14 @@ export const partnerDetailQuerySchema = idQuerySchema;
 
 export const partnerIdParamsSchema = z
   .object({
-    id: z.string().uuid("id invalido."),
+    id: z.string().uuid("Vínculo inválido."),
   })
   .strict();
 
 export const listPartnersQuerySchema = z
   .object({
     type: z.enum(["pf", "pj"]),
-    client_id: z.string().uuid("client_id invalido."),
+    client_id: z.string().uuid("Cliente inválido."),
   })
   .strict();
 

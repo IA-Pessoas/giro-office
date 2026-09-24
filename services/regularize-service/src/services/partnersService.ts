@@ -26,6 +26,11 @@ const partnerListSelect = {
   },
 } as const;
 
+function startOfTodayUtc(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
 export class PartnersService {
   readonly #logs: RegularizeLogService;
 
@@ -201,7 +206,8 @@ export class PartnersService {
     return { ok: true };
   }
 
-  // A soma dos vínculos de uma PJ não passa de 100%; na edição o próprio vínculo sai da conta.
+  // A soma dos vínculos vigentes de uma PJ não passa de 100%: ex-sócios (saída antes de hoje)
+  // não contam, e na edição o próprio vínculo sai da conta.
   private async ensurePjParticipationFits(
     organizationId: string,
     pjId: string,
@@ -212,6 +218,7 @@ export class PartnersService {
       where: {
         organization_id: organizationId,
         pj_id: pjId,
+        OR: [{ exit: null }, { exit: { gte: startOfTodayUtc() } }],
         ...(ignoreId ? { id: { not: ignoreId } } : {}),
       },
       _sum: { part: true },
@@ -231,7 +238,7 @@ export class PartnersService {
       select: { id: true },
     });
     if (!exists) {
-      throw new ServiceError(404, "Cliente PF nao encontrado.");
+      throw new ServiceError(404, "Cliente PF não encontrado.");
     }
   }
 
@@ -241,7 +248,7 @@ export class PartnersService {
       select: { id: true },
     });
     if (!exists) {
-      throw new ServiceError(404, "Cliente PJ nao encontrado.");
+      throw new ServiceError(404, "Cliente PJ não encontrado.");
     }
   }
 }

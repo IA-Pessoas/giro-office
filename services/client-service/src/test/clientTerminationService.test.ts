@@ -128,6 +128,8 @@ describe("terminateClient", () => {
   it.each([
     "Inativo",
     "Processo de Inativação",
+    "Prospecção",
+    "Paralisado",
   ])("falha com 409 quando o cliente ja esta %s", async (status) => {
     const prisma = {
       client: { findFirst: vi.fn().mockResolvedValue({ id: "client-1", status }) },
@@ -142,7 +144,7 @@ describe("terminateClient", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Cliente já está inativo ou em processo de inativação.",
+      message: "Só é possível inativar cliente ativo.",
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
