@@ -1,7 +1,12 @@
 import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 import { documentItemSchema } from "./schemas.js";
-import { createClosingService, createControlService, createDocumentsService } from "./services.js";
+import {
+  createClosingService,
+  createControlService,
+  createDocumentsService,
+  createResponsibleService,
+} from "./services.js";
 
 const ORG = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -91,6 +96,50 @@ describe("contabil services tenant and catalog seams", () => {
       person_responsible_id: null,
       posted_by_id: null,
     });
+  });
+
+  it("grava responsáveis ausentes como null em vez do default '' que viola a FK", async () => {
+    const database = {
+      responsibleContabil: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn(async ({ data }) => ({ id: "responsible-1", ...data })),
+      },
+    };
+    const service = createResponsibleService(database as never, audit());
+
+    await service.create({ client_id: CLIENT, customer_with_movement: false }, auth);
+
+    expect(database.responsibleContabil.create).toHaveBeenCalledWith({
+      data: {
+        client_id: CLIENT,
+        organization_id: ORG,
+        person_responsible_id: null,
+        posted_by_id: null,
+        customer_with_movement: false,
+      },
+    });
+  });
+
+  it("devolve 400 quando responsável ou lançado por não existe", async () => {
+    const database = {
+      responsibleContabil: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockRejectedValue(Object.assign(new Error("fk"), { code: "P2003" })),
+      },
+    };
+    const service = createResponsibleService(database as never, audit());
+
+    await expect(
+      service.create({ client_id: CLIENT, posted_by_id: USER }, auth),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    database.responsibleContabil.findFirst.mockResolvedValue({ id: "responsible-1" });
+    Object.assign(database.responsibleContabil, {
+      update: vi.fn().mockRejectedValue(Object.assign(new Error("fk"), { code: "P2003" })),
+    });
+    await expect(
+      service.update("responsible-1", { posted_by_id: USER }, auth),
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("GET mensal sem registro devolve null em vez de 404 (#1322)", async () => {
