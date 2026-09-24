@@ -151,4 +151,5 @@ export interface UpdateIntegracaoTaskBody {
   billing?: TaskBilling;
   urgency?: string;
   responsible_id?: string | null;
+  prevision_date?: string;
 }

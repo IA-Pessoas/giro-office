@@ -690,6 +690,95 @@ describe("TaskCrudService", () => {
     expect(prismaMock.user.findMany).not.toHaveBeenCalled();
   });
 
+  it("updateTask define a primeira previsão quando a tarefa não tem prazo", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      responsible_id: null,
+      status: "Em Andamento",
+      prevision_date: null,
+    });
+    prismaMock.task.update.mockImplementation(async ({ data }) => data);
+
+    const result = await makeTaskCrudService().updateTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      integracaoLevel: 2,
+      prevision_date: "2099-10-15",
+    });
+
+    expect(result.prevision_date).toEqual(new Date("2099-10-15T00:00:00.000Z"));
+  });
+
+  it("updateTask recusa alterar previsão já definida (só via prorrogação)", async () => {
+    const current = new Date("2026-10-01T00:00:00.000Z");
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      responsible_id: null,
+      status: "Em Andamento",
+      prevision_date: current,
+    });
+    prismaMock.task.update.mockReset();
+    prismaMock.task.update.mockImplementation(async ({ data }) => data);
+    const service = makeTaskCrudService();
+    const base = {
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      integracaoLevel: 2,
+    };
+
+    await expect(
+      service.updateTask({ ...base, prevision_date: "2026-10-20" }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "A tarefa já tem previsão. Use Prorrogações para alterá-la.",
+    });
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+
+    const same = await service.updateTask({ ...base, prevision_date: "2026-10-01" });
+    expect(same.prevision_date).toEqual(current);
+  });
+
+  it("updateTask recusa primeira previsão no passado e trata corrida como 409", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      responsible_id: null,
+      status: "Em Andamento",
+      prevision_date: null,
+    });
+    const base = {
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      integracaoLevel: 2,
+    };
+    const service = makeTaskCrudService();
+
+    await expect(
+      service.updateTask({ ...base, prevision_date: "2020-01-01" }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+    });
+
+    prismaMock.task.update.mockReset();
+    prismaMock.task.update.mockRejectedValueOnce({ code: "P2025" });
+    await expect(
+      service.updateTask({ ...base, prevision_date: "2099-01-01" }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    expect(prismaMock.task.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "task-1", prevision_date: null } }),
+    );
+  });
+
   it("updateTask ignora mutação direta de responsáveis secundários e preserva legado", async () => {
     prismaMock.task.findFirst.mockResolvedValue({
       id: "task-1",

@@ -48,6 +48,7 @@ import {
   TASK_URGENCY_OPTIONS,
   type TaskUrgencyOption,
   getDefaultTaskUrgency,
+  getInitialPrevisionPatch,
   getAutomaticTaskResponsibleId,
   getProjectSelectPlaceholder,
   getTaskCreateValidationMessage,
@@ -282,6 +283,8 @@ export function TaskFormModal({
     projectCount: createProjectsCount,
   });
   const editUrgencyOptions = getTaskUrgencyOptions(editValues.urgency);
+  const canSetInitialPrevision =
+    !isRestrictedEdit && Boolean(taskDetailQuery.data) && !taskDetailQuery.data?.prevision_date;
   const taskEditValidationMessage = getTaskEditValidationMessage(editValues);
 
   function shouldRenderCurrentResponsibleOption(userId: string) {
@@ -483,6 +486,7 @@ export function TaskFormModal({
               ...(editValues.responsible_id !== (detail?.responsible_id ?? "")
                 ? { responsible_id: editValues.responsible_id }
                 : {}),
+              ...getInitialPrevisionPatch(detail?.prevision_date, editValues.prevision_date),
             },
       );
 
@@ -743,12 +747,15 @@ export function TaskFormModal({
                     <input
                       type="date"
                       value={editValues.prevision_date}
-                      readOnly
+                      readOnly={!canSetInitialPrevision}
+                      onChange={(event) => updateEditValue("prevision_date", event.target.value)}
                       className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
                     />
                   </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Use Prorrogações para alterar a previsão.
+                    {canSetInitialPrevision
+                      ? "Defina a primeira previsão da tarefa. Depois, use Prorrogações."
+                      : "Use Prorrogações para alterar a previsão."}
                   </span>
                 </label>
 

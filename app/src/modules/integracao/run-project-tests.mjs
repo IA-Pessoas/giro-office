@@ -1803,3 +1803,15 @@ runTest("task delete error surfaces the 409 reason from the API", () => {
   const workspace = readFileSync("src/modules/integracao/components/TasksWorkspace.tsx", "utf8");
   assert.match(workspace, /getTaskDeleteErrorMessage\(error\)/);
 });
+
+runTest("task edit form only sets the first prevision directly", () => {
+  assert.deepEqual(taskFormUi.getInitialPrevisionPatch(null, "2026-10-15"), {
+    prevision_date: "2026-10-15",
+  });
+  assert.deepEqual(taskFormUi.getInitialPrevisionPatch(null, ""), {});
+  assert.deepEqual(taskFormUi.getInitialPrevisionPatch("2026-10-01T00:00:00.000Z", "2026-10-20"), {});
+
+  const source = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+  assert.match(source, /getInitialPrevisionPatch\(/);
+  assert.match(source, /readOnly=\{!canSetInitialPrevision\}/);
+});

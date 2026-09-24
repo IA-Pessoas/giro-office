@@ -95,6 +95,11 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     urgency: { type: "string" },
     responsible_id: { type: ["string", "null"] },
+    prevision_date: {
+      type: "string",
+      format: "date",
+      description: "Só define a primeira previsão; depois, 409 e uso de prorrogação.",
+    },
   },
 });
 
