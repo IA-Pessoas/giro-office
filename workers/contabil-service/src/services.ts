@@ -1140,10 +1140,7 @@ export function createDocumentsService(
       const fields = type === "FISCAL" ? triageFiscalFields : triageDocumentFields;
       if (!fields.includes(field as never) || (!billing && !validStatus(input.status)))
         throw new ServiceError(400, "Item ou status documental inválido.");
-      if (
-        type !== "FISCAL" &&
-        (input.delivery_method != null || input.state_site != null)
-      )
+      if (type !== "FISCAL" && (input.delivery_method != null || input.state_site != null))
         throw new ServiceError(400, "Campos fiscais não aceitos na rotina contábil.");
       const note = normalizeOptionalNote(input.note, "Nota documental");
       const justification = normalizeOptionalCatalogCode(

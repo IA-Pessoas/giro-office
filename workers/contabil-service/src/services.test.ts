@@ -146,8 +146,12 @@ describe("contabil services tenant and catalog seams", () => {
     expect(documentItemSchema.safeParse(body).success).toBe(true);
     expect(documentItemSchema.safeParse({ ...body, state_site: "SP" }).success).toBe(false);
     expect(
-      documentItemSchema.safeParse({ ...body, type: "FISCAL", field: "nfce_documents", state_site: "SP" })
-        .success,
+      documentItemSchema.safeParse({
+        ...body,
+        type: "FISCAL",
+        field: "nfce_documents",
+        state_site: "SP",
+      }).success,
     ).toBe(true);
 
     const database = prisma();
