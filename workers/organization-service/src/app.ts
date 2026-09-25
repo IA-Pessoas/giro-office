@@ -1,4 +1,5 @@
 import type { WorkerAuthContext } from "@workspace/runtime";
+import { zodIssueMessage } from "@workspace/shared/schemas";
 import type { MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { ZodError } from "zod";
@@ -82,7 +83,7 @@ function parse<T>(schema: { parse: (value: unknown) => T }, value: unknown): T {
     return schema.parse(value);
   } catch (error) {
     if (error instanceof ZodError) {
-      throw new OrganizationWorkerError(400, error.issues[0]?.message ?? "Dados inválidos.");
+      throw new OrganizationWorkerError(400, zodIssueMessage(error));
     }
     throw error;
   }

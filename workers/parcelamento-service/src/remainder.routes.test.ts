@@ -224,22 +224,23 @@ describe("parcelamento Worker — paridade restante", () => {
     expect(await response.json()).toMatchObject({ requestId });
   });
 
-  // status/error/code exatos capturados do Express/qs do Node (supertest) em 2026-09-22.
+  // status/code capturados do Express/qs do Node (supertest) em 2026-09-22. A mensagem padrão
+  // do Zod ("Expected number, received nan") virou texto em português com o campo (#1365).
   // O Node não põe requestId no corpo; o Worker o acrescenta (aditivo, ver ba2aed71).
   it.each([
-    ["/parcelamento/installments?page=1&page=2", "Expected number, received nan"],
-    ["/parcelamento/installments?page_size=10&page_size=10", "Expected number, received nan"],
-    ["/parcelamento/installments?status=A&status=B", "Expected string, received array"],
-    ["/parcelamento/installments?search=x&search=x", "Expected string, received array"],
+    ["/parcelamento/installments?page=1&page=2", "Dados inválidos: campo page."],
+    ["/parcelamento/installments?page_size=10&page_size=10", "Dados inválidos: campo page_size."],
+    ["/parcelamento/installments?status=A&status=B", "Dados inválidos: campo status."],
+    ["/parcelamento/installments?search=x&search=x", "Dados inválidos: campo search."],
     [
       `/parcelamento/installments/${INSTALLMENT}/competencies?page=1&page=2`,
-      "Expected number, received nan",
+      "Dados inválidos: campo page.",
     ],
     [
       "/parcelamento/panoramas?competence=2026-01&competence=2026-02",
-      "Expected string, received array",
+      "Dados inválidos: campo competence.",
     ],
-    ["/parcelamento/panoramas?page=1&page=1", "Expected number, received nan"],
+    ["/parcelamento/panoramas?page=1&page=1", "Dados inválidos: campo page."],
   ])("rejeita chave repetida na query como o Express: %s", async (path, error) => {
     const prisma = prismaMock();
     const app = createParcelamentoWorkerApp({ env: env(), prisma: prisma as never });
