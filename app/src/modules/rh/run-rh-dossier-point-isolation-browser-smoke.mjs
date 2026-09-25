@@ -168,8 +168,15 @@ async function runBrowserProof() {
       (request) => new URL(request.url()).pathname.endsWith("/rh/timesheets"),
       { timeout: 30_000 },
     );
+    const pointConfigRequest = page.waitForRequest(
+      (request) => new URL(request.url()).pathname.includes("/rh/point-config"),
+      { timeout: 30_000 },
+    );
     await page.goto("/rh", { waitUntil: "domcontentloaded", timeout: 120_000 });
     await page.getByRole("button", { name: "Dossiê", exact: true }).waitFor({ timeout: 60_000 });
+    await page.getByRole("button", { name: "Ponto", exact: true }).click();
+    await pointConfigRequest;
+    await page.getByRole("button", { name: "Folhas de ponto", exact: true }).click();
     await timeSheetsRequest;
 
     await page.getByRole("button", { name: "Dossiê", exact: true }).click();
@@ -204,13 +211,6 @@ async function runBrowserProof() {
       });
     }
 
-    const pointConfigRequest = page.waitForRequest(
-      (request) => new URL(request.url()).pathname.includes("/rh/point-config"),
-      { timeout: 30_000 },
-    );
-    await page.getByRole("button", { name: "Ponto" }).click();
-    await pointConfigRequest;
-    await page.getByRole("button", { name: "Dossiê", exact: true }).click();
     const pointConfigFailure = page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname.includes("/rh/point-config") && response.status() === 404,
@@ -273,7 +273,7 @@ async function withNextServer(run) {
     await waitForServer(serverProcess, () => output);
     await run();
   } finally {
-    stopServer(serverProcess);
+    await stopServer(serverProcess);
   }
 }
 
@@ -298,8 +298,8 @@ async function waitForServer(serverProcess, getOutput) {
   throw new Error(`Timed out waiting for Next.js at ${baseUrl}.\n${getOutput()}`);
 }
 
-function stopServer(serverProcess) {
-  if (!serverProcess.pid || serverProcess.exitCode !== null) return;
+async function stopServer(serverProcess) {
+  if (!serverProcess.pid || serverProcess.exitCode !== null || serverProcess.signalCode !== null) return;
 
   if (process.platform === "win32") {
     execFileSync("taskkill", ["/pid", String(serverProcess.pid), "/T", "/F"], {
@@ -309,7 +309,10 @@ function stopServer(serverProcess) {
     return;
   }
 
-  serverProcess.kill("SIGTERM");
+  await new Promise((resolvePromise) => {
+    serverProcess.once("exit", resolvePromise);
+    serverProcess.kill("SIGTERM");
+  });
 }
 
 await withNextServer(runBrowserProof);
