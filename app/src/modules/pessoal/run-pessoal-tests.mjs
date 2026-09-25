@@ -808,7 +808,7 @@ runTest("pessoal overview reads available dashboard data", () => {
   assert.match(overviewHook, /pessoalService\.getOverview\(\)/);
   assert.match(service, /getOverview\(\)/);
   assert.match(service, /PESSOAL_ENDPOINTS\.overview/);
-  assert.match(overview, /bg-gradient-to-br from-blue-700/);
+  assert.doesNotMatch(overview, /bg-gradient-to-br/);
   // #1301: o resumo não ocupa meia tela e Folha/Obrigações mostram números.
   assert.doesNotMatch(overview, /min-h-\[260px\]|text-3xl font-bold/);
   assert.match(overview, /className="rounded-lg border border-gray-200 bg-white p-3/);
