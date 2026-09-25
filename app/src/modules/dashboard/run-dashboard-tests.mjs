@@ -133,3 +133,27 @@ runTest("dashboard last update rejects future timestamps", () => {
   assert.match(dashboardComponent, /date\.getTime\(\) > Date\.now\(\)/);
   assert.match(dashboardComponent, /Sem atualização/);
 });
+
+// #1369: resposta parcial ou fora do formato derrubava o dashboard; o erro remontava o app e
+// todo o shell era buscado de novo, multiplicando as requisições.
+const { normalizeDashboardStats } = await import("./services/dashboardStats.ts");
+
+runTest("dashboard stats are normalized so a partial response cannot crash the page", () => {
+  const fromArray = normalizeDashboardStats([]);
+  assert.equal(fromArray.totalClients, 0);
+  assert.deepEqual(fromArray.tasks, { today: 0, completedToday: 0, pending: 0, urgent: 0 });
+  assert.deepEqual(fromArray.notifications, { total: 0, urgent: 0, pending: 0 });
+  assert.deepEqual(fromArray.recentClients, []);
+  assert.equal(fromArray.updatedAt, null);
+
+  const partial = normalizeDashboardStats({ totalClients: 4, tasks: { today: 2 }, projects: null });
+  assert.equal(partial.totalClients, 4);
+  assert.deepEqual(partial.tasks, { today: 2, completedToday: 0, pending: 0, urgent: 0 });
+  assert.deepEqual(partial.projects, { active: 0, completed: 0, inProgress: 0, delayed: 0, waiting: 0 });
+  assert.deepEqual(partial.commercial.billing, { pending: 0, contracted: 0, notContracted: 0 });
+  assert.deepEqual(partial.departments, []);
+});
+
+runTest("dashboard service normalizes the stats payload", () => {
+  assert.match(dashboardService, /normalizeDashboardStats\(/);
+});

@@ -1,5 +1,6 @@
 import { setupAPIClient } from '@shared/services/api';
 import type { DashboardStats } from '../types';
+import { normalizeDashboardStats } from './dashboardStats';
 
 interface DashboardStatsEnvelope {
   success?: boolean;
@@ -19,6 +20,6 @@ export const dashboardService = {
     const api = setupAPIClient();
     const response = await api.get('/dashboard/stats');
 
-    return unwrapDashboardStats(response.data);
+    return normalizeDashboardStats(unwrapDashboardStats(response.data));
   },
 };
