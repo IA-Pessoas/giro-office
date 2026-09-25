@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { isAxiosError } from "axios";
 import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 
 import {
@@ -33,7 +34,9 @@ export function PlatformSuperAdminsPanel() {
       ) : null}
       {permissionMutation.isError ? (
         <p className="text-sm text-rose-700 dark:text-rose-300" role="alert">
-          Não foi possível atualizar a permissão de personificação.
+          {(isAxiosError(permissionMutation.error)
+            ? permissionMutation.error.response?.data?.error
+            : undefined) ?? "Não foi possível atualizar a permissão de personificação."}
         </p>
       ) : null}
       {permissionMutation.isSuccess ? (

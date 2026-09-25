@@ -1090,6 +1090,20 @@ async function updateSuperAdminImpersonationPermission(
 
   return db.$transaction(
     async (transaction) => {
+      // Reler o ator na mesma transação Serializable: duas revogações cruzadas (A tira de B e
+      // B tira de A) leem a linha uma da outra e o Postgres aborta uma delas.
+      const actor = await transaction.platformUser.findFirst({
+        where: {
+          id: actorId,
+          platform_role: "super_admin",
+          status: "active",
+          can_impersonate: true,
+        },
+        select: { id: true },
+      });
+      if (!actor) {
+        throw new ServiceError(403, "Você não tem permissão para alterar essa permissão.");
+      }
       const target = await transaction.platformUser.findFirst({
         where: { id: superAdminId, platform_role: "super_admin" },
         select: PLATFORM_SUPER_ADMIN_SELECT,
@@ -1121,7 +1135,10 @@ async function updateSuperAdminImpersonationPermission(
       }
 
       let revokedSessions = 0;
-      if (!canImpersonate && transaction.authSession.updateMany) {
+      if (!canImpersonate) {
+        if (!transaction.authSession.updateMany) {
+          throw new ServiceError(503, "Revogação de sessões não configurada.");
+        }
         const now = new Date();
         const revoked = await transaction.authSession.updateMany({
           where: {
@@ -2142,6 +2159,8 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       if (!identity.can_impersonate) {
         throw new ServiceError(403, "Você não tem permissão para alterar essa permissão.");
       }
+      // Ação privilegiada: sem auditoria configurada, não altera nada.
+      if (!options.audit) throw new ServiceError(503, "Auditoria não configurada.");
       const { superAdminId } = parse(platformSuperAdminParamsSchema, c.req.param());
       const { can_impersonate: canImpersonate } = parse(
         updatePlatformSuperAdminImpersonationPermissionSchema,
@@ -2154,7 +2173,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         canImpersonate,
       );
       if (result.changed) {
-        await options.audit?.({
+        await options.audit({
           platformActorUserId: identity.id,
           organizationId: null,
           action: "platform.super_admin.impersonation_permission.updated",
