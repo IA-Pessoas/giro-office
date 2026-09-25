@@ -2162,7 +2162,7 @@ describe("super admins da plataforma (#1528)", () => {
   it("concede sem mexer nas sessões", async () => {
     const db = prisma();
     db.platformUser.findFirst.mockResolvedValue(target({ can_impersonate: false }));
-    const app = createUserWorkerApp({ env: env(), prisma: db });
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
     const { url, init } = patch(await platformHeaders(db), { can_impersonate: true });
 
     const response = await app.request(url, init);
@@ -2178,7 +2178,7 @@ describe("super admins da plataforma (#1528)", () => {
   it("recusa operador sem permissão de personificar", async () => {
     const db = prisma();
     const headers = await platformHeaders(db, PLATFORM_USER_ID, { can_impersonate: false });
-    const app = createUserWorkerApp({ env: env(), prisma: db });
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
     const { url, init } = patch(headers, { can_impersonate: false });
 
     const response = await app.request(url, init);
@@ -2191,7 +2191,7 @@ describe("super admins da plataforma (#1528)", () => {
     const db = prisma();
     const actorId = "30000000-0000-4000-8000-000000000001";
     const headers = await platformHeaders(db, actorId);
-    const app = createUserWorkerApp({ env: env(), prisma: db });
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
     const { url, init } = patch(headers, { can_impersonate: false }, actorId);
 
     const response = await app.request(url, init);
@@ -2203,7 +2203,7 @@ describe("super admins da plataforma (#1528)", () => {
   it("exige CSRF", async () => {
     const db = prisma();
     const { "x-csrf-token": _csrf, ...headers } = await platformHeaders(db);
-    const app = createUserWorkerApp({ env: env(), prisma: db });
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
     const { url, init } = patch(headers, { can_impersonate: false });
 
     const response = await app.request(url, init);
@@ -2214,12 +2214,52 @@ describe("super admins da plataforma (#1528)", () => {
 
   it("responde 404 quando o alvo não é super admin", async () => {
     const db = prisma();
-    db.platformUser.findFirst.mockResolvedValue(null);
-    const app = createUserWorkerApp({ env: env(), prisma: db });
+    db.platformUser.findFirst.mockImplementation(async (args: { where: { id: string } }) =>
+      args.where.id === PLATFORM_USER_ID ? { id: PLATFORM_USER_ID } : null,
+    );
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
     const { url, init } = patch(await platformHeaders(db), { can_impersonate: false });
 
     const response = await app.request(url, init);
 
     expect(response.status).toBe(404);
+  });
+
+  it("recusa quando o ator perdeu a permissão dentro da transação (revogação cruzada)", async () => {
+    const db = prisma();
+    db.platformUser.findFirst.mockImplementation(async (args: { where: { id: string } }) =>
+      args.where.id === PLATFORM_USER_ID ? null : target(),
+    );
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
+    const { url, init } = patch(await platformHeaders(db), { can_impersonate: false });
+
+    const response = await app.request(url, init);
+
+    expect(response.status).toBe(403);
+    expect(db.platformUser.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("não altera nada sem auditoria configurada", async () => {
+    const db = prisma();
+    db.platformUser.findFirst.mockResolvedValue(target());
+    const app = createUserWorkerApp({ env: env(), prisma: db });
+    const { url, init } = patch(await platformHeaders(db), { can_impersonate: false });
+
+    const response = await app.request(url, init);
+
+    expect(response.status).toBe(503);
+    expect(db.platformUser.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("responde 409 quando a permissão muda durante a operação", async () => {
+    const db = prisma();
+    db.platformUser.findFirst.mockResolvedValue(target());
+    db.platformUser.updateMany.mockResolvedValue({ count: 0 });
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
+    const { url, init } = patch(await platformHeaders(db), { can_impersonate: false });
+
+    const response = await app.request(url, init);
+
+    expect(response.status).toBe(409);
   });
 });
