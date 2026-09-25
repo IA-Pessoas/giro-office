@@ -175,6 +175,7 @@ async function run() {
   let generatedJob;
   const models = [];
   let modelVersionId = "reports-fixture-model-version";
+  let staleSavedModel = false;
   let jobPolls = 0;
   const exportRequests = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -196,6 +197,17 @@ async function run() {
     if (path === "/reports/jobs" && route.request().method() === "POST") {
       const payload = route.request().postDataJSON();
       assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
+      if (staleSavedModel) {
+        assert.ok(
+          payload.definition,
+          `A stale saved model must generate from the sanitized definition: ${JSON.stringify(payload)}`,
+        );
+        const clientsArea = payload.definition.areas.find(
+          (area) => area.source === "integracao.clients",
+        );
+        assert.deepEqual(clientsArea.aggregations ?? [], []);
+        staleSavedModel = false;
+      }
       assert.ok(
         payload.modelVersionId === modelVersionId || payload.definition?.version === 2,
         "Generation must use a validated definition or a saved model version",
@@ -223,7 +235,14 @@ async function run() {
       return route.fulfill({ status: 201, json: { success: true, data: model } });
     }
     if (path === "/reports/models/reports-fixture-model" && route.request().method() === "GET") {
-      return route.fulfill({ json: { success: true, data: models[0] } });
+      const staleModel = structuredClone(models[0]);
+      const clientsArea = staleModel.definition.areas.find(
+        (area) => area.source === "integracao.clients",
+      );
+      clientsArea.fields = ["email"];
+      clientsArea.aggregations = [{ field: "name", function: "count" }];
+      staleSavedModel = true;
+      return route.fulfill({ json: { success: true, data: staleModel } });
     }
     if (path === "/reports/jobs/reports-fixture-job" && route.request().method() === "GET") {
       if (generatedJob?.status === "queued") {
@@ -295,7 +314,7 @@ async function run() {
               label: items.find((item) => item.key === area.source).label,
               rows: index
                 ? []
-                : [{ name: area.filters?.[0]?.value ?? "Projeto de exemplo", status_count: 7 }],
+                : [{ name: area.filters?.[0]?.value ?? "Projeto de exemplo", name_count: 7 }],
               presentation: {
                 columns: [
                   { key: index ? "email" : "name", label: index ? "E-mail" : "Nome" },
@@ -503,6 +522,9 @@ async function run() {
     await expect(
       panel.getByRole("region", { name: "Prévia de Projetos", exact: true }),
     ).toContainText("Projeto de exemplo");
+    await expect(
+      panel.getByRole("region", { name: "Prévia de Projetos", exact: true }),
+    ).toContainText("7");
     await expect(
       panel.getByRole("region", { name: "Prévia de Clientes", exact: true }),
     ).toContainText("Nenhum registro encontrado");
