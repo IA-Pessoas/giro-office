@@ -8,6 +8,7 @@ import type {
   ParcelamentoInstallment,
   PatchParcelamentoInstallmentPayload,
 } from "../types";
+import { formatBrlAmount, formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
 import {
   INSTALLMENT_JURISDICTION_OPTIONS,
@@ -91,9 +92,9 @@ function buildFormState(
     legal_nature: installment.legal_nature,
     jurisdiction: installment.jurisdiction,
     is_automatic_debit: installment.is_automatic_debit,
-    consolidated_total_amount: String(installment.consolidated_total_amount),
-    first_installment_amount: String(installment.first_installment_amount),
-    current_month_installment_amount: String(installment.current_month_installment_amount),
+    consolidated_total_amount: formatBrlAmount(installment.consolidated_total_amount),
+    first_installment_amount: formatBrlAmount(installment.first_installment_amount),
+    current_month_installment_amount: formatBrlAmount(installment.current_month_installment_amount),
     agreed_installments_count: String(installment.agreed_installments_count),
     enrollment_date: toDateInputValue(installment.enrollment_date),
     status: installment.status,
@@ -121,6 +122,11 @@ function getMissingRequiredFields(formState: ParcelamentoInstallmentFormState) {
 
 function readRequiredNumber(value: string) {
   return value.trim().length > 0 ? Number(value) : 0;
+}
+
+// Campos de moeda usam a máscara BRL; Number("R$ 1.234,56") seria NaN.
+function readChangedBrl(value: string) {
+  return parseBrlInput(value) ?? Number.NaN;
 }
 
 function readChangedNumber(value: string) {
@@ -175,9 +181,9 @@ export function ParcelamentoInstallmentForm({
       return null;
     }
 
-    const totalAmount = readRequiredNumber(formState.consolidated_total_amount);
-    const firstAmount = readRequiredNumber(formState.first_installment_amount);
-    const currentAmount = readRequiredNumber(formState.current_month_installment_amount);
+    const totalAmount = parseBrlInput(formState.consolidated_total_amount) ?? Number.NaN;
+    const firstAmount = parseBrlInput(formState.first_installment_amount) ?? Number.NaN;
+    const currentAmount = parseBrlInput(formState.current_month_installment_amount) ?? Number.NaN;
     const installmentsCount = Math.trunc(readRequiredNumber(formState.agreed_installments_count));
 
 
@@ -236,18 +242,18 @@ export function ParcelamentoInstallmentForm({
     }
 
     if (formState.consolidated_total_amount !== initialFormState.consolidated_total_amount) {
-      patch.consolidated_total_amount = readChangedNumber(formState.consolidated_total_amount);
+      patch.consolidated_total_amount = readChangedBrl(formState.consolidated_total_amount);
     }
 
     if (formState.first_installment_amount !== initialFormState.first_installment_amount) {
-      patch.first_installment_amount = readChangedNumber(formState.first_installment_amount);
+      patch.first_installment_amount = readChangedBrl(formState.first_installment_amount);
     }
 
     if (
       formState.current_month_installment_amount !==
       initialFormState.current_month_installment_amount
     ) {
-      patch.current_month_installment_amount = readChangedNumber(
+      patch.current_month_installment_amount = readChangedBrl(
         formState.current_month_installment_amount,
       );
     }
@@ -367,31 +373,28 @@ export function ParcelamentoInstallmentForm({
         />
         <TextField
           label="Valor total do parcelamento"
-          type="number"
-          min="0"
-          step="0.01"
+          inputMode="decimal"
+          placeholder="R$ 0,00"
           value={formState.consolidated_total_amount}
-          onChange={(value) => handleFieldChange("consolidated_total_amount", value)}
+          onChange={(value) => handleFieldChange("consolidated_total_amount", formatBrlInput(value))}
           disabled={isDisabled}
           required
         />
         <TextField
           label="Valor da 1ª parcela"
-          type="number"
-          min="0"
-          step="0.01"
+          inputMode="decimal"
+          placeholder="R$ 0,00"
           value={formState.first_installment_amount}
-          onChange={(value) => handleFieldChange("first_installment_amount", value)}
+          onChange={(value) => handleFieldChange("first_installment_amount", formatBrlInput(value))}
           disabled={isDisabled}
           required
         />
         <TextField
           label="Valor da parcela atual"
-          type="number"
-          min="0"
-          step="0.01"
+          inputMode="decimal"
+          placeholder="R$ 0,00"
           value={formState.current_month_installment_amount}
-          onChange={(value) => handleFieldChange("current_month_installment_amount", value)}
+          onChange={(value) => handleFieldChange("current_month_installment_amount", formatBrlInput(value))}
           disabled={isDisabled}
           required
         />
@@ -537,18 +540,22 @@ function SelectField({
 
 function TextField({
   disabled,
+  inputMode,
   label,
   min,
   onChange,
+  placeholder,
   required = false,
   step,
   type = "text",
   value,
 }: {
   disabled: boolean;
+  inputMode?: "decimal";
   label: string;
   min?: string;
   onChange: (value: string) => void;
+  placeholder?: string;
   required?: boolean;
   step?: string;
   type?: string;
@@ -559,6 +566,8 @@ function TextField({
       <FieldLabel label={label} required={required} />
       <input
         type={type}
+        inputMode={inputMode}
+        placeholder={placeholder}
         min={min}
         step={step}
         aria-required={required || undefined}

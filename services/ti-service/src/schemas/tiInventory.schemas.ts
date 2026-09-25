@@ -5,17 +5,17 @@ import { paginationQuerySchema } from "./pagination.schemas.js";
 
 export const tiInventoryIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Ativo de TI invalido." }),
+    id: z.string().uuid({ message: "Ativo de TI inválido." }),
   })
   .strict();
 
 export const createTiInventoryBodySchema = z
   .object({
     asset_code: zNonEmptyText("asset_code"),
-    category_id: z.string().uuid({ message: "Categoria de inventario invalida." }),
-    location_id: z.string().uuid({ message: "Local de inventario invalido." }).optional(),
-    user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
-    responsible_it_staff_id: z.string().uuid({ message: "Responsavel de TI invalido." }).optional(),
+    category_id: z.string().uuid({ message: "Categoria de inventário inválida." }),
+    location_id: z.string().uuid({ message: "Local de inventário inválido." }).optional(),
+    user_id: z.string().uuid({ message: "Usuário inválido." }).optional(),
+    responsible_it_staff_id: z.string().uuid({ message: "Responsável de TI inválido." }).optional(),
     notes: z.string().optional(),
     delivery_date: zIsoDate("delivery_date").optional(),
   })
@@ -29,7 +29,7 @@ export const updateTiInventoryBodySchema = createTiInventoryBodySchema
 
 export const assignTiInventoryUserBodySchema = z
   .object({
-    user_id: z.string().uuid({ message: "Usuario invalido." }),
+    user_id: z.string().uuid({ message: "Usuário inválido." }),
     delivery_date: zIsoDate("delivery_date").optional(),
   })
   .strict();
@@ -44,9 +44,9 @@ export const returnTiInventoryBodySchema = z
 export const listTiInventoryQuerySchema = paginationQuerySchema
   .merge(
     z.object({
-      category_id: z.string().uuid({ message: "Categoria de inventario invalida." }).optional(),
-      location_id: z.string().uuid({ message: "Local de inventario invalido." }).optional(),
-      user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
+      category_id: z.string().uuid({ message: "Categoria de inventário inválida." }).optional(),
+      location_id: z.string().uuid({ message: "Local de inventário inválido." }).optional(),
+      user_id: z.string().uuid({ message: "Usuário inválido." }).optional(),
       asset_code: z.string().optional(),
       status: z.enum(["available", "assigned"]).optional(),
     }),

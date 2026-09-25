@@ -166,9 +166,10 @@ runTest("commercial contract value uses the shared Brazilian currency mask", () 
   const catalog = read("./components/CommercialCatalog.tsx");
 
   assert.match(catalog, /formatBrlInput/);
-  assert.match(catalog, /normalizeDigits\(event\.target\.value\)/);
+  // #1366: o texto digitado vai inteiro à máscara (vírgula decimal), sem virar centavos.
+  assert.match(catalog, /formatBrlInput\(event\.target\.value\)/);
   assert.match(catalog, /parseBrlInput/);
-  assert.match(catalog, /Math\.round\(value \* 100\)/);
+  assert.match(catalog, /formatBrlAmount\(value\)/);
 });
 
 runTest("commercial creation actions open the shared dialogs", () => {

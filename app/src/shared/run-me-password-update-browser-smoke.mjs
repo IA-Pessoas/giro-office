@@ -22,6 +22,8 @@ const viewer = {
   department_id: "department-viewer",
   photo_url: null,
   organization_id: "org-smoke",
+  status: "Ativo",
+  version: 1,
   type: "user",
 };
 
@@ -33,6 +35,8 @@ const rhAdmin = {
   department_id: "department-rh",
   photo_url: null,
   organization_id: "org-smoke",
+  status: "Ativo",
+  version: 1,
   type: "admin",
 };
 
@@ -93,11 +97,18 @@ async function openProfile(user, modules, onPatch) {
   });
 
   try {
+    // #1370: /me redireciona para /configuracoes, onde o perfil é editado em "Editar dados de acesso".
     await page.goto("/me", { waitUntil: "networkidle", timeout: 15_000 });
     await page.waitForTimeout(250);
-    assert.equal(new URL(page.url()).pathname, "/me", "O perfil não pode depender de sessionStorage.");
-    await assertVisible(page.getByRole("heading", { name: "Meu perfil" }), page, "heading Meu perfil");
-    await assertVisible(page.getByLabel("Login"), page, "input Login");
+    assert.equal(
+      new URL(page.url()).pathname,
+      "/configuracoes",
+      "/me deve levar às Configurações sem depender de sessionStorage.",
+    );
+    const openAccessDialog = page.getByRole("button", { name: "Editar dados de acesso" });
+    await assertVisible(openAccessDialog, page, "botão Editar dados de acesso");
+    await openAccessDialog.click();
+    await assertVisible(page.getByRole("dialog", { name: "Editar dados de acesso" }), page, "diálogo");
 
     return { browser, context, diagnostics, page };
   } catch (error) {
@@ -129,7 +140,7 @@ async function assertVisible(locator, page, label) {
 function passwordFields(page) {
   return {
     current: page.getByLabel("Senha atual", { exact: true }),
-    next: page.getByLabel("Nova Senha", { exact: true }),
+    next: page.getByLabel("Nova senha", { exact: true }),
     confirm: page.getByLabel("Confirmar nova senha", { exact: true }),
   };
 }
@@ -145,7 +156,7 @@ async function assertViewerPasswordUpdate() {
   try {
     const nameInput = page.getByLabel("Nome");
     const fields = passwordFields(page);
-    const saveButton = page.getByRole("button", { name: "Salvar alterações" });
+    const saveButton = page.getByRole("button", { name: "Salvar dados" });
 
     assert.equal(await nameInput.isDisabled(), true, "Viewer não pode editar o nome.");
     for (const input of Object.values(fields)) {
@@ -166,6 +177,8 @@ async function assertViewerPasswordUpdate() {
 
     await page.getByText("Perfil atualizado com sucesso!").waitFor({ state: "visible" });
     assert.deepEqual(requests, [{ password, current_password: currentPassword }]);
+    // O diálogo fecha no sucesso; ao reabrir, as senhas vêm limpas.
+    await page.getByRole("button", { name: "Editar dados de acesso" }).click();
     for (const input of Object.values(fields)) {
       assert.equal(await input.inputValue(), "", "As senhas devem ser limpas após sucesso.");
     }
@@ -195,10 +208,11 @@ async function assertRhAdminProfileUpdate() {
     await fields.current.fill(currentPassword);
     await fields.next.fill(password);
     await fields.confirm.fill(password);
-    await page.getByRole("button", { name: "Salvar alterações" }).click();
+    await page.getByRole("button", { name: "Salvar dados" }).click();
 
     await page.getByText("Perfil atualizado com sucesso!").waitFor({ state: "visible" });
     assert.deepEqual(requests, [{ name: nextName, password, current_password: currentPassword }]);
+    await page.getByRole("button", { name: "Editar dados de acesso" }).click();
     assert.equal(await fields.next.inputValue(), "", "A senha deve ser limpa após sucesso.");
     assert.equal((await page.locator("body").innerText()).includes(password), false);
     assert.equal(diagnostics.some((message) => message.includes(password)), false);
@@ -255,10 +269,10 @@ await withNextServer(async () => {
   console.log("PASS usuário define a senha pelo link de redefinição");
 
   await assertViewerPasswordUpdate();
-  console.log("PASS Viewer atualiza a própria senha pelo componente /me");
+  console.log("PASS Viewer atualiza a própria senha em Configurações (/me redireciona)");
 
   await assertRhAdminProfileUpdate();
-  console.log("PASS admin RH atualiza nome e senha pelo componente /me");
+  console.log("PASS admin RH atualiza nome e senha em Configurações (/me redireciona)");
 });
 
 async function withNextServer(run) {

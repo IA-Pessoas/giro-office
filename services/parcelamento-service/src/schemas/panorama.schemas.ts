@@ -6,11 +6,11 @@ const nonEmptyText = (field: string) =>
   z
     .string()
     .trim()
-    .min(1, { message: `${field} e obrigatorio.` });
+    .min(1, { message: `${field} é obrigatório.` });
 
 const optionalResponsavelId = z
   .string()
-  .uuid({ message: "responsavel_id invalido." })
+  .uuid({ message: "responsavel_id inválido." })
   .optional()
   .nullable();
 
@@ -38,7 +38,7 @@ const panoramaPatchBooleanFields = {
 
 export const panoramaIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
@@ -51,14 +51,14 @@ export const panoramaCompetenceParamsSchema = z
 export const listPanoramasQuerySchema = paginationQuerySchema
   .extend({
     competence: nonEmptyText("competence").optional(),
-    client_id: z.string().uuid({ message: "client_id invalido." }).optional(),
-    responsavel_id: z.string().uuid({ message: "responsavel_id invalido." }).optional(),
+    client_id: z.string().uuid({ message: "client_id inválido." }).optional(),
+    responsavel_id: z.string().uuid({ message: "responsavel_id inválido." }).optional(),
   })
   .strict();
 
 export const createPanoramaBodySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
     competence: nonEmptyText("competence"),
     ...panoramaCreateBooleanFields,
     responsavel_id: optionalResponsavelId,

@@ -154,23 +154,23 @@ export class ObligationService {
         select: payrollDefaultsSelect,
       });
       if (!payroll) {
-        throw new ServiceError(404, "Folha de pessoal nao encontrada para o cliente.");
+        throw new ServiceError(404, "Folha de pessoal não encontrada para o cliente.");
       }
       const group = payroll.group;
       if (!group) {
-        throw new ServiceError(409, "Folha de pessoal sem grupo canonico para gerar obrigacao.");
+        throw new ServiceError(409, "Folha de pessoal sem grupo canônico para gerar obrigação.");
       }
       if (group.organization_id !== context.organizationId) {
-        throw new ServiceError(409, "Grupo de pessoal invalido para a organizacao.");
+        throw new ServiceError(409, "Grupo de pessoal inválido para a organização.");
       }
       if (group.archived_at) {
-        throw new ServiceError(409, "Grupo de pessoal arquivado nao gera novas obrigacoes.");
+        throw new ServiceError(409, "Grupo de pessoal arquivado não gera novas obrigações.");
       }
       if (group.policy === NO_OBLIGATIONS_GROUP_POLICY) {
         return { created: false, obligation: null, skippedNoObligations: true };
       }
       if (group.policy !== NORMAL_GROUP_POLICY) {
-        throw new ServiceError(409, "Politica de grupo de pessoal invalida.");
+        throw new ServiceError(409, "Política de grupo de pessoal inválida.");
       }
 
       let createdByInsert = true;
@@ -221,7 +221,7 @@ export class ObligationService {
     } catch (err: unknown) {
       logError("Erro ao criar obrigacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao criar obrigacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao criar obrigação de pessoal.", err);
     }
   }
 
@@ -252,7 +252,7 @@ export class ObligationService {
         select: obligationSelect,
       });
       if (!existing) {
-        throw new ServiceError(404, "Obrigacao de pessoal nao encontrada.");
+        throw new ServiceError(404, "Obrigação de pessoal não encontrada.");
       }
       await ensurePessoalResponsible(
         this.prisma,
@@ -283,7 +283,7 @@ export class ObligationService {
     } catch (err: unknown) {
       logError("Erro ao atualizar obrigacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao atualizar obrigacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao atualizar obrigação de pessoal.", err);
     }
   }
 
@@ -374,7 +374,7 @@ export class ObligationService {
           continue;
         }
         if (group.policy !== NORMAL_GROUP_POLICY) {
-          throw new ServiceError(409, "Politica de grupo de pessoal invalida.");
+          throw new ServiceError(409, "Política de grupo de pessoal inválida.");
         }
 
         createData.push(
@@ -422,7 +422,7 @@ export class ObligationService {
     } catch (err: unknown) {
       logError("Erro ao gerar obrigacoes de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao gerar obrigacoes de pessoal.", err);
+      throw new ServiceError(500, "Erro ao gerar obrigações de pessoal.", err);
     }
   }
 
@@ -432,7 +432,7 @@ export class ObligationService {
       select: { id: true },
     });
     if (!client) {
-      throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      throw new ServiceError(404, "Cliente não encontrado para a organização.");
     }
   }
 }

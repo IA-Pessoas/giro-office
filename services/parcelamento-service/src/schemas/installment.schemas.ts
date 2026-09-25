@@ -6,7 +6,7 @@ const nonEmptyText = (field: string) =>
   z
     .string()
     .trim()
-    .min(1, { message: `${field} e obrigatorio.` });
+    .min(1, { message: `${field} é obrigatório.` });
 
 const optionalText = z.string().trim().optional().nullable();
 const optionalDate = z.coerce.date().optional().nullable();
@@ -15,13 +15,13 @@ const positiveInteger = z.coerce.number().int().min(1);
 
 export const installmentIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
 export const listInstallmentsQuerySchema = paginationQuerySchema
   .extend({
-    client_id: z.string().uuid({ message: "client_id invalido." }).optional(),
+    client_id: z.string().uuid({ message: "client_id inválido." }).optional(),
     status: nonEmptyText("status").optional(),
     type: nonEmptyText("type").optional(),
     jurisdiction: nonEmptyText("jurisdiction").optional(),
@@ -31,7 +31,7 @@ export const listInstallmentsQuerySchema = paginationQuerySchema
 
 export const createInstallmentBodySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
     agreement_number: optionalText,
     type: nonEmptyText("type"),
     legal_nature: nonEmptyText("legal_nature"),

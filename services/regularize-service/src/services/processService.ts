@@ -184,7 +184,7 @@ export class ProcessService {
       select: { id: true },
     });
     if (exists) {
-      throw new ServiceError(409, "Processo ja cadastrado.");
+      throw new ServiceError(409, "Processo já cadastrado.");
     }
 
     let created: ProcessSelectedRecord;
@@ -221,7 +221,7 @@ export class ProcessService {
         throw error;
       }
       logError("Conflito de duplicidade ao criar processo do regularize", { error });
-      throw new ServiceError(409, "Processo ja cadastrado.");
+      throw new ServiceError(409, "Processo já cadastrado.");
     }
 
     return {
@@ -242,7 +242,7 @@ export class ProcessService {
       select: { id: true },
     });
     if (!existing) {
-      throw new ServiceError(404, "Processo nao encontrado.");
+      throw new ServiceError(404, "Processo não encontrado.");
     }
 
     await this.ensureRelations(input.organizationId, input.body);
@@ -255,7 +255,7 @@ export class ProcessService {
           select: processSelect,
         });
         if (!current) {
-          throw new ServiceError(404, "Processo nao encontrado.");
+          throw new ServiceError(404, "Processo não encontrado.");
         }
 
         const financialStatus = normalizeFinancialStatus(
@@ -301,7 +301,7 @@ export class ProcessService {
           select: processSelect,
         });
         if (!updated) {
-          throw new ServiceError(404, "Processo nao encontrado.");
+          throw new ServiceError(404, "Processo não encontrado.");
         }
 
         await logs.logUpdateIfChanged({
@@ -321,7 +321,7 @@ export class ProcessService {
         throw error;
       }
       logError("Conflito de duplicidade ao atualizar processo do regularize", { error });
-      throw new ServiceError(409, "Processo ja cadastrado.");
+      throw new ServiceError(409, "Processo já cadastrado.");
     }
 
     return sanitizeProcessRecord(
@@ -336,7 +336,7 @@ export class ProcessService {
       select: processSelect,
     });
     if (!detail) {
-      throw new ServiceError(404, "Processo nao encontrado.");
+      throw new ServiceError(404, "Processo não encontrado.");
     }
 
     const history = await this.prisma.logs.findMany({
@@ -473,10 +473,10 @@ export class ProcessService {
         select: { id: true, cpf_cnpj: true },
       });
       if (!client) {
-        throw new ServiceError(404, "Cliente PJ nao encontrado.");
+        throw new ServiceError(404, "Cliente PJ não encontrado.");
       }
       if (normalizeDocument(body.cpf_cnpj) !== normalizeDocument(client.cpf_cnpj)) {
-        throw new ServiceError(400, "CPF/CNPJ nao corresponde ao cliente PJ.");
+        throw new ServiceError(400, "CPF/CNPJ não corresponde ao cliente PJ.");
       }
     } else {
       const clientPf = await this.prisma.clientPF.findFirst({
@@ -484,10 +484,10 @@ export class ProcessService {
         select: { id: true, cpf: true },
       });
       if (!clientPf) {
-        throw new ServiceError(404, "Cliente PF nao encontrado.");
+        throw new ServiceError(404, "Cliente PF não encontrado.");
       }
       if (normalizeDocument(body.cpf_cnpj) !== normalizeDocument(clientPf.cpf)) {
-        throw new ServiceError(400, "CPF/CNPJ nao corresponde ao cliente PF.");
+        throw new ServiceError(400, "CPF/CNPJ não corresponde ao cliente PF.");
       }
     }
 
@@ -503,7 +503,7 @@ export class ProcessService {
         select: { id: true },
       });
       if (users.length !== uniqueResponsibleIds.length) {
-        throw new ServiceError(404, "Responsavel nao encontrado na organizacao.");
+        throw new ServiceError(404, "Responsável não encontrado na organização.");
       }
     }
 
@@ -513,7 +513,7 @@ export class ProcessService {
         select: { id: true },
       });
       if (!task) {
-        throw new ServiceError(404, "Tarefa nao encontrada na organizacao.");
+        throw new ServiceError(404, "Tarefa não encontrada na organização.");
       }
     }
   }
@@ -528,7 +528,7 @@ export class ProcessService {
         select: processSelect,
       });
       if (!process) {
-        throw new ServiceError(404, "Processo nao encontrado.");
+        throw new ServiceError(404, "Processo não encontrado.");
       }
 
       await logs.createLog({

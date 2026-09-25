@@ -5,14 +5,14 @@ import { paginationQuerySchema } from "./pagination.schemas.js";
 
 export const tiTermIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Termo de TI invalido." }),
+    id: z.string().uuid({ message: "Termo de TI inválido." }),
   })
   .strict();
 
 export const listTiTermsQuerySchema = paginationQuerySchema
   .merge(
     z.object({
-      user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
+      user_id: z.string().uuid({ message: "Usuário inválido." }).optional(),
       status: z.enum(["pending", "signed"]).optional(),
     }),
   )
@@ -21,8 +21,8 @@ export const listTiTermsQuerySchema = paginationQuerySchema
 export const createTiTermBodySchema = z
   .object({
     date: zIsoDate("date"),
-    user_id: z.string().uuid({ message: "Usuario invalido." }),
-    department_id: z.string().uuid({ message: "Departamento invalido." }).optional(),
+    user_id: z.string().uuid({ message: "Usuário inválido." }),
+    department_id: z.string().uuid({ message: "Departamento inválido." }).optional(),
     address: z.string().optional(),
     reason: z.string().optional(),
     equipament_list: z.string().optional(),
@@ -35,7 +35,7 @@ export const createTiTermBodySchema = z
 const tiTermEditableFieldsSchema = z
   .object({
     date: zIsoDate("date").optional(),
-    department_id: z.string().uuid({ message: "Departamento invalido." }).optional(),
+    department_id: z.string().uuid({ message: "Departamento inválido." }).optional(),
     address: z.string().optional(),
     reason: z.string().optional(),
     equipament_list: z.string().optional(),

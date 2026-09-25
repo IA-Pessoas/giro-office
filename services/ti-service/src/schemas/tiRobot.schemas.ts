@@ -33,7 +33,7 @@ export const tiRobotRunStatusSchema = z.enum(["success", "failed", "running", "c
 
 export const tiRobotIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Robo de TI invalido." }),
+    id: z.string().uuid({ message: "Robô de TI inválido." }),
   })
   .strict();
 

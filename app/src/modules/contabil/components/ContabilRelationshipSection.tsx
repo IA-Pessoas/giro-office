@@ -10,7 +10,7 @@ import {
   Waypoints,
 } from "lucide-react";
 
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog, Dialog } from "@shared/components";
 
 import {
   useContabilRelationship,
@@ -54,6 +54,7 @@ export function ContabilRelationshipSection({
   const deleteMutation = useDeleteContabilRelationshipMutation();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<ContabilRelationshipFormValues>(
     buildContabilRelationshipFormValues(null),
@@ -165,7 +166,7 @@ export function ContabilRelationshipSection({
       return;
     }
 
-    setSubmitError(null);
+    setDeleteError(null);
 
     try {
       await deleteMutation.mutateAsync({
@@ -176,8 +177,9 @@ export function ContabilRelationshipSection({
       setIsEditorOpen(false);
       setFormValues(buildContabilRelationshipFormValues(null));
     } catch (error) {
-      setSubmitError(getContabilErrorMessage(error));
-      setIsDeleteDialogOpen(false);
+      setDeleteError(getContabilErrorMessage(error));
+      // Relança para o ConfirmationDialog permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -393,43 +395,22 @@ export function ContabilRelationshipSection({
         </form>
       </Dialog>
 
-      <Dialog
+      <ConfirmationDialog
         open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open);
+          if (!open) {
+            setDeleteError(null);
+          }
+        }}
         title="Remover relacionamento contábil"
-        description="Confirmação de exclusão do relacionamento contábil"
-        contentClassName="w-[min(92vw,520px)]"
-        bodyClassName="space-y-3"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setIsDeleteDialogOpen(false)}
-              className={SECONDARY_BUTTON_CLASSNAME}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDelete}
-              disabled={deleteMutation.isPending}
-              className={DANGER_BUTTON_CLASSNAME}
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Confirmar remoção
-            </button>
-          </>
-        }
-      >
-        <p className="text-sm text-gray-700 dark:text-slate-300">
-          Esta ação remove o relacionamento contábil atual do cliente. Você poderá cadastrar um
-          novo relacionamento depois, mas este registro será excluído agora.
-        </p>
-      </Dialog>
+        description={"Remover o relacionamento contábil deste cliente? Você poderá cadastrar um novo relacionamento depois, mas este registro será excluído agora."}
+        onConfirm={handleConfirmDelete}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={deleteError}
+        confirmLabel="Confirmar remoção"
+        cancelLabel="Cancelar"
+      />
     </section>
   );
 }
