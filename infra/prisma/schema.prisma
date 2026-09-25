@@ -1694,6 +1694,22 @@ model Icms {
   @@map("fiscal.icms")
 }
 
+model FiscalRate {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  client_name     String
+  client_document String
+  competence      DateTime @db.Date
+  tax_type        String   @db.VarChar(4)
+  rate            Decimal  @db.Decimal(7, 4)
+  issued_by       String
+  createdAt       DateTime @default(now())
+
+  @@index([organization_id, client_id, competence, createdAt])
+  @@map("fiscal.rate_statements")
+}
+
 model Ipi {
   id              String       @id @default(uuid())
   ncm             String

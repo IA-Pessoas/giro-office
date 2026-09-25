@@ -238,6 +238,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/fiscal\/rates\/[^/]+\/pdf$/,
+    description: { action: "baixou", item: "um PDF de alíquota fiscal" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
     description: { action: "consultou", item: "um job de relatório" },
   },
@@ -1215,6 +1220,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "uma regra de IPI",
     newSingular: "uma nova regra de IPI",
     plural: "regras de IPI",
+  },
+  {
+    pattern: /^\/fiscal\/rates(?:\/|$)/,
+    singular: "um registro de alíquota fiscal",
+    newSingular: "um novo registro de alíquota fiscal",
+    plural: "registros de alíquotas fiscais",
   },
   {
     pattern: /^\/contabil\/controls(?:\/|$)/,
