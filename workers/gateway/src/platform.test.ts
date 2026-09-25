@@ -246,7 +246,9 @@ describe("gateway Worker: superfície /platform", () => {
 
     const exit = await call(app, "POST", "/platform/impersonation/exit", impersonated());
     expect(exit.status).toBe(200);
-    const forwarded = bindings.USER_SERVICE.fetch.mock.calls[0]?.[0] as Request;
+    // 1ª chamada: validação da sessão personificada; 2ª: a própria rota.
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledTimes(2);
+    const forwarded = bindings.USER_SERVICE.fetch.mock.calls[1]?.[0] as Request;
     expect(forwarded.headers.get("x-auth-impersonator-id")).toBe("platform-1");
 
     expect(
@@ -255,6 +257,18 @@ describe("gateway Worker: superfície /platform", () => {
     expect((await call(app, "POST", "/platform/impersonation/exit", superAdmin())).status).toBe(
       403,
     );
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("sessão personificada revogada é barrada no gateway, antes do serviço", async () => {
+    const { app, bindings } = setup();
+    // user-service responde 401 à validação: a personificação foi encerrada ou revogada.
+    bindings.USER_SERVICE.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+
+    const response = await call(app, "GET", "/user/me", impersonated());
+
+    expect(response.status).toBe(401);
+    // Só a validação chegou ao user-service; a rota em si não foi encaminhada.
     expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledOnce();
   });
 

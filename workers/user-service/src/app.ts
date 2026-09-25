@@ -1241,6 +1241,7 @@ async function exitImpersonation(
   audit: UserAuditRecorder,
   auth: UserAuthContext,
   env: UserWorkerEnv,
+  reopenPlatform = true,
 ): Promise<{
   platformSession: { identity: PlatformIdentity; token: string; csrfToken: string } | null;
 }> {
@@ -1310,9 +1311,10 @@ async function exitImpersonation(
 
       const operatorActive =
         operator.status === "active" && operator.platform_role === "super_admin";
-      const platformSession = operatorActive
-        ? await openPlatformSession(transaction, operator, env)
-        : null;
+      const platformSession =
+        reopenPlatform && operatorActive
+          ? await openPlatformSession(transaction, operator, env)
+          : null;
       await audit(
         impersonationEndAudit({
           sessionId,
@@ -1369,7 +1371,7 @@ export async function expireImpersonationSessions(
     const user = session.user as Row;
     const platformUserId = String(session.impersonator_platform_user_id ?? "");
     const organizationId = organizationIdOf(user);
-    if (!platformUserId || !organizationId) continue;
+    if (!platformUserId) continue;
     const ended = await db.$transaction(async (transaction) => {
       if (!transaction.authSession.updateMany) return false;
       const revoked = await transaction.authSession.updateMany({
@@ -1382,6 +1384,8 @@ export async function expireImpersonationSessions(
         data: { revoked_at: now },
       });
       if (revoked.count !== 1) return false;
+      // Sem organização não há onde auditar; a sessão é fechada assim mesmo para não travar a fila.
+      if (!organizationId) return true;
       await audit(
         impersonationEndAudit({
           sessionId: String(session.id),
@@ -1918,7 +1922,14 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
   app.delete("/user/session", async (c) =>
     withDb(c, options, async (db) => {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
-      await revokeSession(db, auth);
+      if (auth.claims.impersonator_platform_user_id) {
+        // Logout durante a personificação também encerra e audita (sem reabrir a plataforma).
+        if (!options.audit)
+          throw new ServiceError(503, "Auditoria indisponível para encerrar personificação.");
+        await exitImpersonation(db, options.audit, auth, envOf(c, options), false);
+      } else {
+        await revokeSession(db, auth);
+      }
       sessionCookies(
         c,
         createExpiredSessionCookieHeaders({
