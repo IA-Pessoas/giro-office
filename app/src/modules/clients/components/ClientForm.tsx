@@ -3,9 +3,9 @@ import { useState, type ChangeEvent } from "react";
 import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
-import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
+import { FormField } from "@shared/components/FormField";
 import type { ClientFormValues } from "../types";
-import { CLIENT_TAX_REGIME_OPTIONS } from "../utils/clientForm";
+import { CLIENT_TAX_REGIME_OPTIONS, getClientInternalName } from "../utils/clientForm";
 import {
   formatCpfCnpjInput,
   validateCpfCnpjDocument,
@@ -36,9 +36,18 @@ export function ClientForm({
 }: ClientFormProps) {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const documentLabel = showPersonType ? (values.type === "PF" ? "CPF" : "CNPJ") : "CPF/CNPJ";
+  // Erros do envio aparecem abaixo de cada campo, ligados por aria-describedby (#1367).
   const documentError = (showDocumentError || hasSubmitted) && values.cpf_cnpj
     ? validateCpfCnpjDocument(values.cpf_cnpj, showPersonType ? values.type : undefined)
-    : null;
+    : hasSubmitted && !values.cpf_cnpj.trim()
+      ? `Informe o ${documentLabel}.`
+      : null;
+  const nameError =
+    hasSubmitted && !getClientInternalName(values)
+      ? values.type === "PF"
+        ? "Informe o nome."
+        : "Informe a razão social."
+      : null;
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
     setHasSubmitted(false);
     forwardFormattedInputChange(
@@ -56,10 +65,13 @@ export function ClientForm({
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2">
         {values.type === "PF" ? (
-          <label className="space-y-1.5">
-            <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
-              Nome
-            </RequiredFieldLabel>
+          <FormField
+            className="gap-1.5"
+            labelClassName="text-sm font-medium text-slate-700 dark:text-white"
+            label="Nome"
+            required
+            error={nameError}
+          >
             <input
               name="name"
               value={values.name}
@@ -68,11 +80,15 @@ export function ClientForm({
               className={clientTextFieldClassName}
               aria-required="true"
             />
-          </label>
+          </FormField>
         ) : null}
 
-        <label className="space-y-1.5">
-          <span className="block text-sm font-medium text-slate-700 dark:text-white">Razão social</span>
+        <FormField
+          className="gap-1.5"
+          labelClassName="text-sm font-medium text-slate-700 dark:text-white"
+          label="Razão social"
+          error={values.type === "PF" ? null : nameError}
+        >
           <input
             name="company_name"
             value={values.company_name}
@@ -80,7 +96,7 @@ export function ClientForm({
             disabled={disabled}
             className={clientTextFieldClassName}
           />
-        </label>
+        </FormField>
 
         {showPersonType ? (
           <label className="space-y-1.5">
@@ -97,10 +113,13 @@ export function ClientForm({
           </label>
         ) : null}
 
-        <label className="space-y-1.5">
-          <RequiredFieldLabel className="text-sm font-medium text-slate-700 dark:text-white" required>
-            {documentLabel}
-          </RequiredFieldLabel>
+        <FormField
+          className="gap-1.5"
+          labelClassName="text-sm font-medium text-slate-700 dark:text-white"
+          label={documentLabel}
+          required
+          error={documentError}
+        >
           <input
             name="cpf_cnpj"
             value={values.cpf_cnpj}
@@ -108,8 +127,6 @@ export function ClientForm({
             disabled={disabled}
             inputMode={values.type === "PJ" ? "text" : "numeric"}
             autoComplete="off"
-            aria-invalid={Boolean(documentError)}
-            aria-describedby={documentError ? "client-document-error" : undefined}
             placeholder={
               showPersonType
                 ? values.type === "PF"
@@ -120,15 +137,7 @@ export function ClientForm({
             className={clientTextFieldClassName}
             aria-required="true"
           />
-          {documentError ? (
-            <span
-              id="client-document-error"
-              className="block text-xs font-medium text-red-600 dark:text-red-300"
-            >
-              {documentError}
-            </span>
-          ) : null}
-        </label>
+        </FormField>
 
         <label className="space-y-1.5">
           <span className="block text-sm font-medium text-slate-700 dark:text-white">Nome fantasia</span>
