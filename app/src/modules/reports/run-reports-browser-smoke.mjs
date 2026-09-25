@@ -175,6 +175,7 @@ async function run() {
   let generatedJob;
   const models = [];
   let modelVersionId = "reports-fixture-model-version";
+  let staleSavedModel = false;
   let jobPolls = 0;
   const exportRequests = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -196,6 +197,17 @@ async function run() {
     if (path === "/reports/jobs" && route.request().method() === "POST") {
       const payload = route.request().postDataJSON();
       assert.equal(route.request().headers()["x-csrf-token"], "A".repeat(43));
+      if (staleSavedModel) {
+        assert.ok(
+          payload.definition,
+          `A stale saved model must generate from the sanitized definition: ${JSON.stringify(payload)}`,
+        );
+        const clientsArea = payload.definition.areas.find(
+          (area) => area.source === "integracao.clients",
+        );
+        assert.deepEqual(clientsArea.aggregations ?? [], []);
+        staleSavedModel = false;
+      }
       assert.ok(
         payload.modelVersionId === modelVersionId || payload.definition?.version === 2,
         "Generation must use a validated definition or a saved model version",
@@ -223,7 +235,14 @@ async function run() {
       return route.fulfill({ status: 201, json: { success: true, data: model } });
     }
     if (path === "/reports/models/reports-fixture-model" && route.request().method() === "GET") {
-      return route.fulfill({ json: { success: true, data: models[0] } });
+      const staleModel = structuredClone(models[0]);
+      const clientsArea = staleModel.definition.areas.find(
+        (area) => area.source === "integracao.clients",
+      );
+      clientsArea.fields = ["email"];
+      clientsArea.aggregations = [{ field: "name", function: "count" }];
+      staleSavedModel = true;
+      return route.fulfill({ json: { success: true, data: staleModel } });
     }
     if (path === "/reports/jobs/reports-fixture-job" && route.request().method() === "GET") {
       if (generatedJob?.status === "queued") {
@@ -295,12 +314,12 @@ async function run() {
               label: items.find((item) => item.key === area.source).label,
               rows: index
                 ? []
-                : [{ name: area.filters?.[0]?.value ?? "Projeto de exemplo", status_count: 7 }],
+                : [{ name: area.filters?.[0]?.value ?? "Projeto de exemplo", name_count: 7 }],
               presentation: {
                 columns: [
                   { key: index ? "email" : "name", label: index ? "E-mail" : "Nome" },
                   ...(!index && area.aggregations?.length
-                    ? [{ key: "status_count", label: "Contagem de Situação" }]
+                    ? [{ key: "name_count", label: "Contagem de Nome" }]
                     : []),
                 ],
               },
@@ -452,6 +471,26 @@ async function run() {
     assert.equal(previews.length, 0, "Review never requires preview");
     await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
     const criteria = panel.getByRole("group", { name: "Projetos", exact: true });
+    const clientCriteria = panel.getByRole("group", { name: "Clientes", exact: true });
+    await clientCriteria.getByText("Mais opções", { exact: true }).click();
+    await expect(clientCriteria.getByLabel("Resumo de E-mail")).toBeVisible();
+    await expect(clientCriteria.getByLabel("Resumo de Nome")).toHaveCount(0);
+    await clientCriteria.getByLabel("Resumo de E-mail").selectOption("count");
+    await panel.getByRole("button", { name: "2. Escolher campos", exact: true }).click();
+    await clients.getByRole("checkbox", { name: "E-mail", exact: true }).uncheck();
+    await clients.getByRole("checkbox", { name: "Nome", exact: true }).check();
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    const updatedClientCriteria = panel.getByRole("group", { name: "Clientes", exact: true });
+    await updatedClientCriteria.getByText("Mais opções", { exact: true }).click();
+    await expect(updatedClientCriteria.getByLabel("Resumo de E-mail")).toHaveCount(0);
+    await expect(updatedClientCriteria.getByLabel("Resumo de Nome")).toHaveValue("");
+    await panel.getByRole("button", { name: "2. Escolher campos", exact: true }).click();
+    await clients.getByRole("checkbox", { name: "Nome", exact: true }).uncheck();
+    await clients.getByRole("checkbox", { name: "E-mail", exact: true }).check();
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    const restoredClientCriteria = panel.getByRole("group", { name: "Clientes", exact: true });
+    await restoredClientCriteria.getByText("Mais opções", { exact: true }).click();
+    await expect(restoredClientCriteria.getByLabel("Resumo de E-mail")).toHaveValue("");
     await expect(criteria.locator("details")).not.toHaveAttribute("open", "");
     await criteria.getByRole("button", { name: "Adicionar critério" }).click();
     await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
@@ -465,7 +504,7 @@ async function run() {
       .getByRole("group", { name: "Agrupamento" })
       .getByLabel("Nome", { exact: true })
       .check();
-    await criteria.getByLabel("Resumo de Situação").selectOption("count");
+    await criteria.getByLabel("Resumo de Nome").selectOption("count");
     await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
     await expect(panel.getByRole("alert")).toContainText(
       "remova a ordenação de campos não agrupados",
@@ -475,13 +514,17 @@ async function run() {
     await screenshot("02-opcoes-desktop");
     await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
     await expect(panel.getByText("Pelo menos um critério", { exact: true })).toBeVisible();
-    await expect(panel.getByText("Contagem de Situação", { exact: true })).toBeVisible();
+    await expect(panel.getByText("Contagem de Nome", { exact: true })).toBeVisible();
     assert.equal(previews.length, 0);
     await screenshot("03-revisao-desktop");
     await panel.getByRole("button", { name: "Visualizar prévia", exact: true }).click();
+    assert.deepEqual(previews.at(-1).areas[1].aggregations, []);
     await expect(
       panel.getByRole("region", { name: "Prévia de Projetos", exact: true }),
     ).toContainText("Projeto de exemplo");
+    await expect(
+      panel.getByRole("region", { name: "Prévia de Projetos", exact: true }),
+    ).toContainText("7");
     await expect(
       panel.getByRole("region", { name: "Prévia de Clientes", exact: true }),
     ).toContainText("Nenhum registro encontrado");
