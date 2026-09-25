@@ -8,6 +8,7 @@ import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { platformApi } from "@shared/services/api";
+import { parseMeResponse } from "@workspace/api";
 import { ME_QUERY_KEY } from "@shared/hooks";
 import {
     createAuthInvalidationHandler,
@@ -372,6 +373,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 const userData = response.data?.data;
 
                 if (isCurrentAuthTransition(requestVersion) && isValidAuthUser(userData)) {
+                    // Semeia o cache do useMe com a mesma resposta: sem isso o shell pedia
+                    // /user/me de novo logo depois (#1369).
+                    try {
+                        queryClient.setQueryData(ME_QUERY_KEY, parseMeResponse(response.data));
+                    } catch {
+                        // Formato inesperado: o useMe busca por conta própria, como antes.
+                    }
                     const currentUser = buildCurrentUser(userData);
                     rememberImpersonationExpiry(currentUser.impersonation?.expires_at);
                     setUser(currentUser);
