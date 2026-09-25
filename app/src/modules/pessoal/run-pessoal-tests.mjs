@@ -531,12 +531,12 @@ runTest("pessoal money fields use the shared BRL mask and keep numeric payloads"
   );
 
   assert.match(payroll, /formatBrlInput/);
-  assert.match(payroll, /normalizeDigits\(event\.target\.value\)/);
   assert.match(payroll, /parseBrlInput/);
   assert.match(payroll, /advance_amount: optional\(values\.advance_amount, parseBrlInput\)/);
   assert.match(payroll, /vt_value: optional\(values\.vt_value, parseBrlInput\)/);
   assert.match(payroll, /type=\{isMoney \? "text" : "number"\}/);
-  assert.match(payroll, /isMoney[\s\S]*formatBrlInput\(normalizeDigits\(event\.target\.value\)\)/);
+  // #1366: o texto digitado vai inteiro à máscara (vírgula decimal), sem virar centavos.
+  assert.match(payroll, /isMoney[\s\S]*formatBrlInput\(event\.target\.value\)/);
   assert.match(payroll, /event\.key === "Backspace" \|\| event\.key === "Delete"/);
   assert.match(payroll, /pessoalNumberFieldClassName/);
   // #1301: Saldo é digitado em reais ("100" = R$ 100,00), não em centavos.

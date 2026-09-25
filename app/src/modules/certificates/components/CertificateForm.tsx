@@ -13,6 +13,7 @@ import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
 import {
   formatBrazilianPhoneInput,
+  formatBrlAmount,
   formatBrlInput,
   formatCnpjInput,
   formatCpfInput,
@@ -120,7 +121,7 @@ function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | 
       paymentDate: toInputDate(initialPj?.payment_date),
       paymentAmount:
         initialPj?.payment_amount != null
-          ? formatBrlInput(String(Math.round(initialPj.payment_amount * 100)))
+          ? formatBrlAmount(initialPj.payment_amount)
           : "",
       contactInfo: formatBrazilianPhoneInput(initialPj?.contact_info ?? ""),
     };
@@ -143,7 +144,7 @@ function buildInitialFormState(formKind: "pj" | "pf", initial?: CertificatePj | 
     paymentDate: toInputDate(initialPf?.payment_date),
     paymentAmount:
       initialPf?.payment_amount != null
-        ? formatBrlInput(String(Math.round(initialPf.payment_amount * 100)))
+        ? formatBrlAmount(initialPf.payment_amount)
         : "",
     contactInfo: formatBrazilianPhoneInput(initialPf?.contact_info ?? ""),
   };

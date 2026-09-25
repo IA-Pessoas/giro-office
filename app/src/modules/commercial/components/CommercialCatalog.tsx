@@ -6,7 +6,7 @@ import { toast } from "@shared/services/toast";
 import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, getClientDisplayName, type ClientPickerOption } from "@modules/clients";
 import { ConfirmationDialog, Dialog } from "@shared/components";
-import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
+import { formatBrlAmount, formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCommercialProspecting,
@@ -39,7 +39,7 @@ function formatContractValue(value: number): string {
 }
 
 function formatContractValueForInput(value: number): string {
-  return formatBrlInput(String(Math.round(value * 100)));
+  return formatBrlAmount(value);
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -248,7 +248,7 @@ export function CommercialCatalog() {
                 contractValueEditedRef.current = true;
                 setDraft((current) => ({
                   ...current,
-                  contract_value: formatBrlInput(normalizeDigits(event.target.value)),
+                  contract_value: formatBrlInput(event.target.value),
                 }));
               }}
               className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
