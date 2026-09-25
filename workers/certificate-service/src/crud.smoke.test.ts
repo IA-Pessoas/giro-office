@@ -3,6 +3,7 @@
 // "200 mas não salvou": toda escrita é relida pela rota de leitura da tela.
 // O Supabase Storage é externo: `fetch` global é trocado por um bucket em memória.
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { serializeError } from "@workspace/shared/http";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -15,6 +16,15 @@ import {
   smokeState,
 } from "../../runtime/src/crudSmoke.js";
 import { type CertificateWorkerEnv, createCertificateWorkerApp } from "./index.js";
+
+// PKCS#12 real de teste; o upload valida o arquivo com a senha cadastrada.
+const CERTIFICATE_FIXTURE = readFileSync(
+  new URL(
+    "../../../services/certificate-service/src/test/fixtures/certificado-teste-sha256.p12",
+    import.meta.url,
+  ),
+);
+const CERTIFICATE_FIXTURE_PASSWORD = "secret-password";
 
 const REPORTS_TOKEN = "crud-smoke-reports-token";
 const REPORTS_SECRET = "crud-smoke-reports-secret";
@@ -159,7 +169,7 @@ describe.skipIf(!smokeState)("certificate-service CRUD smoke (banco real)", () =
         responsible: "Beltrano",
         model: "A3",
         legal_nature: "SA",
-        password: "Nova#456",
+        password: CERTIFICATE_FIXTURE_PASSWORD,
         expiration_date: inDays(20),
         notes: null,
         was_paid: false,
@@ -194,7 +204,7 @@ describe.skipIf(!smokeState)("certificate-service CRUD smoke (banco real)", () =
         client_castelo_status: true,
         cpf: "11144477735",
         model: "A3",
-        password: "Nova#456",
+        password: CERTIFICATE_FIXTURE_PASSWORD,
         expiration_date: inDays(20),
         notes: "Editado",
         enterprise: "Outra Empresa",
@@ -240,7 +250,7 @@ describe.skipIf(!smokeState)("certificate-service CRUD smoke (banco real)", () =
       const form = new FormData();
       form.append(
         "file",
-        new File([new Uint8Array([1, 2, 3, 4])], "certificado.pfx", {
+        new File([CERTIFICATE_FIXTURE], "certificado.pfx", {
           type: "application/x-pkcs12",
         }),
       );
@@ -287,13 +297,16 @@ describe.skipIf(!smokeState)("certificate-service CRUD smoke (banco real)", () =
   // Falha hoje: o schema do Worker não nomeia o @@unique como `certificateNotificationIdentity`.
   it("job de notificação reconcilia certificados a vencer", async () => {
     const created = expectOk(
-      await call("POST", "/certificate/pj", kinds[0].create(`notif-${Date.now()}`)),
+      await call("POST", "/certificate/pj", {
+        ...kinds[0].create(`notif-${Date.now()}`),
+        password: CERTIFICATE_FIXTURE_PASSWORD,
+      }),
       "POST /certificate/pj",
     ).data;
     const form = new FormData();
     form.append(
       "file",
-      new File([new Uint8Array([1])], "certificado.pfx", { type: "application/x-pkcs12" }),
+      new File([CERTIFICATE_FIXTURE], "certificado.pfx", { type: "application/x-pkcs12" }),
     );
     const headers = await smokeHeaders();
     delete headers["content-type"];

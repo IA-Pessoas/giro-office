@@ -206,12 +206,14 @@ Decisoes de Certificados:
   criptograficos proprios. Os dados cadastrais e a flag `has_certificate` foram
   preservados.
 - A migracao original copiou `row.senha` sem transformacao. O service protege a
-  senha persistida com AES-256-GCM no envelope `{ v, iv, tag, data }`; a chave
-  base64 de 32 bytes configurada em `CERTIFICATE_PASSWORD_ENCRYPTION_KEY` deve
-  corresponder aos envelopes legados e usa a versao `v1`.
-- Valores JSON invalidos falham fechados. Texto legado nao-JSON e recriptografado
-  na primeira leitura autorizada; nao registrar senha, chave ou payload real em
-  artefatos de migracao.
+  senha persistida com AES-256-GCM no envelope `{ v, iv, tag, data }`. Os
+  envelopes migrados foram cifrados com uma chave diferente da atual
+  (`CERTIFICATE_PASSWORD_ENCRYPTION_KEY`); o Worker le esses envelopes com a
+  chave anterior em `CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY` (#1293).
+- Envelope que nenhuma chave abre nao derruba o detalhe: a resposta vem sem
+  `password` e com `password_unavailable: true`. Texto legado nao-JSON e
+  recriptografado na primeira leitura autorizada; nao registrar senha, chave ou
+  payload real em artefatos de migracao.
 
 ## Parcelamento
 
