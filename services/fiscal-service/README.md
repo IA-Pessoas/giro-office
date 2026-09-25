@@ -1,6 +1,6 @@
 # fiscal-service
 
-Microservico fiscal. Este servico expoe CRUD de NCM, CRUD de ICMS, CRUD de IPI, catálogo/extração interna governada e o health check. O gateway encaminha esse servico pelo prefixo publico **`/fiscal`**.
+Microservico fiscal. Este servico expoe CRUD de NCM, CRUD de ICMS, CRUD de IPI, registro manual de alíquotas ISS/ICMS por empresa, catálogo/extração interna governada e o health check. O gateway encaminha esse servico pelo prefixo publico **`/fiscal`**.
 
 ## Porta local
 
@@ -27,6 +27,9 @@ Exemplos de paths publicos:
 - `/fiscal/ncm/list`
 - `/fiscal/icms`
 - `/fiscal/icms/list`
+- `/fiscal/rates` (POST: alíquota informada manualmente)
+- `/fiscal/rates/list?client_id=<uuid>`
+- `/fiscal/rates/<uuid>/pdf`
 - `/health`
 
 As rotas `/internal/reporting/catalog` e `/internal/reporting/extract` são internas, não passam

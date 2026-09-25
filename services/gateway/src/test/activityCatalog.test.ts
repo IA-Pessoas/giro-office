@@ -82,6 +82,14 @@ describe("activityCatalog", () => {
     ["POST", "/reports/definitions/validate", "revisou", "a configuração de um relatório"],
     ["POST", "/reports/preview", "gerou", "uma prévia de relatório"],
     ["GET", "/reports/jobs/list", "consultou", "o histórico de relatórios"],
+    ["POST", "/fiscal/rates", "cadastrou", "um novo registro de alíquota fiscal"],
+    ["GET", "/fiscal/rates/list", "consultou", "a lista de registros de alíquotas fiscais"],
+    [
+      "GET",
+      "/fiscal/rates/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/pdf",
+      "baixou",
+      "um PDF de alíquota fiscal",
+    ],
     [
       "GET",
       "/reports/jobs/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",

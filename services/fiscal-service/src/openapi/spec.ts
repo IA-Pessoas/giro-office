@@ -107,7 +107,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       title: "fiscal-service",
       version: "1.0.0",
       description:
-        "API fiscal: CRUD de NCM, ICMS e IPI e busca agregada por NCM. Requer JWT válido nos endpoints autenticados.",
+        "API fiscal: CRUD de NCM, ICMS e IPI, busca por NCM e emissão de alíquotas informadas pelo Fiscal. Requer JWT válido nos endpoints autenticados.",
     },
     servers: [{ url: baseUrl }],
     tags: [
@@ -116,6 +116,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       { name: "ICMS", description: "CRUD de ICMS" },
       { name: "IPI", description: "CRUD de IPI" },
       { name: "NCM", description: "CRUD de NCM" },
+      { name: "Alíquotas", description: "Registro manual e PDF de ISS/ICMS por empresa" },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
@@ -722,6 +723,91 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                 },
               },
             },
+          },
+        },
+      },
+      "/fiscal/rates": {
+        post: {
+          tags: ["Alíquotas"],
+          summary: "Registrar alíquota informada pelo Fiscal",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "tax_type", "rate"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    tax_type: { type: "string", enum: ["ISS", "ICMS"] },
+                    rate: {
+                      type: "string",
+                      description: "Percentual de 0 a 100 com até 4 casas decimais",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Alíquota registrada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
+      "/fiscal/rates/list": {
+        get: {
+          tags: ["Alíquotas"],
+          summary: "Listar registros de alíquotas da empresa",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            { name: "competence", in: "query", required: false, schema: { type: "string" } },
+            {
+              name: "tax_type",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["ISS", "ICMS"] },
+            },
+            ...paginationParameters,
+          ],
+          responses: {
+            "200": {
+              description: "Registros paginados",
+              content: { "application/json": { schema: paginatedListEnvelopeSchema } },
+            },
+            "400": { description: "Filtro inválido" },
+          },
+        },
+      },
+      "/fiscal/rates/{id}/pdf": {
+        get: {
+          tags: ["Alíquotas"],
+          summary: "Baixar PDF de um registro de alíquota",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "PDF para envio ao cliente",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+            "404": { description: "Registro não encontrado nesta organização" },
           },
         },
       },

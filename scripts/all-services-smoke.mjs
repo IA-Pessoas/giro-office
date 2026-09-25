@@ -4434,6 +4434,46 @@ const handlers = {
     state.fiscalIcmsCode = icmsCode;
   },
 
+  async fiscalRateCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: new Date().toISOString().slice(0, 7),
+        tax_type: "ISS",
+        rate: "5.25",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalRateId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    }
+  },
+
+  async fiscalRateCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: new Date().toISOString().slice(0, 7),
+        tax_type: "ISS",
+        rate: "101",
+      },
+    });
+  },
+
+  async fiscalRateList(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async fiscalRatePdf(op) {
+    await httpRequest(op, {
+      path: `/fiscal/rates/${requireState("fiscalRateId")}/pdf`,
+      expectEnvelope: false,
+    });
+  },
+
   async fiscalIcmsCreateInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],

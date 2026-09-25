@@ -1,5 +1,10 @@
 import { buildFiscalServiceOpenApiSpec } from "@workspace/fiscal-service/src/openapi/spec.js";
 import { InternalReportingService } from "@workspace/fiscal-service/src/reporting/internalReportingService.js";
+import {
+  createFiscalRateBodySchema,
+  fiscalRateIdParamsSchema,
+  listFiscalRatesQuerySchema,
+} from "@workspace/fiscal-service/src/schemas/fiscalRate.schemas.js";
 import { fiscalSearchQuerySchema } from "@workspace/fiscal-service/src/schemas/fiscalSearch.schemas.js";
 import {
   createIcmsBodySchema,
@@ -20,6 +25,11 @@ import {
   listNcmQuerySchema,
   updateNcmBodySchema,
 } from "@workspace/fiscal-service/src/schemas/ncm.schemas.js";
+import {
+  fiscalRatePdfHeaders,
+  renderFiscalRatePdf,
+} from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
+import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
@@ -59,6 +69,7 @@ type CrudService = {
 };
 type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
+type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
 
 interface FiscalWorkerOptions {
   env: FiscalWorkerEnv;
@@ -67,6 +78,7 @@ interface FiscalWorkerOptions {
   ipiService?: CrudService;
   searchService?: SearchServiceLike;
   reportingService?: ReportingServiceLike;
+  rateService?: RateServiceLike;
 }
 
 type FiscalContext = {
@@ -80,6 +92,7 @@ type WorkerServices = {
   ipiService: CrudService;
   searchService: SearchServiceLike;
   reportingService: ReportingServiceLike;
+  rateService: RateServiceLike;
 };
 
 const SECURITY_HEADERS = {
@@ -200,6 +213,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     return withWorkerPrisma(env, PrismaClient, (client) => {
       const prisma = client as unknown as ConstructorParameters<typeof IcmsService>[0] &
         ConstructorParameters<typeof FiscalSearchService>[0] &
+        ConstructorParameters<typeof FiscalRateService>[0] &
         ConstructorParameters<typeof InternalReportingService>[0];
       const factories: { [S in keyof WorkerServices]: () => WorkerServices[S] } = {
         icmsService: () => new IcmsService(prisma, createFiscalAudit(env)),
@@ -207,6 +221,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         ipiService: () => new IpiService(prisma, createFiscalAudit(env)),
         searchService: () => new FiscalSearchService(prisma),
         reportingService: () => new InternalReportingService(prisma),
+        rateService: () => new FiscalRateService(prisma, createFiscalAudit(env)),
       };
       return callback(factories[key]());
     });
@@ -220,6 +235,39 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
       permission: auth.claims.permission,
     };
   };
+
+  app.post("/fiscal/rates", async (c) => {
+    const body = parseWithZod(createFiscalRateBodySchema, await readJson(c));
+    const data = await withService("rateService", (service) =>
+      service.create({ ...actor(c), ...body }),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.get("/fiscal/rates/list", async (c) => {
+    const query = parseWithZod(listFiscalRatesQuerySchema, {
+      client_id: c.req.query("client_id"),
+      competence: c.req.query("competence"),
+      tax_type: c.req.query("tax_type"),
+      page: c.req.query("page"),
+      page_size: c.req.query("page_size"),
+    });
+    const data = await withService("rateService", (service) =>
+      service.list(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/rates/:id/pdf", async (c) => {
+    const { id } = parseWithZod(fiscalRateIdParamsSchema, { id: c.req.param("id") });
+    const rate = await withService("rateService", (service) =>
+      service.get(id, c.get("auth").organizationId),
+    );
+    const pdf = await renderFiscalRatePdf(rate);
+    return new Response(new Uint8Array(pdf), {
+      headers: fiscalRatePdfHeaders(rate),
+    });
+  });
 
   const crudRoutes: {
     path: string;

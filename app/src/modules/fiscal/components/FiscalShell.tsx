@@ -14,6 +14,7 @@ import type { FiscalTabId } from "../types";
 import { FiscalIcmsSection } from "./FiscalIcmsSection";
 import { FiscalIpiSection } from "./FiscalIpiSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
+import { FiscalRatesSection } from "./FiscalRatesSection";
 import { FiscalSearchSection } from "./FiscalSearchSection";
 
 const fiscalTabs: Array<{
@@ -41,6 +42,11 @@ const fiscalTabs: Array<{
     label: "IPI",
     icon: Percent,
   },
+  {
+    id: "rates",
+    label: "Alíquotas ISS/ICMS",
+    icon: Percent,
+  },
 ];
 
 export function FiscalShell() {
@@ -58,7 +64,7 @@ export function FiscalShell() {
             Fiscal
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Consulta e cadastro de NCM, ICMS e IPI
+            Consulta e cadastro de NCM, ICMS, IPI e alíquotas por empresa
           </p>
         </div>
       </div>
@@ -125,6 +131,10 @@ function FiscalActiveTabPanel({
 
   if (activeTab === "icms") {
     return <FiscalIcmsTab canEdit={canEdit} canDelete={canDelete} />;
+  }
+
+  if (activeTab === "rates") {
+    return <div role="tabpanel" id="fiscal-panel-rates" aria-labelledby="fiscal-tab-rates"><FiscalRatesSection canEdit={canEdit} /></div>;
   }
 
   return <FiscalIpiTab canEdit={canEdit} canDelete={canDelete} />;
