@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { AlertTriangle } from "lucide-react";
+import { ConfirmationDialog } from "@shared/components";
 import { toast } from "@shared/services/toast";
 
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
@@ -11,6 +10,7 @@ import {
 } from "../hooks/useRhCalendar";
 import { useRhPermissions } from "../hooks/useRhPermissions";
 import type { RhTimeBankRelease, RhTimeBankReleaseListFilters } from "../types";
+import { formatRhDate } from "../utils/rhDate";
 import { RhTimeBankFilters, type RhTimeBankStatusFilter } from "./RhTimeBankFilters";
 import { RhTimeBankFormPanel } from "./RhTimeBankFormPanel";
 import { RhTimeBankSummaryCards } from "./RhTimeBankSummaryCards";
@@ -40,6 +40,7 @@ export function RhTimeBankSection() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [releasePendingApproval, setReleasePendingApproval] =
     useState<RhTimeBankRelease | null>(null);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
 
   const approveMutation = useApproveRhTimeBankReleaseMutation();
   const shouldShowSummary = !canManageTimeBank || Boolean(selectedUserId);
@@ -98,6 +99,7 @@ export function RhTimeBankSection() {
     }
 
     setReleasePendingApproval(null);
+    setApprovalError(null);
   }
 
   async function handleConfirmApproval() {
@@ -105,6 +107,7 @@ export function RhTimeBankSection() {
       return;
     }
 
+    setApprovalError(null);
     try {
       await approveMutation.mutateAsync({ id: releasePendingApproval.id });
       toast.success("Lançamento aprovado com sucesso.");
@@ -112,7 +115,9 @@ export function RhTimeBankSection() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Não foi possível aprovar o lançamento.";
-      toast.error(message);
+      setApprovalError(message);
+      // Relança para o diálogo permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -188,60 +193,26 @@ export function RhTimeBankSection() {
         />
       ) : null}
 
-      <DialogPrimitive.Root
+      <ConfirmationDialog
         open={Boolean(releasePendingApproval)}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
             handleCloseApprovalDialog();
           }
         }}
-      >
-        <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="fixed inset-0 z-[1800] bg-black/60 backdrop-blur-sm" />
-          <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-[1900] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-lg focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-            <DialogPrimitive.Title className="sr-only">Aprovar lançamento</DialogPrimitive.Title>
-            <DialogPrimitive.Description className="sr-only">
-              Confirmação de aprovação de lançamento de banco de horas
-            </DialogPrimitive.Description>
-
-            <div className="flex flex-col gap-5">
-              <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Aprovar lançamento
-                  </h3>
-                  <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
-                    Deseja aprovar este lançamento de banco de horas? Essa ação atualiza o status
-                    do registro.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCloseApprovalDialog}
-                  disabled={approveMutation.isPending}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmApproval}
-                  disabled={approveMutation.isPending}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {approveMutation.isPending ? "Aprovando..." : "Aprovar"}
-                </button>
-              </div>
-            </div>
-          </DialogPrimitive.Content>
-        </DialogPrimitive.Portal>
-      </DialogPrimitive.Root>
+        title="Aprovar lançamento"
+        description={
+          releasePendingApproval
+            ? `Aprovar o lançamento de ${getUserLabel(releasePendingApproval.user_id)} em ${formatRhDate(releasePendingApproval.date)}? Essa ação atualiza o status do registro.`
+            : ""
+        }
+        onConfirm={handleConfirmApproval}
+        isConfirming={approveMutation.isPending}
+        errorMessage={approvalError}
+        confirmLabel="Aprovar"
+        cancelLabel="Cancelar"
+        variant="neutral"
+      />
     </div>
   );
 }

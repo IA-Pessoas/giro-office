@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog } from "@shared/components";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
 import { formatBrlDecimalInput, parseBrlDecimalInput } from "@shared/utils/inputFormatting";
@@ -38,7 +38,6 @@ import type {
 } from "../types/tracking";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
-  pessoalDangerButtonClassName,
   pessoalPrimaryButtonClassName,
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
@@ -310,6 +309,7 @@ export function PessoalTrackingSection({
       return;
     }
 
+    clearFeedback();
     setLddToDelete(ldd);
   }
 
@@ -334,7 +334,8 @@ export function PessoalTrackingSection({
       setSuccessMessage("LDD removido.");
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível remover o LDD."));
-      setLddToDelete(null);
+      // Relança para o ConfirmationDialog permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -383,6 +384,8 @@ export function PessoalTrackingSection({
       setSuccessMessage("Situação removida.");
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível remover a situação."));
+      // Relança para o ConfirmationDialog permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -643,7 +646,7 @@ export function PessoalTrackingSection({
         </div>
       </div>
 
-      <Dialog
+      <ConfirmationDialog
         open={Boolean(lddToDelete)}
         onOpenChange={(open) => {
           if (!open) {
@@ -651,47 +654,15 @@ export function PessoalTrackingSection({
           }
         }}
         title="Remover LDD"
-        description="Confirmação de remoção de LDD"
-        contentClassName="w-[min(92vw,520px)]"
-        bodyClassName="space-y-3"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setLddToDelete(null)}
-              disabled={deleteLddMutation.isPending}
-              className={pessoalSecondaryButtonClassName}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDeleteLdd}
-              disabled={deleteLddMutation.isPending}
-              className={pessoalDangerButtonClassName}
-            >
-              {deleteLddMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Confirmar remoção
-            </button>
-          </>
-        }
-      >
-        <p className="text-sm text-gray-700 dark:text-slate-300">
-          Esta ação remove o LDD selecionado do cliente. O registro precisará ser cadastrado
-          novamente se ainda for necessário.
-        </p>
-        {lddToDelete ? (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
-            {lddToDelete.type} - {formatDate(lddToDelete.due_date)}
-          </p>
-        ) : null}
-      </Dialog>
+        description={`Remover o LDD ${lddToDelete?.type ?? ""} - ${lddToDelete ? formatDate(lddToDelete.due_date) : ""}? O registro precisará ser cadastrado novamente se ainda for necessário.`}
+        onConfirm={handleConfirmDeleteLdd}
+        isConfirming={deleteLddMutation.isPending}
+        errorMessage={formError}
+        confirmLabel="Confirmar remoção"
+        cancelLabel="Cancelar"
+      />
 
-      <Dialog
+      <ConfirmationDialog
         open={Boolean(situationToDelete)}
         onOpenChange={(open) => {
           if (!open && !deleteSituationMutation.isPending) {
@@ -699,49 +670,13 @@ export function PessoalTrackingSection({
           }
         }}
         title="Remover situação"
-        description="Confirmação de remoção de situação"
-        contentClassName="w-[min(92vw,520px)]"
-        bodyClassName="space-y-3"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setSituationToDelete(null)}
-              disabled={deleteSituationMutation.isPending}
-              className={pessoalSecondaryButtonClassName}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDeleteSituation}
-              disabled={deleteSituationMutation.isPending}
-              className={pessoalDangerButtonClassName}
-            >
-              {deleteSituationMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Confirmar remoção
-            </button>
-          </>
-        }
-      >
-        <p className="text-sm text-gray-700 dark:text-slate-300">
-          Não será possível recuperar a situação, mesmo quando ela já estiver finalizada.
-        </p>
-        {situationToDelete ? (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
-            {situationToDelete.title}
-          </p>
-        ) : null}
-        {formError ? (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-300">
-            {formError}
-          </p>
-        ) : null}
-      </Dialog>
+        description={`Remover a situação ${situationToDelete?.title ?? ""}? Não será possível recuperar a situação, mesmo quando ela já estiver finalizada.`}
+        onConfirm={handleConfirmDeleteSituation}
+        isConfirming={deleteSituationMutation.isPending}
+        errorMessage={formError}
+        confirmLabel="Confirmar remoção"
+        cancelLabel="Cancelar"
+      />
 
       {isLddFormOpen ? (
         <div

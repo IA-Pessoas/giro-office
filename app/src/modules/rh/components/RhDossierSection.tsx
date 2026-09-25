@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Check, Pencil, Plus, Save, Trash2, UserRound, X } from "lucide-react";
 import { toast } from "@shared/services/toast";
+import { ConfirmationDialog } from "@shared/components";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { useFetch } from "@shared/hooks";
@@ -307,6 +308,8 @@ function DossierDetail({
   const [allergiesDraft, setAllergiesDraft] = useState<RhAllergy[]>([]);
   const [contactDraft, setContactDraft] = useState({ name: "", phone: "", reference: "" });
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [pendingContactRemoval, setPendingContactRemoval] = useState<RhEmergencyContact | null>(null);
+  const [contactRemovalError, setContactRemovalError] = useState<string | null>(null);
   const departmentsQuery = useFetch<DepItem[]>(
     ["rh", "dossier-departments"],
     () => departmentService.list({ status: "Ativo" }),
@@ -401,13 +404,21 @@ function DossierDetail({
       );
     }
   }
-  async function removeContact(id: string) {
-    if (!window.confirm("Excluir este contato de emergência?")) return;
+  async function confirmContactRemoval() {
+    if (!pendingContactRemoval) return;
+    setContactRemovalError(null);
     try {
-      await deleteContactMutation.mutateAsync({ id, ...(targetUserId ? { target_user_id: targetUserId } : {}) });
+      await deleteContactMutation.mutateAsync({
+        id: pendingContactRemoval.id,
+        ...(targetUserId ? { target_user_id: targetUserId } : {}),
+      });
       toast.success("Contato excluído.");
     } catch (deleteError) {
-      toast.error(deleteError instanceof Error ? deleteError.message : "Não foi possível excluir o contato.");
+      // Mantém o diálogo aberto com o erro, no padrão do ConfirmationDialog.
+      setContactRemovalError(
+        deleteError instanceof Error ? deleteError.message : "Não foi possível excluir o contato.",
+      );
+      throw deleteError;
     }
   }
 
@@ -567,7 +578,7 @@ function DossierDetail({
               setEditingContactId(null);
               setContactDraft({ name: "", phone: "", reference: "" });
             }}
-            onDelete={removeContact}
+            onDelete={(id) => setPendingContactRemoval(contacts.find((contact) => contact.id === id) ?? null)}
           />
           <AllergyPanel
             allergies={allergiesDraft}
@@ -580,6 +591,23 @@ function DossierDetail({
       ) : (
         <ReadOnlySupplement contacts={contacts} allergies={allergies} />
       )}
+
+      <ConfirmationDialog
+        open={pendingContactRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingContactRemoval(null);
+            setContactRemovalError(null);
+          }
+        }}
+        title="Excluir contato de emergência"
+        description={`Excluir o contato de emergência "${pendingContactRemoval?.name ?? ""}"?`}
+        onConfirm={confirmContactRemoval}
+        isConfirming={deleteContactMutation.isPending}
+        errorMessage={contactRemovalError}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+      />
     </div>
   );
 }

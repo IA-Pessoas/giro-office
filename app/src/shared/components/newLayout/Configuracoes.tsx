@@ -32,7 +32,7 @@ import {
   canViewTaskModelConfig,
 } from "@modules/integracao";
 import { MyOrganizationSection } from "@modules/organizations";
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog, Dialog } from "@shared/components";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 import { buildSelfProfileUpdatePayload, selfPasswordError } from "@shared/utils/meProfileUpdate";
@@ -113,6 +113,7 @@ export function Configuracoes() {
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [pendingPhotoPreviewUrl, setPendingPhotoPreviewUrl] = useState<string | null>(null);
   const [hasPhotoLoadError, setHasPhotoLoadError] = useState(false);
+  const [isRemovePhotoConfirmOpen, setIsRemovePhotoConfirmOpen] = useState(false);
 
   function clearPasswordDraft() {
     setPassword("");
@@ -269,21 +270,21 @@ export function Configuracoes() {
     }
   };
 
-  const handlePhotoSecondaryAction = async () => {
+  const handlePhotoSecondaryAction = () => {
+    // Descartar a seleção local não persiste nada; só a remoção da foto salva pede confirmação.
     if (pendingPhotoFile) {
       clearPendingPhoto();
       return;
     }
 
-    if (!currentPhotoUrl) {
-      return;
+    if (currentPhotoUrl) {
+      setIsRemovePhotoConfirmOpen(true);
     }
+  };
 
-    try {
-      await deletePhotoMutation.mutateAsync();
-    } catch {
-      // Toasts are handled by the mutation hook.
-    }
+  // Toasts ficam a cargo do hook; o erro relançado mantém a confirmação aberta.
+  const handleRemovePhoto = async () => {
+    await deletePhotoMutation.mutateAsync();
   };
 
   const handleSavePhoto = async () => {
@@ -449,7 +450,7 @@ export function Configuracoes() {
                   {pendingPhotoFile || currentPhotoUrl ? (
                     <button
                       type="button"
-                      onClick={() => void handlePhotoSecondaryAction()}
+                      onClick={handlePhotoSecondaryAction}
                       className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
                       disabled={isSaving}
                     >
@@ -607,6 +608,17 @@ export function Configuracoes() {
                   </div>
                 </div>
               </Dialog>
+              <ConfirmationDialog
+                open={isRemovePhotoConfirmOpen}
+                onOpenChange={setIsRemovePhotoConfirmOpen}
+                title="Remover foto"
+                description={`Remover a foto de perfil de ${currentName || "sua conta"}?`}
+                onConfirm={handleRemovePhoto}
+                isConfirming={deletePhotoMutation.isPending}
+                errorMessage={null}
+                confirmLabel="Remover foto"
+                cancelLabel="Cancelar"
+              />
             </div>
           </div>
         </section>

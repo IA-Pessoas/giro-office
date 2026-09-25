@@ -105,8 +105,8 @@ runTest("pessoal situations expose a permissioned delete confirmation with feedb
   assert.match(section, /setSuccessMessage\("Situação removida\."\)/);
   assert.match(section, /title="Remover situação"/);
   assert.match(section, /Não será possível recuperar a situação, mesmo quando ela já estiver finalizada\./);
-  assert.match(section, /disabled=\{deleteSituationMutation\.isPending\}/);
-  assert.match(section, /onClick=\{\(\) => setSituationToDelete\(null\)\}/);
+  assert.match(section, /<ConfirmationDialog[\s\S]*?title="Remover situação"/);
+  assert.match(section, /isConfirming=\{deleteSituationMutation\.isPending\}/);
   assert.match(section, /\{canEdit \? \([\s\S]*?onClick=\{\(\) => openDeleteSituationDialog\(situation\)\}/);
 });
 
@@ -427,7 +427,7 @@ runTest("union deletion uses the scoped client, cache mutation, and guarded dial
   assert.match(hook, /onSettled: async \(\) => \{\s*await queryClient\.invalidateQueries\(\{ queryKey: unionsKey \}\)/);
   assert.match(section, /useDeletePessoalUnionMutation/);
   assert.match(section, /canEdit \? \(\s*<td/);
-  assert.match(section, /<Dialog[\s\S]*title="Remover sindicato"/);
+  assert.match(section, /<ConfirmationDialog[\s\S]*title="Remover sindicato"/);
   assert.match(section, /openUnionDeletion/);
   assert.match(section, /getUnionDeletionTargetId\(unionDeletion\)/);
   assert.match(section, /await deleteMutation\.mutateAsync\(unionId\)/);
@@ -808,7 +808,7 @@ runTest("pessoal overview reads available dashboard data", () => {
   assert.match(overviewHook, /pessoalService\.getOverview\(\)/);
   assert.match(service, /getOverview\(\)/);
   assert.match(service, /PESSOAL_ENDPOINTS\.overview/);
-  assert.match(overview, /bg-gradient-to-br from-blue-700/);
+  assert.doesNotMatch(overview, /bg-gradient-to-br/);
   // #1301: o resumo não ocupa meia tela e Folha/Obrigações mostram números.
   assert.doesNotMatch(overview, /min-h-\[260px\]|text-3xl font-bold/);
   assert.match(overview, /className="rounded-lg border border-gray-200 bg-white p-3/);

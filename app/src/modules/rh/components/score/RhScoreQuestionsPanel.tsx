@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Eye, Loader2, Plus } from "lucide-react";
+import { ConfirmationDialog } from "@shared/components";
 import { toast } from "@shared/services/toast";
 import {
   useDeleteRhScoreQuestionMutation,
@@ -7,7 +8,6 @@ import {
   useUpdateRhScoreQuestionMutation,
 } from "../../hooks/useRhScore";
 import type { RhScoreQuestion } from "../../types";
-import { RhScoreQuestionDeleteDialog } from "./RhScoreQuestionDeleteDialog";
 import { RhScoreQuestionEditor } from "./RhScoreQuestionEditor";
 import { RhScoreQuestionsListDialog } from "./RhScoreQuestionsListDialog";
 import { RhScoreQuarterGenerationPanel } from "./RhScoreQuarterGenerationPanel";
@@ -19,6 +19,7 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
   const [isQuestionListOpen, setIsQuestionListOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<RhScoreQuestion | null>(null);
   const [questionPendingDelete, setQuestionPendingDelete] = useState<RhScoreQuestion | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletedQuestionIds, setDeletedQuestionIds] = useState<string[]>([]);
   const questionsQuery = useRhScoreQuestions({
     all: true,
@@ -65,6 +66,7 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
     }
 
     setQuestionPendingDelete(null);
+    setDeleteError(null);
   }
 
   async function handleConfirmDeleteQuestion() {
@@ -74,6 +76,7 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
 
     const deletedQuestionId = questionPendingDelete.id;
 
+    setDeleteError(null);
     try {
       await deleteMutation.mutateAsync({ id: deletedQuestionId });
       setDeletedQuestionIds((currentIds) =>
@@ -82,7 +85,10 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
       setQuestionPendingDelete(null);
       toast.success("Pergunta excluída com sucesso.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Não foi possível excluir a pergunta."));
+      const message = getErrorMessage(error, "Não foi possível excluir a pergunta.");
+      setDeleteError(message);
+      // Relança para o diálogo permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -175,11 +181,20 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
         onDelete={handleRequestDeleteQuestion}
       />
 
-      <RhScoreQuestionDeleteDialog
-        question={questionPendingDelete}
-        isDeleting={deleteMutation.isPending}
-        onClose={handleCloseDeleteDialog}
+      <ConfirmationDialog
+        open={Boolean(questionPendingDelete)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            handleCloseDeleteDialog();
+          }
+        }}
+        title="Excluir pergunta de score"
+        description={`Excluir a pergunta "${questionPendingDelete?.question ?? ""}"? Esta ação remove a pergunta de score e não poderá ser desfeita.`}
         onConfirm={handleConfirmDeleteQuestion}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={deleteError}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
       />
 
       <RhScoreQuestionEditor
