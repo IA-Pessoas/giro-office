@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "@shared/services/toast";
 
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog } from "@shared/components";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 
 import { useDeleteFiscalIcmsMutation, useFiscalIcmsList } from "../hooks";
@@ -31,12 +31,6 @@ type FiscalIcmsPanelIntent =
 
 const ACTION_BUTTON_CLASSNAME =
   "inline-flex h-8 w-8 items-center justify-center rounded-md border text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
-
-const DIALOG_SECONDARY_BUTTON_CLASSNAME =
-  "inline-flex h-9 items-center justify-center rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800";
-
-const DIALOG_DANGER_BUTTON_CLASSNAME =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-md bg-red-600 px-3 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60";
 
 const TABLE_HEADER_CLASSNAME =
   "px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-700 dark:text-slate-300";
@@ -104,6 +98,8 @@ export function FiscalIcmsSection({
       toast.success("ICMS excluído com sucesso.");
     } catch (error) {
       toast.error(getFiscalErrorMessage(error));
+      // Relança para o ConfirmationDialog permanecer aberto.
+      throw error;
     }
   }
 
@@ -305,48 +301,17 @@ export function FiscalIcmsSection({
         </div>
       ) : null}
 
-      <Dialog
+      <ConfirmationDialog
         open={Boolean(deleteTarget)}
         onOpenChange={handleDeleteDialogOpenChange}
         title="Excluir ICMS"
-        description="Confirmação de exclusão de ICMS"
-        contentClassName="w-[min(92vw,520px)]"
-        bodyClassName="space-y-3"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setDeleteTarget(null)}
-              disabled={deleteMutation.isPending}
-              className={DIALOG_SECONDARY_BUTTON_CLASSNAME}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDelete}
-              disabled={deleteMutation.isPending}
-              className={DIALOG_DANGER_BUTTON_CLASSNAME}
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Confirmar exclusão
-            </button>
-          </>
-        }
-      >
-        <p className="text-sm text-gray-700 dark:text-slate-300">
-          Esta ação remove o cadastro fiscal selecionado.
-        </p>
-        {deleteTarget ? (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
-            {deleteTarget.state} · {deleteTarget.description}
-          </p>
-        ) : null}
-      </Dialog>
+        description={`Excluir o ICMS ${deleteTarget?.state ?? ""} · ${deleteTarget?.description ?? ""}? Esta ação remove o cadastro fiscal selecionado.`}
+        onConfirm={handleConfirmDelete}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={null}
+        confirmLabel="Confirmar exclusão"
+        cancelLabel="Cancelar"
+      />
     </section>
   );
 }
