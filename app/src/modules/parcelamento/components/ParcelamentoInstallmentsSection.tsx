@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { Dialog, PaginationControls } from "@shared/components";
+import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
 import {
   useCreateParcelamentoInstallmentMutation,
@@ -411,7 +412,15 @@ export function ParcelamentoInstallmentsSection({
               >
                 <div className="min-w-0">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {installment.client?.name || "Cliente não identificado"}
+                      {installment.client?.cpf_cnpj ? (
+                        <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                          {formatCPF_CNPJ(installment.client.cpf_cnpj)}
+                        </span>
+                      ) : null}
+                    </p>
+                    <h3 className="text-sm text-gray-700 dark:text-gray-300">
                       {installment.type} - {installment.jurisdiction}
                     </h3>
                     <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
