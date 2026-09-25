@@ -5689,7 +5689,7 @@ const handlers = {
 
   async taskCompleteRequestPut(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [201],
       method: "POST",
       path: "/task/complete-request",
       json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
@@ -5703,7 +5703,7 @@ const handlers = {
 
   async taskCompleteRequestPost(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [201],
       path: "/task/complete-request",
       json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
     });

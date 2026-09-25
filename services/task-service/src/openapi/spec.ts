@@ -1062,7 +1062,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           security: bearer,
           ...createConclusionRequestBody,
           responses: {
-            "200": { description: "Solicitação criada", ...successJson },
+            "201": { description: "Solicitação criada", ...successJson },
             "409": { description: "Já existe uma solicitação pendente" },
           },
         },

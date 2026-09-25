@@ -55,6 +55,7 @@ const GOOD_STATUS_OVERRIDES = new Map([
   ["taskCreate", [201]],
   ["taskAttachmentCreate", [201]],
   ["taskPostponementCreate", [201]],
+  ["taskCompleteRequestPost", [201]],
   ["taskProjectWizardPreview", [200]],
   ["taskProjectWizardCreate", [201]],
   ["taskProjectPlanCreate", [201]],

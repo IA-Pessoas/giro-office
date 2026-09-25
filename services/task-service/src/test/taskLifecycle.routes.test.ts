@@ -66,7 +66,7 @@ describe("task lifecycle routes", () => {
       .post("/task/complete-request")
       .send({ task_id: "task-1", reason: "Pronta para validação." });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(taskLifecycleServiceMock.requestTaskCompletion).toHaveBeenCalledWith({
       user_id: "user-1",
       organization_id: "org-1",
@@ -75,6 +75,16 @@ describe("task lifecycle routes", () => {
       integracaoLevel: 0,
       isOwner: false,
     });
+  });
+
+  it("POST /task/complete-request rejeita tarefa sem identificador com 400", async () => {
+    const res = await request(createTestApp())
+      .post("/task/complete-request")
+      .send({ reason: "Pronta para validação." });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/task_id/u);
+    expect(taskLifecycleServiceMock.requestTaskCompletion).not.toHaveBeenCalled();
   });
 
   it("PUT /task/complete-request encaminha recusa com motivo", async () => {
