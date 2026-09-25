@@ -8,8 +8,9 @@ type ToastKind = "default" | "success" | "error" | "info" | "warn" | "warning";
  * Regras globais dos toasts (#1364), aplicadas em um só lugar:
  * - mensagem de texto idêntica e ainda visível não empilha (toastId derivado do texto);
  * - sucesso dispensa os erros que ainda estão na tela;
- * - erro do chamador substitui o toast genérico de 5xx do interceptor, então uma falha
- *   gera um toast só.
+ * - enquanto o toast de 5xx do interceptor está na tela, o erro do chamador não aparece:
+ *   o de 5xx já traz a mensagem e o requestId para o suporte (#1365), e uma falha gera um
+ *   toast só.
  */
 export function createAppToast(base: ToastApi): ToastApi {
   // ponytail: sucesso limpa todos os erros visíveis, não só os da mesma ação; basta
@@ -37,7 +38,7 @@ export function createAppToast(base: ToastApi): ToastApi {
 
   const error = <T>(content: ToastContent<T>, options?: ToastOptions<T>) => {
     if (options?.toastId !== SERVER_ERROR_TOAST_ID && base.isActive(SERVER_ERROR_TOAST_ID)) {
-      base.dismiss(SERVER_ERROR_TOAST_ID);
+      return SERVER_ERROR_TOAST_ID;
     }
     const id = showError(content, options);
     visibleErrors.add(id);

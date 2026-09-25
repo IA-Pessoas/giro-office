@@ -65,8 +65,8 @@ export function setupAPIClient(
     onCsrfFailure,
     getUnauthorizedErrorForSsr: () => new AuthTokenError(),
     onServerError: notifyServerErrors
-      ? () => {
-          notifyServerError(toast);
+      ? (error) => {
+          notifyServerError(toast, error);
         }
       : undefined,
   });

@@ -272,6 +272,9 @@ export class TiPasswordService {
       throw new ServiceError(
         500,
         "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.",
+        undefined,
+        undefined,
+        { expose: true },
       );
     }
   }
