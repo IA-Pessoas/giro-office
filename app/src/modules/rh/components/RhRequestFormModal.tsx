@@ -15,7 +15,11 @@ import type {
   RhRequestStatus,
   RhRequestUrgency,
 } from "../types";
-import { formatRhCategoryLabel, RH_REQUEST_STATUS_META } from "../utils/rhRequestUi";
+import {
+  formatRhCategoryLabel,
+  RH_REQUEST_STATUS_META,
+  selectableRhRequestAssignees,
+} from "../utils/rhRequestUi";
 
 interface RhRequestFormModalProps {
   open: boolean;
@@ -23,6 +27,7 @@ interface RhRequestFormModalProps {
   assignableUsers: AssignableUser[];
   canManageRequests: boolean;
   assignableUsersUnavailableMessage?: string | null;
+  currentUserId?: string;
   request: RhRequest | null;
   onClose: () => void;
 }
@@ -66,6 +71,7 @@ export function RhRequestFormModal({
   assignableUsers,
   canManageRequests,
   assignableUsersUnavailableMessage,
+  currentUserId,
   request,
   onClose,
 }: RhRequestFormModalProps) {
@@ -74,6 +80,10 @@ export function RhRequestFormModal({
   const [formState, setFormState] = useState<RhRequestFormState>(buildFormState(request));
 
   const isEditing = Boolean(request);
+  const assigneeOptions = selectableRhRequestAssignees(
+    assignableUsers,
+    request?.requester_user_id ?? currentUserId,
+  );
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   useEffect(() => {
@@ -232,7 +242,7 @@ export function RhRequestFormModal({
                 aria-required="true"
               >
                 <option value="">Selecione</option>
-                {assignableUsers.map((user) => (
+                {assigneeOptions.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.name}
                   </option>

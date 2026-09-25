@@ -298,6 +298,7 @@ export function RhRequestsSection({ initialRequestId }: { initialRequestId?: str
         categories={categories}
         assignableUsers={assignableUsers}
         canManageRequests={canManageRhRequests}
+        currentUserId={user?.id}
         assignableUsersUnavailableMessage={
           auxiliaryError ? "Não foi possível carregar os responsáveis agora." : null
         }

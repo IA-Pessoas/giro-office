@@ -1,4 +1,5 @@
 import type {
+  AssignableUser,
   RhMessageType,
   RhRequestStatus,
   RhRequestUrgency,
@@ -100,4 +101,12 @@ export function formatRhCategoryLabel(value: string | null | undefined) {
     .split(/\s+/)
     .map((part) => part.charAt(0).toLocaleUpperCase("pt-BR") + part.slice(1))
     .join(" ");
+}
+
+/** O rh-service recusa o solicitante como responsável; o select não deve oferecê-lo. */
+export function selectableRhRequestAssignees(
+  users: AssignableUser[],
+  requesterUserId: string | undefined,
+) {
+  return users.filter((user) => user.id !== requesterUserId);
 }
