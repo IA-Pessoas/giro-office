@@ -47,6 +47,7 @@ export interface CertificatePj {
   model: string;
   legal_nature: string;
   password?: string | null;
+  password_unavailable?: boolean;
   expiration_date: string;
   notes: string | null;
   was_paid: boolean;
@@ -64,6 +65,7 @@ export interface CertificatePf {
   cpf: string;
   model: string;
   password?: string | null;
+  password_unavailable?: boolean;
   expiration_date: string;
   notes: string | null;
   enterprise: string | null;

@@ -76,6 +76,8 @@ export interface CertificatePfPublicResult {
 
 export interface CertificatePfDetailResult extends CertificatePfPublicResult {
   password?: string;
+  /** A senha existe, mas não pôde ser descriptografada com as chaves configuradas. */
+  password_unavailable?: true;
 }
 
 export type CertificatePfListResult = PaginatedResult<CertificatePfPublicResult>;
@@ -259,10 +261,20 @@ export class CertificatePfService {
 
     const passwordCrypto = this.requirePasswordCrypto();
     if (isJsonValue(record.password)) {
-      return removeFilePrivateMetadata({
-        ...record,
-        password: passwordCrypto.decrypt(record.password),
-      });
+      let password: string;
+      try {
+        password = passwordCrypto.decrypt(record.password);
+      } catch (err: unknown) {
+        logError("Senha do certificado PF indisponível para descriptografia", {
+          certificateId: record.id,
+          err,
+        });
+        return {
+          ...removePassword(removeFilePrivateMetadata(record)),
+          password_unavailable: true,
+        };
+      }
+      return removeFilePrivateMetadata({ ...record, password });
     }
 
     await this.prisma.certificatePF.updateMany({

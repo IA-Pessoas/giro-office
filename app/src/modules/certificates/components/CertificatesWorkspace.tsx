@@ -994,13 +994,13 @@ export function CertificatesWorkspace() {
     }
   }
 
-  function renderPasswordBlock(value: string | null | undefined) {
+  function renderPasswordBlock(value: string | null | undefined, unavailable?: boolean) {
     if (!value) {
       return (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
           <p className="text-xs text-slate-500 dark:text-slate-400">Senha</p>
           <p className="mt-1 font-semibold text-slate-900 dark:text-white">
-            Senha indisponível para seu nível de acesso
+            {unavailable ? "Senha indisponível" : "Senha indisponível para seu nível de acesso"}
           </p>
         </div>
       );
@@ -2065,7 +2065,7 @@ export function CertificatesWorkspace() {
                 </div>
               </div>
 
-              {renderPasswordBlock(pjDetail?.password)}
+              {renderPasswordBlock(pjDetail?.password, pjDetail?.password_unavailable)}
 
               {pjDetail ? (
                 <CertificateFileActions
@@ -2159,7 +2159,7 @@ export function CertificatesWorkspace() {
                 </div>
               </div>
 
-              {renderPasswordBlock(pfDetail?.password)}
+              {renderPasswordBlock(pfDetail?.password, pfDetail?.password_unavailable)}
 
               {pfDetail ? (
                 <CertificateFileActions

@@ -178,6 +178,14 @@ function attachmentFileName(originalName: string): string {
   return originalName.replace(/[^a-zA-Z0-9._-]/g, "_") || "certificate.p12";
 }
 
+function createPasswordCrypto(env: CertificateWorkerOptions["env"]) {
+  return createCertificatePasswordCrypto({
+    keyBase64: env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
+    keyVersion: env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
+    legacyKeyBase64: env.CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY,
+  });
+}
+
 async function withCertificateService<T>(
   options: CertificateWorkerOptions,
   callback: (service: CertificatePjServiceLike) => Promise<T>,
@@ -185,10 +193,7 @@ async function withCertificateService<T>(
   if (options.service) return callback(options.service);
 
   return withWorkerPrisma(options.env, PrismaClient, async (client) => {
-    const passwordCrypto = createCertificatePasswordCrypto({
-      keyBase64: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
-      keyVersion: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
-    });
+    const passwordCrypto = createPasswordCrypto(options.env);
     const service = new CertificatePjService(
       client as unknown as ConstructorParameters<typeof CertificatePjService>[0],
       createCertificateFileDeps(options.env),
@@ -205,10 +210,7 @@ async function withCertificatePfService<T>(
   if (options.pfService) return callback(options.pfService);
 
   return withWorkerPrisma(options.env, PrismaClient, async (client) => {
-    const passwordCrypto = createCertificatePasswordCrypto({
-      keyBase64: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
-      keyVersion: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
-    });
+    const passwordCrypto = createPasswordCrypto(options.env);
     const service = new CertificatePfService(
       client as unknown as ConstructorParameters<typeof CertificatePfService>[0],
       createCertificateFileDeps(options.env),

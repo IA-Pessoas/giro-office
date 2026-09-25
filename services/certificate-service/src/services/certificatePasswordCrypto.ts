@@ -5,6 +5,8 @@ import { ServiceError } from "@workspace/shared";
 export interface CertificatePasswordCryptoOptions {
   keyBase64: string;
   keyVersion: string;
+  /** Chave anterior, só para leitura dos envelopes migrados; aceita qualquer versão. */
+  legacyKeyBase64?: string;
 }
 
 export interface CertificatePasswordCrypto {
@@ -37,7 +39,7 @@ function decodeBase64(value: string): Buffer {
   return Buffer.from(value, "base64");
 }
 
-function parseEncryptedTextPayload(value: string, keyVersion: string): EncryptedTextPayload {
+function parseEncryptedTextPayload(value: string, keyVersion?: string): EncryptedTextPayload {
   try {
     const payload: unknown = JSON.parse(value);
 
@@ -56,7 +58,7 @@ function parseEncryptedTextPayload(value: string, keyVersion: string): Encrypted
       typeof candidate.iv !== "string" ||
       typeof candidate.tag !== "string" ||
       typeof candidate.data !== "string" ||
-      candidate.v !== keyVersion
+      (keyVersion !== undefined && candidate.v !== keyVersion)
     ) {
       throw decryptionError();
     }
@@ -67,16 +69,39 @@ function parseEncryptedTextPayload(value: string, keyVersion: string): Encrypted
   }
 }
 
+function parseKey(keyBase64: string, envName: string): Buffer {
+  const key = isCanonicalBase64(keyBase64) ? Buffer.from(keyBase64, "base64") : undefined;
+
+  if (!key || key.length !== 32) {
+    throw new ServiceError(500, `${envName} deve ter 32 bytes em base64.`);
+  }
+
+  return key;
+}
+
+function decryptWithKey(value: string, key: Buffer, keyVersion?: string): string {
+  const payload = parseEncryptedTextPayload(value, keyVersion);
+  const iv = decodeBase64(payload.iv);
+  const tag = decodeBase64(payload.tag);
+  const data = decodeBase64(payload.data);
+
+  if (iv.length !== 12 || tag.length !== 16) {
+    throw decryptionError();
+  }
+
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+
+  return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+}
+
 export function createCertificatePasswordCrypto(
   options: CertificatePasswordCryptoOptions,
 ): CertificatePasswordCrypto {
-  const key = isCanonicalBase64(options.keyBase64)
-    ? Buffer.from(options.keyBase64, "base64")
+  const key = parseKey(options.keyBase64, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY");
+  const legacyKey = options.legacyKeyBase64
+    ? parseKey(options.legacyKeyBase64, "CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY")
     : undefined;
-
-  if (!key || key.length !== 32) {
-    throw new ServiceError(500, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64.");
-  }
 
   return {
     encrypt(value: string): string {
@@ -94,19 +119,13 @@ export function createCertificatePasswordCrypto(
 
     decrypt(value: string): string {
       try {
-        const payload = parseEncryptedTextPayload(value, options.keyVersion);
-        const iv = decodeBase64(payload.iv);
-        const tag = decodeBase64(payload.tag);
-        const data = decodeBase64(payload.data);
+        return decryptWithKey(value, key, options.keyVersion);
+      } catch {
+        if (!legacyKey) throw decryptionError();
+      }
 
-        if (iv.length !== 12 || tag.length !== 16) {
-          throw decryptionError();
-        }
-
-        const decipher = createDecipheriv("aes-256-gcm", key, iv);
-        decipher.setAuthTag(tag);
-
-        return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+      try {
+        return decryptWithKey(value, legacyKey);
       } catch {
         throw decryptionError();
       }
