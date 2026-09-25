@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import {
   BadgeDollarSign,
   Bot,

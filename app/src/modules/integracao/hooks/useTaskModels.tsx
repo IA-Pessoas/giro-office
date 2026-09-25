@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient, type QueryObserverResult } from "@tanstack/react-query";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useFetch } from "@shared/hooks";
 import type { PaginatedResult } from "@shared/pagination/pagination";

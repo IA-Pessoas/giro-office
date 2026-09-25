@@ -1907,7 +1907,7 @@ await runTest("ti terms keeps primary action clear and opens term detail in a di
   assert.match(source, /function handlePrintTerm\(term: TiTerm\)/);
   assert.match(source, /function buildPrintableTermHtml\(term: TiTerm, departmentName: string\)/);
   assert.match(source, /window\.open\("", "_blank", "width=900,height=1100"\)/);
-  assert.match(source, /import \{ toast \} from "react-toastify";/);
+  assert.match(source, /import \{ toast \} from "@shared\/services\/toast";/);
   assert.match(
     source,
     /toast\.error\(\s*"Não foi possível abrir a janela de impressão\. Verifique o bloqueador de pop-ups do navegador\."\s*,?\s*\)/,

@@ -1,6 +1,6 @@
 import { Copy, FolderOpen, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";

@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { isAxiosError } from "axios";
 import { Download, LoaderCircle, Trash2, Upload } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import {
   useDeleteCertificatePfFileMutation,

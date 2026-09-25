@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Archive, CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, getClientDisplayName, type ClientPickerOption } from "@modules/clients";

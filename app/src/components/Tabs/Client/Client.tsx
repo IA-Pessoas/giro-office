@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Heading, SimpleGrid, Tag } from '@shared/ui/chakraShims';
-import { toast } from "react-toastify"
+import { toast } from "@shared/services/toast";
 import 'react-toastify/dist/ReactToastify.css';
 import { IoCreate } from "react-icons/io5";
 

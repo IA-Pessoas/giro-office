@@ -117,8 +117,9 @@ function MyApp({ Component, pageProps }: AppProps) {
               <AppLayout isIframeView={isIframeView}>
                 <Component {...pageProps} />
               </AppLayout>
+              {/* No topo: embaixo à direita os toasts cobriam o "Salvar" de formulários e modais (#1364). */}
               <ToastContainer
-                position="bottom-right"
+                position="top-center"
                 autoClose={5000}
                 pauseOnHover
                 closeOnClick={false}

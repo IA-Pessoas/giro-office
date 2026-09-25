@@ -10,7 +10,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { Dialog, PaginationControls } from "@shared/components";
 import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";

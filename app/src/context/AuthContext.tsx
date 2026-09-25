@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Router from "next/router";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import "react-toastify/dist/ReactToastify.css";
 
 import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";

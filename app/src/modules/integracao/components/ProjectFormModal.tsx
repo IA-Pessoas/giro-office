@@ -7,7 +7,7 @@ import { isAxiosError } from "axios";
 import { FileText, LoaderCircle, Save, Sparkles } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import {
   TASK_FORM_DEPARTMENTS_QUERY_KEY,

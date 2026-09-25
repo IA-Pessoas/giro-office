@@ -3,7 +3,7 @@ import { PaginationControls } from "@shared/components";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AlertTriangle } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import { useRhPermissions } from "../hooks/useRhPermissions";

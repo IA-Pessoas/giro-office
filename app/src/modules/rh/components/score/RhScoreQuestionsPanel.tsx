@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Eye, Loader2, Plus } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import {
   useDeleteRhScoreQuestionMutation,
   useRhScoreQuestions,
