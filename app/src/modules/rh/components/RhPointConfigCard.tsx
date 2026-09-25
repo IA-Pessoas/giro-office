@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
+import { formatTimeInput, isValidTimeInput } from "@shared/utils/inputFormatting";
+
 import { useCreateOrUpdateRhPointConfigMutation } from "../hooks/useRhPoint";
 import type { RhPointConfig } from "../types";
 
@@ -162,6 +164,15 @@ export function RhPointConfigCard({
       return;
     }
 
+    if (
+      ![formState.startTime, formState.lunchBreak, formState.lunchReturn, formState.endTime].every(
+        isValidTimeInput,
+      )
+    ) {
+      toast.warn("Informe os horários no formato 24h (HH:MM).");
+      return;
+    }
+
     if (formState.workDays.length === 0) {
       toast.warn("Selecione ao menos um dia útil.");
       return;
@@ -219,9 +230,12 @@ export function RhPointConfigCard({
             <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
               <span>Entrada</span>
               <input
-                type="time"
+                type="text"
+                inputMode="numeric"
+                placeholder="HH:MM"
+                maxLength={5}
                 value={formState.startTime}
-                onChange={(event) => handleTimeChange("startTime", event.target.value)}
+                onChange={(event) => handleTimeChange("startTime", formatTimeInput(event.target.value))}
                 disabled={isLoading || saveMutation.isPending}
                 className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               />
@@ -230,9 +244,12 @@ export function RhPointConfigCard({
             <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
               <span>Saída almoço</span>
               <input
-                type="time"
+                type="text"
+                inputMode="numeric"
+                placeholder="HH:MM"
+                maxLength={5}
                 value={formState.lunchBreak}
-                onChange={(event) => handleTimeChange("lunchBreak", event.target.value)}
+                onChange={(event) => handleTimeChange("lunchBreak", formatTimeInput(event.target.value))}
                 disabled={isLoading || saveMutation.isPending}
                 className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               />
@@ -241,9 +258,12 @@ export function RhPointConfigCard({
             <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
               <span>Volta almoço</span>
               <input
-                type="time"
+                type="text"
+                inputMode="numeric"
+                placeholder="HH:MM"
+                maxLength={5}
                 value={formState.lunchReturn}
-                onChange={(event) => handleTimeChange("lunchReturn", event.target.value)}
+                onChange={(event) => handleTimeChange("lunchReturn", formatTimeInput(event.target.value))}
                 disabled={isLoading || saveMutation.isPending}
                 className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               />
@@ -252,9 +272,12 @@ export function RhPointConfigCard({
             <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
               <span>Saída</span>
               <input
-                type="time"
+                type="text"
+                inputMode="numeric"
+                placeholder="HH:MM"
+                maxLength={5}
                 value={formState.endTime}
-                onChange={(event) => handleTimeChange("endTime", event.target.value)}
+                onChange={(event) => handleTimeChange("endTime", formatTimeInput(event.target.value))}
                 disabled={isLoading || saveMutation.isPending}
                 className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               />

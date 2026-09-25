@@ -4,15 +4,19 @@ import { toast } from "react-toastify";
 
 import {
   useCreateRhCategoryMutation,
+  useDeleteRhCategoryMutation,
   useRhCategories,
   useUpdateRhCategoryMutation,
 } from "../hooks/useRhRequests";
+import { getRhErrorMessage } from "../utils/rhErrorMessage";
 import { formatRhCategoryLabel } from "../utils/rhRequestUi";
 
 export function RhCategoriesManager() {
   const categoriesQuery = useRhCategories({ activeOnly: false });
   const createMutation = useCreateRhCategoryMutation();
   const updateMutation = useUpdateRhCategoryMutation();
+  const deleteMutation = useDeleteRhCategoryMutation();
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -25,7 +29,7 @@ export function RhCategoriesManager() {
       setNewName("");
       toast.success("Categoria criada.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível criar a categoria.");
+      toast.error(getRhErrorMessage(error, "Não foi possível criar a categoria."));
     }
   }
 
@@ -37,7 +41,23 @@ export function RhCategoriesManager() {
       setEditingId(null);
       toast.success("Categoria atualizada.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar a categoria.");
+      toast.error(getRhErrorMessage(error, "Não foi possível atualizar a categoria."));
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      return;
+    }
+    try {
+      await deleteMutation.mutateAsync({ id });
+      toast.success("Categoria excluída.");
+    } catch (error) {
+      // O backend recusa categoria com solicitações vinculadas; nesse caso, inative.
+      toast.error(getRhErrorMessage(error, "Não foi possível excluir a categoria."));
+    } finally {
+      setPendingDeleteId(null);
     }
   }
 
@@ -116,6 +136,15 @@ export function RhCategoriesManager() {
                     className="text-xs font-medium text-blue-600 hover:underline"
                   >
                     {category.active ? "Inativar" : "Ativar"}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Excluir categoria"
+                    onClick={() => void handleDelete(category.id)}
+                    disabled={deleteMutation.isPending}
+                    className="text-xs font-medium text-red-600 hover:underline disabled:opacity-60"
+                  >
+                    {pendingDeleteId === category.id ? "Confirmar exclusão" : "Excluir"}
                   </button>
                 </>
               )}

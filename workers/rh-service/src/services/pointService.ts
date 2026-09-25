@@ -601,7 +601,17 @@ class PointService {
       });
 
       if (!config) {
-        throw new ServiceError(404, "Configuracao de ponto nao encontrada para o usuario.");
+        // Sem jornada configurada não há horas esperadas: o resumo é vazio, não um erro.
+        return {
+          month: input.month,
+          user_id: input.user_id,
+          total_worked_minutes: 0,
+          expected_minutes: 0,
+          balance_minutes: 0,
+          overtime_minutes: 0,
+          absence_days: 0,
+          pending_adjustments: 0,
+        };
       }
       if (config.organization_id !== input.organization_id) {
         throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
