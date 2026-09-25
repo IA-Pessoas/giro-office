@@ -119,6 +119,7 @@ export async function executeProjectReportingQuery(
   }
   for (const aggregation of aggregations) {
     if (
+      aggregation.function !== "count_rows" &&
       !reportingAggregations(projectMetadata.get(aggregation.field)?.value_type ?? "").includes(
         aggregation.function,
       )
@@ -207,15 +208,17 @@ export async function executeProjectReportingQuery(
               }, values[0])
             : null;
         row[aggregation.alias] =
-          aggregation.function === "count"
-            ? values.length
-            : !values.length
-              ? null
-              : aggregation.function === "sum"
-                ? sum
-                : aggregation.function === "avg"
-                  ? sum / values.length
-                  : extreme;
+          aggregation.function === "count_rows"
+            ? bucket.length
+            : aggregation.function === "count"
+              ? values.length
+              : !values.length
+                ? null
+                : aggregation.function === "sum"
+                  ? sum
+                  : aggregation.function === "avg"
+                    ? sum / values.length
+                    : extreme;
       }
       return row;
     });
