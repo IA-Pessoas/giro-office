@@ -103,9 +103,20 @@ export function ReportsCreatePanel({
   }, [error]);
   useEffect(() => {
     if (!model) return;
-    builder.setAreas(legacyDefinitionToAreas(model));
+    const areas = legacyDefinitionToAreas(model);
+    const hasUnselectedAggregations = areas.some((area) =>
+      area.aggregations?.some((aggregation) => !area.fields.includes(aggregation.field)),
+    );
+    builder.setAreas(
+      areas.map((area) => ({
+        ...area,
+        aggregations: area.aggregations?.filter((aggregation) =>
+          area.fields.includes(aggregation.field),
+        ),
+      })),
+    );
     setLoadedModel(model);
-    setLoadedModelVersionId(model.version_id ?? null);
+    setLoadedModelVersionId(hasUnselectedAggregations ? null : (model.version_id ?? null));
     setGeneratedJobId(null);
     createJob.reset();
     preview.reset();
@@ -447,9 +458,18 @@ export function ReportsCreatePanel({
                     fieldKeys={area.fields}
                     disabled={busy}
                     onFieldKeysChange={(fields) => {
+                      const selectedFields = new Set(fields);
                       builder.setAreas((current) =>
                         current.map((item) =>
-                          item.source === area.source ? { ...item, fields } : item,
+                          item.source === area.source
+                            ? {
+                                ...item,
+                                fields,
+                                aggregations: item.aggregations?.filter((aggregation) =>
+                                  selectedFields.has(aggregation.field),
+                                ),
+                              }
+                            : item,
                         ),
                       );
                       clearLoadedModel();
