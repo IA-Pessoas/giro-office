@@ -112,6 +112,21 @@ async function assertAccessibleForm(page, name, scopeSelector) {
   console.log(`PASS ${name}: ${report.controls} campos com rótulo, axe sem violação crítica`);
 }
 
+/** Erro abaixo do campo, anunciado: aria-invalid e aria-describedby apontando para o texto. */
+async function assertFieldError(scope, label, message) {
+  // Campos obrigatórios somam "campo obrigatório" (texto só para leitor de tela) ao nome.
+  const escaped = label.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+  const name = new RegExp(`^${escaped}( campo obrigatório)?$`);
+  const field = scope.getByRole("textbox", { name }).or(scope.getByRole("combobox", { name }));
+  assert.equal(await field.getAttribute("aria-invalid"), "true", `${label}: aria-invalid`);
+  const describedBy = await field.getAttribute("aria-describedby");
+  assert.ok(describedBy, `${label}: o campo com erro precisa de aria-describedby.`);
+  const texts = await Promise.all(
+    describedBy.split(" ").map((id) => scope.page().locator(`[id="${id}"]`).innerText()),
+  );
+  assert.ok(texts.includes(message), `${label}: esperava "${message}", veio ${JSON.stringify(texts)}.`);
+}
+
 async function openDialog(page, buttonName) {
   await page.getByRole("button", { name: buttonName, exact: true }).first().click();
   await page.getByRole("dialog").waitFor({ state: "visible" });
@@ -141,22 +156,23 @@ try {
   // Enviar vazio: o erro aparece abaixo do campo e é anunciado por aria-describedby.
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
-  const documentField = dialog.getByLabel("CNPJ");
-  await assert.doesNotReject(documentField.waitFor({ state: "visible" }));
-  assert.equal(await documentField.getAttribute("aria-invalid"), "true");
-  const describedBy = await documentField.getAttribute("aria-describedby");
-  assert.ok(describedBy, "O campo com erro precisa de aria-describedby.");
-  assert.equal(
-    await page.locator(`[id="${describedBy}"]`).innerText(),
-    "Informe o CNPJ.",
-    "O erro do documento deve aparecer ligado ao campo.",
-  );
-  assert.equal(await dialog.getByLabel("Razão social").getAttribute("aria-invalid"), "true");
-  console.log("PASS Clientes: Novo cliente mostra o erro abaixo do campo com aria-describedby");
+  await assertFieldError(dialog, "CNPJ", "Informe o CNPJ.");
+  await assertFieldError(dialog, "Razão social", "Informe a razão social.");
+  // Novo cliente PF, a primeira evidência da issue.
+  await dialog.getByLabel("Tipo de pessoa").selectOption("PF");
+  await assertAccessibleForm(page, "Clientes: Novo cliente PF", '[role="dialog"]');
+  await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
+  await assertFieldError(dialog, "Nome", "Informe o nome.");
+  await assertFieldError(dialog, "CPF", "Informe o CPF.");
+  console.log("PASS Clientes: Novo cliente PJ e PF mostram o erro abaixo do campo");
   await page.keyboard.press("Escape");
 
   await goto(page, "/clients/integration/new", page.getByRole("button", { name: "Salvar", exact: true }));
   await assertAccessibleForm(page, "Clientes: Nova integração", "main");
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+  await assertFieldError(page.locator("main"), "CNPJ", "Informe o CNPJ.");
+  await assertFieldError(page.locator("main"), "Razão Social", "Informe a razão social.");
+  console.log("PASS Clientes: Nova integração mostra o erro abaixo do campo");
 
   // Nova tarefa só habilita com cliente escolhido.
   await goto(
@@ -166,11 +182,17 @@ try {
   );
   await openDialog(page, "Nova tarefa");
   await assertAccessibleForm(page, "Tarefas: Nova tarefa", '[role="dialog"]');
+  await page.getByRole("dialog").getByRole("button", { name: "Criar tarefa", exact: true }).click();
+  await assertFieldError(page.getByRole("dialog"), "Projeto", "Selecione o projeto.");
+  console.log("PASS Tarefas: Nova tarefa mostra o erro abaixo do campo");
   await page.keyboard.press("Escape");
 
   await goto(page, "/certificados", page.getByRole("button", { name: "Novo PJ", exact: true }));
   await openDialog(page, "Novo PJ");
   await assertAccessibleForm(page, "Certificados: Novo PJ", '[role="dialog"]');
+  await page.getByRole("button", { name: "Criar certificado", exact: true }).click();
+  await assertFieldError(page.getByRole("dialog"), "Nome", "Informe o nome do cliente.");
+  console.log("PASS Certificados: Novo PJ mostra o erro abaixo do campo");
   // Clicar no rótulo foca o campo: antes o botão de ajuda dentro do <label> ficava com o rótulo.
   await page.getByRole("dialog").locator("label", { hasText: "Situação Castelo" }).click();
   assert.equal(

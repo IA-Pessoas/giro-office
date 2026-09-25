@@ -1,5 +1,6 @@
 import {
   cloneElement,
+  Fragment,
   isValidElement,
   useId,
   type ReactElement,
@@ -30,8 +31,9 @@ type FormFieldProps = {
  * Campo de formulário acessível (#1367): rótulo ligado ao controle por `htmlFor`/`id`, ajuda
  * fora do rótulo e erro abaixo do campo, anunciado via `aria-describedby` e `aria-invalid`.
  *
- * O controle recebe o `id` quando é um elemento nativo (input, select, textarea) ou quando há
- * ajuda; nos demais casos o rótulo envolve o filho, que já nomeia qualquer input aninhado.
+ * `aria-invalid`/`aria-describedby` vão para qualquer controle (componentes como os selects
+ * nativos os repassam). O `id` do rótulo só é injetado em elemento nativo ou quando há ajuda;
+ * nos demais casos o rótulo envolve o filho, que já nomeia qualquer input aninhado.
  */
 export function FormField({
   label,
@@ -55,12 +57,20 @@ export function FormField({
     </span>
   ) : null;
 
-  if (isValidElement<ControlProps>(children) && (typeof children.type === "string" || help)) {
-    const control = children as ReactElement<ControlProps>;
+  const control =
+    isValidElement<ControlProps>(children) && children.type !== Fragment
+      ? (children as ReactElement<ControlProps>)
+      : null;
+  const describedBy = [control?.props["aria-describedby"], error ? errorId : null]
+    .filter(Boolean)
+    .join(" ");
+  const ariaProps = {
+    "aria-invalid": error ? true : control?.props["aria-invalid"],
+    "aria-describedby": describedBy || undefined,
+  };
+
+  if (control && (typeof control.type === "string" || help)) {
     const controlId = control.props.id ?? generatedId;
-    const describedBy = [control.props["aria-describedby"], error ? errorId : null]
-      .filter(Boolean)
-      .join(" ");
 
     return (
       <div className={cn("flex flex-col gap-2", className)}>
@@ -68,11 +78,7 @@ export function FormField({
           <label htmlFor={controlId}>{labelText}</label>
           {help}
         </span>
-        {cloneElement(control, {
-          id: controlId,
-          "aria-invalid": error ? true : control.props["aria-invalid"],
-          "aria-describedby": describedBy || undefined,
-        })}
+        {cloneElement(control, { id: controlId, ...ariaProps })}
         {errorMessage}
       </div>
     );
@@ -80,9 +86,9 @@ export function FormField({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <label className="flex flex-col gap-2">
+      <label className="flex flex-col gap-[inherit]">
         {labelText}
-        {children}
+        {control ? cloneElement(control, ariaProps) : children}
       </label>
       {errorMessage}
     </div>

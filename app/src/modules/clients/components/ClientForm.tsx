@@ -49,7 +49,6 @@ export function ClientForm({
         : "Informe a razão social."
       : null;
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setHasSubmitted(false);
     forwardFormattedInputChange(
       event,
       (value) => formatCpfCnpjInput(value, values.type === "PF" ? "PF" : "PJ"),

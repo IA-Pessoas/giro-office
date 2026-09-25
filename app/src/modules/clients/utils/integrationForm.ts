@@ -13,6 +13,7 @@ import type {
   UpdateClientIntegrationPayload,
 } from "../types";
 import { getClientInternalName } from "./clientForm.ts";
+import { validateCpfCnpjDocument, validateOptionalCpfDocument } from "./documentValidation.ts";
 const nullableTextFieldNames = [
   "company_name",
   "fantasy_name",
@@ -247,4 +248,31 @@ export function buildUpdateClientIntegrationPayload(
   }
 
   return payload;
+}
+
+export type IntegrationFieldErrors = Partial<
+  Record<"name" | "cpf_cnpj" | "email" | "cpf_responsible" | "cpf_agent", string | null>
+>;
+
+/** Erros de cada campo do cadastro por integração, exibidos abaixo do campo (#1367). */
+export function getIntegrationFieldErrors(
+  values: Pick<
+    CreateClientIntegrationFormValues,
+    "type" | "name" | "company_name" | "fantasy_name" | "cpf_cnpj" | "email" | "cpf_responsible" | "cpf_agent"
+  >,
+): IntegrationFieldErrors {
+  const documentLabel = values.type === "PJ" ? "CNPJ" : "CPF";
+  return {
+    name: getClientInternalName(values)
+      ? null
+      : values.type === "PF"
+        ? "Informe o nome."
+        : "Informe a razão social.",
+    cpf_cnpj: values.cpf_cnpj.trim()
+      ? validateCpfCnpjDocument(values.cpf_cnpj, values.type)
+      : `Informe o ${documentLabel}.`,
+    email: getIntegrationEmailError(values.email),
+    cpf_responsible: validateOptionalCpfDocument("CPF do responsável", values.cpf_responsible),
+    cpf_agent: validateOptionalCpfDocument("CPF do preposto", values.cpf_agent),
+  };
 }
