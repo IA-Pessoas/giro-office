@@ -34,15 +34,15 @@ const pessoalServiceEnvSchema = z
   .object({
     nodeEnv: z.string().optional().default("development"),
     port: z.coerce.number().int().positive().default(3042),
-    databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o pessoal-service."),
-    jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o pessoal-service."),
-    auditServiceUrl: z.string().url("AUDIT_SERVICE_URL invalida.").default("http://localhost:3020"),
-    auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN nao definido."),
+    databaseUrl: z.string().min(1, "DATABASE_URL não definido para o pessoal-service."),
+    jwtSecret: z.string().min(1, "JWT_SECRET não definido para o pessoal-service."),
+    auditServiceUrl: z.string().url("AUDIT_SERVICE_URL inválida.").default("http://localhost:3020"),
+    auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN não definido."),
     internalServiceTokenEnv: z.string().optional(),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     passwordEncryptionKey: z
       .string()
-      .min(1, "PESSOAL_PASSWORD_ENCRYPTION_KEY nao definida.")
+      .min(1, "PESSOAL_PASSWORD_ENCRYPTION_KEY não definida.")
       .refine(validateBase64Key, "PESSOAL_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64."),
     passwordEncryptionKeyVersion: z.string().min(1).default("v1"),
     domainAuditEnabled: z

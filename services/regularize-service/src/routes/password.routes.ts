@@ -23,7 +23,7 @@ const MIN_PASSWORD_REVEAL_PERMISSION = 2;
 
 function assertCanRevealPassword(permission: number | undefined): void {
   if (Number(permission ?? 0) < MIN_PASSWORD_REVEAL_PERMISSION) {
-    throw new ServiceError(403, "Permissao insuficiente para revelar credencial.");
+    throw new ServiceError(403, "Permissão insuficiente para revelar credencial.");
   }
 }
 

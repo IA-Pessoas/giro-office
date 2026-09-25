@@ -14,13 +14,13 @@ export const tiRequestStatusSchema = z.enum([
 
 export const tiRequestIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Chamado de TI invalido." }),
+    id: z.string().uuid({ message: "Chamado de TI inválido." }),
   })
   .strict();
 
 const tiRequestAnydeskCodeSchema = zNonEmptyText("anydesk_code").max(
   64,
-  "anydesk_code deve ter no maximo 64 caracteres.",
+  "anydesk_code deve ter no máximo 64 caracteres.",
 );
 
 export const createTiRequestBodySchema = z
@@ -28,11 +28,11 @@ export const createTiRequestBodySchema = z
     title: zNonEmptyText("title"),
     description: zNonEmptyText("description"),
     anydesk_code: tiRequestAnydeskCodeSchema,
-    category_id: z.string().uuid({ message: "Categoria de TI invalida." }),
-    requester_id: z.string().uuid({ message: "Solicitante invalido." }).optional(),
-    assigned_to_id: z.string().uuid({ message: "Responsavel invalido." }).optional(),
+    category_id: z.string().uuid({ message: "Categoria de TI inválida." }),
+    requester_id: z.string().uuid({ message: "Solicitante inválido." }).optional(),
+    assigned_to_id: z.string().uuid({ message: "Responsável inválido." }).optional(),
     urgency: tiRequestUrgencySchema.default("Medium"),
-    attachment: z.string().url({ message: "Anexo deve ser uma URL valida." }).optional(),
+    attachment: z.string().url({ message: "Anexo deve ser uma URL válida." }).optional(),
   })
   .strict();
 
@@ -40,9 +40,9 @@ export const updateTiRequestBodySchema = z
   .object({
     title: zNonEmptyText("title").optional(),
     description: zNonEmptyText("description").optional(),
-    category_id: z.string().uuid({ message: "Categoria de TI invalida." }).optional(),
+    category_id: z.string().uuid({ message: "Categoria de TI inválida." }).optional(),
     urgency: tiRequestUrgencySchema.optional(),
-    attachment: z.string().url({ message: "Anexo deve ser uma URL valida." }).optional(),
+    attachment: z.string().url({ message: "Anexo deve ser uma URL válida." }).optional(),
     anydesk_code: tiRequestAnydeskCodeSchema.optional(),
   })
   .strict()
@@ -52,7 +52,7 @@ export const updateTiRequestBodySchema = z
 
 export const assignTiRequestBodySchema = z
   .object({
-    assigned_to_id: z.string().uuid({ message: "Responsavel invalido." }),
+    assigned_to_id: z.string().uuid({ message: "Responsável inválido." }),
   })
   .strict();
 
@@ -74,9 +74,9 @@ export const listTiRequestsQuerySchema = paginationQuerySchema
     z.object({
       status: tiRequestStatusSchema.optional(),
       urgency: tiRequestUrgencySchema.optional(),
-      category_id: z.string().uuid({ message: "Categoria de TI invalida." }).optional(),
-      requester_id: z.string().uuid({ message: "Solicitante invalido." }).optional(),
-      assigned_to_id: z.string().uuid({ message: "Responsavel invalido." }).optional(),
+      category_id: z.string().uuid({ message: "Categoria de TI inválida." }).optional(),
+      requester_id: z.string().uuid({ message: "Solicitante inválido." }).optional(),
+      assigned_to_id: z.string().uuid({ message: "Responsável inválido." }).optional(),
       created_from: zIsoDate("created_from").optional(),
       created_to: zIsoDate("created_to").optional(),
     }),

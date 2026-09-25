@@ -92,7 +92,7 @@ function normalizeActivities(
     const code = comparisonKey(String(item.code));
     const description = comparisonKey(String(item.description));
     if (codes.has(code) || descriptions.has(description)) {
-      throw new ServiceError(409, "Atividade duplicada na orientacao.");
+      throw new ServiceError(409, "Atividade duplicada na orientação.");
     }
     codes.add(code);
     descriptions.add(description);
@@ -100,7 +100,7 @@ function normalizeActivities(
 
   const principalCount = normalized.filter((item) => item.type === "Principal").length;
   if (principalCount > 1 && principalId === undefined) {
-    throw new ServiceError(409, "A orientacao aceita no maximo uma atividade principal.");
+    throw new ServiceError(409, "A orientação aceita no máximo uma atividade principal.");
   }
 
   return normalized.map((item) => ({
@@ -116,7 +116,7 @@ function normalizePartners(items: Array<GuidancePartner | GuidanceJsonRow>): Gui
   for (const item of normalized) {
     const cpf = String(item.cpf);
     if (cpfs.has(cpf)) {
-      throw new ServiceError(409, "O CPF ja existe nesta orientacao.");
+      throw new ServiceError(409, "O CPF já existe nesta orientação.");
     }
     cpfs.add(cpf);
   }
@@ -333,7 +333,7 @@ export class GuidanceService {
   ): Promise<Record<string, unknown>> {
     return this.changeItems(input, "economic_activities", "Atualizar Atividade", (current) => {
       const existing = current.find((item) => item.id === input.activity.id);
-      if (!existing) throw new ServiceError(404, "Atividade nao encontrada na orientacao.");
+      if (!existing) throw new ServiceError(404, "Atividade não encontrada na orientação.");
       const item = normalizeActivity(input.activity);
       const next = current.map((candidate) => (candidate.id === item.id ? item : candidate));
       return normalizeActivities(next, item.type === "Principal" ? item.id : undefined);
@@ -347,7 +347,7 @@ export class GuidanceService {
   ): Promise<Record<string, unknown>> {
     return this.changeItems(input, "economic_activities", "Remover Atividade", (current) => {
       if (!current.some((item) => item.id === input.itemId)) {
-        throw new ServiceError(404, "Atividade nao encontrada na orientacao.");
+        throw new ServiceError(404, "Atividade não encontrada na orientação.");
       }
       return normalizeActivities(current.filter((item) => item.id !== input.itemId));
     });
@@ -372,7 +372,7 @@ export class GuidanceService {
     return this.changeItems(input, "partners", "Atualizar Socio", (current) => {
       const item = normalizePartner(input.partner);
       if (!current.some((candidate) => candidate.id === item.id)) {
-        throw new ServiceError(404, "Socio nao encontrado na orientacao.");
+        throw new ServiceError(404, "Sócio não encontrado na orientação.");
       }
       return normalizePartners(
         current.map((candidate) => (candidate.id === item.id ? item : candidate)),
@@ -387,7 +387,7 @@ export class GuidanceService {
   ): Promise<Record<string, unknown>> {
     return this.changeItems(input, "partners", "Remover Socio", (current) => {
       if (!current.some((item) => item.id === input.itemId)) {
-        throw new ServiceError(404, "Socio nao encontrado na orientacao.");
+        throw new ServiceError(404, "Sócio não encontrado na orientação.");
       }
       return normalizePartners(current.filter((item) => item.id !== input.itemId));
     });
@@ -460,7 +460,7 @@ export class GuidanceService {
       where: { id: processId, organization_id: organizationId },
       select: { id: true },
     });
-    if (!process) throw new ServiceError(404, "Processo nao encontrado.");
+    if (!process) throw new ServiceError(404, "Processo não encontrado.");
   }
 
   private async getGuidance(
@@ -472,7 +472,7 @@ export class GuidanceService {
       where: { id, organization_id: organizationId },
       include,
     });
-    if (!guidance) throw new ServiceError(404, "Orientacao nao encontrada.");
+    if (!guidance) throw new ServiceError(404, "Orientação não encontrada.");
     return guidance;
   }
 
@@ -486,7 +486,7 @@ export class GuidanceService {
         code: err instanceof Prisma.PrismaClientKnownRequestError ? err.code : undefined,
       });
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-        throw new ServiceError(409, "Ja existe orientacao em andamento para este processo.");
+        throw new ServiceError(409, "Já existe orientação em andamento para este processo.");
       }
       throw err;
     }

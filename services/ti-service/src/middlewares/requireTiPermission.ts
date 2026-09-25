@@ -18,7 +18,7 @@ export function requireTiPermission(minPermission: TiPermissionLevel): RequestHa
       const authContext = requireAuthenticatedRequestContext(request);
 
       if (typeof authContext.permission !== "number" || authContext.permission < minPermission) {
-        next(new ServiceError(403, "Permissao insuficiente para acessar o ti-service."));
+        next(new ServiceError(403, "Permissão insuficiente para acessar o módulo de TI."));
         return;
       }
 

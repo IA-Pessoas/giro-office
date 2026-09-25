@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from "@shared/services/toast";
 
 import { resolveDepartmentModuleKey } from '@modules/auth';
 import { Dialog } from '@shared/components';

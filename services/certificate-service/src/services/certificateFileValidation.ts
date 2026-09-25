@@ -22,7 +22,7 @@ export function validateCertificateUploadFile(
   maxSizeBytes: number,
 ): CertificateUploadFile {
   if (!file) {
-    throw new ServiceError(400, "Arquivo de certificado e obrigatorio.");
+    throw new ServiceError(400, "Arquivo de certificado é obrigatório.");
   }
 
   if (file.buffer.length === 0 || file.size === 0) {
@@ -35,11 +35,11 @@ export function validateCertificateUploadFile(
 
   const extension = path.extname(file.originalname).toLowerCase();
   if (extension !== ".pfx" && extension !== ".p12") {
-    throw new ServiceError(400, "Arquivo de certificado deve usar extensao .pfx ou .p12.");
+    throw new ServiceError(400, "Arquivo de certificado deve usar extensão .pfx ou .p12.");
   }
 
   if (!certificateFileMimeTypeSet.has(file.mimetype)) {
-    throw new ServiceError(400, "Tipo de arquivo de certificado nao permitido.");
+    throw new ServiceError(400, "Tipo de arquivo de certificado não permitido.");
   }
 
   return file;

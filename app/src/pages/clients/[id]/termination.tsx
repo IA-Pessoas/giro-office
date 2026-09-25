@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useMemo, useState, type ChangeEvent } from "react";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientTerminationForm } from "@modules/clients/components/ClientTerminationForm";

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ImageIcon, Save, Trash2, Upload } from "lucide-react";
 
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog, Dialog } from "@shared/components";
 import { resolvePhotoUrl } from "@shared/utils";
 
 const ORGANIZATION_SUBPANEL_CLASSNAME =
@@ -47,6 +47,7 @@ export function OrganizationLogoForm({
   onCancel,
 }: OrganizationLogoFormProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
   const resolvedLogoUrl = resolvePhotoUrl(logoUrl);
   const resolvedLogoDraftUrl = resolvePhotoUrl(logoDraft.trim() || null);
   const previewUrl = resolvedLogoDraftUrl ?? resolvedLogoUrl;
@@ -84,9 +85,12 @@ export function OrganizationLogoForm({
   const handleRemove = async () => {
     const removed = await onRemove();
 
-    if (removed) {
-      setIsDialogOpen(false);
+    if (!removed) {
+      // Mantém a confirmação aberta com o erro genérico do diálogo.
+      throw new Error("Falha ao remover a logo.");
     }
+
+    setIsDialogOpen(false);
   };
 
   return (
@@ -137,7 +141,7 @@ export function OrganizationLogoForm({
             {hasConfiguredLogo ? (
               <button
                 type="button"
-                onClick={() => void handleRemove()}
+                onClick={() => setIsRemoveConfirmOpen(true)}
                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
                 disabled={isSaving}
               >
@@ -189,7 +193,7 @@ export function OrganizationLogoForm({
           {hasConfiguredLogo ? (
             <button
               type="button"
-              onClick={() => void handleRemove()}
+              onClick={() => setIsRemoveConfirmOpen(true)}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
               disabled={isSaving}
             >
@@ -246,6 +250,18 @@ export function OrganizationLogoForm({
           </div>
         </Dialog>
       )}
+
+      <ConfirmationDialog
+        open={isRemoveConfirmOpen}
+        onOpenChange={setIsRemoveConfirmOpen}
+        title="Remover logo"
+        description={`Remover a logo da organização ${organizationName}?`}
+        onConfirm={handleRemove}
+        isConfirming={isSaving}
+        errorMessage={null}
+        confirmLabel="Remover logo"
+        cancelLabel="Cancelar"
+      />
     </div>
   );
 }

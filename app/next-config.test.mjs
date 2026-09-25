@@ -59,3 +59,18 @@ test("production and other slots retain upgrade-insecure-requests", async () => 
     assert.equal(getHeader(headers, "Strict-Transport-Security"), "max-age=31536000; includeSubDomains");
   }
 });
+
+// #1370: rotas legadas vão para as telas atuais em vez de mostrar visual antigo ou o login.
+test("legacy routes redirect to the current screens", async () => {
+  const { default: nextConfig } = await import(`${configUrl.href}?scenario=redirects`);
+  const redirects = await nextConfig.redirects();
+  const bySource = Object.fromEntries(redirects.map((rule) => [rule.source, rule]));
+
+  assert.equal(bySource["/home"]?.destination, "/dashboard");
+  assert.equal(bySource["/users"]?.destination, "/administracao");
+  assert.equal(bySource["/me"]?.destination, "/configuracoes");
+  assert.equal(bySource["/clients/:id/commercial"]?.destination, "/clients/:id");
+  for (const rule of redirects) {
+    assert.equal(rule.permanent, false, `${rule.source} não deve virar 308 cacheado`);
+  }
+});

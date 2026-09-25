@@ -5,9 +5,11 @@ export const TASK_FORM_BODY_CLASSNAME = "max-h-[64vh] overflow-y-auto !px-4 !py-
 
 export const TASK_FORM_FORM_CLASSNAME = "space-y-3";
 
-export const TASK_FORM_GRID_CLASSNAME = "grid gap-3 md:grid-cols-2";
+// `grid-cols-1` (minmax(0, 1fr)) segura a coluna única do celular na largura do diálogo; sem ele
+// a trilha implícita cresce até o nome longo do cliente/projeto e corta o campo (#1372).
+export const TASK_FORM_GRID_CLASSNAME = "grid grid-cols-1 gap-3 md:grid-cols-2";
 
-export const TASK_FORM_THREE_COLUMN_GRID_CLASSNAME = "grid gap-3 md:grid-cols-3";
+export const TASK_FORM_THREE_COLUMN_GRID_CLASSNAME = "grid grid-cols-1 gap-3 md:grid-cols-3";
 
 export const TASK_FORM_LABEL_CLASSNAME = "space-y-1.5";
 
@@ -85,6 +87,33 @@ interface GetTaskCreateValidationMessageParams {
   observations: string;
   eligibleResponsibleCount: number;
   responsibleId: string;
+}
+
+export type TaskCreateField =
+  | "project_id"
+  | "department_id"
+  | "model_id"
+  | "urgency"
+  | "responsible_id";
+
+/** Erro de cada campo da nova tarefa, mostrado abaixo do campo (#1367). */
+export function getTaskCreateFieldErrors({
+  projectId,
+  modelId,
+  departmentId,
+  urgency,
+  eligibleResponsibleCount,
+  responsibleId,
+}: GetTaskCreateValidationMessageParams): Partial<Record<TaskCreateField, string>> {
+  const errors: Partial<Record<TaskCreateField, string>> = {};
+  if (!projectId) errors.project_id = "Selecione o projeto.";
+  if (!departmentId) errors.department_id = "Selecione o departamento.";
+  if (!modelId) errors.model_id = "Selecione o modelo de tarefa.";
+  if (!urgency) errors.urgency = "Selecione a urgência.";
+  if (eligibleResponsibleCount > 1 && !responsibleId) {
+    errors.responsible_id = "Selecione um responsável elegível para a tarefa.";
+  }
+  return errors;
 }
 
 export function getTaskCreateValidationMessage({

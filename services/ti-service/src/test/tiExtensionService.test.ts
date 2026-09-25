@@ -93,7 +93,7 @@ describe("TiExtensionService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe um ramal de TI com este numero.",
+      message: "Já existe um ramal de TI com este número.",
     });
   });
 });

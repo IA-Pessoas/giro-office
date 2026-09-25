@@ -857,10 +857,10 @@ runTest("task form obtains legacy edit responsibles independently from project m
   assert.doesNotMatch(source, /listAdminUsers/);
 });
 
-runTest("task model deletion preserves actionable dependency conflicts", () => {
+runTest("task model mutations show the 4xx business message (dependency conflicts included)", () => {
   const source = readFileSync(new URL("./hooks/useTaskModels.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /response\?\.status === 409/);
+  assert.match(source, /response\?\.status && response\.status < 500/);
   assert.match(source, /response\.data\?\.error \?\? response\.data\?\.message/);
 });
 
@@ -1162,7 +1162,7 @@ runTest("task form modal uses compact layout classes", () => {
   assert.equal(TASK_FORM_BODY_CLASSNAME.includes("max-h-[64vh]"), true);
   assert.equal(TASK_FORM_BODY_CLASSNAME.includes("!py-3"), true);
   assert.equal(TASK_FORM_FORM_CLASSNAME, "space-y-3");
-  assert.equal(TASK_FORM_GRID_CLASSNAME, "grid gap-3 md:grid-cols-2");
+  assert.equal(TASK_FORM_GRID_CLASSNAME, "grid grid-cols-1 gap-3 md:grid-cols-2");
   assert.equal(TASK_FORM_TEXTAREA_CLASSNAME.includes("min-h-20"), true);
 });
 

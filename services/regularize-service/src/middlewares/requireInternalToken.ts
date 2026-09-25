@@ -10,13 +10,13 @@ export function requireInternalToken(env: RegularizeServiceEnv) {
     next: NextFunction,
   ): void {
     if (!env.internalServiceToken) {
-      next(new ServiceError(503, "Endpoint interno nao configurado."));
+      next(new ServiceError(503, "Endpoint interno não configurado."));
       return;
     }
 
     const header = request.headers[INTERNAL_SERVICE_TOKEN_HEADER];
     if (typeof header !== "string") {
-      next(new ServiceError(401, "Token interno nao informado."));
+      next(new ServiceError(401, "Token interno não informado."));
       return;
     }
 

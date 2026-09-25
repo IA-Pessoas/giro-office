@@ -13,7 +13,6 @@ const required = [
   "Não foi possível entrar agora. Tente novamente.",
   "um só lugar",
   "Sistema completo de gestão empresarial modular e inteligente",
-  "Módulos",
   "Não tem conta?",
 ];
 
@@ -26,6 +25,10 @@ const forbidden = [
   "Nao tem conta?",
   "senha invalidos",
   "Nao foi possivel entrar",
+  // Estatísticas fictícias removidas (#1371).
+  "99.9%",
+  "Uptime",
+  "24/7",
 ];
 
 for (const text of required) {

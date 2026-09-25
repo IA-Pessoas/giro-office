@@ -44,7 +44,7 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
 
   const authorizationHeader = request.headers.authorization;
   if (!authorizationHeader) {
-    next(new ServiceError(401, "Token de autenticacao nao informado."));
+    next(new ServiceError(401, "Token de autenticação não informado."));
     return;
   }
 
@@ -54,7 +54,7 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     const claims = verifyJwtToken(token, jwtSecret);
 
     if (!claims.organization_id) {
-      throw new ServiceError(401, "Organizacao autenticada nao informada.");
+      throw new ServiceError(401, "Organização autenticada não informada.");
     }
 
     request.user_id = claims.user_id;
@@ -68,6 +68,6 @@ export function isAuthenticated(request: Request, _response: Response, next: Nex
     next();
   } catch (err) {
     logError("Erro ao validar autenticacao do regularize-service", { err });
-    next(new ServiceError(401, "Nao autenticado."));
+    next(new ServiceError(401, "Não autenticado."));
   }
 }

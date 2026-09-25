@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Eye, Loader2, Save, Target } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { Dialog } from "@shared/components";
 import { useRhScoreDetail, useUpdateRhQuarterNitroMutation } from "../../hooks/useRhScore";
 import type { RhNitroMetricType, RhScoreQuestionType } from "../../types";

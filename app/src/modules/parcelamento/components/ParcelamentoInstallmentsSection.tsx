@@ -35,6 +35,7 @@ import {
   parcelamentoSecondaryButtonClassName,
   parcelamentoTextFieldClassName,
 } from "./parcelamentoFormControls";
+import { formatCount } from "@shared/utils/formatters";
 
 interface ParcelamentoInstallmentsSectionProps {
   selectedClient: ParcelamentoClientOption | null;
@@ -216,8 +217,8 @@ export function ParcelamentoInstallmentsSection({
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             {selectedClient
-              ? `${total} registros encontrados.`
-              : `${total} registros encontrados em todos os clientes.`}
+              ? `${formatCount(total, "registro encontrado", "registros encontrados")}.`
+              : `${formatCount(total, "registro encontrado", "registros encontrados")} em todos os clientes.`}
           </p>
         </div>
 

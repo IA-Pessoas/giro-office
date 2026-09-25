@@ -23,7 +23,7 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import {
@@ -476,35 +476,6 @@ function DashboardSectionCard({
   );
 }
 
-function DashboardHeroCard({
-  description,
-  icon: Icon,
-  label,
-  value,
-}: {
-  description: string;
-  icon: LucideIcon;
-  label: string;
-  value: number | string;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-violet-600 p-5 text-white shadow-sm">
-      <div className="flex min-h-[180px] items-start justify-between gap-5">
-        <div className="min-w-0">
-          <p className="text-base font-semibold uppercase tracking-[0.06em] text-white/85">
-            {label}
-          </p>
-          <p className="mt-3 text-4xl font-semibold tracking-tight">{value}</p>
-          <p className="mt-3 max-w-md text-sm leading-6 text-white/75">{description}</p>
-        </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MetricTile({
   icon: Icon,
   label,
@@ -728,13 +699,13 @@ function MaskedValue() {
 }
 
 function getSiteCredentialDetailStatus(error: unknown): string {
-  const message = getRegularizeErrorMessage(error, "Credencial indisponivel para revelacao.");
+  const message = getRegularizeErrorMessage(error, "Credencial indisponível para revelação.");
 
   if (/403|forbidden|permission|permiss|acesso negado/i.test(message)) {
     return "Acesso negado para revelar credenciais.";
   }
 
-  return "Credencial indisponivel para revelacao.";
+  return "Credencial indisponível para revelação.";
 }
 
 function IndependentGuidanceSection({
@@ -1968,45 +1939,38 @@ export function RegularizePage() {
 
       {activeTab === "dashboard" && dashboardQuery.data ? (
         <section className="space-y-5">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
-            <DashboardHeroCard
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <MetricTile
               icon={ClipboardList}
-              label={
-                dashboardQuery.data.metrics.openProcesses > 0
-                  ? "Processos em acompanhamento"
-                  : "Fluxo operacional em dia"
-              }
+              label="Processos abertos"
               value={dashboardQuery.data.metrics.openProcesses}
-              description={
+              supporting={
                 dashboardQuery.data.metrics.openProcesses > 0
-                  ? "Processos que ainda exigem acompanhamento, retorno ou conclusão dentro do Regularize."
-                  : "Nenhum processo aberto no momento. Novas demandas passam a aparecer aqui quando entrarem no fluxo."
+                  ? "Aguardando acompanhamento ou conclusão."
+                  : "Fluxo operacional em dia."
               }
             />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
-              <MetricTile
-                icon={BadgeCheck}
-                label="Licenças ativas"
-                value={dashboardQuery.data.metrics.activeLicenses}
-              />
-              <MetricTile
-                icon={UserRound}
-                label="PF ativos"
-                value={dashboardQuery.data.metrics.activeClientPfs}
-              />
-              <MetricTile
-                icon={Landmark}
-                label="Tributos pendentes"
-                value={dashboardQuery.data.metrics.municipalTaxesPending}
-                supporting={`${dashboardQuery.data.metrics.municipalTaxesCompleted}/${dashboardQuery.data.metrics.municipalTaxesTotal} criados em ${dashboardQuery.data.year}`}
-              />
-              <MetricTile
-                icon={ShieldCheck}
-                label="Sites ativos"
-                value={dashboardQuery.data.metrics.activeSites}
-              />
-            </div>
+            <MetricTile
+              icon={BadgeCheck}
+              label="Licenças ativas"
+              value={dashboardQuery.data.metrics.activeLicenses}
+            />
+            <MetricTile
+              icon={UserRound}
+              label="PF ativos"
+              value={dashboardQuery.data.metrics.activeClientPfs}
+            />
+            <MetricTile
+              icon={Landmark}
+              label="Tributos pendentes"
+              value={dashboardQuery.data.metrics.municipalTaxesPending}
+              supporting={`${dashboardQuery.data.metrics.municipalTaxesCompleted}/${dashboardQuery.data.metrics.municipalTaxesTotal} criados em ${dashboardQuery.data.year}`}
+            />
+            <MetricTile
+              icon={ShieldCheck}
+              label="Sites ativos"
+              value={dashboardQuery.data.metrics.activeSites}
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">

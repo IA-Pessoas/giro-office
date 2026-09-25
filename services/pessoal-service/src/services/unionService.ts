@@ -21,7 +21,7 @@ const unionSelect = {
 
 const UNION_LINKED_TO_PAYROLL_MESSAGE =
   "Não é possível remover o sindicato porque ele está vinculado a uma ou mais configurações de folha. Altere esses vínculos antes de tentar novamente.";
-const UNION_NOT_FOUND_MESSAGE = "Sindicato nao encontrado.";
+const UNION_NOT_FOUND_MESSAGE = "Sindicato não encontrado.";
 
 function isPrismaForeignKeyConstraintError(err: unknown): boolean {
   return (
@@ -143,7 +143,7 @@ export class UnionService {
       });
 
       if (existing) {
-        throw new ServiceError(409, "Sindicato ja cadastrado.");
+        throw new ServiceError(409, "Sindicato já cadastrado.");
       }
 
       const created = await this.prisma.unionPessoal.create({
@@ -209,7 +209,7 @@ export class UnionService {
         select: { id: true },
       });
       if (duplicate) {
-        throw new ServiceError(409, "Sindicato ja cadastrado.");
+        throw new ServiceError(409, "Sindicato já cadastrado.");
       }
 
       const updated = await this.prisma.unionPessoal.update({

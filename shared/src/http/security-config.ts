@@ -78,7 +78,8 @@ export function validateProductionCorsOrigins({
 
 export function createServiceCorsOptions(
   allowedOrigins: string[],
-  serviceLabel: string,
+  // Mantido na assinatura dos serviços; o nome interno não vai mais na mensagem (#1371).
+  _serviceLabel: string,
 ): ServiceCorsOptions {
   return {
     origin(origin, callback) {
@@ -92,7 +93,7 @@ export function createServiceCorsOptions(
         return;
       }
 
-      callback(new ServiceError(403, `Origin não permitida pelo ${serviceLabel}.`));
+      callback(new ServiceError(403, "Origem não permitida."));
     },
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     allowedHeaders: [

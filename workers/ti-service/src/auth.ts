@@ -119,7 +119,7 @@ export async function authenticateTiRequest(
 
 export function requireTiPermission(auth: WorkerAuthContext, minimum: number): void {
   if ((auth.claims.modules?.ti ?? 0) < minimum) {
-    throw new ServiceError(403, "Permissão insuficiente para acessar o ti-service.");
+    throw new ServiceError(403, "Permissão insuficiente para acessar o módulo de TI.");
   }
 }
 

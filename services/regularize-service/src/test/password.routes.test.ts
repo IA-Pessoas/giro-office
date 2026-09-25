@@ -125,7 +125,7 @@ describe("regularize password routes", () => {
     expect(response.status).toBe(422);
     expect(response.body.success).toBe(false);
     expect(response.body.error).toBe(
-      "Credencial indisponivel para revelacao. Atualize o cadastro da senha.",
+      "Credencial indisponível para revelação. Atualize o cadastro da senha.",
     );
     expect(JSON.stringify(response.body)).not.toContain("legacy-login");
     expect(JSON.stringify(response.body)).not.toContain("legacy-password");

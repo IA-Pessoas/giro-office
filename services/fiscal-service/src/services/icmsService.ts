@@ -173,7 +173,7 @@ export class IcmsService {
       });
 
       if (!exists) {
-        throw new ServiceError(404, "ICMS nao existe.");
+        throw new ServiceError(404, "ICMS não existe.");
       }
 
       const deleted = await this.prisma.icms.delete({

@@ -42,6 +42,7 @@ function extractionUnavailable(reason: string): never {
     AI_EXTRACTION_UNAVAILABLE_MESSAGE,
     undefined,
     AI_EXTRACTION_UNAVAILABLE_CODE,
+    { expose: true },
   );
 }
 

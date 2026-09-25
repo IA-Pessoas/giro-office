@@ -1,8 +1,8 @@
 import { Copy, FolderOpen, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog, Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
 import { isOrganizationOwner } from "@modules/auth";
 
@@ -39,6 +39,7 @@ function ModelCard({ model, shared, canManageShared, onEdit, onOpen, opening }: 
   const deleteMutation = useDeleteReportModelMutation();
   const copyMutation = useCopySharedReportModelMutation();
   const summary = modelSummary(model);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function copyModel() {
     try {
@@ -50,13 +51,8 @@ function ModelCard({ model, shared, canManageShared, onEdit, onOpen, opening }: 
   }
 
   async function deleteModel() {
-    if (!window.confirm("Excluir este modelo pessoal?")) return;
-    try {
-      await deleteMutation.mutateAsync(model.id);
-      toast.success("Modelo excluído.");
-    } catch {
-      toast.error("Não foi possível excluir o modelo.");
-    }
+    await deleteMutation.mutateAsync(model.id);
+    toast.success("Modelo excluído.");
   }
 
   return (
@@ -81,7 +77,7 @@ function ModelCard({ model, shared, canManageShared, onEdit, onOpen, opening }: 
             {copyMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />} Copiar como modelo pessoal
           </button>
         ) : (
-          <button type="button" onClick={deleteModel} disabled={deleteMutation.isPending} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30">
+          <button type="button" onClick={() => setConfirmingDelete(true)} disabled={deleteMutation.isPending} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30">
             <Trash2 className="h-3.5 w-3.5" /> Excluir
           </button>
         )}
@@ -91,6 +87,17 @@ function ModelCard({ model, shared, canManageShared, onEdit, onOpen, opening }: 
           </button>
         ) : null}
       </div>
+      <ConfirmationDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title="Excluir modelo pessoal"
+        description={`Excluir o modelo pessoal "${model.name}"?`}
+        onConfirm={deleteModel}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={null}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+      />
     </li>
   );
 }

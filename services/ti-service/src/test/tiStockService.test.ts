@@ -45,7 +45,7 @@ describe("TiStockService", () => {
 
     await expect(service.createCategory(context, { name: "rede interna" })).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+      message: "Já existe uma categoria de estoque de TI ativa com este nome.",
     });
 
     expect(findMany).toHaveBeenCalledWith({
@@ -73,7 +73,7 @@ describe("TiStockService", () => {
 
     await expect(service.createCategory(context, { name: "Redes" })).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+      message: "Já existe uma categoria de estoque de TI ativa com este nome.",
     });
   });
 
@@ -93,7 +93,7 @@ describe("TiStockService", () => {
       service.updateCategory(context, categoryId, { name: "Perifericos" }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+      message: "Já existe uma categoria de estoque de TI ativa com este nome.",
     });
   });
 
@@ -113,7 +113,7 @@ describe("TiStockService", () => {
       service.updateCategory(context, categoryId, { status: true }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+      message: "Já existe uma categoria de estoque de TI ativa com este nome.",
     });
   });
 
@@ -216,7 +216,7 @@ describe("TiStockService", () => {
       service.createLocation(context, { name: "  ALMOXARIFADO   SAO  " }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe um local de estoque de TI ativo com este nome.",
+      message: "Já existe um local de estoque de TI ativo com este nome.",
     });
     expect(locationStock.create).not.toHaveBeenCalled();
   });

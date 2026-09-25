@@ -474,7 +474,7 @@ function localUnionService(
         where: { id, organization_id: context.organizationId },
         select,
       });
-      if (!row) throw new ServiceError(404, "Sindicato nao encontrado.");
+      if (!row) throw new ServiceError(404, "Sindicato não encontrado.");
       return row;
     },
     async create(context, body) {
@@ -488,7 +488,7 @@ function localUnionService(
         },
         select: { id: true },
       });
-      if (existing) throw new ServiceError(409, "Sindicato ja cadastrado.");
+      if (existing) throw new ServiceError(409, "Sindicato já cadastrado.");
       const row = await prisma.unionPessoal.create({
         data: {
           name: body.name,
@@ -518,7 +518,7 @@ function localUnionService(
         where: { id, organization_id: organizationId },
         select,
       });
-      if (!current) throw new ServiceError(404, "Sindicato nao encontrado.");
+      if (!current) throw new ServiceError(404, "Sindicato não encontrado.");
       if (
         body.cnpj !== undefined &&
         body.cnpj !== current.cnpj &&
@@ -541,7 +541,7 @@ function localUnionService(
         },
         select: { id: true },
       });
-      if (duplicate) throw new ServiceError(409, "Sindicato ja cadastrado.");
+      if (duplicate) throw new ServiceError(409, "Sindicato já cadastrado.");
       const row = await prisma.unionPessoal.update({ where: { id }, data, select });
       await audit(env, {
         organizationId,
@@ -563,14 +563,14 @@ function localUnionService(
         where: { id, organization_id: organizationId },
         select,
       });
-      if (!current) throw new ServiceError(404, "Sindicato nao encontrado.");
+      if (!current) throw new ServiceError(404, "Sindicato não encontrado.");
       if (
         (await prisma.payroll.count({ where: { organization_id: organizationId, union_id: id } })) >
         0
       ) {
         throw new ServiceError(
           409,
-          "Nao e possivel remover o sindicato porque ele esta vinculado a uma ou mais configuracoes de folha.",
+          "Não é possível remover o sindicato porque ele está vinculado a uma ou mais configurações de folha.",
         );
       }
       const row = await prisma.unionPessoal.delete({ where: { id }, select });
@@ -619,7 +619,7 @@ function localSituationService(
         where: { id, organization_id: context.organizationId },
         select,
       });
-      if (!row) throw new ServiceError(404, "Situacao nao encontrada.");
+      if (!row) throw new ServiceError(404, "Situação não encontrada.");
       return row;
     },
     async create(context, body) {
@@ -628,7 +628,7 @@ function localSituationService(
         where: { id: body.client_id, organization_id: organizationId },
         select: { id: true },
       });
-      if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
       const row = await prisma.situationsPessoal.create({
         data: {
           client_id: body.client_id,
@@ -660,7 +660,7 @@ function localSituationService(
         where: { id, organization_id: organizationId },
         select,
       });
-      if (!current) throw new ServiceError(404, "Situacao nao encontrada.");
+      if (!current) throw new ServiceError(404, "Situação não encontrada.");
       const data = {
         ...(body.status !== undefined ? { status: body.status } : {}),
         ...(body.title !== undefined ? { title: body.title } : {}),
@@ -692,7 +692,7 @@ function localSituationService(
         where: { id, organization_id: organizationId },
         select,
       });
-      if (!current) throw new ServiceError(404, "Situacao nao encontrada.");
+      if (!current) throw new ServiceError(404, "Situação não encontrada.");
       const row = await prisma.situationsPessoal.delete({ where: { id }, select });
       await audit(env, {
         organizationId,
@@ -739,7 +739,7 @@ function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): P
         where: { id: body.client_id, organization_id: organizationId },
         select: { id: true },
       });
-      if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
       const row = await prisma.lddPessoal.create({
         data: {
           client_id: body.client_id,
@@ -773,7 +773,7 @@ function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): P
         where: { id, organization_id: organizationId },
         select,
       });
-      if (!current) throw new ServiceError(404, "LDD nao encontrado.");
+      if (!current) throw new ServiceError(404, "LDD não encontrado.");
       const data = {
         ...(body.type !== undefined ? { type: body.type } : {}),
         ...(body.period !== undefined ? { period: body.period } : {}),
@@ -805,7 +805,7 @@ function localLddService(prisma: PessoalDomainPrisma, env?: PessoalWorkerEnv): P
         where: { id, organization_id: organizationId },
         select,
       });
-      if (!current) throw new ServiceError(404, "LDD nao encontrado.");
+      if (!current) throw new ServiceError(404, "LDD não encontrado.");
       const row = await prisma.lddPessoal.delete({ where: { id }, select });
       await audit(env, {
         organizationId,
@@ -851,7 +851,7 @@ function localPasswordService(
       })
     : undefined;
   const requireCrypto = () => {
-    if (!crypto) throw new ServiceError(500, "Criptografia de senha de pessoal nao configurada.");
+    if (!crypto) throw new ServiceError(500, "Criptografia de senha de pessoal não configurada.");
     return crypto;
   };
   const secretValue = (value: unknown): string | null =>
@@ -886,7 +886,7 @@ function localPasswordService(
         where: { id, organization_id: context.organizationId },
         select: detailSelect,
       });
-      if (!row) throw new ServiceError(404, "Senha de pessoal nao encontrada.");
+      if (!row) throw new ServiceError(404, "Senha de pessoal não encontrada.");
       if (Number(context.permission ?? 0) < 3) return listRecord(row);
 
       const passwordCrypto = requireCrypto();
@@ -934,14 +934,14 @@ function localPasswordService(
         where: { id: body.client_id, organization_id: organizationId },
         select: { id: true },
       });
-      if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
       if (body.responsavel_id) {
         const user = await prisma.user.findFirst({
           where: { id: body.responsavel_id, organization_id: organizationId },
           select: { id: true },
         });
         if (!user)
-          throw new ServiceError(404, "Responsavel nao encontrado ou inelegivel para Pessoal.");
+          throw new ServiceError(404, "Responsável não encontrado ou inelegível para Pessoal.");
       }
       const data = {
         client_id: body.client_id,
@@ -979,14 +979,14 @@ function localPasswordService(
         where: { id, organization_id: organizationId },
         select: detailSelect,
       });
-      if (!current) throw new ServiceError(404, "Senha de pessoal nao encontrada.");
+      if (!current) throw new ServiceError(404, "Senha de pessoal não encontrada.");
       if (body.responsavel_id) {
         const user = await prisma.user.findFirst({
           where: { id: body.responsavel_id, organization_id: organizationId },
           select: { id: true },
         });
         if (!user)
-          throw new ServiceError(404, "Responsavel nao encontrado ou inelegivel para Pessoal.");
+          throw new ServiceError(404, "Responsável não encontrado ou inelegível para Pessoal.");
       }
       const data: Record<string, unknown> = {};
       for (const field of ["service_name", "responsavel_id", "notes"] as const) {
@@ -1021,7 +1021,7 @@ function localPasswordService(
         where: { id, organization_id: organizationId },
         select: detailSelect,
       });
-      if (!current) throw new ServiceError(404, "Senha de pessoal nao encontrada.");
+      if (!current) throw new ServiceError(404, "Senha de pessoal não encontrada.");
       const row = await prisma.passwordPessoal.delete({ where: { id }, select: listSelect });
       await audit(env, {
         organizationId,
@@ -1080,21 +1080,21 @@ function localPayrollService(
       where: { id: body.client_id, organization_id: organizationId },
       select: { id: true },
     });
-    if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+    if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
     if (body.responsible_id) {
       const user = await prisma.user.findFirst({
         where: { id: body.responsible_id, organization_id: organizationId },
         select: { id: true },
       });
       if (!user)
-        throw new ServiceError(404, "Responsavel nao encontrado ou inelegivel para Pessoal.");
+        throw new ServiceError(404, "Responsável não encontrado ou inelegível para Pessoal.");
     }
     if (body.union_id) {
       const union = await prisma.unionPessoal.findFirst({
         where: { id: body.union_id, organization_id: organizationId },
         select: { id: true },
       });
-      if (!union) throw new ServiceError(404, "Sindicato nao encontrado para a organizacao.");
+      if (!union) throw new ServiceError(404, "Sindicato não encontrado para a organização.");
     }
     const group = await prisma.pessoalGroup.findFirst({
       where: { id: body.group_id, organization_id: organizationId, archived_at: null },
@@ -1118,7 +1118,7 @@ function localPayrollService(
         where: { client_id: body.client_id, organization_id: organizationId },
         select: { id: true },
       });
-      if (existing) throw new ServiceError(409, "Folha de pessoal ja cadastrada para o cliente.");
+      if (existing) throw new ServiceError(409, "Folha de pessoal já cadastrada para o cliente.");
       const groupId = await ensureRelationships(organizationId, body);
       const row = await prisma.payroll.create({
         data: {
@@ -1155,7 +1155,7 @@ function localPayrollService(
         where: { client_id: clientId, organization_id: organizationId },
         select,
       });
-      if (!existing) throw new ServiceError(404, "Folha de pessoal nao encontrada.");
+      if (!existing) throw new ServiceError(404, "Folha de pessoal não encontrada.");
       const groupId = await ensureRelationships(organizationId, {
         ...body,
         client_id: clientId,
@@ -1231,7 +1231,7 @@ function localObligationService(
       where: { id: clientId, organization_id: organizationId },
       select: { id: true },
     });
-    if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+    if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
   };
   const buildData = (
     organizationId: string,
@@ -1257,12 +1257,12 @@ function localObligationService(
   });
   const validGroup = (group: Record<string, unknown> | null) => {
     if (!group)
-      throw new ServiceError(409, "Folha de pessoal sem grupo canonico para gerar obrigacao.");
+      throw new ServiceError(409, "Folha de pessoal sem grupo canônico para gerar obrigação.");
     if (group.archived_at)
-      throw new ServiceError(409, "Grupo de pessoal arquivado nao gera novas obrigacoes.");
+      throw new ServiceError(409, "Grupo de pessoal arquivado não gera novas obrigações.");
     if (group.policy === NO_OBLIGATIONS_GROUP_POLICY) return false;
     if (group.policy !== NORMAL_GROUP_POLICY)
-      throw new ServiceError(409, "Politica de grupo de pessoal invalida.");
+      throw new ServiceError(409, "Política de grupo de pessoal inválida.");
     return true;
   };
 
@@ -1293,7 +1293,7 @@ function localObligationService(
         where: { organization_id: organizationId, client_id: body.client_id },
         select: payrollSelect,
       })) as Record<string, unknown> | null;
-      if (!payroll) throw new ServiceError(404, "Folha de pessoal nao encontrada para o cliente.");
+      if (!payroll) throw new ServiceError(404, "Folha de pessoal não encontrada para o cliente.");
       const group = payroll.group_id
         ? await prisma.pessoalGroup.findFirst({
             where: { id: payroll.group_id, organization_id: organizationId },
@@ -1331,14 +1331,14 @@ function localObligationService(
         where: { id, organization_id: organizationId },
         select,
       });
-      if (!existing) throw new ServiceError(404, "Obrigacao de pessoal nao encontrada.");
+      if (!existing) throw new ServiceError(404, "Obrigação de pessoal não encontrada.");
       if (body.responsavel_id) {
         const user = await prisma.user.findFirst({
           where: { id: body.responsavel_id, organization_id: organizationId },
           select: { id: true },
         });
         if (!user)
-          throw new ServiceError(404, "Responsavel nao encontrado ou inelegivel para Pessoal.");
+          throw new ServiceError(404, "Responsável não encontrado ou inelegível para Pessoal.");
       }
       const updated = await prisma.obrigationsPessoal.update({ where: { id }, data: body, select });
       await audit(env, {
@@ -1419,7 +1419,7 @@ function localObligationService(
           continue;
         }
         if (group.policy !== NORMAL_GROUP_POLICY) {
-          throw new ServiceError(409, "Politica de grupo de pessoal invalida.");
+          throw new ServiceError(409, "Política de grupo de pessoal inválida.");
         }
         data.push(buildData(organizationId, competence, payroll, group));
       }
@@ -1662,7 +1662,7 @@ export function createPessoalWorkerApp(options: PessoalOptions = {}) {
   const requireInternalToken = (c: PessoalContext): void => {
     const token = c.req.header(INTERNAL_SERVICE_TOKEN_HEADER);
     const expected = (options.env ?? c.env).INTERNAL_SERVICE_TOKEN;
-    if (!token) throw new ServiceError(401, "Token interno nao informado.");
+    if (!token) throw new ServiceError(401, "Token interno não informado.");
     if (token !== expected) throw new ServiceError(403, "Acesso negado.");
   };
   app.get("/pessoal/groups", (c) =>

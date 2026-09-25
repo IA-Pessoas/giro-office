@@ -15,7 +15,7 @@ export function requireRegularizePermission(
     : MIN_REGULARIZE_WRITE_PERMISSION;
 
   if (Number(request.permission ?? 0) < minimumPermission) {
-    next(new ServiceError(403, "Permissao insuficiente para acessar o modulo Regularize."));
+    next(new ServiceError(403, "Permissão insuficiente para acessar o módulo Regularize."));
     return;
   }
 

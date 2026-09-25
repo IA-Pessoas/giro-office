@@ -158,7 +158,7 @@ export function contabilPermission(auth: WorkerAuthContext): number {
 
 export function requireContabilWrite(auth: WorkerAuthContext): void {
   if (contabilPermission(auth) < 2) {
-    throw new ServiceError(403, "Permissao insuficiente para alterar dados contabeis.");
+    throw new ServiceError(403, "Permissão insuficiente para alterar dados contábeis.");
   }
 }
 

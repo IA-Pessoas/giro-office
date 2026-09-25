@@ -1,6 +1,6 @@
 import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useDownloadReportMutation } from "../hooks/useReports";
 import type { ReportExportFormat } from "../types/report.types";
@@ -38,7 +38,7 @@ export function ReportDownloadActions({ id, disabled = false }: { id: string; di
     <div
       className="flex flex-wrap gap-2"
       aria-busy={downloadMutation.isPending}
-      aria-label="Downloads do snapshot"
+      aria-label="Downloads do relatório"
     >
       {downloadMutation.isPending && activeLabel ? (
         <span className="sr-only" role="status">

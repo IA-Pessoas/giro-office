@@ -150,7 +150,7 @@ export function RegularizeGuidancePartnerForm({
         }
       }}
       title={mode === "edit" ? "Editar sócio" : "Adicionar sócio"}
-      description="Snapshot do sócio na orientação procedural."
+      description="Dados do sócio registrados nesta orientação."
       contentClassName="w-[min(92vw,680px)]"
     >
       <form onSubmit={handleSubmit} className="space-y-4">

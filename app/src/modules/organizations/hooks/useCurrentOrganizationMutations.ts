@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import type { Organization } from "../types";
 import { organizationService } from "../services/organizationService";

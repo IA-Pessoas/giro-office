@@ -23,7 +23,7 @@ export function normalizeFinancialStatus(value: unknown): FinancialStatus {
     return status;
   }
 
-  throw new Error("Status financeiro invalido.");
+  throw new Error("Status financeiro inválido.");
 }
 
 export function applyFinancialStatusTransition(input: {

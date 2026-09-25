@@ -33,6 +33,7 @@ import {
   parcelamentoSecondaryButtonClassName,
   parcelamentoTextFieldClassName,
 } from "./parcelamentoFormControls";
+import { formatCount } from "@shared/utils/formatters";
 
 const FIRST_PAGE = 1;
 const PAGE_SIZE = 50;
@@ -250,7 +251,7 @@ export function ParcelamentoCompetenciesSection({
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             {selectedInstallmentId
-              ? `${total} registros encontrados.`
+              ? `${formatCount(total, "registro encontrado", "registros encontrados")}.`
               : "Selecione um parcelamento para listar as competências."}
           </p>
         </div>

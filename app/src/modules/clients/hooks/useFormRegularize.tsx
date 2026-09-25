@@ -1,5 +1,5 @@
 import { useState, ChangeEvent } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from "@shared/services/toast";
 import { setupAPIClient } from '@shared/services/api';
 
 interface ClientFormData {

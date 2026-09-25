@@ -19,7 +19,7 @@ function runTest(name, fn) {
 
 runTest("RH point adjustment errors preserve domain messages without leaking 5xx details", () => {
   const conflictMessage =
-    "O dia esta bloqueado por uma folha assinada; reabra a folha antes de altera-lo.";
+    "O dia está bloqueado por uma folha assinada; reabra a folha antes de alterá-lo.";
 
   assert.equal(
     getRhErrorMessage({ response: { status: 409, data: { error: conflictMessage } } }, "fallback"),

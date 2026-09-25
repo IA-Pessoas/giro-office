@@ -144,7 +144,7 @@ export function registerRequestRoutes(app: RhApp, deps: RhRouteDeps): void {
         found.requester_user_id !== auth.userId &&
         found.assigned_to_user_id !== auth.userId
       ) {
-        throw new ServiceError(403, "Permissao insuficiente para acessar solicitacao de terceiro.");
+        throw new ServiceError(403, "Permissão insuficiente para acessar solicitação de terceiro.");
       }
       await service.markOpened({
         organization_id: auth.organizationId,

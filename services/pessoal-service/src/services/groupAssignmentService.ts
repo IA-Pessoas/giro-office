@@ -253,7 +253,7 @@ export class GroupAssignmentService {
     } catch (err: unknown) {
       logError("Erro ao criar previa persistida de atribuicao em lote", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao criar previa de atribuicao em lote.", err);
+      throw new ServiceError(500, "Erro ao criar prévia de atribuição em lote.", err);
     }
   }
 
@@ -277,7 +277,7 @@ export class GroupAssignmentService {
       where: { id: previewId, organization_id: context.organizationId },
       select: previewSelect,
     });
-    if (!preview) throw new ServiceError(404, "Previa de atribuicao em lote nao encontrada.");
+    if (!preview) throw new ServiceError(404, "Prévia de atribuição em lote não encontrada.");
     const [total, details] = await Promise.all([
       this.prisma.pessoalGroupAssignmentPreviewDetail.count({ where: { preview_id: preview.id } }),
       this.prisma.pessoalGroupAssignmentPreviewDetail.findMany({
@@ -298,7 +298,7 @@ export class GroupAssignmentService {
       }),
     ]);
     if (!isPreviewTotals(preview.totals))
-      throw new ServiceError(500, "Previa de atribuicao invalida.");
+      throw new ServiceError(500, "Prévia de atribuição inválida.");
     return {
       preview_id: preview.id,
       fingerprint: preview.fingerprint,
@@ -343,7 +343,7 @@ export class GroupAssignmentService {
         });
         if (previous) {
           if (previous.command_hash !== commandHash) {
-            throw new ServiceError(409, "Idempotency-Key ja utilizada com outro comando.");
+            throw new ServiceError(409, "Idempotency-Key já utilizada com outro comando.");
           }
           return {
             response: previous.response_snapshot as unknown as {
@@ -360,17 +360,17 @@ export class GroupAssignmentService {
           select: previewSelect,
         });
         if (!preview || preview.fingerprint !== body.fingerprint) {
-          throw new ServiceError(409, "Previa inexistente ou obsoleta. Gere uma nova previa.");
+          throw new ServiceError(409, "Prévia inexistente ou obsoleta. Gere uma nova prévia.");
         }
         if (
           preview.applied_at ||
           preview.expires_at <= this.now() ||
           preview.targetGroup.archived_at
         ) {
-          throw new ServiceError(409, "Previa expirada ou obsoleta. Gere uma nova previa.");
+          throw new ServiceError(409, "Prévia expirada ou obsoleta. Gere uma nova prévia.");
         }
         if (!isPreviewTotals(preview.totals))
-          throw new ServiceError(409, "Previa invalida. Gere uma nova previa.");
+          throw new ServiceError(409, "Prévia inválida. Gere uma nova prévia.");
         const actionable = await tx.pessoalGroupAssignmentPreviewDetail.findMany({
           where: { preview_id: preview.id, outcome: { in: [OUTCOME_CHANGED, OUTCOME_NO_OP] } },
           select: { client_id: true, payroll_id: true, previous_group_id: true, outcome: true },
@@ -403,13 +403,13 @@ export class GroupAssignmentService {
             payroll.id !== detail.payroll_id ||
             payroll.group_id !== detail.previous_group_id
           ) {
-            throw new ServiceError(409, "Previa obsoleta. Gere uma nova previa.");
+            throw new ServiceError(409, "Prévia obsoleta. Gere uma nova prévia.");
           }
         }
         for (const detail of actionable) {
           if (detail.outcome !== OUTCOME_CHANGED) continue;
           if (detail.previous_group_id === null)
-            throw new ServiceError(409, "Previa obsoleta. Gere uma nova previa.");
+            throw new ServiceError(409, "Prévia obsoleta. Gere uma nova prévia.");
           const changed = await tx.payroll.updateMany({
             where: {
               id: detail.payroll_id ?? "",
@@ -420,7 +420,7 @@ export class GroupAssignmentService {
             data: { group_id: preview.target_group_id },
           });
           if (changed.count !== 1)
-            throw new ServiceError(409, "Previa obsoleta. Gere uma nova previa.");
+            throw new ServiceError(409, "Prévia obsoleta. Gere uma nova prévia.");
         }
         const response = {
           preview_id: preview.id,
@@ -470,7 +470,7 @@ export class GroupAssignmentService {
       });
       if (result.idempotent) return { ...result.response, idempotent: true };
       if (!result.auditPayload || !result.outboxId) {
-        throw new ServiceError(500, "Resultado de auditoria da atribuicao em lote invalido.");
+        throw new ServiceError(500, "Resultado de auditoria da atribuição em lote inválido.");
       }
       const auditRecorded = await this.auditService.recordChange(result.auditPayload);
       if (auditRecorded) {
@@ -483,7 +483,7 @@ export class GroupAssignmentService {
     } catch (err: unknown) {
       logError("Erro ao aplicar atribuicao de grupo em lote", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao aplicar atribuicao de grupo em lote.", err);
+      throw new ServiceError(500, "Erro ao aplicar atribuição de grupo em lote.", err);
     }
   }
 

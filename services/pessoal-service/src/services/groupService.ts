@@ -78,7 +78,7 @@ export class GroupService {
     });
 
     if (!group) {
-      throw new ServiceError(404, "Grupo de pessoal nao encontrado.");
+      throw new ServiceError(404, "Grupo de pessoal não encontrado.");
     }
 
     return group;
@@ -115,7 +115,7 @@ export class GroupService {
       logError("Erro ao criar grupo de pessoal", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um grupo com este nome na organizacao.", err);
+        throw new ServiceError(409, "Já existe um grupo com este nome na organização.", err);
       }
       throw new ServiceError(500, "Erro ao criar grupo de pessoal.", err);
     }
@@ -131,7 +131,7 @@ export class GroupService {
       const userId = requireUserId(context);
       const existing = await this.detail(context, id);
       if (existing.system_key === NO_MOVEMENT_GROUP_SYSTEM_KEY) {
-        throw new ServiceError(409, "O grupo Sem Movimento nao pode ser alterado.");
+        throw new ServiceError(409, "O grupo Sem Movimento não pode ser alterado.");
       }
       const data = {
         ...(body.name
@@ -164,7 +164,7 @@ export class GroupService {
       logError("Erro ao atualizar grupo de pessoal", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um grupo com este nome na organizacao.", err);
+        throw new ServiceError(409, "Já existe um grupo com este nome na organização.", err);
       }
       throw new ServiceError(500, "Erro ao atualizar grupo de pessoal.", err);
     }
@@ -176,7 +176,7 @@ export class GroupService {
       const userId = requireUserId(context);
       const existing = await this.detail(context, id);
       if (existing.system_key === NO_MOVEMENT_GROUP_SYSTEM_KEY) {
-        throw new ServiceError(409, "O grupo Sem Movimento nao pode ser arquivado.");
+        throw new ServiceError(409, "O grupo Sem Movimento não pode ser arquivado.");
       }
       const archived = await this.prisma.pessoalGroup.update({
         where: { id },

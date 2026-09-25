@@ -65,7 +65,7 @@ describe("serviços fiscais portados para o Worker", () => {
     });
     await expect(service.delete({ ...AUTH, ipi_id: ID })).rejects.toMatchObject({
       statusCode: 404,
-      message: "IPI nao existe.",
+      message: "IPI não existe.",
     });
     await expect(service.detail(ID, ORG)).rejects.toMatchObject({
       statusCode: 404,

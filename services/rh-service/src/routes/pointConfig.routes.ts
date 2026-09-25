@@ -27,7 +27,7 @@ router.put(
 
       const targetUserId = (req.body.target_user_id as string | undefined) ?? req.user_id;
       if (targetUserId !== req.user_id && !canManageRh(req)) {
-        throw new ServiceError(403, "Permissao insuficiente para configurar ponto de terceiro.");
+        throw new ServiceError(403, "Permissão insuficiente para configurar ponto de terceiro.");
       }
       const { start_time, lunch_break, lunch_return, end_time, work_days } = req.body as Record<
         string,

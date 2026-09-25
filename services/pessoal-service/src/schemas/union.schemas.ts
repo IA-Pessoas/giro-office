@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const unionIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 

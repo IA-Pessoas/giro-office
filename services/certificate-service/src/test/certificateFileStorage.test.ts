@@ -50,7 +50,7 @@ describe("certificate file storage", () => {
     await storage.deleteObject("organizations/org-1/certificate-pj/cert-1/file.pfx.enc");
     await expect(
       storage.getObject("organizations/org-1/certificate-pj/cert-1/file.pfx.enc"),
-    ).rejects.toThrow("Arquivo de certificado nao encontrado no storage.");
+    ).rejects.toThrow("Arquivo de certificado não encontrado.");
   });
 
   it("rejects local object paths outside the storage directory", async () => {
@@ -64,7 +64,7 @@ describe("certificate file storage", () => {
         buffer: Buffer.from("encrypted"),
         contentType: "application/octet-stream",
       }),
-    ).rejects.toThrow("Caminho de arquivo de certificado invalido.");
+    ).rejects.toThrow("Caminho de arquivo de certificado inválido.");
   });
 
   it("uses private Supabase storage without returning a public URL", async () => {

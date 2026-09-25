@@ -23,6 +23,7 @@ import {
   usePlatformUsers,
 } from "../hooks/usePlatformUsers";
 import { platformService } from "../services/platformService";
+import { getPlatformErrorMessage } from "../utils/platformManagement";
 import type { PlatformOrganization, PlatformOrganizationUser } from "../types";
 import { OwnershipTransferDialog } from "./OwnershipTransferDialog";
 
@@ -143,13 +144,14 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
       });
       setEditMode(false);
     } catch (error) {
-      if (isAxiosError(error) && error.response?.status === 409) {
-        setEditError(
-          "Este usuário foi alterado por outra pessoa. Recarregue o estado atual antes de salvar.",
-        );
-        return;
-      }
-      setEditError("Não foi possível salvar as alterações do usuário.");
+      setEditError(
+        getPlatformErrorMessage(
+          error,
+          isAxiosError(error) && error.response?.status === 409
+            ? "Este usuário foi alterado por outra pessoa. Recarregue o estado atual antes de salvar."
+            : "Não foi possível salvar as alterações do usuário.",
+        ),
+      );
     }
   };
 

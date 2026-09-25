@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Eye, FileCheck2, Pencil, Plus, Printer, Save, Signature, X } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";

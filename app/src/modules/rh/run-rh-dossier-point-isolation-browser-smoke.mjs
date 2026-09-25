@@ -84,7 +84,7 @@ function missingPointConfig(route) {
     contentType: "application/json",
     body: JSON.stringify({
       success: false,
-      error: "Configuracao de ponto nao encontrada para o usuario.",
+      error: "Configuração de ponto não encontrada para o usuário.",
       code: "NOT_FOUND",
     }),
   });

@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, ListChecks, Plus, Save, Trash2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { useProjectPlans, useProjectPlanTasks, useTaskModels } from "@modules/integracao";
@@ -39,6 +39,8 @@ export default function ProjectPlansConfig() {
   const [modelId, setModelId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<ProjectPlan | null>(null);
+  const [taskToRemove, setTaskToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [removeTaskError, setRemoveTaskError] = useState<string | null>(null);
   const tasksQuery = useProjectPlanTasks(selectedPlan?.id ?? null);
   const modelsQuery = useTaskModels({ page: 1, limit: 100 });
 
@@ -116,17 +118,20 @@ export default function ProjectPlansConfig() {
     }
   }
 
-  async function removeTask(planTaskId: string) {
-    if (!selectedPlan || !canManage) {
+  async function removeTask() {
+    if (!selectedPlan || !canManage || !taskToRemove) {
       return;
     }
 
     setIsSaving(true);
+    setRemoveTaskError(null);
     try {
-      await projectPlanService.deleteTask({ plan_id: selectedPlan.id, plan_task_id: planTaskId });
+      await projectPlanService.deleteTask({ plan_id: selectedPlan.id, plan_task_id: taskToRemove.id });
       await tasksQuery.refetch();
     } catch (error) {
-      toast.error(getErrorMessage(error, "Não foi possível remover o modelo do plano."));
+      setRemoveTaskError(getErrorMessage(error, "Não foi possível remover o modelo do plano."));
+      // Relança para o diálogo permanecer aberto exibindo o erro.
+      throw error;
     } finally {
       setIsSaving(false);
     }
@@ -198,13 +203,14 @@ export default function ProjectPlansConfig() {
               <ol className="mt-4 space-y-2">
                 {tasksQuery.isLoading ? <li className="text-sm text-slate-500">Carregando modelos...</li> : null}
                 {!tasksQuery.isLoading && tasksQuery.data?.length === 0 ? <li className="text-sm text-slate-500">Plano vazio: ele pode ser salvo, mas não pode ser contratado.</li> : null}
-                {tasksQuery.data?.map((task, index) => <li key={task.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"><span className="text-sm text-slate-500">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 dark:text-white">{task.tasks.name}</span>{canManage ? <div className="flex gap-1"><button type="button" onClick={() => void moveTask(task.id, "up")} className={PROJECT_COMPACT_BUTTON_CLASSNAME} disabled={isSaving || index === 0} aria-label={`Mover ${task.tasks.name} para cima`}><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" onClick={() => void moveTask(task.id, "down")} className={PROJECT_COMPACT_BUTTON_CLASSNAME} disabled={isSaving || index === (tasksQuery.data?.length ?? 0) - 1} aria-label={`Mover ${task.tasks.name} para baixo`}><ArrowDown className="h-3.5 w-3.5" /></button><button type="button" onClick={() => void removeTask(task.id)} className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME} disabled={isSaving} aria-label={`Remover ${task.tasks.name}`}><Trash2 className="h-3.5 w-3.5" /></button></div> : null}</li>)}
+                {tasksQuery.data?.map((task, index) => <li key={task.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"><span className="text-sm text-slate-500">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 dark:text-white">{task.tasks.name}</span>{canManage ? <div className="flex gap-1"><button type="button" onClick={() => void moveTask(task.id, "up")} className={PROJECT_COMPACT_BUTTON_CLASSNAME} disabled={isSaving || index === 0} aria-label={`Mover ${task.tasks.name} para cima`}><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" onClick={() => void moveTask(task.id, "down")} className={PROJECT_COMPACT_BUTTON_CLASSNAME} disabled={isSaving || index === (tasksQuery.data?.length ?? 0) - 1} aria-label={`Mover ${task.tasks.name} para baixo`}><ArrowDown className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setTaskToRemove({ id: task.id, name: task.tasks.name })} className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME} disabled={isSaving} aria-label={`Remover ${task.tasks.name}`}><Trash2 className="h-3.5 w-3.5" /></button></div> : null}</li>)}
               </ol>
             </div> : null}
           </section>
         </div>
       </div>
       <ConfirmationDialog open={Boolean(planToDelete)} onOpenChange={(open) => { if (!open && !isSaving) setPlanToDelete(null); }} title={`Excluir plano "${planToDelete?.name ?? ""}"?`} description="Projetos já contratados não são alterados." onConfirm={deletePlan} isConfirming={isSaving} errorMessage={null} confirmLabel="Excluir plano" cancelLabel="Cancelar" variant="destructive" />
+      <ConfirmationDialog open={Boolean(taskToRemove)} onOpenChange={(open) => { if (!open && !isSaving) { setTaskToRemove(null); setRemoveTaskError(null); } }} title="Remover modelo do plano?" description={`Remover o modelo "${taskToRemove?.name ?? ""}" do plano "${selectedPlan?.name ?? ""}"?`} onConfirm={removeTask} isConfirming={isSaving} errorMessage={removeTaskError} confirmLabel="Remover" cancelLabel="Cancelar" />
     </>
   );
 }

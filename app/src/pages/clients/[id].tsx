@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientForm } from "@modules/clients/components/ClientForm";
@@ -114,15 +114,8 @@ export default function ClientDetailPage() {
       return;
     }
 
-    if (!getClientInternalName(formValues)) {
-      toast.error("Preencha o nome do cliente para continuar.");
-      return;
-    }
-
-    const documentError = validateCpfCnpjDocument(formValues.cpf_cnpj);
-
-    if (documentError) {
-      toast.error(documentError);
+    // O ClientForm mostra esses erros abaixo do campo (#1367).
+    if (!getClientInternalName(formValues) || validateCpfCnpjDocument(formValues.cpf_cnpj)) {
       return;
     }
 

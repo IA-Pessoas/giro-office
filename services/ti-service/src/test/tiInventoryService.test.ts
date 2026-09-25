@@ -178,7 +178,7 @@ describe("TiInventoryService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe um ativo de TI com este codigo patrimonial.",
+      message: "Já existe um ativo de TI com este código patrimonial.",
     });
   });
 
@@ -207,7 +207,7 @@ describe("TiInventoryService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Usuario nao encontrado na organizacao.",
+      message: "Usuário não encontrado na organização.",
     });
   });
 
@@ -236,7 +236,7 @@ describe("TiInventoryService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 422,
-      message: "Responsavel de TI deve pertencer ao departamento Tecnologia.",
+      message: "Responsável de TI deve pertencer ao departamento Tecnologia.",
     });
   });
 
@@ -259,7 +259,7 @@ describe("TiInventoryService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Categoria de inventario nao encontrada.",
+      message: "Categoria de inventário não encontrada.",
     });
   });
 
@@ -286,7 +286,7 @@ describe("TiInventoryService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Departamento/local de inventario nao encontrado.",
+      message: "Departamento/local de inventário não encontrado.",
     });
   });
 
@@ -308,7 +308,7 @@ describe("TiInventoryService", () => {
       service.assignUser(context, assetId, { user_id: inactiveUserId }),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Usuario nao encontrado na organizacao.",
+      message: "Usuário não encontrado na organização.",
     });
   });
 });

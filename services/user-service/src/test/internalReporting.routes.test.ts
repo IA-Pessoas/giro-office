@@ -61,7 +61,7 @@ describe("internal reporting routes", () => {
 
   it("serializa falhas do service sem expor detalhes internos", async () => {
     userServiceMock.getReportingAccessContext.mockRejectedValue(
-      new ServiceError(404, "Usuario nao encontrado."),
+      new ServiceError(404, "Usuário não encontrado."),
     );
 
     const response = await request(createTestApp({ reportsInternalToken: "reports-token" }))
@@ -70,6 +70,6 @@ describe("internal reporting routes", () => {
       .send({ userId, organizationId });
 
     expect(response.status).toBe(404);
-    expect(response.body).toMatchObject({ success: false, error: "Usuario nao encontrado." });
+    expect(response.body).toMatchObject({ success: false, error: "Usuário não encontrado." });
   });
 });

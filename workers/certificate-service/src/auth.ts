@@ -121,7 +121,7 @@ export function authorizeCertificateRequest(request: Request, auth: WorkerAuthCo
         : CERTIFICATE_WRITE_PERMISSION;
 
   if (permission < required) {
-    throw new ServiceError(403, "Permissao insuficiente para acessar certificados.");
+    throw new ServiceError(403, "Permissão insuficiente para acessar certificados.");
   }
 }
 

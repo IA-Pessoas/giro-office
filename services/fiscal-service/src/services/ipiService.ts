@@ -154,7 +154,7 @@ export class IpiService {
       });
 
       if (!exists) {
-        throw new ServiceError(404, "IPI nao existe.");
+        throw new ServiceError(404, "IPI não existe.");
       }
 
       const deleted = await this.prisma.ipi.delete({
