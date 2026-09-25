@@ -44,6 +44,7 @@ import {
   useUpdateCertificatePfMutation,
 } from "@modules/certificates/hooks";
 import type {
+  CertificateListSummary,
   CertificateNotification,
   CertificatePj,
   CertificatePf,
@@ -173,7 +174,6 @@ const CERTIFICATE_STATUS_FILTER_OPTIONS = [
 const ZERO = 0;
 const FIRST_PAGE = DEFAULT_CERTIFICATE_PAGE;
 const PAGE_SIZE = DEFAULT_CERTIFICATE_PAGE_SIZE;
-const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
 function parseBooleanFilterValue(value: string): boolean | undefined {
   if (value === "") {
@@ -191,37 +191,22 @@ function trimValue(value: string): string {
   return value.trim();
 }
 
-function buildStats(total: number, expiringInDays: number, expired: number, withCertificate: number) {
+function buildStats(total: number, summary: CertificateListSummary | undefined) {
   return [
     { label: "Total", value: total },
     {
       label: "Vencidos",
-      value: expired,
+      value: summary?.expired ?? ZERO,
     },
     {
       label: "Vencem em 30 dias",
-      value: expiringInDays,
+      value: summary?.expiring_30_days ?? ZERO,
     },
     {
       label: "Com arquivo",
-      value: withCertificate,
+      value: summary?.with_certificate ?? ZERO,
     },
   ];
-}
-
-function calcDaysUntil(date: string | null | undefined): number | null {
-  if (!date) {
-    return null;
-  }
-
-  const normalized = new Date(`${date.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(normalized.getTime())) {
-    return null;
-  }
-
-  const today = new Date();
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((normalized.getTime() - startOfToday.getTime()) / MILLISECONDS_IN_DAY);
 }
 
 function paymentAmountText(value: number | null | undefined): string {
@@ -551,33 +536,15 @@ export function CertificatesWorkspace() {
   const pfTotalPages = Math.max(FIRST_PAGE, Math.ceil(pfTotal / PAGE_SIZE));
   const notificationTotalPages = Math.max(FIRST_PAGE, Math.ceil(notificationTotal / PAGE_SIZE));
 
-  const pjStats = useMemo(() => {
-    const expired = pjItems.filter((item) => {
-      const days = calcDaysUntil(item.expiration_date);
-      return days !== null && days < ZERO;
-    }).length;
-    const dueSoon = pjItems.filter((item) => {
-      const days = calcDaysUntil(item.expiration_date);
-      return days !== null && days >= ZERO && days <= 30;
-    }).length;
-    const withCertificate = pjItems.filter((item) => item.has_certificate).length;
+  const pjStats = useMemo(
+    () => buildStats(pjTotal, pjListQuery.data?.summary),
+    [pjTotal, pjListQuery.data?.summary],
+  );
 
-    return buildStats(pjTotal, dueSoon, expired, withCertificate);
-  }, [pjItems, pjTotal]);
-
-  const pfStats = useMemo(() => {
-    const expired = pfItems.filter((item) => {
-      const days = calcDaysUntil(item.expiration_date);
-      return days !== null && days < ZERO;
-    }).length;
-    const dueSoon = pfItems.filter((item) => {
-      const days = calcDaysUntil(item.expiration_date);
-      return days !== null && days >= ZERO && days <= 30;
-    }).length;
-    const withCertificate = pfItems.filter((item) => item.has_certificate).length;
-
-    return buildStats(pfTotal, dueSoon, expired, withCertificate);
-  }, [pfItems, pfTotal]);
+  const pfStats = useMemo(
+    () => buildStats(pfTotal, pfListQuery.data?.summary),
+    [pfTotal, pfListQuery.data?.summary],
+  );
 
   const notificationsStats = useMemo(() => {
     const pjCount = notificationItems.filter((item) => item.type === "PJ").length;

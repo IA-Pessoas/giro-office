@@ -135,6 +135,7 @@ describe("CertificatePjService", () => {
       page: 2,
       page_size: 25,
       has_more: true,
+      summary: { expired: 51, expiring_30_days: 51, with_certificate: 51 },
     });
     expect(result.items[0]).not.toHaveProperty("password");
     expect(result.items[0]).not.toHaveProperty("file_path");

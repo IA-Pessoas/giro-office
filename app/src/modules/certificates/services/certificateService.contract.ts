@@ -1,6 +1,7 @@
 import type {
   CertificateFileMetadata,
   CertificateListPage,
+  CertificateListSummary,
   CertificateNotificationListParams,
   CertificatePj,
   CertificatePjListParams,
@@ -152,13 +153,17 @@ export function unwrapCertificateList<T>(
       page?: number;
       page_size?: number;
       has_more?: boolean;
+      summary?: CertificateListSummary;
     };
 
-    return buildCertificateListPage(
-      page.items,
-      { page: page.page, page_size: page.page_size },
-      { total: page.total, has_more: page.has_more },
-    );
+    return {
+      ...buildCertificateListPage(
+        page.items,
+        { page: page.page, page_size: page.page_size },
+        { total: page.total, has_more: page.has_more },
+      ),
+      ...(page.summary ? { summary: page.summary } : {}),
+    };
   }
 
   return buildCertificateListPage(unwrapCertificateEnvelope<T[]>(payload), params);
