@@ -17,6 +17,7 @@ import type {
   ListPanoramasQuery,
   PatchPanoramaBody,
 } from "@workspace/parcelamento-service/src/schemas/panorama.schemas.js";
+import { loadInstallmentListExtras } from "@workspace/parcelamento-service/src/services/installmentListExtras.js";
 import {
   executeReportingQuery,
   getParcelamentoReportingFields,
@@ -361,7 +362,16 @@ export function createInstallmentService(
             take,
           }),
         ]);
-        return createPage({ items: items.map(withoutOrganizationId), total, page, pageSize });
+        const extras = await loadInstallmentListExtras(
+          prisma,
+          context.organizationId,
+          where,
+          items.map(withoutOrganizationId),
+        );
+        return {
+          ...createPage({ items: extras.items, total, page, pageSize }),
+          summary: extras.summary,
+        };
       }),
 
     getById: (context: ParcelamentoRequestContext, id: string) =>

@@ -10,6 +10,11 @@ import type {
 } from "../schemas/installment.schemas.js";
 import { createPage, getPaginationParams } from "../schemas/pagination.schemas.js";
 import {
+  type InstallmentListClient,
+  type InstallmentListSummary,
+  loadInstallmentListExtras,
+} from "./installmentListExtras.js";
+import {
   createAuditDiff,
   type ParcelamentoAuditAction,
   type RecordParcelamentoChangeInput,
@@ -143,7 +148,11 @@ export class InstallmentService {
   async list(
     context: Pick<ParcelamentoRequestContext, "organizationId" | "userId">,
     query: ListInstallmentsQuery,
-  ): Promise<ParcelamentoPage<InstallmentDto>> {
+  ): Promise<
+    ParcelamentoPage<InstallmentDto & { client: InstallmentListClient | null }> & {
+      summary: InstallmentListSummary;
+    }
+  > {
     try {
       const { organizationId } = requireContext(context);
       const { page, pageSize, skip, take } = getPaginationParams(query);
@@ -176,7 +185,17 @@ export class InstallmentService {
         }),
       ]);
 
-      return createPage({ items: items.map(toInstallmentDto), total, page, pageSize });
+      const extras = await loadInstallmentListExtras(
+        this.prisma,
+        organizationId,
+        where,
+        items.map(toInstallmentDto),
+      );
+
+      return {
+        ...createPage({ items: extras.items, total, page, pageSize }),
+        summary: extras.summary,
+      };
     } catch (err: unknown) {
       logError("Erro ao listar parcelamentos", { err });
       if (err instanceof ServiceError) throw err;
