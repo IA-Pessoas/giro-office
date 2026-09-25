@@ -188,7 +188,10 @@ export class ReportLetterheadService {
 
     if (input.scope === "personal") {
       return this.assets.find(
-        (asset) => asset.kind === "organization" && asset.status !== "invalid" && asset.organizationId === input.organizationId,
+        (asset) =>
+          asset.kind === "organization" &&
+          asset.status !== "invalid" &&
+          asset.organizationId === input.organizationId,
       );
     }
 

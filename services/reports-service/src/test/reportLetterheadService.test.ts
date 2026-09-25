@@ -189,10 +189,21 @@ describe("ReportLetterheadService", () => {
   it("não escolhe automaticamente um timbrado reprovado", async () => {
     const onWarning = vi.fn();
     const bytes = assetBytes("legacy-letterhead");
-    const service = new ReportLetterheadService([{
-      kind: "organization", organizationId, status: "invalid", bytes, sha256: sha256(bytes),
-    }], onWarning);
-    await expect(service.select({ organizationId, scope: "personal" })).resolves.toMatchObject({ kind: "institutional" });
+    const service = new ReportLetterheadService(
+      [
+        {
+          kind: "organization",
+          organizationId,
+          status: "invalid",
+          bytes,
+          sha256: sha256(bytes),
+        },
+      ],
+      onWarning,
+    );
+    await expect(service.select({ organizationId, scope: "personal" })).resolves.toMatchObject({
+      kind: "institutional",
+    });
     expect(onWarning).toHaveBeenCalledOnce();
   });
 });

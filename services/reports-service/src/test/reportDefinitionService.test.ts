@@ -193,10 +193,15 @@ describe("SourceCatalogService", () => {
 describe("ReportDefinitionService", () => {
   it("rejeita ordenação por alias de agregação com fonte diferente", () => {
     const service = new ReportDefinitionService(new SourceCatalogService([adapter]));
-    expect(() => service.validate(reportDefinitionSchema.parse({
-      ...definition,
-      order_by: [{ source: "finance.accounts", field: "balance_sum", direction: "desc" }],
-    }), scope)).toThrow("área da agregação");
+    expect(() =>
+      service.validate(
+        reportDefinitionSchema.parse({
+          ...definition,
+          order_by: [{ source: "finance.accounts", field: "balance_sum", direction: "desc" }],
+        }),
+        scope,
+      ),
+    ).toThrow("área da agregação");
   });
   it("rejeita agregação incompatível e campo fora do grant", () => {
     const catalog = new SourceCatalogService([adapter]);
