@@ -54,7 +54,7 @@ function dateTimePartsInTimezone(date: Date, timezone: string): Record<string, s
 function organizationDateKeyToUtcStart(dateKey: string, timezone: string): Date {
   const target = new Date(`${dateKey}T00:00:00.000Z`);
   if (Number.isNaN(target.getTime())) {
-    throw new ServiceError(400, "Data invalida.");
+    throw new ServiceError(400, "Data inválida.");
   }
 
   let guess = target;
@@ -73,7 +73,7 @@ function organizationDateKeyToUtcStart(dateKey: string, timezone: string): Date 
 
 export function organizationDateKey(date: Date, timezone = DEFAULT_ORGANIZATION_TIMEZONE): string {
   if (Number.isNaN(date.getTime())) {
-    throw new ServiceError(400, "Data invalida.");
+    throw new ServiceError(400, "Data inválida.");
   }
 
   const parts = datePartsInTimezone(date, timezone);
@@ -91,12 +91,12 @@ export function organizationDateKeyFromInput(
       if (!Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value) {
         return value;
       }
-      throw new ServiceError(400, "Data invalida.");
+      throw new ServiceError(400, "Data inválida.");
     }
 
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) {
-      throw new ServiceError(400, "Data invalida.");
+      throw new ServiceError(400, "Data inválida.");
     }
     return organizationDateKey(parsed, timezone);
   }
@@ -147,7 +147,7 @@ export function assertSameOrganizationDay(
   const fields: Array<keyof PointTimes> = ["lunch_out", "lunch_in", "clock_out"];
   for (const field of fields) {
     if (organizationDateKey(times[field], timezone) !== expected) {
-      throw new ServiceError(400, "Jornadas noturnas nao sao permitidas para ajustes de ponto.");
+      throw new ServiceError(400, "Jornadas noturnas não são permitidas para ajustes de ponto.");
     }
   }
 }
@@ -158,6 +158,6 @@ export function assertChronologicalPointTimes(times: PointTimes): void {
     times.lunch_out.getTime() >= times.lunch_in.getTime() ||
     times.lunch_in.getTime() >= times.clock_out.getTime()
   ) {
-    throw new ServiceError(400, "Os horarios do ajuste devem estar em ordem cronologica.");
+    throw new ServiceError(400, "Os horários do ajuste devem estar em ordem cronológica.");
   }
 }

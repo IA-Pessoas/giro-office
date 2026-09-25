@@ -132,7 +132,7 @@ function createCertificateFileDeps(env: CertificateWorkerEnv): CertificatePjFile
         const response = await storage.download(bucket, path);
         return Buffer.from(await response.arrayBuffer());
       } catch (error) {
-        throw new ServiceError(404, "Arquivo de certificado nao encontrado no storage.", error);
+        throw new ServiceError(404, "Arquivo de certificado não encontrado.", error);
       }
     },
     async deleteObject(path) {
@@ -284,7 +284,7 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
 
   app.post("/internal/notifications/run", async (c) => {
     if (c.req.header(INTERNAL_SERVICE_TOKEN_HEADER) !== options.env.INTERNAL_SERVICE_TOKEN) {
-      throw new ServiceError(401, "Token interno do certificate-service invalido.");
+      throw new ServiceError(401, "Token interno do certificate-service inválido.");
     }
     parseWithZod(certificateNotificationRunBodySchema, await readJson(c));
     return c.json(

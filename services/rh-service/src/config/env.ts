@@ -48,17 +48,17 @@ const rhEnvSchema = z
     jwtSecret: z.string().min(1, "JWT_SECRET não definido para o rh-service."),
     reportsInternalToken: z.string().optional().default("reports-internal-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
-    supabaseUrl: z.string().url("SUPABASE_URL invalida.").optional(),
-    supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY invalida.").optional(),
+    supabaseUrl: z.string().url("SUPABASE_URL inválida.").optional(),
+    supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY inválida.").optional(),
     rhPointAdjustmentBucket: z
       .string()
       .trim()
-      .min(1, "RH_POINT_ADJUSTMENT_BUCKET invalido.")
+      .min(1, "RH_POINT_ADJUSTMENT_BUCKET inválido.")
       .optional(),
     rhRequestMessageBucket: z
       .string()
       .trim()
-      .min(1, "RH_REQUEST_MESSAGE_BUCKET invalido.")
+      .min(1, "RH_REQUEST_MESSAGE_BUCKET inválido.")
       .optional(),
     nodeEnv: z.string().optional().default("development"),
     logLevel: loggerLevelSchema.optional().default("info"),

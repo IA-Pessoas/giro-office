@@ -361,7 +361,7 @@ describe("parcelamento Worker — paridade restante", () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
       success: false,
-      error: "Ja existe parcelamento com este numero de acordo.",
+      error: "Já existe parcelamento com este número de acordo.",
     });
     expect(prisma.installment.findFirst).toHaveBeenCalledWith({
       where: { organization_id: ORG, agreement_number: "123" },
@@ -597,7 +597,7 @@ describe("parcelamento Worker — paridade restante", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
-      error: "Responsavel nao encontrado para a organizacao.",
+      error: "Responsável não encontrado para a organização.",
     });
     expect(prisma.user.findFirst).toHaveBeenCalledWith({
       where: { id: USER, organization_id: ORG },

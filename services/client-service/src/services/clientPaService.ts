@@ -97,7 +97,7 @@ async function ensureClientExists(
   });
 
   if (!client) {
-    throw new ServiceError(404, "Cliente nao encontrado.");
+    throw new ServiceError(404, "Cliente não encontrado.");
   }
 }
 
@@ -117,7 +117,7 @@ export async function createClientPA(
   });
 
   if (exists) {
-    throw new ServiceError(409, "PA ja cadastrado para este cliente.");
+    throw new ServiceError(409, "PA já cadastrado para este cliente.");
   }
 
   const created = await prisma.pA.create({
@@ -164,7 +164,7 @@ export async function updateClientPA(
   });
 
   if (!exists) {
-    throw new ServiceError(404, "PA nao encontrado.");
+    throw new ServiceError(404, "PA não encontrado.");
   }
 
   const data: Record<string, unknown> = {};

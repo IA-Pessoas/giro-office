@@ -110,7 +110,7 @@ export class SituationService {
     });
 
     if (!detail) {
-      throw new ServiceError(404, "Situacao nao encontrada.");
+      throw new ServiceError(404, "Situação não encontrada.");
     }
 
     return detail;
@@ -130,7 +130,7 @@ export class SituationService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Situacao nao encontrada.");
+        throw new ServiceError(404, "Situação não encontrada.");
       }
 
       const completionData =
@@ -185,7 +185,7 @@ export class SituationService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Situacao nao encontrada.");
+        throw new ServiceError(404, "Situação não encontrada.");
       }
 
       await this.prisma.situationsPessoal.delete({ where: { id } });
@@ -217,7 +217,7 @@ export class SituationService {
     });
 
     if (!client) {
-      throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      throw new ServiceError(404, "Cliente não encontrado para a organização.");
     }
   }
 }

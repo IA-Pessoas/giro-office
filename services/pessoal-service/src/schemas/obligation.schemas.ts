@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const competenceSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}$/, "competencia deve estar no formato YYYY-MM.");
+  .regex(/^\d{4}-\d{2}$/, "competência deve estar no formato YYYY-MM.");
 
 export const obligationIdParamsSchema = z
   .object({

@@ -25,7 +25,7 @@ export const booleanQuerySchema = z.union([z.boolean(), z.string()]).transform((
   } catch {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Valor booleano invalido.",
+      message: "Valor booleano inválido.",
     });
     return z.NEVER;
   }

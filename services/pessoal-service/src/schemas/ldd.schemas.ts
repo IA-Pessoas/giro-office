@@ -24,7 +24,7 @@ export const createLddBodySchema = z
   .object({
     client_id: z.string().uuid({ message: "client_id invalido." }),
     type: zNonEmptyText("type"),
-    period: z.string().trim().min(1, "period e obrigatorio.").nullable().optional(),
+    period: z.string().trim().min(1, "period é obrigatório.").nullable().optional(),
     due_date: zIsoDate("due_date").nullable().optional(),
     balance_amount: optionalNonNegativeNumber("balance_amount"),
     registration_status: z.string().trim().min(1).nullable().optional(),
@@ -35,7 +35,7 @@ export const createLddBodySchema = z
 export const updateLddBodySchema = z
   .object({
     type: zNonEmptyText("type").optional(),
-    period: z.string().trim().min(1, "period e obrigatorio.").nullable().optional(),
+    period: z.string().trim().min(1, "period é obrigatório.").nullable().optional(),
     due_date: zIsoDate("due_date").nullable().optional(),
     balance_amount: optionalNonNegativeNumber("balance_amount"),
     registration_status: z.string().trim().min(1).nullable().optional(),

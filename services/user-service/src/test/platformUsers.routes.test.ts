@@ -803,7 +803,7 @@ describe("platform users routes", () => {
 
   it("preserva o conflito de concorrência sem chamar outro tenant", async () => {
     platformUsersMock.update.mockRejectedValue(
-      new ServiceError(409, "Usuario foi alterado por outra edicao. Recarregue e tente novamente."),
+      new ServiceError(409, "Usuário foi alterado por outra edição. Recarregue e tente novamente."),
     );
     const response = await request(createApp())
       .patch("/platform/organizations/org-2/users/user-1")
@@ -841,7 +841,7 @@ describe("platform users routes", () => {
     platformUsersMock.deactivate.mockRejectedValue(
       new ServiceError(
         409,
-        "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+        "Não é possível remover o último owner ativo. Use a transferência de ownership.",
       ),
     );
 
@@ -850,7 +850,7 @@ describe("platform users routes", () => {
       .set(platformGatewayHeaders());
 
     expect(response.status).toBe(409);
-    expect(response.body.error).toContain("transferencia de ownership");
+    expect(response.body.error).toContain("transferência de ownership");
   });
 
   it("returns 403 for an organizational identity", async () => {

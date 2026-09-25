@@ -81,7 +81,7 @@ describe("panorama routes", () => {
     expect(response.status).toBe(409);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Ja existe panorama para este cliente e competencia.",
+      error: "Já existe panorama para este cliente e competência.",
     });
   });
 

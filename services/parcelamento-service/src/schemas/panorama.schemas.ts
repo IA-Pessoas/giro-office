@@ -6,7 +6,7 @@ const nonEmptyText = (field: string) =>
   z
     .string()
     .trim()
-    .min(1, { message: `${field} e obrigatorio.` });
+    .min(1, { message: `${field} é obrigatório.` });
 
 const optionalResponsavelId = z
   .string()

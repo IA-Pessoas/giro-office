@@ -138,13 +138,13 @@ function toPage<T>(data: T[], total: number, page: number, limit: number) {
 
 function requirePermission(context: { permission?: number }, minimum: number): void {
   if (typeof context.permission !== "number" || context.permission < minimum) {
-    throw new ServiceError(403, "Permissao insuficiente para acessar o Departamento Pessoal.");
+    throw new ServiceError(403, "Permissão insuficiente para acessar o Departamento Pessoal.");
   }
 }
 
 function requireUserId(context: { userId?: string }): string {
   const userId = context.userId?.trim();
-  if (!userId) throw new ServiceError(401, "Autenticacao obrigatoria.");
+  if (!userId) throw new ServiceError(401, "Autenticação obrigatória.");
   return userId;
 }
 
@@ -419,7 +419,7 @@ export class GroupAssignmentService {
         targetGroup: { select: { id: true, name: true, archived_at: true } },
       },
     });
-    if (!preview) throw new ServiceError(404, "Previa de atribuicao em lote nao encontrada.");
+    if (!preview) throw new ServiceError(404, "Prévia de atribuição em lote não encontrada.");
     const [total, details] = await Promise.all([
       this.prisma.pessoalGroupAssignmentPreviewDetail.count({ where: { preview_id: preview.id } }),
       this.prisma.pessoalGroupAssignmentPreviewDetail.findMany({
@@ -490,7 +490,7 @@ export class GroupAssignmentService {
       });
       if (previous) {
         if (previous.command_hash !== commandHash) {
-          throw new ServiceError(409, "Idempotency-Key ja utilizada com outro comando.");
+          throw new ServiceError(409, "Idempotency-Key já utilizada com outro comando.");
         }
         return {
           response: previous.response_snapshot as Record<string, unknown>,
@@ -512,17 +512,17 @@ export class GroupAssignmentService {
         },
       });
       if (!preview || preview.fingerprint !== body.fingerprint) {
-        throw new ServiceError(409, "Previa inexistente ou obsoleta. Gere uma nova previa.");
+        throw new ServiceError(409, "Prévia inexistente ou obsoleta. Gere uma nova prévia.");
       }
       if (
         preview.applied_at ||
         preview.expires_at <= this.now() ||
         preview.targetGroup.archived_at
       ) {
-        throw new ServiceError(409, "Previa expirada ou obsoleta. Gere uma nova previa.");
+        throw new ServiceError(409, "Prévia expirada ou obsoleta. Gere uma nova prévia.");
       }
       if (!isPreviewTotals(preview.totals))
-        throw new ServiceError(409, "Previa invalida. Gere uma nova previa.");
+        throw new ServiceError(409, "Prévia inválida. Gere uma nova prévia.");
       const actionable = await tx.pessoalGroupAssignmentPreviewDetail.findMany({
         where: { preview_id: preview.id, outcome: { in: [OUTCOME_CHANGED, OUTCOME_NO_OP] } },
         select: { client_id: true, payroll_id: true, previous_group_id: true, outcome: true },
@@ -557,7 +557,7 @@ export class GroupAssignmentService {
           payroll.id !== detail.payroll_id ||
           payroll.group_id !== detail.previous_group_id
         ) {
-          throw new ServiceError(409, "Previa obsoleta. Gere uma nova previa.");
+          throw new ServiceError(409, "Prévia obsoleta. Gere uma nova prévia.");
         }
       }
       for (const detail of actionable) {
@@ -572,7 +572,7 @@ export class GroupAssignmentService {
           data: { group_id: preview.target_group_id },
         });
         if (changed.count !== 1)
-          throw new ServiceError(409, "Previa obsoleta. Gere uma nova previa.");
+          throw new ServiceError(409, "Prévia obsoleta. Gere uma nova prévia.");
       }
       const response = {
         preview_id: preview.id,
@@ -843,7 +843,7 @@ function getMatchingUnionNotifications(
         regarding: UNION_REGARDING,
         regarding_id: union.id,
         title: "Sindicato prestes a vencer",
-        message: "Data base sera alcancada amanha.",
+        message: "Data base será alcançada amanhã.",
         reference_date: tomorrow,
         organization_id: union.organization_id,
       });
@@ -853,7 +853,7 @@ function getMatchingUnionNotifications(
         regarding: UNION_REGARDING,
         regarding_id: union.id,
         title: "Sindicato vencido",
-        message: "Data base foi alcancada no mes passado.",
+        message: "Data base foi alcançada no mês passado.",
         reference_date: monthAgoFromTomorrow,
         organization_id: union.organization_id,
       });

@@ -134,7 +134,7 @@ router.get(
         result.requester_user_id !== user_id &&
         result.assigned_to_user_id !== user_id
       ) {
-        throw new ServiceError(403, "Permissao insuficiente para acessar solicitacao de terceiro.");
+        throw new ServiceError(403, "Permissão insuficiente para acessar solicitação de terceiro.");
       }
       await requestService.markOpened({
         organization_id,

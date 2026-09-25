@@ -6,7 +6,7 @@ const nonEmptyText = (field: string) =>
   z
     .string()
     .trim()
-    .min(1, { message: `${field} e obrigatorio.` });
+    .min(1, { message: `${field} é obrigatório.` });
 
 const optionalText = z.string().trim().optional().nullable();
 const nonNegativeInteger = z.coerce.number().int().min(0);
@@ -14,7 +14,7 @@ const nonNegativeNumber = z.coerce.number().min(0);
 
 export const installmentCompetencyParentParamsSchema = z
   .object({
-    installmentId: z.string().uuid({ message: "installmentId invalido." }),
+    installmentId: z.string().uuid({ message: "installmentId inválido." }),
   })
   .strict();
 

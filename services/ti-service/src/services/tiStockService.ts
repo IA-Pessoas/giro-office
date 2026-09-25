@@ -240,14 +240,14 @@ export class TiStockService {
         await this.ensureUser(
           context.organizationId,
           body.requester_id,
-          "Solicitante nao encontrado.",
+          "Solicitante não encontrado.",
           tx,
         );
         if (body.approver_id) {
           await this.ensureUser(
             context.organizationId,
             body.approver_id,
-            "Aprovador nao encontrado.",
+            "Aprovador não encontrado.",
             tx,
           );
         }
@@ -255,7 +255,7 @@ export class TiStockService {
           await this.ensureUser(
             context.organizationId,
             body.operator_id,
-            "Operador nao encontrado.",
+            "Operador não encontrado.",
             tx,
           );
         }
@@ -448,7 +448,7 @@ export class TiStockService {
       if (existing) {
         throw new ServiceError(
           409,
-          "Ja existe uma categoria de estoque de TI ativa com este nome.",
+          "Já existe uma categoria de estoque de TI ativa com este nome.",
         );
       }
 
@@ -466,7 +466,7 @@ export class TiStockService {
       if (isPrismaUniqueConstraintError(err)) {
         throw new ServiceError(
           409,
-          "Ja existe uma categoria de estoque de TI ativa com este nome.",
+          "Já existe uma categoria de estoque de TI ativa com este nome.",
         );
       }
       throw new ServiceError(500, "Erro ao criar categoria de estoque de TI.", err);
@@ -485,7 +485,7 @@ export class TiStockService {
       });
 
       if (!category) {
-        throw new ServiceError(404, "Categoria de estoque de TI nao encontrada.");
+        throw new ServiceError(404, "Categoria de estoque de TI não encontrada.");
       }
 
       return await this.prisma.categoryStock.update({
@@ -498,7 +498,7 @@ export class TiStockService {
       if (isPrismaUniqueConstraintError(err)) {
         throw new ServiceError(
           409,
-          "Ja existe uma categoria de estoque de TI ativa com este nome.",
+          "Já existe uma categoria de estoque de TI ativa com este nome.",
         );
       }
       throw new ServiceError(500, "Erro ao atualizar categoria de estoque de TI.", err);
@@ -534,7 +534,7 @@ export class TiStockService {
       );
 
       if (existing) {
-        throw new ServiceError(409, "Ja existe um local de estoque de TI ativo com este nome.");
+        throw new ServiceError(409, "Já existe um local de estoque de TI ativo com este nome.");
       }
 
       return this.prisma.locationStock.create({
@@ -565,7 +565,7 @@ export class TiStockService {
       });
 
       if (!location) {
-        throw new ServiceError(404, "Local de estoque de TI nao encontrado.");
+        throw new ServiceError(404, "Local de estoque de TI não encontrado.");
       }
 
       return this.prisma.locationStock.update({
@@ -599,7 +599,7 @@ export class TiStockService {
     });
 
     if (!stock) {
-      throw new ServiceError(404, "Item de estoque de TI nao encontrado.");
+      throw new ServiceError(404, "Item de estoque de TI não encontrado.");
     }
   }
 
@@ -623,7 +623,7 @@ export class TiStockService {
     });
 
     if (!stock) {
-      throw new ServiceError(404, "Item de estoque de TI nao encontrado.");
+      throw new ServiceError(404, "Item de estoque de TI não encontrado.");
     }
 
     return stock;
@@ -645,7 +645,7 @@ export class TiStockService {
     });
 
     if (!category) {
-      throw new ServiceError(404, "Categoria de estoque de TI nao encontrada.");
+      throw new ServiceError(404, "Categoria de estoque de TI não encontrada.");
     }
   }
 
@@ -665,7 +665,7 @@ export class TiStockService {
     });
 
     if (!location) {
-      throw new ServiceError(404, "Local de estoque de TI nao encontrado.");
+      throw new ServiceError(404, "Local de estoque de TI não encontrado.");
     }
   }
 

@@ -34,7 +34,7 @@ export async function assertPointDayIsUnlocked(
   if (signedSheet) {
     throw new ServiceError(
       409,
-      "O dia esta bloqueado por uma folha assinada; reabra a folha antes de altera-lo.",
+      "O dia está bloqueado por uma folha assinada; reabra a folha antes de altera-lo.",
     );
   }
 }

@@ -6,7 +6,7 @@ const nonEmptyText = (field: string) =>
   z
     .string()
     .trim()
-    .min(1, { message: `${field} e obrigatorio.` });
+    .min(1, { message: `${field} é obrigatório.` });
 
 const optionalText = z.string().trim().optional().nullable();
 const optionalDate = z.coerce.date().optional().nullable();

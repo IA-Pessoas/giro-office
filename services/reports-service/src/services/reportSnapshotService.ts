@@ -35,7 +35,7 @@ export class ReportSnapshotService {
         status: "completed",
       },
     });
-    if (!job) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+    if (!job) throw new ServiceError(404, "Resultado do relatório não encontrado.");
 
     if (input.scope === "library") {
       if (!input.departmentId) {
@@ -58,7 +58,7 @@ export class ReportSnapshotService {
             },
           })
         : null;
-      if (!model) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+      if (!model) throw new ServiceError(404, "Resultado do relatório não encontrado.");
     }
 
     const snapshot = await this.prisma.reportSnapshot.findFirst({
@@ -68,7 +68,7 @@ export class ReportSnapshotService {
         OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
       },
     });
-    if (!snapshot) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+    if (!snapshot) throw new ServiceError(404, "Resultado do relatório não encontrado.");
 
     const blocks = this.prisma.reportSnapshotBlock
       ? await this.prisma.reportSnapshotBlock.findMany({
@@ -159,7 +159,7 @@ export class ReportSnapshotService {
         OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
       },
     });
-    if (!snapshot) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+    if (!snapshot) throw new ServiceError(404, "Resultado do relatório não encontrado.");
 
     const job = await this.prisma.reportJob.findFirst({
       where: {
@@ -169,7 +169,7 @@ export class ReportSnapshotService {
         status: "completed",
       },
     });
-    if (!job) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+    if (!job) throw new ServiceError(404, "Resultado do relatório não encontrado.");
 
     if (input.allowSharedLookup && job.requester_id !== input.userId) {
       const version = await this.prisma.reportModelVersion.findFirst({
@@ -187,7 +187,7 @@ export class ReportSnapshotService {
           })
         : null;
       if (!model || model.created_by_user_id !== null) {
-        throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+        throw new ServiceError(404, "Resultado do relatório não encontrado.");
       }
     }
 
@@ -250,7 +250,7 @@ export class ReportSnapshotService {
         OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
       },
     });
-    if (!snapshot) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+    if (!snapshot) throw new ServiceError(404, "Resultado do relatório não encontrado.");
 
     const job = await this.prisma.reportJob.findFirst({
       where: {
@@ -261,6 +261,6 @@ export class ReportSnapshotService {
       },
       select: { id: true },
     });
-    if (!job) throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+    if (!job) throw new ServiceError(404, "Resultado do relatório não encontrado.");
   }
 }

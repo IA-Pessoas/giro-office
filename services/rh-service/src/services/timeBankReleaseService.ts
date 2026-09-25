@@ -69,7 +69,7 @@ class TimeBankReleaseService {
         throw new ServiceError(400, "date invalido.");
       }
       if (!Number.isInteger(input.minutes)) {
-        throw new ServiceError(400, "minutes deve ser um numero inteiro.");
+        throw new ServiceError(400, "minutes deve ser um número inteiro.");
       }
 
       const targetUser = await prismaClient.user.findFirst({
@@ -78,7 +78,7 @@ class TimeBankReleaseService {
       });
 
       if (!targetUser) {
-        throw new ServiceError(404, "Colaborador nao encontrado nesta organizacao.");
+        throw new ServiceError(404, "Colaborador não encontrado nesta organização.");
       }
 
       return await prismaClient.timeBankReleases.create({
@@ -111,11 +111,11 @@ class TimeBankReleaseService {
       });
 
       if (!release) {
-        throw new ServiceError(404, "Lancamento nao encontrado.");
+        throw new ServiceError(404, "Lançamento não encontrado.");
       }
 
       if (release.is_approved) {
-        throw new ServiceError(409, "Lancamento ja foi aprovado.");
+        throw new ServiceError(409, "Lançamento já foi aprovado.");
       }
 
       const pointsConfig = await prismaClient.pointsConfig.findUnique({
@@ -126,7 +126,7 @@ class TimeBankReleaseService {
       if (!pointsConfig) {
         throw new ServiceError(
           404,
-          "Configuracao de ponto nao encontrada para o colaborador; nao e possivel aprovar o lancamento.",
+          "Configuração de ponto não encontrada para o colaborador; não é possível aprovar o lançamento.",
         );
       }
 
@@ -136,7 +136,7 @@ class TimeBankReleaseService {
           data: { is_approved: true },
         });
         if (claimed.count !== 1) {
-          throw new ServiceError(409, "Lancamento ja foi aprovado.");
+          throw new ServiceError(409, "Lançamento já foi aprovado.");
         }
 
         await tx.pointsConfig.update({
@@ -215,10 +215,10 @@ class TimeBankReleaseService {
       });
 
       if (!config) {
-        throw new ServiceError(404, "Configuracao de ponto nao encontrada para o colaborador.");
+        throw new ServiceError(404, "Configuração de ponto não encontrada para o colaborador.");
       }
       if (config.organization_id !== orgId) {
-        throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
+        throw new ServiceError(403, "Configuração de ponto pertence a outra organização.");
       }
 
       const [approvedCount, pendingCount] = await Promise.all([

@@ -5,7 +5,7 @@ export const createTimeBankReleaseBodySchema = z
   .object({
     user_id: z.string().uuid({ message: "user_id invalido." }),
     date: zIsoDate("date"),
-    minutes: z.number().int({ message: "minutes deve ser um numero inteiro." }),
+    minutes: z.number().int({ message: "minutes deve ser um número inteiro." }),
     reason: zNonEmptyText("reason"),
   })
   .strict();
@@ -22,8 +22,8 @@ function optionalIsoDateQuery(field: string) {
     z
       .string()
       .trim()
-      .min(1, `${field} invalido.`)
-      .refine((s) => !Number.isNaN(Date.parse(s)), `${field} invalido.`)
+      .min(1, `${field} inválido.`)
+      .refine((s) => !Number.isNaN(Date.parse(s)), `${field} inválido.`)
       .transform((s: string) => new Date(s)),
   ]);
 }
@@ -41,6 +41,6 @@ export const listTimeBankReleasesQuerySchema = z
 
 export const timeBankSummaryUserParamsSchema = z
   .object({
-    userId: z.string().uuid({ message: "userId invalido." }),
+    userId: z.string().uuid({ message: "userId inválido." }),
   })
   .strict();

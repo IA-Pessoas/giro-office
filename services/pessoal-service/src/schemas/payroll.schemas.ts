@@ -10,7 +10,7 @@ export const payrollClientParamsSchema = z
 const optionalUuid = (fieldName: string) =>
   z
     .string()
-    .uuid({ message: `${fieldName} invalido.` })
+    .uuid({ message: `${fieldName} inválido.` })
     .nullable()
     .optional();
 

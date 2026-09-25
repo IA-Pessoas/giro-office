@@ -81,7 +81,7 @@ export class TiRobotService {
     });
 
     if (!robot) {
-      throw new ServiceError(404, "Robo de TI nao encontrado.");
+      throw new ServiceError(404, "Robô de TI não encontrado.");
     }
 
     return withLatestRunSummary(robot);
@@ -171,7 +171,7 @@ export class TiRobotService {
     });
 
     if (!robot) {
-      throw new ServiceError(404, "Robo de TI nao encontrado.");
+      throw new ServiceError(404, "Robô de TI não encontrado.");
     }
 
     return robot;

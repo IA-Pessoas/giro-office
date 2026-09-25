@@ -34,7 +34,7 @@ describe("TiMessageService", () => {
 
     await expect(service.list(requesterContext, requestId, {})).rejects.toMatchObject({
       statusCode: 404,
-      message: "Chamado de TI nao encontrado.",
+      message: "Chamado de TI não encontrado.",
     });
     expect(prisma.tIMessage.findMany).not.toHaveBeenCalled();
   });
@@ -61,7 +61,7 @@ describe("TiMessageService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Chamado de TI nao encontrado.",
+      message: "Chamado de TI não encontrado.",
     });
     expect(prisma.tIMessage.create).not.toHaveBeenCalled();
   });

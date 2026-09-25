@@ -97,14 +97,14 @@ export class TiRequestService {
     });
 
     if (!request) {
-      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+      throw new ServiceError(404, "Chamado de TI não encontrado.");
     }
 
     if (
       context.permission < TiPermissionLevel.Technician &&
       request.requester_id !== context.userId
     ) {
-      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+      throw new ServiceError(404, "Chamado de TI não encontrado.");
     }
 
     return request;
@@ -117,12 +117,12 @@ export class TiRequestService {
       if (requesterId !== context.userId && context.permission < TiPermissionLevel.Technician) {
         throw new ServiceError(
           403,
-          "Permissao insuficiente para criar chamado para outro usuario.",
+          "Permissão insuficiente para criar chamado para outro usuário.",
         );
       }
 
       if (body.assigned_to_id && context.permission < TiPermissionLevel.Admin) {
-        throw new ServiceError(403, "Permissao insuficiente para atribuir chamado.");
+        throw new ServiceError(403, "Permissão insuficiente para atribuir chamado.");
       }
 
       await this.ensureCategory(context.organizationId, body.category_id);
@@ -132,7 +132,7 @@ export class TiRequestService {
         await this.ensureUser(
           context.organizationId,
           body.assigned_to_id,
-          "Responsavel nao encontrado.",
+          "Responsável não encontrado.",
         );
       }
 
@@ -174,7 +174,7 @@ export class TiRequestService {
     });
 
     if (!request) {
-      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+      throw new ServiceError(404, "Chamado de TI não encontrado.");
     }
 
     this.assertTransferorPermission(context, request.assigned_to_id);
@@ -182,14 +182,14 @@ export class TiRequestService {
     const destination = await this.ensureUser(
       context.organizationId,
       body.assigned_to_id,
-      "Responsavel nao encontrado.",
+      "Responsável não encontrado.",
     );
     const technologyDepartmentId = await new TiDepartmentResolverService(
       this.prisma,
     ).resolveTechnologyDepartmentId(context.organizationId);
 
     if (destination.status !== "active" || destination.department_id !== technologyDepartmentId) {
-      throw new ServiceError(400, "Responsavel deve pertencer ao departamento Tecnologia.");
+      throw new ServiceError(400, "Responsável deve pertencer ao departamento Tecnologia.");
     }
 
     const updateResult = await this.prisma.tIRequest.updateMany({
@@ -206,7 +206,7 @@ export class TiRequestService {
     });
 
     if (updateResult.count === 0) {
-      throw new ServiceError(409, "Chamado de TI foi transferido por outro usuario.");
+      throw new ServiceError(409, "Chamado de TI foi transferido por outro usuário.");
     }
 
     return { id, assigned_to_id: body.assigned_to_id };
@@ -224,7 +224,7 @@ export class TiRequestService {
     });
 
     if (!request) {
-      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+      throw new ServiceError(404, "Chamado de TI não encontrado.");
     }
 
     this.assertTransferorPermission(context, request.assigned_to_id);
@@ -261,7 +261,7 @@ export class TiRequestService {
       const allowed = allowedTransitions.get(request.status) ?? [];
 
       if (!allowed.includes(body.status) && context.permission < TiPermissionLevel.Admin) {
-        throw new ServiceError(403, "Permissao insuficiente para esta transicao.");
+        throw new ServiceError(403, "Permissão insuficiente para esta transição.");
       }
     }
 
@@ -274,7 +274,7 @@ export class TiRequestService {
     });
 
     if (!category) {
-      throw new ServiceError(404, "Categoria de TI nao encontrada.");
+      throw new ServiceError(404, "Categoria de TI não encontrada.");
     }
   }
 
@@ -284,7 +284,7 @@ export class TiRequestService {
       context.permission < TiPermissionLevel.Admin &&
       !context.isOrganizationOwner
     ) {
-      throw new ServiceError(403, "Permissao insuficiente para transferir chamado.");
+      throw new ServiceError(403, "Permissão insuficiente para transferir chamado.");
     }
   }
 

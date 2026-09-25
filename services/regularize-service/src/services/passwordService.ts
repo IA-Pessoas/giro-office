@@ -93,7 +93,7 @@ export class PasswordService {
       select: passwordSelect,
     });
     if (!existing) {
-      throw new ServiceError(404, "Senha nao encontrada.");
+      throw new ServiceError(404, "Senha não encontrada.");
     }
 
     await this.ensureClientExists(input.organizationId, input.body.client_id);
@@ -156,7 +156,7 @@ export class PasswordService {
       select: passwordSelect,
     });
     if (!password) {
-      throw new ServiceError(404, "Senha nao encontrada.");
+      throw new ServiceError(404, "Senha não encontrada.");
     }
 
     return this.hydratePassword(password);
@@ -177,7 +177,7 @@ export class PasswordService {
       select: { id: true },
     });
     if (exists) {
-      throw new ServiceError(409, "Site ja cadastrado.");
+      throw new ServiceError(409, "Site já cadastrado.");
     }
 
     const created = await this.prisma.sitePasswordsRegularize.create({
@@ -214,7 +214,7 @@ export class PasswordService {
       select: sitePasswordSelect,
     });
     if (!existing) {
-      throw new ServiceError(404, "Site nao encontrado.");
+      throw new ServiceError(404, "Site não encontrado.");
     }
 
     const updated = await this.prisma.sitePasswordsRegularize.update({
@@ -303,7 +303,7 @@ export class PasswordService {
       select: sitePasswordSelect,
     });
     if (!detail) {
-      throw new ServiceError(404, "Site nao encontrado.");
+      throw new ServiceError(404, "Site não encontrado.");
     }
 
     return detail as unknown as Record<string, unknown>;
@@ -334,7 +334,7 @@ export class PasswordService {
     });
 
     if (duplicate) {
-      throw new ServiceError(409, "Senha ja cadastrada.");
+      throw new ServiceError(409, "Senha já cadastrada.");
     }
   }
 
@@ -344,7 +344,7 @@ export class PasswordService {
       select: { id: true },
     });
     if (!exists) {
-      throw new ServiceError(404, "Cliente nao encontrado.");
+      throw new ServiceError(404, "Cliente não encontrado.");
     }
   }
 
@@ -354,7 +354,7 @@ export class PasswordService {
       select: { id: true },
     });
     if (!exists) {
-      throw new ServiceError(404, "Site nao encontrado.");
+      throw new ServiceError(404, "Site não encontrado.");
     }
   }
 

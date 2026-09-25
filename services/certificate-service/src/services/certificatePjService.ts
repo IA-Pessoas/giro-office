@@ -235,7 +235,7 @@ export class CertificatePjService {
     });
 
     if (!record) {
-      throw new ServiceError(404, "Certificado PJ nao encontrado.");
+      throw new ServiceError(404, "Certificado PJ não encontrado.");
     }
 
     if (!input.canViewPassword) {
@@ -278,7 +278,7 @@ export class CertificatePjService {
       });
 
       if (existing) {
-        throw new ServiceError(409, "Ja existe um certificado PJ com estes dados.");
+        throw new ServiceError(409, "Já existe um certificado PJ com estes dados.");
       }
 
       const record = await this.prisma.certificatePJ.create({
@@ -297,7 +297,7 @@ export class CertificatePjService {
       logError("Erro ao criar certificado PJ", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um certificado PJ com estes dados.", err);
+        throw new ServiceError(409, "Já existe um certificado PJ com estes dados.", err);
       }
       throw new ServiceError(500, "Erro ao criar certificado PJ.", err);
     }
@@ -310,7 +310,7 @@ export class CertificatePjService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Certificado PJ nao encontrado.");
+        throw new ServiceError(404, "Certificado PJ não encontrado.");
       }
 
       const name = input.data.name ?? existing.name;
@@ -333,7 +333,7 @@ export class CertificatePjService {
         });
 
         if (duplicate) {
-          throw new ServiceError(409, "Ja existe um certificado PJ com estes dados.");
+          throw new ServiceError(409, "Já existe um certificado PJ com estes dados.");
         }
       }
 
@@ -352,7 +352,7 @@ export class CertificatePjService {
       logError("Erro ao atualizar certificado PJ", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um certificado PJ com estes dados.", err);
+        throw new ServiceError(409, "Já existe um certificado PJ com estes dados.", err);
       }
       throw new ServiceError(500, "Erro ao atualizar certificado PJ.", err);
     }
@@ -364,7 +364,7 @@ export class CertificatePjService {
     });
 
     if (!record) {
-      throw new ServiceError(404, "Certificado PJ nao encontrado.");
+      throw new ServiceError(404, "Certificado PJ não encontrado.");
     }
 
     if (record.file_path) {
@@ -533,7 +533,7 @@ export class CertificatePjService {
     });
 
     if (!record) {
-      throw new ServiceError(404, "Certificado PJ nao encontrado.");
+      throw new ServiceError(404, "Certificado PJ não encontrado.");
     }
 
     return record;
@@ -553,7 +553,7 @@ export class CertificatePjService {
       !record.file_encryption_iv ||
       !record.file_encryption_tag
     ) {
-      throw new ServiceError(404, "Arquivo do certificado PJ nao encontrado.");
+      throw new ServiceError(404, "Arquivo do certificado PJ não encontrado.");
     }
 
     return {

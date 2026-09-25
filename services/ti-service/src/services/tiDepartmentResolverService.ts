@@ -22,7 +22,7 @@ export class TiDepartmentResolverService {
     });
 
     if (!department) {
-      throw new ServiceError(404, "Departamento Tecnologia nao encontrado.");
+      throw new ServiceError(404, "Departamento Tecnologia não encontrado.");
     }
 
     return department.id;

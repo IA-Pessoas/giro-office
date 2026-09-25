@@ -14,7 +14,7 @@ export const listPasswordsQuerySchema = z
   .strict();
 
 const optionalSecret = (fieldName: string) =>
-  z.string().trim().min(1, `${fieldName} e obrigatorio.`).nullable().optional();
+  z.string().trim().min(1, `${fieldName} é obrigatório.`).nullable().optional();
 
 const optionalResponsibleId = z
   .string()

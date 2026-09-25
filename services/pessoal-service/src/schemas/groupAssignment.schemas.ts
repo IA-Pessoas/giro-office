@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const uuidSchema = (field: string) => z.string().uuid({ message: `${field} invalido.` });
+const uuidSchema = (field: string) => z.string().uuid({ message: `${field} inválido.` });
 
 const paginationFields = {
   page: z.coerce.number().int().min(1).default(1),
@@ -21,7 +21,7 @@ export const createGroupAssignmentPreviewBodySchema = z
   })
   .strict()
   .refine((value) => new Set(value.client_ids).size === value.client_ids.length, {
-    message: "client_ids nao pode conter itens repetidos.",
+    message: "client_ids não pode conter itens repetidos.",
   });
 
 export const groupAssignmentPreviewParamsSchema = z
@@ -38,10 +38,10 @@ export const applyGroupAssignmentPreviewBodySchema = z
   .strict();
 
 export const groupAssignmentIdempotencyKeySchema = z
-  .string({ required_error: "Idempotency-Key e obrigatoria." })
+  .string({ required_error: "Idempotency-Key é obrigatória." })
   .trim()
-  .min(1, "Idempotency-Key e obrigatoria.")
-  .max(255, "Idempotency-Key deve ter no maximo 255 caracteres.");
+  .min(1, "Idempotency-Key é obrigatória.")
+  .max(255, "Idempotency-Key deve ter no máximo 255 caracteres.");
 
 export type GroupAssignmentEligibleQuery = z.infer<typeof groupAssignmentEligibleQuerySchema>;
 export type CreateGroupAssignmentPreviewBody = z.infer<

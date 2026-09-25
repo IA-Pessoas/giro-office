@@ -3,11 +3,11 @@ import { z } from "zod";
 
 const organizationDate = z
   .string({
-    required_error: "date e obrigatorio.",
+    required_error: "date é obrigatório.",
     invalid_type_error: "date deve ser uma string.",
   })
   .trim()
-  .min(1, "date e obrigatorio.")
+  .min(1, "date é obrigatório.")
   .refine((value) => {
     if (/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
       const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -72,8 +72,8 @@ export const approveAdjustmentsBulkBodySchema = z
   .object({
     request_ids: z
       .array(z.string().uuid({ message: "request_id invalido." }))
-      .min(1, "Informe ao menos uma solicitacao.")
-      .max(100, "O lote pode conter no maximo 100 solicitacoes."),
+      .min(1, "Informe ao menos uma solicitação.")
+      .max(100, "O lote pode conter no máximo 100 solicitações."),
     obs_approver: z
       .union([z.string(), z.number(), z.null()])
       .optional()
@@ -98,6 +98,6 @@ export const listAdjustmentRequestsQuerySchema = z
 
 export const uploadAdjustmentAttachmentParamsSchema = z
   .object({
-    requestId: z.string().uuid({ message: "requestId invalido." }),
+    requestId: z.string().uuid({ message: "requestId inválido." }),
   })
   .strict();

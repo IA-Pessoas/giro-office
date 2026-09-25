@@ -23,7 +23,7 @@ export function createInternalNotificationRoutes(
     try {
       const token = request.get(INTERNAL_SERVICE_TOKEN_HEADER);
       if (token !== env.internalServiceToken) {
-        throw new ServiceError(401, "Token interno do certificate-service invalido.");
+        throw new ServiceError(401, "Token interno do certificate-service inválido.");
       }
 
       parseWithZod(certificateNotificationRunBodySchema, request.body ?? {});

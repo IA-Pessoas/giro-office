@@ -74,7 +74,7 @@ export function createForwardedAuthContextMiddleware(internalServiceToken: strin
     const token = getHeaderValue(request.headers[INTERNAL_SERVICE_TOKEN_HEADER]);
 
     if (token !== internalServiceToken) {
-      next(new ServiceError(401, "Token interno do certificate-service invalido."));
+      next(new ServiceError(401, "Token interno do certificate-service inválido."));
       return;
     }
 
