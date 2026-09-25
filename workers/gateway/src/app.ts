@@ -452,6 +452,13 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
       if (!isSelfUserPut && !canAccessRoute({ ...auth, claims: { ...auth.claims } }, policy)) {
         throw new ServiceError(403, "Acesso negado para esta rota.");
       }
+      // Sessão personificada sempre revalida no user-service: revogar a permissão, sair ou
+      // expirar corta o acesso na hora, inclusive nos Workers que confiam só na identidade
+      // repassada. O Node revalidava toda rota; a paridade total segue em issue própria.
+      // A busca de auditoria da plataforma lê todas as organizações e também revalida.
+      if (auth.claims.impersonator_platform_user_id || route.targetPath === "/audit/requests") {
+        await validateGatewaySession(c.req.raw, auth, env);
+      }
     }
     const requestId = requestIdFor(c.req.raw);
     c.set("requestId", requestId);
@@ -464,9 +471,6 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     const forwardedRequest = new Request(upstreamUrl, new Request(c.req.raw, { headers }));
 
     if (route.binding === "AUDIT_SERVICE") {
-      // O audit-service confia na identidade repassada; a busca de plataforma lê todas as
-      // organizações, então a sessão do super admin é revalidada antes (logout vale na hora).
-      if (route.targetPath && auth) await validateGatewaySession(c.req.raw, auth, env);
       return withRequestId(await binding.fetch(forwardedRequest), requestId);
     }
 
