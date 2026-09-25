@@ -75,7 +75,7 @@ function createTimestamp(): string {
   return `,"timestamp":"${new Date().toISOString()}"`;
 }
 
-function buildLoggerOptions({
+export function buildLoggerOptions({
   service,
   env = process.env.NODE_ENV ?? "development",
   level = "info",
@@ -93,6 +93,10 @@ function buildLoggerOptions({
     },
     serializers: {
       err: pino.stdSerializers.err,
+    },
+    // Workers usam o build de navegador do pino, que só aplica serializers com esta flag.
+    browser: {
+      serialize: true,
     },
     redact: {
       paths: REDACT_PATHS,

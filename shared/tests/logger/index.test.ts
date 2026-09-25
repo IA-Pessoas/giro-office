@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { Writable } from "node:stream";
 import test from "node:test";
 
-import { createLogger } from "../../src/logger/index.js";
+import { buildLoggerOptions, createLogger } from "../../src/logger/index.js";
 
 class MemoryLogStream extends Writable {
   private readonly chunks: string[] = [];
@@ -90,4 +90,26 @@ test("createLogger redacts common sensitive fields", async () => {
     password: "[Redacted]",
     token: "[Redacted]",
   });
+});
+
+test("browser build used by Workers serializes err (#1539)", async () => {
+  // wrangler resolve o campo "browser" do pino: sem browser.serialize o Error vira {} no console
+  const { default: pinoBrowser } = await import("pino/browser.js");
+  const calls: unknown[][] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => void calls.push(args);
+  try {
+    const logger = pinoBrowser(buildLoggerOptions({ service: "task-service" }));
+    const err = Object.assign(new Error("boom"), { code: "P2002", meta: { target: ["taskId"] } });
+    logger.error({ err }, "Erro ao solicitar conclusão da tarefa");
+  } finally {
+    console.error = original;
+  }
+
+  const [context] = calls[0] as [{ err: Record<string, unknown> }];
+  assert.equal(context.err.message ?? context.err.msg, "boom");
+  assert.equal(context.err.type, "Error");
+  assert.equal(context.err.code, "P2002");
+  assert.deepEqual(context.err.meta, { target: ["taskId"] });
+  assert.match(String(context.err.stack), /boom/);
 });
