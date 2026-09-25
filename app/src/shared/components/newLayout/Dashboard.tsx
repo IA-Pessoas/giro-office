@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -34,6 +35,7 @@ import { useActivityClock } from "../../../modules/dashboard/hooks/useActivityCl
 import { useDashboard } from "../../../modules/dashboard/hooks/useDashboard";
 import type { DashboardStats } from "../../../modules/dashboard/types";
 import { formatActivityTime } from "../../../modules/dashboard/utils/activityTime";
+import { formatDateTime } from "../../utils/dateFormat";
 
 type DashboardProjectStats = DashboardStats["projects"];
 type DashboardActivity = DashboardStats["activities"][number] & {
@@ -127,10 +129,7 @@ function hasDashboardData(stats: DashboardStats): boolean {
       (stats.commercial?.billing.pending ?? 0) > 0 ||
       (stats.commercial?.billing.contracted ?? 0) > 0 ||
       (stats.commercial?.billing.notContracted ?? 0) > 0 ||
-      (stats.departments ?? []).some(
-        (department) =>
-          department.openTasks > 0 || department.completedTasks > 0 || department.urgentTasks > 0,
-      ) ||
+      (stats.departments ?? []).some(hasTaskData) ||
       stats.notifications.total > 0 ||
       stats.notifications.urgent > 0 ||
       stats.notifications.pending > 0 ||
@@ -174,28 +173,29 @@ function DashboardStatePanel({
   );
 }
 
-function formatLastUpdated(updatedAt: string | null | undefined): string {
-  if (!updatedAt) {
-    return "Sem atualização";
-  }
+function ChartEmptyState({ height }: { height: number }) {
+  return (
+    <div
+      role="status"
+      className="flex items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+      style={{ height }}
+    >
+      Sem dados no período.
+    </div>
+  );
+}
 
-  const date = new Date(updatedAt);
-  if (Number.isNaN(date.getTime()) || date.getTime() > Date.now()) {
-    return "Sem atualização";
-  }
-
-  return `${date.toLocaleDateString("pt-BR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })} - ${date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+function hasTaskData(department: DashboardStats["departments"][number]): boolean {
+  return department.openTasks > 0 || department.completedTasks > 0 || department.urgentTasks > 0;
 }
 
 export function Dashboard() {
-  const { stats, isLoading, isFetching, error, refetch } = useDashboard();
+  const { stats, fetchedAt, isLoading, isFetching, error, refetch } = useDashboard();
   const activityNow = useActivityClock();
-  const lastUpdated = formatLastUpdated(stats?.updatedAt);
+  const [showAllDepartments, setShowAllDepartments] = useState(false);
+  // Hora em que estes dados foram buscados. O `updatedAt` do servidor é o último dado alterado
+  // na organização e podia ser de dias atrás, parecendo painel desatualizado (#1371).
+  const lastUpdated = formatDateTime(fetchedAt ? new Date(fetchedAt) : null, "Sem atualização");
 
   if (isLoading && !stats) {
     return (
@@ -250,6 +250,9 @@ export function Dashboard() {
     billing: { pending: 0, contracted: 0, notContracted: 0 },
   };
   const departmentSummary = stats.departments ?? [];
+  // ~50 departamentos zerados escondiam os que importam: por padrão só os que têm tarefas.
+  const departmentsWithData = departmentSummary.filter(hasTaskData);
+  const visibleDepartments = showAllDepartments ? departmentSummary : departmentsWithData;
   const notificationSummary = stats?.notifications ?? {
     total: 0,
     urgent: 0,
@@ -271,6 +274,9 @@ export function Dashboard() {
   }));
   const projectsData = buildProjectsData(projectSummary);
   const performanceData = stats?.performance ?? getEmptyPerformanceData();
+  const hasReceiptsData = receiptsData.some((item) => item.amount > 0);
+  const hasProjectsData = projectsData.some((item) => item.value > 0);
+  const hasPerformanceData = performanceData.some((item) => item.tasks > 0 || item.completed > 0);
   const activities: DashboardActivity[] = (stats?.activities ?? []).map((activity) => ({
     ...activity,
     elapsedTime: formatActivityTime(activity.createdAt, activityNow),
@@ -350,9 +356,11 @@ export function Dashboard() {
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <div className="relative h-[3.25rem] w-[3.25rem] shrink-0 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
                 <Bell className="h-7 w-7 text-white" />
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                  {notificationSummary.urgent}
-                </span>
+                {notificationSummary.urgent > 0 ? (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+                    {notificationSummary.urgent}
+                  </span>
+                ) : null}
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">{notificationSummary.total}</p>
@@ -406,6 +414,7 @@ export function Dashboard() {
               </p>
             </div>
           </div>
+          {hasReceiptsData ? (
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={receiptsData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
@@ -432,6 +441,9 @@ export function Dashboard() {
               />
             </AreaChart>
           </ResponsiveContainer>
+          ) : (
+            <ChartEmptyState height={250} />
+          )}
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
@@ -445,6 +457,7 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-6">
+            {hasProjectsData ? (
             <ResponsiveContainer width="50%" height={200}>
               <PieChart>
                 <Pie
@@ -464,6 +477,11 @@ export function Dashboard() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
+            ) : (
+              <div className="w-1/2">
+                <ChartEmptyState height={200} />
+              </div>
+            )}
             <div className="flex-1 space-y-2">
               {projectsData.map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
@@ -532,9 +550,9 @@ export function Dashboard() {
               </p>
             </div>
           </div>
-          {departmentSummary.length > 0 ? (
-            <div className="space-y-3">
-              {departmentSummary.map((department) => (
+          {visibleDepartments.length > 0 ? (
+            <div className="max-h-96 space-y-3 overflow-y-auto">
+              {visibleDepartments.map((department) => (
                 <div key={department.id} className="rounded-lg border border-gray-100 p-3 dark:border-gray-700">
                   <div className="flex items-center justify-between gap-3">
                     <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">{department.name}</span>
@@ -550,6 +568,16 @@ export function Dashboard() {
           ) : (
             <p className="text-sm text-gray-500 dark:text-gray-400">Nenhum departamento com dados de tarefas.</p>
           )}
+          {departmentSummary.length > departmentsWithData.length ? (
+            <button
+              type="button"
+              onClick={() => setShowAllDepartments((current) => !current)}
+              aria-expanded={showAllDepartments}
+              className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              {showAllDepartments ? "Mostrar só com dados" : `Mostrar todos (${departmentSummary.length})`}
+            </button>
+          ) : null}
         </section>
       </div>
 
@@ -561,6 +589,7 @@ export function Dashboard() {
               Performance Semanal
             </h3>
           </div>
+          {hasPerformanceData ? (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={performanceData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
@@ -578,6 +607,9 @@ export function Dashboard() {
               <Bar dataKey="completed" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
+          ) : (
+            <ChartEmptyState height={200} />
+          )}
         </div>
 
         <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
