@@ -491,7 +491,7 @@ runTest("parcelamento shell wires access, client selector and dashboard", () => 
   assert.match(shell, /ParcelamentoDashboard/);
   assert.match(shell, /role="tablist"/);
   assert.match(shell, /role="tab"/);
-  assert.match(shell, /enabled: access\.canView/);
+  assert.match(shell, /access\.canView && activeTab === "dashboard"/);
   assert.match(clientSelector, /useClients\(/);
   assert.match(clientSelector, /Dialog/);
   assert.match(clientSelector, /contentClassName="w-\[min\(92vw,520px\)\]"/);
@@ -904,6 +904,22 @@ runTest("parcelamento installment mutations refetch the list once (#1349)", () =
   const hooks = readWorkspaceFile("src/modules/parcelamento/hooks/useParcelamentoInstallments.ts");
 
   assert.equal((hooks.match(/invalidateQueries/g) ?? []).length, 2);
+});
+
+runTest("parcelamento review fixes: named missing fields, no raw ids, dashboard-only queries (#1349)", () => {
+  const form = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentForm.tsx",
+  );
+  const panoramas = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramasSection.tsx",
+  );
+  const shell = readWorkspaceFile("src/modules/parcelamento/components/ParcelamentoShell.tsx");
+
+  assert.equal((form.match(/getMissingRequiredFields\(formState\)/g) ?? []).length, 2);
+  assert.match(form, /Preencha os campos obrigatórios: \$\{missingFields\.join/);
+  assert.doesNotMatch(panoramas, /responsibleUserNames\.get\(value\) \?\? value/);
+  assert.match(shell, /activeTab === "dashboard"/);
+  assert.match(shell, /useParcelamentoInstallments\(filters, \{ enabled: isDashboardActive \}\)/);
 });
 
 console.log("parcelamento frontend tests passed");

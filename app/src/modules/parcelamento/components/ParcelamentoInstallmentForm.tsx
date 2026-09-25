@@ -103,6 +103,22 @@ function buildFormState(
   };
 }
 
+const REQUIRED_FIELD_LABELS: Array<[keyof ParcelamentoInstallmentFormState, string]> = [
+  ["type", "Tipo"],
+  ["legal_nature", "Natureza jurídica"],
+  ["jurisdiction", "Jurisdição"],
+  ["consolidated_total_amount", "Valor total do parcelamento"],
+  ["first_installment_amount", "Valor da 1ª parcela"],
+  ["current_month_installment_amount", "Valor da parcela atual"],
+  ["agreed_installments_count", "Quantidade de parcelas"],
+];
+
+function getMissingRequiredFields(formState: ParcelamentoInstallmentFormState) {
+  return REQUIRED_FIELD_LABELS.filter(([field]) => !String(formState[field]).trim()).map(
+    ([, label]) => label,
+  );
+}
+
 function readRequiredNumber(value: string) {
   return value.trim().length > 0 ? Number(value) : 0;
 }
@@ -153,13 +169,9 @@ export function ParcelamentoInstallmentForm({
       return null;
     }
 
-    if (
-      !formState.consolidated_total_amount.trim() ||
-      !formState.first_installment_amount.trim() ||
-      !formState.current_month_installment_amount.trim() ||
-      !formState.agreed_installments_count.trim()
-    ) {
-      setFormError("Preencha os campos obrigatórios marcados com *.");
+    const missingFields = getMissingRequiredFields(formState);
+    if (missingFields.length > 0) {
+      setFormError(`Preencha os campos obrigatórios: ${missingFields.join(", ")}.`);
       return null;
     }
 
@@ -168,10 +180,6 @@ export function ParcelamentoInstallmentForm({
     const currentAmount = readRequiredNumber(formState.current_month_installment_amount);
     const installmentsCount = Math.trunc(readRequiredNumber(formState.agreed_installments_count));
 
-    if (!formState.type.trim() || !formState.legal_nature.trim() || !formState.jurisdiction.trim()) {
-      setFormError("Preencha os campos obrigatórios marcados com *.");
-      return null;
-    }
 
     if (
       isInvalidNonNegativeNumber(totalAmount) ||
@@ -199,6 +207,12 @@ export function ParcelamentoInstallmentForm({
   }
 
   function buildUpdatePayload(): PatchParcelamentoInstallmentPayload | null {
+    const missingFields = getMissingRequiredFields(formState);
+    if (missingFields.length > 0) {
+      setFormError(`Preencha os campos obrigatórios: ${missingFields.join(", ")}.`);
+      return null;
+    }
+
     const patch: PatchParcelamentoInstallmentPayload = {};
 
     if (formState.agreement_number !== initialFormState.agreement_number) {
