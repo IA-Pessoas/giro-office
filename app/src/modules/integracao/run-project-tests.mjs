@@ -1162,7 +1162,7 @@ runTest("task form modal uses compact layout classes", () => {
   assert.equal(TASK_FORM_BODY_CLASSNAME.includes("max-h-[64vh]"), true);
   assert.equal(TASK_FORM_BODY_CLASSNAME.includes("!py-3"), true);
   assert.equal(TASK_FORM_FORM_CLASSNAME, "space-y-3");
-  assert.equal(TASK_FORM_GRID_CLASSNAME, "grid gap-3 md:grid-cols-2");
+  assert.equal(TASK_FORM_GRID_CLASSNAME, "grid grid-cols-1 gap-3 md:grid-cols-2");
   assert.equal(TASK_FORM_TEXTAREA_CLASSNAME.includes("min-h-20"), true);
 });
 
