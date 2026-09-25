@@ -71,11 +71,11 @@ import {
   GuidanceService,
   type GuidanceService as GuidanceServiceType,
 } from "@workspace/regularize-service/src/services/guidanceService.js";
-import { MunicipalTaxesService } from "@workspace/regularize-service/src/services/municipalTaxesService.js";
 import {
   licenseListClientSelect,
   withLicenseClientName,
 } from "@workspace/regularize-service/src/services/licenseService.js";
+import { MunicipalTaxesService } from "@workspace/regularize-service/src/services/municipalTaxesService.js";
 import { PartnersService } from "@workspace/regularize-service/src/services/partnersService.js";
 import { PasswordService } from "@workspace/regularize-service/src/services/passwordService.js";
 import { ProcessService } from "@workspace/regularize-service/src/services/processService.js";
