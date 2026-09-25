@@ -18,6 +18,7 @@ import type {
 } from "../types";
 import {
   triageClosingQueryKey,
+  triageFiscalPortfolioQueryKey,
   triageMonthlyQueryKey,
   triageStatementsQueryKey,
 } from "./queryKeys";
@@ -75,10 +76,16 @@ export function useTriageMutations(
   type: TriageRoutineType = "CONTABIL",
 ) {
   const queryClient = useQueryClient();
-  const refresh = async () =>
-    queryClient.invalidateQueries({
-      queryKey: triageMonthlyQueryKey(clientId, competence, type),
-    });
+  const refresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: triageMonthlyQueryKey(clientId, competence, type),
+      }),
+      ...(type === "FISCAL"
+        ? [queryClient.invalidateQueries({ queryKey: triageFiscalPortfolioQueryKey(competence) })]
+        : []),
+    ]);
+  };
   return {
     create: useMutation({
       mutationFn: () =>

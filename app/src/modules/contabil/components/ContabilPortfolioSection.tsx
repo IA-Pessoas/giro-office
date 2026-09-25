@@ -35,15 +35,13 @@ import {
 import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
 import { ContabilCompanyPicker } from "./ContabilCompanyPicker";
 import { ContabilStateBox } from "./ContabilStateBox";
+import { CONTABIL_TABLE_FILTER_CLASS } from "./contabilUiClasses";
 
 const TEXT_FILTER_COLUMNS = [
   { key: "regime", label: "Regime" },
   { key: "responsible", label: "Responsável" },
   { key: "posted_by", label: "Responsável lançamento" },
 ] as const;
-
-const FILTER_SELECT_CLASSNAME =
-  "mt-1 w-full min-w-[4.5rem] rounded-md border border-gray-300 bg-white px-1 py-1 text-xs font-normal normal-case tracking-normal text-gray-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200";
 
 // Colunas fixas ao rolar: fundo opaco para não vazar o conteúdo que passa por baixo.
 const STICKY_ITEM = "sticky left-0 z-10 w-12 min-w-[3rem]";
@@ -394,7 +392,7 @@ export function ContabilPortfolioSection() {
                         aria-label={`Filtrar ${column.label}`}
                         value={filters[column.key] ?? ""}
                         onChange={(event) => setFilter(column.key, event.target.value)}
-                        className={FILTER_SELECT_CLASSNAME}
+                        className={CONTABIL_TABLE_FILTER_CLASS}
                       >
                         <option value="">Todos</option>
                         {filterOptions[column.key].map((option) => (
@@ -412,7 +410,7 @@ export function ContabilPortfolioSection() {
                         aria-label={`Filtrar ${field.label}`}
                         value={filters[field.field] ?? ""}
                         onChange={(event) => setFilter(field.field, event.target.value)}
-                        className={FILTER_SELECT_CLASSNAME}
+                        className={CONTABIL_TABLE_FILTER_CLASS}
                       >
                         <option value="">Todos</option>
                         <option value="done">Feito</option>

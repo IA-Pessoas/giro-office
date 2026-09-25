@@ -4646,6 +4646,13 @@ const handlers = {
     });
   },
 
+  async triageFiscalPortfolioGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { competence: "2026-09" },
+    });
+  },
+
   async triageEditabilityGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],

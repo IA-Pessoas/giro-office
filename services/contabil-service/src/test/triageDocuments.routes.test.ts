@@ -43,6 +43,7 @@ function gatewayHeaders(
 
 function createMockDeps(): TriageDocumentsRouteDeps {
   return {
+    listFiscalPortfolio: vi.fn(async () => ({ competence: "2026-09", items: [] })),
     getMonthly: vi.fn(async () => ({ id: MONTHLY_ID })),
     getOrCreateMonthly: vi.fn(async () => ({ id: MONTHLY_ID })),
     updateItem: vi.fn(async () => ({ id: MONTHLY_ID })),
@@ -54,9 +55,35 @@ function createMockDeps(): TriageDocumentsRouteDeps {
 }
 
 describe("triage document routes", () => {
+  it("GET /triagem/fiscal-portfolio valida competência e encaminha contexto fiscal", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+    const headers = gatewayHeaders({ fiscal: 1, triagem: 1 });
+
+    const invalid = await request(app)
+      .get("/triagem/fiscal-portfolio?competence=2026-13")
+      .set(headers);
+    expect(invalid.status).toBe(400);
+    expect(deps.listFiscalPortfolio).not.toHaveBeenCalled();
+
+    const response = await request(app)
+      .get("/triagem/fiscal-portfolio?competence=2026-09")
+      .set(headers);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: { competence: "2026-09", items: [] } });
+    expect(deps.listFiscalPortfolio).toHaveBeenCalledWith(
+      "2026-09",
+      expect.objectContaining({
+        organizationId: ORG_ID,
+        modules: expect.objectContaining({ fiscal: 1 }),
+      }),
+    );
+  });
+
   it("publica cada operação de triagem como path OpenAPI de primeiro nível", () => {
     const spec = buildContabilServiceOpenApiSpec(env);
 
+    expect(spec.paths).toHaveProperty("/triagem/fiscal-portfolio.get.responses.200");
     expect(spec.paths).toHaveProperty("/triagem/monthly.get");
     expect(spec.paths).toHaveProperty("/triagem/monthly.post.responses.200");
     expect(spec.paths).toHaveProperty("/triagem/monthly/{id}/item.patch");

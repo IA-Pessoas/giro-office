@@ -132,6 +132,23 @@ export interface TriageDocumentItemNotes {
   required?: boolean;
 }
 
+export interface FiscalTriagePortfolioItem {
+  client_id: string;
+  legal_name: string;
+  cpf_cnpj: string;
+  regime: string | null;
+  responsible_id: string | null;
+  responsible_name: string | null;
+  can_edit: boolean;
+  has_competence: boolean;
+  planned_checklist: Record<string, TriageDocumentStatus> | null;
+  monthly: {
+    id: string;
+    checklist: Record<string, TriageDocumentStatus>;
+    item_notes: Record<string, TriageDocumentItemNotes>;
+  } | null;
+}
+
 function isTriageDocumentField(value: string): value is TriageDocumentField {
   return TRIAGE_DOCUMENT_FIELDS.includes(value as TriageDocumentField);
 }
@@ -322,6 +339,146 @@ export class TriageDocumentsService {
     private readonly audit: TriageDocumentsAudit = { logUpdateIfChanged },
     private readonly overviewClient?: TriageOverviewSummaryClient,
   ) {}
+
+  async listFiscalPortfolio(
+    competence: string,
+    auth: TriageDocumentsAuthContext,
+  ): Promise<{ competence: string; items: FiscalTriagePortfolioItem[] }> {
+    if (!auth.userId || !auth.organizationId) {
+      throw new ServiceError(400, "Contexto autenticado incompleto.");
+    }
+    if (Number(auth.modules?.fiscal ?? auth.permission ?? 0) < 1) {
+      throw new ServiceError(403, "Permissão insuficiente para consultar a Triagem Fiscal.");
+    }
+
+    const [year, month] = competence.split("-").map(Number);
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    // ponytail: a carteira inteira cabe em centenas de empresas; paginar no servidor se chegar a milhares.
+    const clients = await this.prisma.client.findMany({
+      where: {
+        organization_id: auth.organizationId,
+        OR: [
+          {
+            fiscal: true,
+            AND: [
+              { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
+              { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
+            ],
+          },
+          {
+            triageMonthlys: {
+              some: {
+                organization_id: auth.organizationId,
+                competence,
+                type: "FISCAL",
+                archived_at: null,
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        company_name: true,
+        cpf_cnpj: true,
+        regime: true,
+        triageMonthlys: {
+          where: {
+            organization_id: auth.organizationId,
+            competence,
+            type: "FISCAL",
+            archived_at: null,
+          },
+          select: { id: true, checklist: true, item_notes: true },
+          take: 1,
+        },
+        triageCompetences: {
+          where: { organization_id: auth.organizationId, competence, archived_at: null },
+          select: { id: true, responsible_snapshot: true, configuration_snapshot: true },
+          take: 1,
+        },
+        responsiblesTriage: {
+          where: { organization_id: auth.organizationId, type: "FISCAL" },
+          select: { user_id: true },
+          take: 1,
+        },
+      },
+      orderBy: [{ company_name: "asc" }, { name: "asc" }, { id: "asc" }],
+    });
+
+    const snapshotResponsibleIds = clients.map((client) => {
+      const snapshot = client.triageCompetences[0]?.responsible_snapshot;
+      const source =
+        snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)
+          ? (snapshot as Record<string, unknown>)
+          : {};
+      const responsibles = Array.isArray(source.responsibles) ? source.responsibles : [];
+      const fiscal = responsibles.find(
+        (entry) =>
+          entry &&
+          typeof entry === "object" &&
+          !Array.isArray(entry) &&
+          (entry as Record<string, unknown>).type === "FISCAL",
+      ) as Record<string, unknown> | undefined;
+      return typeof fiscal?.user_id === "string" ? fiscal.user_id : null;
+    });
+    const responsibleIds = clients.map((client, index) =>
+      client.triageCompetences[0]
+        ? snapshotResponsibleIds[index]
+        : (client.responsiblesTriage[0]?.user_id ?? null),
+    );
+    const userIds = responsibleIds.flatMap((id) => {
+      return id ? [id] : [];
+    });
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { organization_id: auth.organizationId, id: { in: userIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const userNames = new Map(users.map((user) => [user.id, user.name]));
+
+    return {
+      competence,
+      items: clients.map((client, index) => {
+        const monthly = client.triageMonthlys[0];
+        const competenceSnapshot = client.triageCompetences[0];
+        const plannedItems = competenceSnapshot
+          ? fiscalSnapshotItems(competenceSnapshot.configuration_snapshot)
+          : null;
+        const responsibleId = responsibleIds[index];
+        return {
+          client_id: client.id,
+          legal_name: client.company_name?.trim() || client.name,
+          cpf_cnpj: client.cpf_cnpj,
+          regime: client.regime,
+          responsible_id: responsibleId,
+          responsible_name: responsibleId ? (userNames.get(responsibleId) ?? null) : null,
+          can_edit:
+            Number(auth.modules?.fiscal ?? 0) >= 2 ||
+            client.responsiblesTriage[0]?.user_id === auth.userId,
+          has_competence: Boolean(competenceSnapshot),
+          planned_checklist: plannedItems
+            ? Object.fromEntries(
+                TRIAGE_FISCAL_CHECKLIST_FIELDS.map((field) => [
+                  field,
+                  plannedItems[field]?.required === true ? "PENDING" : "NOT_APPLICABLE",
+                ]),
+              )
+            : null,
+          monthly: monthly
+            ? {
+                id: monthly.id,
+                checklist: asChecklist(monthly.checklist, TRIAGE_FISCAL_CHECKLIST_FIELDS),
+                item_notes: asItemNotes(monthly.item_notes, TRIAGE_FISCAL_CHECKLIST_FIELDS),
+              }
+            : null,
+        };
+      }),
+    };
+  }
 
   getSummary(
     checklist: Record<string, unknown>,

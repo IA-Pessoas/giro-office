@@ -9,6 +9,7 @@ export {
   ContabilShell,
   ContabilStateBox,
   TriageDocumentsSection,
+  FiscalTriagePortfolioSection,
 } from "./components";
 export {
   contabilControlQueryKey,
@@ -53,6 +54,8 @@ export {
 } from "./services";
 export type {
   ContabilCompetence,
+  FiscalTriagePortfolio,
+  FiscalTriagePortfolioItem,
   ContabilControl,
   ContabilControlFilters,
   ContabilControlPortfolio,

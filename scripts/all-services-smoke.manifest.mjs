@@ -3964,6 +3964,14 @@ const baseManifest = [
   op({
     service: "contabil-service",
     method: "GET",
+    path: "/triagem/fiscal-portfolio",
+    action: "triageFiscalPortfolioGet",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "contabil-service",
+    method: "GET",
     path: "/triagem/editability",
     action: "triageEditabilityGet",
     target: "gateway",
