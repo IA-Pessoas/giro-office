@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileDown, Printer, Search } from "lucide-react";
+import { AlertCircle, CalendarDays, FileDown, Loader2, Printer, RotateCcw, Search } from "lucide-react";
 
 import { triagemCompetenceService } from "@modules/triagem/services/triagemCompetenceService";
+import { PaginationControls } from "@shared/components";
 import { useFetch } from "@shared/hooks";
 import { formatCpfCnpjInput } from "@shared/utils/inputFormatting";
 
@@ -11,10 +12,15 @@ import type { ContabilCompetence, FiscalTriagePortfolioItem, TriageDocumentStatu
 import { triageFiscalPortfolioQueryKey, triageMonthlyQueryKey } from "../hooks/queryKeys";
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect, CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
+import { ContabilStateBox } from "./ContabilStateBox";
 import { FISCAL_DOCUMENTS, STATUSES } from "./TriageDocumentsSection";
 
 const PAGE_SIZE = 50;
 const STATUS_LABELS = Object.fromEntries(STATUSES) as Record<TriageDocumentStatus, string>;
+const EXPORT_BUTTON_CLASS =
+  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700";
+const TABLE_FILTER_CLASS =
+  "mt-1 w-full min-w-[7rem] rounded-md border border-gray-300 bg-white px-1 py-1 text-xs font-normal normal-case tracking-normal text-gray-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200";
 
 function cellStatus(row: FiscalTriagePortfolioItem, field: TriageFiscalChecklistField) {
   return row.monthly?.checklist[field] ?? row.planned_checklist?.[field] ?? "NOT_STARTED";
@@ -201,7 +207,7 @@ export function FiscalTriagePortfolioSection({
       className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
       aria-labelledby="fiscal-triage-portfolio-title"
     >
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2
             id="fiscal-triage-portfolio-title"
@@ -209,26 +215,30 @@ export function FiscalTriagePortfolioSection({
           >
             Triagem Fiscal mensal
           </h2>
-          <p className="text-sm text-gray-600 dark:text-slate-400">
+          <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
             Empresas e documentos da competência, inclusive rotinas ainda não iniciadas.
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <ContabilCompetenceSelect
-            value={competence}
-            label="Competência da Triagem Fiscal"
-            onChange={(value) => {
-              setCompetence(value);
-              setPage(1);
-            }}
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
+            <CalendarDays aria-hidden="true" className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+            Competência
+            <ContabilCompetenceSelect
+              value={competence}
+              label="Competência da Triagem Fiscal"
+              onChange={(value) => {
+                setCompetence(value);
+                setPage(1);
+              }}
+            />
+          </div>
           <button
             type="button"
             onClick={() => exportCsv(competence, filtered)}
             disabled={!filtered.length}
-            className="inline-flex items-center gap-1 rounded-lg border px-3 py-1 text-sm disabled:opacity-50"
+            className={EXPORT_BUTTON_CLASS}
           >
-            <FileDown className="h-4 w-4" /> CSV
+            <FileDown aria-hidden="true" className="h-4 w-4" /> CSV
           </button>
           <button
             type="button"
@@ -237,74 +247,64 @@ export function FiscalTriagePortfolioSection({
                 setActionError("Permita a abertura da janela para salvar o PDF.");
             }}
             disabled={!filtered.length}
-            className="inline-flex items-center gap-1 rounded-lg border px-3 py-1 text-sm disabled:opacity-50"
+            className={EXPORT_BUTTON_CLASS}
           >
-            <Printer className="h-4 w-4" /> Imprimir / PDF
+            <Printer aria-hidden="true" className="h-4 w-4" /> Imprimir / PDF
           </button>
         </div>
       </div>
 
       {portfolio.isLoading ? (
-        <p role="status" className="text-sm text-gray-600">
-          Carregando carteira fiscal...
-        </p>
+        <ContabilStateBox icon={Loader2} tone="loading" title="Carregando carteira fiscal" compact>
+          Buscando empresas e documentos desta competência.
+        </ContabilStateBox>
       ) : null}
       {portfolio.isError ? (
-        <p role="alert" className="text-sm text-red-700">
-          Não foi possível carregar a carteira fiscal. {getContabilErrorMessage(portfolio.error)}
-        </p>
+        <ContabilStateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar a carteira fiscal" compact>
+          {getContabilErrorMessage(portfolio.error)}
+          <button
+            type="button"
+            onClick={() => void portfolio.refetch()}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold hover:bg-red-100 dark:border-red-900/50 dark:hover:bg-red-900/30"
+          >
+            <RotateCcw aria-hidden="true" className="h-4 w-4" /> Tentar novamente
+          </button>
+        </ContabilStateBox>
       ) : null}
       {actionError ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-200">
           {actionError}
         </p>
       ) : null}
       {!portfolio.isLoading && !portfolio.isError ? (
         <>
-          <div className="flex flex-wrap gap-2" aria-label="Empresas por responsável">
-            {counts.map(({ name, count }) => (
-              <div
-                key={name}
-                className="min-w-32 rounded-lg border border-gray-200 p-3 dark:border-slate-700"
-              >
-                <strong className="block text-xl text-gray-900 dark:text-white">{count}</strong>
-                <span className="text-xs text-gray-600 dark:text-slate-400">{name}</span>
-              </div>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+            <p aria-live="polite" className="text-sm text-gray-700 dark:text-slate-300">
+              {items.length} empresas na competência
+              {filtered.length !== items.length ? ` · ${filtered.length} exibidas` : ""}
+            </p>
+            <div className="flex flex-wrap gap-2" aria-label="Empresas por responsável">
+              {counts.map(({ name, count }) => (
+                <span key={name} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                  <strong className="font-semibold text-blue-700 dark:text-blue-300">{count}</strong>
+                  {name}
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap items-end gap-2 text-sm">
-            <label className="flex items-center gap-1 rounded-lg border border-gray-300 px-2 dark:border-slate-600">
-              <Search className="h-4 w-4" aria-hidden="true" />
+          <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
+            <label className="relative block w-full sm:w-72">
+              <span className="sr-only">Buscar empresa ou CNPJ</span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
               <input
+                type="search"
                 aria-label="Buscar empresa ou CNPJ"
-                placeholder="Buscar empresa ou CNPJ"
+                placeholder="Buscar empresa ou CNPJ..."
                 value={search}
                 onChange={(event) => updateFilter(setSearch, event.target.value)}
-                className="w-56 bg-transparent py-2 outline-none"
+                className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               />
             </label>
-            <select
-              aria-label="Filtrar responsável"
-              value={responsible}
-              onChange={(event) => updateFilter(setResponsible, event.target.value)}
-              className={CONTABIL_SELECT_CLASS}
-            >
-              <option value="">Todos os responsáveis</option>
-              {responsibles.map((name) => (
-                <option key={name}>{name}</option>
-              ))}
-            </select>
-            <select
-              aria-label="Filtrar regime"
-              value={regime}
-              onChange={(event) => updateFilter(setRegime, event.target.value)}
-              className={CONTABIL_SELECT_CLASS}
-            >
-              <option value="">Todos os regimes</option>
-              {regimes.map((name) => (
-                <option key={name}>{name}</option>
-              ))}
-            </select>
             <select
               aria-label="Documento para filtrar"
               value={documentField}
@@ -334,49 +334,59 @@ export function FiscalTriagePortfolioSection({
                 </option>
               ))}
             </select>
-            <span className="text-gray-600 dark:text-slate-400">{filtered.length} empresas</span>
           </div>
-          {filtered.length === 0 ? (
-            <p className="text-sm text-gray-600 dark:text-slate-400">
-              Nenhuma empresa encontrada nesta competência.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
-              <table className="min-w-max border-collapse text-left text-xs">
+          <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700">
+              <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-slate-700">
                 <caption className="sr-only">Status dos documentos fiscais por empresa</caption>
-                <thead className="bg-gray-50 dark:bg-slate-800">
+                <thead className="bg-gray-50 align-bottom text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-800/70 dark:text-slate-400">
                   <tr>
-                    <th
-                      scope="col"
-                      className="sticky left-0 z-10 min-w-56 bg-gray-50 px-3 py-2 dark:bg-slate-800"
-                    >
-                      Empresa
-                    </th>
-                    <th scope="col" className="px-3 py-2">
-                      CNPJ
-                    </th>
-                    <th scope="col" className="px-3 py-2">
+                    <th scope="col" className="sticky left-0 z-10 w-12 min-w-12 bg-gray-50 px-3 py-3 font-semibold dark:bg-slate-800">Item</th>
+                    <th scope="col" className="sticky left-12 z-10 w-56 min-w-56 max-w-56 bg-gray-50 px-3 py-3 font-semibold dark:bg-slate-800">Empresa</th>
+                    <th scope="col" className="sticky left-[17rem] z-10 min-w-40 bg-gray-50 px-3 py-3 font-semibold shadow-[inset_-1px_0_0_rgb(229_231_235)] dark:bg-slate-800 dark:shadow-[inset_-1px_0_0_rgb(51_65_85)]">CNPJ</th>
+                    <th scope="col" className="min-w-36 px-3 py-3 font-semibold">
                       Regime
+                      <select
+                        aria-label="Filtrar regime"
+                        value={regime}
+                        onChange={(event) => updateFilter(setRegime, event.target.value)}
+                        className={TABLE_FILTER_CLASS}
+                      >
+                        <option value="">Todos</option>
+                        {regimes.map((value) => <option key={value} value={value}>{value}</option>)}
+                      </select>
                     </th>
-                    <th scope="col" className="px-3 py-2">
+                    <th scope="col" className="min-w-44 px-3 py-3 font-semibold">
                       Responsável
+                      <select
+                        aria-label="Filtrar responsável"
+                        value={responsible}
+                        onChange={(event) => updateFilter(setResponsible, event.target.value)}
+                        className={TABLE_FILTER_CLASS}
+                      >
+                        <option value="">Todos</option>
+                        {responsibles.map((value) => <option key={value} value={value}>{value}</option>)}
+                      </select>
                     </th>
                     {FISCAL_DOCUMENTS.map(([field, label]) => (
-                      <th key={field} scope="col" className="max-w-28 whitespace-normal px-2 py-2">
+                      <th key={field} scope="col" className="min-w-36 px-2 py-3 font-semibold">
                         {label}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {visible.map((row) => (
+                <tbody className="divide-y divide-gray-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                  {visible.length === 0 ? (
+                    <tr><td colSpan={5 + FISCAL_DOCUMENTS.length} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">Nenhuma empresa corresponde aos filtros.</td></tr>
+                  ) : null}
+                  {visible.map((row, index) => (
                     <tr
                       key={row.client_id}
-                      className="border-t border-gray-200 dark:border-slate-700"
+                      className="align-top"
                     >
+                      <td className="sticky left-0 z-10 w-12 min-w-12 bg-white px-3 py-3 tabular-nums text-gray-500 dark:bg-slate-900 dark:text-slate-400">{(Math.min(page, totalPages) - 1) * PAGE_SIZE + index + 1}</td>
                       <th
                         scope="row"
-                        className="sticky left-0 bg-white px-3 py-2 text-left font-medium dark:bg-slate-900"
+                        className="sticky left-12 z-10 w-56 min-w-56 max-w-56 bg-white px-3 py-3 text-left font-medium text-gray-900 dark:bg-slate-900 dark:text-white"
                       >
                         {row.legal_name}
                         {!row.monthly &&
@@ -386,17 +396,17 @@ export function FiscalTriagePortfolioSection({
                             type="button"
                             disabled={Boolean(saving)}
                             onClick={() => void startMonthly(row)}
-                            className="ml-2 text-xs text-blue-700 underline disabled:opacity-50 dark:text-blue-300"
+                            className="mt-1 block text-xs font-medium text-blue-700 hover:underline disabled:opacity-50 dark:text-blue-300"
                           >
-                            Iniciar
+                            Iniciar controle mensal
                           </button>
                         ) : null}
                       </th>
-                      <td className="px-3 py-2">{formatCpfCnpjInput(row.cpf_cnpj)}</td>
-                      <td className="px-3 py-2">{row.regime ?? "—"}</td>
-                      <td className="px-3 py-2">{row.responsible_name ?? "Sem responsável"}</td>
+                      <td className="sticky left-[17rem] z-10 min-w-40 whitespace-nowrap bg-white px-3 py-3 tabular-nums text-gray-700 shadow-[inset_-1px_0_0_rgb(229_231_235)] dark:bg-slate-900 dark:text-slate-300 dark:shadow-[inset_-1px_0_0_rgb(51_65_85)]">{formatCpfCnpjInput(row.cpf_cnpj)}</td>
+                      <td className="px-3 py-3 text-gray-700 dark:text-slate-300">{row.regime ?? "—"}</td>
+                      <td className="px-3 py-3 text-gray-700 dark:text-slate-300">{row.responsible_name ?? "Sem responsável"}</td>
                       {FISCAL_DOCUMENTS.map(([field, label]) => (
-                        <td key={field} className="px-2 py-2">
+                        <td key={field} className="px-2 py-3 text-gray-700 dark:text-slate-300">
                           {row.monthly && row.can_edit ? (
                             <select
                               aria-label={`${row.legal_name}: ${label}`}
@@ -409,7 +419,7 @@ export function FiscalTriagePortfolioSection({
                                   event.target.value as TriageDocumentStatus,
                                 )
                               }
-                              className="max-w-28 rounded border border-gray-300 bg-white px-1 py-1 dark:border-slate-600 dark:bg-slate-800"
+                              className="w-full min-w-32 rounded-md border border-gray-300 bg-white px-1 py-1 text-xs dark:border-slate-600 dark:bg-slate-800"
                             >
                               {STATUSES.map(([value, text]) => (
                                 <option key={value} value={value}>
@@ -418,7 +428,7 @@ export function FiscalTriagePortfolioSection({
                               ))}
                             </select>
                           ) : (
-                            <span>{statusLabel(cellStatus(row, field))}</span>
+                            <span className="text-xs">{statusLabel(cellStatus(row, field))}</span>
                           )}
                         </td>
                       ))}
@@ -426,31 +436,20 @@ export function FiscalTriagePortfolioSection({
                   ))}
                 </tbody>
               </table>
+              {totalPages > 1 ? (
+                <PaginationControls
+                  page={Math.min(page, totalPages)}
+                  limit={PAGE_SIZE}
+                  total={filtered.length}
+                  count={visible.length}
+                  hasMore={page < totalPages}
+                  isFetching={false}
+                  totalPages={totalPages}
+                  onPrevious={() => setPage((current) => current - 1)}
+                  onNext={() => setPage((current) => current + 1)}
+                />
+              ) : null}
             </div>
-          )}
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-end gap-3 text-sm">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-                className="disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              <span>
-                Página {Math.min(page, totalPages)} de {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-                className="disabled:opacity-50"
-              >
-                Próxima
-              </button>
-            </div>
-          ) : null}
         </>
       ) : null}
     </section>
