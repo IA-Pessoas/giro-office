@@ -30,7 +30,10 @@ describe("LicenseService", () => {
       paginationRequested: false,
     });
 
-    expect(allLicenses).toEqual([{ status: "Ativo" }, { status: "Vencido" }]);
+    expect(allLicenses).toEqual([
+      { status: "Ativo", client_name: null },
+      { status: "Vencido", client_name: null },
+    ]);
 
     expect(findMany).toHaveBeenNthCalledWith(1, {
       where: { organization_id: "org-1" },
@@ -38,12 +41,45 @@ describe("LicenseService", () => {
       select: expect.any(Object),
     });
     expect(findMany).toHaveBeenNthCalledWith(2, {
-      where: { organization_id: "org-1", status: "Ativo" },
+      where: { organization_id: "org-1", status: { in: ["Em Andamento", "Ativo"] } },
       orderBy: { entry_date: "desc" },
       select: expect.any(Object),
     });
 
     expect(listLicensesQuerySchema.safeParse({ status: "Desconhecido" }).success).toBe(false);
+  });
+
+  it("lists the client name of the organization only (#1347)", async () => {
+    const findMany = vi.fn(async () => [
+      { id: "license-1", client: { name: "Castelo", organization_id: "org-1" } },
+      { id: "license-2", client: { name: "Outra org", organization_id: "org-2" } },
+      { id: "license-3", client: null },
+    ]);
+    const service = new LicenseService(
+      { license: { findMany } } as unknown as PrismaClient,
+      {} as never,
+    );
+
+    const rows = await service.list({
+      organizationId: "org-1",
+      status: "Todos",
+      page: 1,
+      limit: 20,
+      paginationRequested: false,
+    });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          client: { select: { name: true, organization_id: true } },
+        }),
+      }),
+    );
+    expect(rows).toEqual([
+      { id: "license-1", client_name: "Castelo" },
+      { id: "license-2", client_name: null },
+      { id: "license-3", client_name: null },
+    ]);
   });
 
   it("returns paginated licenses with hasMore when pagination is requested", async () => {
@@ -63,17 +99,17 @@ describe("LicenseService", () => {
     });
 
     expect(findMany).toHaveBeenCalledWith({
-      where: { organization_id: "org-1", status: "Ativo" },
+      where: { organization_id: "org-1", status: { in: ["Em Andamento", "Ativo"] } },
       orderBy: { entry_date: "desc" },
       skip: 10,
       take: 10,
       select: expect.any(Object),
     });
     expect(count).toHaveBeenCalledWith({
-      where: { organization_id: "org-1", status: "Ativo" },
+      where: { organization_id: "org-1", status: { in: ["Em Andamento", "Ativo"] } },
     });
     expect(page).toEqual({
-      data: [{ id: "license-1", status: "Ativo" }],
+      data: [{ id: "license-1", status: "Ativo", client_name: null }],
       total: 25,
       page: 2,
       limit: 10,
