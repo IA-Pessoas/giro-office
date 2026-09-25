@@ -18,7 +18,7 @@ export function requireCertificatePermissionLevel(minPermission: number): Reques
         typeof request.permission?.certificado !== "number" ||
         request.permission.certificado < minPermission
       ) {
-        next(new ServiceError(403, "Permissao insuficiente para acessar certificados."));
+        next(new ServiceError(403, "Permissão insuficiente para acessar certificados."));
         return;
       }
 

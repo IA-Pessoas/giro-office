@@ -218,13 +218,13 @@ export function formatDaysUntilExpiration(value: string): string {
   const deltaDays = Math.round((date.getTime() - startOfToday.getTime()) / MILLISECONDS_IN_DAY);
 
   if (deltaDays < 0) {
-    return `${Math.abs(deltaDays)} dias em atraso`;
+    return `${Math.abs(deltaDays)} ${Math.abs(deltaDays) === 1 ? "dia" : "dias"} em atraso`;
   }
   if (deltaDays === 0) {
     return "vence hoje";
   }
 
-  return `${deltaDays} dias`;
+  return `${deltaDays} ${deltaDays === 1 ? "dia" : "dias"}`;
 }
 
 export function getExpirationTone(value: string | null | undefined): {

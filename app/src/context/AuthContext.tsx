@@ -452,8 +452,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             if (error.code === "ECONNREFUSED" || error.code === "ERR_NETWORK" || !error.response) {
-                const url = process.env.NEXT_PUBLIC_API_URL || "nao definida";
-                toast.error("Erro de conexao! Verifique se o servidor esta rodando.");
+                const url = process.env.NEXT_PUBLIC_API_URL || "não definida";
+                toast.error("Não foi possível conectar. Verifique sua internet e tente novamente.");
                 logAuthError("Erro de conexao no login:", {
                     code: error.code,
                     message: error.message,

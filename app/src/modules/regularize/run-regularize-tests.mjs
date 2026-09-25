@@ -1327,7 +1327,7 @@ await runTest("regularize process task id uses the real task selector", async ()
   assert.match(processSource, /tasksQuery\.isLoading/);
   assert.match(processSource, /tasksQuery\.error/);
   assert.match(processSource, /disabled=/);
-  assert.match(processSource, /Sem task vinculada/);
+  assert.match(processSource, /Sem tarefa vinculada/);
   assert.doesNotMatch(processSource, /<input\s+value=\{formState\.task_id\}/);
 });
 
@@ -1422,9 +1422,9 @@ await runTest("regularize site credential detail states are explicit", async () 
   assert.notEqual(taxesStart, -1);
   assert.match(sitesSource, /Selecione um site para revelar credenciais/);
   assert.match(sitesSource, /Acesso negado para revelar credenciais/);
-  assert.match(pageSource, /Credencial indispon[iÃ­]vel para revela[cÃ§][aÃ£]o/);
+  assert.match(pageSource, /Credencial indisponível para revelação/);
   assert.match(sitesSource, /getSiteCredentialDetailStatus\(sitePasswordDetailQuery\.error\)/);
-  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponivel para revelacao\."\)/);
+  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponível para revelação\."\)/);
   assert.match(pageSource, /403\|forbidden\|permission\|permiss\|acesso negado/);
   assert.doesNotMatch(sitesSource, /Acesso negado ou indispon[iÃ­]vel/);
 });

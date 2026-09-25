@@ -240,7 +240,7 @@ export function FiscalNcmSection({
               </div>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Digite parte do codigo ou use virgulas para consultar mais de um NCM.
+              Digite parte do código ou use vírgulas para consultar mais de um NCM.
             </p>
           </div>
         </form>

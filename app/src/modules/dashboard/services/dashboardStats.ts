@@ -19,6 +19,10 @@ function numbers<K extends string>(value: unknown, keys: readonly K[]): Record<K
   return Object.fromEntries(keys.map((key) => [key, numberOr0(source[key])])) as Record<K, number>;
 }
 
+function isApiRoute(value: unknown): boolean {
+  return typeof value === "string" && value.trim().startsWith("/");
+}
+
 /**
  * Completa o formato de `/dashboard/stats` com zeros e listas vazias. Uma resposta parcial ou
  * fora do formato derrubava o dashboard, o erro remontava o app e todo o shell era buscado de
@@ -58,6 +62,9 @@ export function normalizeDashboardStats(payload: unknown): DashboardStats {
     projects: numbers(stats.projects, ["active", "completed", "inProgress", "delayed", "waiting"]),
     performance: arrayOrEmpty(stats.performance),
     pendingTasks: arrayOrEmpty(stats.pendingTasks),
-    activities: arrayOrEmpty(stats.activities),
+    // Defesa: rota de API crua ("acessou /user/me") não é atividade de negócio (#1371).
+    activities: arrayOrEmpty<DashboardStats["activities"][number]>(stats.activities).filter(
+      (activity) => isRecord(activity) && !isApiRoute(activity.action) && !isApiRoute(activity.item),
+    ),
   };
 }

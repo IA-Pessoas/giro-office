@@ -42,7 +42,7 @@ describe("ti inventory routes", () => {
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Permissao insuficiente para acessar o ti-service.",
+      error: "Permissão insuficiente para acessar o módulo de TI.",
       code: "FORBIDDEN",
     });
   });
@@ -127,7 +127,7 @@ describe("ti inventory routes", () => {
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Permissao insuficiente para acessar o ti-service.",
+      error: "Permissão insuficiente para acessar o módulo de TI.",
       code: "FORBIDDEN",
     });
   });
@@ -162,7 +162,7 @@ describe("ti inventory routes", () => {
     expect(response.status).toBe(422);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Responsavel de TI deve pertencer ao departamento Tecnologia.",
+      error: "Responsável de TI deve pertencer ao departamento Tecnologia.",
     });
   });
 
@@ -192,7 +192,7 @@ describe("ti inventory routes", () => {
     expect(response.status).toBe(404);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Usuario nao encontrado na organizacao.",
+      error: "Usuário não encontrado na organização.",
     });
   });
 

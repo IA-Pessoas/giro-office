@@ -3,28 +3,28 @@ import { z } from "zod";
 
 export const passwordIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
 export const listPasswordsQuerySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
   })
   .strict();
 
 const optionalSecret = (fieldName: string) =>
-  z.string().trim().min(1, `${fieldName} e obrigatorio.`).nullable().optional();
+  z.string().trim().min(1, `${fieldName} é obrigatório.`).nullable().optional();
 
 const optionalResponsibleId = z
   .string()
-  .uuid({ message: "responsavel_id invalido." })
+  .uuid({ message: "responsavel_id inválido." })
   .nullable()
   .optional();
 
 export const createPasswordBodySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
     service_name: zNonEmptyText("service_name"),
     login_main: optionalSecret("login_main"),
     senha_main: optionalSecret("senha_main"),

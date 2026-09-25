@@ -189,7 +189,7 @@ function cors(env: OrganizationWorkerEnv): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     const origin = c.req.header("origin");
     if (origin && !allowed.includes("*") && !allowed.includes(origin)) {
-      throw new OrganizationWorkerError(403, "Origin não permitida pelo organization-service.");
+      throw new OrganizationWorkerError(403, "Origem não permitida.");
     }
     if (origin) {
       c.header("access-control-allow-origin", allowed.includes("*") ? "*" : origin);

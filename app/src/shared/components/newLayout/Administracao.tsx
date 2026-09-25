@@ -28,6 +28,7 @@ import {
 } from "@modules/users/services/adminUsersService";
 import { signOut, useAuth } from "@/context/AuthContext";
 import { useFetch } from "@shared/hooks";
+import { formatCount } from "@shared/utils/formatters";
 
 const ADMIN_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
@@ -268,7 +269,7 @@ export function Administracao() {
   if (isAdministrationAccessLoading) {
     return (
       <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
-        <p className={ADMIN_TEXT_CLASSNAME}>Carregando acesso de administracao.</p>
+        <p className={ADMIN_TEXT_CLASSNAME}>Carregando acesso de administração.</p>
       </div>
     );
   }
@@ -447,7 +448,7 @@ export function Administracao() {
               <div className="flex min-h-0 flex-1 flex-col space-y-3">
                 <div className="flex items-center justify-between">
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    {filteredUsers.length} usuário{filteredUsers.length === 1 ? "" : "s"}
+                    {formatCount(filteredUsers.length, "usuário", "usuários")}
                   </p>
                   <span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
                     {ADMIN_USER_STATUS_LABELS[userStatusFilter]}

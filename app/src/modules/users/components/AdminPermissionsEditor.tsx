@@ -32,6 +32,7 @@ import {
   needsDepartmentPermissionSync,
 } from "../utils/createUserPayload";
 import { ConfirmationDialog } from "@shared/components";
+import { formatCount } from "@shared/utils/formatters";
 
 type PermissionSelectValue = (typeof PERMISSION_SELECT_OPTIONS)[number]["value"];
 
@@ -313,7 +314,7 @@ export function AdminPermissionsEditor({
             </div>
           </div>
           <div className="flex min-h-0 flex-1 flex-col space-y-3">
-            <div className="flex items-center justify-between"><p className={TEXT_CLASSNAME}>{filteredUsers.length} de {users.length} usuário{users.length === 1 ? "" : "s"}</p><span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">Ativo</span></div>
+            <div className="flex items-center justify-between"><p className={TEXT_CLASSNAME}>{filteredUsers.length} de {formatCount(users.length, "usuário", "usuários")}</p><span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">Ativo</span></div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               {usersQuery.isLoading ? <div className={EMPTY_STATE_CLASSNAME}><p className={MUTED_CLASSNAME}>Carregando usuários ativos...</p></div> : null}
               {!usersQuery.isLoading && !usersQuery.isError && users.length === 0 ? <div className={EMPTY_STATE_CLASSNAME}><p className={TEXT_CLASSNAME}>Nenhum usuário ativo encontrado.</p></div> : null}

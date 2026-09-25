@@ -299,4 +299,36 @@ runTest("Configuracoes access dialog uses accented permission copy", () => {
   assert.equal(configuracoesSource.includes("Permissao atual"), false);
 });
 
+// #1371: botões do Perfil no tema claro precisam de contraste AA (>= 4.5:1).
+function contrastRatio(foreground, background) {
+  const luminance = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((index) => {
+      const channel = parseInt(hex.slice(index, index + 2), 16) / 255;
+      return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+runTest("Configuracoes profile buttons keep AA contrast in the light theme", () => {
+  const tokens = readFileSync(new URL("../../styles/tokens.css", import.meta.url), "utf8");
+  const token = (name) => new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, "i").exec(tokens)?.[1];
+  const white = "#ffffff";
+  const slate50 = "#f8fafc";
+
+  for (const name of ["colors-brand-gradient-start", "colors-brand-gradient-end"]) {
+    assert.ok(contrastRatio(white, token(name)) >= 4.5, name);
+  }
+  // Desabilitado: slate-600 sólido; opacity-70 sobre o gradiente caía para ~3:1.
+  assert.match(configuracoesSource, /disabled:from-slate-600 disabled:to-slate-600/);
+  assert.equal(configuracoesSource.includes("disabled:opacity-70"), false);
+  assert.ok(contrastRatio(white, "#475569") >= 4.5);
+  // Secundários: slate-700 e red-700 sobre o subpainel slate-50.
+  assert.ok(contrastRatio("#334155", slate50) >= 4.5);
+  assert.match(configuracoesSource, /font-medium text-red-700 transition-colors/);
+  assert.ok(contrastRatio("#b91c1c", slate50) >= 4.5);
+});
+
 await import("./run-confirmation-dialog-behavior-tests.mjs");

@@ -420,8 +420,8 @@ async function parseUserPhoto(c: {
 }> {
   const body = await c.req.parseBody();
   const file = body.file instanceof File ? body.file : undefined;
-  if (!file) throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
-  if (file.size === 0) throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
+  if (!file) throw new ServiceError(400, "Arquivo de imagem é obrigatório.");
+  if (file.size === 0) throw new ServiceError(400, "Arquivo de imagem é obrigatório.");
   if (file.size > USER_PHOTO_MAX_SIZE_BYTES) {
     throw new ServiceError(413, "A imagem deve ter no máximo 5 MB.");
   }
@@ -691,10 +691,10 @@ async function updateOrganizationUser(
     where: organizationUserWhere(userId, organizationId),
     select: userSelect(),
   });
-  if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
+  if (!existing) throw new ServiceError(404, "Usuário não encontrado.");
   if (actor) assertCanManageTarget(actor, existing);
   if (input.organization_id !== undefined && input.organization_id !== organizationId) {
-    throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+    throw new ServiceError(403, "Organização da requisição não confere.");
   }
 
   const expectedVersion =
@@ -785,7 +785,7 @@ async function updateOrganizationUser(
       if (activeOwners <= 1) {
         throw new ServiceError(
           409,
-          "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+          "Não é possível remover o último owner ativo. Use a transferência de ownership.",
         );
       }
     }
@@ -828,7 +828,7 @@ async function updateOrganizationUser(
     if (updated.count !== 1) {
       throw new ServiceError(
         409,
-        "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+        "Usuário foi alterado por outra edição. Recarregue e tente novamente.",
       );
     }
     return toUser(
@@ -864,7 +864,7 @@ async function deactivateOrganizationUser(
         where: organizationUserWhere(userId, organizationId),
         select: userSelect(),
       });
-      if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
+      if (!existing) throw new ServiceError(404, "Usuário não encontrado.");
       if (actor) assertCanManageTarget(actor, existing);
       if (existing.type === "owner" && existing.status === "active") {
         const owners = await transaction.user.count({
@@ -873,7 +873,7 @@ async function deactivateOrganizationUser(
         if (owners <= 1) {
           throw new ServiceError(
             409,
-            "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+            "Não é possível remover o último owner ativo. Use a transferência de ownership.",
           );
         }
       }
@@ -888,7 +888,7 @@ async function deactivateOrganizationUser(
       if (updated.count !== 1) {
         throw new ServiceError(
           409,
-          "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+          "Usuário foi alterado por outra edição. Recarregue e tente novamente.",
         );
       }
     },
@@ -1461,7 +1461,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
             };
           })
         | null;
-      if (!user) throw new ServiceError(404, "Usuario nao encontrado.");
+      if (!user) throw new ServiceError(404, "Usuário não encontrado.");
       const permission = await db.permission.findFirst({
         where: { user_id: input.userId, organization_id: input.organizationId },
         select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
@@ -1541,7 +1541,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       await requireCsrf(c.req.raw, auth);
       const input = parse(createUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
       if (input.organization_id !== undefined && input.organization_id !== auth.organizationId) {
-        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+        throw new ServiceError(403, "Organização da requisição não confere.");
       }
       if (isOwnerMutation(input)) requireOwner(auth);
       let user: Row;
@@ -1581,7 +1581,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       });
       const objectPath = photoObjectPath(row?.photo_url);
       if (!objectPath || !objectPath.startsWith(`${id}/`) || objectPath.includes("..")) {
-        throw new ServiceError(404, "Foto nao encontrada.");
+        throw new ServiceError(404, "Foto não encontrada.");
       }
       const storage = userPhotoStorage(envOf(c, options), options);
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
@@ -1810,7 +1810,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         referringId: id,
         changes: { status: "inactive" },
       });
-      return c.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
+      return c.json(createSuccessResponse({ message: "Usuário desativado com sucesso." }));
     }),
   );
 
@@ -1915,7 +1915,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { organizationId } = parse(platformOrganizationUsersParamsSchema, c.req.param());
       const input = parse(createUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
       if (input.organization_id !== undefined && input.organization_id !== organizationId) {
-        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+        throw new ServiceError(403, "Organização da requisição não confere.");
       }
       const user = await createOrganizationUser(
         db,

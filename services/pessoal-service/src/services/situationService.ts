@@ -82,7 +82,7 @@ export class SituationService {
     } catch (err: unknown) {
       logError("Erro ao criar situacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao criar situacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao criar situação de pessoal.", err);
     }
   }
 
@@ -110,7 +110,7 @@ export class SituationService {
     });
 
     if (!detail) {
-      throw new ServiceError(404, "Situacao nao encontrada.");
+      throw new ServiceError(404, "Situação não encontrada.");
     }
 
     return detail;
@@ -130,7 +130,7 @@ export class SituationService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Situacao nao encontrada.");
+        throw new ServiceError(404, "Situação não encontrada.");
       }
 
       const completionData =
@@ -171,7 +171,7 @@ export class SituationService {
     } catch (err: unknown) {
       logError("Erro ao atualizar situacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao atualizar situacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao atualizar situação de pessoal.", err);
     }
   }
 
@@ -185,7 +185,7 @@ export class SituationService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Situacao nao encontrada.");
+        throw new ServiceError(404, "Situação não encontrada.");
       }
 
       await this.prisma.situationsPessoal.delete({ where: { id } });
@@ -206,7 +206,7 @@ export class SituationService {
     } catch (err: unknown) {
       logError("Erro ao remover situacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao remover situacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao remover situação de pessoal.", err);
     }
   }
 
@@ -217,7 +217,7 @@ export class SituationService {
     });
 
     if (!client) {
-      throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      throw new ServiceError(404, "Cliente não encontrado para a organização.");
     }
   }
 }

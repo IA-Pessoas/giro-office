@@ -8,7 +8,7 @@ import {
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 
 export const REPORT_SNAPSHOT_LIMIT_MESSAGE =
-  "O relatório excede o limite global do snapshot (50.000 linhas ou 20 MiB). Reduza os filtros ou as colunas e tente novamente.";
+  "O relatório excede o limite global (50.000 linhas ou 20 MiB). Reduza os filtros ou as colunas e tente novamente.";
 
 export function reportAggregationAlias(
   aggregation: ReportDefinition["aggregations"][number],

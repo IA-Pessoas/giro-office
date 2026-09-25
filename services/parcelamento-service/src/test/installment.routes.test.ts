@@ -134,7 +134,7 @@ describe("installment routes", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Contexto de organizacao ausente.",
+      error: "Contexto de organização ausente.",
     });
   });
 
@@ -188,7 +188,7 @@ describe("installment routes", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Contexto de organizacao ausente.",
+      error: "Contexto de organização ausente.",
     });
   });
 
@@ -202,7 +202,7 @@ describe("installment routes", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Contexto de usuario ausente.",
+      error: "Contexto de usuário ausente.",
     });
   });
 
@@ -218,7 +218,7 @@ describe("installment routes", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Contexto de organizacao ausente.",
+      error: "Contexto de organização ausente.",
     });
   });
 
@@ -302,7 +302,7 @@ describe("installment routes", () => {
     expect(response.status).toBe(404);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Parcelamento nao encontrado.",
+      error: "Parcelamento não encontrado.",
     });
   });
 });

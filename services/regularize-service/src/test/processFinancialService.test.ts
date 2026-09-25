@@ -18,7 +18,7 @@ describe("process financial status", () => {
   });
 
   it("rejects an unknown legacy code", () => {
-    expect(() => normalizeFinancialStatus(2)).toThrow("Status financeiro invalido.");
+    expect(() => normalizeFinancialStatus(2)).toThrow("Status financeiro inválido.");
   });
 
   it("pauses a process with a financial locking cause", () => {

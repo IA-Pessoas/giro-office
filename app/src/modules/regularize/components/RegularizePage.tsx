@@ -699,13 +699,13 @@ function MaskedValue() {
 }
 
 function getSiteCredentialDetailStatus(error: unknown): string {
-  const message = getRegularizeErrorMessage(error, "Credencial indisponivel para revelacao.");
+  const message = getRegularizeErrorMessage(error, "Credencial indisponível para revelação.");
 
   if (/403|forbidden|permission|permiss|acesso negado/i.test(message)) {
     return "Acesso negado para revelar credenciais.";
   }
 
-  return "Credencial indisponivel para revelacao.";
+  return "Credencial indisponível para revelação.";
 }
 
 function IndependentGuidanceSection({

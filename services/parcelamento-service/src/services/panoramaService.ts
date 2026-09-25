@@ -55,11 +55,11 @@ function requireContext(context: Pick<ParcelamentoRequestContext, "organizationI
   userId: string;
 } {
   if (!context.organizationId) {
-    throw new ServiceError(400, "Contexto de organizacao ausente.");
+    throw new ServiceError(400, "Contexto de organização ausente.");
   }
 
   if (!context.userId) {
-    throw new ServiceError(400, "Contexto de usuario ausente.");
+    throw new ServiceError(400, "Contexto de usuário ausente.");
   }
 
   return { organizationId: context.organizationId, userId: context.userId };
@@ -194,7 +194,7 @@ export class PanoramaService {
       logError("Erro ao criar panorama de parcelamento", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueError(err)) {
-        throw new ServiceError(409, "Ja existe panorama para este cliente e competencia.", err);
+        throw new ServiceError(409, "Já existe panorama para este cliente e competência.", err);
       }
       throw new ServiceError(500, "Erro ao criar panorama de parcelamento.", err);
     }
@@ -335,7 +335,7 @@ export class PanoramaService {
     });
 
     if (!client) {
-      throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      throw new ServiceError(404, "Cliente não encontrado para a organização.");
     }
   }
 
@@ -345,7 +345,7 @@ export class PanoramaService {
     });
 
     if (!responsavel) {
-      throw new ServiceError(404, "Responsavel nao encontrado para a organizacao.");
+      throw new ServiceError(404, "Responsável não encontrado para a organização.");
     }
   }
 
@@ -363,7 +363,7 @@ export class PanoramaService {
     });
 
     if (existing) {
-      throw new ServiceError(409, "Ja existe panorama para este cliente e competencia.");
+      throw new ServiceError(409, "Já existe panorama para este cliente e competência.");
     }
   }
 
@@ -374,7 +374,7 @@ export class PanoramaService {
     });
 
     if (!panorama) {
-      throw new ServiceError(404, "Panorama de parcelamento nao encontrado.");
+      throw new ServiceError(404, "Panorama de parcelamento não encontrado.");
     }
 
     return panorama;
