@@ -70,7 +70,7 @@ export function requireFiscalWritePermission(
   next: NextFunction,
 ): void {
   if (Number(request.permission ?? 0) < FISCAL_WRITE_PERMISSION) {
-    next(new ServiceError(403, "Permissao insuficiente para alterar dados fiscais."));
+    next(new ServiceError(403, "Permissão insuficiente para alterar dados fiscais."));
     return;
   }
 
@@ -83,7 +83,7 @@ export function requireFiscalAdminPermission(
   next: NextFunction,
 ): void {
   if (Number(request.permission ?? 0) < FISCAL_ADMIN_PERMISSION) {
-    next(new ServiceError(403, "Permissao insuficiente para excluir dados fiscais."));
+    next(new ServiceError(403, "Permissão insuficiente para excluir dados fiscais."));
     return;
   }
 

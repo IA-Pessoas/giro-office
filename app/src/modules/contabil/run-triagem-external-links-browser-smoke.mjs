@@ -174,9 +174,12 @@ async function runBrowserProof() {
     await expect(page.getByText("https://links.example.test/revisado")).toBeVisible();
     assert.ok(requests.some((request) => request.method === "PUT" && request.path.includes("/triagem/external-links/")));
 
-    page.once("dialog", (dialog) => dialog.accept());
     await page
       .getByRole("list", { name: /Links externos da competência/ })
+      .getByRole("button", { name: "Arquivar", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Arquivar link externo" })
       .getByRole("button", { name: "Arquivar", exact: true })
       .click();
     await expect(page.getByText("Nenhum link externo registrado para esta competência.")).toBeVisible();

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, Edit3, FolderSync, ListTodo, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/router";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { ConfirmationDialog } from "@shared/components";

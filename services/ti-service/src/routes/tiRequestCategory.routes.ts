@@ -18,7 +18,7 @@ import { TiRequestCategoryService } from "../services/tiRequestCategoryService.j
 
 function requireOrganizationId(organizationId: string | undefined): string {
   if (!organizationId) {
-    throw new ServiceError(401, "Autenticacao obrigatoria.");
+    throw new ServiceError(401, "Autenticação obrigatória.");
   }
 
   return organizationId;

@@ -66,10 +66,10 @@ class TimeBankReleaseService {
       const addedByUserId = assertNonEmptyString(input.added_by_user_id, "added_by_user_id");
       const reason = assertNonEmptyString(input.reason, "reason");
       if (Number.isNaN(input.date.getTime())) {
-        throw new ServiceError(400, "date invalido.");
+        throw new ServiceError(400, "date inválido.");
       }
       if (!Number.isInteger(input.minutes)) {
-        throw new ServiceError(400, "minutes deve ser um numero inteiro.");
+        throw new ServiceError(400, "minutes deve ser um número inteiro.");
       }
 
       const targetUser = await prismaClient.user.findFirst({
@@ -78,7 +78,7 @@ class TimeBankReleaseService {
       });
 
       if (!targetUser) {
-        throw new ServiceError(404, "Colaborador nao encontrado nesta organizacao.");
+        throw new ServiceError(404, "Colaborador não encontrado nesta organização.");
       }
 
       return await prismaClient.timeBankReleases.create({
@@ -111,11 +111,11 @@ class TimeBankReleaseService {
       });
 
       if (!release) {
-        throw new ServiceError(404, "Lancamento nao encontrado.");
+        throw new ServiceError(404, "Lançamento não encontrado.");
       }
 
       if (release.is_approved) {
-        throw new ServiceError(409, "Lancamento ja foi aprovado.");
+        throw new ServiceError(409, "Lançamento já foi aprovado.");
       }
 
       const pointsConfig = await prismaClient.pointsConfig.findUnique({
@@ -126,7 +126,7 @@ class TimeBankReleaseService {
       if (!pointsConfig) {
         throw new ServiceError(
           404,
-          "Configuracao de ponto nao encontrada para o colaborador; nao e possivel aprovar o lancamento.",
+          "Configuração de ponto não encontrada para o colaborador; não é possível aprovar o lançamento.",
         );
       }
 
@@ -136,7 +136,7 @@ class TimeBankReleaseService {
           data: { is_approved: true },
         });
         if (claimed.count !== 1) {
-          throw new ServiceError(409, "Lancamento ja foi aprovado.");
+          throw new ServiceError(409, "Lançamento já foi aprovado.");
         }
 
         await tx.pointsConfig.update({
@@ -168,13 +168,13 @@ class TimeBankReleaseService {
       const dateFilter: { gte?: Date; lte?: Date } = {};
       if (filters.date_from !== undefined) {
         if (Number.isNaN(filters.date_from.getTime())) {
-          throw new ServiceError(400, "date_from invalido.");
+          throw new ServiceError(400, "date_from inválido.");
         }
         dateFilter.gte = TimeUtils.getUtcDayBounds(filters.date_from).dayStart;
       }
       if (filters.date_to !== undefined) {
         if (Number.isNaN(filters.date_to.getTime())) {
-          throw new ServiceError(400, "date_to invalido.");
+          throw new ServiceError(400, "date_to inválido.");
         }
         dateFilter.lte = TimeUtils.getUtcDayBounds(filters.date_to).dayEnd;
       }
@@ -215,10 +215,10 @@ class TimeBankReleaseService {
       });
 
       if (!config) {
-        throw new ServiceError(404, "Configuracao de ponto nao encontrada para o colaborador.");
+        throw new ServiceError(404, "Configuração de ponto não encontrada para o colaborador.");
       }
       if (config.organization_id !== orgId) {
-        throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
+        throw new ServiceError(403, "Configuração de ponto pertence a outra organização.");
       }
 
       const [approvedCount, pendingCount] = await Promise.all([
@@ -269,7 +269,7 @@ class TimeBankReleaseService {
     } catch (err: unknown) {
       logError("Erro ao obter visao agregada de banco de horas", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao obter visao agregada de banco de horas.", err);
+      throw new ServiceError(500, "Erro interno ao obter visão agregada de banco de horas.", err);
     }
   }
 }

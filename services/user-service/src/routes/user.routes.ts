@@ -92,7 +92,7 @@ export function createUserRoutes(
         const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
 
         if (!publicPhotoUrl) {
-          throw new ServiceError(404, "Foto nao encontrada.");
+          throw new ServiceError(404, "Foto não encontrada.");
         }
 
         response.json(createSuccessResponse({ url: publicPhotoUrl }));
@@ -128,7 +128,7 @@ export function createUserRoutes(
         const auth = requireManageUsersAuth(request);
         const body = parseWithZod(createUserBodySchema, request.body);
         if (body.organization_id !== undefined && body.organization_id !== auth.organization_id) {
-          throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+          throw new ServiceError(403, "Organização da requisição não confere.");
         }
         if (isOwnerMutationPayload(body)) {
           requireOwnerUserAuth(request);
@@ -203,7 +203,7 @@ export function createUserRoutes(
         const { id } = parseWithZod(userIdParamsSchema, request.params);
 
         if (!request.file) {
-          throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
+          throw new ServiceError(400, "Arquivo de imagem é obrigatório.");
         }
 
         validateUploadFileSignature(request.file);
@@ -247,7 +247,7 @@ export function createUserRoutes(
 
         await userManagement(auth).delete(id);
 
-        response.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
+        response.json(createSuccessResponse({ message: "Usuário desativado com sucesso." }));
       } catch (err) {
         logError("Erro ao desativar usuario", { err });
         next(err);

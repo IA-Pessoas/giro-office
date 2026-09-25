@@ -1125,7 +1125,13 @@ describe("project wizard task extraction routes", () => {
       extractTasks: vi
         .fn()
         .mockRejectedValue(
-          new ServiceError(502, "Não foi possível extrair tarefas da Ata inteira."),
+          new ServiceError(
+            502,
+            "Não foi possível extrair tarefas da Ata inteira.",
+            undefined,
+            undefined,
+            { expose: true },
+          ),
         ),
     };
 
@@ -1250,7 +1256,11 @@ describe("project wizard task extraction routes", () => {
     [502, "Não foi possível extrair tarefas da Ata.", "BAD_GATEWAY"],
   ])("serializa a falha de extração como %i", async (statusCode, message, code) => {
     const service: ProjectWizardExtractionRouteDeps = {
-      extractTasks: vi.fn().mockRejectedValue(new ServiceError(statusCode, message)),
+      extractTasks: vi
+        .fn()
+        .mockRejectedValue(
+          new ServiceError(statusCode, message, undefined, undefined, { expose: true }),
+        ),
     };
 
     const response = await request(createExtractionApp(service))

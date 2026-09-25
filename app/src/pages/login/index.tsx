@@ -137,21 +137,6 @@ export default function Login() {
                   );
                 })}
               </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
-                  <div className="mb-0.5 text-2xl font-bold">6</div>
-                  <div className="text-xs text-blue-100">Módulos</div>
-                </div>
-                <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
-                  <div className="mb-0.5 text-2xl font-bold">99.9%</div>
-                  <div className="text-xs text-blue-100">Uptime</div>
-                </div>
-                <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
-                  <div className="mb-0.5 text-2xl font-bold">24/7</div>
-                  <div className="text-xs text-blue-100">Suporte</div>
-                </div>
-              </div>
             </div>
 
             <div className="flex items-center justify-center animate-fade-in-right">

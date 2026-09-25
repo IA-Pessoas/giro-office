@@ -20,7 +20,7 @@ export function canUseRhWorkflowMessages(request: Request): boolean {
 export function requireRhPermission(minPermission: number): RequestHandler {
   return (request: Request, _response: Response, next: NextFunction): void => {
     if (getRhPermissionLevel(request) < minPermission) {
-      next(new ServiceError(403, "Permissao insuficiente para acessar o modulo RH."));
+      next(new ServiceError(403, "Permissão insuficiente para acessar o módulo RH."));
       return;
     }
 

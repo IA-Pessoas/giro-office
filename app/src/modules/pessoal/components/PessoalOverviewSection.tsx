@@ -4,7 +4,6 @@ import {
   CheckSquare,
   ClipboardList,
   Landmark,
-  UserRoundCog,
   WalletCards,
 } from "lucide-react";
 
@@ -128,19 +127,16 @@ export function PessoalOverviewSection({ onSelectTab }: PessoalOverviewSectionPr
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-500/40 bg-gradient-to-br from-blue-700 via-sky-700 to-blue-800 px-5 py-4 text-white shadow-lg">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15">
-          <UserRoundCog className="h-5 w-5" />
-        </span>
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-bold leading-tight">Resumo operacional</h2>
-          <p className="text-sm text-blue-100">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Resumo operacional</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Folha, obrigações, sindicatos e acompanhamentos do Departamento Pessoal.
           </p>
         </div>
         {hasError ? (
-          <div className="ml-auto flex items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-xs text-white">
-            <AlertCircle className="h-4 w-4" />
+          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+            <AlertCircle className="h-4 w-4" aria-hidden="true" />
             Não foi possível carregar todos os indicadores agora.
           </div>
         ) : null}

@@ -1,3 +1,5 @@
+import { INTERNAL_ERROR_MESSAGE } from "@workspace/shared/http";
+
 const STATUS_CODES: Record<number, string> = {
   400: "BAD_REQUEST",
   401: "UNAUTHORIZED",
@@ -27,12 +29,20 @@ export function isOrganizationWorkerError(error: unknown): error is Organization
 export function errorResponse(error: unknown, requestId?: string): Response {
   const workerError = isOrganizationWorkerError(error)
     ? error
-    : new OrganizationWorkerError(500, "Erro interno no organization-service.");
+    : new OrganizationWorkerError(500, INTERNAL_ERROR_MESSAGE, error);
+  const isServerError = workerError.statusCode >= 500;
+  if (isServerError) {
+    console.error(`[organization-service] erro ${workerError.statusCode}`, {
+      requestId,
+      error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+    });
+  }
 
   return Response.json(
     {
       success: false,
-      error: workerError.message,
+      // 5xx nunca expõe o motivo interno; ele fica no log com o requestId (#1365).
+      error: isServerError ? INTERNAL_ERROR_MESSAGE : workerError.message,
       code: workerError.code,
       ...(requestId ? { requestId } : {}),
     },

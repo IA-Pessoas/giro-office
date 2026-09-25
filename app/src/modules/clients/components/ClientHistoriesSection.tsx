@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { ConfirmationDialog } from "@shared/components";
 import { useClientHistories, useDeleteClientHistoryMutation } from "../hooks/useClientHistories";

@@ -26,16 +26,16 @@ const tiServiceEnvSchema = z
   .object({
     nodeEnv: z.string().optional().default("development"),
     port: z.coerce.number().int().positive().default(3040),
-    databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o ti-service."),
-    auditServiceUrl: z.string().url("AUDIT_SERVICE_URL invalida."),
-    auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN nao definido."),
-    internalServiceToken: z.string().min(1, "TI_SERVICE_INTERNAL_TOKEN nao definido."),
-    reportsInternalToken: z.string().min(1, "REPORTS_INTERNAL_TOKEN nao definido."),
-    reportsGrantSecret: z.string().min(1, "REPORTS_GRANT_SECRET nao definido."),
-    passwordEncryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY nao definido."),
-    supabaseUrl: z.string().url("SUPABASE_URL invalida."),
-    supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY nao definida."),
-    tiRequestImageBucket: z.string().min(1, "TI_REQUEST_IMAGE_BUCKET nao definido."),
+    databaseUrl: z.string().min(1, "DATABASE_URL não definido para o ti-service."),
+    auditServiceUrl: z.string().url("AUDIT_SERVICE_URL inválida."),
+    auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN não definido."),
+    internalServiceToken: z.string().min(1, "TI_SERVICE_INTERNAL_TOKEN não definido."),
+    reportsInternalToken: z.string().min(1, "REPORTS_INTERNAL_TOKEN não definido."),
+    reportsGrantSecret: z.string().min(1, "REPORTS_GRANT_SECRET não definido."),
+    passwordEncryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY não definido."),
+    supabaseUrl: z.string().url("SUPABASE_URL inválida."),
+    supabaseServiceRoleKey: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY não definida."),
+    tiRequestImageBucket: z.string().min(1, "TI_REQUEST_IMAGE_BUCKET não definido."),
     allowedOrigins: z
       .string()
       .optional()
