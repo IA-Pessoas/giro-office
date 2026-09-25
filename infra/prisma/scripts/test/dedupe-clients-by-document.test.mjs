@@ -11,7 +11,7 @@ const SQL = readFileSync(
 );
 
 const FIXTURE = `
-DROP TABLE IF EXISTS pa, tasks, "pessoal.payroll", clients;
+DROP TABLE IF EXISTS pa, tasks, "pessoal.payroll", "triagem.urgent_requests", odd_refs, clients;
 CREATE TABLE clients (
   id text PRIMARY KEY,
   organization_id text NOT NULL,
@@ -105,4 +105,31 @@ test("apply mantem o ativo, ignora clientes de teste e agrupa CNPJ alfanumerico"
       WHERE id IN ('old-inactive', 'new-active', 'qa-a', 'qa-b', 'alnum-a', 'alnum-b')`),
     "alnum-a,new-active,qa-a,qa-b",
   );
+});
+
+test("apply move vinculo com FK composta (client_id, organization_id)", { skip: !hasDocker }, () => {
+  query(FIXTURE);
+  // Como triagem.external_links e triagem.urgent_requests.
+  query(`ALTER TABLE clients ADD UNIQUE (id, organization_id);
+    CREATE TABLE "triagem.urgent_requests" (
+      id text PRIMARY KEY, client_id text NOT NULL, organization_id text NOT NULL,
+      FOREIGN KEY (client_id, organization_id) REFERENCES clients(id, organization_id)
+        ON UPDATE CASCADE ON DELETE RESTRICT);
+    INSERT INTO "triagem.urgent_requests" VALUES ('u1', 'dup', 'org-1')`);
+  const dryRun = psql(SQL);
+  assert.equal(dryRun.status, 0, dryRun.stderr);
+  assert.match(dryRun.stdout, /triagem\.urgent_requests"?\|client_id\|1\|/);
+  const result = psql(SQL, ["apply=1"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(query(`SELECT client_id FROM "triagem.urgent_requests"`), "keep");
+});
+
+test("FK composta fora do formato (id, organization_id) continua abortando", { skip: !hasDocker }, () => {
+  query(FIXTURE);
+  query(`ALTER TABLE clients ADD UNIQUE (id, name);
+    CREATE TABLE odd_refs (client_id text, client_name text,
+      FOREIGN KEY (client_id, client_name) REFERENCES clients(id, name))`);
+  const result = psql(SQL);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /FK composta/);
 });

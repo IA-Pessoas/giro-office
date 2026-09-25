@@ -39,9 +39,15 @@ $$;
 
 DO $guard$
 BEGIN
+  -- FK composta (client_id, organization_id) -> clients(id, organization_id), como na triagem,
+  -- e segura: mantido e removido sao da mesma organizacao, basta mover o client_id.
   IF EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE contype = 'f' AND confrelid = 'clients'::regclass AND cardinality(conkey) > 1
+    SELECT 1 FROM pg_constraint c
+    CROSS JOIN LATERAL unnest(c.conkey, c.confkey) AS k(child, parent)
+    JOIN pg_attribute p ON p.attrelid = c.confrelid AND p.attnum = k.parent
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.child
+    WHERE c.contype = 'f' AND c.confrelid = 'clients'::regclass AND cardinality(c.conkey) > 1
+      AND p.attname <> 'id' AND (p.attname, a.attname) <> ('organization_id', 'organization_id')
   ) THEN
     RAISE EXCEPTION 'FK composta para clients: o reparo nao sabe remapear, revise o script';
   END IF;
@@ -82,7 +88,9 @@ BEGIN
   FOR fk IN
     SELECT c.conrelid::regclass AS tbl, a.attname AS col
     FROM pg_constraint c
-    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+    CROSS JOIN LATERAL unnest(c.conkey, c.confkey) AS k(child, parent)
+    JOIN pg_attribute p ON p.attrelid = c.confrelid AND p.attnum = k.parent AND p.attname = 'id'
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.child
     WHERE c.contype = 'f' AND c.confrelid = 'clients'::regclass
     UNION
     -- Vinculos a clients.id sem FK no banco; mantenha em dia com o schema.prisma.
