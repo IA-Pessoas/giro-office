@@ -43,7 +43,7 @@ function AppLayout({ children, isIframeView = false }) {
     return (
       <SessionTransitionScreen
         title="Trocando de ambiente"
-        description="Estamos concluindo a transicao da sua sessao para exibir os dados corretos da conta atual."
+        description="Estamos concluindo a transição da sua sessão para exibir os dados corretos da conta atual."
       />
     );
   }

@@ -396,7 +396,7 @@ export function RegularizeLicenseForm({
               </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Task ID">
+            <RegularizeFormField label="Código da tarefa">
               <input
                 value={formState.task_id}
                 onChange={(event) => handleChange("task_id", event.target.value)}

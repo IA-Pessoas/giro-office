@@ -694,7 +694,7 @@ export function ReportsCreatePanel({
                           <p className="text-sm text-gray-700 dark:text-slate-300">
                             {snapshot.data.blocks
                               ? "Resultado concluído. Escolha um formato para baixar as áreas separadamente."
-                              : "Resultado concluído. Escolha um formato para baixar o snapshot."}
+                              : "Resultado concluído. Escolha um formato para baixar o relatório."}
                           </p>
                           <ReportDownloadActions id={snapshot.data.snapshot.id} />
                         </div>

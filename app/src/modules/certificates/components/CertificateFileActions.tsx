@@ -50,7 +50,7 @@ type CertificateFileErrorBody = {
 };
 
 const INVALID_CERTIFICATE_FILE_MESSAGE =
-  "Arquivo de certificado deve usar extensao .pfx ou .p12.";
+  "Arquivo de certificado deve usar extensão .pfx ou .p12.";
 
 function getCertificateFileErrorMessage(error: unknown, fallback: string): string {
   if (isAxiosError<CertificateFileErrorBody>(error)) {

@@ -229,7 +229,7 @@ export function FiscalIcmsSection({
               </div>
             </div>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              Digite parte da descricao ou use virgulas para consultar mais de um termo.
+              Digite parte da descrição ou use vírgulas para consultar mais de um termo.
             </p>
           </div>
         </form>

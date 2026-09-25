@@ -1327,7 +1327,7 @@ await runTest("regularize process task id uses the real task selector", async ()
   assert.match(processSource, /tasksQuery\.isLoading/);
   assert.match(processSource, /tasksQuery\.error/);
   assert.match(processSource, /disabled=/);
-  assert.match(processSource, /Sem task vinculada/);
+  assert.match(processSource, /Sem tarefa vinculada/);
   assert.doesNotMatch(processSource, /<input\s+value=\{formState\.task_id\}/);
 });
 

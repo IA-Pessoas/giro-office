@@ -38,7 +38,7 @@ export function ReportDownloadActions({ id, disabled = false }: { id: string; di
     <div
       className="flex flex-wrap gap-2"
       aria-busy={downloadMutation.isPending}
-      aria-label="Downloads do snapshot"
+      aria-label="Downloads do relatório"
     >
       {downloadMutation.isPending && activeLabel ? (
         <span className="sr-only" role="status">

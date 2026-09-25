@@ -385,7 +385,7 @@ export default function DataTabRegularize({ client }) {
                         </Flex>
                         <Flex w="100%" direction="row" gap={2}>
                             <Flex w="50%" direction="column" justifyContent={'flex-end'}>
-                                <FormLabel htmlFor="start_strike">Inicio Paralisação</FormLabel>
+                                <FormLabel htmlFor="start_strike">Início Paralisação</FormLabel>
                                 <Input
                                     type='date'
                                     value={formatDateToInput(start_strike)}

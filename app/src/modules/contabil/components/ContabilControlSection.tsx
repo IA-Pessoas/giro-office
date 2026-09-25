@@ -26,6 +26,7 @@ import {
 import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
+  formatContabilCount,
   getContabilCompletionPercent,
   getCurrentContabilCompetence,
   rollbackContabilFieldValue,
@@ -306,7 +307,9 @@ export function ContabilControlSection({
     return runOperation(async () => {
       const year = Number(competence.slice(0, 4));
       const result = await createYearMutation.mutateAsync({ client_id: clientId, year, confirmed: true });
-      setOperationMessage(`${result.created} competências criadas; ${result.existing} já existiam.`);
+      setOperationMessage(
+        `${formatContabilCount(result.created, "competência criada", "competências criadas")}; ${formatContabilCount(result.existing, "já existia", "já existiam")}.`,
+      );
     });
   }
 
