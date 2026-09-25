@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IoMdArrowRoundBack } from "react-icons/io";
 import { MdGroupAdd } from "react-icons/md";
 import { CiCirclePlus } from "react-icons/ci";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useChat } from '../../../context/ChatContext';
 import { useAuth } from '../../../context/AuthContext';

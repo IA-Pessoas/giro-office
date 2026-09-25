@@ -185,6 +185,14 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/password-reset$/,
+    description: {
+      action: "enviou",
+      item: "um link de redefinição de senha a um usuário da organização",
+    },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/,
     description: { action: "reativou", item: "um usuário da organização" },
   },
@@ -246,17 +254,17 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   {
     methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+\/snapshot$/,
-    description: { action: "consultou", item: "um snapshot de relatório" },
+    description: { action: "consultou", item: "um relatório gerado" },
   },
   {
     methods: ["GET"],
     pattern: /^\/reports\/snapshots\/[^/]+\/export$/,
-    description: { action: "exportou", item: "um snapshot de relatório" },
+    description: { action: "exportou", item: "um relatório gerado" },
   },
   {
     methods: ["POST"],
     pattern: /^\/reports\/snapshots\/[^/]+\/delete$/,
-    description: { action: "excluiu", item: "um snapshot de relatório" },
+    description: { action: "excluiu", item: "um relatório gerado" },
   },
   {
     methods: ["GET"],
@@ -312,6 +320,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["PATCH", "PUT", "POST", "DELETE"],
     pattern: /^\/user\/[^/]+\/photo$/,
     description: { action: "atualizou", item: "a foto de um usuário" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/user\/password-reset\/confirm$/,
+    description: { action: "redefiniu", item: "a própria senha pelo link enviado por e-mail" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/user\/[^/]+\/password-reset$/,
+    description: { action: "enviou", item: "um link de redefinição de senha a um usuário" },
   },
   {
     methods: ["PATCH", "PUT"],

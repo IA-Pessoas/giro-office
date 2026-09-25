@@ -13,6 +13,7 @@ function createInitialValues(project?: ProjectDetail | null): ProjectFormValues 
     start_date: project?.start_date?.slice(0, 10) ?? "",
     end_date: project?.end_date?.slice(0, 10) ?? "",
     objective: project?.objective ?? "",
+    status: project?.status ?? "",
   };
 }
 
@@ -73,9 +74,10 @@ export function useProjectForm(project?: ProjectDetail | null) {
         start_date: values.start_date,
         end_date: values.end_date || values.start_date,
         objective: values.objective.trim(),
+        ...(values.status ? { status: values.status } : {}),
       };
     },
-    [values.end_date, values.name, values.objective, values.start_date],
+    [values.end_date, values.name, values.objective, values.start_date, values.status],
   );
 
   return {

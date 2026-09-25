@@ -17,7 +17,7 @@ import { TiInventoryLocationService } from "../services/tiInventoryLocationServi
 
 function getOrganizationId(request: Request): string {
   if (!request.organization_id) {
-    throw new ServiceError(401, "Autenticacao obrigatoria.");
+    throw new ServiceError(401, "Autenticação obrigatória.");
   }
 
   return request.organization_id;

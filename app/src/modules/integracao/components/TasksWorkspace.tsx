@@ -12,12 +12,13 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption, useClient } from "@modules/clients";
 import { ConfirmationDialog, PaginationControls } from "@shared/components";
 import { useDebouncedValue } from "@shared/hooks";
+import { isServerErrorAlreadyNotified } from "@shared/services/serverErrorToast";
 
 import { INTEGRACAO_TASK_STATUS_VALUES, type IntegracaoTaskListItem } from "../types";
 import { useDeleteIntegracaoTaskMutation, useIntegracaoTasksList } from "../hooks";
@@ -46,6 +47,7 @@ import {
   TASK_TABLE_NAME_HEAD_CELL_CLASSNAME,
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
   canEditIntegracaoTask,
+  getTaskDeleteErrorMessage,
 } from "./taskWorkspaceUi";
 
 const TASKS_PAGE_SIZE = 20;
@@ -199,23 +201,8 @@ export function TasksWorkspace() {
       setPendingTaskDeletion(null);
       setTaskDeletionError(null);
     } catch (error) {
-      const statusCode =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { status?: number } }).response?.status === "number"
-          ? (error as { response?: { status?: number } }).response?.status
-          : null;
-
-      if (statusCode === 403) {
-        const message = "Somente usuários com permissão administrativa na Integração podem excluir tarefas.";
-        toast.error(message);
-        setTaskDeletionError(message);
-        throw error;
-      }
-
-      const message = "Não foi possível excluir a tarefa.";
-      toast.error(message);
+      const message = getTaskDeleteErrorMessage(error);
+      if (!isServerErrorAlreadyNotified(error)) toast.error(message);
       setTaskDeletionError(message);
       throw error;
     }
@@ -301,7 +288,7 @@ export function TasksWorkspace() {
             Tarefas
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Acompanhe tarefas reais da integração, com filtros alinhados ao task-service.
+            Acompanhe as tarefas da integração por cliente, status e responsável.
           </p>
         </div>
 
@@ -538,7 +525,7 @@ export function TasksWorkspace() {
                       </span>
                     </td>
                     <td className={TASK_TABLE_CELL_CLASSNAME}>
-                      {task.isUnassigned ? "Sem responsável" : "Com responsável"}
+                      {task.responsible_name ?? (task.isUnassigned ? "Sem responsável" : "—")}
                     </td>
                     <td className={TASK_TABLE_CELL_CLASSNAME}>
                       <span

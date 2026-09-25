@@ -26,8 +26,8 @@ const reportsServiceEnvSchema = z
   .object({
     port: z.coerce.number().int().positive().default(3044),
     nodeEnv: z.string().optional().default("development"),
-    databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o reports-service."),
-    jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o reports-service."),
+    databaseUrl: z.string().min(1, "DATABASE_URL não definido para o reports-service."),
+    jwtSecret: z.string().min(1, "JWT_SECRET não definido para o reports-service."),
     reportsInternalToken: z.string().optional().default("reports-service-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     certificateReportingToken: z.string().optional().default(""),
@@ -39,44 +39,44 @@ const reportsServiceEnvSchema = z
       .transform((value) => parseBoolean(value)),
     auditServiceUrl: z.string().url().default("http://localhost:3020"),
     auditServiceToken: z.string().default("audit-service-token"),
-    userServiceUrl: z.string().url("USER_SERVICE_URL invalida.").default("http://localhost:3001"),
+    userServiceUrl: z.string().url("USER_SERVICE_URL inválida.").default("http://localhost:3001"),
     parcelamentoServiceUrl: z
       .string()
-      .url("PARCELAMENTO_SERVICE_URL invalida.")
+      .url("PARCELAMENTO_SERVICE_URL inválida.")
       .default("http://localhost:3043"),
     clientServiceUrl: z
       .string()
-      .url("CLIENT_SERVICE_URL invalida.")
+      .url("CLIENT_SERVICE_URL inválida.")
       .default("http://localhost:3000"),
     contabilServiceUrl: z
       .string()
-      .url("CONTABIL_SERVICE_URL invalida.")
+      .url("CONTABIL_SERVICE_URL inválida.")
       .default("http://localhost:3038"),
-    taskServiceUrl: z.string().url("TASK_SERVICE_URL invalida.").default("http://localhost:3032"),
+    taskServiceUrl: z.string().url("TASK_SERVICE_URL inválida.").default("http://localhost:3032"),
     projectServiceUrl: z
       .string()
-      .url("PROJECT_SERVICE_URL invalida.")
+      .url("PROJECT_SERVICE_URL inválida.")
       .default("http://localhost:3033"),
     certificateServiceUrl: z
       .string()
-      .url("CERTIFICATE_SERVICE_URL invalida.")
+      .url("CERTIFICATE_SERVICE_URL inválida.")
       .default("http://localhost:3041"),
     fiscalServiceUrl: z
       .string()
-      .url("FISCAL_SERVICE_URL invalida.")
+      .url("FISCAL_SERVICE_URL inválida.")
       .default("http://localhost:3037"),
     pessoalServiceUrl: z
       .string()
-      .url("PESSOAL_SERVICE_URL invalida.")
+      .url("PESSOAL_SERVICE_URL inválida.")
       .default("http://localhost:3042"),
     regularizeServiceUrl: z
       .string()
-      .url("REGULARIZE_SERVICE_URL invalida.")
+      .url("REGULARIZE_SERVICE_URL inválida.")
       .default("http://localhost:3039"),
-    tiServiceUrl: z.string().url("TI_SERVICE_URL invalida.").default("http://localhost:3040"),
+    tiServiceUrl: z.string().url("TI_SERVICE_URL inválida.").default("http://localhost:3040"),
     regularizeReportingToken: z.string().default(""),
     regularizeReportingGrantSecret: z.string().default(""),
-    rhServiceUrl: z.string().url("RH_SERVICE_URL invalida.").default("http://localhost:3034"),
+    rhServiceUrl: z.string().url("RH_SERVICE_URL inválida.").default("http://localhost:3034"),
     workerPollIntervalMs: z.coerce.number().int().positive().default(5000),
     workerConcurrency: z.coerce.number().int().positive().default(2),
     workerLeaseSeconds: z.coerce.number().int().positive().default(120),

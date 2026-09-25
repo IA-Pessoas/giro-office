@@ -41,6 +41,7 @@ export interface IntegracaoTaskListItem {
   charge_financeiro: boolean;
   client_name: string;
   project_name: string;
+  responsible_name: string | null;
 }
 
 export interface IntegracaoTaskListResult {
@@ -130,7 +131,7 @@ export interface CreateIntegracaoTaskBody {
   model_id: string;
   project_id: string;
   client_id: string;
-  prospecting_status: ProspectingStatus;
+  prospecting_status?: ProspectingStatus;
   name?: string;
   status?: IntegracaoTaskStatus;
   department_id: string;
@@ -151,4 +152,5 @@ export interface UpdateIntegracaoTaskBody {
   billing?: TaskBilling;
   urgency?: string;
   responsible_id?: string | null;
+  prevision_date?: string;
 }

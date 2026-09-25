@@ -5,7 +5,7 @@ import type {
   ReportSourceAdapter,
 } from "./types.js";
 
-const departmentLabels: Readonly<Record<string, string>> = {
+export const departmentLabels: Readonly<Record<string, string>> = {
   financeiro: "Financeiro",
   integracao: "Integração",
   contabil: "Contábil",
@@ -17,6 +17,14 @@ const departmentLabels: Readonly<Record<string, string>> = {
   rh: "Recursos Humanos",
   ti: "Tecnologia da Informação",
 };
+
+/** Minúscula só na inicial e só quando não é sigla: "ICMS fiscal", "solicitações de RH". */
+export function inSentence(label: string): string {
+  const [first = "", second = ""] = label;
+  return second === second.toLocaleUpperCase("pt-BR")
+    ? label
+    : first.toLocaleLowerCase("pt-BR") + label.slice(1);
+}
 
 export interface AuthorizedReportCatalog {
   sources: readonly ReportCatalogSource[];
@@ -55,7 +63,7 @@ export class SourceCatalogService {
                   source.department_label ?? departmentLabels[source.module] ?? "Outras áreas",
                 description:
                   source.description ??
-                  `Consulte ${source.label.toLocaleLowerCase("pt-BR")} e escolha as informações que deseja apresentar.`,
+                  `Consulte ${inSentence(source.label)} e escolha as informações que deseja apresentar.`,
                 fields,
               },
             ]

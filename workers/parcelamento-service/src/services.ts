@@ -17,6 +17,11 @@ import type {
   ListPanoramasQuery,
   PatchPanoramaBody,
 } from "@workspace/parcelamento-service/src/schemas/panorama.schemas.js";
+import { computeOutstandingBalance } from "@workspace/parcelamento-service/src/services/installmentBalance.js";
+import {
+  attachInstallmentClients,
+  loadInstallmentSummary,
+} from "@workspace/parcelamento-service/src/services/installmentListExtras.js";
 import {
   executeReportingQuery,
   getParcelamentoReportingFields,
@@ -225,7 +230,7 @@ async function ensureClient(prisma: ParcelamentoPrisma, organizationId: string, 
   const client = await prisma.client.findFirst({
     where: { id: clientId, organization_id: organizationId },
   });
-  if (!client) throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+  if (!client) throw new ServiceError(404, "Cliente não encontrado para a organização.");
 }
 
 export function createInstallmentService(
@@ -242,7 +247,7 @@ export function createInstallmentService(
       where: { id, organization_id: organizationId },
       select: installmentSelect,
     });
-    if (!installment) throw new ServiceError(404, "Parcelamento nao encontrado.");
+    if (!installment) throw new ServiceError(404, "Parcelamento não encontrado.");
     return installment;
   };
 
@@ -269,7 +274,7 @@ export function createInstallmentService(
         },
       });
       if (existing) {
-        throw new ServiceError(409, "Ja existe parcelamento com este numero de acordo.");
+        throw new ServiceError(409, "Já existe parcelamento com este número de acordo.");
       }
       return;
     }
@@ -286,7 +291,7 @@ export function createInstallmentService(
       },
     });
     if (existing) {
-      throw new ServiceError(409, "Ja existe parcelamento ativo para este escopo operacional.");
+      throw new ServiceError(409, "Já existe parcelamento ativo para este escopo operacional.");
     }
   };
 
@@ -321,13 +326,18 @@ export function createInstallmentService(
             paid_installments_count: paid,
             overdue_installments_count: Math.max(overdueRaw - paid, 0),
             remaining_installments_count: remaining,
-            outstanding_balance: remaining * installment.current_month_installment_amount,
+            outstanding_balance: computeOutstandingBalance({
+              total: installment.consolidated_total_amount,
+              agreed: installment.agreed_installments_count,
+              remaining,
+              currentAmount: installment.current_month_installment_amount,
+            }),
             ...statusData,
           },
         });
         return withoutOrganizationId(await findByIdOrThrow(organizationId, installmentId, db));
       },
-      "Ja existe parcelamento com este numero de acordo.",
+      "Já existe parcelamento com este número de acordo.",
     );
 
   return {
@@ -351,7 +361,7 @@ export function createInstallmentService(
               ]
             : undefined,
         });
-        const [total, items] = await Promise.all([
+        const [total, items, summary] = await Promise.all([
           prisma.installment.count({ where }),
           prisma.installment.findMany({
             where,
@@ -360,8 +370,14 @@ export function createInstallmentService(
             skip,
             take,
           }),
+          loadInstallmentSummary(prisma, where),
         ]);
-        return createPage({ items: items.map(withoutOrganizationId), total, page, pageSize });
+        const withClients = await attachInstallmentClients(
+          prisma,
+          context.organizationId,
+          items.map(withoutOrganizationId),
+        );
+        return { ...createPage({ items: withClients, total, page, pageSize }), summary };
       }),
 
     getById: (context: ParcelamentoRequestContext, id: string) =>
@@ -393,10 +409,15 @@ export function createInstallmentService(
                 type: input.type,
                 jurisdiction: input.jurisdiction,
                 is_automatic_debit: input.is_automatic_debit,
-                consolidated_total_amount: 0,
+                consolidated_total_amount: input.consolidated_total_amount ?? 0,
                 first_installment_amount: input.first_installment_amount,
                 current_month_installment_amount: input.current_month_installment_amount,
-                outstanding_balance: 0,
+                outstanding_balance: computeOutstandingBalance({
+                  total: input.consolidated_total_amount ?? 0,
+                  agreed: input.agreed_installments_count,
+                  remaining: input.agreed_installments_count,
+                  currentAmount: input.current_month_installment_amount,
+                }),
                 paid_installments_count: 0,
                 agreed_installments_count: input.agreed_installments_count,
                 remaining_installments_count: input.agreed_installments_count,
@@ -429,7 +450,7 @@ export function createInstallmentService(
           );
           return dto;
         },
-        "Ja existe parcelamento com este numero de acordo.",
+        "Já existe parcelamento com este número de acordo.",
       ),
 
     patch: (context: ParcelamentoRequestContext, id: string, input: PatchInstallmentBody) =>
@@ -503,7 +524,7 @@ export function createInstallmentService(
           }
           return withoutOrganizationId(await findByIdOrThrow(organizationId, id));
         },
-        "Ja existe parcelamento com este numero de acordo.",
+        "Já existe parcelamento com este número de acordo.",
       ),
   };
 }
@@ -523,7 +544,7 @@ export function createInstallmentCompetencyService(
     const installment = await db.installment.findFirst({
       where: { id: installmentId, organization_id: organizationId },
     });
-    if (!installment) throw new ServiceError(404, "Parcelamento nao encontrado.");
+    if (!installment) throw new ServiceError(404, "Parcelamento não encontrado.");
   };
   const findByIdOrThrow = async (
     organizationId: string,
@@ -534,10 +555,10 @@ export function createInstallmentCompetencyService(
       where: { id, organization_id: organizationId },
       select: competencySelect,
     });
-    if (!competency) throw new ServiceError(404, "Competencia de parcelamento nao encontrada.");
+    if (!competency) throw new ServiceError(404, "Competência de parcelamento não encontrada.");
     return competency;
   };
-  const conflict = "Ja existe competencia para este parcelamento.";
+  const conflict = "Já existe competência para este parcelamento.";
 
   return {
     list: (
@@ -545,7 +566,7 @@ export function createInstallmentCompetencyService(
       installmentId: string,
       query: ListInstallmentCompetenciesQuery,
     ) =>
-      guard("Erro ao listar competencias de parcelamento.", async () => {
+      guard("Erro ao listar competências de parcelamento.", async () => {
         await ensureParent(context.organizationId, installmentId);
         const { page, pageSize, skip, take } = getPaginationParams(query);
         const where = { installment_id: installmentId, organization_id: context.organizationId };
@@ -568,7 +589,7 @@ export function createInstallmentCompetencyService(
       input: CreateInstallmentCompetencyBody,
     ) =>
       guard(
-        "Erro ao criar competencia de parcelamento.",
+        "Erro ao criar competência de parcelamento.",
         async () => {
           const { organizationId } = context;
           const created = await prisma.$transaction(async (tx) => {
@@ -621,7 +642,7 @@ export function createInstallmentCompetencyService(
       id: string,
       input: PatchInstallmentCompetencyBody,
     ) =>
-      guard("Erro ao atualizar competencia de parcelamento.", async () => {
+      guard("Erro ao atualizar competência de parcelamento.", async () => {
         const { organizationId } = context;
         const existing = await findByIdOrThrow(organizationId, id);
         const data = omitUndefined({
@@ -669,16 +690,16 @@ export function createPanoramaService(prisma: ParcelamentoPrisma, audit: Parcela
       where: { id, organization_id: organizationId },
       select: panoramaSelect,
     });
-    if (!panorama) throw new ServiceError(404, "Panorama de parcelamento nao encontrado.");
+    if (!panorama) throw new ServiceError(404, "Panorama de parcelamento não encontrado.");
     return panorama;
   };
   const ensureResponsavel = async (organizationId: string, responsavelId: string) => {
     const user = await prisma.user.findFirst({
       where: { id: responsavelId, organization_id: organizationId },
     });
-    if (!user) throw new ServiceError(404, "Responsavel nao encontrado para a organizacao.");
+    if (!user) throw new ServiceError(404, "Responsável não encontrado para a organização.");
   };
-  const conflict = "Ja existe panorama para este cliente e competencia.";
+  const conflict = "Já existe panorama para este cliente e competência.";
 
   return {
     list: (context: ParcelamentoRequestContext, query: ListPanoramasQuery) =>

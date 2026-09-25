@@ -4,7 +4,7 @@ import { idQuerySchema } from "./common.schemas.js";
 
 export const createMunicipalTaxesBodySchema = z
   .object({
-    client_id: z.string().uuid("client_id invalido."),
+    client_id: z.string().uuid("client_id inválido."),
     year: z.coerce.number().int(),
     tff_is_applicable: z.boolean(),
     tff_amount: z.coerce.number(),
@@ -16,14 +16,14 @@ export const createMunicipalTaxesBodySchema = z
     tlp_is_applicable: z.boolean(),
     tlp_amount: z.coerce.number(),
     tlp_notes: z.string().nullable().optional(),
-    tlp_is_sent: z.string().min(1, "tlp_is_sent obrigatorio."),
+    tlp_is_sent: z.string().min(1, "tlp_is_sent obrigatório."),
     tlp_sent_date: z.coerce.date().optional(),
     tlp_due_date: z.coerce.date().optional(),
     tlp_not_email: z.boolean(),
     tll_is_applicable: z.boolean(),
     tll_amount: z.coerce.number(),
     tll_notes: z.string().nullable().optional(),
-    tll_is_sent: z.string().min(1, "tll_is_sent obrigatorio."),
+    tll_is_sent: z.string().min(1, "tll_is_sent obrigatório."),
     tll_sent_date: z.coerce.date().optional(),
     tll_due_date: z.coerce.date().optional(),
     tll_analysis_is_done: z.boolean(),
@@ -33,7 +33,7 @@ export const createMunicipalTaxesBodySchema = z
 
 export const updateMunicipalTaxesBodySchema = createMunicipalTaxesBodySchema
   .extend({
-    id: z.string().uuid("id invalido."),
+    id: z.string().uuid("id inválido."),
   })
   .strict();
 

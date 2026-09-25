@@ -76,7 +76,10 @@ model PanoramaParcelameto {
 
 // Somente leitura: escopo de cliente/responsável e geração de panoramas.
 model Client {
-  id              String @id @default(uuid())
+  id              String  @id @default(uuid())
+  name            String
+  company_name    String?
+  cpf_cnpj        String  @default("")
   status          String
   organization_id String
 

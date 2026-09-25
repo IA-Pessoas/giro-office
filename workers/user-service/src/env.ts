@@ -10,4 +10,9 @@ export interface UserWorkerEnv extends WorkerEnv {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   AUDIT_SERVICE?: ServiceBinding;
   AUDIT_SERVICE_TOKEN?: string;
+  /** Origem pública do app, base do link de redefinição de senha. */
+  APP_PUBLIC_URL?: string;
+  USER_EMAIL_ADAPTER_URL?: string;
+  USER_EMAIL_ADAPTER_TOKEN?: string;
+  USER_EMAIL_FROM?: string;
 }

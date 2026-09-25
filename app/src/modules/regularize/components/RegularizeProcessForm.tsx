@@ -1,9 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
 import { formatCpfCnpjInput, normalizeDigits } from "@shared/utils/inputFormatting";
-import { ClientSelectionField } from "@modules/clients";
-import { useIntegracaoTasksList } from "@modules/integracao";
+import { ClientSelectionField, useClient } from "@modules/clients";
 import { useAssignableUsers } from "@modules/rh";
 
 import type {
@@ -26,12 +25,14 @@ import {
   getRegularizePresetOptions,
   regularizeFinancialStatusOptions,
   regularizeProcessStatusOptions,
+  regularizeProcessTypeOptions,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
   regularizeUrgencyOptions,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizeClientPfSelect } from "./RegularizeClientPfSelect";
+import { RegularizeTaskSelect } from "./RegularizeTaskSelect";
 
 type RegularizeProcessClientKind = "pj" | "pf";
 
@@ -166,36 +167,33 @@ export function RegularizeProcessForm({
     buildProcessFormState(process, defaultClientId),
   );
   const [formError, setFormError] = useState<string | null>(null);
-  const [taskSearch, setTaskSearch] = useState("");
   const responsibleUsersQuery = useAssignableUsers({ enabled: open, module: "regularize" });
   const responsibleUsers = responsibleUsersQuery.data ?? [];
   const isEditing = mode === "edit";
-  const tasksQuery = useIntegracaoTasksList(
-    { status: "Todos", limit: 100, search: taskSearch },
-    { enabled: open },
+  const processTypeListId = useId();
+  // Documento do PJ vem do cadastro do cliente (#1347); o PF já preenche pelo select.
+  const pjClientQuery = useClient(
+    open && formState.clientKind === "pj" && formState.client_id ? formState.client_id : undefined,
   );
-  const taskOptions = (tasksQuery.data?.data ?? []).map((task) => ({
-    id: task.id,
-    label: `${task.name} — ${task.status}`,
-  }));
+  const pjClientDocument = pjClientQuery.data?.cpf_cnpj;
 
-  if (formState.task_id && !taskOptions.some((task) => task.id === formState.task_id)) {
-    taskOptions.push({ id: formState.task_id, label: "Task vinculada (fora da lista)" });
-  }
-
-  const taskQueryMessage = tasksQuery.isLoading
-    ? "Carregando tasks..."
-    : tasksQuery.error
-      ? `Erro ao carregar tasks: ${tasksQuery.error.message}`
-      : null;
 
   useEffect(() => {
     if (open) {
       setFormState(buildProcessFormState(process, defaultClientId));
       setFormError(null);
-      setTaskSearch("");
     }
   }, [defaultClientId, open, process]);
+
+  useEffect(() => {
+    // Depois do reset ao abrir: com o cliente em cache, o documento não pode se perder.
+    if (!open || !pjClientDocument) return;
+    setFormState((current) =>
+      current.cpf_cnpj.trim()
+        ? current
+        : { ...current, cpf_cnpj: formatCpfCnpjInput(pjClientDocument) },
+    );
+  }, [open, pjClientDocument]);
 
   function handleChange<K extends keyof RegularizeProcessFormState>(
     key: K,
@@ -211,7 +209,8 @@ export function RegularizeProcessForm({
     setFormState((current) => ({
       ...current,
       clientKind: value,
-      client_id: "",
+      client_id: value === "pj" ? defaultClientId : "",
+      cpf_cnpj: "",
     }));
   }
 
@@ -333,10 +332,17 @@ export function RegularizeProcessForm({
 
             <RegularizeFormField label="Tipo do processo" required>
               <input
+                list={processTypeListId}
                 value={formState.process_type}
                 onChange={(event) => handleChange("process_type", event.target.value)}
                 className={regularizeTextFieldClassName}
+                placeholder="Escolha ou digite o tipo"
               />
+              <datalist id={processTypeListId}>
+                {regularizeProcessTypeOptions.map((type) => (
+                  <option key={type} value={type} />
+                ))}
+              </datalist>
             </RegularizeFormField>
 
             <RegularizeFormField label="Status" required>
@@ -472,33 +478,11 @@ export function RegularizeProcessForm({
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="Buscar task">
-              <input
-                type="search"
-                value={taskSearch}
-                onChange={(event) => setTaskSearch(event.target.value)}
-                placeholder="Buscar task por nome ou identificador"
-                className={regularizeTextFieldClassName}
-              />
-            </RegularizeFormField>
-
-            <RegularizeFormField label="Task ID">
-              <RegularizeNativeSelect
-                value={formState.task_id}
-                onChange={(event) => handleChange("task_id", event.target.value)}
-                disabled={tasksQuery.isLoading || Boolean(tasksQuery.error)}
-              >
-                <option value="">Sem task vinculada</option>
-                {taskOptions.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {task.label}
-                  </option>
-                ))}
-              </RegularizeNativeSelect>
-              {taskQueryMessage ? (
-                <span className="text-xs text-gray-500 dark:text-slate-400">{taskQueryMessage}</span>
-              ) : null}
-            </RegularizeFormField>
+            <RegularizeTaskSelect
+              enabled={open}
+              value={formState.task_id}
+              onChange={(taskId) => handleChange("task_id", taskId)}
+            />
 
             <RegularizeFormField label="Descrição" required className="md:col-span-3">
               <textarea

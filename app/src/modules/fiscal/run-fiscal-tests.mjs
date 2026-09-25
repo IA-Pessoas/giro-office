@@ -74,7 +74,7 @@ await runTest("fiscal viewer keeps NCM, ICMS and IPI sections read-only", () => 
 await runTest("fiscal admins can delete NCM, ICMS and IPI from the list", () => {
   for (const source of [fiscalSources.ncmSection, fiscalSources.icmsSection, fiscalSources.ipiSection]) {
     assert.match(source, /Trash2/);
-    assert.match(source, /Dialog/);
+    assert.match(source, /<ConfirmationDialog/);
     assert.match(source, /canDelete \? \(item\) => setDeleteTarget\(item\) : undefined/);
     assert.match(source, /onDelete=\{canDelete \?/);
     assert.match(source, /title="Excluir/);
@@ -195,9 +195,29 @@ await runTest("NCM create and edit keep codes numeric while search keeps eight-d
   assert.match(fiscalSources.ncmForm, /inputMode="numeric"/);
   assert.match(fiscalSources.ncmForm, /pattern="\[0-9\]\*"/);
   assert.match(fiscalSources.ncmForm, /Informe apenas números no código NCM\./);
+  assert.match(fiscalSources.ncmForm, /ncm_code\.trim\(\)\.length !== 8[\s\S]*O código NCM deve ter 8 dígitos\./);
+  assert.match(fiscalSources.ncmForm, /endDateIso && endDateIso < startDateIso[\s\S]*A vigência final não pode ser anterior à vigência inicial\./);
+  assert.match(fiscalSources.ncmSchema, /O código NCM deve ter 8 dígitos\./);
+  assert.doesNotMatch(fiscalSources.ncmSchema, /validity_end_date não pode/);
   assert.match(fiscalSources.ncmSchema, /\.regex\(\/\^\\d\+\$\//);
   assert.match(fiscalSources.searchSection, /\.replace\(\/\\D\/g, ""\)\s*\.slice\(0, NCM_CODE_LENGTH\)/);
   assert.match(fiscalSources.searchSection, /trimmedCode\.length !== NCM_CODE_LENGTH/);
+});
+
+await runTest("fiscal search keeps the typed code and clears stale results on invalid input", () => {
+  assert.doesNotMatch(fiscalSources.searchSection, /setInputValue\(""\)/);
+  assert.match(fiscalSources.searchSection, /function rejectSearch\(message: string\)[\s\S]*setSubmittedCode\(undefined\)[\s\S]*setStoredSearch\(null\)[\s\S]*removeItem\(LAST_FISCAL_SEARCH_STORAGE_KEY\)/);
+  assert.doesNotMatch(fiscalSources.searchSection, /setValidationMessage\("/);
+  assert.match(fiscalSources.searchSection, /!searchQuery\.isPlaceholderData/);
+  assert.match(fiscalSources.searchSection, /storedSearch\?\.code === submittedCode/);
+  assert.match(fiscalSources.searchSection, /setInputValue\(restoredSearch\.code\)/);
+});
+
+await runTest("NCM list filters by the code just created", () => {
+  assert.match(fiscalSources.ncmForm, /onCreated\?: \(ncmCode: string\) => void/);
+  assert.match(fiscalSources.ncmForm, /} else \{\s*await createMutation\.mutateAsync\(basePayload\);[^}]*onCreated\?\.\(basePayload\.ncm_code\);\s*}/);
+  assert.match(fiscalSources.ncmSection, /onCreated=\{showCreatedNcm\}/);
+  assert.match(fiscalSources.ncmSection, /function showCreatedNcm\(ncmCode: string\)[\s\S]*setFilterValue\(ncmCode\)[\s\S]*setSearchCodes\(\[ncmCode\]\)[\s\S]*setPage\(1\)/);
 });
 
 await runTest("fiscal-service list routes pass pagination and optional search terms", () => {

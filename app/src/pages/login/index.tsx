@@ -64,6 +64,8 @@ export default function Login() {
     } catch (error: any) {
       if (error?.response?.status === 400 || error?.response?.status === 401) {
         setError("Login ou senha inválidos");
+      } else if (error?.response?.status === 429) {
+        setError("Muitas tentativas. Aguarde um minuto e tente novamente.");
       } else {
         setError("Não foi possível entrar agora. Tente novamente.");
       }
@@ -134,21 +136,6 @@ export default function Login() {
                     </div>
                   );
                 })}
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
-                  <div className="mb-0.5 text-2xl font-bold">6</div>
-                  <div className="text-xs text-blue-100">Módulos</div>
-                </div>
-                <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
-                  <div className="mb-0.5 text-2xl font-bold">99.9%</div>
-                  <div className="text-xs text-blue-100">Uptime</div>
-                </div>
-                <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
-                  <div className="mb-0.5 text-2xl font-bold">24/7</div>
-                  <div className="text-xs text-blue-100">Suporte</div>
-                </div>
               </div>
             </div>
 
@@ -292,7 +279,7 @@ export default function Login() {
                       className={`text-xs ${LOGIN_CARD_SECONDARY_TEXT_CLASSNAME}`}
                       hidden={!showPasswordHelp}
                     >
-                      Peça ao administrador da sua empresa para redefinir sua senha.
+                      Peça ao administrador da sua empresa um link de redefinição de senha por e-mail.
                     </p>
 
                     <button

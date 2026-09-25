@@ -15,9 +15,9 @@ const processFieldsSchema = z
   .object({
     client_pj_id: z.string().uuid().optional(),
     client_pf_id: z.string().uuid().optional(),
-    cpf_cnpj: z.string().min(1, "cpf_cnpj obrigatorio."),
-    process_type: z.string().min(1, "process_type obrigatorio."),
-    description: z.string().min(1, "description obrigatorio."),
+    cpf_cnpj: z.string().min(1, "cpf_cnpj obrigatório."),
+    process_type: z.string().min(1, "process_type obrigatório."),
+    description: z.string().min(1, "description obrigatório."),
     entry_date: z.coerce.date().optional(),
     completion_date: z.coerce.date().optional(),
     expected_date: z.coerce.date().optional(),
@@ -55,10 +55,10 @@ export const createProcessBodySchema = processFieldsSchema
   .superRefine(requireExactlyOneClient);
 
 export const updateProcessBodySchema = processFieldsSchema
-  .extend({ id: z.string().uuid("id invalido.") })
+  .extend({ id: z.string().uuid("id inválido.") })
   .superRefine(requireExactlyOneClient);
 
-export const processActionBodySchema = z.object({ id: z.string().uuid("id invalido.") }).strict();
+export const processActionBodySchema = z.object({ id: z.string().uuid("id inválido.") }).strict();
 
 export const processDetailQuerySchema = idQuerySchema;
 

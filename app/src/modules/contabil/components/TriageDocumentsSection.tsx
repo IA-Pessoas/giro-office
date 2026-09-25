@@ -14,6 +14,7 @@ import {
   useTriageClosing,
 } from "../hooks";
 import { useTriageCatalogs } from "@modules/triagem";
+import { ConfirmationDialog } from "@shared/components";
 import { getContabilErrorMessage } from "../services";
 import type {
   ContabilCompetence,
@@ -113,6 +114,9 @@ export function TriageDocumentsSection({
     getCurrentContabilCompetence(),
   );
   const [bankId, setBankId] = useState("");
+  // O item fica guardado após fechar para o texto não sumir durante a animação de saída.
+  const [pendingBankArchive, setPendingBankArchive] = useState<string | null>(null);
+  const [isBankArchiveOpen, setIsBankArchiveOpen] = useState(false);
   const [billingAmount, setBillingAmount] = useState("");
   const [documentDrafts, setDocumentDrafts] = useState<TriageDocumentDraft>(() =>
     buildDocumentDrafts(undefined, documents),
@@ -135,7 +139,7 @@ export function TriageDocumentsSection({
     mutations.item.error ??
     mutations.all.error ??
     mutations.statement.error ??
-    mutations.archiveStatement.error ??
+    // Erro de arquivamento de extrato aparece dentro do diálogo de confirmação.
     mutations.closing.error;
   const statementMutationPending =
     mutations.statement.isPending || mutations.archiveStatement.isPending;
@@ -159,14 +163,13 @@ export function TriageDocumentsSection({
     }));
   }
 
-  function archiveBankStatement(bankIdToArchive: string) {
-    if (window.confirm(`Arquivar o marcador do banco ${bankIdToArchive} nesta competência?`)) {
-      mutations.archiveStatement.mutate({
-        clientId,
-        competence,
-        bankId: bankIdToArchive,
-      });
-    }
+  async function confirmBankArchive() {
+    if (!pendingBankArchive) return;
+    await mutations.archiveStatement.mutateAsync({
+      clientId,
+      competence,
+      bankId: pendingBankArchive,
+    });
   }
 
   if (monthly.isLoading)
@@ -617,7 +620,10 @@ export function TriageDocumentsSection({
                           type="button"
                           aria-label={`Arquivar marcador do banco ${statement.bank_id}`}
                           disabled={statementMutationPending}
-                          onClick={() => archiveBankStatement(statement.bank_id)}
+                          onClick={() => {
+                            setPendingBankArchive(statement.bank_id);
+                            setIsBankArchiveOpen(true);
+                          }}
                           className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200"
                         >
                           <Archive className="h-3.5 w-3.5" aria-hidden="true" />
@@ -637,6 +643,26 @@ export function TriageDocumentsSection({
           ) : null}
         </>
       )}
+
+      <ConfirmationDialog
+        open={isBankArchiveOpen}
+        onOpenChange={(open) => {
+          if (open) return;
+          setIsBankArchiveOpen(false);
+          mutations.archiveStatement.reset();
+        }}
+        title="Arquivar marcador do banco"
+        description={`Arquivar o marcador do banco ${pendingBankArchive ?? ""} nesta competência?`}
+        onConfirm={confirmBankArchive}
+        isConfirming={mutations.archiveStatement.isPending}
+        errorMessage={
+          mutations.archiveStatement.error
+            ? getContabilErrorMessage(mutations.archiveStatement.error)
+            : null
+        }
+        confirmLabel="Arquivar"
+        cancelLabel="Cancelar"
+      />
     </section>
   );
 }

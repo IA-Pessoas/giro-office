@@ -1,5 +1,10 @@
 import type { ServiceBinding, WorkerEnv } from "@workspace/runtime";
 
+/** Binding `ratelimits` do Workers: `success: false` quando a chave estourou o limite. */
+export interface RateLimiterBinding {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface GatewayWorkerEnv extends WorkerEnv {
   JWT_SECRET: string;
   INTERNAL_SERVICE_TOKEN: string;
@@ -22,4 +27,5 @@ export interface GatewayWorkerEnv extends WorkerEnv {
   TRIAGEM_SERVICE?: ServiceBinding;
   PESSOAL_SERVICE?: ServiceBinding;
   REGULARIZE_SERVICE?: ServiceBinding;
+  LOGIN_RATE_LIMITER?: RateLimiterBinding;
 }

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const createTimeSheetBodySchema = z
   .object({
-    user_id: z.string().uuid({ message: "user_id invalido." }),
+    user_id: z.string().uuid({ message: "user_id inválido." }),
     start_time: zIsoDate("start_time").optional(),
     end_time: zIsoDate("end_time").optional(),
   })
@@ -29,14 +29,14 @@ export const createTimeSheetBodySchema = z
 
 export const rebuildTimeSheetBodySchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
 export const listTimeSheetsQuerySchema = z
   .object({
     target_user_id: z
-      .union([z.string().uuid({ message: "target_user_id invalido." }), z.literal("")])
+      .union([z.string().uuid({ message: "target_user_id inválido." }), z.literal("")])
       .optional()
       .transform((v) => (v === "" ? undefined : v)),
   })
@@ -44,20 +44,20 @@ export const listTimeSheetsQuerySchema = z
 
 export const timeSheetIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
 export const signTimeSheetBodySchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
     signature: zNonEmptyText("signature").optional(),
   })
   .strict();
 
 export const reopenTimeSheetBodySchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
     reason: zNonEmptyText("reason"),
   })
   .strict();

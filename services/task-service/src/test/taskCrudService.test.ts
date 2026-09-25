@@ -23,6 +23,21 @@ const { prismaMock, auditMock, workflowMock, operationalNotificationMock } = vi.
     taskModel: {
       findFirst: vi.fn(),
     },
+    taskAttachment: {
+      count: vi.fn(),
+      findMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    commercialTaskBilling: {
+      findFirst: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    taskCompletionRequest: {
+      deleteMany: vi.fn(),
+    },
+    taskPostponement: {
+      deleteMany: vi.fn(),
+    },
     taskDependent: {
       findMany: vi.fn(),
     },
@@ -675,6 +690,95 @@ describe("TaskCrudService", () => {
     expect(prismaMock.user.findMany).not.toHaveBeenCalled();
   });
 
+  it("updateTask define a primeira previsão quando a tarefa não tem prazo", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      responsible_id: null,
+      status: "Em Andamento",
+      prevision_date: null,
+    });
+    prismaMock.task.update.mockImplementation(async ({ data }) => data);
+
+    const result = await makeTaskCrudService().updateTask({
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      integracaoLevel: 2,
+      prevision_date: "2099-10-15",
+    });
+
+    expect(result.prevision_date).toEqual(new Date("2099-10-15T00:00:00.000Z"));
+  });
+
+  it("updateTask recusa alterar previsão já definida (só via prorrogação)", async () => {
+    const current = new Date("2026-10-01T00:00:00.000Z");
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      responsible_id: null,
+      status: "Em Andamento",
+      prevision_date: current,
+    });
+    prismaMock.task.update.mockReset();
+    prismaMock.task.update.mockImplementation(async ({ data }) => data);
+    const service = makeTaskCrudService();
+    const base = {
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      integracaoLevel: 2,
+    };
+
+    await expect(
+      service.updateTask({ ...base, prevision_date: "2026-10-20" }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: "A tarefa já tem previsão. Use Prorrogações para alterá-la.",
+    });
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+
+    const same = await service.updateTask({ ...base, prevision_date: "2026-10-01" });
+    expect(same.prevision_date).toEqual(current);
+  });
+
+  it("updateTask recusa primeira previsão no passado e trata corrida como 409", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      department_id: "dep-1",
+      responsible_id: null,
+      status: "Em Andamento",
+      prevision_date: null,
+    });
+    const base = {
+      user_id: "user-1",
+      organization_id: "org-1",
+      task_id: "task-1",
+      integracaoLevel: 2,
+    };
+    const service = makeTaskCrudService();
+
+    await expect(
+      service.updateTask({ ...base, prevision_date: "2020-01-01" }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+    });
+
+    prismaMock.task.update.mockReset();
+    prismaMock.task.update.mockRejectedValueOnce({ code: "P2025" });
+    await expect(
+      service.updateTask({ ...base, prevision_date: "2099-01-01" }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    expect(prismaMock.task.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "task-1", prevision_date: null } }),
+    );
+  });
+
   it("updateTask ignora mutação direta de responsáveis secundários e preserva legado", async () => {
     prismaMock.task.findFirst.mockResolvedValue({
       id: "task-1",
@@ -991,7 +1095,7 @@ describe("TaskCrudService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 400,
-      message: "Projeto nao pertence ao cliente informado.",
+      message: "Projeto não pertence ao cliente informado.",
     });
     expect(prismaMock.task.create).not.toHaveBeenCalled();
   });
@@ -1015,7 +1119,7 @@ describe("TaskCrudService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Projeto nao encontrado.",
+      message: "Projeto não encontrado.",
     });
     expect(prismaMock.task.create).not.toHaveBeenCalled();
   });
@@ -1360,6 +1464,7 @@ describe("TaskCrudService", () => {
         hiring_status: "Contratado",
         client: { name: "Empresa", company_name: null },
         project: { name: "Projeto" },
+        responsible: { name: "Maria Souza" },
         responsible_id: "other-user",
         responsible2_id: null,
         responsible3_id: null,
@@ -1394,6 +1499,7 @@ describe("TaskCrudService", () => {
           hiring_status: "Contratado",
           client_name: "Empresa",
           project_name: "Projeto",
+          responsible_name: "Maria Souza",
           isOwn: false,
           isUnassigned: false,
         },
@@ -2020,5 +2126,91 @@ describe("TaskCrudService", () => {
         integracaoLevel: 1,
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  describe("deleteTask dependências", () => {
+    const request = {
+      task_id: "task-1",
+      user_id: "user-1",
+      organization_id: "org-1",
+      integracaoLevel: 3,
+      isOwner: true,
+    };
+
+    beforeEach(() => {
+      prismaMock.task.findFirst.mockResolvedValue({ id: "task-1", organization_id: "org-1" });
+      prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
+      prismaMock.taskAttachment.count.mockResolvedValue(0);
+      prismaMock.taskAttachment.findMany.mockResolvedValue([]);
+      prismaMock.taskAttachment.deleteMany.mockResolvedValue({ count: 0 });
+      prismaMock.commercialTaskBilling.findFirst.mockResolvedValue(null);
+      prismaMock.commercialTaskBilling.deleteMany.mockResolvedValue({ count: 0 });
+      prismaMock.taskCompletionRequest.deleteMany.mockResolvedValue({ count: 0 });
+      prismaMock.taskPostponement.deleteMany.mockResolvedValue({ count: 0 });
+      prismaMock.task.delete.mockReset();
+      prismaMock.task.delete.mockResolvedValue({ id: "task-1" });
+    });
+
+    it("exclui cobrança comercial junto e guarda o snapshot na auditoria", async () => {
+      const billing = { hiring_status: "Contratado", payment: "Pix", billing_description: "QA" };
+      prismaMock.commercialTaskBilling.findFirst.mockResolvedValue(billing);
+      auditMock.createLog.mockClear();
+
+      await expect(makeTaskCrudService().deleteTask(request)).resolves.toEqual({ deleted: true });
+
+      expect(prismaMock.commercialTaskBilling.deleteMany).toHaveBeenCalledWith({
+        where: { task_id: "task-1", organization_id: "org-1" },
+      });
+      expect(auditMock.createLog).toHaveBeenCalledWith(
+        expect.objectContaining({ changes: { commercial_billing: billing } }),
+      );
+    });
+
+    it("bloqueia com 409 quando só há anexos", async () => {
+      prismaMock.taskAttachment.count.mockResolvedValue(1);
+
+      await expect(makeTaskCrudService().deleteTask(request)).rejects.toMatchObject({
+        statusCode: 409,
+        message: "Não é possível excluir a tarefa: ela tem 1 anexo(s). Remova os anexos.",
+      });
+    });
+
+    it("remove solicitações de conclusão e prorrogações junto com a tarefa", async () => {
+      prismaMock.taskCompletionRequest.deleteMany.mockResolvedValue({ count: 2 });
+      prismaMock.taskPostponement.deleteMany.mockResolvedValue({ count: 1 });
+      auditMock.createLog.mockClear();
+
+      await expect(makeTaskCrudService().deleteTask(request)).resolves.toEqual({ deleted: true });
+
+      const where = { task_id: "task-1", organization_id: "org-1" };
+      expect(prismaMock.taskCompletionRequest.deleteMany).toHaveBeenCalledWith({ where });
+      expect(prismaMock.taskPostponement.deleteMany).toHaveBeenCalledWith({ where });
+      expect(prismaMock.task.delete).toHaveBeenCalledWith({ where: { id: "task-1" } });
+      expect(auditMock.createLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: { completion_requests_removed: 2, postponements_removed: 1 },
+        }),
+      );
+    });
+
+    it("conta só anexos visíveis e apaga os já removidos, auditando o object_path", async () => {
+      prismaMock.taskAttachment.findMany.mockResolvedValue([{ object_path: "org-1/task-1/a.pdf" }]);
+      auditMock.createLog.mockClear();
+
+      await expect(makeTaskCrudService().deleteTask(request)).resolves.toEqual({ deleted: true });
+
+      const where = { task_id: "task-1", organization_id: "org-1" };
+      expect(prismaMock.taskAttachment.count).toHaveBeenCalledWith({
+        where: { ...where, deleted_at: null },
+      });
+      expect(prismaMock.taskAttachment.deleteMany).toHaveBeenCalledWith({
+        where: { ...where, deleted_at: { not: null } },
+      });
+      expect(auditMock.createLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: { removed_attachment_paths: ["org-1/task-1/a.pdf"] },
+        }),
+      );
+    });
   });
 });

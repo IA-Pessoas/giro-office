@@ -101,6 +101,7 @@ export function createProjectCrudRoutes(service: ProjectCrudRouteDeps): ReturnTy
         end_date: body.end_date,
         objective: body.objective,
         sponsor_id: body.sponsor_id ?? undefined,
+        status: body.status,
       });
 
       res.json(createSuccessResponse(result));

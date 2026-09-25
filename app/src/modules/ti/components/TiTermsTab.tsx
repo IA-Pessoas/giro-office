@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Eye, FileCheck2, Pencil, Plus, Printer, Save, Signature, X } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
@@ -11,6 +11,7 @@ import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { useFetch } from "@shared/hooks";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
+import { maskCPF } from "@shared/utils/formatters";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -602,7 +603,7 @@ export function TiTermsTab() {
                             {getTermTitle(term)}
                           </button>
                           <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">
-                            {getText(term.user_cpf)}
+                            {maskCPF(term.user_cpf) || getText(term.user_cpf)}
                           </p>
                           <DocumentIssueBadge value={term.user_cpf} />
                         </td>

@@ -212,8 +212,11 @@ try {
   ).toBe(1);
   assert.equal(requests.find((request) => request.method === "PUT").body.status, "UNDER_REVIEW");
 
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Arquivar marcador do banco 001" }).click();
+  await page
+    .getByRole("dialog", { name: "Arquivar marcador do banco" })
+    .getByRole("button", { name: "Arquivar", exact: true })
+    .click();
   await expect(page.getByText("Nenhum marcador registrado.")).toBeVisible();
   assert.ok(
     requests.some(

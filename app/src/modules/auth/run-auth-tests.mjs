@@ -905,7 +905,8 @@ await (async () => {
   await runTest("admin permissions editor uses explicit save copy and stable saving state", () => {
     assert.match(
       adminPermissionsEditorSource,
-      /\{filteredUsers\.length\} de \{users\.length\} usuário/,
+      // #1371: plural pelo formatCount ("1 usuário", "2 usuários").
+      /\{filteredUsers\.length\} de \{formatCount\(users\.length, "usuário", "usuários"\)\}/,
     );
     assert.match(adminPermissionsEditorSource, /Salvar permissões/);
     assert.equal(adminPermissionsEditorSource.includes(': "Salvar"'), false);

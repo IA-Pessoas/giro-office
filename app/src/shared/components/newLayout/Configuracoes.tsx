@@ -16,26 +16,34 @@ import {
   Upload,
   User,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useAuth } from "@/context/AuthContext";
-import { canCreateOrganizationOwner, canCreateUsers, useModuleAccess } from "@modules/auth";
+import {
+  canCreateOrganizationOwner,
+  canCreateUsers,
+  isOrganizationOwner,
+  OWNER_ROLE_LABEL,
+  useModuleAccess,
+} from "@modules/auth";
 import {
   TASK_MODEL_CONFIG_ENTRY,
   canManageTaskModelConfig,
   canViewTaskModelConfig,
 } from "@modules/integracao";
 import { MyOrganizationSection } from "@modules/organizations";
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog, Dialog } from "@shared/components";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
-import { buildSelfProfileUpdatePayload } from "@shared/utils/meProfileUpdate";
+import { buildSelfProfileUpdatePayload, selfPasswordError } from "@shared/utils/meProfileUpdate";
 
 const SETTINGS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
 
+// Contraste AA no tema claro (#1371): branco sobre o gradiente >= 5.17:1; desabilitado usa
+// slate-600 sólido (7.58:1) em vez de opacity-70, que caía para ~3:1.
 const SETTINGS_GRADIENT_BUTTON_CLASSNAME =
-  "bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:opacity-70";
+  "bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:from-slate-600 disabled:to-slate-600 disabled:shadow-none";
 
 const SETTINGS_PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -102,9 +110,18 @@ export function Configuracoes() {
   const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [pendingPhotoPreviewUrl, setPendingPhotoPreviewUrl] = useState<string | null>(null);
   const [hasPhotoLoadError, setHasPhotoLoadError] = useState(false);
+  const [isRemovePhotoConfirmOpen, setIsRemovePhotoConfirmOpen] = useState(false);
+
+  function clearPasswordDraft() {
+    setPassword("");
+    setCurrentPassword("");
+    setConfirmPassword("");
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -121,7 +138,7 @@ export function Configuracoes() {
     }
 
     setName(meQuery.data.name);
-    setPassword("");
+    clearPasswordDraft();
   }, [meQuery.data]);
 
   useEffect(() => {
@@ -136,7 +153,9 @@ export function Configuracoes() {
   const currentLogin = meQuery.data?.login ?? "";
   const currentPhotoUrl = meQuery.data?.photo_url ?? null;
   const canManageUsers = canCreateUsers(user);
-  const currentPermissionLabel = PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário";
+  const currentPermissionLabel = isOrganizationOwner(meQuery.data)
+    ? OWNER_ROLE_LABEL
+    : (PERMISSION_LABELS[meQuery.data?.permission ?? 0] ?? "Usuário");
   const managedOrganizationId =
     canCreateOrganizationOwner(meQuery.data) && meQuery.data.organization_id
       ? meQuery.data.organization_id
@@ -152,12 +171,14 @@ export function Configuracoes() {
   );
 
   const hasPendingPhotoChanges = pendingPhotoFile !== null;
+  const passwordDraft = { password, currentPassword, confirmPassword };
+  const passwordError = selfPasswordError(passwordDraft);
   const accessUpdatePayload = meQuery.data
     ? buildSelfProfileUpdatePayload({
         canManageUsers,
         currentName,
         name,
-        password,
+        ...passwordDraft,
       })
     : null;
 
@@ -226,7 +247,7 @@ export function Configuracoes() {
 
   const resetAccessDraft = () => {
     setName(currentName);
-    setPassword("");
+    clearPasswordDraft();
   };
 
   const handleAccessDialogOpenChange = (open: boolean) => {
@@ -244,28 +265,28 @@ export function Configuracoes() {
 
     try {
       await updateMeMutation.mutateAsync(accessUpdatePayload);
-      setPassword("");
+      clearPasswordDraft();
       setIsAccessDialogOpen(false);
     } catch {
       // Toasts are handled by the mutation hook.
     }
   };
 
-  const handlePhotoSecondaryAction = async () => {
+  const handlePhotoSecondaryAction = () => {
+    // Descartar a seleção local não persiste nada; só a remoção da foto salva pede confirmação.
     if (pendingPhotoFile) {
       clearPendingPhoto();
       return;
     }
 
-    if (!currentPhotoUrl) {
-      return;
+    if (currentPhotoUrl) {
+      setIsRemovePhotoConfirmOpen(true);
     }
+  };
 
-    try {
-      await deletePhotoMutation.mutateAsync();
-    } catch {
-      // Toasts are handled by the mutation hook.
-    }
+  // Toasts ficam a cargo do hook; o erro relançado mantém a confirmação aberta.
+  const handleRemovePhoto = async () => {
+    await deletePhotoMutation.mutateAsync();
   };
 
   const handleSavePhoto = async () => {
@@ -431,8 +452,8 @@ export function Configuracoes() {
                   {pendingPhotoFile || currentPhotoUrl ? (
                     <button
                       type="button"
-                      onClick={() => void handlePhotoSecondaryAction()}
-                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
+                      onClick={handlePhotoSecondaryAction}
+                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
                       disabled={isSaving}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -522,6 +543,25 @@ export function Configuracoes() {
                     <div className="space-y-2">
                       <label
                         className={SETTINGS_LABEL_CLASSNAME}
+                        htmlFor="settings-access-current-password"
+                      >
+                        Senha atual
+                      </label>
+                      <input
+                        id="settings-access-current-password"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(event) => setCurrentPassword(event.target.value)}
+                        placeholder="Necessária para trocar a senha"
+                        autoComplete="current-password"
+                        className={SETTINGS_INPUT_CLASSNAME}
+                        disabled={isSaving}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label
+                        className={SETTINGS_LABEL_CLASSNAME}
                         htmlFor="settings-access-password"
                       >
                         Nova senha
@@ -537,9 +577,50 @@ export function Configuracoes() {
                         disabled={isSaving}
                       />
                     </div>
+
+                    <div className="space-y-2">
+                      <label
+                        className={SETTINGS_LABEL_CLASSNAME}
+                        htmlFor="settings-access-confirm-password"
+                      >
+                        Confirmar nova senha
+                      </label>
+                      <input
+                        id="settings-access-confirm-password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        placeholder="Repita a nova senha"
+                        autoComplete="new-password"
+                        className={SETTINGS_INPUT_CLASSNAME}
+                        disabled={isSaving}
+                        aria-describedby={
+                          passwordError ? "settings-access-password-error" : undefined
+                        }
+                      />
+                      {passwordError ? (
+                        <p
+                          id="settings-access-password-error"
+                          className="text-sm text-red-600 dark:text-red-400"
+                        >
+                          {passwordError}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </Dialog>
+              <ConfirmationDialog
+                open={isRemovePhotoConfirmOpen}
+                onOpenChange={setIsRemovePhotoConfirmOpen}
+                title="Remover foto"
+                description={`Remover a foto de perfil de ${currentName || "sua conta"}?`}
+                onConfirm={handleRemovePhoto}
+                isConfirming={deletePhotoMutation.isPending}
+                errorMessage={null}
+                confirmLabel="Remover foto"
+                cancelLabel="Cancelar"
+              />
             </div>
           </div>
         </section>

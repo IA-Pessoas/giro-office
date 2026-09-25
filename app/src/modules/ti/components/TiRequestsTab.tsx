@@ -11,7 +11,7 @@ import {
   UserCheck,
   X,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
@@ -47,6 +47,7 @@ import {
   tiDialogSectionClassName,
   tiDialogSubsectionClassName,
   tiLabelClassName,
+  tiMetaLabelClassName,
   tiPrimaryButtonClassName,
   tiSecondaryButtonClassName,
 } from "./tiWorkspaceUi";
@@ -1189,19 +1190,19 @@ export function TiRequestsTab() {
 
                   <dl className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
-                      <dt className={tiLabelClassName}>Categoria</dt>
+                      <dt className={tiMetaLabelClassName}>Categoria</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
                         {getCategoryLabel(activeRequest, categoriesById)}
                       </dd>
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
-                      <dt className={tiLabelClassName}>Solicitante</dt>
+                      <dt className={tiMetaLabelClassName}>Solicitante</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
                         {getRequesterLabel(activeRequest, currentUser)}
                       </dd>
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
-                      <dt className={tiLabelClassName}>Responsável</dt>
+                      <dt className={tiMetaLabelClassName}>Responsável</dt>
                       <dd className="mt-1 min-w-0 flex flex-col items-start gap-2 text-slate-700 dark:text-slate-200">
                         <span>{getAssigneeLabel(activeRequest)}</span>
                         {canManageRequests && !hasAssignee(activeRequest) ? (
@@ -1241,19 +1242,19 @@ export function TiRequestsTab() {
                       </dd>
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
-                      <dt className={tiLabelClassName}>Urgência</dt>
+                      <dt className={tiMetaLabelClassName}>Urgência</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
                         {getUrgencyLabel(activeRequest.urgency)}
                       </dd>
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
-                      <dt className={tiLabelClassName}>AnyDesk</dt>
+                      <dt className={tiMetaLabelClassName}>AnyDesk</dt>
                       <dd className="mt-1 break-all text-slate-700 dark:text-slate-200">
                         {getStringField(activeRequest, ["anydesk_code"])}
                       </dd>
                     </div>
                     <div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
-                      <dt className={tiLabelClassName}>Atualizado em</dt>
+                      <dt className={tiMetaLabelClassName}>Atualizado em</dt>
                       <dd className="mt-1 text-slate-700 dark:text-slate-200">
                         {formatDate(activeRequest.updated_at)}
                       </dd>

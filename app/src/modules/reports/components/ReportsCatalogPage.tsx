@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Archive, FileText, Layers3, ListChecks, Plus } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccessMap } from "@modules/auth/hooks/useModuleAccess";
 import { ReportsCreatePanel } from "./ReportsCreatePanel";

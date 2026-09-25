@@ -86,7 +86,7 @@ describe("resolveGuidanceTarget", () => {
         target_type: "PJ",
         client_pj_id: clientPjId,
       }),
-    ).rejects.toMatchObject({ statusCode: 404, message: "Cadastro nao encontrado." });
+    ).rejects.toMatchObject({ statusCode: 404, message: "Cadastro não encontrado." });
     await expect(
       resolveGuidanceTarget({ client: { findFirst } }, organizationId, {
         target_type: "PJ",
@@ -104,7 +104,7 @@ describe("resolveGuidanceTarget", () => {
         target_type: "PF",
         client_pf_id: clientPfId,
       }),
-    ).rejects.toMatchObject({ statusCode: 404, message: "Cadastro nao encontrado." });
+    ).rejects.toMatchObject({ statusCode: 404, message: "Cadastro não encontrado." });
     expect(findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: clientPfId, organization_id: organizationId } }),
     );

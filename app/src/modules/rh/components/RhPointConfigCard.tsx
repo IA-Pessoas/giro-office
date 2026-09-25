@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
+
+import { formatTimeInput, isValidTimeInput } from "@shared/utils/inputFormatting";
 
 import { useCreateOrUpdateRhPointConfigMutation } from "../hooks/useRhPoint";
 import type { RhPointConfig } from "../types";
@@ -94,6 +96,35 @@ function ReadOnlyValue({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Campo HH:MM em 24h: o input nativo de hora segue o locale do navegador (12h em en-US). */
+function TimeInput({
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+      <span>{label}</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        placeholder="HH:MM"
+        maxLength={5}
+        value={value}
+        onChange={(event) => onChange(formatTimeInput(event.target.value))}
+        disabled={disabled}
+        className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+      />
+    </label>
+  );
+}
+
 export function RhPointConfigCard({
   config,
   isLoading,
@@ -162,6 +193,15 @@ export function RhPointConfigCard({
       return;
     }
 
+    if (
+      ![formState.startTime, formState.lunchBreak, formState.lunchReturn, formState.endTime].every(
+        isValidTimeInput,
+      )
+    ) {
+      toast.warn("Informe os horários no formato 24h (HH:MM).");
+      return;
+    }
+
     if (formState.workDays.length === 0) {
       toast.warn("Selecione ao menos um dia útil.");
       return;
@@ -216,49 +256,33 @@ export function RhPointConfigCard({
       {canManagePoint ? (
         <>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <span>Entrada</span>
-              <input
-                type="time"
-                value={formState.startTime}
-                onChange={(event) => handleTimeChange("startTime", event.target.value)}
-                disabled={isLoading || saveMutation.isPending}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-            </label>
+            <TimeInput
+              label="Entrada"
+              value={formState.startTime}
+              onChange={(value) => handleTimeChange("startTime", value)}
+              disabled={isLoading || saveMutation.isPending}
+            />
 
-            <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <span>Saída almoço</span>
-              <input
-                type="time"
-                value={formState.lunchBreak}
-                onChange={(event) => handleTimeChange("lunchBreak", event.target.value)}
-                disabled={isLoading || saveMutation.isPending}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-            </label>
+            <TimeInput
+              label="Saída almoço"
+              value={formState.lunchBreak}
+              onChange={(value) => handleTimeChange("lunchBreak", value)}
+              disabled={isLoading || saveMutation.isPending}
+            />
 
-            <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <span>Volta almoço</span>
-              <input
-                type="time"
-                value={formState.lunchReturn}
-                onChange={(event) => handleTimeChange("lunchReturn", event.target.value)}
-                disabled={isLoading || saveMutation.isPending}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-            </label>
+            <TimeInput
+              label="Volta almoço"
+              value={formState.lunchReturn}
+              onChange={(value) => handleTimeChange("lunchReturn", value)}
+              disabled={isLoading || saveMutation.isPending}
+            />
 
-            <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <span>Saída</span>
-              <input
-                type="time"
-                value={formState.endTime}
-                onChange={(event) => handleTimeChange("endTime", event.target.value)}
-                disabled={isLoading || saveMutation.isPending}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-            </label>
+            <TimeInput
+              label="Saída"
+              value={formState.endTime}
+              onChange={(value) => handleTimeChange("endTime", value)}
+              disabled={isLoading || saveMutation.isPending}
+            />
           </div>
 
           <div className="mt-4 rounded-lg border border-dashed border-gray-300 px-4 py-4 dark:border-gray-700">

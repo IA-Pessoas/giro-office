@@ -1,7 +1,7 @@
 import { useMemo, useState, type ChangeEvent } from "react";
 import { Plus, Trash2, NotebookPen } from "lucide-react";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useAuth } from "@/context/AuthContext";
 import { ConfirmationDialog } from "@shared/components";

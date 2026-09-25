@@ -1,6 +1,7 @@
+import { formatCivilDate } from "@shared/utils/dateFormat";
 import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { BriefcaseBusiness, CircleAlert, Database, Landmark, Plus, Save } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { isAxiosError } from "axios";
 
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
@@ -190,7 +191,10 @@ function buildUpdatePayload(
   const payload: UpdateClientPaPayload = {};
 
   for (const fieldName of textFieldNames) {
-    const nextValue = normalizeTextValue(values[fieldName]);
+    const rawValue = normalizeTextValue(values[fieldName]);
+    // "R$ 150," (vírgula ainda sem centavos) o backend rejeita; envia "R$ 150".
+    const nextValue =
+      rawValue !== null && PA_MONEY_FIELD_NAMES.has(fieldName) ? rawValue.replace(/,$/u, "") : rawValue;
     const currentValue = pa[fieldName] ?? null;
     const sameMoneyAmount =
       PA_MONEY_FIELD_NAMES.has(fieldName) &&
@@ -225,11 +229,7 @@ function buildUpdatePayload(
 }
 
 function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Não informado";
-  }
-
-  return new Date(value).toLocaleDateString("pt-BR");
+  return formatCivilDate(value, "Não informado");
 }
 
 export function ClientPASection({ clientId }: { clientId: string }) {

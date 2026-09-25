@@ -4,10 +4,10 @@ import { ConfirmationDialog, Dialog } from "@shared/components";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { useFetch } from "@shared/hooks";
 import { isAxiosError } from "axios";
-import { CalendarDays, FileText, LoaderCircle, Save, Sparkles } from "lucide-react";
+import { FileText, LoaderCircle, Save, Sparkles } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import {
   TASK_FORM_DEPARTMENTS_QUERY_KEY,
@@ -21,7 +21,10 @@ import {
   useProjectWizardPreviewMutation,
   useUpdateProjectMutation,
 } from "../hooks/useProjects";
-import { PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE } from "../services/projectService.contract";
+import {
+  getProjectStatusOptions,
+  PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE,
+} from "../services/projectService.contract";
 import { taskModelService } from "../services/taskModelService";
 import type {
   ProjectDetail,
@@ -46,6 +49,7 @@ import {
   wizardExtractionConsumesAttempt,
   createProjectWizardId,
   getWizardExtractionSourceValidationMessage,
+  getProjectWizardSuccessMessage,
   getWizardTaskDateWarning,
   WIZARD_EXTRACTION_MAX_ATTEMPTS,
 } from "./projectWizardUi";
@@ -443,9 +447,7 @@ export function ProjectFormModal({
         tasks: tasks.map(toWizardTaskPayload),
         revision: preview.revision,
       });
-      toast.success(
-        `Projeto criado com sucesso. Tarefas principais: ${result.counts.main}. Dependências: ${result.counts.dependencies}. Sem responsável: ${result.counts.unassigned}.`,
-      );
+      toast.success(getProjectWizardSuccessMessage(result.counts));
       onSuccess?.(result.project);
       onOpenChange(false);
       await router.push(`/tasks?clientId=${clientId}`);
@@ -662,7 +664,6 @@ export function ProjectFormModal({
                     Data de início
                   </RequiredFieldLabel>
                   <div className="relative">
-                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       aria-invalid={hasValidated && Boolean(validationErrors.start_date)}
                       aria-describedby={
@@ -674,7 +675,7 @@ export function ProjectFormModal({
                       value={values.start_date}
                       onChange={(event) => updateValue("start_date", event.target.value)}
                       onInput={(event) => updateValue("start_date", event.currentTarget.value)}
-                      className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                      className={PROJECT_INPUT_CLASSNAME}
                       required
                     />
                   </div>
@@ -686,13 +687,12 @@ export function ProjectFormModal({
                   Data final prevista
                 </span>
                 <div className="relative">
-                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="date"
                     value={values.end_date}
                     onChange={(event) => updateValue("end_date", event.target.value)}
                     onInput={(event) => updateValue("end_date", event.currentTarget.value)}
-                    className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                    className={PROJECT_INPUT_CLASSNAME}
                     aria-invalid={Boolean(dateRangeError)}
                     aria-describedby={dateRangeError ? "project-end-date-error" : undefined}
                   />
@@ -707,6 +707,26 @@ export function ProjectFormModal({
                   </p>
                 ) : null}
               </label>
+
+              {isEditing ? (
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
+                  <ProjectSelect
+                    value={values.status}
+                    onChange={(event) => updateValue("status", event.target.value)}
+                    disabled={values.status === "Aguardando liberação do Comercial"}
+                  >
+                    {getProjectStatusOptions(values.status).map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </ProjectSelect>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Concluir exige todas as tarefas concluídas e perfil administrador.
+                  </span>
+                </label>
+              ) : null}
 
               <label className="space-y-2">
                 <RequiredFieldLabel
@@ -893,8 +913,10 @@ export function ProjectFormModal({
                 const models = taskModels.filter(
                   ({ department_id }) => department_id === task.department_id,
                 );
+                // Candidatos vêm do departamento: já dá para marcar a obrigatoriedade antes do Modelo.
                 const candidates =
-                  models.find(({ id }) => id === task.model_id)?.department?.users ?? [];
+                  (models.find(({ id }) => id === task.model_id) ?? models[0])?.department
+                    ?.users ?? [];
                 const dateWarning = getWizardTaskDateWarning(
                   task,
                   values.start_date,
@@ -989,7 +1011,7 @@ export function ProjectFormModal({
                       htmlFor={`task-${task.id}-responsible`}
                       className={`block ${TASK_FORM_LABEL_CLASSNAME}`}
                     >
-                      <RequiredFieldLabel required={candidates.length > 1}>
+                      <RequiredFieldLabel required={candidates.length > 0}>
                         Responsável
                       </RequiredFieldLabel>
                       <ProjectSelect
@@ -1004,7 +1026,7 @@ export function ProjectFormModal({
                           taskOptionsError ||
                           candidates.length <= 1
                         }
-                        aria-required={candidates.length > 1}
+                        aria-required={candidates.length > 0}
                       >
                         <option value="" disabled={candidates.length > 0}>
                           {candidates.length ? "Selecione um responsável" : "Sem responsável"}
@@ -1075,11 +1097,11 @@ export function ProjectFormModal({
                 <span className="font-medium">Nome:</span> {values.name}
               </p>
               <p>
-                <span className="font-medium">Início:</span> {values.start_date}
+                <span className="font-medium">Início:</span> {formatProjectDate(values.start_date)}
               </p>
               {values.end_date ? (
                 <p>
-                  <span className="font-medium">Término:</span> {values.end_date}
+                  <span className="font-medium">Término:</span> {formatProjectDate(values.end_date)}
                 </p>
               ) : null}
               <p>

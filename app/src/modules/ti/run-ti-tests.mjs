@@ -143,7 +143,7 @@ await runTest("ti request transfer UI uses request-scoped candidates and preserv
 
 await runTest("ti request detail card keeps assignee actions from overflowing", async () => {
   const tiRequestsTabSource = await readModuleSource("components/TiRequestsTab.tsx");
-  const responsibleLabel = '<dt className={tiLabelClassName}>Responsável</dt>';
+  const responsibleLabel = '<dt className={tiMetaLabelClassName}>Responsável</dt>';
   const responsibleLabelIndex = tiRequestsTabSource.indexOf(responsibleLabel);
   const responsibleBlockStart = tiRequestsTabSource.lastIndexOf(
     '<div className="rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-950/40">',
@@ -818,11 +818,10 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /className=\{cn\(tiFiveRowTableClassName/);
   assert.match(tabSource, /xl:min-h-\[280px\]/);
   assert.match(tabSource, /Saldo atual/);
-  assert.match(tabSource, /Movimentacoes/);
+  assert.match(tabSource, /Movimentações/);
   assert.match(tabSource, /stockMovementsQuery/);
   assert.match(tabSource, /selectedItemQuery\.isError/);
-  assert.match(tabSource, /const \[movementItemId, setMovementItemId\]/);
-  assert.match(tabSource, /stockItemOptions/);
+  assert.match(tabSource, /const \[movementItem, setMovementItem\]/);
   assert.match(tabSource, /function closeItemDialog/);
   assert.match(tabSource, /function closeEntryDialog/);
   assert.match(tabSource, /function closeExitDialog/);
@@ -836,7 +835,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /setLocationName\(""\)/);
   assert.match(tabSource, /stockCategoriesQuery\.refetch\(\)/);
   assert.match(tabSource, /stockLocationsQuery\.refetch\(\)/);
-  assert.match(tabSource, /disabled=\{!movementItemId \|\| !canEditStock \|\| isMovementSubmitting\}/);
+  assert.match(tabSource, /disabled=\{!movementItem \|\| !canEditStock \|\| isMovementSubmitting\}/);
   assert.doesNotMatch(tabSource, /disabled=\{!selectedItemId\}/);
   assert.doesNotMatch(tabSource, /Ações do estoque/);
   assert.doesNotMatch(tabSource, /Movimentação/);
@@ -1908,7 +1907,7 @@ await runTest("ti terms keeps primary action clear and opens term detail in a di
   assert.match(source, /function handlePrintTerm\(term: TiTerm\)/);
   assert.match(source, /function buildPrintableTermHtml\(term: TiTerm, departmentName: string\)/);
   assert.match(source, /window\.open\("", "_blank", "width=900,height=1100"\)/);
-  assert.match(source, /import \{ toast \} from "react-toastify";/);
+  assert.match(source, /import \{ toast \} from "@shared\/services\/toast";/);
   assert.match(
     source,
     /toast\.error\(\s*"Não foi possível abrir a janela de impressão\. Verifique o bloqueador de pop-ups do navegador\."\s*,?\s*\)/,
@@ -2453,4 +2452,79 @@ await runTest("new TI request discloses required fields before submission", asyn
   assert.match(source, /id="ti-request-title"[\s\S]*aria-required/);
   assert.match(source, /value=\{requestDraft\.category_id\}[\s\S]*aria-required/);
   assert.match(source, /<textarea[\s\S]*aria-required/);
+});
+
+await runTest("ti stock movement item options keep the chosen item outside the search results", async () => {
+  const { buildTiStockMovementItemOptions } = await import("./utils/stockMovementItems.ts");
+  const results = [
+    { id: "a", name: "Mouse" },
+    { id: "b", name: "" },
+  ];
+
+  assert.deepEqual(buildTiStockMovementItemOptions(results, null), [
+    { value: "", label: "Selecione" },
+    { value: "a", label: "Mouse" },
+    { value: "b", label: "Item sem nome" },
+  ]);
+  assert.deepEqual(
+    buildTiStockMovementItemOptions(results, { id: "z", name: "Teclado" }).map((option) => option.value),
+    ["", "z", "a", "b"],
+  );
+  assert.equal(buildTiStockMovementItemOptions(results, { id: "a", name: "Mouse" }).length, 3);
+});
+
+await runTest("ti stock movement dialogs search every stock item on the server", async () => {
+  const tab = await readFile(join(moduleRoot, "components/TiStockTab.tsx"), "utf8");
+  const picker = await readFile(join(moduleRoot, "components/TiStockItemSelect.tsx"), "utf8");
+
+  assert.match(picker, /useTiStockItems\(\s*\{\s*name: deferredSearch \|\| undefined, page: 1, page_size: MOVEMENT_ITEM_PAGE_SIZE \}/);
+  assert.match(picker, /MOVEMENT_ITEM_PAGE_SIZE = 100/);
+  assert.match(picker, /Mostrando \$\{items\.length\} de \$\{total\} itens/);
+  assert.equal(tab.match(/<TiStockItemSelect/g)?.length, 2);
+  assert.match(picker, /Nenhum item encontrado\./);
+  assert.match(picker, /itemsQuery\.isError/);
+});
+
+await runTest("ti stock item form explains an invalid initial quantity on the field", async () => {
+  const tab = await readFile(join(moduleRoot, "components/TiStockTab.tsx"), "utf8");
+  const controls = await readFile(join(moduleRoot, "components/tiFormControls.tsx"), "utf8");
+
+  assert.match(controls, /errorText\?: string/);
+  assert.match(controls, /aria-invalid=\{errorText \? true : undefined\}/);
+  assert.match(controls, /role="alert"/);
+  assert.match(tab, /const initialQuantityError =/);
+  assert.match(tab, /Informe uma quantidade maior ou igual a zero\./);
+  assert.match(tab, /label="Quantidade inicial"[\s\S]*errorText=\{initialQuantityError\}/);
+});
+
+await runTest("ti dashboard uses the same KPI labels in tiles and summary rows", async () => {
+  const dashboard = await readFile(join(moduleRoot, "components/TiDashboardTab.tsx"), "utf8");
+
+  assert.equal(dashboard.match(/label="Estoque crítico"/g)?.length, 2);
+  assert.equal(dashboard.match(/label="Robôs ativos"/g)?.length, 2);
+  assert.doesNotMatch(dashboard, /label="Estoque"\s/);
+  assert.doesNotMatch(dashboard, /label="Robôs"\s/);
+  assert.doesNotMatch(dashboard, /label="Abertos"/);
+  assert.doesNotMatch(dashboard, /label="Resolvidos"\s/);
+  assert.equal(dashboard.match(/label="Resolvidos em 7 dias"/g)?.length, 2);
+});
+
+await runTest("ti form controls follow the app form look (sentence-case labels, blue focus)", async () => {
+  const ui = await readFile(join(moduleRoot, "components/tiWorkspaceUi.ts"), "utf8");
+  const label = ui.match(/export const tiLabelClassName =\s*"([^"]+)"/)?.[1] ?? "";
+  const input = ui.match(/export const tiInputClassName =\s*"([^"]+)"/)?.[1] ?? "";
+
+  assert.doesNotMatch(label, /uppercase/);
+  assert.match(label, /text-sm font-medium/);
+  assert.match(input, /rounded-lg/);
+  assert.match(input, /focus:border-blue-500/);
+  assert.doesNotMatch(input, /dark:bg-slate-950/);
+});
+
+await runTest("ti terms list masks the employee CPF (#1344)", async () => {
+  const source = await readModuleSource("components/TiTermsTab.tsx");
+
+  assert.match(source, /import \{ maskCPF \} from "@shared\/utils\/formatters";/);
+  assert.match(source, /maskCPF\(term\.user_cpf\)/);
+  assert.doesNotMatch(source, /<p[^>]*>\s*\{getText\(term\.user_cpf\)\}/);
 });

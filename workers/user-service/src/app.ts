@@ -15,6 +15,7 @@ import {
   ServiceError,
   serializeError,
 } from "@workspace/shared/http";
+import { zodIssueMessage } from "@workspace/shared/schemas";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError } from "zod";
@@ -34,12 +35,14 @@ import {
   updatePlatformUserBodySchema,
 } from "../../../services/user-service/src/schemas/platformUsers.schemas.js";
 import {
+  confirmPasswordResetBodySchema,
   createUserBodySchema,
   listUsersQuerySchema,
+  ownPasswordPolicyError,
   updateUserBodySchema,
   userIdParamsSchema,
 } from "../../../services/user-service/src/schemas/user.schemas.js";
-import type { UserAuditRecorder } from "./audit.js";
+import type { UserAuditParams, UserAuditRecorder } from "./audit.js";
 import {
   ACTIVE_MODULE_KEYS,
   activeOrganizationId,
@@ -65,6 +68,12 @@ import {
   verifyPassword as defaultVerifyPassword,
   isLegacyBcryptHash,
 } from "./passwordHash.js";
+import {
+  confirmPasswordReset,
+  httpPasswordResetEmailSender,
+  issuePasswordReset,
+  type PasswordResetEmailSender,
+} from "./passwordReset.js";
 import type { Row, UserPrismaClient } from "./types.js";
 
 interface HonoEnv {
@@ -79,6 +88,7 @@ interface UserWorkerOptions {
   verifyPassword?: (password: string, hash: string) => Promise<boolean>;
   hashPassword?: (password: string) => Promise<string>;
   audit?: UserAuditRecorder;
+  sendPasswordResetEmail?: PasswordResetEmailSender;
 }
 
 const USER_PHOTO_BUCKET = "Fotos";
@@ -116,7 +126,7 @@ function parse<T>(schema: { parse(value: unknown): T }, value: unknown): T {
     return schema.parse(value);
   } catch (error) {
     if (error instanceof ZodError) {
-      throw new ServiceError(400, error.issues[0]?.message ?? "Dados inválidos.");
+      throw new ServiceError(400, zodIssueMessage(error));
     }
     throw error;
   }
@@ -410,8 +420,8 @@ async function parseUserPhoto(c: {
 }> {
   const body = await c.req.parseBody();
   const file = body.file instanceof File ? body.file : undefined;
-  if (!file) throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
-  if (file.size === 0) throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
+  if (!file) throw new ServiceError(400, "Arquivo de imagem é obrigatório.");
+  if (file.size === 0) throw new ServiceError(400, "Arquivo de imagem é obrigatório.");
   if (file.size > USER_PHOTO_MAX_SIZE_BYTES) {
     throw new ServiceError(413, "A imagem deve ter no máximo 5 MB.");
   }
@@ -439,9 +449,10 @@ async function refreshOrganizationSession(
   db: UserPrismaClient,
   auth: UserAuthContext,
   env: UserWorkerEnv,
+  nextSessionVersion?: number,
 ): Promise<Row & { token: string; csrfToken: string }> {
   const sessionId = auth.claims.session_id;
-  const sessionVersion = auth.claims.session_version;
+  const sessionVersion = nextSessionVersion ?? auth.claims.session_version;
   const csrfHash = auth.claims.csrf_hash;
   if (
     !sessionId ||
@@ -530,6 +541,36 @@ async function revokeSession(
   if (revoked.count !== 1) throw new ServiceError(401, "Sessão obsoleta. Faça login novamente.");
 }
 
+/** Senha trocada: derruba as outras sessões e reemite a atual na nova session_version. */
+async function keepOnlyCurrentSession(
+  c: Parameters<typeof sessionCookies>[0],
+  db: UserPrismaClient,
+  auth: UserAuthContext,
+  env: UserWorkerEnv,
+): Promise<void> {
+  if (!db.authSession.updateMany) throw new ServiceError(503, "Sessão não configurada.");
+  await db.authSession.updateMany({
+    where: { user_id: auth.userId, id: { not: auth.claims.session_id }, revoked_at: null },
+    data: { revoked_at: new Date() },
+  });
+  await db.passwordResetToken.updateMany({
+    where: { user_id: auth.userId, used_at: null },
+    data: { used_at: new Date() },
+  });
+  const issued = await refreshOrganizationSession(
+    db,
+    auth,
+    env,
+    Number(auth.claims.session_version) + 1,
+  );
+  sessionCookies(
+    c,
+    createSessionCookieHeaders(issued.token, issued.csrfToken, {
+      secure: env.AUTH_COOKIE_SECURE ?? false,
+    }),
+  );
+}
+
 async function refreshPlatformSession(
   db: UserPrismaClient,
   auth: UserAuthContext,
@@ -615,6 +656,29 @@ function isOwnerMutation(input: Record<string, unknown>): boolean {
   return input.type === "owner" || input.first_owner_flag === true;
 }
 
+/** Troca da própria senha: prova a senha atual e aplica a política mínima (#1341). */
+async function assertOwnPasswordChange(
+  db: UserPrismaClient,
+  auth: UserAuthContext,
+  input: Record<string, unknown>,
+  verifyPassword: (password: string, hash: string) => Promise<boolean>,
+): Promise<void> {
+  const currentPassword = input.current_password;
+  const nextPassword = String(input.password);
+  if (typeof currentPassword !== "string") {
+    throw new ServiceError(400, "Informe a senha atual para trocar a senha.");
+  }
+  const row = await db.user.findFirst({
+    where: organizationUserWhere(auth.userId, auth.organizationId),
+    select: { password: true },
+  });
+  if (!(await verifyPassword(currentPassword, String(row?.password ?? "")))) {
+    throw new ServiceError(403, "Senha atual incorreta.");
+  }
+  const policyError = ownPasswordPolicyError(currentPassword, nextPassword);
+  if (policyError) throw new ServiceError(400, policyError);
+}
+
 async function updateOrganizationUser(
   db: UserPrismaClient,
   userId: string,
@@ -627,10 +691,10 @@ async function updateOrganizationUser(
     where: organizationUserWhere(userId, organizationId),
     select: userSelect(),
   });
-  if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
+  if (!existing) throw new ServiceError(404, "Usuário não encontrado.");
   if (actor) assertCanManageTarget(actor, existing);
   if (input.organization_id !== undefined && input.organization_id !== organizationId) {
-    throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+    throw new ServiceError(403, "Organização da requisição não confere.");
   }
 
   const expectedVersion =
@@ -721,7 +785,7 @@ async function updateOrganizationUser(
       if (activeOwners <= 1) {
         throw new ServiceError(
           409,
-          "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+          "Não é possível remover o último owner ativo. Use a transferência de ownership.",
         );
       }
     }
@@ -764,7 +828,7 @@ async function updateOrganizationUser(
     if (updated.count !== 1) {
       throw new ServiceError(
         409,
-        "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+        "Usuário foi alterado por outra edição. Recarregue e tente novamente.",
       );
     }
     return toUser(
@@ -800,7 +864,7 @@ async function deactivateOrganizationUser(
         where: organizationUserWhere(userId, organizationId),
         select: userSelect(),
       });
-      if (!existing) throw new ServiceError(404, "Usuario nao encontrado.");
+      if (!existing) throw new ServiceError(404, "Usuário não encontrado.");
       if (actor) assertCanManageTarget(actor, existing);
       if (existing.type === "owner" && existing.status === "active") {
         const owners = await transaction.user.count({
@@ -809,7 +873,7 @@ async function deactivateOrganizationUser(
         if (owners <= 1) {
           throw new ServiceError(
             409,
-            "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+            "Não é possível remover o último owner ativo. Use a transferência de ownership.",
           );
         }
       }
@@ -824,7 +888,7 @@ async function deactivateOrganizationUser(
       if (updated.count !== 1) {
         throw new ServiceError(
           409,
-          "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+          "Usuário foi alterado por outra edição. Recarregue e tente novamente.",
         );
       }
     },
@@ -1397,7 +1461,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
             };
           })
         | null;
-      if (!user) throw new ServiceError(404, "Usuario nao encontrado.");
+      if (!user) throw new ServiceError(404, "Usuário não encontrado.");
       const permission = await db.permission.findFirst({
         where: { user_id: input.userId, organization_id: input.organizationId },
         select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
@@ -1477,7 +1541,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       await requireCsrf(c.req.raw, auth);
       const input = parse(createUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
       if (input.organization_id !== undefined && input.organization_id !== auth.organizationId) {
-        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+        throw new ServiceError(403, "Organização da requisição não confere.");
       }
       if (isOwnerMutation(input)) requireOwner(auth);
       let user: Row;
@@ -1517,7 +1581,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       });
       const objectPath = photoObjectPath(row?.photo_url);
       if (!objectPath || !objectPath.startsWith(`${id}/`) || objectPath.includes("..")) {
-        throw new ServiceError(404, "Foto nao encontrada.");
+        throw new ServiceError(404, "Foto não encontrada.");
       }
       const storage = userPhotoStorage(envOf(c, options), options);
       if (!storage) throw new ServiceError(503, "Armazenamento de fotos não configurado.");
@@ -1604,11 +1668,27 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { auth } = await requireUserDb(c, { ...options, prisma: db });
       const { id } = parse(userIdParamsSchema, c.req.param());
       const body = parse(updateUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
+      if (body.password !== undefined && auth.userId !== id) {
+        throw new ServiceError(
+          403,
+          "Administradores não definem a senha de outro usuário. Envie um link de redefinição.",
+        );
+      }
+      const ownPasswordChange = body.password !== undefined;
       const selfPasswordUpdate =
-        auth.userId === id && Object.keys(body).every((key) => key === "password");
+        ownPasswordChange &&
+        Object.keys(body).every((key) => key === "password" || key === "current_password");
       if (!selfPasswordUpdate) requireManageUsers(auth);
       if (isOwnerMutation(body)) requireOwner(auth);
       await requireCsrf(c.req.raw, auth);
+      if (ownPasswordChange) {
+        await assertOwnPasswordChange(
+          db,
+          auth,
+          body,
+          options.verifyPassword ?? defaultVerifyPassword,
+        );
+      }
       const user = await updateOrganizationUser(
         db,
         id,
@@ -1623,9 +1703,95 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         action: "UPDATE",
         referring: "user",
         referringId: id,
-        changes: { input: { ...body, password: body.password ? "[REDACTED]" : undefined } },
+        changes: {
+          input: {
+            ...body,
+            password: body.password ? "[REDACTED]" : undefined,
+            current_password: undefined,
+          },
+        },
       });
+      if (ownPasswordChange) await keepOnlyCurrentSession(c, db, auth, envOf(c, options));
       return c.json(createSuccessResponse(user));
+    }),
+  );
+
+  /** Pedido de link (#1342): o alvo já passou pela checagem de tenant e de hierarquia. */
+  async function sendPasswordResetLink(
+    c: { env: UserWorkerEnv; json: (body: unknown) => Response },
+    db: UserPrismaClient,
+    targetWhere: Record<string, unknown>,
+    actor: Pick<UserAuditParams, "actorUserId" | "platformActorUserId" | "organizationId">,
+    assertTarget: (target: Row) => void = () => {},
+  ): Promise<Response> {
+    const target = await db.user.findFirst({
+      where: targetWhere,
+      select: { ...userSelect(), email: true },
+    });
+    if (!target) throw new ServiceError(404, "Usuário não encontrado.");
+    assertTarget(target);
+    const { expiresAt, deliver } = await issuePasswordReset(
+      db,
+      target,
+      envOf(c, options),
+      options.sendPasswordResetEmail ?? httpPasswordResetEmailSender(envOf(c, options)),
+    );
+    await options.audit?.({
+      ...actor,
+      action: "PASSWORD_RESET_REQUESTED",
+      referring: "user",
+      referringId: String(target.id),
+      changes: { expires_at: expiresAt.toISOString() },
+    });
+    await deliver();
+    return c.json(createSuccessResponse({ sent: true, expires_at: expiresAt.toISOString() }));
+  }
+
+  app.post("/user/password-reset/confirm", async (c) =>
+    withDb(c, options, async (db) => {
+      const input = parse(confirmPasswordResetBodySchema, await jsonBody(c));
+      const { userId } = await confirmPasswordReset(
+        db,
+        input,
+        options.hashPassword ?? defaultHashPassword,
+      );
+      await options.audit?.({
+        actorUserId: userId,
+        organizationId: null,
+        action: "PASSWORD_RESET_COMPLETED",
+        referring: "user",
+        referringId: userId,
+        changes: {},
+      });
+      return c.json(createSuccessResponse({ reset: true }));
+    }),
+  );
+
+  app.post("/user/:id/password-reset", async (c) =>
+    withDb(c, options, async (db) => {
+      const { auth } = await requireUserDb(c, { ...options, prisma: db });
+      requireManageUsers(auth);
+      await requireCsrf(c.req.raw, auth);
+      const { id } = parse(userIdParamsSchema, c.req.param());
+      return sendPasswordResetLink(
+        c,
+        db,
+        organizationUserWhere(id, auth.organizationId),
+        { actorUserId: auth.userId, organizationId: auth.organizationId },
+        (target) => assertCanManageTarget(auth, target),
+      );
+    }),
+  );
+
+  app.post("/platform/organizations/:organizationId/users/:userId/password-reset", async (c) =>
+    withDb(c, options, async (db) => {
+      const { auth } = await platformContext(c, options, db);
+      await requireCsrf(c.req.raw, auth);
+      const { organizationId, userId } = parse(platformOrganizationUserParamsSchema, c.req.param());
+      return sendPasswordResetLink(c, db, organizationUserWhere(userId, organizationId), {
+        platformActorUserId: auth.userId,
+        organizationId,
+      });
     }),
   );
 
@@ -1644,7 +1810,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         referringId: id,
         changes: { status: "inactive" },
       });
-      return c.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
+      return c.json(createSuccessResponse({ message: "Usuário desativado com sucesso." }));
     }),
   );
 
@@ -1749,7 +1915,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { organizationId } = parse(platformOrganizationUsersParamsSchema, c.req.param());
       const input = parse(createUserBodySchema, await jsonBody(c)) as Record<string, unknown>;
       if (input.organization_id !== undefined && input.organization_id !== organizationId) {
-        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+        throw new ServiceError(403, "Organização da requisição não confere.");
       }
       const user = await createOrganizationUser(
         db,

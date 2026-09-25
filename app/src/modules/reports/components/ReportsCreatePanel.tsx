@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { Dialog } from "@shared/components";
 import { Button } from "@shared/ui/newLayout/button";
 import { useReportBuilder } from "../hooks/useReportBuilder";
@@ -117,7 +117,10 @@ export function ReportsCreatePanel({
   }, [model]);
 
   const sources = catalog.data?.items ?? [];
-  const pessoalPresets = getPessoalReportPresets(sources);
+  // Presets de Pessoal só fazem sentido antes de escolher áreas ou com áreas de Pessoal.
+  const pessoalPresets = builder.areas.every((area) => area.source.startsWith("pessoal."))
+    ? getPessoalReportPresets(sources)
+    : [];
   const selected = builder.areas.map((area) => ({
     ...area,
     catalog: sources.find((source) => source.key === area.source),
@@ -694,7 +697,7 @@ export function ReportsCreatePanel({
                           <p className="text-sm text-gray-700 dark:text-slate-300">
                             {snapshot.data.blocks
                               ? "Resultado concluído. Escolha um formato para baixar as áreas separadamente."
-                              : "Resultado concluído. Escolha um formato para baixar o snapshot."}
+                              : "Resultado concluído. Escolha um formato para baixar o relatório."}
                           </p>
                           <ReportDownloadActions id={snapshot.data.snapshot.id} />
                         </div>
@@ -776,6 +779,9 @@ export function ReportsCreatePanel({
           </Button>
         ) : (
           <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" disabled={busy || unavailable} onClick={() => setSaveDialogOpen(true)}>
+              Salvar como modelo
+            </Button>
             <Button type="button" variant="outline" disabled={busy || unavailable} onClick={() => void showPreview()}>
               {preview.isPending ? "Carregando prévia..." : "Visualizar prévia"}
             </Button>

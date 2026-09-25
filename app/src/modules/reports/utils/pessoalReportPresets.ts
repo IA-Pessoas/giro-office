@@ -75,7 +75,7 @@ const presets: readonly PessoalReportPreset[] = [
   {
     id: "pessoal-obrigacoes-competencia",
     label: "Obrigações por competência",
-    description: "Snapshot histórico da competência. Informe a competência nos critérios antes de gerar.",
+    description: "Retrato histórico da competência. Informe a competência nos critérios antes de gerar.",
     areas: [
       {
         source: "pessoal.obligations",

@@ -1,7 +1,7 @@
 import { zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
-const uuid = z.string().uuid("id invalido.");
+const uuid = z.string().uuid("id inválido.");
 const optionalNullableText = (fieldName: string) => zNonEmptyText(fieldName).nullable().optional();
 
 export const dossierTargetQuerySchema = z

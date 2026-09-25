@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, FilePlus2, Loader2, Target } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { useAssignableUsers } from "../../hooks/useAssignableUsers";
 import { useGenerateRhScoreQuarterMutation } from "../../hooks/useRhScore";
 import { getDefaultRhQuarterValue, getRhQuarterOptions } from "../../utils/rhScoreUi";

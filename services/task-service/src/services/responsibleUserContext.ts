@@ -73,7 +73,7 @@ export async function assertResponsibleUsersInDepartment(
   if (users.length !== responsibleIds.length) {
     throw new ServiceError(
       422,
-      "Todos os responsaveis devem ser usuarios ativos do departamento informado.",
+      "Todos os responsáveis devem ser usuários ativos do departamento informado.",
     );
   }
 }

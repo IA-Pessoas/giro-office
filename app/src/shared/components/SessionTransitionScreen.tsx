@@ -36,7 +36,7 @@ function LoadingDots() {
 }
 
 export function SessionTransitionScreen({
-  title = "Sincronizando sessao",
+  title = "Sincronizando sessão",
   description = "Estamos preparando o ambiente com os dados mais recentes da sua conta.",
 }: SessionTransitionScreenProps) {
   return (

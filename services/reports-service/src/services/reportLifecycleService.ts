@@ -354,7 +354,7 @@ export class ReportLifecycleService {
             })
           : null;
       if ("snapshot_id" in input && !requestedSnapshot) {
-        throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+        throw new ServiceError(404, "Resultado do relatório não encontrado.");
       }
       const job = await this.getJob(
         transaction,
@@ -375,7 +375,7 @@ export class ReportLifecycleService {
             })
           : null;
         if (!model || model.department_id !== input.department_id) {
-          throw new ServiceError(403, "O snapshot não pertence ao departamento atual.");
+          throw new ServiceError(403, "O resultado não pertence ao departamento atual.");
         }
       }
       const occurredAt = this.clock();
@@ -388,7 +388,7 @@ export class ReportLifecycleService {
           },
         });
         if (!dueSnapshot) {
-          throw new ServiceError(409, "O snapshot ainda não atingiu o prazo de retenção.");
+          throw new ServiceError(409, "O resultado ainda não atingiu o prazo de retenção.");
         }
       }
       const nextStatus = status === "completed" ? "expired" : "deleted";
@@ -496,12 +496,12 @@ export class ReportLifecycleService {
 
   private assertSnapshotLimits(rows: ReadonlyArray<Record<string, unknown>>): number {
     if (rows.length > MAX_SNAPSHOT_ROWS) {
-      throw new ServiceError(400, "O snapshot excede o limite de linhas.");
+      throw new ServiceError(400, "O resultado excede o limite de linhas.");
     }
 
     const byteSize = Buffer.byteLength(JSON.stringify(rows), "utf8");
     if (byteSize > MAX_SNAPSHOT_BYTES) {
-      throw new ServiceError(400, "O snapshot excede o limite de bytes.");
+      throw new ServiceError(400, "O resultado excede o limite de bytes.");
     }
 
     return byteSize;

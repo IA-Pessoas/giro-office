@@ -8,6 +8,14 @@ export const TAX_REGIME_OPTIONS = ["Simples Nacional", "Lucro Presumido", "Lucro
 
 export type TaxRegime = (typeof TAX_REGIME_OPTIONS)[number];
 
+// Código gravado em Fiscal/NCM, herdado de tb_fiscal.tributacao_pis_cofins.regime.
+// Explícito por regime: reordenar a lista não muda o significado.
+export const FISCAL_TAX_REGIME_CODES = {
+  "Simples Nacional": "0",
+  "Lucro Presumido": "1",
+  "Lucro Real": "2",
+} as const satisfies Record<TaxRegime, string>;
+
 export const REGULARIZE_GUIDANCE_TARGET_TYPES = ["PJ", "PF", "SEM_CLIENTE"] as const;
 
 export const REGULARIZE_GUIDANCE_CHECKLIST_ITEMS = [

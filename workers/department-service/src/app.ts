@@ -9,6 +9,7 @@ import {
   ServiceError,
   serializeError,
 } from "@workspace/shared/http";
+import { zodIssueMessage } from "@workspace/shared/schemas";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -71,7 +72,7 @@ function parseUpdateBody(input: unknown): {
 function parseWorkerWithZod<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<T> {
   const parsed = schema.safeParse(input);
   if (!parsed.success) {
-    throw new ServiceError(400, parsed.error.issues[0]?.message ?? "Dados inválidos.");
+    throw new ServiceError(400, zodIssueMessage(parsed.error));
   }
   return parsed.data;
 }

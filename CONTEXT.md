@@ -13,8 +13,12 @@ Pessoa que opera a plataforma, fora de qualquer organização, e administra orga
 _Avoid_: usuário de plataforma, admin global, root
 
 **Owner**:
-Usuário de organização com poder total sobre a própria organização.
+Usuário de organização com poder total sobre a própria organização, acima dos níveis por módulo (ver `docs/adr/0002-owner-ignora-niveis-por-modulo.md`).
 _Avoid_: proprietário (só na UI), dono
+
+**Visualizador**:
+Nível 1 de um módulo: lê, mas não escreve. Nível 2 (Usuário) escreve; nível 3 (Administrador) administra.
+_Avoid_: viewer (na UI)
 
 ## Personificação
 
@@ -37,3 +41,25 @@ _Avoid_: sessão impersonada
 **Permissão de personificar**:
 Atributo de um super admin que o autoriza a iniciar personificações; só quem já a tem pode concedê-la ou revogá-la.
 _Avoid_: flag de impersonate
+
+## Solicitações de RH
+
+**Responsável**:
+Usuário do RH que atende a solicitação. Nunca é o próprio solicitante, e uma solicitação só é resolvida com um responsável existente.
+_Avoid_: atendente, dono
+
+**Status da solicitação**:
+Novo → Em andamento → Resolvido → Fechado. Enviar a solução move para Resolvido. O solicitante aceita (Fechado) ou recusa, e a recusa volta para Em andamento.
+_Avoid_: concluído (como status)
+
+**Pendente**:
+Solicitação em Novo ou Em andamento, isto é, aguardando o RH. O dashboard e o badge da aba contam pelo total do backend, não pela página carregada.
+_Avoid_: aberta, em aberto
+
+**Resolvido**:
+O responsável enviou uma solução e ela aguarda a resposta do solicitante. Ainda pode voltar para Em andamento.
+_Avoid_: finalizado
+
+**Fechado**:
+O solicitante aceitou a solução. É o único status terminal: não aceita novas mensagens.
+_Avoid_: encerrado, arquivado

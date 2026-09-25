@@ -211,10 +211,10 @@ class PointService {
   async registerPoint(input: RegisterPointInput): Promise<RegisterPointResult> {
     try {
       if (!input.user_id?.trim()) {
-        throw new ServiceError(400, "user_id e obrigatorio.");
+        throw new ServiceError(400, "user_id é obrigatório.");
       }
       if (!input.organization_id?.trim()) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
 
       const now = new Date();
@@ -241,7 +241,7 @@ class PointService {
         if (TimeUtils.diffMinutes(last, now) < this.pointMinIntervalMinutes) {
           throw new ServiceError(
             400,
-            `Intervalo minimo de ${this.pointMinIntervalMinutes} minutos entre registros nao respeitado.`,
+            `Intervalo mínimo de ${this.pointMinIntervalMinutes} minutos entre registros não respeitado.`,
           );
         }
       };
@@ -259,7 +259,7 @@ class PointService {
       }
 
       if (existing.clock_out) {
-        throw new ServiceError(400, "Jornada do dia ja concluida.");
+        throw new ServiceError(400, "Jornada do dia já concluída.");
       }
 
       if (!existing.lunch_out) {
@@ -313,10 +313,10 @@ class PointService {
   ): Promise<CalculateDailyHoursResult> {
     try {
       if (!pointId?.trim()) {
-        throw new ServiceError(400, "point_id e obrigatorio.");
+        throw new ServiceError(400, "point_id é obrigatório.");
       }
       if (!organizationId?.trim()) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
 
       const point = await db.point.findUnique({
@@ -334,18 +334,18 @@ class PointService {
       });
 
       if (!point) {
-        throw new ServiceError(404, "Registro de ponto nao encontrado.");
+        throw new ServiceError(404, "Registro de ponto não encontrado.");
       }
       if (point.organization_id !== organizationId) {
-        throw new ServiceError(403, "Registro de ponto pertence a outra organizacao.");
+        throw new ServiceError(403, "Registro de ponto pertence a outra organização.");
       }
       if (!point.clock_in || !point.clock_out) {
-        throw new ServiceError(400, "Registro incompleto para calculo (exige entrada e saida).");
+        throw new ServiceError(400, "Registro incompleto para cálculo (exige entrada e saída).");
       }
       if (!point.lunch_out || !point.lunch_in) {
         throw new ServiceError(
           400,
-          "Registro incompleto para calculo (intervalo de almoco ausente).",
+          "Registro incompleto para cálculo (intervalo de almoço ausente).",
         );
       }
 
@@ -371,10 +371,10 @@ class PointService {
       });
 
       if (!config) {
-        throw new ServiceError(400, "Configuracao de ponto nao encontrada para o usuario.");
+        throw new ServiceError(400, "Configuração de ponto não encontrada para o usuário.");
       }
       if (config.organization_id !== organizationId) {
-        throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
+        throw new ServiceError(403, "Configuração de ponto pertence a outra organização.");
       }
 
       const holidayDay = holidayDayBounds(point.clock_in, timezone);
@@ -440,14 +440,14 @@ class PointService {
   async recalculateRange(input: RecalculatePointsInput): Promise<CalculateDailyHoursResult[]> {
     try {
       if (!input.organization_id?.trim() || !input.user_id?.trim()) {
-        throw new ServiceError(400, "organization_id e user_id sao obrigatorios.");
+        throw new ServiceError(400, "organization_id e user_id são obrigatórios.");
       }
       if (
         Number.isNaN(input.date_from.getTime()) ||
         Number.isNaN(input.date_to.getTime()) ||
         input.date_from.getTime() > input.date_to.getTime()
       ) {
-        throw new ServiceError(400, "Periodo de recalculo invalido.");
+        throw new ServiceError(400, "Período de recálculo inválido.");
       }
 
       const timezone = await this.organizationTimezone(input.organization_id);
@@ -484,7 +484,7 @@ class PointService {
   async listPoints(organizationId: string, filters: PointListFilters): Promise<PointListItem[]> {
     try {
       if (!organizationId?.trim()) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
 
       const timezone = await this.organizationTimezone(organizationId);
@@ -492,13 +492,13 @@ class PointService {
       const clockInFilter: Prisma.DateTimeFilter = {};
       if (filters.date_from !== undefined) {
         if (Number.isNaN(filters.date_from.getTime())) {
-          throw new ServiceError(400, "date_from invalido.");
+          throw new ServiceError(400, "date_from inválido.");
         }
         clockInFilter.gte = organizationDayBounds(filters.date_from, timezone).start;
       }
       if (filters.date_to !== undefined) {
         if (Number.isNaN(filters.date_to.getTime())) {
-          throw new ServiceError(400, "date_to invalido.");
+          throw new ServiceError(400, "date_to inválido.");
         }
         clockInFilter.lte = organizationDayBounds(filters.date_to, timezone).end;
       }
@@ -534,10 +534,10 @@ class PointService {
   async getTodayPointForUser(input: TodayPointInput): Promise<TodayPointResult> {
     try {
       if (!input.user_id?.trim()) {
-        throw new ServiceError(400, "user_id e obrigatorio.");
+        throw new ServiceError(400, "user_id é obrigatório.");
       }
       if (!input.organization_id?.trim()) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
 
       const timezone = await this.organizationTimezone(input.organization_id);
@@ -576,10 +576,10 @@ class PointService {
   async getMonthlySummary(input: MonthlySummaryInput): Promise<MonthlySummaryResult> {
     try {
       if (!input.user_id?.trim()) {
-        throw new ServiceError(400, "user_id e obrigatorio.");
+        throw new ServiceError(400, "user_id é obrigatório.");
       }
       if (!input.organization_id?.trim()) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
 
       const timezone = await this.organizationTimezone(input.organization_id);
@@ -601,10 +601,20 @@ class PointService {
       });
 
       if (!config) {
-        throw new ServiceError(404, "Configuracao de ponto nao encontrada para o usuario.");
+        // Sem jornada configurada não há horas esperadas: o resumo é vazio, não um erro.
+        return {
+          month: input.month,
+          user_id: input.user_id,
+          total_worked_minutes: 0,
+          expected_minutes: 0,
+          balance_minutes: 0,
+          overtime_minutes: 0,
+          absence_days: 0,
+          pending_adjustments: 0,
+        };
       }
       if (config.organization_id !== input.organization_id) {
-        throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
+        throw new ServiceError(403, "Configuração de ponto pertence a outra organização.");
       }
 
       const [points, holidays, pendingAdjustments] = await Promise.all([

@@ -7,6 +7,7 @@ import {
   ServiceError,
   serializeError,
 } from "@workspace/shared/http";
+import { zodIssueMessage } from "@workspace/shared/schemas";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -63,8 +64,7 @@ function parse<S extends z.ZodTypeAny>(schema: S, value: unknown): z.output<S> {
   try {
     return schema.parse(value);
   } catch (error) {
-    if (error instanceof ZodError)
-      throw new ServiceError(400, error.issues[0]?.message ?? "Dados inválidos.");
+    if (error instanceof ZodError) throw new ServiceError(400, zodIssueMessage(error));
     throw error;
   }
 }

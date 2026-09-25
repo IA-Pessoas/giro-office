@@ -91,7 +91,7 @@ export class PayrollService {
         select: { id: true },
       });
       if (existing) {
-        throw new ServiceError(409, "Folha de pessoal ja cadastrada para o cliente.");
+        throw new ServiceError(409, "Folha de pessoal já cadastrada para o cliente.");
       }
 
       const { group_id: _groupId, ...payrollData } = body;
@@ -155,7 +155,7 @@ export class PayrollService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Folha de pessoal nao encontrada.");
+        throw new ServiceError(404, "Folha de pessoal não encontrada.");
       }
 
       const groupId = await this.ensureRelationships(
@@ -222,7 +222,7 @@ export class PayrollService {
       select: { id: true },
     });
     if (!client) {
-      throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      throw new ServiceError(404, "Cliente não encontrado para a organização.");
     }
 
     await ensurePessoalResponsible(
@@ -238,7 +238,7 @@ export class PayrollService {
         select: { id: true },
       });
       if (!union) {
-        throw new ServiceError(404, "Sindicato nao encontrado para a organizacao.");
+        throw new ServiceError(404, "Sindicato não encontrado para a organização.");
       }
     }
 

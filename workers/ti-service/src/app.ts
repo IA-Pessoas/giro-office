@@ -680,7 +680,7 @@ export function createTiWorkerApp(options: TiOptions = {}) {
     }
     try {
       if (attachment && !validImagePath(attachment, requestContext(c).organizationId, params.id)) {
-        throw new ServiceError(500, "Armazenamento da imagem retornou uma chave invalida.");
+        throw new ServiceError(500, "Armazenamento da imagem retornou uma chave inválida.");
       }
       const message = await execute<unknown>(c, "requests", "createMessage", [
         requestContext(c),
