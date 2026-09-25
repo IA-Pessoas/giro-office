@@ -55,7 +55,7 @@ describe("InstallmentService uniqueness", () => {
       service.create(parcelamentoContext, createCreateInstallmentBody()),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe parcelamento com este numero de acordo.",
+      message: "Já existe parcelamento com este número de acordo.",
     });
   });
 

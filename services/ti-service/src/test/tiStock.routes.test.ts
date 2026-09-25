@@ -44,7 +44,7 @@ describe("ti stock routes", () => {
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Permissao insuficiente para acessar o ti-service.",
+      error: "Permissão insuficiente para acessar o módulo de TI.",
       code: "FORBIDDEN",
     });
   });
@@ -118,7 +118,7 @@ describe("ti stock routes", () => {
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Permissao insuficiente para acessar o ti-service.",
+      error: "Permissão insuficiente para acessar o módulo de TI.",
       code: "FORBIDDEN",
     });
   });
@@ -246,7 +246,7 @@ describe("ti stock routes", () => {
     expect(response.body).toMatchObject({
       success: false,
       code: "BAD_REQUEST",
-      error: "Item de estoque invalido.",
+      error: "Item de estoque inválido.",
     });
   });
 
@@ -277,7 +277,7 @@ describe("ti stock routes", () => {
     expect(response.body).toMatchObject({
       success: false,
       code: "CONFLICT",
-      error: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+      error: "Já existe uma categoria de estoque de TI ativa com este nome.",
     });
   });
 
@@ -291,7 +291,7 @@ describe("ti stock routes", () => {
     expect(response.body).toMatchObject({
       success: false,
       code: "CONFLICT",
-      error: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+      error: "Já existe uma categoria de estoque de TI ativa com este nome.",
     });
   });
 
@@ -305,7 +305,7 @@ describe("ti stock routes", () => {
     expect(response.body).toMatchObject({
       success: false,
       code: "CONFLICT",
-      error: "Ja existe uma categoria de estoque de TI ativa com este nome.",
+      error: "Já existe uma categoria de estoque de TI ativa com este nome.",
     });
   });
 
@@ -336,7 +336,7 @@ describe("ti stock routes", () => {
     expect(response.status).toBe(409);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Ja existe um local de estoque de TI ativo com este nome.",
+      error: "Já existe um local de estoque de TI ativo com este nome.",
       code: "CONFLICT",
     });
   });

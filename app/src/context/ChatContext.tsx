@@ -12,7 +12,7 @@ import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
 import { api } from '@shared/services/apiClient';
 import { chatService } from '../modules/chat/services/chatService';
-import { toast } from "react-toastify"
+import { toast } from "@shared/services/toast";
 import 'react-toastify/dist/ReactToastify.css';
 import type { ChatParticipant, User, Message, Chat } from '../modules/chat/types';
 

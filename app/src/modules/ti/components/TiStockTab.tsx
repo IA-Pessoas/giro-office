@@ -17,7 +17,7 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { useAssignableUsers } from "@modules/rh";
@@ -1051,7 +1051,7 @@ export function TiStockTab() {
                 />
               ) : null}
             </div>
-            <section className={tiDialogSubsectionClassName} aria-label="Movimentacoes do estoque">
+            <section className={tiDialogSubsectionClassName} aria-label="Movimentações do estoque">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
                   Movimentações

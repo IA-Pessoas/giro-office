@@ -201,7 +201,7 @@ describe("TiRequestService", () => {
       ),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para criar chamado para outro usuario.",
+      message: "Permissão insuficiente para criar chamado para outro usuário.",
     });
   });
 
@@ -287,7 +287,7 @@ describe("TiRequestService", () => {
       ),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Chamado de TI nao encontrado.",
+      message: "Chamado de TI não encontrado.",
     });
   });
 
@@ -305,7 +305,7 @@ describe("TiRequestService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para esta transicao.",
+      message: "Permissão insuficiente para esta transição.",
     });
   });
 
@@ -323,7 +323,7 @@ describe("TiRequestService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para esta transicao.",
+      message: "Permissão insuficiente para esta transição.",
     });
   });
 
@@ -426,7 +426,7 @@ describe("TiRequestService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Chamado de TI foi transferido por outro usuario.",
+      message: "Chamado de TI foi transferido por outro usuário.",
     });
 
     expect(prisma.tIRequest.updateMany).toHaveBeenCalledWith({
@@ -450,7 +450,7 @@ describe("TiRequestService", () => {
       ),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para transferir chamado.",
+      message: "Permissão insuficiente para transferir chamado.",
     });
   });
 
@@ -492,7 +492,7 @@ describe("TiRequestService", () => {
       ),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para transferir chamado.",
+      message: "Permissão insuficiente para transferir chamado.",
     });
   });
 
@@ -530,7 +530,7 @@ describe("TiRequestService", () => {
       service.assign(context, requestId, { assigned_to_id: financeUserId }),
     ).rejects.toMatchObject({
       statusCode: 400,
-      message: "Responsavel deve pertencer ao departamento Tecnologia.",
+      message: "Responsável deve pertencer ao departamento Tecnologia.",
     });
   });
 
@@ -546,7 +546,7 @@ describe("TiRequestService", () => {
       service.assign(context, requestId, { assigned_to_id: inactiveTiUserId }),
     ).rejects.toMatchObject({
       statusCode: 400,
-      message: "Responsavel deve pertencer ao departamento Tecnologia.",
+      message: "Responsável deve pertencer ao departamento Tecnologia.",
     });
   });
 });

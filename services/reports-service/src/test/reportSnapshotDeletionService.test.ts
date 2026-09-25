@@ -113,7 +113,7 @@ describe("ReportLifecycleService.deleteSnapshot", () => {
         justification: "Solicitação formal com fundamento.",
       }),
     ).rejects.toMatchObject(
-      new ServiceError(403, "O snapshot não pertence ao departamento atual."),
+      new ServiceError(403, "O resultado não pertence ao departamento atual."),
     );
     expect(transaction.reportJob.updateMany).not.toHaveBeenCalled();
   });

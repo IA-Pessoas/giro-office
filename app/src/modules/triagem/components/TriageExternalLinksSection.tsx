@@ -3,6 +3,7 @@ import { Archive, ExternalLink, Loader2, Pencil, Plus, Save, X } from "lucide-re
 
 import { getContabilErrorMessage } from "@modules/contabil";
 import { useAssignableUsers } from "@modules/rh";
+import { ConfirmationDialog } from "@shared/components";
 
 import {
   useTriageCatalogs,
@@ -147,6 +148,9 @@ export function TriageExternalLinksSection({
   const [createValues, setCreateValues] = useState<LinkFormValues>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<LinkFormValues>(EMPTY_FORM);
+  // O item fica guardado após fechar para o texto não sumir durante a animação de saída.
+  const [pendingArchive, setPendingArchive] = useState<TriageExternalLink | null>(null);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const users = (usersQuery.data ?? []).map((user) => ({ id: user.id, name: user.name }));
   const createLinkTypes = linkTypeOptions(linkTypesQuery.data);
   const actionError =
@@ -154,8 +158,8 @@ export function TriageExternalLinksSection({
     linkTypesQuery.error ??
     usersQuery.error ??
     mutations.create.error ??
-    mutations.update.error ??
-    mutations.archive.error;
+    // Erro de arquivamento aparece dentro do diálogo de confirmação.
+    mutations.update.error;
   const isMutating =
     mutations.create.isPending || mutations.update.isPending || mutations.archive.isPending;
 
@@ -191,10 +195,9 @@ export function TriageExternalLinksSection({
     setEditValues(toInputValues(link));
   }
 
-  function archiveLink(id: string): void {
-    if (window.confirm("Arquivar este link externo?")) {
-      mutations.archive.mutate(id);
-    }
+  async function confirmArchive(): Promise<void> {
+    if (!pendingArchive) return;
+    await mutations.archive.mutateAsync(pendingArchive.id);
   }
 
   if (linksQuery.isLoading) {
@@ -288,7 +291,10 @@ export function TriageExternalLinksSection({
                       <button
                         type="button"
                         className={BUTTON_CLASSNAME}
-                        onClick={() => archiveLink(link.id)}
+                        onClick={() => {
+                          setPendingArchive(link);
+                          setIsArchiveOpen(true);
+                        }}
                         disabled={isMutating}
                       >
                         <Archive className="h-4 w-4" aria-hidden="true" />
@@ -308,6 +314,24 @@ export function TriageExternalLinksSection({
           Não foi possível concluir a alteração. {getContabilErrorMessage(actionError)}
         </p>
       ) : null}
+
+      <ConfirmationDialog
+        open={isArchiveOpen}
+        onOpenChange={(open) => {
+          if (open) return;
+          setIsArchiveOpen(false);
+          mutations.archive.reset();
+        }}
+        title="Arquivar link externo"
+        description={`Arquivar o link "${pendingArchive?.description || pendingArchive?.url || ""}"?`}
+        onConfirm={confirmArchive}
+        isConfirming={mutations.archive.isPending}
+        errorMessage={
+          mutations.archive.error ? getContabilErrorMessage(mutations.archive.error) : null
+        }
+        confirmLabel="Arquivar"
+        cancelLabel="Cancelar"
+      />
     </div>
   );
 }

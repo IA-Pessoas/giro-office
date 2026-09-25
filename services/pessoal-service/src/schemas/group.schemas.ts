@@ -5,7 +5,7 @@ import { PESSOAL_GROUP_POLICIES } from "../services/pessoalGroupPolicy.js";
 
 export const groupIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 

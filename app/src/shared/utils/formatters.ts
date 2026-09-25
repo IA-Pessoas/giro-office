@@ -48,3 +48,8 @@ export function formatDateToInput(date: Date | string | null | undefined): strin
 
   return `${year}-${month}-${day}`;
 }
+
+/** "1 cliente" / "2 clientes": escolhe singular ou plural pela contagem. */
+export function formatCount(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}

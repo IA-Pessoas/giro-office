@@ -31,7 +31,7 @@ export class TiInventoryLocationService {
       });
 
       if (existing) {
-        throw new ServiceError(409, "Ja existe um local de inventario de TI ativo com este nome.");
+        throw new ServiceError(409, "Já existe um local de inventário de TI ativo com este nome.");
       }
 
       return this.prisma.inventoryLocationTecnologia.create({
@@ -59,7 +59,7 @@ export class TiInventoryLocationService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Local de inventario de TI nao encontrado.");
+        throw new ServiceError(404, "Local de inventário de TI não encontrado.");
       }
 
       return this.prisma.inventoryLocationTecnologia.update({

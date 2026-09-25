@@ -8,21 +8,21 @@ const tiExtensionNumberSchema = z.string().regex(/^[0-9]{3,4}$/, {
 
 export const tiExtensionIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Ramal de TI invalido." }),
+    id: z.string().uuid({ message: "Ramal de TI inválido." }),
   })
   .strict();
 
 export const listTiExtensionsQuerySchema = paginationQuerySchema
   .merge(
     z.object({
-      user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
+      user_id: z.string().uuid({ message: "Usuário inválido." }).optional(),
     }),
   )
   .strict();
 
 export const createTiExtensionBodySchema = z
   .object({
-    user_id: z.string().uuid({ message: "Usuario invalido." }),
+    user_id: z.string().uuid({ message: "Usuário inválido." }),
     number: tiExtensionNumberSchema,
   })
   .strict();

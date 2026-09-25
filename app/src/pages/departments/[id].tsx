@@ -1,3 +1,4 @@
+import Head from "next/head";
 import Link from "next/link";
 import "react-toastify/dist/ReactToastify.css";
 import { ArrowLeft, Save } from "lucide-react";
@@ -33,7 +34,14 @@ export default function Department({ dep, forbidden = false }: Props) {
     return null;
   }
 
-  return <DepartmentForm dep={dep} />;
+  return (
+    <>
+      <Head>
+        <title>{dep.name ? `Departamento ${dep.name} | Office` : "Departamento | Office"}</title>
+      </Head>
+      <DepartmentForm dep={dep} />
+    </>
+  );
 }
 
 function DepartmentForm({ dep }: { dep: DepItem }) {

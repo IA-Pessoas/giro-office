@@ -190,7 +190,7 @@ class TimeSheetService {
       SELECT "timezone" FROM "organizations" WHERE "id" = ${organizationId}
     `;
     const organization = rows[0];
-    if (!organization) throw new ServiceError(404, "Organizacao nao encontrada.");
+    if (!organization) throw new ServiceError(404, "Organização não encontrada.");
     return organization.timezone?.trim() || DEFAULT_ORGANIZATION_TIMEZONE;
   }
 
@@ -210,7 +210,7 @@ class TimeSheetService {
         : defaultTimeSheetPeriod(input.now, timezone);
 
     if (Number.isNaN(period.start_time.getTime()) || Number.isNaN(period.end_time.getTime())) {
-      throw new ServiceError(400, "Datas invalidas.");
+      throw new ServiceError(400, "Datas inválidas.");
     }
     if (period.start_time.getTime() >= period.end_time.getTime()) {
       throw new ServiceError(400, "end_time deve ser posterior a start_time.");
@@ -230,7 +230,7 @@ class TimeSheetService {
       where: { id: timesheetId, organization_id: organizationId },
       select: TIME_SHEET_SELECT,
     });
-    if (!sheet) throw new ServiceError(404, "Folha nao encontrada.");
+    if (!sheet) throw new ServiceError(404, "Folha não encontrada.");
     return sheet;
   }
 
@@ -254,10 +254,10 @@ class TimeSheetService {
     });
 
     if (!config) {
-      throw new ServiceError(404, "Configuracao de ponto nao encontrada para o usuario.");
+      throw new ServiceError(404, "Configuração de ponto não encontrada para o usuário.");
     }
     if (config.organization_id !== input.organization_id) {
-      throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
+      throw new ServiceError(403, "Configuração de ponto pertence a outra organização.");
     }
 
     const periodStart = organizationDayBounds(input.start_time, timezone).start;
@@ -357,7 +357,7 @@ class TimeSheetService {
         },
         select: { id: true },
       });
-      if (duplicate) throw new ServiceError(409, "Folha ja gerada para este periodo.");
+      if (duplicate) throw new ServiceError(409, "Folha já gerada para este período.");
 
       const snapshot = await this.buildTimesheetSnapshot(resolved, timezone);
       return await this.prismaClient.timeSheets.create({
@@ -384,7 +384,7 @@ class TimeSheetService {
     try {
       const sheet = await this.loadSheet(input);
       if (isClosed(sheet)) {
-        throw new ServiceError(409, "Folha assinada e imutavel; reabra-a antes de reconstruir.");
+        throw new ServiceError(409, "Folha assinada e imutável; reabra-a antes de reconstruir.");
       }
       const timezone = await this.organizationTimezone(input.organization_id);
       const snapshot = await this.buildTimesheetSnapshot(
@@ -468,7 +468,7 @@ class TimeSheetService {
       if (sheet.user_id !== signerUserId) {
         throw new ServiceError(403, "Apenas o colaborador da folha pode assinar.");
       }
-      if (isClosed(sheet)) throw new ServiceError(409, "Folha ja assinada.");
+      if (isClosed(sheet)) throw new ServiceError(409, "Folha já assinada.");
 
       const timezone = await this.organizationTimezone(organizationId);
       const periodStart = organizationDayBounds(sheet.start_time, timezone).start;
@@ -483,7 +483,7 @@ class TimeSheetService {
         select: { id: true },
       });
       if (pendingRequest) {
-        throw new ServiceError(409, "Nao e possivel fechar a folha com ajuste de ponto pendente.");
+        throw new ServiceError(409, "Não é possível fechar a folha com ajuste de ponto pendente.");
       }
 
       const pointConfig = await this.prismaClient.pointsConfig.findUnique({
@@ -491,10 +491,10 @@ class TimeSheetService {
         select: { organization_id: true, signature: true, bank_balance: true },
       });
       if (!pointConfig) {
-        throw new ServiceError(404, "Configuracao de ponto nao encontrada para o usuario.");
+        throw new ServiceError(404, "Configuração de ponto não encontrada para o usuário.");
       }
       if (pointConfig.organization_id !== organizationId) {
-        throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
+        throw new ServiceError(403, "Configuração de ponto pertence a outra organização.");
       }
 
       const signature = pointConfig.signature?.trim() || input.signature?.trim();
@@ -574,7 +574,7 @@ class TimeSheetService {
         where: { id: sheet.user_id, organization_id: sheet.organization_id },
         select: { name: true, full_name: true },
       });
-      if (!user) throw new ServiceError(404, "Colaborador da folha nao encontrado.");
+      if (!user) throw new ServiceError(404, "Colaborador da folha não encontrado.");
 
       return {
         buffer: await renderTimeSheetPdf({
@@ -608,7 +608,7 @@ class TimeSheetService {
         organization_id: organizationId,
         timesheet_id: timesheetId,
       });
-      if (!isClosed(sheet)) throw new ServiceError(409, "Folha nao esta assinada.");
+      if (!isClosed(sheet)) throw new ServiceError(409, "Folha não está assinada.");
 
       return await this.prismaClient.timeSheets.update({
         where: { id: timesheetId },

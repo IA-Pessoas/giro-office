@@ -130,10 +130,10 @@ describe("DashboardStatsService", () => {
     const query = dashboardQueryMock([
       {
         user_name: "Davi",
-        action: "consultou",
-        method: "GET",
-        item: "a lista de tarefas",
-        path: "/task/list",
+        action: "cadastrou",
+        method: "POST",
+        item: "uma nova tarefa",
+        path: "/task",
         created_at: new Date("2026-07-23T12:00:00.000Z"),
       },
     ]);
@@ -143,8 +143,8 @@ describe("DashboardStatsService", () => {
 
     expect(stats.activities[0]).toMatchObject({
       user: "Davi",
-      action: "consultou",
-      item: "a lista de tarefas",
+      action: "cadastrou",
+      item: "uma nova tarefa",
       createdAt: "2026-07-23T12:00:00.000Z",
     });
     expect(stats.activities[0]).not.toHaveProperty("time");
@@ -161,47 +161,48 @@ describe("DashboardStatsService", () => {
     expect(activitiesSql).toContain("a.metadata_json @> '{\"activityVisible\": true}'::jsonb");
     expect(activitiesSql).toContain("a.outcome = 'success'");
     expect(activitiesSql).toContain("order by a.created_at desc");
-    expect(activitiesSql).toContain("limit 5");
+    expect(activitiesSql).toContain("not in ('GET', 'HEAD', 'OPTIONS')");
+    expect(activitiesSql).toContain("limit 20");
   });
 
   it("defends the activity feed against unfiltered query rows", async () => {
     const query = dashboardQueryMock([
       {
         user_name: "Legado",
-        action: "consultou",
-        method: "GET",
-        item: "a lista de tarefas",
-        path: "/task/list",
+        action: "cadastrou",
+        method: "POST",
+        item: "uma nova tarefa",
+        path: "/task",
         created_at: new Date(),
         outcome: "error",
         activity_visible: null,
       },
       {
         user_name: "Sucesso",
-        action: "consultou",
-        method: "GET",
-        item: "a lista de tarefas",
-        path: "/task/list",
+        action: "cadastrou",
+        method: "POST",
+        item: "uma nova tarefa",
+        path: "/task",
         created_at: new Date(),
         outcome: "success",
         activity_visible: true,
       },
       {
         user_name: "Erro",
-        action: "consultou",
-        method: "GET",
-        item: "a lista de tarefas",
-        path: "/task/list",
+        action: "cadastrou",
+        method: "POST",
+        item: "uma nova tarefa",
+        path: "/task",
         created_at: new Date(),
         outcome: "error",
         activity_visible: true,
       },
       {
         user_name: "Abortado",
-        action: "consultou",
-        method: "GET",
-        item: "a lista de tarefas",
-        path: "/task/list",
+        action: "cadastrou",
+        method: "POST",
+        item: "uma nova tarefa",
+        path: "/task",
         created_at: new Date(),
         outcome: "aborted",
         activity_visible: true,
@@ -222,6 +223,45 @@ describe("DashboardStatsService", () => {
     const stats = await service.getStats("org-1");
 
     expect(stats.activities.map((activity) => activity.user)).toEqual(["Legado", "Sucesso"]);
+  });
+
+  it("drops read and raw API-route audit rows from the activity feed (#1371)", async () => {
+    const legacy = { outcome: null, activity_visible: null, created_at: new Date() };
+    const query = dashboardQueryMock([
+      {
+        ...legacy,
+        user_name: "Leitura",
+        action: null,
+        method: "GET",
+        item: null,
+        path: "/user/me",
+      },
+      {
+        ...legacy,
+        user_name: "Rota",
+        action: null,
+        method: "POST",
+        item: null,
+        path: "/xpto/rota",
+      },
+      { ...legacy, user_name: "Catálogo", action: null, method: "POST", item: null, path: "/task" },
+      ...Array.from({ length: 6 }, (_, index) => ({
+        ...legacy,
+        user_name: `Extra ${index}`,
+        action: "atualizou",
+        method: "PATCH",
+        item: "uma tarefa",
+        path: "/task/1",
+      })),
+    ]);
+    const service = new DashboardStatsService({ pool: { query } as never });
+
+    const stats = await service.getStats("org-1");
+
+    expect(stats.activities).toHaveLength(5);
+    expect(stats.activities[0]).toMatchObject({ user: "Catálogo", action: "cadastrou" });
+    expect(stats.activities.some((activity) => activity.item.startsWith("/"))).toBe(false);
+    expect(stats.activities.map((activity) => activity.user)).not.toContain("Leitura");
   });
 
   it("returns financial, commercial and department indicators from real query rows", async () => {

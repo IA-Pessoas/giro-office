@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const tiInventoryLocationIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Local de inventario invalido." }),
+    id: z.string().uuid({ message: "Local de inventário inválido." }),
   })
   .strict();
 

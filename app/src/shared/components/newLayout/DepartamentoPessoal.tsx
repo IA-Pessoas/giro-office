@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { getSummaryItems } from '../../utils/summaryItems';
+import { formatCount } from "@shared/utils/formatters";
 
 interface Company {
   id: string;
@@ -686,7 +687,7 @@ export function DepartamentoPessoal() {
                           Certificado {cert.type} - {cert.holder}
                         </p>
                         <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          {daysLeft < 0 ? `Expirado há ${Math.abs(daysLeft)} dias` : `Expira em ${daysLeft} dias`}
+                          {daysLeft < 0 ? `Expirado há ${formatCount(Math.abs(daysLeft), "dia", "dias")}` : `Expira em ${formatCount(daysLeft, "dia", "dias")}`}
                         </p>
                       </div>
                     </div>
@@ -963,7 +964,7 @@ export function DepartamentoPessoal() {
                             daysLeft <= 30 ? 'text-yellow-600 dark:text-yellow-400' :
                             'text-gray-600 dark:text-gray-400'
                           }`}>
-                            {daysLeft < 0 ? `Expirado há ${Math.abs(daysLeft)} dias` : `${daysLeft} dias`}
+                            {daysLeft < 0 ? `Expirado há ${formatCount(Math.abs(daysLeft), "dia", "dias")}` : formatCount(daysLeft, "dia", "dias")}
                           </p>
                         </td>
                         <td className="px-6 py-4">

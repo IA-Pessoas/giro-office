@@ -52,7 +52,7 @@ const financialStatusCodeSchema = z
     if (!status) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Status financeiro legado invalido.",
+        message: "Status financeiro inválido.",
       });
       return z.NEVER;
     }

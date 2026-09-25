@@ -321,7 +321,7 @@ export type ProspectingService = {
 
 function assertProspectingTransition(current: string, next: ProspectingStatus): void {
   if (!prospectingStatuses.includes(current as ProspectingStatus)) {
-    throw new ServiceError(409, "A prospecção possui um status legado não suportado.");
+    throw new ServiceError(409, "A prospecção possui um status antigo não suportado.");
   }
   if (current === "Fechado" && next !== "Fechado") {
     throw new ServiceError(409, "Uma prospecção fechada não pode ser reaberta.");

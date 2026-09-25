@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const zUuid = (field: string) =>
   z.string().uuid({
-    message: `${field} invalido.`,
+    message: `${field} inválido.`,
   });
 
 export const projectPlanCreateBodySchema = z

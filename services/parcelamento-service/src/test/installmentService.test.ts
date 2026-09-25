@@ -332,7 +332,7 @@ describe("InstallmentService", () => {
 
     await expect(service.list({ requestId: "missing" }, {})).rejects.toMatchObject({
       statusCode: 400,
-      message: "Contexto de organizacao ausente.",
+      message: "Contexto de organização ausente.",
     });
   });
 
@@ -346,7 +346,7 @@ describe("InstallmentService", () => {
       service.list({ requestId: "missing-user", organizationId }, {}),
     ).rejects.toMatchObject({
       statusCode: 400,
-      message: "Contexto de usuario ausente.",
+      message: "Contexto de usuário ausente.",
     });
   });
 

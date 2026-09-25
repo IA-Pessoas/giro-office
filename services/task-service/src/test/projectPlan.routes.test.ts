@@ -86,7 +86,7 @@ function createRouteDeps(): ProjectPlanRouteDeps {
       return [];
     },
     async reorderTask() {
-      return { message: "A tarefa ja esta no topo." };
+      return { message: "A tarefa já está no topo." };
     },
     async deleteTask() {
       return {

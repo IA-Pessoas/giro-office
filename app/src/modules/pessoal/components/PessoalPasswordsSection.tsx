@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 import { useAssignableUsers } from "@modules/rh";
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog } from "@shared/components";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -37,7 +37,6 @@ import type {
 } from "../types/passwords";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
-  pessoalDangerButtonClassName,
   pessoalPrimaryButtonClassName,
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
@@ -230,6 +229,7 @@ export function PessoalPasswordsSection({
   );
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const usersQuery = useAssignableUsers({
     enabled: isFormOpen && canEdit,
     module: "pessoal",
@@ -462,7 +462,7 @@ export function PessoalPasswordsSection({
       return;
     }
 
-    setFormError(null);
+    setDeleteError(null);
     setSuccessMessage(null);
 
     try {
@@ -471,8 +471,9 @@ export function PessoalPasswordsSection({
       setIsDeleteDialogOpen(false);
       setSuccessMessage("Senha removida.");
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Não foi possível remover a senha."));
-      setIsDeleteDialogOpen(false);
+      setDeleteError(getPessoalErrorMessage(error, "Não foi possível remover a senha."));
+      // Relança para o ConfirmationDialog permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -747,49 +748,22 @@ export function PessoalPasswordsSection({
         ) : null}
       </div>
 
-      <Dialog
+      <ConfirmationDialog
         open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open);
+          if (!open) {
+            setDeleteError(null);
+          }
+        }}
         title="Remover senha"
-        description="Confirmação de remoção de senha"
-        contentClassName="w-[min(92vw,520px)]"
-        bodyClassName="space-y-3"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setIsDeleteDialogOpen(false)}
-              disabled={deleteMutation.isPending}
-              className={pessoalSecondaryButtonClassName}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDelete}
-              disabled={deleteMutation.isPending}
-              className={pessoalDangerButtonClassName}
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Confirmar remoção
-            </button>
-          </>
-        }
-      >
-        <p className="text-sm text-gray-700 dark:text-slate-300">
-          Esta ação remove o acesso selecionado. Os campos sensíveis vinculados a esta senha
-          deixarão de ficar disponíveis para o cliente.
-        </p>
-        {detail ? (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
-            {detail.service_name}
-          </p>
-        ) : null}
-      </Dialog>
+        description={`Remover o acesso ${detail?.service_name ?? selectedPassword?.service_name ?? ""}? Os campos sensíveis vinculados a esta senha deixarão de ficar disponíveis para o cliente.`}
+        onConfirm={handleConfirmDelete}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={deleteError}
+        confirmLabel="Confirmar remoção"
+        cancelLabel="Cancelar"
+      />
 
       {isFormOpen && canEdit ? (
         <div

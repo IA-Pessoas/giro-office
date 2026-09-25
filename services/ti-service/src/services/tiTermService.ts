@@ -87,11 +87,11 @@ export class TiTermService {
     });
 
     if (!term) {
-      throw new ServiceError(404, "Termo de TI nao encontrado.");
+      throw new ServiceError(404, "Termo de TI não encontrado.");
     }
 
     if (context.permission < TiPermissionLevel.Admin && term.user_id !== context.userId) {
-      throw new ServiceError(404, "Termo de TI nao encontrado.");
+      throw new ServiceError(404, "Termo de TI não encontrado.");
     }
 
     return toTermResponse(term);
@@ -150,7 +150,7 @@ export class TiTermService {
       const term = (await this.getById(context, id)) as TermRecord;
 
       if (context.permission < TiPermissionLevel.Admin && term.user_id !== context.userId) {
-        throw new ServiceError(403, "Permissao insuficiente para assinar termo de outro usuario.");
+        throw new ServiceError(403, "Permissão insuficiente para assinar termo de outro usuário.");
       }
 
       return this.prisma.termTecnologia
@@ -176,7 +176,7 @@ export class TiTermService {
     });
 
     if (!user) {
-      throw new ServiceError(404, "Usuario nao encontrado.");
+      throw new ServiceError(404, "Usuário não encontrado.");
     }
 
     return user;
@@ -188,7 +188,7 @@ export class TiTermService {
     });
 
     if (!department) {
-      throw new ServiceError(404, "Departamento nao encontrado.");
+      throw new ServiceError(404, "Departamento não encontrado.");
     }
   }
 }

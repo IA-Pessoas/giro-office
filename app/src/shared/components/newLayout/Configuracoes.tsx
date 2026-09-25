@@ -16,7 +16,7 @@ import {
   Upload,
   User,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -32,7 +32,7 @@ import {
   canViewTaskModelConfig,
 } from "@modules/integracao";
 import { MyOrganizationSection } from "@modules/organizations";
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog, Dialog } from "@shared/components";
 import { useDeleteMePhoto, useMe, useUpdateMe, useUploadMePhoto } from "@shared/hooks";
 import { resolvePhotoUrl } from "@shared/utils";
 import { buildSelfProfileUpdatePayload, selfPasswordError } from "@shared/utils/meProfileUpdate";
@@ -40,8 +40,10 @@ import { buildSelfProfileUpdatePayload, selfPasswordError } from "@shared/utils/
 const SETTINGS_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
 
+// Contraste AA no tema claro (#1371): branco sobre o gradiente >= 5.17:1; desabilitado usa
+// slate-600 sólido (7.58:1) em vez de opacity-70, que caía para ~3:1.
 const SETTINGS_GRADIENT_BUTTON_CLASSNAME =
-  "bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:opacity-70";
+  "bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20 transition-all hover:from-[var(--colors-brand-gradient-hover-start)] hover:to-[var(--colors-brand-gradient-hover-end)] disabled:cursor-not-allowed disabled:from-slate-600 disabled:to-slate-600 disabled:shadow-none";
 
 const SETTINGS_PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -113,6 +115,7 @@ export function Configuracoes() {
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [pendingPhotoPreviewUrl, setPendingPhotoPreviewUrl] = useState<string | null>(null);
   const [hasPhotoLoadError, setHasPhotoLoadError] = useState(false);
+  const [isRemovePhotoConfirmOpen, setIsRemovePhotoConfirmOpen] = useState(false);
 
   function clearPasswordDraft() {
     setPassword("");
@@ -269,21 +272,21 @@ export function Configuracoes() {
     }
   };
 
-  const handlePhotoSecondaryAction = async () => {
+  const handlePhotoSecondaryAction = () => {
+    // Descartar a seleção local não persiste nada; só a remoção da foto salva pede confirmação.
     if (pendingPhotoFile) {
       clearPendingPhoto();
       return;
     }
 
-    if (!currentPhotoUrl) {
-      return;
+    if (currentPhotoUrl) {
+      setIsRemovePhotoConfirmOpen(true);
     }
+  };
 
-    try {
-      await deletePhotoMutation.mutateAsync();
-    } catch {
-      // Toasts are handled by the mutation hook.
-    }
+  // Toasts ficam a cargo do hook; o erro relançado mantém a confirmação aberta.
+  const handleRemovePhoto = async () => {
+    await deletePhotoMutation.mutateAsync();
   };
 
   const handleSavePhoto = async () => {
@@ -449,8 +452,8 @@ export function Configuracoes() {
                   {pendingPhotoFile || currentPhotoUrl ? (
                     <button
                       type="button"
-                      onClick={() => void handlePhotoSecondaryAction()}
-                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
+                      onClick={handlePhotoSecondaryAction}
+                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/30"
                       disabled={isSaving}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -607,6 +610,17 @@ export function Configuracoes() {
                   </div>
                 </div>
               </Dialog>
+              <ConfirmationDialog
+                open={isRemovePhotoConfirmOpen}
+                onOpenChange={setIsRemovePhotoConfirmOpen}
+                title="Remover foto"
+                description={`Remover a foto de perfil de ${currentName || "sua conta"}?`}
+                onConfirm={handleRemovePhoto}
+                isConfirming={deletePhotoMutation.isPending}
+                errorMessage={null}
+                confirmLabel="Remover foto"
+                cancelLabel="Cancelar"
+              />
             </div>
           </div>
         </section>

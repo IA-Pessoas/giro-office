@@ -1,13 +1,14 @@
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Router from "next/router";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import "react-toastify/dist/ReactToastify.css";
 
 import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { platformApi } from "@shared/services/api";
+import { parseMeResponse } from "@workspace/api";
 import { ME_QUERY_KEY } from "@shared/hooks";
 import {
     createAuthInvalidationHandler,
@@ -372,6 +373,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 const userData = response.data?.data;
 
                 if (isCurrentAuthTransition(requestVersion) && isValidAuthUser(userData)) {
+                    // Semeia o cache do useMe com a mesma resposta: sem isso o shell pedia
+                    // /user/me de novo logo depois (#1369).
+                    try {
+                        queryClient.setQueryData(ME_QUERY_KEY, parseMeResponse(response.data));
+                    } catch {
+                        // Formato inesperado: o useMe busca por conta própria, como antes.
+                    }
                     const currentUser = buildCurrentUser(userData);
                     rememberImpersonationExpiry(currentUser.impersonation?.expires_at);
                     setUser(currentUser);
@@ -444,8 +452,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             if (error.code === "ECONNREFUSED" || error.code === "ERR_NETWORK" || !error.response) {
-                const url = process.env.NEXT_PUBLIC_API_URL || "nao definida";
-                toast.error("Erro de conexao! Verifique se o servidor esta rodando.");
+                const url = process.env.NEXT_PUBLIC_API_URL || "não definida";
+                toast.error("Não foi possível conectar. Verifique sua internet e tente novamente.");
                 logAuthError("Erro de conexao no login:", {
                     code: error.code,
                     message: error.message,

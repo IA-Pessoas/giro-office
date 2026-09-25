@@ -83,7 +83,7 @@ export class MunicipalTaxesService {
       select: { id: true },
     });
     if (exists) {
-      throw new ServiceError(409, "Tributo municipal ja cadastrado para o ano informado.");
+      throw new ServiceError(409, "Tributo municipal já cadastrado para o ano informado.");
     }
 
     const created = await this.prisma.municipalTaxes.create({
@@ -121,7 +121,7 @@ export class MunicipalTaxesService {
       select: municipalTaxesSelect,
     });
     if (!existing) {
-      throw new ServiceError(404, "Tributo municipal nao encontrado.");
+      throw new ServiceError(404, "Tributo municipal não encontrado.");
     }
 
     await this.ensureClientExists(input.organizationId, input.body.client_id);
@@ -158,7 +158,7 @@ export class MunicipalTaxesService {
       select: municipalTaxesSelect,
     });
     if (!detail) {
-      throw new ServiceError(404, "Tributo municipal nao encontrado.");
+      throw new ServiceError(404, "Tributo municipal não encontrado.");
     }
 
     return { detail };
@@ -238,7 +238,7 @@ export class MunicipalTaxesService {
       select: { id: true },
     });
     if (!exists) {
-      throw new ServiceError(404, "Cliente nao encontrado.");
+      throw new ServiceError(404, "Cliente não encontrado.");
     }
   }
 }

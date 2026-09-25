@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from "@shared/services/toast";
 import { clientService } from '../services/clientService';
 import type { ClientItem } from '../types';
 

@@ -143,7 +143,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const origin = c.req.header("origin");
     if (origin) {
       if (!allowedOrigins.includes("*") && !allowedOrigins.includes(origin)) {
-        throw new ServiceError(403, "Origin não permitida pelo fiscal-service.");
+        throw new ServiceError(403, "Origem não permitida.");
       }
       c.header("access-control-allow-origin", origin);
       c.header("access-control-allow-credentials", "true");

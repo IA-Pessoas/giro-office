@@ -12,15 +12,15 @@ export const listUsersQuerySchema = z
   .strict();
 
 export const userIdParamsSchema = z.object({
-  id: z.string().trim().min(1, "id e obrigatorio."),
+  id: z.string().trim().min(1, "id é obrigatório."),
 });
 
 export const createUserBodySchema = z
   .object({
-    name: z.string().trim().min(1, "name e obrigatorio."),
-    login: z.string().trim().toLowerCase().min(1, "login e obrigatorio."),
-    password: z.string().min(1, "password e obrigatorio."),
-    department_id: z.string().trim().min(1, "department_id e obrigatorio."),
+    name: z.string().trim().min(1, "name é obrigatório."),
+    login: z.string().trim().toLowerCase().min(1, "login é obrigatório."),
+    password: z.string().min(1, "password é obrigatório."),
+    department_id: z.string().trim().min(1, "department_id é obrigatório."),
     permission: z.number().int(),
     status: z.string().trim().min(1).optional(),
     photo_url: z.string().trim().min(1).optional(),
@@ -56,7 +56,7 @@ export const createUserBodySchema = z
     if (body.first_owner_flag === true && body.type !== "owner") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "first_owner_flag so pode ser true quando type for owner.",
+        message: "first_owner_flag só pode ser true quando type for owner.",
       });
     }
   });
@@ -78,7 +78,7 @@ export function ownPasswordPolicyError(
 /** Link de redefinição (#1342): o token vem do e-mail. */
 export const confirmPasswordResetBodySchema = z
   .object({
-    token: z.string().trim().min(1, "token e obrigatorio.").max(256),
+    token: z.string().trim().min(1, "token é obrigatório.").max(256),
     password: z
       .string()
       .min(MIN_PASSWORD_LENGTH, `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`)
@@ -107,7 +107,7 @@ export const updateUserBodySchema = z
     if (body.first_owner_flag === true && body.type !== "owner") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "first_owner_flag so pode ser true quando type for owner.",
+        message: "first_owner_flag só pode ser true quando type for owner.",
       });
     }
   });

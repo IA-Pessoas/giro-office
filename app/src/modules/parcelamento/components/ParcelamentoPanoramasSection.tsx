@@ -35,6 +35,7 @@ import {
   parcelamentoSecondaryButtonClassName,
   parcelamentoTextFieldClassName,
 } from "./parcelamentoFormControls";
+import { formatCount } from "@shared/utils/formatters";
 
 const FIRST_PAGE = 1;
 const PAGE_SIZE = 50;
@@ -228,7 +229,7 @@ export function ParcelamentoPanoramasSection({
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             {selectedClient
-              ? `${total} registros encontrados.`
+              ? `${formatCount(total, "registro encontrado", "registros encontrados")}.`
               : "Selecione um cliente para listar os panoramas."}
           </p>
         </div>

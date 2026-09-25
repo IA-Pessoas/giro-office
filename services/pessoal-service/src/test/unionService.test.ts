@@ -230,7 +230,7 @@ describe("UnionService", () => {
       service.delete({ organizationId, userId, permission: 2 }, recordId),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Sindicato nao encontrado.",
+      message: "Sindicato não encontrado.",
     });
 
     expect(prisma.payroll.count).not.toHaveBeenCalled();
@@ -283,7 +283,7 @@ describe("UnionService", () => {
       service.delete({ organizationId, userId, permission: 2 }, recordId),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Sindicato nao encontrado.",
+      message: "Sindicato não encontrado.",
     });
 
     expect(audit.recordChange).not.toHaveBeenCalled();

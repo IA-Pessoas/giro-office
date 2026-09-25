@@ -15,7 +15,7 @@ export interface CreateApiClientOptions {
   /** When set, non-browser 401 responses reject with this error (e.g. SSR). */
   getUnauthorizedErrorForSsr?: () => Error;
   /** Browser only: chamado em respostas HTTP 5xx (ex.: toast genérico). */
-  onServerError?: () => void;
+  onServerError?: (error: AxiosError) => void;
   /** Browser only: chamado quando o gateway rejeita a sessão por CSRF inválido. */
   onCsrfFailure?: () => void;
 }
@@ -207,7 +207,7 @@ export function createApiClient(options: CreateApiClientOptions): AxiosInstance 
 
       const status = error.response?.status;
       if (typeof window !== "undefined" && status !== undefined && status >= 500) {
-        onServerError?.();
+        onServerError?.(error);
       }
 
       return Promise.reject(error);

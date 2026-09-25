@@ -21,7 +21,7 @@ import { TiRobotService } from "../services/tiRobotService.js";
 
 function getContext(request: Request): TiAuthContext {
   if (!request.user_id || !request.organization_id) {
-    throw new ServiceError(401, "Autenticacao obrigatoria.");
+    throw new ServiceError(401, "Autenticação obrigatória.");
   }
 
   return {

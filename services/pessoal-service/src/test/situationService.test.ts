@@ -214,7 +214,7 @@ describe("SituationService", () => {
       service.delete({ organizationId, userId, permission: 2 }, recordId),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Situacao nao encontrada.",
+      message: "Situação não encontrada.",
     });
     expect(prisma.situationsPessoal.delete).not.toHaveBeenCalled();
   });
@@ -228,7 +228,7 @@ describe("SituationService", () => {
       service.delete({ organizationId: otherOrganizationId, userId, permission: 2 }, recordId),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Situacao nao encontrada.",
+      message: "Situação não encontrada.",
     });
     expect(prisma.situationsPessoal.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: recordId, organization_id: otherOrganizationId } }),

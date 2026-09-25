@@ -536,7 +536,7 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
   };
   const requirePasswordReveal = (c: RegularizeContext): void => {
     if (Number(c.get("auth").claims.permission ?? 0) < 2) {
-      throw new ServiceError(403, "Permissao insuficiente para revelar credencial.");
+      throw new ServiceError(403, "Permissão insuficiente para revelar credencial.");
     }
   };
   const requireInternal = (c: RegularizeContext): void =>

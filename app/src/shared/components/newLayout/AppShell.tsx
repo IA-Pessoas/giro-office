@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import {
   BadgeDollarSign,
   Bot,
@@ -52,7 +52,7 @@ import {
   useRhNotifications,
 } from "@modules/rh/hooks/useRhRequests";
 import { useNewTiRequestAlerts } from "@modules/ti/hooks/useNewTiRequestAlerts";
-import { useFetch, useMe } from "@shared/hooks";
+import { useClickOutside, useFetch, useMe } from "@shared/hooks";
 import { taskOperationalNotificationService } from "@shared/services/taskOperationalNotificationService";
 import { SYSTEM_VERTICAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 import { resolvePhotoUrl } from "@shared/utils";
@@ -490,6 +490,12 @@ export function AppShell({
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const aiChatTriggerRef = useRef<HTMLButtonElement | null>(null);
+  // Clique fora fecha os popovers do cabeçalho sem backdrop: um backdrop invisível
+  // engolia o primeiro clique no botão ou aba que o usuário queria acionar (#1363).
+  const closeNotifications = useCallback(() => setShowNotifications(false), []);
+  const closeUserMenu = useCallback(() => setShowUserMenu(false), []);
+  const notificationsRef = useClickOutside(closeNotifications);
+  const userMenuRef = useClickOutside(closeUserMenu);
 
   const pathname = router.asPath.split("?")[0] ?? "";
   const displayUserName = user?.name ?? meQuery.data?.name ?? "Admin";
@@ -822,6 +828,8 @@ export function AppShell({
         onClick={() => setIsMobileMenuOpen((v) => !v)}
         className={`lg:hidden fixed ${impersonation ? "top-14" : "top-4"} left-4 z-50 p-2 bg-white dark:bg-slate-900 rounded-lg shadow-lg`}
         type="button"
+        aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+        aria-expanded={isMobileMenuOpen}
       >
         {isMobileMenuOpen ? (
           <X className="w-6 h-6 text-gray-700 dark:text-white" />
@@ -971,30 +979,24 @@ export function AppShell({
             </div>
 
             <div className="flex items-center gap-3">
-              {!isPlatformSuperAdmin ? (
-                <button
-                  onClick={() => setShowNotifications((v) => !v)}
-                  className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  type="button"
-                  aria-expanded={showNotifications}
-                  aria-controls={NOTIFICATIONS_PANEL_ID}
-                  aria-label="Abrir notificações"
-                >
-                  <Bell className="w-5 h-5 text-gray-600 dark:text-slate-300" />
-                  {hasUnreadNotifications ? (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-                  ) : null}
-                </button>
-              ) : null}
+              <div ref={notificationsRef} className="contents">
+                {!isPlatformSuperAdmin ? (
+                  <button
+                    onClick={() => setShowNotifications((v) => !v)}
+                    className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    type="button"
+                    aria-expanded={showNotifications}
+                    aria-controls={NOTIFICATIONS_PANEL_ID}
+                    aria-label="Abrir notificações"
+                  >
+                    <Bell className="w-5 h-5 text-gray-600 dark:text-slate-300" />
+                    {hasUnreadNotifications ? (
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                    ) : null}
+                  </button>
+                ) : null}
 
-              {!isPlatformSuperAdmin && showNotifications ? (
-                <>
-                  <div
-                    aria-hidden="true"
-                    className="fixed inset-0 z-40"
-                    data-testid="app-shell-notifications-backdrop"
-                    onClick={() => setShowNotifications(false)}
-                  />
+                {!isPlatformSuperAdmin && showNotifications ? (
                   <div
                     id={NOTIFICATIONS_PANEL_ID}
                     className="absolute right-6 top-16 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
@@ -1065,10 +1067,10 @@ export function AppShell({
                       ) : null}
                     </div>
                   </div>
-                </>
-              ) : null}
+                ) : null}
+              </div>
 
-              <div className="relative">
+              <div ref={userMenuRef} className="relative">
                 <button
                   onClick={() => setShowUserMenu((v) => !v)}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -1100,48 +1102,41 @@ export function AppShell({
                 </button>
 
                 {showUserMenu ? (
-                  <>
-                    <div
-                      aria-hidden="true"
-                      className="fixed inset-0 z-40"
-                      onClick={() => setShowUserMenu(false)}
-                    />
-                    <div
-                      id={USER_MENU_PANEL_ID}
-                      role="menu"
-                      className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50"
-                    >
-                      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {displayUserName}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {displayUserLogin}
-                        </p>
-                      </div>
-                      {getModulePermissionLevel(moduleAccessUser, "integracao") !== 0 ? (
-                        <Link
-                          href="/configuracoes"
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                          onClick={() => setShowUserMenu(false)}
-                          role="menuitem"
-                        >
-                          <Settings className="w-4 h-4" />
-                          Configurações
-                        </Link>
-                      ) : null}
-                      <div className="border-t border-gray-100 dark:border-gray-700 mt-2 pt-2">
-                        <button
-                          onClick={handleLogout}
-                          className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                          type="button"
-                          role="menuitem"
-                        >
-                          Sair
-                        </button>
-                      </div>
+                  <div
+                    id={USER_MENU_PANEL_ID}
+                    role="menu"
+                    className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50"
+                  >
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {displayUserName}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {displayUserLogin}
+                      </p>
                     </div>
-                  </>
+                    {getModulePermissionLevel(moduleAccessUser, "integracao") !== 0 ? (
+                      <Link
+                        href="/configuracoes"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                        onClick={() => setShowUserMenu(false)}
+                        role="menuitem"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Configurações
+                      </Link>
+                    ) : null}
+                    <div className="border-t border-gray-100 dark:border-gray-700 mt-2 pt-2">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        type="button"
+                        role="menuitem"
+                      >
+                        Sair
+                      </button>
+                    </div>
+                  </div>
                 ) : null}
               </div>
             </div>

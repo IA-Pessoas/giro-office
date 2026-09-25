@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useCreateOrUpdateRhPointConfigMutation } from "../hooks/useRhPoint";
 import type { RhPointConfig } from "../types";

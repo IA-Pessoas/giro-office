@@ -7,7 +7,7 @@ import {
 } from "@workspace/api";
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { api } from "@shared/services/apiClient";
 import { isServerErrorAlreadyNotified } from "@shared/services/serverErrorToast";

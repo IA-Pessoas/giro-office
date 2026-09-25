@@ -1,3 +1,4 @@
+import { formatTime } from "@shared/utils/dateFormat";
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { GrSend } from "react-icons/gr";
@@ -9,7 +10,8 @@ import { FaRegEdit } from "react-icons/fa";
 import { GiConfirmed } from "react-icons/gi";
 import { CiCircleInfo } from "react-icons/ci";
 import { FaPencilRuler } from "react-icons/fa";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
+import { ConfirmationDialog } from "@shared/components";
 
 import { useChat } from '../../../context/ChatContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -137,6 +139,7 @@ const MessageBubble = ({ message, isSentByMe, chatType, isHighlighted }) => {
     const [isLoadingMedia, setIsLoadingMedia] = useState(false);
     const { startEditingMessage, deleteMessage } = useChat();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const canInteract = isSentByMe && (new Date().getTime() - new Date(message.createdAt).getTime()) < 300000;
 
     useEffect(() => {
@@ -208,7 +211,7 @@ const MessageBubble = ({ message, isSentByMe, chatType, isHighlighted }) => {
                 )}
                 {renderContent()}
                 <span style={{ fontSize: '0.7em', color: '#667781', float: 'right', marginLeft: '10px', marginTop: '5px' }}>
-                    {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatTime(message.createdAt)}
                 </span>
                 <Box display={'flex'} alignItems={'center'} float={'right'} ml={'10px'} mt={'5px'}>
                     {message.isEdited && <span style={{ fontSize: '0.7em', color: '#888', marginRight: '5px' }}><FaRegEdit /></span> }
@@ -252,7 +255,7 @@ const MessageBubble = ({ message, isSentByMe, chatType, isHighlighted }) => {
                                 Editar
                             </Button>
                             <Button 
-                                onClick={() => deleteMessage(message.id)}
+                                onClick={() => setIsDeleteConfirmOpen(true)}
                                 display={'block'}
                                 w={'100%'}
                                 p={'10px'}
@@ -268,9 +271,30 @@ const MessageBubble = ({ message, isSentByMe, chatType, isHighlighted }) => {
                     )}
                 </Box>
             )}
+            {/* Fora do Box do menu: eventos do portal sobem pela árvore React e alternariam o menu. */}
+            <ConfirmationDialog
+                open={isDeleteConfirmOpen}
+                onOpenChange={setIsDeleteConfirmOpen}
+                title="Apagar mensagem"
+                description={`Apagar ${getMessageExcerpt(message)}? Esta ação não pode ser desfeita.`}
+                onConfirm={() => deleteMessage(message.id)}
+                isConfirming={false}
+                errorMessage={null}
+                confirmLabel="Apagar"
+                cancelLabel="Cancelar"
+            />
         </Box>
     );
 };
+
+// Trecho curto da mensagem para identificá-la no diálogo de confirmação.
+function getMessageExcerpt(message: { type?: string; content?: string | null }) {
+    if (message.type === 'IMAGE') return 'esta imagem';
+    if (message.type === 'AUDIO') return 'este áudio';
+    const content = message.content?.trim() ?? '';
+    if (!content) return 'esta mensagem';
+    return `a mensagem "${content.length > 60 ? `${content.slice(0, 60)}…` : content}"`;
+}
 
 const MessageInput = ({ onSendMessage }: MessageInputProps) => {
     const { sendMessage, uploadFileAndSendMessage, isUploading, editingMessage, cancelEditingMessage, editMessage } = useChat();

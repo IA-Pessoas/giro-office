@@ -362,3 +362,42 @@ async function expectLoginFailureIsNotSessionExpiry() {
 await expectLoginFailureIsNotSessionExpiry();
 
 console.log("PASS API client treats a rejected login as bad credentials, not an expired session");
+
+async function expectServerErrorCallbackReceivesTheError() {
+  const received = [];
+  const server = createServer((request, response) => {
+    const status = request.url === "/business" ? 409 : 500;
+    response.writeHead(status, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify({ success: false, error: "Mensagem.", code: "X", requestId: "req-500" }),
+    );
+  });
+
+  await new Promise((resolve) => server.listen(0, resolve));
+  const address = server.address();
+
+  try {
+    assert.ok(address && typeof address !== "string");
+    globalThis.window = {};
+    const api = createApiClient({
+      baseURL: `http://127.0.0.1:${address.port}`,
+      onServerError: (error) => received.push(error),
+    });
+
+    await assert.rejects(api.get("/business"), { status: 409 });
+    assert.equal(received.length, 0, "4xx fica com o chamador, que mostra a mensagem de negócio.");
+
+    await assert.rejects(api.get("/boom"), { status: 500 });
+    assert.equal(received.length, 1);
+    assert.equal(received[0].response.data.requestId, "req-500");
+  } finally {
+    delete globalThis.window;
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+}
+
+await expectServerErrorCallbackReceivesTheError();
+
+console.log("PASS API client hands 5xx errors, with requestId, to onServerError");

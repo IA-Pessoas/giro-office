@@ -480,7 +480,7 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
     notificationState.setMode("success");
     notificationState.releaseLoading();
     await page.getByRole("button", { name: /Tarefa operacional pendente/ }).waitFor({ state: "visible" });
-    await page.getByTestId("app-shell-notifications-backdrop").click({ position: { x: 1, y: 1 } });
+    await page.keyboard.press("Escape");
 
     notificationState.setMode("error");
     await page.reload({ waitUntil: "networkidle" });
@@ -489,7 +489,7 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
     notificationState.setMode("empty");
     await page.getByRole("button", { name: "Tentar novamente" }).click();
     await page.getByText("Nenhuma notificação encontrada.", { exact: true }).waitFor({ state: "visible" });
-    await page.getByTestId("app-shell-notifications-backdrop").click({ position: { x: 1, y: 1 } });
+    await page.keyboard.press("Escape");
     await captureContabilEvidence(page, currentUser.id);
     if (isMobileSmoke) return;
     assert.equal(

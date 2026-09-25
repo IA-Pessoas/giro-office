@@ -73,7 +73,7 @@ describe("scoreQuarter routes", () => {
 
   it("GET /rh/score/quarters/:id bloqueia visualizador em score de terceiro", async () => {
     scoreQuarterServiceMock.getDetail.mockRejectedValueOnce(
-      new ServiceError(403, "Permissao insuficiente para acessar score de terceiro."),
+      new ServiceError(403, "Permissão insuficiente para acessar score de terceiro."),
     );
     const app = createTestApp({ rhPermission: 1 });
     const res = await request(app).get(`/rh/score/quarters/${itemId}`);

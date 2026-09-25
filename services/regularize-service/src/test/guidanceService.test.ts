@@ -220,7 +220,7 @@ describe("GuidanceService", () => {
           ...(target_type === "PJ" ? { client_pj_id: "pj-a" } : { client_pf_id: "pf-a" }),
         },
       }),
-    ).rejects.toMatchObject({ statusCode: 404, message: "Cadastro nao encontrado." });
+    ).rejects.toMatchObject({ statusCode: 404, message: "Cadastro não encontrado." });
     expect(await f.service.detail(organizationId, created.id as string)).toEqual(created);
   });
 
@@ -239,7 +239,7 @@ describe("GuidanceService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe orientacao em andamento para este processo.",
+      message: "Já existe orientação em andamento para este processo.",
     });
     expect(await f.service.detail(organizationId, created.id as string)).toEqual(created);
     expect(f.state.logs).toHaveLength(1);
@@ -342,7 +342,7 @@ describe("GuidanceService", () => {
       ),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: kind === "process" ? "Processo nao encontrado." : "Cadastro nao encontrado.",
+      message: kind === "process" ? "Processo não encontrado." : "Cadastro não encontrado.",
     });
     expect(f.state.guidances).toHaveLength(0);
   });
@@ -355,7 +355,7 @@ describe("GuidanceService", () => {
     });
     await expect(f.create()).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe orientacao em andamento para este processo.",
+      message: "Já existe orientação em andamento para este processo.",
     });
     expect(f.state.logs).toHaveLength(0);
   });

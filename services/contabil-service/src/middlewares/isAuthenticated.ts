@@ -39,7 +39,7 @@ export function requireContabilWritePermission(
   next: NextFunction,
 ): void {
   if (Number(request.permission ?? 0) < CONTABIL_WRITE_PERMISSION) {
-    next(new ServiceError(403, "Permissao insuficiente para alterar dados contabeis."));
+    next(new ServiceError(403, "Permissão insuficiente para alterar dados contábeis."));
     return;
   }
 

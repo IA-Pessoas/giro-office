@@ -4,6 +4,7 @@ import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_ERROR_MESSAGE,
   INTERNAL_SERVICE_TOKEN_HEADER,
   REQUEST_ID_HEADER,
 } from "@workspace/shared/http";
@@ -249,7 +250,8 @@ describe("gateway Worker: rotas de contabil, fiscal, triagem e parcelamento", ()
     expect(await response.json()).toMatchObject({
       success: false,
       code: "SERVICE_UNAVAILABLE",
-      error: "Serviço não configurado no gateway.",
+      // O binding ausente fica no log; o usuário recebe a mensagem neutra (#1365).
+      error: INTERNAL_ERROR_MESSAGE,
     });
     for (const name of SERVICES) expect(bindings[name].fetch).not.toHaveBeenCalled();
   });

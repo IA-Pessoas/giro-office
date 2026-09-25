@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { AxiosError } from "axios";
 import { AlertCircle, ArrowLeft, Building2, Hash, Mail, Send } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { formatCnpjInput, normalizeDigits } from "@shared/utils/inputFormatting";
 

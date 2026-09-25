@@ -138,7 +138,7 @@ class FiscalCatalogService {
         where: { id, organization_id: organizationId },
         select: this.config.select,
       });
-      if (!exists) throw new ServiceError(404, `${this.config.label} nao existe.`);
+      if (!exists) throw new ServiceError(404, `${this.config.label} não existe.`);
 
       const deleted = await this.delegate.delete({ where: { id }, select: this.config.select });
       await this.audit.createLog({

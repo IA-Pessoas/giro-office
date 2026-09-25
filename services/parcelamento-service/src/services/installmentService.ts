@@ -124,11 +124,11 @@ function requireContext(context: Pick<ParcelamentoRequestContext, "organizationI
   userId: string;
 } {
   if (!context.organizationId) {
-    throw new ServiceError(400, "Contexto de organizacao ausente.");
+    throw new ServiceError(400, "Contexto de organização ausente.");
   }
 
   if (!context.userId) {
-    throw new ServiceError(400, "Contexto de usuario ausente.");
+    throw new ServiceError(400, "Contexto de usuário ausente.");
   }
 
   return { organizationId: context.organizationId, userId: context.userId };
@@ -277,7 +277,7 @@ export class InstallmentService {
       logError("Erro ao criar parcelamento", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueError(err)) {
-        throw new ServiceError(409, "Ja existe parcelamento com este numero de acordo.", err);
+        throw new ServiceError(409, "Já existe parcelamento com este número de acordo.", err);
       }
       throw new ServiceError(500, "Erro ao criar parcelamento.", err);
     }
@@ -383,7 +383,7 @@ export class InstallmentService {
       logError("Erro ao atualizar parcelamento", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueError(err)) {
-        throw new ServiceError(409, "Ja existe parcelamento com este numero de acordo.", err);
+        throw new ServiceError(409, "Já existe parcelamento com este número de acordo.", err);
       }
       throw new ServiceError(500, "Erro ao atualizar parcelamento.", err);
     }
@@ -444,7 +444,7 @@ export class InstallmentService {
       logError("Erro ao recalcular agregados do parcelamento", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueError(err)) {
-        throw new ServiceError(409, "Ja existe parcelamento com este numero de acordo.", err);
+        throw new ServiceError(409, "Já existe parcelamento com este número de acordo.", err);
       }
       throw new ServiceError(500, "Erro ao recalcular agregados do parcelamento.", err);
     }
@@ -456,7 +456,7 @@ export class InstallmentService {
     });
 
     if (!client) {
-      throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      throw new ServiceError(404, "Cliente não encontrado para a organização.");
     }
   }
 
@@ -467,7 +467,7 @@ export class InstallmentService {
     });
 
     if (!installment) {
-      throw new ServiceError(404, "Parcelamento nao encontrado.");
+      throw new ServiceError(404, "Parcelamento não encontrado.");
     }
 
     return installment;
@@ -496,7 +496,7 @@ export class InstallmentService {
       });
 
       if (existingAgreement) {
-        throw new ServiceError(409, "Ja existe parcelamento com este numero de acordo.");
+        throw new ServiceError(409, "Já existe parcelamento com este número de acordo.");
       }
 
       return;
@@ -516,7 +516,7 @@ export class InstallmentService {
     });
 
     if (existingFallback) {
-      throw new ServiceError(409, "Ja existe parcelamento ativo para este escopo operacional.");
+      throw new ServiceError(409, "Já existe parcelamento ativo para este escopo operacional.");
     }
   }
 

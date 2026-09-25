@@ -62,7 +62,7 @@ function createCertificateFileUpload(maxFileSizeBytes: number): RequestHandler {
       }
 
       if (err instanceof multer.MulterError) {
-        next(new ServiceError(400, "Upload de certificado invalido."));
+        next(new ServiceError(400, "Upload de certificado inválido."));
         return;
       }
 

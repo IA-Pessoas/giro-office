@@ -730,7 +730,7 @@ await runTest("simultaneous server errors produce one active toast", async () =>
 await runTest("API client delegates 5xx feedback to the deduplicated notifier", async () => {
   const apiSource = await readFile(join(appRoot, "src/shared/services/api.ts"), "utf8");
 
-  assert.match(apiSource, /notifyServerError\(toast\)/);
+  assert.match(apiSource, /notifyServerError\(toast, error\)/);
   assert.doesNotMatch(apiSource, /toast\.error\(SERVER_ERROR_TOAST_MESSAGE\)/);
 });
 
@@ -1212,9 +1212,8 @@ await runTest("regularize required field errors render as sticky alerts", async 
 await runTest("regularize required field markers keep label punctuation spacing clean", async () => {
   const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
 
-  assert.match(controlsSource, /inline-flex items-center gap-1/);
-  assert.match(controlsSource, /<span>\{label\}<\/span>/);
-  assert.match(controlsSource, /<span className="text-red-500">\*<\/span>/);
+  // #1367: o campo delega ao FormField compartilhado, que marca o obrigatório com RequiredFieldLabel.
+  assert.match(controlsSource, /<FormField[\s\S]*required=\{required\}/);
   assert.doesNotMatch(controlsSource, /> \*<\/span>/);
 });
 
@@ -1429,9 +1428,9 @@ await runTest("regularize site credential detail states are explicit", async () 
   assert.notEqual(taxesStart, -1);
   assert.match(sitesSource, /Selecione um site para revelar credenciais/);
   assert.match(sitesSource, /Acesso negado para revelar credenciais/);
-  assert.match(pageSource, /Credencial indispon[iÃ­]vel para revela[cÃ§][aÃ£]o/);
+  assert.match(pageSource, /Credencial indisponível para revelação/);
   assert.match(sitesSource, /getSiteCredentialDetailStatus\(sitePasswordDetailQuery\.error\)/);
-  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponivel para revelacao\."\)/);
+  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponível para revelação\."\)/);
   assert.match(pageSource, /403\|forbidden\|permission\|permiss\|acesso negado/);
   assert.doesNotMatch(sitesSource, /Acesso negado ou indispon[iÃ­]vel/);
 });
@@ -1625,7 +1624,7 @@ await runTest("regularize dashboard and lists stay consistent with the tabs (#13
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
 
   assert.doesNotMatch(pageSource, /DashboardHeroCard/);
-  assert.match(pageSource, /label="Processos em aberto"/);
+  assert.match(pageSource, /label="Processos abertos"/);
   assert.match(
     pageSource,
     /headers=\{\["Licença", "Cliente", "Protocolo", "Contato", "Status", "Vencimento", ""\]\}/,

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient, type QueryObserverResult } from "@tanstack/react-query";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useFetch } from "@shared/hooks";
 import type { PaginatedResult } from "@shared/pagination/pagination";
@@ -25,7 +25,8 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
     }
   ).response;
 
-  if (response?.status === 409) {
+  // 4xx traz a mensagem de negócio; 5xx já ganhou o toast neutro com requestId (#1365).
+  if (response?.status && response.status < 500) {
     return response.data?.error ?? response.data?.message ?? fallback;
   }
 

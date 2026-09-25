@@ -653,8 +653,8 @@ runTest("separa permissao de edicao e remocao de arquivos", () => {
 runTest("certificate required fields are disclosed only while creating", () => {
   const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /RequiredFieldLabel/);
-  assert.match(source, /<RequiredFieldLabel[\s\S]*required=\{isCreate\}/);
+  // #1367: o marcador de obrigatório vem do FormField (que usa RequiredFieldLabel).
+  assert.match(source, /<FormField[\s\S]*required=\{isCreate\}/);
   assert.match(source, /aria-required=\{isCreate\}/);
   assert.match(source, /isPj \? "CNPJ" : "CPF"/);
   assert.match(source, /function hasText\(value: string\): boolean/);

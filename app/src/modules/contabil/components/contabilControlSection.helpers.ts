@@ -89,9 +89,8 @@ export function shouldSyncRemoteContabilControl(
   return (remote?.id ?? null) !== currentControlId;
 }
 
-export function formatContabilCount(count: number, singular: string, plural: string): string {
-  return `${count} ${count === 1 ? singular : plural}`;
-}
+// Mesmo formatador compartilhado; o nome antigo segue exportado para os call sites do módulo.
+export { formatCount as formatContabilCount } from "../../../shared/utils/formatters.ts";
 
 // <input type="month"> segue o idioma do navegador ("September 2026"); o seletor próprio fica em pt-BR.
 export const CONTABIL_MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => {

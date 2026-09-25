@@ -117,7 +117,7 @@ export class LicenseService {
       select: { id: true },
     });
     if (exists) {
-      throw new ServiceError(409, "Alvara com este protocolo ja cadastrado.");
+      throw new ServiceError(409, "Alvará com este protocolo já cadastrado.");
     }
 
     const created = await this.prisma.license.create({
@@ -153,7 +153,7 @@ export class LicenseService {
       select: licenseSelect,
     });
     if (!existing) {
-      throw new ServiceError(404, "Alvara nao encontrado.");
+      throw new ServiceError(404, "Alvará não encontrado.");
     }
 
     if (input.body.client_id) {
@@ -203,7 +203,7 @@ export class LicenseService {
       },
     });
     if (!detail) {
-      throw new ServiceError(404, "Alvara nao encontrado.");
+      throw new ServiceError(404, "Alvará não encontrado.");
     }
 
     return toPublicLicense(detail as unknown as Record<string, unknown>);
@@ -382,7 +382,7 @@ export class LicenseService {
       select: { id: true },
     });
     if (!client) {
-      throw new ServiceError(404, "Cliente nao encontrado.");
+      throw new ServiceError(404, "Cliente não encontrado.");
     }
   }
 
@@ -400,7 +400,7 @@ export class LicenseService {
       select: { id: true },
     });
     if (!task) {
-      throw new ServiceError(404, "Tarefa nao encontrada na organizacao.");
+      throw new ServiceError(404, "Tarefa não encontrada na organização.");
     }
   }
 }
