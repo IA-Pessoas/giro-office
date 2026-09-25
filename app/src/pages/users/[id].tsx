@@ -27,7 +27,7 @@ export default function User({
   return (
     <>
       <Head>
-        <title>{`Usuário ${user.name ?? ""} | Office`.replace("  ", " ")}</title>
+        <title>{user.name ? `Usuário ${user.name} | Office` : "Usuário | Office"}</title>
       </Head>
       <UserProfile userId={user.id} me={me} departments={deps} />
     </>

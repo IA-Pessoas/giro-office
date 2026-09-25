@@ -37,7 +37,7 @@ export default function Department({ dep, forbidden = false }: Props) {
   return (
     <>
       <Head>
-        <title>{`Departamento ${dep.name ?? ""} | Office`.replace("  ", " ")}</title>
+        <title>{dep.name ? `Departamento ${dep.name} | Office` : "Departamento | Office"}</title>
       </Head>
       <DepartmentForm dep={dep} />
     </>
