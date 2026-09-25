@@ -122,7 +122,7 @@ function assertValidPointTimes(input: {
   for (const [field, value] of Object.entries(input)) {
     if (field === "timezone") continue;
     if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
-      throw new ServiceError(400, `${field} invalido.`);
+      throw new ServiceError(400, `${field} inválido.`);
     }
   }
 
@@ -163,7 +163,7 @@ class TimeClockRequestService {
       where: { id: organizationId },
       select: { timezone: true } as never,
     });
-    if (!organization) throw new ServiceError(404, "Organizacao nao encontrada.");
+    if (!organization) throw new ServiceError(404, "Organização não encontrada.");
     return (
       (organization as { timezone?: string | null }).timezone?.trim() ||
       DEFAULT_ORGANIZATION_TIMEZONE
@@ -182,12 +182,12 @@ class TimeClockRequestService {
         select: { id: true },
       });
       if (!actor) {
-        throw new ServiceError(404, "Aprovador nao encontrado nesta organizacao.");
+        throw new ServiceError(404, "Aprovador não encontrado nesta organização.");
       }
       return;
     }
     if (input.access.rh_permission < RH_MANAGER_PERMISSION) {
-      throw new ServiceError(403, "Permissao insuficiente para decidir ajustes de ponto.");
+      throw new ServiceError(403, "Permissão insuficiente para decidir ajustes de ponto.");
     }
 
     const [actor, target] = await Promise.all([
@@ -202,7 +202,7 @@ class TimeClockRequestService {
     ]);
 
     if (!actor || !target || !actor.department_id || actor.department_id !== target.department_id) {
-      throw new ServiceError(404, "Solicitacao nao encontrada no escopo do gestor.");
+      throw new ServiceError(404, "Solicitação não encontrada no escopo do gestor.");
     }
   }
 
@@ -230,7 +230,7 @@ class TimeClockRequestService {
       where: { id: requestId },
       select: TIME_CLOCK_REQUEST_SELECT,
     });
-    if (!request) throw new ServiceError(404, "Solicitacao nao encontrada.");
+    if (!request) throw new ServiceError(404, "Solicitação não encontrada.");
     return request;
   }
 
@@ -253,13 +253,13 @@ class TimeClockRequestService {
   ): Promise<TimeClockRequestSnapshot> {
     const request = await this.getRequest(tx, input.request_id);
     if (request.organization_id !== input.organization_id) {
-      throw new ServiceError(403, "Solicitacao pertence a outra organizacao.");
+      throw new ServiceError(403, "Solicitação pertence a outra organização.");
     }
     if (request.status !== "Pendente") {
-      throw new ServiceError(409, "Solicitacao nao esta pendente de aprovacao.");
+      throw new ServiceError(409, "Solicitação não está pendente de aprovação.");
     }
     if (request.user_id === input.approver_user_id) {
-      throw new ServiceError(403, "O solicitante nao pode decidir o proprio ajuste.");
+      throw new ServiceError(403, "O solicitante não pode decidir o próprio ajuste.");
     }
 
     await this.assertManagementAccess(tx, {
@@ -295,7 +295,7 @@ class TimeClockRequestService {
       : null;
 
     if (request.point_id && !point) {
-      throw new ServiceError(404, "Registro de ponto vinculado nao encontrado.");
+      throw new ServiceError(404, "Registro de ponto vinculado não encontrado.");
     }
     if (
       point &&
@@ -307,7 +307,7 @@ class TimeClockRequestService {
       point?.clock_in &&
       organizationDateKey(point.clock_in, timezone) !== organizationDateKey(request.date, timezone)
     ) {
-      throw new ServiceError(409, "Registro de ponto nao corresponde ao dia da solicitacao.");
+      throw new ServiceError(409, "Registro de ponto não corresponde ao dia da solicitação.");
     }
 
     if (!point) {
@@ -364,7 +364,7 @@ class TimeClockRequestService {
       },
     });
     if (claimed.count !== 1) {
-      throw new ServiceError(409, "Solicitacao nao esta mais pendente de aprovacao.");
+      throw new ServiceError(409, "Solicitação não está mais pendente de aprovação.");
     }
 
     await this.pointService.calculateDailyHours(point.id, input.organization_id, tx, timezone);
@@ -394,18 +394,18 @@ class TimeClockRequestService {
           where: { id: input.point_id },
           select: { id: true, user_id: true, organization_id: true, clock_in: true },
         });
-        if (!point) throw new ServiceError(404, "Registro de ponto nao encontrado.");
+        if (!point) throw new ServiceError(404, "Registro de ponto não encontrado.");
         if (point.user_id !== userId) {
-          throw new ServiceError(403, "So e possivel solicitar ajuste para o proprio ponto.");
+          throw new ServiceError(403, "Só é possível solicitar ajuste para o próprio ponto.");
         }
         if (point.organization_id !== organizationId) {
-          throw new ServiceError(403, "Registro de ponto pertence a outra organizacao.");
+          throw new ServiceError(403, "Registro de ponto pertence a outra organização.");
         }
         if (
           organizationDateKey(point.clock_in, timezone) !==
           organizationDateKey(input.clock_in, timezone)
         ) {
-          throw new ServiceError(400, "point_id deve corresponder ao dia dos horarios informados.");
+          throw new ServiceError(400, "point_id deve corresponder ao dia dos horários informados.");
         }
       }
 
@@ -415,14 +415,14 @@ class TimeClockRequestService {
         organizationDateKeyFromInput(input.date, timezone) !==
           organizationDateKey(input.clock_in, timezone)
       ) {
-        throw new ServiceError(400, "date deve corresponder ao dia dos horarios informados.");
+        throw new ServiceError(400, "date deve corresponder ao dia dos horários informados.");
       }
       const pending = await this.db.timeClockRequest.findFirst({
         where: { organization_id: organizationId, user_id: userId, date, status: "Pendente" },
         select: { id: true },
       });
       if (pending) {
-        throw new ServiceError(409, "Ja existe solicitacao pendente para este colaborador e dia.");
+        throw new ServiceError(409, "Já existe solicitação pendente para este colaborador e dia.");
       }
 
       const created = await this.db.timeClockRequest.create({
@@ -446,10 +446,10 @@ class TimeClockRequestService {
       logError("Erro ao criar solicitacao de ajuste de ponto", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueViolation(err)) {
-        throw new ServiceError(409, "Ja existe solicitacao pendente para este colaborador e dia.");
+        throw new ServiceError(409, "Já existe solicitação pendente para este colaborador e dia.");
       }
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao criar solicitacao de ajuste. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao criar solicitação de ajuste. ${msg}`, err);
     }
   }
 
@@ -470,18 +470,18 @@ class TimeClockRequestService {
       logError("Erro ao aprovar solicitacao de ajuste de ponto", { err });
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao aprovar solicitacao. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao aprovar solicitação. ${msg}`, err);
     }
   }
 
   async approveBulk(input: TimeClockRequestBulkApproveInput): Promise<TimeClockRequestSnapshot[]> {
     try {
       if (input.request_ids.length === 0) {
-        throw new ServiceError(400, "Informe ao menos uma solicitacao.");
+        throw new ServiceError(400, "Informe ao menos uma solicitação.");
       }
       const uniqueIds = new Set(input.request_ids);
       if (uniqueIds.size !== input.request_ids.length) {
-        throw new ServiceError(400, "O lote nao pode conter solicitacoes repetidas.");
+        throw new ServiceError(400, "O lote não pode conter solicitações repetidas.");
       }
       return await this.db.$transaction(async (tx) => {
         const approved: TimeClockRequestSnapshot[] = [];
@@ -512,13 +512,13 @@ class TimeClockRequestService {
       const organizationId = assertNonEmptyString(input.organization_id, "organization_id");
       const request = await this.getRequest(this.db, requestId);
       if (request.organization_id !== organizationId) {
-        throw new ServiceError(403, "Solicitacao pertence a outra organizacao.");
+        throw new ServiceError(403, "Solicitação pertence a outra organização.");
       }
       if (request.status !== "Pendente") {
-        throw new ServiceError(409, "Solicitacao nao esta pendente de rejeicao.");
+        throw new ServiceError(409, "Solicitação não está pendente de rejeição.");
       }
       if (request.user_id === approverUserId) {
-        throw new ServiceError(403, "O solicitante nao pode decidir o proprio ajuste.");
+        throw new ServiceError(403, "O solicitante não pode decidir o próprio ajuste.");
       }
 
       await this.assertManagementAccess(this.db, {
@@ -542,14 +542,14 @@ class TimeClockRequestService {
         },
       });
       if (updated.count !== 1) {
-        throw new ServiceError(409, "Solicitacao nao esta mais pendente de rejeicao.");
+        throw new ServiceError(409, "Solicitação não está mais pendente de rejeição.");
       }
       return this.withSignedAttachment(await this.getRequest(this.db, requestId));
     } catch (err: unknown) {
       logError("Erro ao rejeitar solicitacao de ajuste de ponto", { err });
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao rejeitar solicitacao. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao rejeitar solicitação. ${msg}`, err);
     }
   }
 
@@ -573,7 +573,7 @@ class TimeClockRequestService {
             select: { department_id: true },
           });
           if (!actor?.department_id) {
-            throw new ServiceError(404, "Departamento do gestor nao encontrado.");
+            throw new ServiceError(404, "Departamento do gestor não encontrado.");
           }
           where.user = { organization_id: orgId, department_id: actor.department_id };
         }
@@ -589,7 +589,7 @@ class TimeClockRequestService {
       logError("Erro ao listar solicitacoes de ajuste de ponto", { err });
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao listar solicitacoes de ajuste. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao listar solicitações de ajuste. ${msg}`, err);
     }
   }
 
@@ -614,7 +614,7 @@ class TimeClockRequestService {
         organizationDateKeyFromInput(input.date, timezone) !==
         organizationDateKey(input.clock_in, timezone)
       ) {
-        throw new ServiceError(400, "date deve corresponder ao dia dos horarios informados.");
+        throw new ServiceError(400, "date deve corresponder ao dia dos horários informados.");
       }
 
       return await this.db.$transaction(async (tx) => {
@@ -623,14 +623,14 @@ class TimeClockRequestService {
           select: { id: true },
         });
         if (!approver) {
-          throw new ServiceError(404, "Aprovador nao encontrado nesta organizacao.");
+          throw new ServiceError(404, "Aprovador não encontrado nesta organização.");
         }
 
         const target = await tx.user.findFirst({
           where: { id: targetUserId, organization_id: organizationId },
           select: { id: true },
         });
-        if (!target) throw new ServiceError(404, "Colaborador nao encontrado nesta organizacao.");
+        if (!target) throw new ServiceError(404, "Colaborador não encontrado nesta organização.");
         await assertPointDayIsUnlocked(tx, {
           organizationId,
           userId: targetUserId,
@@ -646,7 +646,7 @@ class TimeClockRequestService {
           },
           select: { id: true },
         });
-        if (pending) throw new ServiceError(409, "Existe solicitacao pendente para este dia.");
+        if (pending) throw new ServiceError(409, "Existe solicitação pendente para este dia.");
 
         const { start: dayStart, end: dayEnd } = organizationDayBounds(date, timezone);
         const existingPoint = await tx.point.findFirst({
@@ -741,10 +741,10 @@ class TimeClockRequestService {
   }): Promise<TimeClockRequestSnapshot> {
     const request = await this.getRequest(this.db, input.request_id);
     if (request.organization_id !== input.organization_id) {
-      throw new ServiceError(403, "Solicitacao pertence a outra organizacao.");
+      throw new ServiceError(403, "Solicitação pertence a outra organização.");
     }
     if (request.status !== "Pendente") {
-      throw new ServiceError(409, "Somente solicitacoes pendentes podem receber comprovante.");
+      throw new ServiceError(409, "Somente solicitações pendentes podem receber comprovante.");
     }
     if (request.user_id !== input.actor_user_id && input.rh_permission < RH_MANAGEMENT_PERMISSION) {
       throw new ServiceError(403, "Somente o solicitante pode anexar o comprovante.");
@@ -759,7 +759,7 @@ class TimeClockRequestService {
       },
     });
     if (!isRhPointAdjustmentObjectPath(objectPath, input.organization_id, request.id)) {
-      throw new ServiceError(500, "Armazenamento retornou uma chave de comprovante invalida.");
+      throw new ServiceError(500, "Armazenamento retornou uma chave de comprovante inválida.");
     }
 
     const updated = await this.db.timeClockRequest.update({

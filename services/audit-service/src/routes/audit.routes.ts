@@ -178,7 +178,7 @@ export function createAuditPublicRouter(options: CreateAuditRouterOptions): Rout
             requestId: request.params.requestId,
           },
         });
-        throw new ServiceError(404, "Registro de auditoria nao encontrado.");
+        throw new ServiceError(404, "Registro de auditoria não encontrado.");
       }
 
       options.logger.info({

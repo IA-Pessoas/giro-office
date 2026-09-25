@@ -60,7 +60,7 @@ describe("certificate service env", () => {
     });
 
     expect(() => getCertificateServiceEnv()).toThrow(
-      /SUPABASE_URL invalida para certificate-service/,
+      /SUPABASE_URL inválida para certificate-service/,
     );
   });
 
@@ -74,7 +74,7 @@ describe("certificate service env", () => {
     });
 
     expect(() => getCertificateServiceEnv()).toThrow(
-      /CERTIFICATE_STORAGE_MODE=local nao e permitido em producao/,
+      /CERTIFICATE_STORAGE_MODE=local não é permitido em produção/,
     );
   });
 

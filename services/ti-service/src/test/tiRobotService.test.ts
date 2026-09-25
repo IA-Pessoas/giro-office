@@ -124,7 +124,7 @@ describe("TiRobotService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Robo de TI nao encontrado.",
+      message: "Robô de TI não encontrado.",
     });
     expect(prisma.tIRobotRun.create).not.toHaveBeenCalled();
   });

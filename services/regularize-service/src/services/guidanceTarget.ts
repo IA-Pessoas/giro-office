@@ -50,7 +50,7 @@ export async function resolveGuidanceTarget(
       where: { id: input.client_pj_id, organization_id: organizationId },
     });
     if (!client) {
-      throw new ServiceError(404, "Cadastro nao encontrado.");
+      throw new ServiceError(404, "Cadastro não encontrado.");
     }
     return {
       targetType: "PJ",
@@ -67,7 +67,7 @@ export async function resolveGuidanceTarget(
     where: { id: input.client_pf_id, organization_id: organizationId },
   });
   if (!clientPf) {
-    throw new ServiceError(404, "Cadastro nao encontrado.");
+    throw new ServiceError(404, "Cadastro não encontrado.");
   }
   return {
     targetType: "PF",

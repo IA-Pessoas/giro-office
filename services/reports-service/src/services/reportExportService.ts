@@ -221,7 +221,7 @@ export class ReportExportService {
     });
     if (version.model.created_by_user_id !== null) {
       if (source.job.requester_id !== input.userId) {
-        throw new ServiceError(404, "Snapshot de relatório não encontrado.");
+        throw new ServiceError(404, "Resultado do relatório não encontrado.");
       }
       return { scope: "personal" };
     }

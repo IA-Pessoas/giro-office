@@ -69,7 +69,7 @@ export class TiExtensionService {
     });
 
     if (!extension) {
-      throw new ServiceError(404, "Ramal de TI nao encontrado.");
+      throw new ServiceError(404, "Ramal de TI não encontrado.");
     }
 
     return withoutNestedUserPassword(extension);
@@ -82,7 +82,7 @@ export class TiExtensionService {
       });
 
       if (duplicated) {
-        throw new ServiceError(409, "Ja existe um ramal de TI com este numero.");
+        throw new ServiceError(409, "Já existe um ramal de TI com este número.");
       }
 
       await this.ensureUser(context.organizationId, body.user_id);
@@ -98,7 +98,7 @@ export class TiExtensionService {
       logError("Erro ao criar ramal de TI", { err });
       if (err instanceof ServiceError) throw err;
       if (isUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um ramal de TI com este numero.", err);
+        throw new ServiceError(409, "Já existe um ramal de TI com este número.", err);
       }
       throw new ServiceError(500, "Erro ao criar ramal de TI.", err);
     }
@@ -122,7 +122,7 @@ export class TiExtensionService {
         });
 
         if (duplicated) {
-          throw new ServiceError(409, "Ja existe um ramal de TI com este numero.");
+          throw new ServiceError(409, "Já existe um ramal de TI com este número.");
         }
       }
 
@@ -134,7 +134,7 @@ export class TiExtensionService {
       logError("Erro ao atualizar ramal de TI", { err });
       if (err instanceof ServiceError) throw err;
       if (isUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um ramal de TI com este numero.", err);
+        throw new ServiceError(409, "Já existe um ramal de TI com este número.", err);
       }
       throw new ServiceError(500, "Erro ao atualizar ramal de TI.", err);
     }
@@ -146,7 +146,7 @@ export class TiExtensionService {
     });
 
     if (!user) {
-      throw new ServiceError(404, "Usuario nao encontrado.");
+      throw new ServiceError(404, "Usuário não encontrado.");
     }
   }
 }

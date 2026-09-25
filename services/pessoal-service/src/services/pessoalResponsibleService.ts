@@ -35,6 +35,6 @@ export async function ensurePessoalResponsible(
   });
 
   if (!responsible) {
-    throw new ServiceError(404, "Responsavel nao encontrado ou inelegivel para Pessoal.");
+    throw new ServiceError(404, "Responsável não encontrado ou inelegível para Pessoal.");
   }
 }

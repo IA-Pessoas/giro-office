@@ -27,14 +27,14 @@ const parcelamentoServiceEnvSchema = z
   .object({
     port: z.coerce.number().int().positive().default(3043),
     nodeEnv: z.string().optional().default("development"),
-    databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o parcelamento-service."),
-    jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o parcelamento-service."),
+    databaseUrl: z.string().min(1, "DATABASE_URL não definido para o parcelamento-service."),
+    jwtSecret: z.string().min(1, "JWT_SECRET não definido para o parcelamento-service."),
     auditEnabled: z
       .string()
       .optional()
       .default("true")
       .transform((value) => parseBoolean(value)),
-    auditServiceUrl: z.string().url("AUDIT_SERVICE_URL invalida.").default("http://localhost:3020"),
+    auditServiceUrl: z.string().url("AUDIT_SERVICE_URL inválida.").default("http://localhost:3020"),
     auditServiceToken: z.string().optional().default("audit-service-token"),
     reportsInternalToken: z.string().optional().default("reports-service-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),

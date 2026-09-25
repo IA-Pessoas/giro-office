@@ -39,7 +39,7 @@ function getSummaryErrorMessage(error: Error | null) {
     if (
       error.response?.status === 404 &&
       typeof responseMessage === "string" &&
-      responseMessage.includes("Configuracao de ponto nao encontrada")
+      /Configura(ção|cao) de ponto n(ão|ao) encontrada/.test(responseMessage)
     ) {
       return "Cadastre a configuração de ponto para visualizar o resumo.";
     }

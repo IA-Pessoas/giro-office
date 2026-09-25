@@ -29,7 +29,10 @@ export function getPlatformErrorMessage(error: unknown, fallback: string): strin
 
 export function getPlatformMutationErrorMessage(error: unknown, fallback: string): string {
   if (isPlatformConflict(error)) {
-    return "Esta organização foi alterada por outra pessoa. Os dados foram atualizados; revise e tente novamente.";
+    return getPlatformErrorMessage(
+      error,
+      "Esta organização foi alterada por outra pessoa. Os dados foram atualizados; revise e tente novamente.",
+    );
   }
   return getPlatformErrorMessage(error, fallback);
 }

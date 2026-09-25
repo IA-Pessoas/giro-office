@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import { useRouter } from "next/router";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { canAccessAdministration, isOrganizationOwner, OWNER_ROLE_LABEL } from "@modules/auth";
 import { useAuth } from "@/context/AuthContext";

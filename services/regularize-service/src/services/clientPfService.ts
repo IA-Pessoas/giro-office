@@ -97,7 +97,7 @@ export class ClientPfService {
       select: clientPfSelect,
     });
     if (!existing) {
-      throw new ServiceError(404, "Cliente PF nao encontrado.");
+      throw new ServiceError(404, "Cliente PF não encontrado.");
     }
 
     await this.ensureUnique(input.organizationId, input.body);
@@ -131,7 +131,7 @@ export class ClientPfService {
       select: clientPfSelect,
     });
     if (!detail) {
-      throw new ServiceError(404, "Cliente PF nao encontrado.");
+      throw new ServiceError(404, "Cliente PF não encontrado.");
     }
 
     return { detail };
@@ -198,7 +198,7 @@ export class ClientPfService {
     });
 
     if (exists) {
-      throw new ServiceError(409, "Cliente PF ja cadastrado.");
+      throw new ServiceError(409, "Cliente PF já cadastrado.");
     }
   }
 }

@@ -174,8 +174,8 @@ export function authorizeFiscalRequest(request: Request, auth: WorkerAuthContext
       throw new ServiceError(
         403,
         request.method === "DELETE"
-          ? "Permissao insuficiente para excluir dados fiscais."
-          : "Permissao insuficiente para alterar dados fiscais.",
+          ? "Permissão insuficiente para excluir dados fiscais."
+          : "Permissão insuficiente para alterar dados fiscais.",
       );
     }
   }

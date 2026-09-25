@@ -40,7 +40,7 @@ export function QuickActions() {
     {
       label: "Ver Usuários",
       icon: User,
-      href: "/users",
+      href: "/administracao",
       tone: "purple",
     },
     ...(isAdmin

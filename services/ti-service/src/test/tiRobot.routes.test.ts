@@ -39,7 +39,7 @@ describe("ti robot routes", () => {
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Permissao insuficiente para acessar o ti-service.",
+      error: "Permissão insuficiente para acessar o módulo de TI.",
       code: "FORBIDDEN",
     });
   });
@@ -94,7 +94,7 @@ describe("ti robot routes", () => {
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Permissao insuficiente para acessar o ti-service.",
+      error: "Permissão insuficiente para acessar o módulo de TI.",
       code: "FORBIDDEN",
     });
   });

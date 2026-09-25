@@ -1,5 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { Dialog } from "@shared/components";
 import { useMe } from "@shared/hooks/useMe";
@@ -88,13 +88,8 @@ export function ClientCreateModal({ isOpen, onClose, onCreated }: CreateModalPro
       setShowDocumentError(false);
     }
 
-    if (!getClientInternalName(formValues) || !formValues.cpf_cnpj.trim()) {
-      toast.error("Preencha nome e CPF/CNPJ para continuar.");
-      return;
-    }
-
-    if (documentError) {
-      toast.error(documentError);
+    // O ClientForm mostra o erro abaixo do campo (#1367); aqui só interrompe o envio.
+    if (!getClientInternalName(formValues) || !formValues.cpf_cnpj.trim() || documentError) {
       return;
     }
 
