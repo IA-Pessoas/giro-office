@@ -39,6 +39,38 @@ describe("certificate password crypto", () => {
     );
   });
 
+  it("reads payloads encrypted with the legacy key, whatever their version", () => {
+    const legacyKey = Buffer.alloc(32, 7).toString("base64");
+    const legacyCrypto = createCertificatePasswordCrypto({
+      keyBase64: legacyKey,
+      keyVersion: "v0",
+    });
+    const crypto = createCertificatePasswordCrypto({
+      keyBase64: testKey,
+      keyVersion: "v1",
+      legacyKeyBase64: legacyKey,
+    });
+
+    expect(crypto.decrypt(legacyCrypto.encrypt("senha-legada"))).toBe("senha-legada");
+    expect(crypto.decrypt(crypto.encrypt("senha-nova"))).toBe("senha-nova");
+  });
+
+  it("rejects a payload encrypted with an unknown key", () => {
+    const otherCrypto = createCertificatePasswordCrypto({
+      keyBase64: Buffer.alloc(32, 5).toString("base64"),
+      keyVersion: "v1",
+    });
+    const crypto = createCertificatePasswordCrypto({
+      keyBase64: testKey,
+      keyVersion: "v1",
+      legacyKeyBase64: Buffer.alloc(32, 7).toString("base64"),
+    });
+
+    expect(() => crypto.decrypt(otherCrypto.encrypt("senha"))).toThrow(
+      "Erro ao descriptografar senha de certificado.",
+    );
+  });
+
   it.each(["iv", "tag", "data"] as const)("rejects a tampered %s payload field", (field) => {
     const crypto = createCertificatePasswordCrypto({ keyBase64: testKey, keyVersion: "v1" });
     const payload = JSON.parse(crypto.encrypt("senha-segura")) as Record<string, string>;

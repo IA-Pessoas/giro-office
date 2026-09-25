@@ -753,6 +753,10 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
             model: { type: "string" },
             legal_nature: { type: "string" },
             password: { type: "string", nullable: true },
+            password_unavailable: {
+              type: "boolean",
+              description: "Senha cadastrada, mas ilegível com as chaves configuradas.",
+            },
             expiration_date: { type: "string", format: "date-time" },
             notes: { type: "string", nullable: true },
             was_paid: { type: "boolean" },
@@ -806,6 +810,10 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
             cpf: { type: "string" },
             model: { type: "string" },
             password: { type: "string", nullable: true },
+            password_unavailable: {
+              type: "boolean",
+              description: "Senha cadastrada, mas ilegível com as chaves configuradas.",
+            },
             expiration_date: { type: "string", format: "date-time" },
             notes: { type: "string", nullable: true },
             enterprise: { type: "string", nullable: true },

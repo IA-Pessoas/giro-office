@@ -76,6 +76,8 @@ export interface CertificatePjPublicResult {
 
 export interface CertificatePjDetailResult extends CertificatePjPublicResult {
   password?: string;
+  /** A senha existe, mas não pôde ser descriptografada com as chaves configuradas. */
+  password_unavailable?: true;
 }
 
 export type CertificatePjListResult = PaginatedResult<CertificatePjPublicResult>;
@@ -248,10 +250,21 @@ export class CertificatePjService {
 
     const passwordCrypto = this.requirePasswordCrypto();
     if (isJsonValue(record.password)) {
-      return removeFilePrivateMetadata({
-        ...record,
-        password: passwordCrypto.decrypt(record.password),
-      });
+      try {
+        return removeFilePrivateMetadata({
+          ...record,
+          password: passwordCrypto.decrypt(record.password),
+        });
+      } catch (err: unknown) {
+        logWarn("Senha do certificado PJ indisponível para descriptografia", {
+          certificateId: record.id,
+          err,
+        });
+        return {
+          ...removePassword(removeFilePrivateMetadata(record)),
+          password_unavailable: true,
+        };
+      }
     }
 
     await this.prisma.certificatePJ.updateMany({

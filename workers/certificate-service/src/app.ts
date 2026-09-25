@@ -188,6 +188,7 @@ async function withCertificateService<T>(
     const passwordCrypto = createCertificatePasswordCrypto({
       keyBase64: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
       keyVersion: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
+      legacyKeyBase64: options.env.CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY,
     });
     const service = new CertificatePjService(
       client as unknown as ConstructorParameters<typeof CertificatePjService>[0],
@@ -208,6 +209,7 @@ async function withCertificatePfService<T>(
     const passwordCrypto = createCertificatePasswordCrypto({
       keyBase64: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
       keyVersion: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
+      legacyKeyBase64: options.env.CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY,
     });
     const service = new CertificatePfService(
       client as unknown as ConstructorParameters<typeof CertificatePfService>[0],

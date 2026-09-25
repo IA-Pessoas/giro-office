@@ -5,6 +5,8 @@ export interface CertificateWorkerEnv extends WorkerEnv {
   INTERNAL_SERVICE_TOKEN: string;
   CERTIFICATE_PASSWORD_ENCRYPTION_KEY: string;
   CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION?: string;
+  /** Chave anterior das senhas migradas; só leitura. */
+  CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY?: string;
   CERTIFICATE_FILE_ENCRYPTION_KEY?: string;
   CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION?: string;
   CERTIFICATE_STORAGE_BUCKET?: string;

@@ -85,8 +85,11 @@ a versao atual da chave. Nunca registre a chave, senhas ou payloads reais em doc
 artefatos versionados.
 
 As senhas persistidas usam AES-256-GCM no envelope JSON `{ v, iv, tag, data }`. JSON invalido ou
-que nao represente esse envelope falha fechado. Texto legado nao-JSON e recriptografado na primeira
-leitura autorizada.
+que nao represente esse envelope nao derruba o detalhe: o Worker responde 200 sem `password` e com
+`password_unavailable: true`. Texto legado nao-JSON e recriptografado na primeira leitura autorizada.
+
+No Worker, `CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY` (opcional) recebe a chave usada nos envelopes
+migrados. Ela so e usada para leitura, em qualquer versao de envelope, depois que a chave atual falha.
 
 ## Rotas internas
 

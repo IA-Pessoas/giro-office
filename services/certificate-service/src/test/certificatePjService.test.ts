@@ -194,7 +194,7 @@ describe("CertificatePjService", () => {
     ).resolves.toMatchObject({ password: "senha-segura" });
   });
 
-  it("does not return an invalid persisted password envelope", async () => {
+  it("flags an undecryptable password instead of failing the detail read", async () => {
     const crypto = createCertificatePasswordCryptoForTest();
     const prisma = {
       certificatePJ: {
@@ -209,14 +209,14 @@ describe("CertificatePjService", () => {
         organizationId: certificateOrganizationId,
         canViewPassword: true,
       }),
-    ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
+    ).resolves.toMatchObject({ password_unavailable: true });
   });
 
   it.each([
     " []",
     ' "senha"',
     '  {"v":"v1"}',
-  ])("fails closed for persisted JSON that is not an envelope: %s", async (password) => {
+  ])("flags persisted JSON that is not an envelope as unavailable: %s", async (password) => {
     const crypto = createCertificatePasswordCryptoForTest();
     const prisma = {
       certificatePJ: {
@@ -232,7 +232,7 @@ describe("CertificatePjService", () => {
         organizationId: certificateOrganizationId,
         canViewPassword: true,
       }),
-    ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
+    ).resolves.not.toHaveProperty("password");
     expect(prisma.certificatePJ.update).not.toHaveBeenCalled();
   });
 
