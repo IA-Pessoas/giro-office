@@ -88,7 +88,11 @@ async function runPrismaGenerate() {
         cwd: infraDir,
         stdio: "inherit",
         shell: true,
-        env: process.env,
+        env: {
+          ...process.env,
+          DATABASE_URL:
+            process.env.DATABASE_URL ?? "postgresql://localhost:5432/giro_build?schema=public",
+        },
       },
     );
 
