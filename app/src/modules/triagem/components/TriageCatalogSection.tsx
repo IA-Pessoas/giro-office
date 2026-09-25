@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Archive, Loader2, Pencil, Plus, Save, X } from "lucide-react";
 import { toast } from "@shared/services/toast";
+import { ConfirmationDialog } from "@shared/components";
 
 import { getContabilErrorMessage } from "@modules/contabil";
 
@@ -115,6 +116,7 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<CatalogFormValues>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
+  const [pendingArchive, setPendingArchive] = useState<TriageCatalogItem | null>(null);
   const actionError =
     catalogs.error ?? mutations.create.error ?? mutations.update.error ?? mutations.archive.error;
   const isMutating =
@@ -169,10 +171,9 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
     if (saved) setEditingId(null);
   }
 
-  function archiveCatalog(id: string): void {
-    if (window.confirm("Arquivar este item de catálogo?")) {
-      mutations.archive.mutate(id);
-    }
+  async function confirmArchive(): Promise<void> {
+    if (!pendingArchive) return;
+    await mutations.archive.mutateAsync(pendingArchive.id);
   }
 
   return (
@@ -285,7 +286,7 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
                       <button
                         type="button"
                         className={BUTTON_CLASSNAME}
-                        onClick={() => archiveCatalog(item.id)}
+                        onClick={() => setPendingArchive(item)}
                         disabled={isMutating}
                       >
                         <Archive className="h-4 w-4" aria-hidden="true" />
@@ -310,6 +311,20 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
           Não foi possível concluir a alteração. {getContabilErrorMessage(actionError)}
         </p>
       ) : null}
+
+      <ConfirmationDialog
+        open={pendingArchive !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingArchive(null);
+        }}
+        title="Arquivar item do catálogo"
+        description={`Arquivar o item "${pendingArchive?.label ?? ""}" do catálogo?`}
+        onConfirm={confirmArchive}
+        isConfirming={mutations.archive.isPending}
+        errorMessage={null}
+        confirmLabel="Arquivar"
+        cancelLabel="Cancelar"
+      />
     </section>
   );
 }

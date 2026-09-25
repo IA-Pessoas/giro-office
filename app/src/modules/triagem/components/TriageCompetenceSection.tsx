@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Archive, CalendarPlus, Loader2, RotateCcw } from "lucide-react";
 
 import { getContabilErrorMessage } from "@modules/contabil";
+import { ConfirmationDialog } from "@shared/components";
 
 import {
   useTriageCompetenceMutations,
@@ -29,6 +30,7 @@ export function TriageCompetenceSection({
   const competences = useTriageCompetences(clientId);
   const mutations = useTriageCompetenceMutations(clientId);
   const actionError = mutations.create.error ?? mutations.archive.error;
+  const [pendingArchive, setPendingArchive] = useState<{ id: string; competence: string } | null>(null);
 
   function createCompetence(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,10 +38,9 @@ export function TriageCompetenceSection({
     mutations.create.mutate(competence);
   }
 
-  function archiveCompetence(id: string) {
-    if (window.confirm("Arquivar esta competência da Triagem?")) {
-      mutations.archive.mutate(id);
-    }
+  async function confirmArchive() {
+    if (!pendingArchive) return;
+    await mutations.archive.mutateAsync(pendingArchive.id);
   }
 
   function renderCompetenceContent() {
@@ -102,7 +103,7 @@ export function TriageCompetenceSection({
               {canEdit && !item.archived_at ? (
                 <button
                   type="button"
-                  onClick={() => archiveCompetence(item.id)}
+                  onClick={() => setPendingArchive({ id: item.id, competence: item.competence })}
                   disabled={mutations.archive.isPending}
                   className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:self-auto"
                 >
@@ -181,6 +182,20 @@ export function TriageCompetenceSection({
           Não foi possível concluir a alteração. {getContabilErrorMessage(actionError)}
         </p>
       ) : null}
+
+      <ConfirmationDialog
+        open={pendingArchive !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingArchive(null);
+        }}
+        title="Arquivar competência"
+        description={`Arquivar a competência ${pendingArchive ? formatTriageCompetence(pendingArchive.competence) : ""} da Triagem?`}
+        onConfirm={confirmArchive}
+        isConfirming={mutations.archive.isPending}
+        errorMessage={null}
+        confirmLabel="Arquivar"
+        cancelLabel="Cancelar"
+      />
     </section>
   );
 }

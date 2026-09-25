@@ -10,6 +10,8 @@ import {
   usePatchContabilControlFieldMutation,
   useRestoreContabilCompetenceMutation,
 } from "../hooks";
+import { ConfirmationDialog } from "@shared/components";
+
 import { getContabilErrorMessage } from "../services";
 import type {
   ContabilCompetence,
@@ -289,7 +291,7 @@ export function ContabilControlSection({
     queueFieldSave("notes", value);
   }
 
-  // Erro de qualquer ação aparece na tela e os botões de confirmação voltam ao estado normal.
+  // Erro de qualquer ação aparece na tela e os diálogos de confirmação fecham.
   async function runOperation(action: () => Promise<void>) {
     setOperationError(null);
     try {
@@ -493,27 +495,38 @@ export function ContabilControlSection({
 
             {canEdit ? (
               <div className="mt-4 flex flex-wrap gap-2">
-                {confirmYearCreation ? (
-                  <button type="button" onClick={() => void createYear()} disabled={createYearMutation.isPending} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                    Confirmar criação do ano
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => setConfirmYearCreation(true)} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 dark:border-blue-900/50 dark:text-blue-300">
-                    Criar 12 competências do ano
-                  </button>
-                )}
+                <button type="button" onClick={() => setConfirmYearCreation(true)} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 dark:border-blue-900/50 dark:text-blue-300">
+                  Criar 12 competências do ano
+                </button>
                 <button type="button" onClick={() => void completeAll()} disabled={completeAllMutation.isPending} className="rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 disabled:opacity-60 dark:border-emerald-900/50 dark:text-emerald-300">
                   Marcar os 17 itens como concluídos
                 </button>
-                {confirmArchive ? (
-                  <button type="button" onClick={() => void archiveCompetence()} disabled={archiveMutation.isPending} className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                    Confirmar arquivamento
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 dark:border-red-900/50 dark:text-red-300">
-                    <Archive className="h-4 w-4" /> Arquivar competência
-                  </button>
-                )}
+                <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 dark:border-red-900/50 dark:text-red-300">
+                  <Archive className="h-4 w-4" /> Arquivar competência
+                </button>
+                <ConfirmationDialog
+                  open={confirmYearCreation}
+                  onOpenChange={setConfirmYearCreation}
+                  title="Criar 12 competências do ano"
+                  description={`Criar as 12 competências de ${competence.slice(0, 4)} para este cliente? As que já existem são mantidas.`}
+                  onConfirm={createYear}
+                  isConfirming={createYearMutation.isPending}
+                  errorMessage={null}
+                  confirmLabel="Criar competências"
+                  cancelLabel="Cancelar"
+                  variant="neutral"
+                />
+                <ConfirmationDialog
+                  open={confirmArchive}
+                  onOpenChange={setConfirmArchive}
+                  title="Arquivar competência"
+                  description={`Arquivar a competência ${competence.slice(5)}/${competence.slice(0, 4)}?`}
+                  onConfirm={archiveCompetence}
+                  isConfirming={archiveMutation.isPending}
+                  errorMessage={null}
+                  confirmLabel="Arquivar"
+                  cancelLabel="Cancelar"
+                />
               </div>
             ) : null}
           </div>

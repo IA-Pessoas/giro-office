@@ -197,7 +197,8 @@ await (async () => {
     assert.match(source, /Arquivar/);
     assert.match(source, /Nenhuma competência para este cliente/);
     assert.match(source, /role="alert"/);
-    assert.match(source, /window\.confirm/);
+    assert.doesNotMatch(source, /window\.confirm/);
+    assert.match(source, /<ConfirmationDialog/);
   });
 
   await runTest("triagem apresenta links externos por competência", () => {
@@ -212,7 +213,8 @@ await (async () => {
     assert.doesNotMatch(source, /<option value="CLOUD">/);
     assert.match(source, /responsible_id/);
     assert.match(source, /Arquivar/);
-    assert.match(source, /window\.confirm/);
+    assert.doesNotMatch(source, /window\.confirm/);
+    assert.match(source, /<ConfirmationDialog/);
   });
 
   await runTest("triagem apresenta solicitações urgentes por competência", () => {
@@ -247,7 +249,8 @@ await (async () => {
     assert.match(source, /useTriageStatements/);
     assert.match(source, /Status do banco/);
     assert.match(source, /Arquivar marcador do banco/);
-    assert.match(source, /window\.confirm/);
+    assert.doesNotMatch(source, /window\.confirm/);
+    assert.match(source, /<ConfirmationDialog/);
     assert.match(source, /Nenhum marcador registrado/);
     assert.match(source, /Carregando marcadores/);
     assert.match(source, /useTriageClosing/);
@@ -851,6 +854,12 @@ await (async () => {
     const effects = source.split("useEffect(").slice(1).map((chunk) => chunk.split("}, [")[0]);
     assert.ok(effects.every((effect) => !effect.includes("bootstrapControl(")));
     assert.match(source, /Iniciar controle/);
+  });
+  await runTest("criar ano e arquivar competência confirmam em diálogo (#1368)", () => {
+    const source = readWorkspaceSource("./components/ContabilControlSection.tsx");
+    assert.equal((source.match(/<ConfirmationDialog/g) ?? []).length, 2);
+    assert.match(source, /variant="neutral"/);
+    assert.doesNotMatch(source, /Confirmar criação do ano|Confirmar arquivamento/);
   });
   await runTest("pluraliza a contagem da carteira (#1325)", () => {
     assert.equal(formatContabilCount(1, "cliente", "clientes"), "1 cliente");
