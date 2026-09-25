@@ -919,7 +919,8 @@ runTest("parcelamento review fixes: named missing fields, no raw ids, dashboard-
   assert.match(form, /Preencha os campos obrigatórios: \$\{missingFields\.join/);
   assert.doesNotMatch(panoramas, /responsibleUserNames\.get\(value\) \?\? value/);
   assert.match(shell, /activeTab === "dashboard"/);
-  assert.match(shell, /useParcelamentoInstallments\(filters, \{ enabled: isDashboardActive \}\)/);
+  assert.match(shell, /useParcelamentoInstallments\(dashboardFilters, \{\s*enabled: isDashboardActive,\s*\}\)/);
+  assert.match(shell, /\.\.\.filters, page_size: 1/);
 });
 
 console.log("parcelamento frontend tests passed");

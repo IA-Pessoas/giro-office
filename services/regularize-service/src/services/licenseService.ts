@@ -37,18 +37,25 @@ const licenseSelect = {
   protocol_file_uploaded_at: true,
 } as const;
 
-// Lista mostra o cliente (#1347). O nome só sai quando o cliente é da mesma organização.
-export const licenseListClientSelect = { select: { name: true, organization_id: true } } as const;
+// Lista mostra o cliente (#1347). O nome só sai quando o cliente é da mesma organização e segue a
+// regra do app: razão social, depois nome.
+export const licenseListClientSelect = {
+  select: { name: true, company_name: true, organization_id: true },
+} as const;
 
 export function withLicenseClientName(
   record: Record<string, unknown>,
   organizationId: string,
 ): Record<string, unknown> {
   const { client, ...license } = record;
-  const owner = client as { name?: string; organization_id?: string } | null | undefined;
+  const owner = client as
+    | { name?: string; company_name?: string | null; organization_id?: string }
+    | null
+    | undefined;
   return {
     ...license,
-    client_name: owner?.organization_id === organizationId ? (owner.name ?? null) : null,
+    client_name:
+      owner?.organization_id === organizationId ? owner.company_name || owner.name || null : null,
   };
 }
 
