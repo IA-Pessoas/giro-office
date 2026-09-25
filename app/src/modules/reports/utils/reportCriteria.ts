@@ -52,9 +52,13 @@ export function buildReportComposition(
         throw new Error(
           `Um dos campos selecionados em ${source.label} não está mais disponível. Atualize os campos e tente novamente.`,
         );
+      const selectedFields = new Set(area.fields);
+      const aggregations = area.aggregations?.filter((aggregation) =>
+        selectedFields.has(aggregation.field),
+      );
       const parameterValues: Record<string, unknown> = {};
       if (
-        (area.groupBy?.length || area.aggregations?.length) &&
+        (area.groupBy?.length || aggregations?.length) &&
         area.orderBy?.some((item) => !area.groupBy?.includes(item.field))
       )
         throw new Error(
@@ -71,6 +75,7 @@ export function buildReportComposition(
       }
       return {
         ...area,
+        ...(aggregations ? { aggregations } : {}),
         ...(source.parameters?.length ? { parameterValues } : {}),
         filters: (area.filters ?? []).map((filter) => {
           const field = source.fields.find((item) => item.key === filter.field);
