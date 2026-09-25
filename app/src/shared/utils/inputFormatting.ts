@@ -27,8 +27,15 @@ function splitBrlTyped(value: string): { integer: string; fraction: string | nul
     /^0+(?=\d)/u,
     "",
   );
-  const fraction = comma === -1 ? null : normalizeDigits(cleaned.slice(comma + 1)).slice(0, 2);
-  return { integer: integer || "0", fraction };
+  const fractionDigits = comma === -1 ? null : normalizeDigits(cleaned.slice(comma + 1));
+  // Campo pré-preenchido ("R$ 0,00" ou valor carregado): o dígito que chega depois de duas casas
+  // desloca o valor para a esquerda, como numa calculadora, em vez de ser descartado.
+  if (fractionDigits !== null && fractionDigits.length > 2) {
+    const shifted = fractionDigits.slice(0, -2);
+    const nextInteger = `${integer}${shifted}`.replace(/^0+(?=\d)/u, "");
+    return { integer: nextInteger || "0", fraction: fractionDigits.slice(-2) };
+  }
+  return { integer: integer || "0", fraction: fractionDigits };
 }
 
 export function normalizeDigits(value: string | null | undefined): string {

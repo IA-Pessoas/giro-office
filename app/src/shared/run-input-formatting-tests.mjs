@@ -57,7 +57,8 @@ assert.equal(parseBrlInput(typeInto("150,5")), 150.5);
 assert.equal(typeInto("100"), "R$ 100");
 assert.equal(parseBrlInput(typeInto("100")), 100);
 assert.equal(typeInto("1234567,8"), "R$ 1.234.567,8");
-assert.equal(typeInto("150,555"), "R$ 150,55");
+// Terceira casa decimal desloca o valor (mesma regra do campo pré-preenchido).
+assert.equal(typeInto("150,555"), "R$ 1.505,55");
 // Apagar um dígito de "R$ 1.234" não vira decimal: ponto é sempre milhar.
 assert.equal(formatBrlInput("R$ 1.23"), "R$ 123");
 assert.equal(formatBrlInput("R$ 1.234,56"), "R$ 1.234,56");
@@ -77,6 +78,15 @@ assert.equal(formatBrlInput("1.000"), "R$ 1.000");
 assert.equal(formatBrlInput("R$ 150."), "R$ 150,");
 assert.equal(typeInto("150.50"), "R$ 150,50");
 assert.equal(parseBrlInput("150.50"), 150.5);
+// Campo pré-preenchido ("R$ 0,00" ou valor carregado): o dígito digitado no fim desloca o
+// valor como numa calculadora, em vez de ser descartado.
+function typeAfter(initial, keys) {
+  return [...keys].reduce((display, key) => formatBrlInput(display + key), initial);
+}
+assert.equal(typeAfter("R$ 0,00", "15050"), "R$ 150,50");
+assert.equal(parseBrlInput(typeAfter("R$ 0,00", "15050")), 150.5);
+assert.equal(typeAfter("R$ 1.234,50", "7"), "R$ 12.345,07");
+assert.equal(formatBrlInput("R$ 0,005"), "R$ 0,05");
 assert.equal(formatBrlAmount(1234.5), "R$ 1.234,50");
 assert.equal(formatBrlAmount(0), "R$ 0,00");
 assert.equal(parseBrlInput(formatBrlAmount(1234.5)), 1234.5);

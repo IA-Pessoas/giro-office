@@ -12,7 +12,11 @@ type ToastKind = "default" | "success" | "error" | "info" | "warn" | "warning";
  *   o de 5xx já traz a mensagem e o requestId para o suporte (#1365), e uma falha gera um
  *   toast só.
  */
-export function createAppToast(base: ToastApi): ToastApi {
+// Erro do chamador que chega logo depois do toast de 5xx é a mesma falha; depois disso, é outra.
+const SERVER_ERROR_SUPPRESSION_MS = 1_500;
+
+export function createAppToast(base: ToastApi, now: () => number = Date.now): ToastApi {
+  let serverErrorShownAt = Number.NEGATIVE_INFINITY;
   // ponytail: sucesso limpa todos os erros visíveis, não só os da mesma ação; basta
   // enquanto os toasts não carregam contexto.
   const visibleErrors = new Set<Id>();
@@ -37,7 +41,15 @@ export function createAppToast(base: ToastApi): ToastApi {
   };
 
   const error = <T>(content: ToastContent<T>, options?: ToastOptions<T>) => {
-    if (options?.toastId !== SERVER_ERROR_TOAST_ID && base.isActive(SERVER_ERROR_TOAST_ID)) {
+    if (options?.toastId === SERVER_ERROR_TOAST_ID) {
+      serverErrorShownAt = now();
+      // Fica fora de visibleErrors: um sucesso não pode apagar o código para o suporte.
+      return showError(content, options);
+    }
+    if (
+      base.isActive(SERVER_ERROR_TOAST_ID) &&
+      now() - serverErrorShownAt < SERVER_ERROR_SUPPRESSION_MS
+    ) {
       return SERVER_ERROR_TOAST_ID;
     }
     const id = showError(content, options);
