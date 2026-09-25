@@ -16,6 +16,7 @@ export function ReportCriteriaStep({
   disabled: boolean;
 }) {
   const fields = getSelectableReportFields(source);
+  const selectedFields = fields.filter((field) => area.fields.includes(field.key));
   const filterFields = fields.filter(
     (field) => field.filterable && field.operators?.some((operator) => operatorLabels[operator]),
   );
@@ -253,7 +254,7 @@ export function ReportCriteriaStep({
               A contagem considera valores preenchidos. Com resumo, aparecem os grupos e os totais
               escolhidos.
             </p>
-            {fields
+            {selectedFields
               .filter((field) => field.aggregationFunctions?.length)
               .map((field) => (
                 <label key={field.key} className="block text-sm text-gray-800 dark:text-slate-200">
