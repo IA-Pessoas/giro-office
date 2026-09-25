@@ -288,10 +288,26 @@ describe("gateway Worker: superfície /platform", () => {
     expect(url.pathname).toBe("/audit/requests");
     expect(url.search).toBe("?page=2&method=POST");
     expect(forwarded.headers.get("x-auth-kind")).toBe("platform");
+  });
 
-    const denied = await call(app, "GET", "/platform/audit/requests", member(), "bearer");
-    expect(denied.status).toBe(403);
-    expect(bindings.AUDIT_SERVICE.fetch).toHaveBeenCalledOnce();
+  it("auditoria da plataforma barra organização e sessão personificada", async () => {
+    const { app, bindings } = setup();
+
+    const member403 = await call(app, "GET", "/platform/audit/requests", member(), "bearer");
+    const impersonated403 = await call(app, "GET", "/platform/audit/requests", impersonated());
+
+    expect([member403.status, impersonated403.status]).toEqual([403, 403]);
+    expect(bindings.AUDIT_SERVICE.fetch).not.toHaveBeenCalled();
+  });
+
+  it("auditoria da plataforma revalida a sessão do super admin", async () => {
+    const { app, bindings } = setup();
+    bindings.USER_SERVICE.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+
+    const response = await call(app, "GET", "/platform/audit/requests", superAdmin());
+
+    expect(response.status).toBe(401);
+    expect(bindings.AUDIT_SERVICE.fetch).not.toHaveBeenCalled();
   });
 
   it("path de plataforma não mapeado não é roteado", async () => {
