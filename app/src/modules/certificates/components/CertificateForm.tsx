@@ -9,7 +9,7 @@ import {
   CERTIFICATE_INPUT_CLASSNAME,
 } from "./certificateWorkspaceUi";
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
-import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
+import { FormField } from "@shared/components/FormField";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
 import {
   formatBrazilianPhoneInput,
@@ -182,6 +182,9 @@ export function CertificateForm({
   );
   const [formState, setFormState] = useState<CertificateFormState>(() => initialState);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  // Erro de validação de um campo: aparece abaixo dele, ligado por aria-describedby (#1367).
+  const [fieldError, setFieldError] = useState<{ field: string; message: string } | null>(null);
+  const fieldErrorFor = (field: string) => (fieldError?.field === field ? fieldError.message : null);
 
   useEffect(() => {
     setFormState(initialState);
@@ -198,6 +201,7 @@ export function CertificateForm({
 
   async function handleSubmit() {
     setErrorMessage("");
+    setFieldError(null);
 
     if (isPj) {
       const state = formState as PjFormState;
@@ -207,37 +211,37 @@ export function CertificateForm({
       );
 
       if (invalidAmountMessage) {
-        setErrorMessage(invalidAmountMessage);
+        setFieldError({ field: "paymentAmount", message: invalidAmountMessage });
         return;
       }
 
       if (isCreate) {
         if (!hasText(state.name)) {
-          setErrorMessage("Informe o nome do cliente.");
+          setFieldError({ field: "name", message: "Informe o nome do cliente." });
           return;
         }
         if (!hasText(state.cnpj)) {
-          setErrorMessage("Informe o CNPJ.");
+          setFieldError({ field: "document", message: "Informe o CNPJ." });
           return;
         }
         if (!hasText(state.responsible)) {
-          setErrorMessage("Informe o responsável.");
+          setFieldError({ field: "responsible", message: "Informe o responsável." });
           return;
         }
         if (!hasText(state.model)) {
-          setErrorMessage("Informe o modelo.");
+          setFieldError({ field: "model", message: "Informe o modelo." });
           return;
         }
         if (!hasText(state.legalNature)) {
-          setErrorMessage("Informe a natureza jurídica.");
+          setFieldError({ field: "legalNature", message: "Informe a natureza jurídica." });
           return;
         }
         if (!hasText(state.password)) {
-          setErrorMessage("Informe a senha.");
+          setFieldError({ field: "password", message: "Informe a senha." });
           return;
         }
         if (!state.expirationDate) {
-          setErrorMessage("Informe a data de vencimento.");
+          setFieldError({ field: "expirationDate", message: "Informe a data de vencimento." });
           return;
         }
 
@@ -276,29 +280,29 @@ export function CertificateForm({
     );
 
     if (invalidAmountMessage) {
-      setErrorMessage(invalidAmountMessage);
+      setFieldError({ field: "paymentAmount", message: invalidAmountMessage });
       return;
     }
 
     if (isCreate) {
       if (!hasText(state.name)) {
-        setErrorMessage("Informe o nome do titular.");
+        setFieldError({ field: "name", message: "Informe o nome do titular." });
         return;
       }
       if (!hasText(state.cpf)) {
-        setErrorMessage("Informe o CPF.");
+        setFieldError({ field: "document", message: "Informe o CPF." });
         return;
       }
       if (!hasText(state.model)) {
-        setErrorMessage("Informe o modelo.");
+        setFieldError({ field: "model", message: "Informe o modelo." });
         return;
       }
       if (!hasText(state.password)) {
-        setErrorMessage("Informe a senha.");
+        setFieldError({ field: "password", message: "Informe a senha." });
         return;
       }
       if (!state.expirationDate) {
-        setErrorMessage("Informe a data de vencimento.");
+        setFieldError({ field: "expirationDate", message: "Informe a data de vencimento." });
         return;
       }
 
@@ -345,10 +349,13 @@ export function CertificateForm({
       ) : null}
 
       <section className={CERTIFICATE_FORM_GRID_CLASSNAME}>
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
-            Nome
-          </RequiredFieldLabel>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Nome"
+          required={isCreate}
+          error={fieldErrorFor("name")}
+        >
           <input
             type="text"
             value={formState.name}
@@ -357,12 +364,15 @@ export function CertificateForm({
             disabled={isSubmitting}
             aria-required={isCreate}
           />
-        </label>
+        </FormField>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
-            {isPj ? "CNPJ" : "CPF"}
-          </RequiredFieldLabel>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label={isPj ? "CNPJ" : "CPF"}
+          required={isCreate}
+          error={fieldErrorFor("document")}
+        >
           <input
             type="text"
             value={formState.kind === "pj" ? formState.cnpj : formState.cpf}
@@ -376,12 +386,15 @@ export function CertificateForm({
             disabled={isSubmitting}
             aria-required={isCreate}
           />
-        </label>
+        </FormField>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
-            Modelo
-          </RequiredFieldLabel>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Modelo"
+          required={isCreate}
+          error={fieldErrorFor("model")}
+        >
           <input
             type="text"
             value={formState.model}
@@ -390,14 +403,17 @@ export function CertificateForm({
             disabled={isSubmitting}
             aria-required={isCreate}
           />
-        </label>
+        </FormField>
 
         {isPj ? (
           <>
-            <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-              <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
-                Responsável
-              </RequiredFieldLabel>
+            <FormField
+              className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+              labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+              label="Responsável"
+              required={isCreate}
+              error={fieldErrorFor("responsible")}
+            >
               <input
                 type="text"
                 value={formState.responsible}
@@ -408,19 +424,22 @@ export function CertificateForm({
                 disabled={isSubmitting}
                 aria-required={isCreate}
               />
-            </label>
+            </FormField>
 
-            <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-              <span className="inline-flex items-center gap-1">
-                <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
-                  Natureza jurídica
-                </RequiredFieldLabel>
+            <FormField
+              className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+              labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+              label="Natureza jurídica"
+              required={isCreate}
+              error={fieldErrorFor("legalNature")}
+              help={
                 <FieldHelp
                   label="Natureza jurídica"
                   description="Classificação jurídica da empresa conforme o cadastro oficial."
                   container={tooltipContainer}
                 />
-              </span>
+              }
+            >
               <input
                 type="text"
                 value={formState.legalNature}
@@ -434,7 +453,7 @@ export function CertificateForm({
                 disabled={isSubmitting}
                 aria-required={isCreate}
               />
-            </label>
+            </FormField>
           </>
         ) : (
           <>
@@ -466,10 +485,13 @@ export function CertificateForm({
           </>
         )}
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
-            Senha
-          </RequiredFieldLabel>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Senha"
+          required={isCreate}
+          error={fieldErrorFor("password")}
+        >
           <input
             type="text"
             value={formState.password}
@@ -479,12 +501,15 @@ export function CertificateForm({
             placeholder={isCreate ? "Senha nova" : "Nova senha (opcional)"}
             aria-required={isCreate}
           />
-        </label>
+        </FormField>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
-            Vencimento
-          </RequiredFieldLabel>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Vencimento"
+          required={isCreate}
+          error={fieldErrorFor("expirationDate")}
+        >
           <input
             type="date"
             value={formState.expirationDate}
@@ -493,7 +518,7 @@ export function CertificateForm({
             disabled={isSubmitting}
             aria-required={isCreate}
           />
-        </label>
+        </FormField>
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
           <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Contato</span>
@@ -508,15 +533,18 @@ export function CertificateForm({
           />
         </label>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className="inline-flex items-center gap-1">
-            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Castelo</span>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Situação Castelo"
+          help={
             <FieldHelp
               label="Situação Castelo"
               description="Indica se este certificado está regularizado no sistema Castelo."
               container={tooltipContainer}
             />
-          </span>
+          }
+        >
           <CertificateNativeSelect
             value={certificateStatusValue(formState.clientCasteloStatus)}
             onChange={(event) => setBoolField("clientCasteloStatus", event.target.value === "true")}
@@ -528,17 +556,20 @@ export function CertificateForm({
               </option>
             ))}
           </CertificateNativeSelect>
-        </label>
+        </FormField>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className="inline-flex items-center gap-1">
-            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Focus</span>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Situação Focus"
+          help={
             <FieldHelp
               label="Situação Focus"
               description="Indica se este certificado está regularizado no sistema Focus."
               container={tooltipContainer}
             />
-          </span>
+          }
+        >
           <CertificateNativeSelect
             value={certificateStatusValue(formState.clientFocusStatus)}
             onChange={(event) => setBoolField("clientFocusStatus", event.target.value === "true")}
@@ -550,7 +581,7 @@ export function CertificateForm({
               </option>
             ))}
           </CertificateNativeSelect>
-        </label>
+        </FormField>
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
           <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Pago</span>
@@ -575,15 +606,19 @@ export function CertificateForm({
           />
         </label>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className="inline-flex items-center gap-1">
-            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Valor pago</span>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Valor pago"
+          error={fieldErrorFor("paymentAmount")}
+          help={
             <FieldHelp
               label="Valor pago"
               description="Informe o valor pago em reais, usando o formato R$ 0,00."
               container={tooltipContainer}
             />
-          </span>
+          }
+        >
           <input
             type="text"
             value={formState.paymentAmount}
@@ -592,7 +627,7 @@ export function CertificateForm({
             disabled={isSubmitting || !formState.wasPaid}
             placeholder="R$ 0,00"
           />
-        </label>
+        </FormField>
 
         <label className="col-span-full space-y-2">
           <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Observações</span>

@@ -87,6 +87,33 @@ interface GetTaskCreateValidationMessageParams {
   responsibleId: string;
 }
 
+export type TaskCreateField =
+  | "project_id"
+  | "department_id"
+  | "model_id"
+  | "urgency"
+  | "responsible_id";
+
+/** Erro de cada campo da nova tarefa, mostrado abaixo do campo (#1367). */
+export function getTaskCreateFieldErrors({
+  projectId,
+  modelId,
+  departmentId,
+  urgency,
+  eligibleResponsibleCount,
+  responsibleId,
+}: GetTaskCreateValidationMessageParams): Partial<Record<TaskCreateField, string>> {
+  const errors: Partial<Record<TaskCreateField, string>> = {};
+  if (!projectId) errors.project_id = "Selecione o projeto.";
+  if (!departmentId) errors.department_id = "Selecione o departamento.";
+  if (!modelId) errors.model_id = "Selecione o modelo de tarefa.";
+  if (!urgency) errors.urgency = "Selecione a urgência.";
+  if (eligibleResponsibleCount > 1 && !responsibleId) {
+    errors.responsible_id = "Selecione um responsável elegível para a tarefa.";
+  }
+  return errors;
+}
+
 export function getTaskCreateValidationMessage({
   clientId,
   projectId,

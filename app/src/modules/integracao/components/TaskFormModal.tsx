@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { FileText, LoaderCircle, Save } from "lucide-react";
+
+import { FormField } from "@shared/components/FormField";
 import { toast } from "@shared/services/toast";
 
 import { ClientSelectionField, type ClientPickerOption } from "@modules/clients";
@@ -52,11 +54,13 @@ import {
   getInitialPrevisionPatch,
   getAutomaticTaskResponsibleId,
   getProjectSelectPlaceholder,
+  getTaskCreateFieldErrors,
   getTaskCreateValidationMessage,
   getTaskEditValidationMessage,
   getTaskUrgencyOptions,
   LOOSE_TASKS_PROJECT_NAME,
   shouldBlockTaskEditForm,
+  type TaskCreateField,
 } from "./taskFormModalUi";
 import { TaskCompletionPanel } from "./TaskCompletionPanel";
 import { TaskAttachmentPanel } from "./TaskAttachmentPanel";
@@ -306,10 +310,16 @@ export function TaskFormModal({
     return "Selecione";
   }
 
+  const [createFieldErrors, setCreateFieldErrors] = useState<
+    Partial<Record<TaskCreateField, string | undefined>>
+  >({});
+  const createFieldMessage = (field: TaskCreateField) => createFieldErrors[field] ?? null;
+
   function updateCreateValue<Key extends keyof CreateFormState>(
     field: Key,
     value: CreateFormState[Key],
   ) {
+    setCreateFieldErrors((current) => ({ ...current, [field]: undefined }));
     setCreateValues((currentValues) => {
       if (field === "department_id") {
         return {
@@ -368,7 +378,7 @@ export function TaskFormModal({
   }
 
   async function handleCreateSubmit() {
-    const validationMessage = getTaskCreateValidationMessage({
+    const validationParams = {
       clientId: createValues.client_id,
       projectId: createValues.project_id,
       modelId: createValues.model_id,
@@ -377,12 +387,19 @@ export function TaskFormModal({
       observations: createValues.observations,
       eligibleResponsibleCount: createResponsibleCandidates.length,
       responsibleId: createValues.responsible_id,
-    });
+    };
+    const validationMessage = getTaskCreateValidationMessage(validationParams);
 
     if (validationMessage) {
-      toast.warning(validationMessage, { toastId: "task-create-validation" });
+      // Campo vazio aparece abaixo do próprio campo (#1367); o toast fica para o que não é campo.
+      const fieldErrors = getTaskCreateFieldErrors(validationParams);
+      setCreateFieldErrors(fieldErrors);
+      if (Object.keys(fieldErrors).length === 0) {
+        toast.warning(validationMessage, { toastId: "task-create-validation" });
+      }
       return;
     }
+    setCreateFieldErrors({});
 
     try {
       const createdTask = await createMutation.mutateAsync({
@@ -839,24 +856,31 @@ export function TaskFormModal({
               <ClientSelectionField client={selectedClient} clientId={createValues.client_id} />
             </div>
 
-            <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Projeto</span>
-              <ProjectSelect
-                value={createValues.project_id}
-                onChange={(event) => updateCreateValue("project_id", event.target.value)}
-                disabled={
-                  !createValues.client_id ||
-                  projectsQuery.isLoading ||
-                  hasNoProjectsForSelectedClient
-                }
+            {/* O botão fica fora do rótulo: dentro dele, o texto do botão entrava no nome do campo. */}
+            <div className={TASK_FORM_LABEL_CLASSNAME}>
+              <FormField
+                className="gap-1.5"
+                labelClassName="text-sm font-medium text-slate-700 dark:text-white"
+                label="Projeto"
+                error={createFieldMessage("project_id")}
               >
-                <option value="">{projectSelectPlaceholder}</option>
-                {(projectsQuery.data ?? []).map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </ProjectSelect>
+                <ProjectSelect
+                  value={createValues.project_id}
+                  onChange={(event) => updateCreateValue("project_id", event.target.value)}
+                  disabled={
+                    !createValues.client_id ||
+                    projectsQuery.isLoading ||
+                    hasNoProjectsForSelectedClient
+                  }
+                >
+                  <option value="">{projectSelectPlaceholder}</option>
+                  {(projectsQuery.data ?? []).map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </ProjectSelect>
+              </FormField>
               {hasNoProjectsForSelectedClient ? (
                 <button
                   type="button"
@@ -869,14 +893,16 @@ export function TaskFormModal({
                     : `Criar projeto "${LOOSE_TASKS_PROJECT_NAME}"`}
                 </button>
               ) : null}
-            </label>
+            </div>
           </div>
 
           <div className={TASK_FORM_GRID_CLASSNAME}>
-            <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">
-                Departamento
-              </span>
+            <FormField
+              className="gap-1.5"
+              labelClassName="text-sm font-medium text-slate-700 dark:text-white"
+              label="Departamento"
+              error={createFieldMessage("department_id")}
+            >
               <ProjectSelect
                 value={createValues.department_id}
                 onChange={(event) => updateCreateValue("department_id", event.target.value)}
@@ -889,12 +915,14 @@ export function TaskFormModal({
                   </option>
                 ))}
               </ProjectSelect>
-            </label>
+            </FormField>
 
-            <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">
-                Modelo de tarefa
-              </span>
+            <FormField
+              className="gap-1.5"
+              labelClassName="text-sm font-medium text-slate-700 dark:text-white"
+              label="Modelo de tarefa"
+              error={createFieldMessage("model_id")}
+            >
               <ProjectSelect
                 value={createValues.model_id}
                 onChange={(event) => updateCreateValue("model_id", event.target.value)}
@@ -911,7 +939,7 @@ export function TaskFormModal({
                   </option>
                 ))}
               </ProjectSelect>
-            </label>
+            </FormField>
           </div>
 
           <div className={TASK_FORM_GRID_CLASSNAME}>
@@ -937,8 +965,12 @@ export function TaskFormModal({
               </ProjectSelect>
             </label>
 
-            <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Urgência</span>
+            <FormField
+              className="gap-1.5"
+              labelClassName="text-sm font-medium text-slate-700 dark:text-white"
+              label="Urgência"
+              error={createFieldMessage("urgency")}
+            >
               <ProjectSelect
                 value={createValues.urgency}
                 onChange={(event) =>
@@ -951,7 +983,7 @@ export function TaskFormModal({
                   </option>
                 ))}
               </ProjectSelect>
-            </label>
+            </FormField>
           </div>
 
           <div className={TASK_FORM_GRID_CLASSNAME}>
@@ -1011,8 +1043,12 @@ export function TaskFormModal({
             </label>
           </div>
           <div className={TASK_FORM_GRID_CLASSNAME}>
-            <label className={TASK_FORM_LABEL_CLASSNAME}>
-              <span className="text-sm font-medium text-slate-700 dark:text-white">Responsável</span>
+            <FormField
+              className="gap-1.5"
+              labelClassName="text-sm font-medium text-slate-700 dark:text-white"
+              label="Responsável"
+              error={createFieldMessage("responsible_id")}
+            >
               <ProjectSelect
                 value={createValues.responsible_id}
                 onChange={(event) => updateCreateValue("responsible_id", event.target.value)}
@@ -1034,7 +1070,7 @@ export function TaskFormModal({
                   </option>
                 ))}
               </ProjectSelect>
-            </label>
+            </FormField>
           </div>
 
           <label className={TASK_FORM_LABEL_CLASSNAME}>

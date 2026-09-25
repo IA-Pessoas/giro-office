@@ -1206,9 +1206,8 @@ await runTest("regularize required field errors render as sticky alerts", async 
 await runTest("regularize required field markers keep label punctuation spacing clean", async () => {
   const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
 
-  assert.match(controlsSource, /inline-flex items-center gap-1/);
-  assert.match(controlsSource, /<span>\{label\}<\/span>/);
-  assert.match(controlsSource, /<span className="text-red-500">\*<\/span>/);
+  // #1367: o campo delega ao FormField compartilhado, que marca o obrigatório com RequiredFieldLabel.
+  assert.match(controlsSource, /<FormField[\s\S]*required=\{required\}/);
   assert.doesNotMatch(controlsSource, /> \*<\/span>/);
 });
 
