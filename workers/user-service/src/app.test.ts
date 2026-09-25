@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { ServiceError } from "@workspace/shared/http";
 import { describe, expect, it, vi } from "vitest";
 import { hashCsrfToken } from "../../runtime/src/session.js";
-import { createUserWorkerApp, type UserWorkerEnv } from "./app.js";
+import { createUserWorkerApp, expireImpersonationSessions, type UserWorkerEnv } from "./app.js";
 
 const JWT_SECRET = "user-worker-test-secret-with-enough-length";
 const INTERNAL_TOKEN = "user-worker-internal-token";
@@ -2571,5 +2572,110 @@ describe("personificação (#1529)", () => {
       expires_at: expiresAt.toISOString(),
       organization_name: "Castelo",
     });
+  });
+
+  it("sem auditoria gravada a personificação não abre (e não emite cookie)", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue(activeTarget());
+    const audit = vi.fn(async () => {
+      throw new ServiceError(503, "Auditoria indisponível.");
+    });
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit } as never);
+
+    const response = await app.request(impersonateUrl, {
+      method: "POST",
+      headers: await platformHeaders(db),
+    });
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("cookie da personificação vale 60 minutos", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue(activeTarget());
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
+
+    const response = await app.request(impersonateUrl, {
+      method: "POST",
+      headers: await platformHeaders(db),
+    });
+
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=3600");
+  });
+
+  it("entrar exige CSRF", async () => {
+    const db = prisma();
+    db.user.findFirst.mockResolvedValue(activeTarget());
+    const { "x-csrf-token": _csrf, ...headers } = await platformHeaders(db);
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
+
+    const response = await app.request(impersonateUrl, { method: "POST", headers });
+
+    expect(response.status).toBe(403);
+    expect(db.authSession.create).not.toHaveBeenCalled();
+  });
+
+  it("sair exige CSRF", async () => {
+    const db = prisma();
+    const { "x-csrf-token": _csrf, ...headers } = impersonatedHeaders() as Record<string, string>;
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
+
+    const response = await app.request("https://user.test/platform/impersonation/exit", {
+      method: "POST",
+      headers,
+    });
+
+    expect(response.status).toBe(403);
+    expect(db.authSession.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("não troca a senha do usuário durante a personificação", async () => {
+    const db = prisma();
+    db.authSession.findFirst.mockResolvedValue(sessionRow());
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit: vi.fn(async () => {}) });
+
+    const response = await app.request(`https://user.test/user/${USER_ID}`, {
+      method: "PUT",
+      headers: {
+        ...(impersonatedHeaders() as Record<string, string>),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ password: "NovaSenha#123", current_password: "Atual#123" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("a varredura encerra e audita personificações vencidas", async () => {
+    const db = prisma();
+    const now = new Date("2026-09-25T12:00:00.000Z");
+    db.authSession.findMany.mockResolvedValue([
+      {
+        id: "imp-1",
+        created_at: new Date("2026-09-25T10:30:00.000Z"),
+        expires_at: new Date("2026-09-25T11:30:00.000Z"),
+        impersonator_platform_user_id: PLATFORM_USER_ID,
+        user: { id: USER_ID, name: "Usuário", organization_id: ORGANIZATION_ID, department: null },
+      },
+    ]);
+    const audit = vi.fn(async () => {});
+
+    const expired = await expireImpersonationSessions(db as never, audit, now);
+
+    expect(expired).toBe(1);
+    expect(db.authSession.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ id: "imp-1", revoked_at: null }),
+      data: { revoked_at: now },
+    });
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        required: true,
+        organizationId: ORGANIZATION_ID,
+        action: "platform.impersonation.ended",
+        changes: expect.objectContaining({ reason: "expiração", durationMs: 60 * 60 * 1000 }),
+      }),
+    );
   });
 });

@@ -1,3 +1,5 @@
+import { ServiceError } from "@workspace/shared/http";
+
 import type { UserWorkerEnv } from "./env.js";
 
 export interface UserAuditParams {
@@ -8,6 +10,8 @@ export interface UserAuditParams {
   referring: string;
   referringId: string;
   changes: Record<string, unknown>;
+  /** Evento obrigatório (personificação): falha de envio lança em vez de só avisar. */
+  required?: boolean;
 }
 
 export type UserAuditRecorder = (params: UserAuditParams) => Promise<void>;
@@ -36,13 +40,15 @@ function payload(params: UserAuditParams): Record<string, unknown> {
 
 export function createUserAudit(env: UserWorkerEnv): UserAuditRecorder {
   return async (params) => {
+    const fail = (message: string, error?: unknown) => {
+      if (params.required) throw new ServiceError(503, "Auditoria indisponível.", error);
+      console.warn(message, ...(error === undefined ? [] : [error]));
+    };
     if (!env.AUDIT_SERVICE) {
-      console.warn("[user-service] AUDIT_SERVICE binding ausente; auditoria não foi enviada.");
-      return;
+      return fail("[user-service] AUDIT_SERVICE binding ausente; auditoria não foi enviada.");
     }
     if (!env.AUDIT_SERVICE_TOKEN) {
-      console.warn("[user-service] AUDIT_SERVICE_TOKEN ausente; auditoria não foi enviada.");
-      return;
+      return fail("[user-service] AUDIT_SERVICE_TOKEN ausente; auditoria não foi enviada.");
     }
     try {
       const response = await env.AUDIT_SERVICE.fetch(
@@ -56,15 +62,11 @@ export function createUserAudit(env: UserWorkerEnv): UserAuditRecorder {
         }),
       );
       if (!response.ok) {
-        console.warn(
-          `[user-service] AUDIT_SERVICE respondeu ${response.status}; auditoria best-effort falhou.`,
-        );
+        fail(`[user-service] AUDIT_SERVICE respondeu ${response.status}; auditoria falhou.`);
       }
     } catch (error) {
-      console.warn(
-        "[user-service] falha ao comunicar com AUDIT_SERVICE; auditoria best-effort falhou.",
-        error,
-      );
+      if (error instanceof ServiceError) throw error;
+      fail("[user-service] falha ao comunicar com AUDIT_SERVICE; auditoria falhou.", error);
     }
   };
 }

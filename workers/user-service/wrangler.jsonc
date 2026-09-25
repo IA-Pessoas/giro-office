@@ -14,5 +14,7 @@
     "AUTH_COOKIE_SECURE": true,
     "APP_PUBLIC_URL": "https://giro-app.eed-jrr.workers.dev"
   },
+  // Encerra e audita personificações vencidas a cada minuto (#1529).
+  "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true }
 }

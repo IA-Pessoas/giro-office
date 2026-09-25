@@ -1084,7 +1084,7 @@ type ImpersonationEnd = {
   platformUserId: string;
   startedAt: Date;
   endedAt: Date;
-  reason: "saída" | "revogação";
+  reason: "saída" | "revogação" | "expiração";
 };
 
 function organizationIdOf(user: Row): string {
@@ -1094,6 +1094,7 @@ function organizationIdOf(user: Row): string {
 
 function impersonationEndAudit(event: ImpersonationEnd): UserAuditParams {
   return {
+    required: true,
     actorUserId: event.targetUserId,
     platformActorUserId: event.platformUserId,
     organizationId: event.organizationId,
@@ -1126,6 +1127,7 @@ const IMPERSONATION_TARGET_SELECT = {
  */
 async function startImpersonation(
   db: UserPrismaClient,
+  audit: UserAuditRecorder,
   input: {
     organizationId: string;
     targetUserId: string;
@@ -1190,6 +1192,21 @@ async function startImpersonation(
         select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
       });
       const modules = normalizeModulePermissions(permission);
+      // Último passo da transação: sem auditoria gravada, a sessão não é criada.
+      await audit({
+        required: true,
+        actorUserId: String(target.id),
+        platformActorUserId: input.platformUserId,
+        organizationId: input.organizationId,
+        action: "platform.impersonation.started",
+        referring: "user",
+        referringId: String(target.id),
+        changes: {
+          operatorPlatformUserId: input.platformUserId,
+          target: { id: target.id, name: target.name },
+          startedAt: startedAt.toISOString(),
+        },
+      });
       const token = await signSessionToken(
         {
           user_id: target.id,
@@ -1221,11 +1238,11 @@ async function startImpersonation(
 /** Encerra a personificação atual e devolve o operador à plataforma, se ele seguir ativo. */
 async function exitImpersonation(
   db: UserPrismaClient,
+  audit: UserAuditRecorder,
   auth: UserAuthContext,
   env: UserWorkerEnv,
 ): Promise<{
   platformSession: { identity: PlatformIdentity; token: string; csrfToken: string } | null;
-  ended: ImpersonationEnd;
 }> {
   const sessionId = auth.claims.session_id;
   const csrfHash = auth.claims.csrf_hash;
@@ -1296,9 +1313,8 @@ async function exitImpersonation(
       const platformSession = operatorActive
         ? await openPlatformSession(transaction, operator, env)
         : null;
-      return {
-        platformSession,
-        ended: {
+      await audit(
+        impersonationEndAudit({
           sessionId,
           organizationId: auth.organizationId,
           targetUserId: String(user.id),
@@ -1307,11 +1323,82 @@ async function exitImpersonation(
           startedAt: new Date(String(session.created_at)),
           endedAt,
           reason: "saída",
-        },
-      };
+        }),
+      );
+      return { platformSession };
     },
     { isolationLevel: "Serializable" },
   );
+}
+
+/**
+ * Varredura do cron: encerra e audita personificações vencidas que ninguém fechou.
+ * Cada sessão tem transação própria; auditoria falha desfaz só aquela.
+ */
+export async function expireImpersonationSessions(
+  db: UserPrismaClient,
+  audit: UserAuditRecorder,
+  now = new Date(),
+): Promise<number> {
+  if (!db.authSession.findMany || !db.$transaction) return 0;
+  const sessions = await db.authSession.findMany({
+    where: {
+      impersonator_platform_user_id: { not: null },
+      revoked_at: null,
+      expires_at: { lte: now },
+    },
+    orderBy: { expires_at: "asc" },
+    take: 100,
+    select: {
+      id: true,
+      created_at: true,
+      expires_at: true,
+      impersonator_platform_user_id: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          organization_id: true,
+          department: { select: { organization_id: true } },
+        },
+      },
+    },
+  });
+  let expired = 0;
+  for (const session of sessions) {
+    const user = session.user as Row;
+    const platformUserId = String(session.impersonator_platform_user_id ?? "");
+    const organizationId = organizationIdOf(user);
+    if (!platformUserId || !organizationId) continue;
+    const ended = await db.$transaction(async (transaction) => {
+      if (!transaction.authSession.updateMany) return false;
+      const revoked = await transaction.authSession.updateMany({
+        where: {
+          id: session.id,
+          impersonator_platform_user_id: platformUserId,
+          revoked_at: null,
+          expires_at: { lte: now },
+        },
+        data: { revoked_at: now },
+      });
+      if (revoked.count !== 1) return false;
+      await audit(
+        impersonationEndAudit({
+          sessionId: String(session.id),
+          organizationId,
+          targetUserId: String(user.id),
+          targetName: String(user.name),
+          platformUserId,
+          startedAt: new Date(String(session.created_at)),
+          endedAt: new Date(String(session.expires_at)),
+          reason: "expiração",
+        }),
+      );
+      return true;
+    });
+    if (ended) expired += 1;
+  }
+  return expired;
 }
 
 /** Dados do banner de personificação para o `/user/me`. */
@@ -1355,10 +1442,11 @@ const PLATFORM_SUPER_ADMIN_SELECT = {
  */
 async function updateSuperAdminImpersonationPermission(
   db: UserPrismaClient,
+  audit: UserAuditRecorder,
   actorId: string,
   superAdminId: string,
   canImpersonate: boolean,
-): Promise<{ superAdmin: Row; changed: boolean; ended: ImpersonationEnd[] }> {
+): Promise<{ superAdmin: Row; changed: boolean }> {
   if (actorId === superAdminId) {
     throw new ServiceError(409, "Não é permitido alterar a própria permissão.");
   }
@@ -1386,7 +1474,7 @@ async function updateSuperAdminImpersonationPermission(
       });
       if (!target) throw new ServiceError(404, "Super admin não encontrado.");
       if (target.can_impersonate === canImpersonate) {
-        return { superAdmin: target, changed: false, ended: [] };
+        return { superAdmin: target, changed: false };
       }
       if (!transaction.platformUser.updateMany) {
         throw new ServiceError(503, "Atualização não configurada.");
@@ -1452,11 +1540,18 @@ async function updateSuperAdminImpersonationPermission(
         }
       }
 
-      return {
-        superAdmin: { ...target, can_impersonate: canImpersonate },
-        changed: true,
-        ended,
-      };
+      await audit({
+        required: true,
+        platformActorUserId: actorId,
+        organizationId: null,
+        action: "platform.super_admin.impersonation_permission.updated",
+        referring: "platform_user",
+        referringId: superAdminId,
+        changes: { can_impersonate: { from: !canImpersonate, to: canImpersonate } },
+      });
+      for (const event of ended) await audit(impersonationEndAudit(event));
+
+      return { superAdmin: { ...target, can_impersonate: canImpersonate }, changed: true };
     },
     { isolationLevel: "Serializable" },
   );
@@ -2087,6 +2182,9 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         );
       }
       const ownPasswordChange = body.password !== undefined;
+      if (ownPasswordChange && auth.claims.impersonator_platform_user_id) {
+        throw new ServiceError(403, "Não é permitido alterar a senha durante a personificação.");
+      }
       const selfPasswordUpdate =
         ownPasswordChange &&
         Object.keys(body).every((key) => key === "password" || key === "current_password");
@@ -2480,23 +2578,11 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       );
       const result = await updateSuperAdminImpersonationPermission(
         db,
+        options.audit,
         identity.id,
         superAdminId,
         canImpersonate,
       );
-      if (result.changed) {
-        await options.audit({
-          platformActorUserId: identity.id,
-          organizationId: null,
-          action: "platform.super_admin.impersonation_permission.updated",
-          referring: "platform_user",
-          referringId: superAdminId,
-          changes: {
-            can_impersonate: { from: !canImpersonate, to: canImpersonate },
-          },
-        });
-        for (const ended of result.ended) await options.audit(impersonationEndAudit(ended));
-      }
       return c.json(createSuccessResponse(result.superAdmin));
     }),
   );
@@ -2514,6 +2600,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       };
       const issued = await startImpersonation(
         db,
+        options.audit,
         {
           organizationId,
           targetUserId: userId,
@@ -2523,23 +2610,11 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         },
         envOf(c, options),
       );
-      await options.audit({
-        actorUserId: userId,
-        platformActorUserId: identity.id,
-        organizationId,
-        action: "platform.impersonation.started",
-        referring: "user",
-        referringId: userId,
-        changes: {
-          operatorPlatformUserId: identity.id,
-          target: { id: userId, name: issued.user.name },
-          startedAt: issued.startedAt.toISOString(),
-        },
-      });
       sessionCookies(
         c,
         createSessionCookieHeaders(issued.token, issued.csrfToken, {
           secure: envOf(c, options).AUTH_COOKIE_SECURE ?? false,
+          maxAgeSeconds: IMPERSONATION_SESSION_MAX_AGE_SECONDS,
         }),
       );
       return c.json(createSuccessResponse(issued.user));
@@ -2555,8 +2630,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       await requireCsrf(c.req.raw, auth);
       if (!options.audit)
         throw new ServiceError(503, "Auditoria indisponível para encerrar personificação.");
-      const exited = await exitImpersonation(db, auth, envOf(c, options));
-      await options.audit(impersonationEndAudit(exited.ended));
+      const exited = await exitImpersonation(db, options.audit, auth, envOf(c, options));
       const secure = envOf(c, options).AUTH_COOKIE_SECURE ?? false;
       const session = exited.platformSession;
       sessionCookies(
