@@ -1,6 +1,6 @@
 import { Eye, Loader2, Search, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { PaginationControls } from "@shared/components";
 import { StatusBadge } from "@shared/components/StatusBadge";

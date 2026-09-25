@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { FileText, LoaderCircle, Save } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { ClientSelectionField, type ClientPickerOption } from "@modules/clients";
 import type { ModuleAccess } from "@modules/auth";

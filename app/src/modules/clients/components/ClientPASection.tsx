@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { BriefcaseBusiness, CircleAlert, Database, Landmark, Plus, Save } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { isAxiosError } from "axios";
 
 import { ClientNativeSelect } from "../form/ClientNativeSelect";

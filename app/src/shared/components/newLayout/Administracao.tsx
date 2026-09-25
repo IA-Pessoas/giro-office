@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { BarChart3, KeyRound, Lock, Plus, Search, Shield, Users } from "lucide-react";
 import { useRouter } from "next/router";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import {

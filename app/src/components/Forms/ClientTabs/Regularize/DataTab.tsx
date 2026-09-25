@@ -9,7 +9,7 @@ import {
     Switch, 
 } from '@shared/ui/chakraShims';
 import { IoCreate } from 'react-icons/io5';
-import { toast } from 'react-toastify';
+import { toast } from "@shared/services/toast";
 import { setupAPIClient } from '@shared/services/api';
 
 import StateCity from '../../StateCity';

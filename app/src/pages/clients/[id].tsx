@@ -15,7 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientForm } from "@modules/clients/components/ClientForm";

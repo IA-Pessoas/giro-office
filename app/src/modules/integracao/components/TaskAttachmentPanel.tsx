@@ -1,6 +1,6 @@
 import { ExternalLink, FileUp, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import type { ModuleAccess } from "@modules/auth";
 

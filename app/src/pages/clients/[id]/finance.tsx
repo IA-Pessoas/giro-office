@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { canSSRAuth } from "@modules/auth";
 import { ClientFinanceForm } from "@modules/clients/components/ClientFinanceForm";

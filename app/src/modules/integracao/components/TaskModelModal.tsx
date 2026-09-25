@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { regularizeService } from "@modules/regularize";

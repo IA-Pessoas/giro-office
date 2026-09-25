@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { Dialog } from "@shared/components";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";

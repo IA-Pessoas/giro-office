@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Check, Pencil, Plus, Save, Trash2, UserRound, X } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { useFetch } from "@shared/hooks";

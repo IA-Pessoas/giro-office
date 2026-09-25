@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, ListChecks, Plus, Save, Trash2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { useProjectPlans, useProjectPlanTasks, useTaskModels } from "@modules/integracao";

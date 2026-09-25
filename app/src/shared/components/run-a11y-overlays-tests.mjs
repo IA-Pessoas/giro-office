@@ -182,7 +182,7 @@ runTest("AppShell task notifications preserve task deep-links and report read fa
     appShellSource,
     /router\.push\(\{[\s\S]*?pathname: "\/tasks",[\s\S]*?query: \{ taskId: item\.taskId \},[\s\S]*?\}\)/,
   );
-  assert.match(appShellSource, /import \{ toast \} from "react-toastify";/);
+  assert.match(appShellSource, /import \{ toast \} from "@shared\/services\/toast";/);
   assert.match(appShellSource, /Não foi possível marcar a notificação de RH como lida\./);
   assert.match(appShellSource, /Não foi possível marcar a notificação de tarefa como lida\./);
 });

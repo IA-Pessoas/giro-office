@@ -16,7 +16,7 @@ import {
   Upload,
   User,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useAuth } from "@/context/AuthContext";
 import {

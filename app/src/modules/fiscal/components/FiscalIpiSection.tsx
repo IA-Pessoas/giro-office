@@ -9,7 +9,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { Dialog } from "@shared/components";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";

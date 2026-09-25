@@ -1,5 +1,5 @@
 import { createApiClient } from "@workspace/api";
-import { toast } from "react-toastify";
+import { toast } from "./toast.ts";
 
 import { AuthTokenError } from "./errors/AuthTokenError";
 import { notifyServerError } from "./serverErrorToast";
