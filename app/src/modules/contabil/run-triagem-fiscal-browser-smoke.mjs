@@ -6,6 +6,7 @@ const baseUrl = (process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3125").rep
 const screenshotPath =
   process.env.TRIAGE_BROWSER_SCREENSHOT_PATH ??
   "output/playwright/issue-1149-triagem-fiscal.png";
+const portfolioScreenshotDir = process.env.TRIAGE_PORTFOLIO_SCREENSHOT_DIR;
 const clientId = "c1000000-0000-4000-8000-000000000001";
 const accountingMonthlyId = "m1000000-0000-4000-8000-000000000001";
 const fiscalMonthlyId = "m2000000-0000-4000-8000-000000000001";
@@ -306,8 +307,27 @@ try {
   await expect(page.getByLabel("Competência da Triagem Fiscal (mês)")).toHaveValue("09");
   await expect(page.getByLabel("Competência da Triagem Fiscal (ano)")).toHaveValue("2026");
   await expect(page.getByText("Empresa sem rotina")).toBeVisible();
+  if (portfolioScreenshotDir) {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    const section = page.locator('section[aria-labelledby="fiscal-triage-portfolio-title"]');
+    await section.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${portfolioScreenshotDir}/00-contexto-office.png` });
+    await section.screenshot({ path: `${portfolioScreenshotDir}/01-carteira-mensal.png` });
+  }
   await page.getByLabel("Cliente Demonstração: Relatório de entradas").selectOption("COMPLETED");
   await expect.poll(() => fiscalFixture.checklist.inbound_report).toBe("COMPLETED");
+  if (portfolioScreenshotDir) {
+    const section = page.locator('section[aria-labelledby="fiscal-triage-portfolio-title"]');
+    await expect(page.getByLabel("Cliente Demonstração: Relatório de entradas")).toHaveValue("COMPLETED");
+    await section.screenshot({ path: `${portfolioScreenshotDir}/02-baixa-registrada.png` });
+    await page.getByLabel("Filtrar status documental").selectOption("COMPLETED");
+    await section.screenshot({ path: `${portfolioScreenshotDir}/03-filtro-concluidos.png` });
+    await page.getByLabel("Filtrar status documental").selectOption("");
+    const scroller = section.locator(".overflow-x-auto");
+    await scroller.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+    await section.screenshot({ path: `${portfolioScreenshotDir}/04-colunas-finais.png` });
+    await scroller.evaluate((element) => { element.scrollLeft = 0; });
+  }
   const csvDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "CSV" }).click();
   const csv = await csvDownload;
