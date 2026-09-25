@@ -12,7 +12,8 @@ import {
 import { Prisma } from "../generated/prisma/client.js";
 import type { UserAuditRecorder } from "../integrations/audit.js";
 import prismaClient from "../prisma/index.js";
-import { hashPassword } from "../security/passwordHashService.js";
+import { ownPasswordPolicyError } from "../schemas/user.schemas.js";
+import { hashPassword, verifyPassword } from "../security/passwordHashService.js";
 import { PermissionService } from "./permissionService.js";
 
 const USER_PUBLIC_SELECT = {
@@ -308,10 +309,30 @@ class UserManagementService {
     });
 
     if (!user) {
-      throw new ServiceError(404, "Usuario nao encontrado.");
+      throw new ServiceError(404, "Usuário não encontrado.");
     }
 
     return normalizeUserOrganization(user, organizationId);
+  }
+
+  /** Troca da própria senha: prova a senha atual e aplica a política mínima (#1341). */
+  async assertOwnPasswordChange(
+    id: string,
+    organizationId: string,
+    currentPassword: string | undefined,
+    nextPassword: string,
+  ): Promise<void> {
+    if (currentPassword === undefined) {
+      throw new ServiceError(400, "Informe a senha atual para trocar a senha.");
+    }
+    const user = await prismaClient.user.findFirst({
+      where: userOrganizationWhere(id, organizationId),
+      select: { password: true },
+    });
+    const { valid } = await verifyPassword(currentPassword, user?.password ?? "");
+    if (!valid) throw new ServiceError(403, "Senha atual incorreta.");
+    const policyError = ownPasswordPolicyError(currentPassword, nextPassword);
+    if (policyError) throw new ServiceError(400, policyError);
   }
 
   async getByIdWithModules(id: string, organizationId: string): Promise<UserSessionRow> {
@@ -369,7 +390,7 @@ class UserManagementService {
     });
 
     if (!user) {
-      throw new ServiceError(404, "Usuario nao encontrado.");
+      throw new ServiceError(404, "Usuário não encontrado.");
     }
 
     let permission: unknown;
@@ -478,7 +499,7 @@ class UserManagementService {
         "code" in err &&
         (err as { code: string }).code === "P2002";
       if (isUniqueViolation) {
-        throw new ServiceError(409, "Login ja cadastrado.");
+        throw new ServiceError(409, "Login já cadastrado.");
       }
       logError("Erro ao criar usuario", { err });
       throw err;
@@ -498,7 +519,7 @@ class UserManagementService {
     });
 
     if (!existingUser) {
-      throw new ServiceError(404, "Usuario nao encontrado.");
+      throw new ServiceError(404, "Usuário não encontrado.");
     }
 
     const updateData: Record<string, unknown> = {};
@@ -540,7 +561,7 @@ class UserManagementService {
     if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
     if (data.organization_id !== undefined) {
       if (data.organization_id !== organizationId) {
-        throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+        throw new ServiceError(403, "Organização da requisição não confere.");
       }
       updateData.organization_id = data.organization_id;
     }
@@ -626,7 +647,7 @@ class UserManagementService {
             if (activeOwners <= 1) {
               throw new ServiceError(
                 409,
-                "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+                "Não é possível remover o último owner ativo. Use a transferência de ownership.",
               );
             }
           }
@@ -641,7 +662,7 @@ class UserManagementService {
           if (result.count !== 1) {
             throw new ServiceError(
               409,
-              "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+              "Usuário foi alterado por outra edição. Recarregue e tente novamente.",
             );
           }
 
@@ -740,7 +761,7 @@ class UserManagementService {
         "code" in err &&
         (err as { code: string }).code === "P2002";
       if (isUniqueViolation) {
-        throw new ServiceError(409, "Login ja cadastrado.");
+        throw new ServiceError(409, "Login já cadastrado.");
       }
       logError("Erro ao atualizar usuario", { err });
       throw err;
@@ -777,7 +798,7 @@ class UserManagementService {
             if (activeOwners <= 1) {
               throw new ServiceError(
                 409,
-                "Nao e possivel remover o ultimo owner ativo. Use a transferencia de ownership.",
+                "Não é possível remover o último owner ativo. Use a transferência de ownership.",
               );
             }
           }
@@ -798,7 +819,7 @@ class UserManagementService {
           if (updateResult.count !== 1) {
             throw new ServiceError(
               409,
-              "Usuario foi alterado por outra edicao. Recarregue e tente novamente.",
+              "Usuário foi alterado por outra edição. Recarregue e tente novamente.",
             );
           }
         },
@@ -820,9 +841,9 @@ class UserManagementService {
       if (err instanceof ServiceError) throw err;
       const prismaErr = err as { code?: string };
       if (prismaErr?.code === "P2003") {
-        throw new ServiceError(409, "Nao e possivel desativar: usuario possui vinculos.");
+        throw new ServiceError(409, "Não é possível desativar: usuário possui vínculos.");
       }
-      throw new ServiceError(500, "Erro ao desativar usuario.", err);
+      throw new ServiceError(500, "Erro ao desativar usuário.", err);
     }
   }
 
@@ -837,7 +858,7 @@ class UserManagementService {
     });
 
     if (conflict) {
-      throw new ServiceError(409, "Login ja cadastrado.");
+      throw new ServiceError(409, "Login já cadastrado.");
     }
   }
 
@@ -851,7 +872,7 @@ class UserManagementService {
     });
 
     if (!department) {
-      throw new ServiceError(404, "Departamento nao encontrado.");
+      throw new ServiceError(404, "Departamento não encontrado.");
     }
 
     return {

@@ -1,3 +1,13 @@
+// Mesmas opções nos filtros da lista e no formulário de parcelamento (#1349).
+export const INSTALLMENT_TYPE_OPTIONS = [
+  "Federal",
+  "Estadual",
+  "Municipal",
+  "Simplificado",
+  "SIMPLES",
+];
+export const INSTALLMENT_JURISDICTION_OPTIONS = ["PGFN", "RFB", "Federal", "Estadual", "Municipal"];
+
 export const parcelamentoTextFieldClassName =
   "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:disabled:bg-gray-900";
 

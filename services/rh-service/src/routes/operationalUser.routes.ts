@@ -30,6 +30,7 @@ const OPERATIONAL_USER_CATALOG_MODULES = [
   "ti",
   "integracao",
   "triagem",
+  "parcelamento",
 ] as const;
 const OPERATIONAL_USER_CATALOG_MIN_PERMISSION = RH_SELF_SERVICE_PERMISSION;
 
@@ -57,7 +58,7 @@ function requireOperationalUserCatalogPermission(
   );
 
   if (!canReadCatalog) {
-    next(new ServiceError(403, "Permissao insuficiente para listar colaboradores operacionais."));
+    next(new ServiceError(403, "Permissão insuficiente para listar colaboradores operacionais."));
     return;
   }
 

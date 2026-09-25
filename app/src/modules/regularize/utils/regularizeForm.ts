@@ -90,3 +90,9 @@ export function getRegularizeMutationErrorMessage(
 
   return message || fallback;
 }
+
+// A migração gravou "legacy" no escopo dos sites sem esfera conhecida (#1347).
+export function formatSiteSphere(value: string | null | undefined): string {
+  if (!value) return "-";
+  return value === "legacy" ? "Não informado" : value;
+}

@@ -39,7 +39,7 @@ export const pointSummaryQuerySchema = z
 
 export const recalculatePointsBodySchema = z
   .object({
-    target_user_id: z.string().uuid({ message: "target_user_id invalido." }),
+    target_user_id: z.string().uuid({ message: "target_user_id inválido." }),
     date_from: zIsoDate("date_from"),
     date_to: zIsoDate("date_to"),
   })

@@ -3,6 +3,7 @@ import {
   formatBrazilianPhoneInput,
   formatCpfCnpjInput,
   formatCpfInput,
+  normalizeCnpjInput,
 } from "../../../shared/utils/inputFormatting.ts";
 import type {
   Client,
@@ -12,6 +13,10 @@ import type {
 
 function normalizeDocumentValue(value: string | null | undefined): string {
   return (value ?? "").replace(/\D/g, "");
+}
+
+function normalizeClientDocumentValue(value: string | null | undefined, type: string | null | undefined): string {
+  return type === "PJ" ? normalizeCnpjInput(value) : normalizeDocumentValue(value);
 }
 
 function normalizeNullableTextValue(value: string | null | undefined): string | null {
@@ -171,8 +176,8 @@ export function buildRegularizePayload(
     payload.name = nextName;
   }
 
-  const nextCpfCnpj = normalizeDocumentValue(values.cpf_cnpj);
-  const currentCpfCnpj = normalizeDocumentValue(currentValues.cpf_cnpj);
+  const nextCpfCnpj = normalizeClientDocumentValue(values.cpf_cnpj, client.type);
+  const currentCpfCnpj = normalizeClientDocumentValue(currentValues.cpf_cnpj, client.type);
 
   if (nextCpfCnpj.length > 0 && nextCpfCnpj !== currentCpfCnpj) {
     payload.cpf_cnpj = nextCpfCnpj;

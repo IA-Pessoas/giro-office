@@ -82,7 +82,7 @@ async function userInOrganization(
   database: TiDatabase,
   organizationId: string,
   userId: string,
-  message = "Usuario nao encontrado.",
+  message = "Usuário não encontrado.",
 ): Promise<Row> {
   const user = await delegate(database, "user").findFirst({
     where: { id: userId, organization_id: organizationId },
@@ -99,7 +99,7 @@ async function activeUserInOrganization(
   const user = await delegate(database, "user").findFirst({
     where: { id: userId, organization_id: organizationId, status: "active" },
   });
-  if (!user) throw new ServiceError(404, "Usuario nao encontrado na organizacao.");
+  if (!user) throw new ServiceError(404, "Usuário não encontrado na organização.");
   return user;
 }
 
@@ -112,7 +112,7 @@ async function technologyDepartment(database: TiDatabase, organizationId: string
     select: { id: true },
   });
   if (!department || typeof department.id !== "string") {
-    throw new ServiceError(404, "Departamento Tecnologia nao encontrado.");
+    throw new ServiceError(404, "Departamento Tecnologia não encontrado.");
   }
   return department.id;
 }
@@ -148,7 +148,7 @@ function inventoryServices(database: TiDatabase): TiServices {
         if (existing) {
           throw new ServiceError(
             409,
-            "Ja existe uma categoria de inventario de TI ativa com este nome.",
+            "Já existe uma categoria de inventário de TI ativa com este nome.",
           );
         }
         return categories.create({
@@ -160,7 +160,7 @@ function inventoryServices(database: TiDatabase): TiServices {
         const existing = await categories.findFirst({
           where: { id, organization_id: auth.organizationId },
         });
-        if (!existing) throw new ServiceError(404, "Categoria de inventario de TI nao encontrada.");
+        if (!existing) throw new ServiceError(404, "Categoria de inventário de TI não encontrada.");
         return categories.update({ where: { id }, data: row(body) });
       },
     },
@@ -179,7 +179,7 @@ function inventoryServices(database: TiDatabase): TiServices {
         if (existing)
           throw new ServiceError(
             409,
-            "Ja existe um local de inventario de TI ativo com este nome.",
+            "Já existe um local de inventário de TI ativo com este nome.",
           );
         return locations.create({
           data: { ...input, active: true, organization_id: auth.organizationId },
@@ -190,7 +190,7 @@ function inventoryServices(database: TiDatabase): TiServices {
         const existing = await locations.findFirst({
           where: { id, organization_id: auth.organizationId },
         });
-        if (!existing) throw new ServiceError(404, "Local de inventario de TI nao encontrado.");
+        if (!existing) throw new ServiceError(404, "Local de inventário de TI não encontrado.");
         return locations.update({ where: { id }, data: row(body) });
       },
     },
@@ -229,7 +229,7 @@ function inventoryServices(database: TiDatabase): TiServices {
           where: { id, organization_id: auth.organizationId },
           include: inventoryInclude,
         });
-        if (!result) throw new ServiceError(404, "Ativo de TI nao encontrado.");
+        if (!result) throw new ServiceError(404, "Ativo de TI não encontrado.");
         return result;
       },
       create: async (value, body) => {
@@ -242,7 +242,7 @@ function inventoryServices(database: TiDatabase): TiServices {
           });
         } catch (error) {
           if (uniqueError(error))
-            throw new ServiceError(409, "Ja existe um ativo de TI com este codigo patrimonial.");
+            throw new ServiceError(409, "Já existe um ativo de TI com este código patrimonial.");
           throw new ServiceError(500, "Erro ao criar ativo de inventario de TI.", error);
         }
       },
@@ -252,7 +252,7 @@ function inventoryServices(database: TiDatabase): TiServices {
         await inventory
           .findFirst({ where: { id, organization_id: auth.organizationId } })
           .then((found) => {
-            if (!found) throw new ServiceError(404, "Ativo de TI nao encontrado.");
+            if (!found) throw new ServiceError(404, "Ativo de TI não encontrado.");
           });
         await ensureInventoryReferences(database, auth.organizationId, input, String(id));
         return inventory.update({ where: { id }, data: input });
@@ -262,7 +262,7 @@ function inventoryServices(database: TiDatabase): TiServices {
         await inventory
           .findFirst({ where: { id, organization_id: auth.organizationId } })
           .then((found) => {
-            if (!found) throw new ServiceError(404, "Ativo de TI nao encontrado.");
+            if (!found) throw new ServiceError(404, "Ativo de TI não encontrado.");
           });
         const input = row(body);
         await activeUserInOrganization(database, auth.organizationId, String(input.user_id));
@@ -280,7 +280,7 @@ function inventoryServices(database: TiDatabase): TiServices {
         await inventory
           .findFirst({ where: { id, organization_id: auth.organizationId } })
           .then((found) => {
-            if (!found) throw new ServiceError(404, "Ativo de TI nao encontrado.");
+            if (!found) throw new ServiceError(404, "Ativo de TI não encontrado.");
           });
         const input = row(body);
         return inventory.update({
@@ -306,13 +306,13 @@ async function ensureInventoryReferences(
     const category = await delegate(database, "inventoryCategoryTecnologia").findFirst({
       where: { id: input.category_id, organization_id: organizationId, active: true },
     });
-    if (!category) throw new ServiceError(404, "Categoria de inventario nao encontrada.");
+    if (!category) throw new ServiceError(404, "Categoria de inventário não encontrada.");
   }
   if (typeof input.location_id === "string") {
     const location = await delegate(database, "inventoryLocationTecnologia").findFirst({
       where: { id: input.location_id, organization_id: organizationId, active: true },
     });
-    if (!location) throw new ServiceError(404, "Departamento/local de inventario nao encontrado.");
+    if (!location) throw new ServiceError(404, "Departamento/local de inventário não encontrado.");
   }
   if (typeof input.user_id === "string")
     await activeUserInOrganization(database, organizationId, input.user_id);
@@ -327,7 +327,7 @@ async function ensureInventoryReferences(
       },
     });
     if (!staff)
-      throw new ServiceError(422, "Responsavel de TI deve pertencer ao departamento Tecnologia.");
+      throw new ServiceError(422, "Responsável de TI deve pertencer ao departamento Tecnologia.");
   }
   if (typeof input.asset_code === "string") {
     const duplicate = await delegate(database, "inventoryTecnologia").findFirst({
@@ -338,7 +338,7 @@ async function ensureInventoryReferences(
       },
     });
     if (duplicate)
-      throw new ServiceError(409, "Ja existe um ativo de TI com este codigo patrimonial.");
+      throw new ServiceError(409, "Já existe um ativo de TI com este código patrimonial.");
   }
 }
 
@@ -369,7 +369,7 @@ function extensionServices(database: TiDatabase): TiServices {
           where: { id, organization_id: context(value).organizationId },
           include: { user: safeUser },
         });
-        if (!result) throw new ServiceError(404, "Ramal de TI nao encontrado.");
+        if (!result) throw new ServiceError(404, "Ramal de TI não encontrado.");
         return result;
       },
       create: async (value, body) => {
@@ -378,7 +378,7 @@ function extensionServices(database: TiDatabase): TiServices {
         const duplicate = await extensions.findFirst({
           where: { organization_id: auth.organizationId, number: input.number },
         });
-        if (duplicate) throw new ServiceError(409, "Ja existe um ramal de TI com este numero.");
+        if (duplicate) throw new ServiceError(409, "Já existe um ramal de TI com este número.");
         await userInOrganization(database, auth.organizationId, String(input.user_id));
         return extensions.create({ data: { ...input, organization_id: auth.organizationId } });
       },
@@ -387,7 +387,7 @@ function extensionServices(database: TiDatabase): TiServices {
         const current = await extensions.findFirst({
           where: { id, organization_id: auth.organizationId },
         });
-        if (!current) throw new ServiceError(404, "Ramal de TI nao encontrado.");
+        if (!current) throw new ServiceError(404, "Ramal de TI não encontrado.");
         const input = row(body);
         if (input.user_id)
           await userInOrganization(database, auth.organizationId, String(input.user_id));
@@ -395,7 +395,7 @@ function extensionServices(database: TiDatabase): TiServices {
           const duplicate = await extensions.findFirst({
             where: { organization_id: auth.organizationId, number: input.number, NOT: { id } },
           });
-          if (duplicate) throw new ServiceError(409, "Ja existe um ramal de TI com este numero.");
+          if (duplicate) throw new ServiceError(409, "Já existe um ramal de TI com este número.");
         }
         return extensions.update({ where: { id }, data: input });
       },
@@ -478,7 +478,7 @@ function passwordServices(database: TiDatabase, encryptionKey: string | undefine
           where: { id, organization_id: auth.organizationId },
           include: safeUser,
         });
-        if (!found) throw new ServiceError(404, "Senha de TI nao encontrada.");
+        if (!found) throw new ServiceError(404, "Senha de TI não encontrada.");
         if (row(found).active === false) throw new ServiceError(409, "Senha de TI inativa.");
         const result = withoutPassword(found);
         if (typeof row(found).password === "string") {
@@ -510,7 +510,7 @@ function passwordServices(database: TiDatabase, encryptionKey: string | undefine
           where: { id, organization_id: auth.organizationId },
           include: safeUser,
         });
-        if (!current) throw new ServiceError(404, "Senha de TI nao encontrada.");
+        if (!current) throw new ServiceError(404, "Senha de TI não encontrada.");
         if (row(current).active === false) throw new ServiceError(409, "Senha de TI inativa.");
         const input = row(body);
         if (input.user_id)
@@ -535,9 +535,9 @@ function passwordServices(database: TiDatabase, encryptionKey: string | undefine
         const current = await passwords.findFirst({
           where: { id, organization_id: auth.organizationId },
         });
-        if (!current) throw new ServiceError(404, "Senha de TI nao encontrada.");
+        if (!current) throw new ServiceError(404, "Senha de TI não encontrada.");
         if (row(current).active === false)
-          throw new ServiceError(409, "Senha de TI ja esta inativa.");
+          throw new ServiceError(409, "Senha de TI já está inativa.");
         const result = await passwords.updateMany({
           where: { id, organization_id: auth.organizationId, active: true },
           data: {
@@ -547,7 +547,7 @@ function passwordServices(database: TiDatabase, encryptionKey: string | undefine
             deactivation_reason: row(body).reason,
           },
         });
-        if (result.count === 0) throw new ServiceError(409, "Senha de TI ja esta inativa.");
+        if (result.count === 0) throw new ServiceError(409, "Senha de TI já está inativa.");
         return withoutPassword(
           await passwords.findFirst({
             where: { id, organization_id: auth.organizationId },
@@ -573,7 +573,7 @@ function requestServices(database: TiDatabase): TiServices {
       include,
     });
     if (!found || (auth.permission < 2 && row(found).requester_id !== auth.userId))
-      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+      throw new ServiceError(404, "Chamado de TI não encontrado.");
     return found;
   }
   return {
@@ -614,26 +614,26 @@ function requestServices(database: TiDatabase): TiServices {
         if (requesterId !== auth.userId && auth.permission < 2)
           throw new ServiceError(
             403,
-            "Permissao insuficiente para criar chamado para outro usuario.",
+            "Permissão insuficiente para criar chamado para outro usuário.",
           );
         if (input.assigned_to_id && auth.permission < 3)
-          throw new ServiceError(403, "Permissao insuficiente para atribuir chamado.");
+          throw new ServiceError(403, "Permissão insuficiente para atribuir chamado.");
         const category = await categories.findFirst({
           where: { id: input.category_id, organization_id: auth.organizationId, active: true },
         });
-        if (!category) throw new ServiceError(404, "Categoria de TI nao encontrada.");
+        if (!category) throw new ServiceError(404, "Categoria de TI não encontrada.");
         await userInOrganization(
           database,
           auth.organizationId,
           requesterId,
-          "Solicitante nao encontrado.",
+          "Solicitante não encontrado.",
         );
         if (input.assigned_to_id)
           await userInOrganization(
             database,
             auth.organizationId,
             String(input.assigned_to_id),
-            "Responsavel nao encontrado.",
+            "Responsável não encontrado.",
           );
         return requests.create({
           data: {
@@ -654,7 +654,7 @@ function requestServices(database: TiDatabase): TiServices {
             where: { id: input.category_id, organization_id: auth.organizationId, active: true },
           }))
         )
-          throw new ServiceError(404, "Categoria de TI nao encontrada.");
+          throw new ServiceError(404, "Categoria de TI não encontrada.");
         return requests.update({ where: { id }, data: input });
       },
       assign: async (value, id, body) => {
@@ -663,22 +663,22 @@ function requestServices(database: TiDatabase): TiServices {
           where: { id, organization_id: auth.organizationId },
           select: { assigned_to_id: true },
         });
-        if (!current) throw new ServiceError(404, "Chamado de TI nao encontrado.");
+        if (!current) throw new ServiceError(404, "Chamado de TI não encontrado.");
         if (
           row(current).assigned_to_id !== auth.userId &&
           auth.permission < 3 &&
           !auth.isOrganizationOwner
         )
-          throw new ServiceError(403, "Permissao insuficiente para transferir chamado.");
+          throw new ServiceError(403, "Permissão insuficiente para transferir chamado.");
         const destination = await userInOrganization(
           database,
           auth.organizationId,
           String(row(body).assigned_to_id),
-          "Responsavel nao encontrado.",
+          "Responsável não encontrado.",
         );
         const departmentId = await technologyDepartment(database, auth.organizationId);
         if (destination.status !== "active" || destination.department_id !== departmentId)
-          throw new ServiceError(400, "Responsavel deve pertencer ao departamento Tecnologia.");
+          throw new ServiceError(400, "Responsável deve pertencer ao departamento Tecnologia.");
         const changed = await requests.updateMany({
           where: {
             id,
@@ -692,7 +692,7 @@ function requestServices(database: TiDatabase): TiServices {
           data: { assigned_to_id: row(body).assigned_to_id },
         });
         if (changed.count === 0)
-          throw new ServiceError(409, "Chamado de TI foi transferido por outro usuario.");
+          throw new ServiceError(409, "Chamado de TI foi transferido por outro usuário.");
         return { id, assigned_to_id: row(body).assigned_to_id };
       },
       listTransferCandidates: async (value, id) => {
@@ -701,13 +701,13 @@ function requestServices(database: TiDatabase): TiServices {
           where: { id, organization_id: auth.organizationId },
           select: { assigned_to_id: true },
         });
-        if (!current) throw new ServiceError(404, "Chamado de TI nao encontrado.");
+        if (!current) throw new ServiceError(404, "Chamado de TI não encontrado.");
         if (
           row(current).assigned_to_id !== auth.userId &&
           auth.permission < 3 &&
           !auth.isOrganizationOwner
         )
-          throw new ServiceError(403, "Permissao insuficiente para transferir chamado.");
+          throw new ServiceError(403, "Permissão insuficiente para transferir chamado.");
         const departmentId = await technologyDepartment(database, auth.organizationId);
         return delegate(database, "user").findMany({
           where: {
@@ -741,7 +741,7 @@ function requestServices(database: TiDatabase): TiServices {
           auth.permission < 3 &&
           !allowed[String(row(current).status)]?.includes(String(next))
         )
-          throw new ServiceError(403, "Permissao insuficiente para esta transicao.");
+          throw new ServiceError(403, "Permissão insuficiente para esta transição.");
         return requests.update({ where: { id }, data: { status: next } });
       },
       listMessages: async (value, id, query) => {
@@ -799,7 +799,7 @@ function requestServices(database: TiDatabase): TiServices {
             where: { organization_id: auth.organizationId, name: input.name, active: true },
           })
         )
-          throw new ServiceError(409, "Ja existe uma categoria de TI ativa com este nome.");
+          throw new ServiceError(409, "Já existe uma categoria de TI ativa com este nome.");
         return categories.create({
           data: { ...input, active: true, organization_id: auth.organizationId },
         });
@@ -807,7 +807,7 @@ function requestServices(database: TiDatabase): TiServices {
       update: async (value, id, body) => {
         const auth = context(value);
         if (!(await categories.findFirst({ where: { id, organization_id: auth.organizationId } })))
-          throw new ServiceError(404, "Categoria de TI nao encontrada.");
+          throw new ServiceError(404, "Categoria de TI não encontrada.");
         return categories.update({ where: { id }, data: row(body) });
       },
     },
@@ -865,7 +865,7 @@ function robotServices(database: TiDatabase): TiServices {
           where: { id, organization_id: context(value).organizationId },
           include: latestRunInclude,
         });
-        if (!result) throw new ServiceError(404, "Robo de TI nao encontrado.");
+        if (!result) throw new ServiceError(404, "Robô de TI não encontrado.");
         return robotResponse(result);
       },
       create: async (value, body) =>
@@ -873,13 +873,13 @@ function robotServices(database: TiDatabase): TiServices {
       update: async (value, id, body) => {
         const auth = context(value);
         if (!(await robots.findFirst({ where: { id, organization_id: auth.organizationId } })))
-          throw new ServiceError(404, "Robo de TI nao encontrado.");
+          throw new ServiceError(404, "Robô de TI não encontrado.");
         return robots.update({ where: { id }, data: row(body) });
       },
       createRun: async (value, id, body) => {
         const auth = context(value);
         if (!(await robots.findFirst({ where: { id, organization_id: auth.organizationId } })))
-          throw new ServiceError(404, "Robo de TI nao encontrado.");
+          throw new ServiceError(404, "Robô de TI não encontrado.");
         return runs.create({
           data: { robot_id: id, organization_id: auth.organizationId, ...row(body) },
         });
@@ -887,7 +887,7 @@ function robotServices(database: TiDatabase): TiServices {
       listRuns: async (value, id, query) => {
         const auth = context(value);
         if (!(await robots.findFirst({ where: { id, organization_id: auth.organizationId } })))
-          throw new ServiceError(404, "Robo de TI nao encontrado.");
+          throw new ServiceError(404, "Robô de TI não encontrado.");
         const input = row(query);
         const { skip, take } = pageQuery(query);
         return runs.findMany({
@@ -953,9 +953,9 @@ function termServices(database: TiDatabase): TiServices {
           where: { id, organization_id: context(value).organizationId },
           include: userInclude,
         });
-        if (!result) throw new ServiceError(404, "Termo de TI nao encontrado.");
+        if (!result) throw new ServiceError(404, "Termo de TI não encontrado.");
         if (auth.permission < 3 && row(result).user_id !== auth.userId)
-          throw new ServiceError(404, "Termo de TI nao encontrado.");
+          throw new ServiceError(404, "Termo de TI não encontrado.");
         return termResponse(result);
       },
       create: async (value, body) => {
@@ -967,7 +967,7 @@ function termServices(database: TiDatabase): TiServices {
           const department = await delegate(database, "department").findFirst({
             where: { id: input.department_id, organization_id: auth.organizationId },
           });
-          if (!department) throw new ServiceError(404, "Departamento nao encontrado.");
+          if (!department) throw new ServiceError(404, "Departamento não encontrado.");
         }
         return termResponse(
           await terms.create({
@@ -990,7 +990,7 @@ function termServices(database: TiDatabase): TiServices {
           const department = await delegate(database, "department").findFirst({
             where: { id: input.department_id, organization_id: auth.organizationId },
           });
-          if (!department) throw new ServiceError(404, "Departamento nao encontrado.");
+          if (!department) throw new ServiceError(404, "Departamento não encontrado.");
         }
         return termResponse(await terms.update({ where: { id }, data: input }));
       },
@@ -1000,7 +1000,7 @@ function termServices(database: TiDatabase): TiServices {
         if (auth.permission < 3 && row(term).user_id !== auth.userId)
           throw new ServiceError(
             403,
-            "Permissao insuficiente para assinar termo de outro usuario.",
+            "Permissão insuficiente para assinar termo de outro usuário.",
           );
         return termResponse(
           await terms.update({
@@ -1027,7 +1027,7 @@ async function thisTermGet(
     include,
   });
   if (!result || (auth.permission < 3 && result.user_id !== auth.userId))
-    throw new ServiceError(404, "Termo de TI nao encontrado.");
+    throw new ServiceError(404, "Termo de TI não encontrado.");
   return result;
 }
 
@@ -1147,7 +1147,7 @@ function stockServices(database: TiDatabase): TiServices {
           where: { id, organization_id: auth.organizationId, department_id: departmentId },
           include: { category: true, location: true, department: true },
         });
-        if (!result) throw new ServiceError(404, "Item de estoque nao encontrado.");
+        if (!result) throw new ServiceError(404, "Item de estoque não encontrado.");
         return result;
       },
       createItem: async (value, body) => {
@@ -1207,21 +1207,21 @@ function stockServices(database: TiDatabase): TiServices {
             tx,
             auth.organizationId,
             String(input.requester_id),
-            "Solicitante nao encontrado.",
+            "Solicitante não encontrado.",
           );
           if (input.approver_id)
             await userInOrganization(
               tx,
               auth.organizationId,
               String(input.approver_id),
-              "Aprovador nao encontrado.",
+              "Aprovador não encontrado.",
             );
           if (input.operator_id)
             await userInOrganization(
               tx,
               auth.organizationId,
               String(input.operator_id),
-              "Operador nao encontrado.",
+              "Operador não encontrado.",
             );
           if (input.location_destination_id)
             await ensureStockLocation(
@@ -1368,7 +1368,7 @@ function stockServices(database: TiDatabase): TiServices {
         )
           throw new ServiceError(
             409,
-            "Ja existe uma categoria de estoque de TI ativa com este nome.",
+            "Já existe uma categoria de estoque de TI ativa com este nome.",
           );
         try {
           return await categories.create({
@@ -1384,7 +1384,7 @@ function stockServices(database: TiDatabase): TiServices {
           if (uniqueError(error))
             throw new ServiceError(
               409,
-              "Ja existe uma categoria de estoque de TI ativa com este nome.",
+              "Já existe uma categoria de estoque de TI ativa com este nome.",
             );
           throw error;
         }
@@ -1397,14 +1397,14 @@ function stockServices(database: TiDatabase): TiServices {
             where: { id, organization_id: auth.organizationId, department_id: departmentId },
           }))
         )
-          throw new ServiceError(404, "Categoria de estoque nao encontrada.");
+          throw new ServiceError(404, "Categoria de estoque não encontrada.");
         try {
           return await categories.update({ where: { id }, data: row(body) });
         } catch (error) {
           if (uniqueError(error))
             throw new ServiceError(
               409,
-              "Ja existe uma categoria de estoque de TI ativa com este nome.",
+              "Já existe uma categoria de estoque de TI ativa com este nome.",
             );
           throw error;
         }
@@ -1443,7 +1443,7 @@ function stockServices(database: TiDatabase): TiServices {
               normalizeLocation(String(input.name)),
           )
         )
-          throw new ServiceError(409, "Ja existe um local de estoque de TI ativo com este nome.");
+          throw new ServiceError(409, "Já existe um local de estoque de TI ativo com este nome.");
         return locations.create({
           data: {
             ...input,
@@ -1461,7 +1461,7 @@ function stockServices(database: TiDatabase): TiServices {
             where: { id, organization_id: auth.organizationId, department_id: departmentId },
           }))
         )
-          throw new ServiceError(404, "Local de estoque nao encontrado.");
+          throw new ServiceError(404, "Local de estoque não encontrado.");
         return locations.update({ where: { id }, data: row(body) });
       },
     },
@@ -1477,7 +1477,7 @@ async function ensureStock(
   const result = await delegate(database, "stock").findFirst({
     where: { id, organization_id: organizationId, department_id: departmentId },
   });
-  if (!result) throw new ServiceError(404, "Item de estoque nao encontrado.");
+  if (!result) throw new ServiceError(404, "Item de estoque não encontrado.");
   return result;
 }
 
@@ -1498,7 +1498,7 @@ async function ensureStockReference(
       },
     }))
   )
-    throw new ServiceError(404, "Categoria de estoque nao encontrada.");
+    throw new ServiceError(404, "Categoria de estoque não encontrada.");
   if (
     input.location_id &&
     !(await delegate(database, "locationStock").findFirst({
@@ -1510,7 +1510,7 @@ async function ensureStockReference(
       },
     }))
   )
-    throw new ServiceError(404, "Local de estoque nao encontrado.");
+    throw new ServiceError(404, "Local de estoque não encontrado.");
 }
 
 async function ensureStockLocation(
@@ -1522,7 +1522,7 @@ async function ensureStockLocation(
   const location = await delegate(database, "locationStock").findFirst({
     where: { id, organization_id: organizationId, department_id: departmentId, status: true },
   });
-  if (!location) throw new ServiceError(404, "Local de estoque nao encontrado.");
+  if (!location) throw new ServiceError(404, "Local de estoque não encontrado.");
 }
 
 type ReportingInput = {

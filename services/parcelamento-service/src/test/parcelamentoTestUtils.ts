@@ -146,6 +146,9 @@ export function createPrismaMock() {
     },
     installment: {
       count: vi.fn(async () => 1),
+      aggregate: vi.fn(async () => ({
+        _sum: { paid_installments_count: 0, agreed_installments_count: 0 },
+      })),
       findMany: vi.fn(async () => [fixture]),
       findFirst: vi.fn(async () => null),
       create: vi.fn(async ({ data }) => createInstallmentFixture(data)),

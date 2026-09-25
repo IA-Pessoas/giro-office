@@ -8,6 +8,19 @@ export const panelClassName =
 export const reportCheckboxClassName =
   "h-4 w-4 accent-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
 
+/** O histórico só traz o id do solicitante; o nome vem do catálogo de usuários ou da sessão. */
+export function getReportAuthorLabel(
+  item: { requester_id: string; author_name?: string | null },
+  namesById: ReadonlyMap<string, string>,
+  currentUser?: { id?: string; name?: string | null } | null,
+): string {
+  if (item.author_name) return item.author_name;
+  const name = namesById.get(item.requester_id);
+  if (name) return name;
+  if (currentUser?.id === item.requester_id && currentUser.name) return currentUser.name;
+  return "Usuário não encontrado";
+}
+
 export function formatReportDate(value?: string | null): string {
   if (!value) return "—";
   const date = new Date(value);

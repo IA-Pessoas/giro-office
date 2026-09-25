@@ -476,7 +476,7 @@ function localTimeBankService(prisma: RhCategoryPrisma): RhTimeBankService {
         where: { id: input.target_user_id, organization_id: input.organization_id },
         select: { id: true },
       });
-      if (!user) throw new ServiceError(404, "Colaborador nao encontrado nesta organizacao.");
+      if (!user) throw new ServiceError(404, "Colaborador não encontrado nesta organização.");
       return prisma.timeBankReleases.create({
         data: {
           user_id: input.target_user_id,
@@ -495,8 +495,8 @@ function localTimeBankService(prisma: RhCategoryPrisma): RhTimeBankService {
         where: { id: input.id, organization_id: input.organization_id },
         select,
       });
-      if (!release) throw new ServiceError(404, "Lancamento nao encontrado.");
-      if (release.is_approved) throw new ServiceError(409, "Lancamento ja foi aprovado.");
+      if (!release) throw new ServiceError(404, "Lançamento não encontrado.");
+      if (release.is_approved) throw new ServiceError(409, "Lançamento já foi aprovado.");
       const config = await prisma.pointsConfig.findUnique({
         where: { user_id: release.user_id },
         select: { user_id: true },
@@ -504,7 +504,7 @@ function localTimeBankService(prisma: RhCategoryPrisma): RhTimeBankService {
       if (!config) {
         throw new ServiceError(
           404,
-          "Configuracao de ponto nao encontrada para o colaborador; nao e possivel aprovar o lancamento.",
+          "Configuração de ponto não encontrada para o colaborador; não é possível aprovar o lançamento.",
         );
       }
       const approveInTransaction = async (client: RhCategoryPrisma) => {
@@ -512,7 +512,7 @@ function localTimeBankService(prisma: RhCategoryPrisma): RhTimeBankService {
           where: { id: input.id, organization_id: input.organization_id, is_approved: false },
           data: { is_approved: true },
         });
-        if (claimed.count !== 1) throw new ServiceError(409, "Lancamento ja foi aprovado.");
+        if (claimed.count !== 1) throw new ServiceError(409, "Lançamento já foi aprovado.");
         await client.pointsConfig.update({
           where: { user_id: release.user_id },
           data: { bank_balance: { increment: release.minutes } },
@@ -532,10 +532,10 @@ function localTimeBankService(prisma: RhCategoryPrisma): RhTimeBankService {
         select: { user_id: true, organization_id: true, bank_balance: true },
       });
       if (!config) {
-        throw new ServiceError(404, "Configuracao de ponto nao encontrada para o colaborador.");
+        throw new ServiceError(404, "Configuração de ponto não encontrada para o colaborador.");
       }
       if (config.organization_id !== organizationId) {
-        throw new ServiceError(403, "Configuracao de ponto pertence a outra organizacao.");
+        throw new ServiceError(403, "Configuração de ponto pertence a outra organização.");
       }
       const [approved, pending] = await Promise.all([
         prisma.timeBankReleases.count({

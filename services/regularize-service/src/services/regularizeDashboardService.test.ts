@@ -116,8 +116,9 @@ describe("RegularizeDashboardService", () => {
         }),
       }),
     );
+    // Mesma regra do filtro "Em Andamento" da aba Licenças, para os números baterem (#1347).
     expect(prisma.license.count).toHaveBeenCalledWith({
-      where: { organization_id: organizationId, status: "Ativo" },
+      where: { organization_id: organizationId, status: { in: ["Em Andamento", "Ativo"] } },
     });
     expect(prisma.clientPF.count).toHaveBeenCalledWith({
       where: { organization_id: organizationId, status: "Ativo" },

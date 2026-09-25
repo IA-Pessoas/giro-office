@@ -131,7 +131,7 @@ describe("parcelamento Worker", () => {
   it("serializa erro de domínio do fluxo de detalhe", async () => {
     const installmentService = service();
     installmentService.getById.mockRejectedValue(
-      new ServiceError(404, "Parcelamento nao encontrado."),
+      new ServiceError(404, "Parcelamento não encontrado."),
     );
     const app = createParcelamentoWorkerApp({ env: env(), installmentService });
 
@@ -143,7 +143,7 @@ describe("parcelamento Worker", () => {
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
       success: false,
-      error: "Parcelamento nao encontrado.",
+      error: "Parcelamento não encontrado.",
       code: "NOT_FOUND",
     });
   });

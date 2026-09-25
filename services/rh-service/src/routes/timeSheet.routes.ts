@@ -36,10 +36,10 @@ router.post(
       const organizationId = req.organization_id;
       const userId = req.user_id;
       if (!organizationId) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
       if (!userId) {
-        throw new ServiceError(400, "user_id e obrigatorio.");
+        throw new ServiceError(400, "user_id é obrigatório.");
       }
 
       const body = parseWithZod(createTimeSheetBodySchema, req.body);
@@ -67,7 +67,7 @@ router.put(
     try {
       const organizationId = req.organization_id;
       if (!organizationId) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
 
       const body = parseWithZod(rebuildTimeSheetBodySchema, req.body);
@@ -92,10 +92,10 @@ router.get(
       const organizationId = req.organization_id;
       const requesterId = req.user_id;
       if (!organizationId) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
       if (!requesterId) {
-        throw new ServiceError(400, "user_id e obrigatorio.");
+        throw new ServiceError(400, "user_id é obrigatório.");
       }
 
       const query = parseWithZod(listTimeSheetsQuerySchema, req.query);
@@ -125,10 +125,10 @@ router.get(
       const organizationId = req.organization_id;
       const requesterId = req.user_id;
       if (!organizationId) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
       if (!requesterId) {
-        throw new ServiceError(400, "user_id e obrigatorio.");
+        throw new ServiceError(400, "user_id é obrigatório.");
       }
 
       const { id } = parseWithZod(timeSheetIdParamsSchema, req.params);
@@ -139,7 +139,7 @@ router.get(
       if (!canManageRh(req) && detail.user_id !== requesterId) {
         throw new ServiceError(
           403,
-          "Permissao insuficiente para acessar folha de ponto de terceiro.",
+          "Permissão insuficiente para acessar folha de ponto de terceiro.",
         );
       }
 
@@ -166,10 +166,10 @@ router.get(
       const organizationId = req.organization_id;
       const requesterId = req.user_id;
       if (!organizationId) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
       if (!requesterId) {
-        throw new ServiceError(400, "user_id e obrigatorio.");
+        throw new ServiceError(400, "user_id é obrigatório.");
       }
 
       const { id } = parseWithZod(timeSheetIdParamsSchema, req.params);
@@ -181,7 +181,7 @@ router.get(
       if (!canManageRh(req) && result.user_id !== requesterId) {
         throw new ServiceError(
           403,
-          "Permissao insuficiente para acessar folha de ponto de terceiro.",
+          "Permissão insuficiente para acessar folha de ponto de terceiro.",
         );
       }
 
@@ -202,10 +202,10 @@ router.put(
       const organizationId = req.organization_id;
       const actorUserId = req.user_id;
       if (!organizationId) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
       if (!actorUserId) {
-        throw new ServiceError(400, "user_id e obrigatorio.");
+        throw new ServiceError(400, "user_id é obrigatório.");
       }
 
       const body = parseWithZod(reopenTimeSheetBodySchema, req.body);
@@ -232,10 +232,10 @@ router.put(
       const organizationId = req.organization_id;
       const signerUserId = req.user_id;
       if (!organizationId) {
-        throw new ServiceError(400, "organization_id e obrigatorio.");
+        throw new ServiceError(400, "organization_id é obrigatório.");
       }
       if (!signerUserId) {
-        throw new ServiceError(400, "user_id e obrigatorio.");
+        throw new ServiceError(400, "user_id é obrigatório.");
       }
 
       const body = parseWithZod(signTimeSheetBodySchema, req.body);

@@ -81,7 +81,7 @@ export class TiRobotService {
     });
 
     if (!robot) {
-      throw new ServiceError(404, "Robo de TI nao encontrado.");
+      throw new ServiceError(404, "Robô de TI não encontrado.");
     }
 
     return withLatestRunSummary(robot);
@@ -138,7 +138,7 @@ export class TiRobotService {
     } catch (err: unknown) {
       logError("Erro ao registrar execucao de robo de TI", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao registrar execucao de robo de TI.", err);
+      throw new ServiceError(500, "Erro ao registrar execução de robô de TI.", err);
     }
   }
 
@@ -171,7 +171,7 @@ export class TiRobotService {
     });
 
     if (!robot) {
-      throw new ServiceError(404, "Robo de TI nao encontrado.");
+      throw new ServiceError(404, "Robô de TI não encontrado.");
     }
 
     return robot;

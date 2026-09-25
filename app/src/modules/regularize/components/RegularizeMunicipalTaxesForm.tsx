@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { Dialog } from "@shared/components";
+import { formatBrlAmount, formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 import { ClientSelectionField } from "@modules/clients";
 
 import type {
@@ -90,21 +91,21 @@ function buildMunicipalTaxesFormState(
       client_id: defaultClientId,
       year: String(currentYear),
       tff_is_applicable: false,
-      tff_amount: "0",
+      tff_amount: formatBrlAmount(0),
       tff_notes: "",
       tff_analysis_is_done: false,
       tff_analysis_notes: "",
       tff_sent_date: "",
       tff_due_date: "",
       tlp_is_applicable: false,
-      tlp_amount: "0",
+      tlp_amount: formatBrlAmount(0),
       tlp_notes: "",
       tlp_is_sent: "Não",
       tlp_sent_date: "",
       tlp_due_date: "",
       tlp_not_email: false,
       tll_is_applicable: false,
-      tll_amount: "0",
+      tll_amount: formatBrlAmount(0),
       tll_notes: "",
       tll_is_sent: "Não",
       tll_sent_date: "",
@@ -118,21 +119,21 @@ function buildMunicipalTaxesFormState(
     client_id: municipalTax.client_id,
     year: String(municipalTax.year),
     tff_is_applicable: Boolean(municipalTax.tff_is_applicable),
-    tff_amount: String(municipalTax.tff_amount ?? 0),
+    tff_amount: formatBrlAmount(Number(municipalTax.tff_amount ?? 0)),
     tff_notes: municipalTax.tff_notes ?? "",
     tff_analysis_is_done: Boolean(municipalTax.tff_analysis_is_done),
     tff_analysis_notes: municipalTax.tff_analysis_notes ?? "",
     tff_sent_date: toRegularizeInputDate(municipalTax.tff_sent_date),
     tff_due_date: toRegularizeInputDate(municipalTax.tff_due_date),
     tlp_is_applicable: Boolean(municipalTax.tlp_is_applicable),
-    tlp_amount: String(municipalTax.tlp_amount ?? 0),
+    tlp_amount: formatBrlAmount(Number(municipalTax.tlp_amount ?? 0)),
     tlp_notes: municipalTax.tlp_notes ?? "",
     tlp_is_sent: toRegularizeYesNo(municipalTax.tlp_is_sent),
     tlp_sent_date: toRegularizeInputDate(municipalTax.tlp_sent_date),
     tlp_due_date: toRegularizeInputDate(municipalTax.tlp_due_date),
     tlp_not_email: Boolean(municipalTax.tlp_not_email),
     tll_is_applicable: Boolean(municipalTax.tll_is_applicable),
-    tll_amount: String(municipalTax.tll_amount ?? 0),
+    tll_amount: formatBrlAmount(Number(municipalTax.tll_amount ?? 0)),
     tll_notes: municipalTax.tll_notes ?? "",
     tll_is_sent: toRegularizeYesNo(municipalTax.tll_is_sent),
     tll_sent_date: toRegularizeInputDate(municipalTax.tll_sent_date),
@@ -149,21 +150,21 @@ function buildMunicipalTaxesPayload(
     client_id: formState.client_id,
     year: toRegularizeRequiredNumber(formState.year),
     tff_is_applicable: formState.tff_is_applicable,
-    tff_amount: toRegularizeRequiredNumber(formState.tff_amount),
+    tff_amount: parseBrlInput(formState.tff_amount) ?? 0,
     tff_notes: trimRegularizeNullableText(formState.tff_notes),
     tff_analysis_is_done: formState.tff_analysis_is_done,
     tff_analysis_notes: trimRegularizeNullableText(formState.tff_analysis_notes),
     tff_sent_date: formState.tff_sent_date || undefined,
     tff_due_date: formState.tff_due_date || undefined,
     tlp_is_applicable: formState.tlp_is_applicable,
-    tlp_amount: toRegularizeRequiredNumber(formState.tlp_amount),
+    tlp_amount: parseBrlInput(formState.tlp_amount) ?? 0,
     tlp_notes: trimRegularizeNullableText(formState.tlp_notes),
     tlp_is_sent: formState.tlp_is_sent,
     tlp_sent_date: formState.tlp_sent_date || undefined,
     tlp_due_date: formState.tlp_due_date || undefined,
     tlp_not_email: formState.tlp_not_email,
     tll_is_applicable: formState.tll_is_applicable,
-    tll_amount: toRegularizeRequiredNumber(formState.tll_amount),
+    tll_amount: parseBrlInput(formState.tll_amount) ?? 0,
     tll_notes: trimRegularizeNullableText(formState.tll_notes),
     tll_is_sent: formState.tll_is_sent,
     tll_sent_date: formState.tll_sent_date || undefined,
@@ -334,11 +335,11 @@ export function RegularizeMunicipalTaxesForm({
               />
               <RegularizeFormField label="Valor" required>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="R$ 0,00"
                   value={formState.tff_amount}
-                  onChange={(event) => handleChange("tff_amount", event.target.value)}
+                  onChange={(event) => handleChange("tff_amount", formatBrlInput(event.target.value))}
                   className={regularizeTextFieldClassName}
                 />
               </RegularizeFormField>
@@ -383,11 +384,11 @@ export function RegularizeMunicipalTaxesForm({
               />
               <RegularizeFormField label="Valor" required>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="R$ 0,00"
                   value={formState.tlp_amount}
-                  onChange={(event) => handleChange("tlp_amount", event.target.value)}
+                  onChange={(event) => handleChange("tlp_amount", formatBrlInput(event.target.value))}
                   className={regularizeTextFieldClassName}
                 />
               </RegularizeFormField>
@@ -441,11 +442,11 @@ export function RegularizeMunicipalTaxesForm({
               />
               <RegularizeFormField label="Valor" required>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="R$ 0,00"
                   value={formState.tll_amount}
-                  onChange={(event) => handleChange("tll_amount", event.target.value)}
+                  onChange={(event) => handleChange("tll_amount", formatBrlInput(event.target.value))}
                   className={regularizeTextFieldClassName}
                 />
               </RegularizeFormField>

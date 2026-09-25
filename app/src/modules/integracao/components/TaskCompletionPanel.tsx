@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, RotateCcw, Send, X } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import type { ModuleAccess } from "@modules/auth";
 

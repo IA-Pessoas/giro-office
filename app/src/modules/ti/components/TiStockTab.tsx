@@ -17,7 +17,7 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { useAssignableUsers } from "@modules/rh";
@@ -58,6 +58,7 @@ import {
 } from "../utils/stockDisplay";
 import { getTiStockMutationErrorMessage } from "../utils/stockMutationError";
 import { TiNativeSelect } from "./TiNativeSelect";
+import { TiStockItemSelect } from "./TiStockItemSelect";
 import {
   TiDataTable,
   TiEmptyState,
@@ -303,7 +304,7 @@ export function TiStockTab() {
   const [itemForm, setItemForm] = useState<StockItemFormState>(initialItemFormState);
   const [editingItemId, setEditingItemId] = useState<TiId | undefined>();
   const [stockDialog, setStockDialog] = useState<StockDialogState>(null);
-  const [movementItemId, setMovementItemId] = useState("");
+  const [movementItem, setMovementItem] = useState<TiStockItem | null>(null);
   const [entryQuantity, setEntryQuantity] = useState("");
   const [exitForm, setExitForm] = useState<StockExitFormState>(initialExitFormState);
   const [pendingExitConfirmation, setPendingExitConfirmation] =
@@ -349,6 +350,10 @@ export function TiStockTab() {
   const selectedItem = selectedItemQuery.data ?? selectedListItem;
   const stockMovements = stockMovementsQuery.data ?? [];
   const isItemSubmitting = createItemMutation.isPending || updateItemMutation.isPending;
+  const initialQuantityError =
+    itemForm.quantity.trim() !== "" && toNonNegativeNumber(itemForm.quantity) === null
+      ? "Informe uma quantidade maior ou igual a zero."
+      : undefined;
   const isMovementSubmitting = createEntryMutation.isPending || createExitMutation.isPending;
   const isStockRefreshing =
     stockItemsQuery.isFetching ||
@@ -413,17 +418,6 @@ export function TiStockTab() {
       })),
     ],
     [stockLocations],
-  );
-
-  const stockItemOptions = useMemo(
-    () => [
-      { value: "", label: "Selecione" },
-      ...stockItems.map((item) => ({
-        value: getId(item.id),
-        label: formatText(item.name, "Item sem nome"),
-      })),
-    ],
-    [stockItems],
   );
 
   const userOptions = useMemo(
@@ -500,18 +494,18 @@ export function TiStockTab() {
   }
 
   function openMovementDialog(nextDialog: "entry" | "exit") {
-    setMovementItemId(getId(selectedItemId));
+    setMovementItem(selectedItem ?? null);
     setStockDialog(nextDialog);
   }
 
   function closeEntryDialog() {
-    setMovementItemId("");
+    setMovementItem(null);
     setEntryQuantity("");
     setStockDialog(null);
   }
 
   function closeExitDialog() {
-    setMovementItemId("");
+    setMovementItem(null);
     setExitForm(initialExitFormState);
     setStockDialog(null);
   }
@@ -631,7 +625,7 @@ export function TiStockTab() {
       return;
     }
 
-    const itemId = toOptionalId(movementItemId);
+    const itemId = movementItem?.id;
 
     if (!itemId) {
       toast.error("Selecione o item da entrada.");
@@ -662,7 +656,7 @@ export function TiStockTab() {
       return;
     }
 
-    const itemId = toOptionalId(movementItemId);
+    const itemId = movementItem?.id;
 
     if (!itemId) {
       toast.error("Selecione o item da saída.");
@@ -1057,7 +1051,7 @@ export function TiStockTab() {
                 />
               ) : null}
             </div>
-            <section className={tiDialogSubsectionClassName} aria-label="Movimentacoes do estoque">
+            <section className={tiDialogSubsectionClassName} aria-label="Movimentações do estoque">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
                   Movimentações
@@ -1160,6 +1154,7 @@ export function TiStockTab() {
             {!editingItemId ? (
               <TiTextField
                 label="Quantidade inicial"
+                errorText={initialQuantityError}
                 min={0}
                 onChange={(event) => updateItemField("quantity", event.target.value)}
                 type="number"
@@ -1221,13 +1216,7 @@ export function TiStockTab() {
         contentClassName="w-[min(92vw,520px)]"
       >
         <form className="space-y-4" onSubmit={handleSubmitEntry}>
-          <TiNativeSelect
-            disabled={stockItemsQuery.isLoading}
-            label="Item"
-            onChange={(event) => setMovementItemId(event.target.value)}
-            options={stockItemOptions}
-            value={movementItemId}
-          />
+          <TiStockItemSelect selectedItem={movementItem} onSelect={setMovementItem} />
           <TiTextField
             label="Quantidade"
             min={0}
@@ -1248,7 +1237,7 @@ export function TiStockTab() {
               type="submit"
               label={createEntryMutation.isPending ? "Registrando..." : "Registrar entrada"}
               variant="primary"
-              disabled={!movementItemId || !canEditStock || isMovementSubmitting}
+              disabled={!movementItem || !canEditStock || isMovementSubmitting}
             />
           </div>
         </form>
@@ -1267,13 +1256,7 @@ export function TiStockTab() {
       >
         <form className="space-y-4" onSubmit={handleSubmitExit}>
           <div className="grid gap-3 md:grid-cols-2">
-            <TiNativeSelect
-              disabled={stockItemsQuery.isLoading}
-              label="Item"
-              onChange={(event) => setMovementItemId(event.target.value)}
-              options={stockItemOptions}
-              value={movementItemId}
-            />
+            <TiStockItemSelect selectedItem={movementItem} onSelect={setMovementItem} />
             <TiTextField
               label="Quantidade"
               min={0}
@@ -1328,7 +1311,7 @@ export function TiStockTab() {
               type="submit"
               label={createExitMutation.isPending ? "Registrando..." : "Registrar saída"}
               variant="primary"
-              disabled={!movementItemId || !canEditStock || isMovementSubmitting}
+              disabled={!movementItem || !canEditStock || isMovementSubmitting}
             />
           </div>
         </form>

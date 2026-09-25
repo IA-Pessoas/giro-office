@@ -6,6 +6,8 @@ import {
 } from "@workspace/shared";
 import pg from "pg";
 
+import { describeActivity } from "../audit/activityCatalog.js";
+
 const { Pool } = pg;
 
 type Queryable = Pick<pg.Pool, "query">;
@@ -359,27 +361,27 @@ function fillMonthlyClientTrends(rows: MonthlyClientRow[]): DashboardStats["mont
   });
 }
 
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const DASHBOARD_ACTIVITY_LIMIT = 5;
+
 function isEligibleActivity(activity: ActivityRow): boolean {
+  // Leituras (GET) não são atividade de negócio: "acessou /user/me" poluía o feed (#1371).
+  if (READ_METHODS.has((activity.method ?? "").toUpperCase())) return false;
   if (activity.activity_visible == null) return true;
   return activity.activity_visible && activity.outcome === "success";
 }
 
-function normalizeAction(row: ActivityRow): string {
-  if (row.action) {
-    return row.action;
-  }
-
-  switch (row.method) {
-    case "POST":
-      return "criou";
-    case "PUT":
-    case "PATCH":
-      return "atualizou";
-    case "DELETE":
-      return "removeu";
-    default:
-      return "acessou";
-  }
+/**
+ * Rótulo humano da atividade. Linhas legadas sem `action`/`referring` são descritas pelo
+ * catálogo de auditoria a partir de método + rota; sem descrição conhecida (ou se o item
+ * ainda for uma rota de API), a linha sai do feed em vez de mostrar o caminho cru.
+ */
+function describeActivityRow(row: ActivityRow): { action: string; item: string } | null {
+  const catalog = row.method && row.path ? describeActivity(row.method, row.path) : null;
+  const action = row.action ?? catalog?.action;
+  const item = row.item ?? catalog?.item;
+  if (!action || !item || item.startsWith("/")) return null;
+  return { action, item };
 }
 
 class DashboardQueryQueue {
@@ -604,17 +606,24 @@ export class DashboardStatsService {
           dueDate: formatDueDate(task.prevision_date),
           status: task.is_urgent ? "urgent" : "pending",
         })),
-        activities: activitiesResult.rows.filter(isEligibleActivity).map((activity, index) => {
-          const user = activity.user_name ?? "Usuário";
-          return {
-            user,
-            action: normalizeAction(activity),
-            item: activity.item ?? activity.path ?? "registro",
-            createdAt: formatNullableIsoDate(activity.created_at),
-            avatar: initials(user),
-            tone: ACTIVITY_TONES[index % ACTIVITY_TONES.length] ?? "blue",
-          };
-        }),
+        activities: activitiesResult.rows
+          .filter(isEligibleActivity)
+          .flatMap((activity) => {
+            const description = describeActivityRow(activity);
+            return description ? [{ activity, description }] : [];
+          })
+          .slice(0, DASHBOARD_ACTIVITY_LIMIT)
+          .map(({ activity, description }, index) => {
+            const user = activity.user_name ?? "Usuário";
+            return {
+              user,
+              action: description.action,
+              item: description.item,
+              createdAt: formatNullableIsoDate(activity.created_at),
+              avatar: initials(user),
+              tone: ACTIVITY_TONES[index % ACTIVITY_TONES.length] ?? "blue",
+            };
+          }),
       };
     } catch (err) {
       if (err instanceof ServiceError) {
@@ -886,6 +895,7 @@ const ACTIVITIES_SQL = `
   from public.audit_requests a
   left join public.users u on u.id = a.user_id
   where a.organization_id = $1
+    and upper(coalesce(a.method, '')) not in ('GET', 'HEAD', 'OPTIONS')
     and (
       not coalesce(a.metadata_json ? 'activityVisible', false)
       or (
@@ -894,7 +904,7 @@ const ACTIVITIES_SQL = `
       )
     )
   order by a.created_at desc
-  limit 5
+  limit 20
 `;
 
 const UPDATED_AT_SQL = `

@@ -19,6 +19,7 @@ import type {
   SharedReportModel,
 } from "../types/report.types";
 import {
+  reportJobPollInterval,
   reportsHistoryQueryKey,
   reportsJobQueryKey,
   reportsModelsQueryKey,
@@ -78,10 +79,11 @@ export function useReportJob(id: string | null): UseQueryResult<ReportJob, Error
     () => reportsService.getJob(id ?? ""),
     {
       enabled: Boolean(id),
-      refetchInterval: (query) => {
-        const status = query.state.data?.status;
-        return status === "queued" || status === "processing" ? 1500 : false;
-      },
+      refetchInterval: (query) =>
+        reportJobPollInterval(query.state.data?.status, query.state.dataUpdateCount),
+      // Com a aba oculta o react-query pausa o intervalo, e refetchOnWindowFocus é false no app:
+      // a tela ficava "na fila" para sempre. É um job só, e o polling para no estado terminal.
+      refetchIntervalInBackground: true,
     },
   );
 }

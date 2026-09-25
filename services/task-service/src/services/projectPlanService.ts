@@ -205,7 +205,7 @@ export class ProjectPlanService {
       });
 
       if (exists) {
-        throw new ServiceError(409, "Plano com esse nome ja foi cadastrado.");
+        throw new ServiceError(409, "Plano com esse nome já foi cadastrado.");
       }
 
       const create = await this.#prisma.projectPlan.create({
@@ -230,7 +230,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao cadastrar plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel cadastrar o plano.", err);
+      throw new ServiceError(500, "Não foi possível cadastrar o plano.", err);
     }
   }
 
@@ -247,7 +247,7 @@ export class ProjectPlanService {
       });
 
       if (!exists) {
-        throw new ServiceError(404, "Plano nao encontrado.");
+        throw new ServiceError(404, "Plano não encontrado.");
       }
 
       const updated = await this.#prisma.projectPlan.update({
@@ -275,7 +275,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao atualizar plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel atualizar o plano.", err);
+      throw new ServiceError(500, "Não foi possível atualizar o plano.", err);
     }
   }
 
@@ -296,14 +296,14 @@ export class ProjectPlanService {
       });
 
       if (!detail) {
-        throw new ServiceError(404, "Plano nao encontrado.");
+        throw new ServiceError(404, "Plano não encontrado.");
       }
 
       return { detail };
     } catch (err: unknown) {
       logError("Erro ao detalhar plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel buscar o plano.", err);
+      throw new ServiceError(500, "Não foi possível buscar o plano.", err);
     }
   }
 
@@ -326,7 +326,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao listar planos de projeto", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel listar os planos.", err);
+      throw new ServiceError(500, "Não foi possível listar os planos.", err);
     }
   }
 
@@ -342,7 +342,7 @@ export class ProjectPlanService {
       });
 
       if (!exists) {
-        throw new ServiceError(404, "Plano nao encontrado.");
+        throw new ServiceError(404, "Plano não encontrado.");
       }
 
       await this.#prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -376,7 +376,7 @@ export class ProjectPlanService {
       if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
         throw new ServiceError(409, "Não é possível excluir um plano já contratado.");
       }
-      throw new ServiceError(500, "Nao foi possivel excluir o plano.", err);
+      throw new ServiceError(500, "Não foi possível excluir o plano.", err);
     }
   }
 
@@ -392,7 +392,7 @@ export class ProjectPlanService {
       });
 
       if (!plan) {
-        throw new ServiceError(404, "Plano nao encontrado.");
+        throw new ServiceError(404, "Plano não encontrado.");
       }
 
       const taskModel = await this.#prisma.taskModel.findFirst({
@@ -403,7 +403,7 @@ export class ProjectPlanService {
       });
 
       if (!taskModel) {
-        throw new ServiceError(404, "Modelo de tarefa nao encontrado.");
+        throw new ServiceError(404, "Modelo de tarefa não encontrado.");
       }
 
       const alreadyInPlan = await this.#prisma.projectPlanTasks.findFirst({
@@ -416,7 +416,7 @@ export class ProjectPlanService {
       });
 
       if (alreadyInPlan) {
-        throw new ServiceError(409, "Modelo de tarefa ja esta neste plano.");
+        throw new ServiceError(409, "Modelo de tarefa já está neste plano.");
       }
 
       const lastTaskInPlan = await this.#prisma.projectPlanTasks.findFirst({
@@ -461,10 +461,10 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao adicionar modelo de tarefa ao plano", { err });
       if (isUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Modelo de tarefa ja esta neste plano.", err);
+        throw new ServiceError(409, "Modelo de tarefa já está neste plano.", err);
       }
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel adicionar a tarefa ao plano.", err);
+      throw new ServiceError(500, "Não foi possível adicionar a tarefa ao plano.", err);
     }
   }
 
@@ -489,7 +489,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao listar tarefas do plano", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel listar as tarefas do plano.", err);
+      throw new ServiceError(500, "Não foi possível listar as tarefas do plano.", err);
     }
   }
 
@@ -510,11 +510,11 @@ export class ProjectPlanService {
       });
 
       if (!taskA) {
-        throw new ServiceError(404, "Tarefa nao encontrada neste plano.");
+        throw new ServiceError(404, "Tarefa não encontrada neste plano.");
       }
 
       if (data.direction === "up" && taskA.order === 1) {
-        return { message: "A tarefa ja esta no topo." };
+        return { message: "A tarefa já está no topo." };
       }
 
       const targetOrder = data.direction === "up" ? taskA.order - 1 : taskA.order + 1;
@@ -527,7 +527,7 @@ export class ProjectPlanService {
       });
 
       if (!taskB) {
-        return { message: "Nao e possivel mover a tarefa nesta direcao." };
+        return { message: "Não é possível mover a tarefa nesta direção." };
       }
 
       const [updatedTaskA, updatedTaskB] = await this.#prisma.$transaction([
@@ -559,7 +559,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao reordenar tarefa do plano", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel reordenar a tarefa do plano.", err);
+      throw new ServiceError(500, "Não foi possível reordenar a tarefa do plano.", err);
     }
   }
 
@@ -578,7 +578,7 @@ export class ProjectPlanService {
         });
 
         if (!taskToDelete) {
-          throw new ServiceError(404, "Tarefa nao encontrada neste plano.");
+          throw new ServiceError(404, "Tarefa não encontrada neste plano.");
         }
 
         await tx.projectPlanTasks.delete({
@@ -618,7 +618,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao excluir tarefa do plano", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel excluir a tarefa do plano.", err);
+      throw new ServiceError(500, "Não foi possível excluir a tarefa do plano.", err);
     }
   }
 
@@ -654,7 +654,7 @@ export class ProjectPlanService {
             where: { id: data.plan_id, organization_id: data.organization_id },
           });
           if (!plan) {
-            throw new ServiceError(404, "Plano nao encontrado.");
+            throw new ServiceError(404, "Plano não encontrado.");
           }
 
           const project = await tx.project.findFirst({
@@ -662,7 +662,7 @@ export class ProjectPlanService {
             select: { client_id: true, status: true },
           });
           if (!project) {
-            throw new ServiceError(404, "Projeto nao encontrado.");
+            throw new ServiceError(404, "Projeto não encontrado.");
           }
           assertProjectCommercialValidationReleased(project);
 
@@ -671,7 +671,7 @@ export class ProjectPlanService {
             select: { prospecting_status: true },
           });
           if (!client) {
-            throw new ServiceError(404, "Cliente nao encontrado.");
+            throw new ServiceError(404, "Cliente não encontrado.");
           }
 
           const planTasks = await tx.projectPlanTasks.findMany({
@@ -741,11 +741,11 @@ export class ProjectPlanService {
       if (isTransactionTimeoutError(err)) {
         throw new ServiceError(
           409,
-          "A contratacao do plano esta em andamento. Tente novamente.",
+          "A contratação do plano está em andamento. Tente novamente.",
           err,
         );
       }
-      throw new ServiceError(500, "Nao foi possivel contratar o plano.", err);
+      throw new ServiceError(500, "Não foi possível contratar o plano.", err);
     }
   }
 }

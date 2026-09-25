@@ -145,7 +145,7 @@ async function reconcileLicenseNotification(
   const license = rows[0];
   if (!license) return;
   const title = `ALVARA A VENCER: ${license.type_license}`;
-  const message = `O alvara do cliente ${license.client_name} vence em ${license.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })}.`;
+  const message = `O alvará do cliente ${license.client_name} vence em ${license.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" })}.`;
   const referenceDate = range.gte;
   for (const manager of managers) {
     await prisma.$executeRaw`INSERT INTO "notification.regularize" ("id", "user_id", "regarding", "regarding_id", "title", "message", "reference_date", "organization_id") VALUES (${crypto.randomUUID()}, ${manager.user_id}, ${"regularize.license"}, ${license.id}, ${title}, ${message}, ${referenceDate}, ${organizationId}) ON CONFLICT ("organization_id", "user_id", "regarding", "regarding_id", "title", "reference_date") DO NOTHING`;
@@ -205,7 +205,7 @@ export function createLicenseMutationService(
           },
           select: { id: true },
         });
-        if (duplicate) throw new ServiceError(409, "Alvara com este protocolo ja cadastrado.");
+        if (duplicate) throw new ServiceError(409, "Alvará com este protocolo já cadastrado.");
         const created = await prisma.license.create({
           data: { ...input.body, organization_id: input.organizationId },
           select,
@@ -230,7 +230,7 @@ export function createLicenseMutationService(
           where: { id: input.body.id, organization_id: input.organizationId },
           select,
         });
-        if (!existing) throw new ServiceError(404, "Alvara nao encontrado.");
+        if (!existing) throw new ServiceError(404, "Alvará não encontrado.");
         await ensureReferences(
           prisma,
           input.organizationId,

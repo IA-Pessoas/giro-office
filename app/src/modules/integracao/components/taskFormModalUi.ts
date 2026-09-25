@@ -5,9 +5,11 @@ export const TASK_FORM_BODY_CLASSNAME = "max-h-[64vh] overflow-y-auto !px-4 !py-
 
 export const TASK_FORM_FORM_CLASSNAME = "space-y-3";
 
-export const TASK_FORM_GRID_CLASSNAME = "grid gap-3 md:grid-cols-2";
+// `grid-cols-1` (minmax(0, 1fr)) segura a coluna única do celular na largura do diálogo; sem ele
+// a trilha implícita cresce até o nome longo do cliente/projeto e corta o campo (#1372).
+export const TASK_FORM_GRID_CLASSNAME = "grid grid-cols-1 gap-3 md:grid-cols-2";
 
-export const TASK_FORM_THREE_COLUMN_GRID_CLASSNAME = "grid gap-3 md:grid-cols-3";
+export const TASK_FORM_THREE_COLUMN_GRID_CLASSNAME = "grid grid-cols-1 gap-3 md:grid-cols-3";
 
 export const TASK_FORM_LABEL_CLASSNAME = "space-y-1.5";
 
@@ -16,8 +18,8 @@ export const TASK_FORM_TEXTAREA_CLASSNAME = "min-h-20 resize-y pl-10";
 export const TASK_FORM_AUXILIARY_WARNING_CLASSNAME =
   "rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200";
 
-export const TASK_CREATE_REQUIRED_FIELDS_MESSAGE =
-  "Preencha cliente, projeto, departamento, modelo, status de prospecção e urgência.";
+/** Projeto criado no modal "Nova tarefa" quando o cliente ainda não tem nenhum. */
+export const LOOSE_TASKS_PROJECT_NAME = "Tarefas avulsas";
 
 export function getAutomaticTaskResponsibleId(
   modelDefaultId: string | null | undefined,
@@ -81,11 +83,37 @@ interface GetTaskCreateValidationMessageParams {
   projectId: string;
   modelId: string;
   departmentId: string;
-  prospectingStatus: string;
   urgency: string;
   observations: string;
   eligibleResponsibleCount: number;
   responsibleId: string;
+}
+
+export type TaskCreateField =
+  | "project_id"
+  | "department_id"
+  | "model_id"
+  | "urgency"
+  | "responsible_id";
+
+/** Erro de cada campo da nova tarefa, mostrado abaixo do campo (#1367). */
+export function getTaskCreateFieldErrors({
+  projectId,
+  modelId,
+  departmentId,
+  urgency,
+  eligibleResponsibleCount,
+  responsibleId,
+}: GetTaskCreateValidationMessageParams): Partial<Record<TaskCreateField, string>> {
+  const errors: Partial<Record<TaskCreateField, string>> = {};
+  if (!projectId) errors.project_id = "Selecione o projeto.";
+  if (!departmentId) errors.department_id = "Selecione o departamento.";
+  if (!modelId) errors.model_id = "Selecione o modelo de tarefa.";
+  if (!urgency) errors.urgency = "Selecione a urgência.";
+  if (eligibleResponsibleCount > 1 && !responsibleId) {
+    errors.responsible_id = "Selecione um responsável elegível para a tarefa.";
+  }
+  return errors;
 }
 
 export function getTaskCreateValidationMessage({
@@ -93,13 +121,23 @@ export function getTaskCreateValidationMessage({
   projectId,
   modelId,
   departmentId,
-  prospectingStatus,
   urgency,
   eligibleResponsibleCount,
   responsibleId,
 }: GetTaskCreateValidationMessageParams): string | null {
-  if (!clientId || !projectId || !departmentId || !modelId || !prospectingStatus || !urgency) {
-    return TASK_CREATE_REQUIRED_FIELDS_MESSAGE;
+  const missing = (
+    [
+      ["cliente", clientId],
+      ["projeto", projectId],
+      ["departamento", departmentId],
+      ["modelo", modelId],
+      ["urgência", urgency],
+    ] as const
+  )
+    .filter(([, value]) => !value)
+    .map(([label]) => label);
+  if (missing.length > 0) {
+    return `Preencha: ${missing.join(", ")}.`;
   }
 
   if (eligibleResponsibleCount > 1 && !responsibleId) {
@@ -133,4 +171,12 @@ export function getProjectSelectPlaceholder({
   }
 
   return "Selecione um projeto";
+}
+
+/** Previsão só é definida direto quando a tarefa ainda não tem; depois, via prorrogação. */
+export function getInitialPrevisionPatch(
+  currentPrevision: string | null | undefined,
+  value: string,
+): { prevision_date?: string } {
+  return !currentPrevision && value ? { prevision_date: value } : {};
 }

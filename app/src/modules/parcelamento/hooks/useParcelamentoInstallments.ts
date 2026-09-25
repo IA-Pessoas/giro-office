@@ -37,9 +37,8 @@ export function useParcelamentoInstallments(
   );
 }
 
-export function useCreateParcelamentoInstallmentMutation(
-  filters: ParcelamentoListFilters,
-): UseMutationResult<ParcelamentoInstallment, Error, CreateParcelamentoInstallmentPayload> {
+// Uma invalidação pelo prefixo cobre lista, dashboard e detalhe: uma recarga só (#1349).
+export function useCreateParcelamentoInstallmentMutation(): UseMutationResult<ParcelamentoInstallment, Error, CreateParcelamentoInstallmentPayload> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -47,14 +46,12 @@ export function useCreateParcelamentoInstallmentMutation(
       parcelamentoService.createInstallment(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: parcelamentoQueryKey("installments") });
-      await queryClient.invalidateQueries({ queryKey: parcelamentoInstallmentsQueryKey(filters) });
     },
   });
 }
 
 export function useUpdateParcelamentoInstallmentMutation(
   id: string,
-  filters: ParcelamentoListFilters,
 ): UseMutationResult<ParcelamentoInstallment, Error, PatchParcelamentoInstallmentPayload> {
   const queryClient = useQueryClient();
 
@@ -63,8 +60,6 @@ export function useUpdateParcelamentoInstallmentMutation(
       parcelamentoService.updateInstallment(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: parcelamentoQueryKey("installments") });
-      await queryClient.invalidateQueries({ queryKey: parcelamentoInstallmentsQueryKey(filters) });
-      await queryClient.invalidateQueries({ queryKey: parcelamentoQueryKey("installments", id) });
     },
   });
 }

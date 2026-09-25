@@ -9,6 +9,14 @@ export function formatCNPJ(cnpj: string) {
   );
 }
 
+/** CPF para listas (#1344): só os dígitos do meio, ex.: ***.444.777-**. */
+export function maskCPF(value: string | null | undefined): string {
+  if (!value) return '';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 11) return '***';
+  return `***.${digits.slice(3, 6)}.${digits.slice(6, 9)}-**`;
+}
+
 export function formatCPF_CNPJ(value: string | null | undefined): string {
   if (!value) return '';
   const digits = value.replace(/\D/g, '');
@@ -39,4 +47,9 @@ export function formatDateToInput(date: Date | string | null | undefined): strin
   const day = String(d.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+}
+
+/** "1 cliente" / "2 clientes": escolhe singular ou plural pela contagem. */
+export function formatCount(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
 }

@@ -5,27 +5,27 @@ import { paginationQuerySchema } from "./pagination.schemas.js";
 
 export const stockItemIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Item de estoque invalido." }),
+    id: z.string().uuid({ message: "Item de estoque inválido." }),
   })
   .strict();
 
 export const stockCategoryIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Categoria de estoque invalida." }),
+    id: z.string().uuid({ message: "Categoria de estoque inválida." }),
   })
   .strict();
 
 export const stockLocationIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Local de estoque invalido." }),
+    id: z.string().uuid({ message: "Local de estoque inválido." }),
   })
   .strict();
 
 export const createTiStockItemBodySchema = z
   .object({
     name: zNonEmptyText("name"),
-    category_id: z.string().uuid({ message: "Categoria de estoque invalida." }),
-    location_id: z.string().uuid({ message: "Local de estoque invalido." }),
+    category_id: z.string().uuid({ message: "Categoria de estoque inválida." }),
+    location_id: z.string().uuid({ message: "Local de estoque inválido." }),
     quantity: z.coerce.number().int().min(0),
     description: z.string().optional(),
   })
@@ -34,8 +34,8 @@ export const createTiStockItemBodySchema = z
 export const updateTiStockItemBodySchema = z
   .object({
     name: zNonEmptyText("name").optional(),
-    category_id: z.string().uuid({ message: "Categoria de estoque invalida." }).optional(),
-    location_id: z.string().uuid({ message: "Local de estoque invalido." }).optional(),
+    category_id: z.string().uuid({ message: "Categoria de estoque inválida." }).optional(),
+    location_id: z.string().uuid({ message: "Local de estoque inválido." }).optional(),
     description: z.string().optional(),
     status: z.boolean().optional(),
   })
@@ -55,10 +55,10 @@ export const createTiStockExitBodySchema = z
   .object({
     quantity: z.coerce.number().int().positive(),
     destination: z.string().optional(),
-    requester_id: z.string().uuid({ message: "Solicitante invalido." }),
-    approver_id: z.string().uuid({ message: "Aprovador invalido." }).optional(),
-    operator_id: z.string().uuid({ message: "Operador invalido." }).optional(),
-    location_destination_id: z.string().uuid({ message: "Local destino invalido." }).optional(),
+    requester_id: z.string().uuid({ message: "Solicitante inválido." }),
+    approver_id: z.string().uuid({ message: "Aprovador inválido." }).optional(),
+    operator_id: z.string().uuid({ message: "Operador inválido." }).optional(),
+    location_destination_id: z.string().uuid({ message: "Local destino inválido." }).optional(),
     exit_date: zIsoDate("exit_date").optional(),
   })
   .strict();
@@ -100,8 +100,8 @@ export const updateTiStockLocationBodySchema = z
 export const listTiStockItemsQuerySchema = paginationQuerySchema
   .merge(
     z.object({
-      category_id: z.string().uuid({ message: "Categoria de estoque invalida." }).optional(),
-      location_id: z.string().uuid({ message: "Local de estoque invalido." }).optional(),
+      category_id: z.string().uuid({ message: "Categoria de estoque inválida." }).optional(),
+      location_id: z.string().uuid({ message: "Local de estoque inválido." }).optional(),
       name: z.string().optional(),
       status: z
         .enum(["true", "false"])

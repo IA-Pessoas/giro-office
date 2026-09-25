@@ -29,10 +29,19 @@ export interface ParcelamentoPage<T> {
   has_more: boolean;
 }
 
+// KPIs da lista de parcelamentos, agregados no backend com os mesmos filtros (#1348).
+export interface ParcelamentoInstallmentSummary {
+  active: number;
+  overdue: number;
+  progress_percent: number;
+}
+
 export interface ParcelamentoListPage<T> extends ParcelamentoPage<T> {
   data: T[];
   pageSize: number;
   hasMore: boolean;
+  /** Só a lista de parcelamentos devolve. */
+  summary?: ParcelamentoInstallmentSummary;
 }
 
 export interface ParcelamentoListFilters {
@@ -50,6 +59,7 @@ export interface ParcelamentoListFilters {
 export interface ParcelamentoInstallment {
   id: string;
   client_id: string;
+  client?: { name: string; cpf_cnpj: string } | null;
   agreement_number: string | null;
   type: string;
   legal_nature: string;
@@ -78,6 +88,7 @@ export interface CreateParcelamentoInstallmentPayload {
   legal_nature: string;
   jurisdiction: string;
   is_automatic_debit: boolean;
+  consolidated_total_amount: number;
   first_installment_amount: number;
   current_month_installment_amount: number;
   agreed_installments_count: number;

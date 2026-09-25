@@ -1,6 +1,7 @@
+import { formatCivilDate } from "@shared/utils/dateFormat";
 import React, { useState } from 'react';
 import { Box, Heading, SimpleGrid, Tag } from '@shared/ui/chakraShims';
-import { toast } from "react-toastify"
+import { toast } from "@shared/services/toast";
 import 'react-toastify/dist/ReactToastify.css';
 import { IoCreate } from "react-icons/io5";
 
@@ -29,8 +30,7 @@ export const clientTab = ({ client, perms }: ClientTabProps) => {
     };
     const formatDate = (dateString) => {
         if (!dateString) return <Tag colorScheme="gray">N/I</Tag>;
-        const date = new Date(dateString + 'T00:00:00');
-        return date.toLocaleDateString('pt-BR');
+        return formatCivilDate(dateString);
     };
 
     const handleProjetoClick = async (projectId: string) => {

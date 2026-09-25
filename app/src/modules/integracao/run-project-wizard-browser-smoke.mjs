@@ -461,6 +461,8 @@ async function runBrowserProof() {
       start_date: project.start_date,
       end_date: "2026-08-31",
       objective: project.objective,
+      // #1333: a edição envia o status manual atual do projeto.
+      status: project.status,
     });
     await expect(legacyEditDialog).not.toBeVisible();
     assert.equal(wizardRequests.length, 0, "Edição deve continuar no PUT direto.");
@@ -545,7 +547,7 @@ async function runBrowserProof() {
     });
     await expect(
       page.getByText(
-        "Projeto criado com sucesso. Tarefas principais: 0. Dependências: 0. Sem responsável: 0.",
+        "Projeto criado com 0 tarefas.",
         { exact: true },
       ),
     ).toHaveCount(1);
@@ -736,7 +738,7 @@ async function runBrowserProof() {
     assert.notEqual(wizardRequests[2].key, wizardRequests[1].key);
     await expect(
       page.getByText(
-        "Projeto criado com sucesso. Tarefas principais: 1. Dependências: 1. Sem responsável: 1.",
+        "Projeto criado com 2 tarefas. 1 ainda sem responsável.",
         { exact: true },
       ),
     ).toHaveCount(1);
@@ -1007,6 +1009,9 @@ async function runBrowserProof() {
     await expect(draftDiscardConfirmation).not.toBeVisible();
     await expect(wizard).toBeVisible();
 
+    // Sem animação de saída (#1363) a confirmação desmonta na hora, mas o Radix só
+    // devolve o clique-fora ao wizard quando a camada dele volta a aceitar ponteiro.
+    await expect(wizard).toHaveCSS("pointer-events", "auto");
     await page.mouse.click(5, 5);
     await expect(draftDiscardConfirmation).toBeVisible();
     await draftDiscardConfirmation.getByRole("button", { name: "Continuar editando" }).click();

@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { departmentService } from "../services/departmentService";
 import type { DepItem } from "../types";

@@ -45,7 +45,13 @@ describe("regularize status contracts", () => {
   });
 
   it("keeps legacy license filters readable without changing stored values", () => {
-    expect(buildLicenseStatusFilter("Ativo")).toEqual({ status: "Ativo" });
+    expect(buildLicenseStatusFilter("Ativo")).toEqual({
+      status: { in: ["Em Andamento", "Ativo"] },
+    });
+    expect(buildLicenseStatusFilter("Em Andamento")).toEqual({
+      status: { in: ["Em Andamento", "Ativo"] },
+    });
+    expect(buildLicenseStatusFilter("Finalizado")).toEqual({ status: "Finalizado" });
     expect(buildLicenseStatusFilter("Todos")).toEqual({});
   });
 

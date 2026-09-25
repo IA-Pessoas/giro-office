@@ -23,6 +23,7 @@ import type {
   RhRequest,
   RhRequestListFilters,
   RhRequestListPage,
+  RhRequestStatus,
   RhNotification,
   UpdateRhCategoryPayload,
   UpdateRhRequestPayload,
@@ -75,6 +76,23 @@ export function useRhRequests(
   return useFetch(rhRequestsQueryKey(filters), () => rhRequestsService.listRequests(filters), {
     enabled: options?.enabled ?? true,
   });
+}
+
+/** Pendente: aguarda ação do RH. Com solução: Resolvido (aguarda o solicitante) ou Fechado. */
+export const RH_PENDING_REQUEST_STATUSES = ["New", "In_Progress"] as const;
+export const RH_FINISHED_REQUEST_STATUSES = ["Resolved", "Closed"] as const;
+
+/** Soma o `total` do backend por status, e não os itens da página carregada. */
+export function useRhRequestsTotal(
+  statuses: readonly [RhRequestStatus, RhRequestStatus],
+  options?: RhRequestsReadQueryOptions,
+) {
+  const first = useRhRequests({ status: statuses[0], limit: 1 }, options);
+  const second = useRhRequests({ status: statuses[1], limit: 1 }, options);
+  return {
+    total: (first.data?.total ?? 0) + (second.data?.total ?? 0),
+    isLoading: first.isLoading || second.isLoading,
+  };
 }
 
 export function useRhRequest(id: string | undefined): UseQueryResult<RhRequest, Error> {

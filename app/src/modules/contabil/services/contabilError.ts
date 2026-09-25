@@ -5,14 +5,13 @@ const DEFAULT_CONTABIL_ERROR_MESSAGE =
 
 export function getContabilErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {
-    const responseMessage =
-      error.response?.data?.error ??
-      error.response?.data?.message ??
-      error.message;
+    // Sem cair em error.message: o do Axios é "Request failed with status code 4xx" (#1365).
+    const responseMessage = error.response?.data?.error ?? error.response?.data?.message;
 
     if (typeof responseMessage === "string" && responseMessage.trim()) {
       return responseMessage;
     }
+    return DEFAULT_CONTABIL_ERROR_MESSAGE;
   }
 
   if (error instanceof Error && error.message.trim()) {

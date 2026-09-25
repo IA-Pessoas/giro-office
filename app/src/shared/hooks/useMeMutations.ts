@@ -7,19 +7,12 @@ import {
 } from "@workspace/api";
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { api } from "@shared/services/apiClient";
+import { isServerErrorAlreadyNotified } from "@shared/services/serverErrorToast";
 import { ME_QUERY_KEY } from "./useMe";
 import { PROFILE_UPDATE_ERROR_MESSAGE } from "@shared/utils/meProfileUpdate";
-
-function shouldSkipToastForServerError(error: unknown): boolean {
-  return (
-    isAxiosError(error) &&
-    typeof error.response?.status === "number" &&
-    error.response.status >= 500
-  );
-}
 
 function getUploadPhotoErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {
@@ -53,11 +46,12 @@ export function useUpdateMe(): UseMutationResult<
       toast.success("Perfil atualizado com sucesso!");
     },
     onError: (error: unknown) => {
-      if (shouldSkipToastForServerError(error)) {
+      if (isServerErrorAlreadyNotified(error)) {
         return;
       }
 
-      toast.error(PROFILE_UPDATE_ERROR_MESSAGE);
+      const serverMessage = isAxiosError(error) ? error.response?.data?.error : undefined;
+      toast.error(typeof serverMessage === "string" ? serverMessage : PROFILE_UPDATE_ERROR_MESSAGE);
     },
   });
 }
@@ -72,7 +66,7 @@ export function useUploadMePhoto(): UseMutationResult<MeSessionUser, unknown, Fi
       toast.success("Foto atualizada com sucesso!");
     },
     onError: (error: unknown) => {
-      if (shouldSkipToastForServerError(error)) {
+      if (isServerErrorAlreadyNotified(error)) {
         return;
       }
 
@@ -92,7 +86,7 @@ export function useDeleteMePhoto(): UseMutationResult<MeSessionUser, unknown, vo
       toast.success("Foto removida com sucesso!");
     },
     onError: (error: unknown) => {
-      if (shouldSkipToastForServerError(error)) {
+      if (isServerErrorAlreadyNotified(error)) {
         return;
       }
 

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "_documents.tsx"), "utf8");
+const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "_document.tsx"), "utf8");
 
 assert.ok(source.includes('lang="pt-BR"'), "missing lang=pt-BR");
 assert.ok(

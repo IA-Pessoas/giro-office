@@ -186,12 +186,22 @@ class OpenAiTaskExtractionProvider implements AiTaskExtractionProvider {
       });
     } catch (err: unknown) {
       logError("Falha ao chamar o provedor de extração de tarefas.");
-      throw new ServiceError(502, "Não foi possível extrair tarefas da Ata.", err);
+      throw new ServiceError(502, "Não foi possível extrair tarefas da Ata.", err, undefined, {
+        expose: true,
+      });
     }
 
     if (!response.ok) {
       logError("Provedor de extração de tarefas retornou erro.", { status: response.status });
-      throw new ServiceError(502, "Não foi possível extrair tarefas da Ata.");
+      throw new ServiceError(
+        502,
+        "Não foi possível extrair tarefas da Ata.",
+        undefined,
+        undefined,
+        {
+          expose: true,
+        },
+      );
     }
 
     try {

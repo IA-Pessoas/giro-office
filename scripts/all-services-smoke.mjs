@@ -6952,6 +6952,28 @@ const handlers = {
     });
   },
 
+  async userPasswordResetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/user/00000000-0000-0000-0000-000000000000/password-reset",
+    });
+  },
+
+  async userPasswordResetConfirmInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { token: "smoke-invalid-reset-token", password: "smoke-password-123" },
+    });
+  },
+
+  async platformUserPasswordResetNotFound(op) {
+    const organizationId = requireState("session").organization_id;
+    await platformHttpRequest(op, {
+      expectedStatus: [404],
+      path: `/platform/organizations/${organizationId}/users/00000000-0000-0000-0000-000000000000/password-reset`,
+    });
+  },
+
   async clientPatchNotFound(op) {
     await httpRequest(op, {
       expectedStatus: [404],

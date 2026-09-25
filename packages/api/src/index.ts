@@ -3,6 +3,7 @@ export {
   deleteCurrentUserPhoto,
   getMe,
   getUserById,
+  parseMeResponse,
   updateCurrentUser,
   uploadCurrentUserPhoto,
 } from "./services/userService.js";

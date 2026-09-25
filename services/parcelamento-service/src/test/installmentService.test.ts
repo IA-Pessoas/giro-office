@@ -38,7 +38,8 @@ describe("InstallmentService", () => {
           client_id: clientId,
           organization_id: organizationId,
           consolidated_total_amount: 0,
-          outstanding_balance: 0,
+          // Sem valor total: restantes (10) × parcela atual (120) (#1349).
+          outstanding_balance: 1200,
           paid_installments_count: 0,
           remaining_installments_count: 10,
           overdue_installments_count: 0,
@@ -176,6 +177,58 @@ describe("InstallmentService", () => {
     );
   });
 
+  it("create com valor total informado grava o total e parte dele no saldo (#1349)", async () => {
+    const prisma = createPrismaMock();
+    const service = new InstallmentService({
+      prisma: prisma as never,
+      auditService: createAuditMock(),
+    });
+
+    await service.create(
+      parcelamentoContext,
+      createCreateInstallmentBody({ consolidated_total_amount: 15000 }),
+    );
+
+    expect(prisma.installment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          consolidated_total_amount: 15000,
+          outstanding_balance: 15000,
+        }),
+      }),
+    );
+  });
+
+  it("recalculateAggregates calcula o saldo a partir do valor total (#1349)", async () => {
+    const prisma = createPrismaMock();
+    prisma.installment.findFirst.mockResolvedValue(
+      createInstallmentFixture({
+        agreed_installments_count: 4,
+        consolidated_total_amount: 1000,
+        current_month_installment_amount: 999,
+        status: "Ativo",
+      }),
+    );
+    prisma.installmentCompetencies.findMany.mockResolvedValueOnce([
+      { how_many_paid: 1, how_many_overdue: 0 },
+    ]);
+    const service = new InstallmentService({
+      prisma: prisma as never,
+      auditService: createAuditMock(),
+    });
+
+    await service.recalculateAggregates(parcelamentoContext, installmentId);
+
+    expect(prisma.installment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          remaining_installments_count: 3,
+          outstanding_balance: 750,
+        }),
+      }),
+    );
+  });
+
   it("recalculateAggregates deriva progresso das competencias e liquida quando restante chega a zero", async () => {
     const prisma = createPrismaMock();
     const clockDate = new Date("2026-07-14T12:00:00.000Z");
@@ -279,7 +332,7 @@ describe("InstallmentService", () => {
 
     await expect(service.list({ requestId: "missing" }, {})).rejects.toMatchObject({
       statusCode: 400,
-      message: "Contexto de organizacao ausente.",
+      message: "Contexto de organização ausente.",
     });
   });
 
@@ -293,7 +346,7 @@ describe("InstallmentService", () => {
       service.list({ requestId: "missing-user", organizationId }, {}),
     ).rejects.toMatchObject({
       statusCode: 400,
-      message: "Contexto de usuario ausente.",
+      message: "Contexto de usuário ausente.",
     });
   });
 

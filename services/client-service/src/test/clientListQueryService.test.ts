@@ -47,4 +47,22 @@ describe("mergeClientListSearchWhere", () => {
       ],
     });
   });
+
+  it("normaliza pontuação na busca por CPF/CNPJ", () => {
+    for (const search of ["12.345.678/0001-95", "12345678000195"]) {
+      expect(mergeClientListSearchWhere({}, search)).toEqual({
+        AND: [
+          {},
+          {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { company_name: { contains: search, mode: "insensitive" } },
+              { fantasy_name: { contains: search, mode: "insensitive" } },
+              { cpf_cnpj: { contains: "12345678000195", mode: "insensitive" } },
+            ],
+          },
+        ],
+      });
+    }
+  });
 });

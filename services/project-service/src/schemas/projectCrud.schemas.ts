@@ -34,6 +34,8 @@ export const integracaoProjectUpdateBodySchema = z
     end_date: z.coerce.date({ invalid_type_error: "end_date inválida." }),
     objective: z.string(),
     sponsor_id: optionalSponsorId,
+    /** Transição validada no service (resolveManualProjectStatus). */
+    status: z.string().optional(),
   })
   .strict();
 

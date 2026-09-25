@@ -356,7 +356,7 @@ describe("regularize remaining routes", () => {
 
   it("POST /regularize/guidance preserva o conflito de domínio", async () => {
     vi.spyOn(GuidanceService.prototype, "create").mockRejectedValue(
-      new ServiceError(409, "Ja existe orientacao em andamento para este processo."),
+      new ServiceError(409, "Já existe orientação em andamento para este processo."),
     );
     const app = createTestApp();
 
@@ -366,7 +366,7 @@ describe("regularize remaining routes", () => {
       .send(guidancePayload);
 
     expect(response.status).toBe(409);
-    expect(response.body.error).toBe("Ja existe orientacao em andamento para este processo.");
+    expect(response.body.error).toBe("Já existe orientação em andamento para este processo.");
   });
 
   it("POST /regularize/license creates a license", async () => {

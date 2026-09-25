@@ -1,5 +1,5 @@
 import type { PrismaClient } from "../generated/prisma/client.js";
-import { OPERATIONAL_PROCESS_FILTER } from "../schemas/status.schemas.js";
+import { ACTIVE_LICENSE_STATUSES, OPERATIONAL_PROCESS_FILTER } from "../schemas/status.schemas.js";
 
 export interface RegularizeDashboardProcess {
   id: string;
@@ -76,10 +76,10 @@ export class RegularizeDashboardService {
         take: 6,
       }),
       this.prisma.license.count({
-        where: { organization_id: organizationId, status: "Ativo" },
+        where: { organization_id: organizationId, status: { in: [...ACTIVE_LICENSE_STATUSES] } },
       }),
       this.prisma.license.findMany({
-        where: { organization_id: organizationId, status: "Ativo" },
+        where: { organization_id: organizationId, status: { in: [...ACTIVE_LICENSE_STATUSES] } },
         select: {
           id: true,
           type_license: true,

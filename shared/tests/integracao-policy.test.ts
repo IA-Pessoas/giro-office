@@ -192,6 +192,21 @@ test("a política manual de tarefa rejeita responsáveis secundários", () => {
   }
 });
 
+test("previsão direta da tarefa é só para USER/ADMIN", () => {
+  const policy = requirePolicy("PUT", "/task");
+  const input = {
+    userId: "user-1",
+    organizationId: "org-1",
+    resourceOrganizationId: "org-1",
+    responsibleId: "user-1",
+    isOwner: false,
+    requestedFields: ["prevision_date"],
+  };
+
+  assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 2 }), "allow");
+  assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 1 }), "forbidden");
+});
+
 test("a propriedade da tarefa vale para os três responsáveis", () => {
   const readPolicy = requirePolicy("GET", "/task");
   const updatePolicy = requirePolicy("PUT", "/task");

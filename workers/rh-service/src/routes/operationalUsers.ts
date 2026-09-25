@@ -14,6 +14,7 @@ const OPERATIONAL_USER_CATALOG_MODULES = [
   "ti",
   "integracao",
   "triagem",
+  "parcelamento",
 ] as const;
 
 export function registerOperationalUserRoutes(app: RhApp, deps: RhRouteDeps): void {
@@ -26,7 +27,7 @@ export function registerOperationalUserRoutes(app: RhApp, deps: RhRouteDeps): vo
         (key) => (modules[key] ?? 0) >= RH_SELF_SERVICE_PERMISSION,
       );
     if (!canReadCatalog) {
-      throw new ServiceError(403, "Permissao insuficiente para listar colaboradores operacionais.");
+      throw new ServiceError(403, "Permissão insuficiente para listar colaboradores operacionais.");
     }
     const query = parseWithZod(operationalUserListQuerySchema, c.req.query());
     const context = {

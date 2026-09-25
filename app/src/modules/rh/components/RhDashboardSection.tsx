@@ -9,7 +9,12 @@ import {
 } from "lucide-react";
 
 import { useRhTimeSheets } from "../hooks/useRhCalendar";
-import { useRhRequests } from "../hooks/useRhRequests";
+import {
+  RH_FINISHED_REQUEST_STATUSES,
+  RH_PENDING_REQUEST_STATUSES,
+  useRhRequests,
+  useRhRequestsTotal,
+} from "../hooks/useRhRequests";
 import { useRhPendingScoreEvaluations } from "../hooks/useRhScore";
 import type { RhRequest } from "../types";
 import { formatRhDateTime } from "../utils/rhDate";
@@ -184,12 +189,10 @@ export function RhDashboardSection({
 
   const requests = requestsQuery.data?.items ?? [];
   const recentRequests = useMemo(() => sortRequestsByUpdatedAt(requests).slice(0, 4), [requests]);
-  const pendingRequestsCount = requests.filter(
-    (request) => request.status === "New" || request.status === "In_Progress",
-  ).length;
-  const resolvedRequestsCount = requests.filter(
-    (request) => request.status === "Resolved" || request.status === "Closed",
-  ).length;
+  const pendingRequests = useRhRequestsTotal(RH_PENDING_REQUEST_STATUSES, { enabled: isActive });
+  const finishedRequests = useRhRequestsTotal(RH_FINISHED_REQUEST_STATUSES, { enabled: isActive });
+  const pendingRequestsCount = pendingRequests.total;
+  const resolvedRequestsCount = finishedRequests.total;
   const pendingEvaluationsCount = pendingEvaluationsQuery.data?.length ?? 0;
   const unsignedTimeSheetsCount =
     timeSheetsQuery.data?.filter((sheet) => !sheet.signature).length ?? 0;
@@ -207,7 +210,7 @@ export function RhDashboardSection({
         <HeroMetricCard
           icon={Bell}
           label={hasPendingRequests ? "Solicitações pendentes" : "Fluxo principal em dia"}
-          value={requestsQuery.isLoading ? "--" : pendingRequestsCount}
+          value={pendingRequests.isLoading ? "--" : pendingRequestsCount}
           description={
             hasPendingRequests
               ? "Demandas do RH que ainda precisam de retorno ou acompanhamento."
@@ -220,7 +223,7 @@ export function RhDashboardSection({
           <MetricCard
             icon={TrendingUp}
             label="Solicitações resolvidas"
-            value={requestsQuery.isLoading ? "--" : resolvedRequestsCount}
+            value={finishedRequests.isLoading ? "--" : resolvedRequestsCount}
           />
           <MetricCard
             icon={ClipboardCheck}

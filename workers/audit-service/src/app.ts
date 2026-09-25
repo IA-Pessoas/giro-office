@@ -117,7 +117,7 @@ export function createAuditWorkerApp(options: AuditWorkerOptions = {}) {
     const item = await withService(c, (service) =>
       service.findByRequestId(c.req.param("requestId"), auth.organizationId as string),
     );
-    if (!item) throw new ServiceError(404, "Registro de auditoria nao encontrado.");
+    if (!item) throw new ServiceError(404, "Registro de auditoria não encontrado.");
     return c.json(createSuccessResponse({ item }));
   });
 

@@ -2,11 +2,43 @@ import type { UpdateCurrentUserPayload } from "@workspace/api";
 
 export const PROFILE_UPDATE_ERROR_MESSAGE = "Não foi possível atualizar o perfil.";
 
-interface BuildSelfProfileUpdatePayloadOptions {
+/** Espelha a política do user-service (#1341). */
+export const MIN_PASSWORD_LENGTH = 10;
+
+interface SelfPasswordDraft {
+  password: string;
+  currentPassword: string;
+  confirmPassword: string;
+}
+
+interface BuildSelfProfileUpdatePayloadOptions extends SelfPasswordDraft {
   canManageUsers: boolean;
   currentName: string;
   name: string;
-  password: string;
+}
+
+/** Política da nova senha (tamanho e confirmação), comum ao perfil e ao link de redefinição. */
+export function newPasswordError(password: string, confirmPassword: string): string | null {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+  }
+  if (password !== confirmPassword) return "As senhas não conferem.";
+  return null;
+}
+
+/** Primeiro problema da troca de senha; null quando não há troca ou ela é válida. */
+export function selfPasswordError({
+  password,
+  currentPassword,
+  confirmPassword,
+}: SelfPasswordDraft): string | null {
+  const trimmedPassword = password.trim();
+  if (!trimmedPassword) return null;
+  if (!currentPassword) return "Informe a senha atual.";
+  const policyError = newPasswordError(trimmedPassword, confirmPassword.trim());
+  if (policyError) return policyError;
+  if (trimmedPassword === currentPassword) return "A nova senha deve ser diferente da atual.";
+  return null;
 }
 
 export function buildSelfProfileUpdatePayload({
@@ -14,11 +46,18 @@ export function buildSelfProfileUpdatePayload({
   currentName,
   name,
   password,
+  currentPassword,
+  confirmPassword,
 }: BuildSelfProfileUpdatePayloadOptions): UpdateCurrentUserPayload | null {
+  if (selfPasswordError({ password, currentPassword, confirmPassword })) {
+    return null;
+  }
+
   const trimmedPassword = password.trim();
+  const passwordChange = trimmedPassword ? { password: trimmedPassword, currentPassword } : null;
 
   if (!canManageUsers) {
-    return trimmedPassword ? { password: trimmedPassword } : null;
+    return passwordChange;
   }
 
   const trimmedName = name.trim();
@@ -27,8 +66,8 @@ export function buildSelfProfileUpdatePayload({
       return null;
     }
 
-    return trimmedPassword ? { name: trimmedName, password: trimmedPassword } : { name: trimmedName };
+    return passwordChange ? { name: trimmedName, ...passwordChange } : { name: trimmedName };
   }
 
-  return trimmedPassword ? { password: trimmedPassword } : null;
+  return passwordChange;
 }

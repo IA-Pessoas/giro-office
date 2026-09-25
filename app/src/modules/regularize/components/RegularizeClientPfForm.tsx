@@ -19,6 +19,9 @@ import {
   RegularizeFormError,
   RegularizeFormField,
   getRegularizePresetOptions,
+  regularizeClientPfMaritalStatusOptions,
+  regularizeClientPfSexOptions,
+  regularizeClientPfStateOptions,
   regularizeClientStatusOptions,
   regularizeTextareaClassName,
   regularizeTextFieldClassName,
@@ -88,7 +91,6 @@ const REQUIRED_CLIENT_PF_FIELDS: Array<keyof RegularizeClientPfFormState> = [
   "zip_code",
   "state",
   "profession",
-  "father",
   "mother",
   "marital_status",
   "date_of_birth",
@@ -97,11 +99,28 @@ const REQUIRED_CLIENT_PF_FIELDS: Array<keyof RegularizeClientPfFormState> = [
   "status",
 ];
 
+type ClientPfFieldErrors = Partial<Record<keyof RegularizeClientPfFormState, string>>;
+
+function generateClientPfCode(): string {
+  return `PF-${Date.now().toString(36).toUpperCase()}-${Math.random()
+    .toString(36)
+    .slice(2, 6)
+    .toUpperCase()}`;
+}
+
+function getClientPfFieldErrors(formState: RegularizeClientPfFormState): ClientPfFieldErrors {
+  return Object.fromEntries(
+    REQUIRED_CLIENT_PF_FIELDS.filter((fieldName) => !formState[fieldName].trim()).map(
+      (fieldName) => [fieldName, "Campo obrigatório."],
+    ),
+  );
+}
+
 function buildClientPfFormState(
   clientPf: RegularizeClientPfDetail | null,
 ): RegularizeClientPfFormState {
   if (!clientPf) {
-    return DEFAULT_CLIENT_PF_FORM_STATE;
+    return { ...DEFAULT_CLIENT_PF_FORM_STATE };
   }
 
   return {
@@ -186,13 +205,21 @@ export function RegularizeClientPfForm({
     buildClientPfFormState(clientPf),
   );
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<ClientPfFieldErrors>({});
 
   const isEditing = mode === "edit";
+  const getFieldClassName = (fieldName: keyof RegularizeClientPfFormState) =>
+    `${regularizeTextFieldClassName}${fieldErrors[fieldName] ? " border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`;
 
   useEffect(() => {
     if (open) {
-      setFormState(buildClientPfFormState(clientPf));
+      const nextFormState = buildClientPfFormState(clientPf);
+      if (!clientPf && !nextFormState.code) {
+        nextFormState.code = generateClientPfCode();
+      }
+      setFormState(nextFormState);
       setFormError(null);
+      setFieldErrors({});
     }
   }, [clientPf, open]);
 
@@ -204,6 +231,15 @@ export function RegularizeClientPfForm({
       ...current,
       [key]: value,
     }));
+    setFieldErrors((current) => {
+      if (!current[key]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -219,17 +255,23 @@ export function RegularizeClientPfForm({
       return;
     }
 
-    const missingRequiredField = REQUIRED_CLIENT_PF_FIELDS.some(
-      (fieldName) => !formState[fieldName].trim(),
-    );
+    const nextFormState =
+      !isEditing && !formState.code.trim()
+        ? { ...formState, code: generateClientPfCode() }
+        : formState;
+    const nextFieldErrors = getClientPfFieldErrors(nextFormState);
 
-    if (missingRequiredField) {
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFormState(nextFormState);
+      setFieldErrors(nextFieldErrors);
       setFormError("Preencha os campos obrigatórios.");
       return;
     }
 
+    setFieldErrors({});
+
     try {
-      const payload = buildClientPfPayload(formState);
+      const payload = buildClientPfPayload(nextFormState);
 
       if (isEditing && clientPf) {
         await onSubmit({
@@ -263,110 +305,168 @@ export function RegularizeClientPfForm({
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <RegularizeFormError message={formError} />
+          <RegularizeFormError message={formError} sticky={false} />
 
           <div className="grid gap-4 md:grid-cols-3">
-            <RegularizeFormField label="Código" required>
+            <RegularizeFormField
+              label="Código"
+              required
+              help="Gerado automaticamente para novos clientes PF."
+              error={fieldErrors.code}
+            >
               <input
                 value={formState.code}
-                onChange={(event) => handleChange("code", event.target.value)}
-                className={regularizeTextFieldClassName}
+                readOnly
+                aria-invalid={Boolean(fieldErrors.code)}
+                className={getFieldClassName("code")}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="Nome" required className="md:col-span-2">
+            <RegularizeFormField
+              label="Nome"
+              required
+              className="md:col-span-2"
+              error={fieldErrors.name}
+            >
               <input
                 value={formState.name}
                 onChange={(event) => handleChange("name", event.target.value)}
-                className={regularizeTextFieldClassName}
+                aria-invalid={Boolean(fieldErrors.name)}
+                className={getFieldClassName("name")}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="CPF" required>
+            <RegularizeFormField label="CPF" required error={fieldErrors.cpf}>
               <input
                 value={formState.cpf}
                 onChange={(event) => handleChange("cpf", formatCpfInput(event.target.value))}
-                className={regularizeTextFieldClassName}
+                aria-invalid={Boolean(fieldErrors.cpf)}
+                className={getFieldClassName("cpf")}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="RG" required>
+            <RegularizeFormField label="RG" required error={fieldErrors.rg}>
               <input
                 value={formState.rg}
                 onChange={(event) => handleChange("rg", event.target.value)}
-                className={regularizeTextFieldClassName}
+                aria-invalid={Boolean(fieldErrors.rg)}
+                className={getFieldClassName("rg")}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="Nascimento" required>
+            <RegularizeFormField
+              label="Nascimento"
+              required
+              error={fieldErrors.date_of_birth}
+            >
               <input
                 type="date"
                 value={formState.date_of_birth}
                 onChange={(event) => handleChange("date_of_birth", event.target.value)}
-                className={regularizeTextFieldClassName}
+                aria-invalid={Boolean(fieldErrors.date_of_birth)}
+                className={getFieldClassName("date_of_birth")}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="Sexo" required>
-              <input
+            <RegularizeFormField label="Sexo" required error={fieldErrors.sex}>
+              <RegularizeNativeSelect
                 value={formState.sex}
                 onChange={(event) => handleChange("sex", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+                aria-invalid={Boolean(fieldErrors.sex)}
+                className={getFieldClassName("sex")}
+              >
+                <option value="">Selecione o sexo</option>
+                {regularizeClientPfSexOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Estado civil" required>
-              <input
+            <RegularizeFormField
+              label="Estado civil"
+              required
+              error={fieldErrors.marital_status}
+            >
+              <RegularizeNativeSelect
                 value={formState.marital_status}
                 onChange={(event) => handleChange("marital_status", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+                aria-invalid={Boolean(fieldErrors.marital_status)}
+                className={getFieldClassName("marital_status")}
+              >
+                <option value="">Selecione o estado civil</option>
+                {regularizeClientPfMaritalStatusOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Profissão" required>
+            <RegularizeFormField label="Profissão" required error={fieldErrors.profession}>
               <input
                 value={formState.profession}
                 onChange={(event) => handleChange("profession", event.target.value)}
-                className={regularizeTextFieldClassName}
+                aria-invalid={Boolean(fieldErrors.profession)}
+                className={getFieldClassName("profession")}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="Endereço" required className="md:col-span-2">
+            <RegularizeFormField
+              label="Endereço"
+              required
+              className="md:col-span-2"
+              error={fieldErrors.address}
+            >
               <input
                 value={formState.address}
                 onChange={(event) => handleChange("address", event.target.value)}
-                className={regularizeTextFieldClassName}
+                aria-invalid={Boolean(fieldErrors.address)}
+                className={getFieldClassName("address")}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="CEP" required>
+            <RegularizeFormField label="CEP" required error={fieldErrors.zip_code}>
               <input
                 value={formState.zip_code}
                 onChange={(event) => handleChange("zip_code", event.target.value)}
-                className={regularizeTextFieldClassName}
+                aria-invalid={Boolean(fieldErrors.zip_code)}
+                className={getFieldClassName("zip_code")}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="Cidade" required>
+            <RegularizeFormField label="Cidade" required error={fieldErrors.city}>
               <input
                 value={formState.city}
                 onChange={(event) => handleChange("city", event.target.value)}
-                className={regularizeTextFieldClassName}
+                aria-invalid={Boolean(fieldErrors.city)}
+                className={getFieldClassName("city")}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="UF" required>
-              <input
+            <RegularizeFormField label="UF" required error={fieldErrors.state}>
+              <RegularizeNativeSelect
                 value={formState.state}
                 onChange={(event) => handleChange("state", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
+                aria-invalid={Boolean(fieldErrors.state)}
+                className={getFieldClassName("state")}
+              >
+                <option value="">Selecione a UF</option>
+                {regularizeClientPfStateOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Status" required>
+            <RegularizeFormField label="Status" required error={fieldErrors.status}>
               <RegularizeNativeSelect
                 value={formState.status}
                 onChange={(event) => handleChange("status", event.target.value)}
+                aria-invalid={Boolean(fieldErrors.status)}
+                className={getFieldClassName("status")}
               >
                 {getRegularizePresetOptions(regularizeClientStatusOptions, formState.status).map(
                   (status) => (
@@ -378,7 +478,7 @@ export function RegularizeClientPfForm({
               </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Pai" required>
+            <RegularizeFormField label="Pai">
               <input
                 value={formState.father}
                 onChange={(event) => handleChange("father", event.target.value)}
@@ -386,11 +486,12 @@ export function RegularizeClientPfForm({
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="Mãe" required>
+            <RegularizeFormField label="Mãe" required error={fieldErrors.mother}>
               <input
                 value={formState.mother}
                 onChange={(event) => handleChange("mother", event.target.value)}
-                className={regularizeTextFieldClassName}
+                aria-invalid={Boolean(fieldErrors.mother)}
+                className={getFieldClassName("mother")}
               />
             </RegularizeFormField>
 

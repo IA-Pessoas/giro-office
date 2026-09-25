@@ -33,7 +33,7 @@ export class TiInventoryCategoryService {
       if (existing) {
         throw new ServiceError(
           409,
-          "Ja existe uma categoria de inventario de TI ativa com este nome.",
+          "Já existe uma categoria de inventário de TI ativa com este nome.",
         );
       }
 
@@ -63,7 +63,7 @@ export class TiInventoryCategoryService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Categoria de inventario de TI nao encontrada.");
+        throw new ServiceError(404, "Categoria de inventário de TI não encontrada.");
       }
 
       return this.prisma.inventoryCategoryTecnologia.update({

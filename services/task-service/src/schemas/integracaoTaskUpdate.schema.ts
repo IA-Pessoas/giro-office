@@ -5,6 +5,7 @@ import {
   INTEGRACAO_TASK_STATUS_VALUES,
   type IntegracaoTaskStatus,
 } from "../constants/integracaoTask.js";
+import { isIsoCalendarDate } from "../utils/civilDate.js";
 
 const integracaoTaskStatusZod = z.enum(
   INTEGRACAO_TASK_STATUS_VALUES as unknown as [IntegracaoTaskStatus, ...IntegracaoTaskStatus[]],
@@ -26,5 +27,10 @@ export const integracaoTaskUpdateBodySchema = z
     billing: taskBillingZod.optional(),
     urgency: z.string().optional(),
     responsible_id: zNonEmptyText("responsible_id").nullable().optional(),
+    /** Só define a primeira previsão; depois disso, alteração é via prorrogação. */
+    prevision_date: z
+      .string()
+      .refine(isIsoCalendarDate, "prevision_date deve ser uma data YYYY-MM-DD válida.")
+      .optional(),
   })
   .strict();

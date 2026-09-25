@@ -59,6 +59,7 @@ model Organization {
 model Client {
   id              String    @id
   name            String
+  company_name    String?
   dominio_code    String?
   cpf_cnpj        String?
   status          String

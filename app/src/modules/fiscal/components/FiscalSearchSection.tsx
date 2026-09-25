@@ -59,7 +59,12 @@ export function FiscalSearchSection() {
 
   const searchQuery = useFiscalNcmSearch(submittedCode);
   const hasSearched = Boolean(submittedCode);
-  const displayedResult = searchQuery.data ?? storedSearch?.result ?? null;
+  // keepPreviousData devolve o resultado de outro código como placeholder: não exibir.
+  const activeResult =
+    submittedCode && !searchQuery.isPlaceholderData ? searchQuery.data : undefined;
+  const storedResult =
+    !submittedCode || storedSearch?.code === submittedCode ? storedSearch?.result : undefined;
+  const displayedResult = activeResult ?? storedResult ?? null;
   const hasResultData = Boolean(displayedResult);
   const displayedLastSearch = submittedCode ?? storedSearch?.code ?? null;
   const errorMessage = searchQuery.error
@@ -103,6 +108,7 @@ export function FiscalSearchSection() {
       };
 
       setStoredSearch(restoredSearch);
+      setInputValue(restoredSearch.code);
     } catch {
       window.localStorage.removeItem(LAST_FISCAL_SEARCH_STORAGE_KEY);
     }
@@ -125,35 +131,40 @@ export function FiscalSearchSection() {
     setStoredSearch(nextStoredSearch);
   }, [submittedCode, searchQuery.data]);
 
+  function rejectSearch(message: string) {
+    setValidationMessage(message);
+    setSubmittedCode(undefined);
+    setStoredSearch(null);
+    window.localStorage.removeItem(LAST_FISCAL_SEARCH_STORAGE_KEY);
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedCode = inputValue.trim();
     if (!trimmedCode) {
-      setValidationMessage("Informe um código NCM antes de buscar.");
+      rejectSearch("Informe um código NCM antes de buscar.");
       return;
     }
 
     if (!/^\d+$/.test(trimmedCode)) {
-      setValidationMessage("Informe apenas números no código NCM.");
+      rejectSearch("Informe apenas números no código NCM.");
       return;
     }
 
     if (trimmedCode.length !== NCM_CODE_LENGTH) {
-      setValidationMessage("Informe um código NCM com 8 dígitos.");
+      rejectSearch("Informe um código NCM com 8 dígitos.");
       return;
     }
 
     setValidationMessage(null);
 
     if (trimmedCode === submittedCode) {
-      setInputValue("");
       void searchQuery.refetch();
       return;
     }
 
     setSubmittedCode(trimmedCode);
-    setInputValue("");
   }
 
   return (

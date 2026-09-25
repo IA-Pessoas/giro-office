@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const tiRequestCategoryIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Categoria de TI invalida." }),
+    id: z.string().uuid({ message: "Categoria de TI inválida." }),
   })
   .strict();
 

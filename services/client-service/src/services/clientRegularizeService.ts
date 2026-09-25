@@ -1,6 +1,10 @@
 import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { UpdateRegularizeBody } from "../schemas/clientVerticals.schemas.js";
+import {
+  assertValidClientDocument,
+  isClientDocumentUniqueConstraintError,
+} from "../utils/clientDocuments.js";
 import { cleanDocument } from "../utils/documents.js";
 
 export async function updateRegularizeClient(
@@ -12,13 +16,16 @@ export async function updateRegularizeClient(
 ): Promise<Record<string, unknown>> {
   const exists = await prisma.client.findFirst({
     where: { id: clientId, organization_id: organizationId },
-    select: { id: true },
+    select: { id: true, type: true },
   });
   if (!exists) {
     throw new ServiceError(404, "Cliente não encontrado.");
   }
 
-  const cleanedCpfCnpj = input.cpf_cnpj !== undefined ? cleanDocument(input.cpf_cnpj) : undefined;
+  const cleanedCpfCnpj =
+    input.cpf_cnpj !== undefined
+      ? assertValidClientDocument(input.cpf_cnpj, exists.type)
+      : undefined;
   const cleanedCpfResponsible =
     input.cpf_responsible !== undefined ? cleanDocument(input.cpf_responsible) : undefined;
 
@@ -41,6 +48,17 @@ export async function updateRegularizeClient(
   }
 
   if (cleanedCpfCnpj !== undefined) {
+    const duplicate = await prisma.client.findFirst({
+      where: {
+        organization_id: organizationId,
+        cpf_cnpj: cleanedCpfCnpj,
+        id: { not: clientId },
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ServiceError(409, "Cliente já cadastrado.");
+    }
     data.cpf_cnpj = cleanedCpfCnpj;
   }
 
@@ -189,11 +207,18 @@ export async function updateRegularizeClient(
     deletion_date: true,
   };
 
-  const updated = await prisma.client.update({
-    where: { id: clientId },
-    data,
-    select,
-  });
+  try {
+    const updated = await prisma.client.update({
+      where: { id: clientId },
+      data,
+      select,
+    });
 
-  return updated as Record<string, unknown>;
+    return updated as Record<string, unknown>;
+  } catch (error) {
+    if (isClientDocumentUniqueConstraintError(error)) {
+      throw new ServiceError(409, "Cliente já cadastrado.", error);
+    }
+    throw error;
+  }
 }

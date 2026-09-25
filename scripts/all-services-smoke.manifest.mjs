@@ -587,6 +587,18 @@ const baseManifest = [
     auth: "session",
     condition: "auditEnabled",
   }),
+  // Redefinição de senha (#1342): o caminho feliz manda e-mail real ou consome um token de
+  // uso único, então o smoke de produção cobre só os erros (pairCoverageExempt).
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/platform/organizations/{organizationId}/users/{userId}/password-reset",
+    action: "platformUserPasswordResetNotFound",
+    target: "gateway",
+    auth: "session",
+    expectationKind: "bad",
+    pairCoverageExempt: true,
+  }),
   op({
     service: "user-service",
     method: "POST",
@@ -822,6 +834,26 @@ const baseManifest = [
     specOperation: false,
     expectedStatus: [404],
     expectedLabel: "not found",
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/{id}/password-reset",
+    action: "userPasswordResetNotFound",
+    target: "gateway",
+    auth: "bearer",
+    expectationKind: "bad",
+    pairCoverageExempt: true,
+  }),
+  op({
+    service: "user-service",
+    method: "POST",
+    path: "/user/password-reset/confirm",
+    action: "userPasswordResetConfirmInvalid",
+    target: "gateway",
+    auth: "public",
+    expectationKind: "bad",
+    pairCoverageExempt: true,
   }),
   op({
     service: "user-service",

@@ -347,7 +347,7 @@ describe("certificate Worker PJ slice", () => {
   it("surfaces service errors without changing the organization scope", async () => {
     const certificateService = service();
     certificateService.getCertificatePj.mockRejectedValueOnce(
-      new ServiceError(404, "Certificado PJ nao encontrado."),
+      new ServiceError(404, "Certificado PJ não encontrado."),
     );
     const app = createCertificateWorkerApp({ env: env(), service: certificateService });
 

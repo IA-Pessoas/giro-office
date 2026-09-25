@@ -175,6 +175,14 @@ export async function getMe(client: AxiosInstance): Promise<MeSessionUser> {
   return toMeSessionUser(currentUser);
 }
 
+/**
+ * Mesmo resultado de `getMe` a partir de uma resposta de `/user/me` já recebida: quem já buscou
+ * a sessão (AuthContext) semeia o cache do useMe sem uma segunda chamada (#1369).
+ */
+export function parseMeResponse(payload: unknown): MeSessionUser {
+  return toMeSessionUser(extractMeRecord(payload));
+}
+
 export async function updateCurrentUser(
   client: AxiosInstance,
   payload: UpdateCurrentUserPayload,
@@ -188,6 +196,7 @@ export async function updateCurrentUser(
 
   if (payload.password !== undefined && payload.password !== "") {
     body.password = payload.password;
+    if (payload.currentPassword !== undefined) body.current_password = payload.currentPassword;
   }
 
   const { data } = await client.put(`/user/${currentUser.id}`, body);

@@ -137,7 +137,7 @@ export class CertificateNotificationService {
     } catch (err: unknown) {
       logError("Erro ao reconciliar notificacoes de certificados", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao reconciliar notificacoes de certificados.", err);
+      throw new ServiceError(500, "Erro ao reconciliar notificações de certificados.", err);
     }
   }
 

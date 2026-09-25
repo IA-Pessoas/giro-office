@@ -2,12 +2,12 @@ import { z } from "zod";
 
 export const platformOrganizationUsersParamsSchema = z
   .object({
-    organizationId: z.string().trim().min(1, "organizationId e obrigatorio."),
+    organizationId: z.string().trim().min(1, "organizationId é obrigatório."),
   })
   .strict();
 
 export const platformOrganizationUserParamsSchema = platformOrganizationUsersParamsSchema
-  .extend({ userId: z.string().trim().min(1, "userId e obrigatorio.") })
+  .extend({ userId: z.string().trim().min(1, "userId é obrigatório.") })
   .strict();
 
 export const platformSuperAdminParamsSchema = z
@@ -28,10 +28,10 @@ export const listPlatformUsersQuerySchema = z
 
 export const transferPlatformOwnershipBodySchema = z
   .object({
-    currentOwnerId: z.string().trim().min(1, "currentOwnerId e obrigatório."),
-    successorUserId: z.string().trim().min(1, "successorUserId e obrigatório."),
+    currentOwnerId: z.string().trim().min(1, "currentOwnerId é obrigatório."),
+    successorUserId: z.string().trim().min(1, "successorUserId é obrigatório."),
     previousOwnerAction: z.enum(["demote", "deactivate"]),
-    justification: z.string().trim().min(1, "justification e obrigatória.").max(500),
+    justification: z.string().trim().min(1, "justification é obrigatória.").max(500),
   })
   .strict()
   .refine((input) => input.currentOwnerId !== input.successorUserId, {
@@ -43,7 +43,6 @@ export const updatePlatformUserBodySchema = z
   .object({
     name: z.string().trim().min(1).max(255).optional(),
     login: z.string().trim().toLowerCase().min(1).max(255).optional(),
-    password: z.string().min(8).max(255).optional(),
     department_id: z.string().trim().min(1).optional(),
     permission: z.number().int().min(0).max(3).optional(),
     status: z.enum(["active", "inactive"]).optional(),
@@ -54,7 +53,6 @@ export const updatePlatformUserBodySchema = z
     (input) =>
       input.name !== undefined ||
       input.login !== undefined ||
-      input.password !== undefined ||
       input.department_id !== undefined ||
       input.permission !== undefined ||
       input.status !== undefined,
