@@ -338,6 +338,9 @@ try {
     .selectOption("PORTAL");
   await page.waitForTimeout(1000);
   await expect(page.getByText(/1 em atenção/)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByLabel("Cliente Demonstração: Relatório de entradas")).toHaveValue(
+    "UNDER_REVIEW",
+  );
 
   const reviewRequest = requests.find(
     (request) => request === "PATCH /triagem/monthly/" + fiscalMonthlyId + "/item",

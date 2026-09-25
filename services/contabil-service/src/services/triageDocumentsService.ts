@@ -358,24 +358,24 @@ export class TriageDocumentsService {
     const clients = await this.prisma.client.findMany({
       where: {
         organization_id: auth.organizationId,
-        AND: [
+        OR: [
           {
-            OR: [
-              { fiscal: true },
-              {
-                triageMonthlys: {
-                  some: {
-                    organization_id: auth.organizationId,
-                    competence,
-                    type: "FISCAL",
-                    archived_at: null,
-                  },
-                },
-              },
+            fiscal: true,
+            AND: [
+              { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
+              { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
             ],
           },
-          { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
-          { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
+          {
+            triageMonthlys: {
+              some: {
+                organization_id: auth.organizationId,
+                competence,
+                type: "FISCAL",
+                archived_at: null,
+              },
+            },
+          },
         ],
       },
       select: {

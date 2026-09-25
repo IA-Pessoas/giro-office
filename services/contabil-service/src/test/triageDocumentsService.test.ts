@@ -122,13 +122,12 @@ describe("TriageDocumentsService", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organization_id: ORG_ID,
-          AND: expect.arrayContaining([
+          OR: expect.arrayContaining([
             expect.objectContaining({
-              OR: expect.arrayContaining([
-                { fiscal: true },
-                expect.objectContaining({ triageMonthlys: expect.anything() }),
-              ]),
+              fiscal: true,
+              AND: expect.any(Array),
             }),
+            expect.objectContaining({ triageMonthlys: expect.anything() }),
           ]),
         }),
       }),
