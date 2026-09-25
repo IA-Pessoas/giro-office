@@ -272,6 +272,12 @@ class RequestService {
         data.status = input.status;
       }
 
+      const isFinishing =
+        data.status !== existing.status && (data.status === "Resolved" || data.status === "Closed");
+      if (isFinishing && data.assigned_to_user_id === undefined && !existing.assigned_to) {
+        throw new ServiceError(409, "Atribua um responsável antes de resolver a solicitação.");
+      }
+
       const assigneeAfterUpdate = assertNonEmptyString(
         data.assigned_to_user_id ?? existing.assigned_to_user_id ?? undefined,
         "assigned_to_user_id",
