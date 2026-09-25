@@ -46,7 +46,7 @@ Exemplos de paths publicos:
 - `/task/project-plan`
 - `/task/project-plan/list`
 - `/task/deps/list`
-- `POST /task/complete-request` abre solicitação de conclusão; `PUT` aprova ou recusa, `DELETE`
+- `POST /task/complete-request` retorna `201` ao abrir solicitação de conclusão; `PUT` aprova ou recusa, `DELETE`
   cancela a própria solicitação e `GET /task/complete-request/list` retorna o histórico da tarefa.
 - `PUT /task/reopen` reabre uma tarefa concluída com motivo; a permissão é validada no serviço.
 - `POST /task/attachment` aceita um arquivo permitido de até 10 MB com assinatura validada e cria

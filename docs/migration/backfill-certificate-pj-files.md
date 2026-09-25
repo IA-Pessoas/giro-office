@@ -6,10 +6,10 @@ O dump `tb_certificados.pj.sql` contém o ID legado e a referência `arquivo`. O
 node scripts/backfill-certificate-pj-files.mjs \
   --dump /caminho/privado/tb_certificados.pj.sql \
   --assets /caminho/privado/arquivos \
-  --report /tmp/certificados-pj-inventario.json
+  --report /tmp/certificados-pj-inventario.jsonl
 ```
 
-Esse primeiro passo é somente local: encontra arquivos únicos e relata `sem_referencia`, `arquivo_ausente`, `arquivo_ambiguo`, `tipo_nao_suportado` ou problemas de ID. O relatório contém apenas IDs e estados, nunca senhas, caminhos ou conteúdo dos arquivos.
+Esse primeiro passo é somente local: encontra arquivos únicos e relata `sem_referencia`, `arquivo_ausente`, `arquivo_ambiguo`, `tipo_nao_suportado` ou problemas de ID. Referências com pasta só são aceitas se o caminho relativo corresponder exatamente ao diretório de origem; o nome isolado só é aceito quando for único. O relatório JSONL contém apenas IDs e estados, nunca senhas, caminhos ou conteúdo dos arquivos. Cada linha é gravada antes do próximo certificado, preservando o progresso se a execução falhar.
 
 Para conferir o vínculo com a base de destino, defina `CERTIFICATE_MIGRATION_TOKEN` no ambiente com autorização para ler e enviar certificados da organização Castelo e execute um dry-run com `--certificate-api` apontando para o prefixo do certificado, por exemplo `https://host/api/certificate`. Ele verifica ID, organização e CNPJ, e mostra `pronto`, `ja_migrado` ou o motivo pendente.
 
@@ -18,7 +18,7 @@ node scripts/backfill-certificate-pj-files.mjs \
   --dump /caminho/privado/tb_certificados.pj.sql \
   --assets /caminho/privado/arquivos \
   --certificate-api https://host/api/certificate \
-  --report /tmp/certificados-pj-dry-run.json
+  --report /tmp/certificados-pj-dry-run.jsonl
 ```
 
 Depois de conferir o relatório, repita com outro `--report` e `--apply`. O script não sobrescreve relatórios, não envia arquivo se o certificado já tiver um e confirma o download após cada upload. Se a identidade V4 não corresponder ao registro atual, ele registra `certificado_destino_ausente`; é preciso resolver esse vínculo antes de migrar o arquivo. Faça nova execução após corrigir os casos pendentes; os arquivos já migrados são verificados e ignorados.

@@ -17,7 +17,7 @@ test("relata arquivos ausentes e migra somente o certificado PJ de ID correspond
   const dump = path.join(root, "tb_certificados.pj.sql");
   await writeFile(
     dump,
-    "INSERT INTO `tb_certificados`.`pj` (`id`, `cnpj`, `arquivo`) VALUES (1, '12.345.678/0001-90', 'a.pfx'), (2, '98.765.432/0001-10', 'nao-existe.pfx'), (3, '11.111.111/0001-11', '');\n",
+    "INSERT INTO `tb_certificados`.`pj` (`id`, `cnpj`, `arquivo`) VALUES (1, '12.345.678/0001-90', 'a.pfx'), (2, '98.765.432/0001-10', 'nao-existe.pfx'), (3, '11.111.111/0001-11', ''), (4, '22.222.222/0001-22', 'outra-pasta/a.pfx');\n",
   );
   await writeFile(path.join(assets, "a.pfx"), "arquivo de teste");
 
@@ -25,6 +25,7 @@ test("relata arquivos ausentes e migra somente o certificado PJ de ID correspond
   assert.match(scanned[0].certificate_id, /^[0-9a-f-]{36}$/u);
   assert.equal(scanned[1].reason, "arquivo_ausente");
   assert.equal(scanned[2].reason, "sem_referencia");
+  assert.equal(scanned[3].reason, "arquivo_ausente");
 
   let stored = false;
   const requests = [];
@@ -52,6 +53,7 @@ test("relata arquivos ausentes e migra somente o certificado PJ de ID correspond
     token: "test-token",
     fetcher,
   };
+  const progress = [];
   const wrongIdentity = await backfillLegacyCertificatePjFiles({
     ...options,
     apply: true,
@@ -69,11 +71,16 @@ test("relata arquivos ausentes e migra somente o certificado PJ de ID correspond
   assert.equal(stored, false);
   assert.equal((await backfillLegacyCertificatePjFiles(options))[0].status, "pronto");
   assert.equal(requests.filter(({ method }) => method === "POST").length, 0);
-  const applied = await backfillLegacyCertificatePjFiles({ ...options, apply: true });
+  const applied = await backfillLegacyCertificatePjFiles({
+    ...options,
+    apply: true,
+    onProgress: (item) => progress.push(item),
+  });
   assert.deepEqual(
     applied.map(({ status }) => status),
-    ["migrado", "sem_arquivo", "sem_arquivo"],
+    ["migrado", "sem_arquivo", "sem_arquivo", "sem_arquivo"],
   );
+  assert.deepEqual(progress, applied);
   assert.equal(requests.filter(({ method }) => method === "POST").length, 1);
   assert.equal(
     (await backfillLegacyCertificatePjFiles({ ...options, apply: true }))[0].status,

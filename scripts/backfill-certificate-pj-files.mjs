@@ -49,7 +49,11 @@ export async function scanLegacyCertificatePjFiles({ dump, assets }) {
     const normalized = reference.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase();
     const basename = path.posix.basename(normalized);
     const exact = files.byRelative.get(normalized);
-    const matches = exact ? [exact] : (files.byName.get(basename) ?? []);
+    const matches = exact
+      ? [exact]
+      : normalized.includes("/")
+        ? []
+        : (files.byName.get(basename) ?? []);
     const reason = !certificateId
       ? "id_invalido"
       : seenIds.has(legacyId)
@@ -87,6 +91,16 @@ async function apiRequest(fetcher, base, token, suffix, init) {
   return response;
 }
 
+async function matchesStoredFile(fetcher, certificateApi, token, certificateId, bytes) {
+  const download = await apiRequest(fetcher, certificateApi, token, `${certificateId}/file`);
+  return (
+    download.ok &&
+    createHash("sha256")
+      .update(Buffer.from(await download.arrayBuffer()))
+      .digest("hex") === createHash("sha256").update(bytes).digest("hex")
+  );
+}
+
 export async function backfillLegacyCertificatePjFiles({
   dump,
   assets,
@@ -94,29 +108,34 @@ export async function backfillLegacyCertificatePjFiles({
   token,
   apply = false,
   fetcher = fetch,
+  onProgress,
 }) {
   if ((apply && !certificateApi) || (certificateApi && !token)) {
     throw new Error("Consulta ou aplicação exige --certificate-api e CERTIFICATE_MIGRATION_TOKEN.");
   }
   const rows = await scanLegacyCertificatePjFiles({ dump, assets });
   const report = [];
+  async function record(item) {
+    report.push(item);
+    await onProgress?.(item);
+  }
   for (const row of rows) {
     const item = { legacy_id: row.legacy_id, certificate_id: row.certificate_id };
     if (row.reason) {
-      report.push({ ...item, status: "sem_arquivo", reason: row.reason });
+      await record({ ...item, status: "sem_arquivo", reason: row.reason });
       continue;
     }
     if (!certificateApi) {
-      report.push({ ...item, status: "arquivo_localizado", reason: "destino_nao_verificado" });
+      await record({ ...item, status: "arquivo_localizado", reason: "destino_nao_verificado" });
       continue;
     }
     const detailResponse = await apiRequest(fetcher, certificateApi, token, row.certificate_id);
     if (detailResponse.status === 404) {
-      report.push({ ...item, status: "pendente", reason: "certificado_destino_ausente" });
+      await record({ ...item, status: "pendente", reason: "certificado_destino_ausente" });
       continue;
     }
     if (!detailResponse.ok) {
-      report.push({
+      await record({
         ...item,
         status: "pendente",
         reason: `consulta_http_${detailResponse.status}`,
@@ -129,23 +148,19 @@ export async function backfillLegacyCertificatePjFiles({
       detail?.organization_id !== row.organization_id ||
       String(detail?.cnpj ?? "").replace(/\D/gu, "") !== row.cnpj
     ) {
-      report.push({ ...item, status: "pendente", reason: "identidade_divergente" });
+      await record({ ...item, status: "pendente", reason: "identidade_divergente" });
       continue;
     }
     if (detail.has_certificate) {
       const bytes = await readFile(row.file);
-      const download = await apiRequest(
+      const matches = await matchesStoredFile(
         fetcher,
         certificateApi,
         token,
-        `${row.certificate_id}/file`,
+        row.certificate_id,
+        bytes,
       );
-      const matches =
-        download.ok &&
-        createHash("sha256")
-          .update(Buffer.from(await download.arrayBuffer()))
-          .digest("hex") === createHash("sha256").update(bytes).digest("hex");
-      report.push(
+      await record(
         matches
           ? { ...item, status: "ja_migrado" }
           : { ...item, status: "pendente", reason: "arquivo_existente_divergente" },
@@ -153,12 +168,12 @@ export async function backfillLegacyCertificatePjFiles({
       continue;
     }
     if (!apply) {
-      report.push({ ...item, status: "pronto" });
+      await record({ ...item, status: "pronto" });
       continue;
     }
     const bytes = await readFile(row.file);
     if (bytes.length === 0 || bytes.length > MAX_FILE_BYTES) {
-      report.push({ ...item, status: "pendente", reason: "tamanho_invalido" });
+      await record({ ...item, status: "pendente", reason: "tamanho_invalido" });
       continue;
     }
     const form = new FormData();
@@ -172,16 +187,17 @@ export async function backfillLegacyCertificatePjFiles({
       body: form,
     });
     if (upload.status !== 201) {
-      report.push({ ...item, status: "pendente", reason: `upload_http_${upload.status}` });
+      await record({ ...item, status: "pendente", reason: `upload_http_${upload.status}` });
       continue;
     }
-    const download = await apiRequest(fetcher, certificateApi, token, `${row.certificate_id}/file`);
-    const verified =
-      download.ok &&
-      createHash("sha256")
-        .update(Buffer.from(await download.arrayBuffer()))
-        .digest("hex") === createHash("sha256").update(bytes).digest("hex");
-    report.push(
+    const verified = await matchesStoredFile(
+      fetcher,
+      certificateApi,
+      token,
+      row.certificate_id,
+      bytes,
+    );
+    await record(
       verified
         ? { ...item, status: "migrado" }
         : { ...item, status: "pendente", reason: "download_nao_confere" },
@@ -201,7 +217,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const output = argument("--report");
   if (!dump || !assets || !output) {
     throw new Error(
-      "Uso: --dump <tb_certificados.pj.sql> --assets <diretorio> --report <json> [--certificate-api <url>] [--apply]",
+      "Uso: --dump <tb_certificados.pj.sql> --assets <diretorio> --report <jsonl> [--certificate-api <url>] [--apply]",
     );
   }
   const handle = await open(output, "wx", 0o600);
@@ -213,8 +229,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       certificateApi: argument("--certificate-api"),
       token: process.env.CERTIFICATE_MIGRATION_TOKEN,
       apply: process.argv.includes("--apply"),
+      onProgress: async (item) => {
+        await handle.writeFile(`${JSON.stringify(item)}\n`);
+        await handle.sync();
+      },
     });
-    await handle.writeFile(`${JSON.stringify(report, null, 2)}\n`);
   } finally {
     await handle.close();
   }
