@@ -248,7 +248,8 @@ async function withCertificateReportingService<T>(
 }
 
 function notificationWindowDays(env: CertificateWorkerEnv): number {
-  return Number(env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30);
+  const days = Number(env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30);
+  return Number.isInteger(days) && days > 0 ? days : 30;
 }
 
 /** Execução do cron diário (`triggers.crons`): materializa os alertas de vencimento. */

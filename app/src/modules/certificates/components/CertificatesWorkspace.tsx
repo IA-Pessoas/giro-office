@@ -547,25 +547,15 @@ export function CertificatesWorkspace() {
     [pfTotal, pfListQuery.data?.summary],
   );
 
-  const notificationsStats = useMemo(() => {
-    const pjCount = notificationItems.filter((item) => item.type === "PJ").length;
-    const pfCount = notificationItems.filter((item) => item.type === "PF").length;
-
-    return [
-      {
-        label: "Total",
-        value: notificationTotal,
-      },
-      {
-        label: "PJ",
-        value: pjCount,
-      },
-      {
-        label: "PF",
-        value: pfCount,
-      },
-    ];
-  }, [notificationItems, notificationTotal]);
+  const notificationSummary = notificationsQuery.data?.summary;
+  const notificationsStats = useMemo(
+    () => [
+      { label: "Total", value: notificationTotal },
+      { label: "PJ", value: notificationSummary?.pj ?? ZERO },
+      { label: "PF", value: notificationSummary?.pf ?? ZERO },
+    ],
+    [notificationTotal, notificationSummary],
+  );
 
   const activeStats = activeTab === "pf" ? pfStats : activeTab === "pj" ? pjStats : notificationsStats;
   const activePage = activeTab === "pf" ? pfPage : activeTab === "pj" ? pjPage : notificationPage;

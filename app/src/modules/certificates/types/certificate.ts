@@ -11,14 +11,19 @@ export interface CertificateListSummary {
   with_certificate: number;
 }
 
-export interface CertificateListPage<T> {
+export interface CertificateNotificationSummary {
+  pj: number;
+  pf: number;
+}
+
+export interface CertificateListPage<T, S = CertificateListSummary> {
   data: T[];
   total: number;
   page: number;
   page_size: number;
   hasMore: boolean;
-  /** KPIs sobre todos os registros filtrados (listas PJ/PF). */
-  summary?: CertificateListSummary;
+  /** KPIs sobre todos os registros filtrados, não só a página. */
+  summary?: S;
 }
 
 export interface CertificatePjListParams extends CertificatePaginationParams {
