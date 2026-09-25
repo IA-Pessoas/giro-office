@@ -69,7 +69,7 @@ router.post(
         integracaoLevel: normalizeModulePermission(req.modules?.integracao),
         isOwner: req.user_type === "owner",
       });
-      res.json(createSuccessResponse(result));
+      res.status(201).json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro na rota de solicitação de conclusão de tarefa", { err });
       next(err);

@@ -5728,33 +5728,64 @@ const handlers = {
   },
 
   async taskCompleteRequestPut(op) {
-    await httpRequest(op, {
-      expectedStatus: [200],
+    if (isBadExpectation(op)) {
+      await httpRequest(op, { json: { task_id: requireState("taskId") } });
+      return;
+    }
+    const requested = await httpRequest(op, {
+      expectedStatus: [201],
       method: "POST",
       path: "/task/complete-request",
       json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
     });
-    await httpRequest(op, {
+    const requestId = requested.body?.data?.id;
+    if (!requestId) throw new Error("Smoke de conclusão não recebeu ID da solicitação.");
+    const approved = await httpRequest(op, {
       expectedStatus: [200],
       path: "/task/complete-request",
-      json: { task_id: requireState("taskId") },
+      json: { task_id: requireState("taskId"), request_id: requestId },
     });
+    if (approved.body?.data?.status !== "Concluída") {
+      throw new Error("Smoke de conclusão não atualizou o status da tarefa.");
+    }
+    const history = await httpRequest(op, {
+      expectedStatus: [200],
+      method: "GET",
+      path: "/task/complete-request/list",
+      query: { task_id: requireState("taskId") },
+    });
+    if (!history.body?.data?.some((item) => item.id === requestId && item.status === "approved")) {
+      throw new Error("Smoke de conclusão não encontrou a aprovação no histórico.");
+    }
   },
 
   async taskCompleteRequestPost(op) {
-    await httpRequest(op, {
-      expectedStatus: [200],
+    const requested = await httpRequest(op, {
+      expectedStatus: [201],
       path: "/task/complete-request",
       json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
     });
+    if (isBadExpectation(op)) return;
+    if (!requested.body?.data?.id || requested.body?.data?.status !== "pending") {
+      throw new Error("Smoke de conclusão não recebeu solicitação pendente.");
+    }
+    state.taskCompletionRequestId = requested.body.data.id;
   },
 
   async taskCompleteRequestListGet(op) {
-    await httpRequest(op, {
+    const history = await httpRequest(op, {
       expectedStatus: [200],
       path: "/task/complete-request/list",
       query: { task_id: requireState("taskId") },
     });
+    if (isBadExpectation(op)) return;
+    if (
+      !history.body?.data?.some(
+        (item) => item.id === requireState("taskCompletionRequestId") && item.status === "pending",
+      )
+    ) {
+      throw new Error("Smoke de conclusão não encontrou a solicitação no histórico.");
+    }
   },
 
   async taskPostponementCreate(op) {

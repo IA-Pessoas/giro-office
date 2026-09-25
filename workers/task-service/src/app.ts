@@ -701,18 +701,21 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
 
   app.post(
     "/task/complete-request",
-    route(async (r, s) => {
-      const { user_id, organization_id } = requireAuthenticatedRequestContext(r);
-      const body = parseWithZod(integracaoTaskCompletionRequestBodySchema, r.body);
-      return s.lifecycle().requestTaskCompletion({
-        user_id,
-        organization_id,
-        task_id: body.task_id,
-        reason: body.reason,
-        integracaoLevel: integracao(r),
-        isOwner: isOwner(r),
-      });
-    }),
+    route(
+      async (r, s) => {
+        const { user_id, organization_id } = requireAuthenticatedRequestContext(r);
+        const body = parseWithZod(integracaoTaskCompletionRequestBodySchema, r.body);
+        return s.lifecycle().requestTaskCompletion({
+          user_id,
+          organization_id,
+          task_id: body.task_id,
+          reason: body.reason,
+          integracaoLevel: integracao(r),
+          isOwner: isOwner(r),
+        });
+      },
+      { status: 201 },
+    ),
   );
 
   app.put(
