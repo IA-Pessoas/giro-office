@@ -30,7 +30,6 @@ export function normalizeDashboardStats(payload: unknown): DashboardStats {
   const commercial = isRecord(stats.commercial) ? stats.commercial : {};
 
   return {
-    ...(stats as Partial<DashboardStats>),
     updatedAt: typeof stats.updatedAt === "string" ? stats.updatedAt : null,
     totalClients: numberOr0(stats.totalClients),
     clientsByService: numbers(stats.clientsByService, [

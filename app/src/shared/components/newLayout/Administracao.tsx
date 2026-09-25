@@ -87,7 +87,6 @@ export function Administracao() {
   const { user } = useAuth();
   // A sessão já traz a organização; buscar /user/me de novo a cada visita duplicava a chamada (#1369).
   const organizationId = user?.organization_id?.trim() || undefined;
-  const isLoadingOrganizationId = false;
   const { access: rhAccess, isLoading: isRhAccessLoading } = useModuleAccess("rh");
   const canManageOrganizationOwners = canCreateOrganizationOwner(user);
   const hasAdminAccess = canAccessAdministration(user, { rhAccess });
@@ -123,12 +122,14 @@ export function Administracao() {
       retry: false,
     },
   );
+  // Mesma chave do useModuleAccess: é a mesma lista, e com chaves diferentes ela era pedida
+  // duas vezes na mesma navegação (#1369).
   const {
     data: departments = [],
     error: departmentsError,
     isLoading: isDepartmentsLoading,
     refetch: refetchDepartments,
-  } = useFetch<DepItem[]>(["admin-departments"], () => departmentService.list(), {
+  } = useFetch<DepItem[]>(["module-access", "departments"], () => departmentService.list(), {
     enabled:
       hasAdminAccess &&
       (activeTab === "users" ||
@@ -551,7 +552,6 @@ export function Administracao() {
         departmentsError={Boolean(departmentsError)}
         onRetryDepartments={handleRetryDepartments}
         organizationId={organizationId}
-        organizationIdLoading={isLoadingOrganizationId}
         invitedBy={user?.id}
         canCreateOrganizationOwner={canManageOrganizationOwners}
       />
