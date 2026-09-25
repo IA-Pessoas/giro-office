@@ -62,9 +62,10 @@ runTest("AppShell has Escape handling for lightweight overlays", () => {
   assert.match(appShellSource, /document\.addEventListener\("keydown"/);
 });
 
-runTest("AppShell lightweight overlay backdrops are hidden from assistive tech", () => {
-  assert.match(appShellSource, /aria-hidden="true"[\s\S]*setShowNotifications\(false\)/);
-  assert.match(appShellSource, /aria-hidden="true"[\s\S]*setShowUserMenu\(false\)/);
+runTest("AppShell header popovers close on outside click without a click-eating backdrop", () => {
+  assert.match(appShellSource, /const notificationsRef = useClickOutside\(closeNotifications\)/);
+  assert.match(appShellSource, /const userMenuRef = useClickOutside\(closeUserMenu\)/);
+  assert.doesNotMatch(appShellSource, /className="fixed inset-0 z-40"/);
 });
 
 runTest("AppShell menu triggers expose expanded state and controlled panels", () => {
@@ -241,24 +242,23 @@ runTest("shared Dialog constrains content and scrolls only its body", () => {
   assert.match(dialogSource, /<footer className="[^"]*shrink-0[^"]*"/);
 });
 
-runTest("shared Dialog animates close without trapping interaction in the exiting content", () => {
+runTest("shared Dialog unmounts on close so nothing intercepts the next click", () => {
   const overlayClass =
     dialogSource.match(/<DialogPrimitive\.Overlay[\s\S]*?className=\{`([^`]*)`\}/)?.[1] ?? "";
   const contentClass =
     dialogSource.match(/<DialogPrimitive\.Content[\s\S]*?className=\{`([^`]*)`\}/)?.[1] ?? "";
 
   assert.match(overlayClass, /data-\[state=open\]:animate-in/);
-  assert.match(overlayClass, /data-\[state=closed\]:animate-out/);
   assert.match(overlayClass, /data-\[state=open\]:fade-in-0/);
-  assert.match(overlayClass, /data-\[state=closed\]:fade-out-0/);
   assert.match(overlayClass, /motion-reduce:animate-none/);
-
   assert.match(contentClass, /data-\[state=open\]:fade-in-0/);
   assert.match(contentClass, /data-\[state=open\]:zoom-in-95/);
-  assert.match(contentClass, /data-\[state=closed\]:fade-out-0/);
-  assert.match(contentClass, /data-\[state=closed\]:zoom-out-95/);
-  assert.match(contentClass, /data-\[state=closed\]:pointer-events-none/);
   assert.match(contentClass, /motion-reduce:animate-none/);
+
+  // Animação de saída mantém overlay e `body { pointer-events: none }` do Radix montados
+  // até ela terminar, e o primeiro clique depois de fechar se perde (#1363).
+  assert.doesNotMatch(overlayClass, /data-\[state=closed\]/);
+  assert.doesNotMatch(contentClass, /data-\[state=closed\]/);
 });
 
 runTest("ConfirmationDialog composes the shared Dialog with explicit action controls", () => {
