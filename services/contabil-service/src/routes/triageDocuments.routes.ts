@@ -9,6 +9,7 @@ import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
 import {
+  fiscalTriagePortfolioQuerySchema,
   triageDocumentItemBodySchema,
   triageDocumentsBulkBodySchema,
   triageEditabilityRequestSchema,
@@ -24,6 +25,7 @@ import type {
 
 export type TriageDocumentsRouteDeps = Pick<
   TriageDocumentsService,
+  | "listFiscalPortfolio"
   | "getMonthly"
   | "getEditability"
   | "getOrCreateMonthly"
@@ -48,6 +50,24 @@ export function createTriageDocumentsRoutes(
   service: TriageDocumentsRouteDeps,
 ): ReturnType<typeof Router> {
   const router: ReturnType<typeof Router> = Router();
+
+  router.get(
+    "/fiscal-portfolio",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(fiscalTriagePortfolioQuerySchema, req.query);
+        res.json(
+          createSuccessResponse(
+            await service.listFiscalPortfolio(query.competence, authenticatedContext(req)),
+          ),
+        );
+      } catch (err) {
+        logError("Erro ao listar a carteira da Triagem Fiscal", { err });
+        next(err);
+      }
+    },
+  );
 
   router.get(
     "/editability",

@@ -42,7 +42,7 @@ const CONTABIL_DOCUMENTS = [
   ["bank_investments", "Investimentos bancários"],
   ["card_sales_report", "Relatório de vendas de cartão"],
 ] as const;
-const FISCAL_DOCUMENTS = [
+export const FISCAL_DOCUMENTS = [
   ["inbound_report", "Relatório de entradas"],
   ["outbound_report", "Relatório de saídas"],
   ["nfse_provided", "NFSe prestados"],
@@ -57,7 +57,7 @@ const FISCAL_DOCUMENTS = [
   ["cte_as_issuer", "CTe como emitente"],
   ["services_provided_as_mei", "Serviços prestados como MEI"],
 ] as const;
-const STATUSES: Array<[TriageDocumentStatus, string]> = [
+export const STATUSES: Array<[TriageDocumentStatus, string]> = [
   ["PENDING", "Pendente"],
   ["COMPLETED", "Concluído"],
   ["ATTENTION", "Atenção"],
@@ -371,6 +371,7 @@ export function TriageDocumentsSection({
                     <select
                       aria-label={`${label} status`}
                       value={statusDrafts[field] ?? record.checklist[field]}
+                      disabled={mutations.item.isPending}
                       onChange={(event) => {
                         const status = event.target.value as TriageDocumentStatus;
                         setStatusDrafts((current) => ({ ...current, [field]: status }));
@@ -438,7 +439,7 @@ export function TriageDocumentsSection({
                             <select
                               aria-label={`${label} Método de entrega`}
                               value={record.item_notes[field]?.delivery_method ?? ""}
-                              disabled={catalogsLoading || Boolean(catalogError)}
+                              disabled={catalogsLoading || Boolean(catalogError) || mutations.item.isPending}
                               onChange={(event) =>
                                 mutations.item.mutate({
                                   id: record.id,

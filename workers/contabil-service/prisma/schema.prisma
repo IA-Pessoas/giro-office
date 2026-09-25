@@ -13,15 +13,28 @@ model Client {
   name               String
   company_name       String?
   cpf_cnpj           String           @default("")
+  type               String           @default("PJ")
   regime             String?
   competence_entry   DateTime?
   competence_output  DateTime?
   contabil           Boolean?
+  fiscal             Boolean?
   organization_id    String
   controlContabil    ControlContabil[]
   triageClosings     TriageClosing[]
+  triageMonthlys     TriageMonthly[]
+  responsiblesTriage TriageResponsible[]
+  triageCompetences  TriageCompetence[]
 
   @@map("clients")
+}
+
+model User {
+  id              String  @id @default(uuid())
+  name            String
+  organization_id String?
+
+  @@map("users")
 }
 
 model ControlContabil {
@@ -117,6 +130,7 @@ model TriageMonthly {
   updated_at      DateTime @updatedAt
   archived_at     DateTime?
   organization_id String
+  client          Client   @relation(fields: [client_id], references: [id])
 
   @@unique([organization_id, client_id, competence, type])
   @@map("triagem.monthly")
@@ -143,6 +157,7 @@ model TriageResponsible {
   user_id         String
   type            String
   organization_id String
+  client          Client   @relation(fields: [client_id], references: [id])
 
   @@unique([organization_id, client_id, type])
   @@map("triagem.responsibles")
@@ -154,8 +169,10 @@ model TriageCompetence {
   client_id                       String
   competence                      String
   configuration_snapshot          Json
+  responsible_snapshot            Json
   catalog_snapshot_initialized_at DateTime?
   archived_at                     DateTime?
+  client                          Client    @relation(fields: [client_id], references: [id])
 
   @@unique([organization_id, client_id, competence])
   @@map("triagem.competences")

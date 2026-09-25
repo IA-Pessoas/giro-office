@@ -65,6 +65,7 @@ function prisma() {
           platform_role: "super_admin",
           status: "active",
           session_version: 1,
+          can_impersonate: true,
         },
       })),
       create: vi.fn(async () => ({ id: "platform-session-created" })),
@@ -130,6 +131,7 @@ function platformUser() {
     platform_role: "super_admin",
     status: "active",
     session_version: 1,
+    can_impersonate: true,
   };
 }
 
@@ -976,12 +978,14 @@ describe("user Worker", () => {
       body: JSON.stringify({ email: "platform@example.com", password: "secret" }),
     });
     expect(response.status).toBe(200);
+    // O app recusa a identidade de plataforma sem can_impersonate (isValidPlatformUser).
     expect((await response.json()).data).toEqual({
       id: PLATFORM_USER_ID,
       name: "Platform",
       email: "platform@example.com",
       auth_kind: "platform",
       platform_role: "super_admin",
+      can_impersonate: true,
     });
     expect(db.platformAuthSession.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1047,6 +1051,7 @@ describe("user Worker", () => {
     });
 
     expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({ can_impersonate: true });
     expect(db.platformAuthSession.findFirst).toHaveBeenCalled();
     expect(db.platformAuthSession.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({

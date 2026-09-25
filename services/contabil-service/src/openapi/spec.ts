@@ -845,6 +845,29 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           },
         },
       },
+      "/triagem/fiscal-portfolio": {
+        get: {
+          tags: ["Triage Documents"],
+          summary: "Listar carteira mensal da Triagem Fiscal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Empresas fiscais e status documentais da competência",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+          },
+        },
+      },
       "/triagem/editability": {
         get: {
           tags: ["Triage Documents"],

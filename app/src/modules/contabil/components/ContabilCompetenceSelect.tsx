@@ -1,7 +1,7 @@
 import type { ContabilCompetence } from "../types";
 import { CONTABIL_MONTH_OPTIONS, getContabilCompetenceYears } from "./contabilControlSection.helpers";
 
-const SELECT_CLASS =
+export const CONTABIL_SELECT_CLASS =
   "h-10 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white";
 
 export function ContabilCompetenceSelect({
@@ -24,7 +24,7 @@ export function ContabilCompetenceSelect({
         value={month}
         disabled={disabled}
         onChange={(event) => onChange(`${year}-${event.target.value}` as ContabilCompetence)}
-        className={SELECT_CLASS}
+        className={CONTABIL_SELECT_CLASS}
       >
         {CONTABIL_MONTH_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
@@ -37,7 +37,7 @@ export function ContabilCompetenceSelect({
         value={year}
         disabled={disabled}
         onChange={(event) => onChange(`${event.target.value}-${month}` as ContabilCompetence)}
-        className={SELECT_CLASS}
+        className={CONTABIL_SELECT_CLASS}
       >
         {getContabilCompetenceYears(value).map((option) => (
           <option key={option} value={String(option)}>
