@@ -61,6 +61,7 @@ function assertUserCanAccessRequest(
 type MessageAuthorizationRequest = {
   requester_user_id: string;
   assigned_to_user_id: string;
+  assigned_to: { id: string } | null;
   status: string;
 };
 
@@ -104,6 +105,10 @@ function assertMessageCanBeCreated(
   if (expectedStatus !== null && request.status !== expectedStatus) {
     throw new ServiceError(409, "A mensagem de workflow não corresponde ao status atual.");
   }
+
+  if (type === "Solution" && !request.assigned_to) {
+    throw new ServiceError(409, "Atribua um responsável antes de resolver a solicitação.");
+  }
 }
 
 class MessageService {
@@ -129,6 +134,7 @@ class MessageService {
       select: {
         requester_user_id: true,
         assigned_to_user_id: true,
+        assigned_to: { select: { id: true } },
         status: true,
       },
     });
@@ -162,6 +168,7 @@ class MessageService {
               title: true,
               requester_user_id: true,
               assigned_to_user_id: true,
+              assigned_to: { select: { id: true } },
               status: true,
             },
           });

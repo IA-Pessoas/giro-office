@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Award, BarChart3, Calendar, Clock, FileText, UserRound, Users } from "lucide-react";
 import { useRouter } from "next/router";
 
@@ -9,7 +9,8 @@ import {
   RhPointSection,
   RhRequestsSection,
   RhScoreSection,
-  useRhRequests,
+  RH_PENDING_REQUEST_STATUSES,
+  useRhRequestsTotal,
 } from "@modules/rh";
 import { useRhPermissions } from "@modules/rh/hooks/useRhPermissions";
 import { Dialog } from "@shared/components";
@@ -22,24 +23,10 @@ export function RH() {
   const [isHolidaysManagerOpen, setIsHolidaysManagerOpen] = useState(false);
   const { canAccessRhPortal, canManageRh, canManageRhRequests, canViewRhDashboard, permissionQuery } =
     useRhPermissions("rh-shell");
-  const newRequestsQuery = useRhRequests(
-    { status: "New" },
-    { enabled: canManageRhRequests && activeTab === "requests" },
-  );
-  const inProgressRequestsQuery = useRhRequests(
-    { status: "In_Progress" },
-    { enabled: canManageRhRequests && activeTab === "requests" },
-  );
-
-  const pendingRequestsCount = useMemo(() => {
-    if (!canManageRhRequests) {
-      return 0;
-    }
-
-    const newRequests = newRequestsQuery.data?.items ?? [];
-    const inProgressRequests = inProgressRequestsQuery.data?.items ?? [];
-    return newRequests.length + inProgressRequests.length;
-  }, [canManageRhRequests, inProgressRequestsQuery.data, newRequestsQuery.data]);
+  const pendingRequests = useRhRequestsTotal(RH_PENDING_REQUEST_STATUSES, {
+    enabled: canManageRhRequests && activeTab === "requests",
+  });
+  const pendingRequestsCount = canManageRhRequests ? pendingRequests.total : 0;
 
   useEffect(() => {
     if (!permissionQuery.isLoading && !canViewRhDashboard && activeTab === "dashboard") {

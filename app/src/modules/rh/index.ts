@@ -6,7 +6,11 @@ export { RhTimesheetsSection } from "./components/RhTimesheetsSection";
 export { RhPointSection } from "./components/RhPointSection";
 export { RhScoreSection } from "./components/score/RhScoreSection";
 export { useAssignableUsers } from "./hooks/useAssignableUsers";
-export { useRhRequests } from "./hooks/useRhRequests";
+export {
+  RH_PENDING_REQUEST_STATUSES,
+  useRhRequests,
+  useRhRequestsTotal,
+} from "./hooks/useRhRequests";
 export { RhDossierSection } from "./components/RhDossierSection";
 export {
   useCreateRhContactMutation,
