@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
-import { ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError } from "@workspace/shared";
 
 export interface CertificatePasswordCryptoOptions {
   keyBase64: string;
@@ -131,4 +131,22 @@ export function createCertificatePasswordCrypto(
       }
     },
   };
+}
+
+/**
+ * Senha em claro para validar o arquivo enviado. `undefined` quando não há senha ou quando o
+ * envelope não abre com as chaves configuradas; texto legado não cifrado volta como está.
+ */
+export function readStoredCertificatePassword(
+  stored: string | null | undefined,
+  crypto: CertificatePasswordCrypto | undefined,
+): string | undefined {
+  if (!stored) return undefined;
+  if (!stored.trim().startsWith("{")) return stored;
+  try {
+    return crypto?.decrypt(stored);
+  } catch (err: unknown) {
+    logError("Senha de certificado ilegível; arquivo validado só pela estrutura", { err });
+    return undefined;
+  }
 }

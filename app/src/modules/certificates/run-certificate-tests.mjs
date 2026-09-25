@@ -18,9 +18,11 @@ import {
 } from "./hooks/queryKeys.ts";
 import * as certificateWorkspaceUi from "./components/certificateWorkspaceUi.ts";
 import {
+  certificateModelOptions,
   getCreatePfPayload,
   getCreatePjPayload,
   getPaymentAmountValidationError,
+  getPaymentDateValidationError,
   getUpdatePfPayload,
   getUpdatePjPayload,
   normalizeCertificateDocumentFilter,
@@ -943,6 +945,59 @@ runTest("certificate dates stay on the registered civil day in negative time zon
   } finally {
     if (previousTimeZone === undefined) delete process.env.TZ;
     else process.env.TZ = previousTimeZone;
+  }
+});
+
+runTest("certificate documents are masked only when they have a full CPF/CNPJ length", () => {
+  const { formatCertificateDocument } = certificateWorkspaceUi;
+
+  assert.equal(formatCertificateDocument("12345678000195"), "12.345.678/0001-95");
+  assert.equal(formatCertificateDocument("12.345.678/0001-95"), "12.345.678/0001-95");
+  assert.equal(formatCertificateDocument("12345678909"), "123.456.789-09");
+  // Documento legado fora do padrão aparece como está, sem truncar.
+  assert.equal(formatCertificateDocument("123456789012"), "123456789012");
+  assert.equal(formatCertificateDocument(null), "-");
+  assert.equal(formatCertificateDocument(""), "-");
+});
+
+runTest("certificate requires a payment date when marked as paid", () => {
+  assert.equal(getPaymentDateValidationError("", true), "Informe a data de pagamento.");
+  assert.equal(getPaymentDateValidationError("2026-09-25", true), null);
+  assert.equal(getPaymentDateValidationError("", false), null);
+});
+
+runTest("certificate model is chosen among A1/A3 without losing a legacy value", () => {
+  assert.deepEqual(certificateModelOptions(""), ["A1", "A3"]);
+  assert.deepEqual(certificateModelOptions("A3"), ["A1", "A3"]);
+  assert.deepEqual(certificateModelOptions("e-CPF A1"), ["A1", "A3", "e-CPF A1"]);
+});
+
+runTest("certificate form hides the password and uses a model select", () => {
+  const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /type=\{showPassword \? "text" : "password"\}/);
+  assert.match(source, /aria-label=\{showPassword \? "Ocultar senha" : "Mostrar senha"\}/);
+  assert.match(source, /certificateModelOptions\(formState\.model\)\.map/);
+  assert.match(source, /field: "paymentDate"/);
+});
+
+runTest("certificate tables and detail show masked documents", () => {
+  const source = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  for (const expression of [
+    "item.cnpj",
+    "item.cpf",
+    "pjDetail?.cnpj",
+    "pfDetail?.cpf",
+    "pfDetail?.cnpj",
+  ]) {
+    assert.ok(
+      source.includes(`formatCertificateDocument(${expression})`),
+      `${expression} deve passar por formatCertificateDocument`,
+    );
   }
 });
 

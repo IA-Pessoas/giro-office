@@ -6,7 +6,12 @@ export const MAX_PAGE_SIZE = 100;
 
 export const paginationQueryFields = {
   page: z.coerce.number().int().min(1).optional(),
-  page_size: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).optional(),
+  page_size: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_PAGE_SIZE, `Tamanho de página deve ser no máximo ${MAX_PAGE_SIZE}.`)
+    .optional(),
 };
 
 export const paginationQuerySchema = z.object(paginationQueryFields).strict();
