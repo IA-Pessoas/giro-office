@@ -8,6 +8,7 @@ import { createCertificatePasswordCrypto } from "../services/certificatePassword
 import { CertificatePjService as CertificatePjServiceBase } from "../services/certificatePjService.js";
 import {
   certificateOrganizationId,
+  certificateTestFile,
   certificateUserId,
   createCertificatePasswordCryptoForTest,
 } from "./testUtils.js";
@@ -679,7 +680,7 @@ describe("CertificatePjService", () => {
       storageProvider: "local",
       storageBucket: "Certificados",
     });
-    const originalBuffer = Buffer.from("certificate-pj-bytes");
+    const originalBuffer = certificateTestFile;
 
     try {
       const result = await service.uploadCertificatePjFile({
@@ -732,7 +733,7 @@ describe("CertificatePjService", () => {
 
   it("downloadCertificatePjFile decrypts original bytes from tenant-scoped metadata", async () => {
     const { storage, crypto } = createCertificateFileDeps();
-    const originalBuffer = Buffer.from("certificate-pj-bytes");
+    const originalBuffer = certificateTestFile;
     const encrypted = crypto.encrypt(originalBuffer);
     const objectPath =
       "organizations/10000000-0000-4000-8000-000000000001/certificate-pj/20000000-0000-4000-8000-000000000001/file.pfx.enc";

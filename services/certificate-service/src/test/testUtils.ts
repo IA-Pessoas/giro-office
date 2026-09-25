@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
@@ -269,3 +270,8 @@ export function createCertificateTestApp(
       }),
   });
 }
+
+/** PKCS#12 autoassinado de teste (`fixtures/`), aberto pela senha padrão dos registros de teste. */
+export const certificateTestFile = readFileSync(
+  new URL("./fixtures/certificado-teste-sha256.p12", import.meta.url),
+);

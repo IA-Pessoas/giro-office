@@ -9,6 +9,7 @@ import {
   certificateGatewayHeaders,
   certificateGatewayHeadersWithoutPermission,
   certificateOrganizationId,
+  certificateTestFile,
   certificateUserId,
   createCertificatePrismaMock,
   createCertificateTestApp,
@@ -430,6 +431,30 @@ describe("certificate PJ routes", () => {
     });
   });
 
+  it("POST /certificate/pj/:id/file rejects a renamed text file with a clear message", async () => {
+    const prisma = createCertificatePrismaMock();
+    const fileStorage = {
+      putObject: vi.fn(async () => undefined),
+      getObject: vi.fn(),
+      deleteObject: vi.fn(),
+    };
+    const app = createCertificateTestApp(prisma, { fileStorage });
+
+    const response = await request(app)
+      .post(`/certificate/pj/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2))
+      .attach("file", Buffer.from("isto nao e um certificado"), {
+        filename: "falso.pfx",
+        contentType: "application/x-pkcs12",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe(
+      "O arquivo enviado não é um certificado digital PKCS#12 (.pfx/.p12) válido.",
+    );
+    expect(fileStorage.putObject).not.toHaveBeenCalled();
+  });
+
   it("POST /certificate/pj/:id/file stores encrypted metadata and returns metadata only", async () => {
     const prisma = createCertificatePrismaMock();
     const fileStorage = {
@@ -442,7 +467,7 @@ describe("certificate PJ routes", () => {
     const response = await request(app)
       .post(`/certificate/pj/${certificateId}/file`)
       .set(certificateGatewayHeaders(2))
-      .attach("file", Buffer.from("certificate-bytes"), {
+      .attach("file", certificateTestFile, {
         filename: "Empresa Castelo.pfx",
         contentType: "application/x-pkcs12",
       });

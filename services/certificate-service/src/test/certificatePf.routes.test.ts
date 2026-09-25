@@ -9,6 +9,7 @@ import {
   certificateGatewayHeaders,
   certificateGatewayHeadersWithoutPermission,
   certificateOrganizationId,
+  certificateTestFile,
   certificateUserId,
   createCertificatePasswordCryptoForTest,
   createCertificatePrismaMock,
@@ -508,7 +509,7 @@ describe("certificate PF routes", () => {
     const response = await request(app)
       .post(`/certificate/pf/${certificateId}/file`)
       .set(certificateGatewayHeaders(2))
-      .attach("file", Buffer.from("certificate-bytes"), {
+      .attach("file", certificateTestFile, {
         filename: "Joao Silva.pfx",
         contentType: "application/x-pkcs12",
       });

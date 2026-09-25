@@ -21,7 +21,11 @@ import {
   type CertificateListSummary,
   countCertificateListSummary,
 } from "./certificateListSummary.js";
-import type { CertificatePasswordCrypto } from "./certificatePasswordCrypto.js";
+import {
+  type CertificatePasswordCrypto,
+  readStoredCertificatePassword,
+} from "./certificatePasswordCrypto.js";
+import { assertValidPkcs12 } from "./certificatePkcs12.js";
 import { isPrismaUniqueConstraintError } from "./prismaErrors.js";
 
 export interface CertificatePfContext {
@@ -434,6 +438,10 @@ export class CertificatePfService {
     const deps = this.requireFileDeps();
 
     const existing = await this.findCertificatePfForFile(input);
+    assertValidPkcs12(
+      input.file.buffer,
+      readStoredCertificatePassword(existing.password, this.passwordCrypto),
+    );
     const encrypted = deps.fileCrypto.encrypt(input.file.buffer);
     const objectPath = buildCertificateObjectPath({
       organizationId: input.organizationId,
