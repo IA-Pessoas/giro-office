@@ -331,10 +331,21 @@ function certificateNotificationListOperation() {
     security: [{ bearerAuth: [] }],
     parameters: paginationQueryParameters(),
     responses: {
-      "200": successResponse(
-        "Notificacoes de certificados listadas",
-        paginatedListSchema("CertificateNotification"),
-      ),
+      "200": successResponse("Notificacoes de certificados listadas", {
+        ...paginatedListSchema("CertificateNotification"),
+        properties: {
+          ...paginatedListSchema("CertificateNotification").properties,
+          summary: {
+            type: "object",
+            description: "Notificações por tipo em toda a organização, não só a página.",
+            properties: {
+              pj: { type: "integer", minimum: 0 },
+              pf: { type: "integer", minimum: 0 },
+            },
+            required: ["pj", "pf"],
+          },
+        },
+      }),
       "400": errorResponse("Requisicao invalida"),
       "401": errorResponse("Autenticacao obrigatoria"),
       "403": errorResponse("Permissao insuficiente"),

@@ -7,6 +7,7 @@ import {
   getPaginationParams,
   type PaginatedResult,
 } from "../schemas/pagination.schemas.js";
+import { startOfBusinessDay } from "./certificateListSummary.js";
 
 export interface CertificateNotificationListInput {
   organizationId: string;
@@ -22,7 +23,10 @@ export interface CertificateNotificationResult {
   organization_id: string;
 }
 
-export type CertificateNotificationListResult = PaginatedResult<CertificateNotificationResult>;
+export type CertificateNotificationListResult = PaginatedResult<CertificateNotificationResult> & {
+  /** Contagem por tipo sobre todas as notificações da organização, não só a página. */
+  summary: { pj: number; pf: number };
+};
 
 export interface CertificateNotificationRunInput {
   now?: Date;
@@ -59,10 +63,10 @@ const certificateNotificationIdentitySelect = {
 };
 const RECONCILIATION_BATCH_SIZE = 25;
 
+/** Primeiro dia fora da janela: vence até hoje + windowDays (dia de São Paulo) entra. */
 function getWindowEnd(now: Date, windowDays: number): Date {
-  const windowEnd = new Date(now);
-  windowEnd.setUTCDate(windowEnd.getUTCDate() + windowDays);
-  windowEnd.setUTCHours(23, 59, 59, 999);
+  const windowEnd = startOfBusinessDay(now);
+  windowEnd.setUTCDate(windowEnd.getUTCDate() + windowDays + 1);
   return windowEnd;
 }
 
@@ -92,8 +96,10 @@ export class CertificateNotificationService {
   ): Promise<CertificateNotificationListResult> {
     const pagination = getPaginationParams(input.query);
     const where = { organization_id: input.organizationId };
-    const [total, items] = await Promise.all([
+    const [total, pj, pf, items] = await Promise.all([
       this.prisma.certificateNotification.count({ where }),
+      this.prisma.certificateNotification.count({ where: { ...where, type: "PJ" } }),
+      this.prisma.certificateNotification.count({ where: { ...where, type: "PF" } }),
       this.prisma.certificateNotification.findMany({
         where,
         orderBy: [{ date: "asc" }, { client_name: "asc" }],
@@ -101,7 +107,7 @@ export class CertificateNotificationService {
       }),
     ]);
 
-    return buildPaginatedResult(items, total, input.query);
+    return { ...buildPaginatedResult(items, total, input.query), summary: { pj, pf } };
   }
 
   async runCertificateNotificationReconciliation(
@@ -112,13 +118,13 @@ export class CertificateNotificationService {
       const [certificatePj, certificatePf] = await Promise.all([
         this.prisma.certificatePJ.findMany({
           where: {
-            expiration_date: { lte: windowEnd },
+            expiration_date: { lt: windowEnd },
           },
           select: certificateNotificationCandidateSelect,
         }),
         this.prisma.certificatePF.findMany({
           where: {
-            expiration_date: { lte: windowEnd },
+            expiration_date: { lt: windowEnd },
           },
           select: certificateNotificationCandidateSelect,
         }),
@@ -149,6 +155,8 @@ export class CertificateNotificationService {
     type: CertificateNotificationType,
     result: CertificateNotificationRunResult,
   ): Promise<void> {
+    // ponytail: `notIn` com todos os candidatos; perto de 65k ids (limite de parâmetros do Postgres),
+    // trocar por subconsulta de certificados fora da janela.
     const { count } = await this.prisma.certificateNotification.deleteMany({
       where: { type, certificate_id: { notIn: candidates.map((candidate) => candidate.id) } },
     });

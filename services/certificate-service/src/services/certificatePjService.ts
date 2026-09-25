@@ -23,6 +23,7 @@ import {
 } from "./certificateListSummary.js";
 import {
   type CertificatePasswordCrypto,
+  isEncryptedPasswordPayload,
   readStoredCertificatePassword,
 } from "./certificatePasswordCrypto.js";
 import { assertValidPkcs12 } from "./certificatePkcs12.js";
@@ -183,15 +184,6 @@ function removeFilePrivateMetadata(record: CertificatePjPrivateRecord): Certific
   return safeRecord;
 }
 
-function isJsonValue(value: string): boolean {
-  try {
-    JSON.parse(value.trim());
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function buildListWhere(organizationId: string, query: CertificatePjListQuery) {
   return {
     organization_id: organizationId,
@@ -271,7 +263,7 @@ export class CertificatePjService {
     }
 
     const passwordCrypto = this.requirePasswordCrypto();
-    if (isJsonValue(record.password)) {
+    if (isEncryptedPasswordPayload(record.password)) {
       let password: string;
       try {
         password = passwordCrypto.decrypt(record.password);

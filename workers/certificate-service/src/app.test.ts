@@ -247,6 +247,19 @@ describe("certificate Worker PJ slice", () => {
     ).toHaveBeenCalledWith({ windowDays: 15 });
   });
 
+  it("falls back to 30 days when the configured notification window is invalid", async () => {
+    const certificateNotificationService = notificationService();
+
+    await runScheduledCertificateNotifications({
+      env: { ...env(), CERTIFICATE_NOTIFICATION_WINDOW_DAYS: "abc" as unknown as number },
+      notificationService: certificateNotificationService,
+    });
+
+    expect(
+      certificateNotificationService.runCertificateNotificationReconciliation,
+    ).toHaveBeenCalledWith({ windowDays: 30 });
+  });
+
   it("keeps the authenticated organization on the PJ CRUD flow", async () => {
     const certificateService = service();
     const app = createCertificateWorkerApp({ env: env(), service: certificateService });

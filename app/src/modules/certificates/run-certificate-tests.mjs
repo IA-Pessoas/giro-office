@@ -415,6 +415,8 @@ runTest("certificate KPI cards use the server summary, not the current page", ()
   assert.match(source, /buildStats\(pjTotal, pjListQuery\.data\?\.summary\)/);
   assert.match(source, /buildStats\(pfTotal, pfListQuery\.data\?\.summary\)/);
   assert.doesNotMatch(source, /pjItems\.filter\(\(item\) => item\.has_certificate\)/);
+  assert.match(source, /notificationSummary\?\.pj/);
+  assert.doesNotMatch(source, /notificationItems\.filter\(\(item\) => item\.type === "PJ"\)/);
 });
 
 runTest("certificate workspace uses full pagination controls", () => {

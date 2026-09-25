@@ -133,6 +133,16 @@ export function createCertificatePasswordCrypto(
   };
 }
 
+/** Senha persistida em JSON é tratada como envelope cifrado; texto legado não-JSON fica em claro. */
+export function isEncryptedPasswordPayload(value: string): boolean {
+  try {
+    JSON.parse(value.trim());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Senha em claro para validar o arquivo enviado. `undefined` quando não há senha ou quando o
  * envelope não abre com as chaves configuradas; texto legado não cifrado volta como está.
@@ -142,7 +152,7 @@ export function readStoredCertificatePassword(
   crypto: CertificatePasswordCrypto | undefined,
 ): string | undefined {
   if (!stored) return undefined;
-  if (!stored.trim().startsWith("{")) return stored;
+  if (!isEncryptedPasswordPayload(stored)) return stored;
   try {
     return crypto?.decrypt(stored);
   } catch (err: unknown) {

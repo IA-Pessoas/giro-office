@@ -10,7 +10,8 @@ const EXPIRING_WINDOW_DAYS = 30;
 const BUSINESS_TIME_ZONE = "America/Sao_Paulo";
 
 // Datas de vencimento são gravadas como meia-noite UTC do dia; "hoje" segue o fuso do escritório.
-function startOfBusinessDay(now: Date): Date {
+// Usado também pela janela das notificações, para KPIs e alertas terem a mesma borda.
+export function startOfBusinessDay(now: Date): Date {
   const isoDate = new Intl.DateTimeFormat("en-CA", { timeZone: BUSINESS_TIME_ZONE }).format(now);
   return new Date(`${isoDate}T00:00:00.000Z`);
 }
