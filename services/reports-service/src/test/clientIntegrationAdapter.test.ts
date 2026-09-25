@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ClientIntegrationAdapter } from "../integrations/clientIntegrationAdapter.js";
 
 describe("ClientIntegrationAdapter", () => {
-  it("publica só campos seguros e chama extract interno com request id", async () => {
+  it("publica os campos do catálogo e chama extract interno com request id", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({
@@ -20,7 +20,8 @@ describe("ClientIntegrationAdapter", () => {
       sourceTimeoutMs: 100,
     });
 
-    expect(adapter.sources[0]?.fields.map((field) => field.key)).not.toContain("cpf_cnpj");
+    // #1361: CPF/CNPJ publicado por decisão de produto (acesso exige integracao e grant assinado).
+    expect(adapter.sources[0]?.fields.map((field) => field.key)).toContain("cpf_cnpj");
     expect(clientIntegrationReportingCatalog.sources[0]?.keys.map((field) => field.key)).toEqual([
       "client_id",
     ]);

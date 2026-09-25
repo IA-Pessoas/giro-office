@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { PaginationControls } from "@shared/components";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -23,6 +23,12 @@ export function ReportSnapshotTable({
   const [page, setPage] = useState(1);
   const [cursorStack, setCursorStack] = useState<Array<number | undefined>>([]);
   const snapshotQuery = useReportSnapshot(job.id, scope, cursor);
+  const sectionRef = useRef<HTMLElement>(null);
+  // O snapshot abre abaixo da tabela; leva o usuário até ele.
+  useEffect(() => {
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    sectionRef.current?.focus({ preventScroll: true });
+  }, [job.id]);
   const snapshotId = snapshotQuery.data?.snapshot.id;
   const rows = snapshotQuery.data?.rows ?? [];
   const blocks = snapshotQuery.data?.blocks;
@@ -31,7 +37,12 @@ export function ReportSnapshotTable({
   const headers = rows.length > 0 ? Object.keys(rows[0]?.values ?? {}) : [];
 
   return (
-    <section className={`${panelClassName} mt-5`} aria-labelledby="report-snapshot-title">
+    <section
+      ref={sectionRef}
+      tabIndex={-1}
+      className={`${panelClassName} mt-5`}
+      aria-labelledby="report-snapshot-title"
+    >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 id="report-snapshot-title" className="font-semibold text-gray-900 dark:text-white">

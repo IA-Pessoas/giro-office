@@ -1,5 +1,7 @@
 import { SourceCatalogService } from "./catalog/sourceCatalogService.js";
 import type { ReportsServiceEnv } from "./config/env.js";
+import { CertificatePfAdapter } from "./integrations/certificatePfAdapter.js";
+import { CertificatePjAdapter } from "./integrations/certificatePjAdapter.js";
 import { ClientIntegrationAdapter } from "./integrations/clientIntegrationAdapter.js";
 import { ContabilControlAdapter } from "./integrations/contabilControlAdapter.js";
 import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
@@ -28,6 +30,8 @@ export function createWorkerSourceCatalog(env: ReportsServiceEnv): SourceCatalog
   return new SourceCatalogService([
     new ParcelamentoAdapter(env),
     new ClientIntegrationAdapter(env),
+    new CertificatePfAdapter(env),
+    new CertificatePjAdapter(env),
     new ContabilControlAdapter(env),
     new TaskAdapter(env),
     new ProjectAdapter(env),
