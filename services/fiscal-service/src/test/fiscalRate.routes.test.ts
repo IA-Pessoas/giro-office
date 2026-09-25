@@ -94,17 +94,23 @@ describe("fiscal rate routes", () => {
     const service = deps();
     const app = createFiscalApp({ env, logger, fiscalRateRouteDeps: service });
     const payload = { client_id: clientId, competence: "2026-08", tax_type: "ICMS", rate: "101" };
-    expect((await request(app).post("/fiscal/rates").set(headers()).send(payload)).status).toBe(
-      400,
+    const invalid = await request(app).post("/fiscal/rates").set(headers()).send(payload);
+    expect(invalid.status).toBe(400);
+    expect(invalid.body).toEqual(expect.objectContaining({ success: false, code: "BAD_REQUEST" }));
+
+    const forbidden = await request(app)
+      .post("/fiscal/rates")
+      .set(headers(1))
+      .send({ ...payload, rate: "18" });
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body).toEqual(expect.objectContaining({ success: false, code: "FORBIDDEN" }));
+
+    const unauthenticated = await request(app).get(`/fiscal/rates/${rateId}/pdf`);
+    expect(unauthenticated.status).toBe(401);
+    expect(unauthenticated.body).toEqual(
+      expect.objectContaining({ success: false, code: "UNAUTHORIZED" }),
     );
-    expect(
-      (
-        await request(app)
-          .post("/fiscal/rates")
-          .set(headers(1))
-          .send({ ...payload, rate: "18" })
-      ).status,
-    ).toBe(403);
     expect(service.create).not.toHaveBeenCalled();
+    expect(service.get).not.toHaveBeenCalled();
   });
 });

@@ -25,7 +25,10 @@ import {
   listNcmQuerySchema,
   updateNcmBodySchema,
 } from "@workspace/fiscal-service/src/schemas/ncm.schemas.js";
-import { renderFiscalRatePdf } from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
+import {
+  fiscalRatePdfHeaders,
+  renderFiscalRatePdf,
+} from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
@@ -262,11 +265,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     );
     const pdf = await renderFiscalRatePdf(rate);
     return new Response(new Uint8Array(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="aliquota-${rate.tax_type}-${rate.competence}-${rate.id}.pdf"`,
-        "Cache-Control": "no-store",
-      },
+      headers: fiscalRatePdfHeaders(rate),
     });
   });
 

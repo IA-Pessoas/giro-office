@@ -3,6 +3,14 @@ import PdfDocument from "pdfkit/js/pdfkit.standalone.js";
 
 import type { FiscalRateDto } from "./fiscalRateService.js";
 
+export function fiscalRatePdfHeaders(rate: FiscalRateDto) {
+  return {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `attachment; filename="aliquota-${rate.tax_type}-${rate.competence}-${rate.id}.pdf"`,
+    "Cache-Control": "no-store",
+  };
+}
+
 type PdfDoc = {
   on(event: string, listener: (value: unknown) => void): PdfDoc;
   fontSize(size: number): PdfDoc;

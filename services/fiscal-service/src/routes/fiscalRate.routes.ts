@@ -13,7 +13,7 @@ import {
   fiscalRateIdParamsSchema,
   listFiscalRatesQuerySchema,
 } from "../schemas/fiscalRate.schemas.js";
-import { renderFiscalRatePdf } from "../services/fiscalRatePdfService.js";
+import { fiscalRatePdfHeaders, renderFiscalRatePdf } from "../services/fiscalRatePdfService.js";
 import type { FiscalRateService } from "../services/fiscalRateService.js";
 
 export type FiscalRateRouteDeps = Pick<FiscalRateService, "create" | "list" | "get">;
@@ -67,12 +67,9 @@ export function createFiscalRateRoutes(service: FiscalRateRouteDeps): ReturnType
         const auth = requireAuthenticatedRequestContext(req);
         const rate = await service.get(id, auth.organization_id);
         const pdf = await renderFiscalRatePdf(rate);
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader(
-          "Content-Disposition",
-          `attachment; filename="aliquota-${rate.tax_type}-${rate.competence}-${rate.id}.pdf"`,
-        );
-        res.setHeader("Cache-Control", "no-store");
+        for (const [name, value] of Object.entries(fiscalRatePdfHeaders(rate))) {
+          res.setHeader(name, value);
+        }
         res.status(200).send(pdf);
       } catch (err) {
         logError("Erro ao gerar PDF de alíquota fiscal", { err });
