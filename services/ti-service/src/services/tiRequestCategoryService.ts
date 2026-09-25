@@ -41,7 +41,7 @@ export class TiRequestCategoryService {
       });
 
       if (existing) {
-        throw new ServiceError(409, "Ja existe uma categoria de TI ativa com este nome.");
+        throw new ServiceError(409, "Já existe uma categoria de TI ativa com este nome.");
       }
 
       return this.prisma.tICategoryRequest.create({
@@ -69,7 +69,7 @@ export class TiRequestCategoryService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Categoria de TI nao encontrada.");
+        throw new ServiceError(404, "Categoria de TI não encontrada.");
       }
 
       return this.prisma.tICategoryRequest.update({

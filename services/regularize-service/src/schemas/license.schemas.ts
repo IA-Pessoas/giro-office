@@ -11,17 +11,17 @@ export const createLicenseBodySchema = z
   .object({
     client_id: z.string().uuid().optional(),
     has: z.boolean(),
-    type_license: z.string().min(1, "type_license obrigatorio."),
+    type_license: z.string().min(1, "type_license obrigatório."),
     entry_date: z.coerce.date(),
-    protocol: z.string().min(1, "protocol obrigatorio."),
+    protocol: z.string().min(1, "protocol obrigatório."),
     responsible_id: z.string().uuid().optional(),
     status: licenseWriteStatusSchema,
     date_last_consultation: z.coerce.date().optional(),
-    current_situation: z.string().min(1, "current_situation obrigatorio."),
-    contact: z.string().min(1, "contact obrigatorio."),
+    current_situation: z.string().min(1, "current_situation obrigatório."),
+    contact: z.string().min(1, "contact obrigatório."),
     observation: z.string().nullable().optional(),
-    urgency: z.string().min(1, "urgency obrigatorio."),
-    type: z.string().min(1, "type obrigatorio."),
+    urgency: z.string().min(1, "urgency obrigatório."),
+    type: z.string().min(1, "type obrigatório."),
     due_date: z.coerce.date().optional(),
     task_id: z.string().uuid().optional(),
   })
@@ -29,7 +29,7 @@ export const createLicenseBodySchema = z
 
 export const updateLicenseBodySchema = createLicenseBodySchema
   .extend({
-    id: z.string().uuid("id invalido."),
+    id: z.string().uuid("id inválido."),
     status: licenseUpdateStatusSchema,
   })
   .strict();

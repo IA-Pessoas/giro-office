@@ -74,7 +74,7 @@ export class TiMessageService {
       !request ||
       (context.permission < TiPermissionLevel.Technician && request.requester_id !== context.userId)
     ) {
-      throw new ServiceError(404, "Chamado de TI nao encontrado.");
+      throw new ServiceError(404, "Chamado de TI não encontrado.");
     }
   }
 }

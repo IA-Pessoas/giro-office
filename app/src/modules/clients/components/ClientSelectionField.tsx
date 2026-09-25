@@ -26,7 +26,7 @@ export function ClientSelectionField({ client, clientId }: ClientSelectionFieldP
           {clientName ?? (clientQuery.isLoading ? "Carregando cliente..." : "Nenhum cliente selecionado")}
         </span>
         {clientDocument ? (
-          <span className="block truncate text-xs text-gray-500 dark:text-slate-400">{clientDocument}</span>
+          <span className="block truncate text-xs text-gray-600 dark:text-slate-400">{clientDocument}</span>
         ) : null}
       </span>
     </div>

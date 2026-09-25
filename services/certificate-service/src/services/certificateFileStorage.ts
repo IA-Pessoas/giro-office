@@ -35,7 +35,7 @@ function resolveInsideBaseDir(baseDir: string, objectPath: string): string {
   const fullPath = path.resolve(basePath, objectPath);
 
   if (fullPath !== basePath && !fullPath.startsWith(`${basePath}${path.sep}`)) {
-    throw new ServiceError(400, "Caminho de arquivo de certificado invalido.");
+    throw new ServiceError(400, "Caminho de arquivo de certificado inválido.");
   }
 
   return fullPath;
@@ -65,7 +65,7 @@ export class LocalCertificateFileStorage implements CertificateFileStorage {
         throw err;
       }
       logError("Erro ao ler arquivo local de certificado", { err });
-      throw new ServiceError(404, "Arquivo de certificado nao encontrado no storage.", err);
+      throw new ServiceError(404, "Arquivo de certificado não encontrado.", err);
     }
   }
 
@@ -99,7 +99,7 @@ export class SupabaseCertificateFileStorage implements CertificateFileStorage {
 
     if (error || !data) {
       logError("Erro ao baixar certificado do Supabase", { err: error });
-      throw new ServiceError(404, "Arquivo de certificado nao encontrado no storage.", error);
+      throw new ServiceError(404, "Arquivo de certificado não encontrado.", error);
     }
 
     return Buffer.from(await data.arrayBuffer());

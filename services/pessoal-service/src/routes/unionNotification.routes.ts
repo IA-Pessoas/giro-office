@@ -22,7 +22,7 @@ export function createPessoalInternalNotificationRoutes(
     try {
       const token = request.get(INTERNAL_SERVICE_TOKEN_HEADER);
       if (!token) {
-        throw new ServiceError(401, "Token interno nao informado.");
+        throw new ServiceError(401, "Token interno não informado.");
       }
       if (token !== options.internalServiceToken) {
         throw new ServiceError(403, "Acesso negado.");

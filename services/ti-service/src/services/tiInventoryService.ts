@@ -70,7 +70,7 @@ export class TiInventoryService {
     });
 
     if (!asset) {
-      throw new ServiceError(404, "Ativo de TI nao encontrado.");
+      throw new ServiceError(404, "Ativo de TI não encontrado.");
     }
 
     return asset;
@@ -83,7 +83,7 @@ export class TiInventoryService {
       });
 
       if (duplicated) {
-        throw new ServiceError(409, "Ja existe um ativo de TI com este codigo patrimonial.");
+        throw new ServiceError(409, "Já existe um ativo de TI com este código patrimonial.");
       }
 
       await this.ensureCategory(context.organizationId, body.category_id);
@@ -117,7 +117,7 @@ export class TiInventoryService {
       logError("Erro ao criar ativo de inventario de TI", { err });
       if (err instanceof ServiceError) throw err;
       if (isUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um ativo de TI com este codigo patrimonial.", err);
+        throw new ServiceError(409, "Já existe um ativo de TI com este código patrimonial.", err);
       }
       throw new ServiceError(500, "Erro ao criar ativo de inventario de TI.", err);
     }
@@ -137,7 +137,7 @@ export class TiInventoryService {
         });
 
         if (duplicated) {
-          throw new ServiceError(409, "Ja existe um ativo de TI com este codigo patrimonial.");
+          throw new ServiceError(409, "Já existe um ativo de TI com este código patrimonial.");
         }
       }
       if (body.category_id) {
@@ -164,7 +164,7 @@ export class TiInventoryService {
       logError("Erro ao atualizar ativo de inventario de TI", { err });
       if (err instanceof ServiceError) throw err;
       if (isUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um ativo de TI com este codigo patrimonial.", err);
+        throw new ServiceError(409, "Já existe um ativo de TI com este código patrimonial.", err);
       }
       throw new ServiceError(500, "Erro ao atualizar ativo de inventario de TI.", err);
     }
@@ -211,7 +211,7 @@ export class TiInventoryService {
     });
 
     if (!category) {
-      throw new ServiceError(404, "Categoria de inventario nao encontrada.");
+      throw new ServiceError(404, "Categoria de inventário não encontrada.");
     }
   }
 
@@ -221,7 +221,7 @@ export class TiInventoryService {
     });
 
     if (!location) {
-      throw new ServiceError(404, "Departamento/local de inventario nao encontrado.");
+      throw new ServiceError(404, "Departamento/local de inventário não encontrado.");
     }
   }
 
@@ -234,7 +234,7 @@ export class TiInventoryService {
     });
 
     if (!user) {
-      throw new ServiceError(404, "Usuario nao encontrado na organizacao.");
+      throw new ServiceError(404, "Usuário não encontrado na organização.");
     }
   }
 
@@ -251,7 +251,7 @@ export class TiInventoryService {
     });
 
     if (!user) {
-      throw new ServiceError(422, "Responsavel de TI deve pertencer ao departamento Tecnologia.");
+      throw new ServiceError(422, "Responsável de TI deve pertencer ao departamento Tecnologia.");
     }
   }
 }

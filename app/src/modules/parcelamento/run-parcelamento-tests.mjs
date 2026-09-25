@@ -683,7 +683,7 @@ runTest("parcelamento dashboard follows the module dashboard layout pattern", ()
     "src/modules/parcelamento/components/ParcelamentoDashboard.tsx",
   );
 
-  assert.match(dashboard, /DashboardHeroCard/);
+  assert.doesNotMatch(dashboard, /DashboardHeroCard/);
   assert.match(dashboard, /MetricTile/);
   assert.match(dashboard, /DashboardSectionCard/);
   assert.match(dashboard, /DashboardSummaryRow/);

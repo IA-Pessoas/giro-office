@@ -1861,7 +1861,7 @@ it("returns shared upstream error when the upstream service is unreachable", asy
 
     expect(response.status).toBe(502);
     expect(body.success).toBe(false);
-    expect(body.error).toBe("Erro ao comunicar com o serviço upstream.");
+    expect(body.error).toBe("Não foi possível concluir a operação. Tente de novo daqui a pouco.");
     expect(body.code).toBe("BAD_GATEWAY");
     expect(body.requestId).toBeTruthy();
   } finally {

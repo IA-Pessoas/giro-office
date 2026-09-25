@@ -74,7 +74,7 @@ await runTest("fiscal viewer keeps NCM, ICMS and IPI sections read-only", () => 
 await runTest("fiscal admins can delete NCM, ICMS and IPI from the list", () => {
   for (const source of [fiscalSources.ncmSection, fiscalSources.icmsSection, fiscalSources.ipiSection]) {
     assert.match(source, /Trash2/);
-    assert.match(source, /Dialog/);
+    assert.match(source, /<ConfirmationDialog/);
     assert.match(source, /canDelete \? \(item\) => setDeleteTarget\(item\) : undefined/);
     assert.match(source, /onDelete=\{canDelete \?/);
     assert.match(source, /title="Excluir/);

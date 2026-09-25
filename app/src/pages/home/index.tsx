@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router';
 import { FormEvent, useState, useEffect } from "react";
 import Head from "next/head";
-import { toast } from "react-toastify"
+import { toast } from "@shared/services/toast";
 import 'react-toastify/dist/ReactToastify.css';
 import styles from "./HomePage.module.css";
 
