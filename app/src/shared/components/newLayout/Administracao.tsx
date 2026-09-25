@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { BarChart3, KeyRound, Lock, Plus, Search, Shield, Users } from "lucide-react";
 import { useRouter } from "next/router";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import {
@@ -27,8 +27,8 @@ import {
   listAdminUsers,
 } from "@modules/users/services/adminUsersService";
 import { signOut, useAuth } from "@/context/AuthContext";
-import { setupAPIClient } from "@shared/services/api";
 import { useFetch } from "@shared/hooks";
+import { formatCount } from "@shared/utils/formatters";
 
 const ADMIN_GRADIENT_ICON_CLASSNAME =
   "bg-gradient-to-br from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] shadow-lg shadow-blue-950/20";
@@ -82,12 +82,12 @@ export function Administracao() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "permissions">("dashboard");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [organizationId, setOrganizationId] = useState<string | undefined>(undefined);
-  const [isLoadingOrganizationId, setIsLoadingOrganizationId] = useState(false);
   const [userStatusFilter, setUserStatusFilter] = useState<AdminUserStatus>("active");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const { user } = useAuth();
+  // A sessão já traz a organização; buscar /user/me de novo a cada visita duplicava a chamada (#1369).
+  const organizationId = user?.organization_id?.trim() || undefined;
   const { access: rhAccess, isLoading: isRhAccessLoading } = useModuleAccess("rh");
   const canManageOrganizationOwners = canCreateOrganizationOwner(user);
   const hasAdminAccess = canAccessAdministration(user, { rhAccess });
@@ -123,12 +123,14 @@ export function Administracao() {
       retry: false,
     },
   );
+  // Mesma chave do useModuleAccess: é a mesma lista, e com chaves diferentes ela era pedida
+  // duas vezes na mesma navegação (#1369).
   const {
     data: departments = [],
     error: departmentsError,
     isLoading: isDepartmentsLoading,
     refetch: refetchDepartments,
-  } = useFetch<DepItem[]>(["admin-departments"], () => departmentService.list(), {
+  } = useFetch<DepItem[]>(["module-access", "departments"], () => departmentService.list(), {
     enabled:
       hasAdminAccess &&
       (activeTab === "users" ||
@@ -201,47 +203,6 @@ export function Administracao() {
   }, [activeTab, canManagePermissions]);
 
   useEffect(() => {
-    if (!user?.id) {
-      setOrganizationId(undefined);
-      return;
-    }
-
-    let isMounted = true;
-
-    async function loadOrganizationId() {
-      setIsLoadingOrganizationId(true);
-      try {
-        const api = setupAPIClient();
-        const response = await api.get("/user/me");
-        const meData = response.data?.data ?? response.data?.user;
-        const nextOrganizationId =
-          typeof meData?.organization_id === "string" && meData.organization_id.trim().length > 0
-            ? meData.organization_id
-            : undefined;
-
-        if (isMounted) {
-          setOrganizationId(nextOrganizationId);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setOrganizationId(undefined);
-        }
-        console.error("Erro ao carregar organization_id do usuário logado", error);
-      } finally {
-        if (isMounted) {
-          setIsLoadingOrganizationId(false);
-        }
-      }
-    }
-
-    void loadOrganizationId();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id]);
-
-  useEffect(() => {
     if (users.length === 0) {
       setSelectedUserId(null);
       return;
@@ -308,7 +269,7 @@ export function Administracao() {
   if (isAdministrationAccessLoading) {
     return (
       <div className={ADMIN_FEEDBACK_PANEL_CLASSNAME}>
-        <p className={ADMIN_TEXT_CLASSNAME}>Carregando acesso de administracao.</p>
+        <p className={ADMIN_TEXT_CLASSNAME}>Carregando acesso de administração.</p>
       </div>
     );
   }
@@ -487,7 +448,7 @@ export function Administracao() {
               <div className="flex min-h-0 flex-1 flex-col space-y-3">
                 <div className="flex items-center justify-between">
                   <p className={ADMIN_TEXT_CLASSNAME}>
-                    {filteredUsers.length} usuário{filteredUsers.length === 1 ? "" : "s"}
+                    {formatCount(filteredUsers.length, "usuário", "usuários")}
                   </p>
                   <span className="rounded-full bg-[var(--colors-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--colors-brand-strong)] dark:bg-blue-900/30 dark:text-blue-300">
                     {ADMIN_USER_STATUS_LABELS[userStatusFilter]}
@@ -592,7 +553,6 @@ export function Administracao() {
         departmentsError={Boolean(departmentsError)}
         onRetryDepartments={handleRetryDepartments}
         organizationId={organizationId}
-        organizationIdLoading={isLoadingOrganizationId}
         invitedBy={user?.id}
         canCreateOrganizationOwner={canManageOrganizationOwners}
       />

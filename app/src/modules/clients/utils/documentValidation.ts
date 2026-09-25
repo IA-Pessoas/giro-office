@@ -1,5 +1,5 @@
 import { normalizeCnpjInput } from "../../../shared/utils/inputFormatting.ts";
-import { isValidCpf, isValidCpfCnpj, normalizeCpfCnpj } from "@workspace/shared";
+import { isValidCpf, isValidCpfCnpj, normalizeCpfCnpj } from "@workspace/shared/validation";
 
 export type ClientPersonType = "PJ" | "PF";
 

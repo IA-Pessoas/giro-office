@@ -56,7 +56,7 @@ describe("ReportExecutionService", () => {
     ).rejects.toMatchObject({
       statusCode: 400,
       message:
-        "O relatório excede o limite global do snapshot (50.000 linhas ou 20 MiB). Reduza os filtros ou as colunas e tente novamente.",
+        "O relatório excede o limite global (50.000 linhas ou 20 MiB). Reduza os filtros ou as colunas e tente novamente.",
     });
     expect(adapter.preview).toHaveBeenCalledWith(
       expect.objectContaining({ limit: MAX_REPORTING_QUERY_LIMIT }),
@@ -119,7 +119,7 @@ describe("ReportExecutionService", () => {
     ).rejects.toMatchObject({
       statusCode: 400,
       message:
-        "O relatório excede o limite global do snapshot (50.000 linhas ou 20 MiB). Reduza os filtros ou as colunas e tente novamente.",
+        "O relatório excede o limite global (50.000 linhas ou 20 MiB). Reduza os filtros ou as colunas e tente novamente.",
     });
   });
 

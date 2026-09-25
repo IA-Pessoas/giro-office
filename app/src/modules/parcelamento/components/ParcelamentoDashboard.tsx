@@ -44,35 +44,6 @@ function getAverageProgress(items: ParcelamentoInstallment[]) {
   return Math.round((totalProgress / progressItems.length) * 100);
 }
 
-function DashboardHeroCard({
-  description,
-  icon: Icon,
-  label,
-  value,
-}: {
-  description: string;
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-violet-600 p-5 text-white shadow-sm">
-      <div className="flex min-h-[180px] items-start justify-between gap-5">
-        <div className="min-w-0">
-          <p className="text-base font-semibold uppercase tracking-[0.06em] text-white/85">
-            {label}
-          </p>
-          <p className="mt-3 text-4xl font-semibold tracking-tight">{value}</p>
-          <p className="mt-3 max-w-md text-sm leading-6 text-white/75">{description}</p>
-        </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MetricTile({
   icon: Icon,
   label,
@@ -202,35 +173,32 @@ export function ParcelamentoDashboard({
 
   return (
     <section className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
-        <DashboardHeroCard
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <MetricTile
           icon={BadgeDollarSign}
-          label="Acompanhamento de parcelamentos"
+          label="Parcelamentos"
           value={totalInstallments}
-          description="Resumo dos acordos retornados no filtro atual, com status, atrasos e progresso de pagamento."
+          supporting="Acordos retornados no filtro atual."
         />
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          <MetricTile
-            icon={CheckCircle2}
-            label="Ativos"
-            value={formatCount(activeInstallments, isLoading)}
-            supporting="Parcelamentos ativos na página."
-          />
-          <MetricTile
-            icon={Clock3}
-            label="Em atraso"
-            value={formatCount(overdueInstallments, isLoading)}
-            supporting="Com parcelas vencidas na página."
-          />
-          <MetricTile
-            icon={WalletCards}
-            label="Panoramas"
-            value={totalPanoramas}
-            supporting={`${pagePanoramas} nesta página.`}
-          />
-          <MetricTile icon={BarChart3} label="Progresso" value={progressValue} />
-        </div>
+        <MetricTile
+          icon={CheckCircle2}
+          label="Ativos"
+          value={formatCount(activeInstallments, isLoading)}
+          supporting="Parcelamentos ativos na página."
+        />
+        <MetricTile
+          icon={Clock3}
+          label="Em atraso"
+          value={formatCount(overdueInstallments, isLoading)}
+          supporting="Com parcelas vencidas na página."
+        />
+        <MetricTile
+          icon={WalletCards}
+          label="Panoramas"
+          value={totalPanoramas}
+          supporting={`${pagePanoramas} nesta página.`}
+        />
+        <MetricTile icon={BarChart3} label="Progresso" value={progressValue} />
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">

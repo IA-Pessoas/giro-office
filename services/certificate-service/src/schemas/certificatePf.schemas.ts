@@ -41,7 +41,7 @@ export const certificatePfListQuerySchema = z
 
 export const certificatePfIdParamSchema = z
   .object({
-    id: z.string().uuid({ message: "Certificado PF invalido." }),
+    id: z.string().uuid({ message: "Certificado PF inválido." }),
   })
   .strict();
 

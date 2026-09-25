@@ -1,5 +1,5 @@
 import { useState, ChangeEvent } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from "@shared/services/toast";
 import type { UserItem, UpdateUserData } from '../types';
 import { isOrganizationOwner } from '@modules/auth';
 import { userService } from '../services/userService';

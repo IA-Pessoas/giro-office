@@ -3,18 +3,18 @@ import { z } from "zod";
 
 export const payrollClientParamsSchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
   })
   .strict();
 
 const optionalUuid = (fieldName: string) =>
   z
     .string()
-    .uuid({ message: `${fieldName} invalido.` })
+    .uuid({ message: `${fieldName} inválido.` })
     .nullable()
     .optional();
 
-const groupId = z.string().uuid({ message: "group_id invalido." });
+const groupId = z.string().uuid({ message: "group_id inválido." });
 
 const optionalNonNegativeNumber = (fieldName: string) =>
   z
@@ -25,7 +25,7 @@ const optionalNonNegativeNumber = (fieldName: string) =>
 
 const payrollBodySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
     responsible_id: optionalUuid("responsible_id"),
     advance: z.boolean(),
     advance_type: z.string().trim().min(1).nullable().optional(),

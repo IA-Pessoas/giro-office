@@ -50,6 +50,8 @@ System.Object[]
   throw new ServiceError(500, "Mensagem amigavel.", err);
 }
 ```
+- Resposta 5xx sai sempre com a mensagem neutra de `INTERNAL_ERROR_MESSAGE` e o `requestId`; o texto do `ServiceError` fica so no log. So passe `{ expose: true }` (5o argumento) em texto de negocio escrito para o usuario, sem nome de servico, variavel de ambiente ou tabela (#1365).
+- 4xx mostra a mensagem do `ServiceError` ao usuario: escreva-a em portugues, como mensagem de negocio.
 
 ## Middlewares (`**/middlewares/**/*.ts`)
 - No `catch`, registrar antes de ramificar: `logError("contexto", { err })`.

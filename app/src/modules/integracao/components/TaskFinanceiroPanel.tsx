@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { departmentService } from "@modules/departments";
 import { useAssignableUsers } from "@modules/rh";

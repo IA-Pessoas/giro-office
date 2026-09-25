@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { FaUsers } from "react-icons/fa";
 
 import {

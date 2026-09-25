@@ -11,7 +11,7 @@ import {
   UserCheck,
   X,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";

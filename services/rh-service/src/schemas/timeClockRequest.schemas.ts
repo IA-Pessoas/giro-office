@@ -3,18 +3,18 @@ import { z } from "zod";
 
 const organizationDate = z
   .string({
-    required_error: "date e obrigatorio.",
+    required_error: "date é obrigatório.",
     invalid_type_error: "date deve ser uma string.",
   })
   .trim()
-  .min(1, "date e obrigatorio.")
+  .min(1, "date é obrigatório.")
   .refine((value) => {
     if (/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
       const parsed = new Date(`${value}T00:00:00.000Z`);
       return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
     }
     return !Number.isNaN(new Date(value).getTime());
-  }, "date invalida.");
+  }, "date inválida.");
 
 const pointTimesShape = {
   clock_in: zIsoDate("clock_in"),
@@ -31,7 +31,7 @@ const optionalAttachment = z
 
 export const createAdjustmentRequestBodySchema = z
   .object({
-    point_id: z.string().uuid({ message: "point_id invalido." }).optional(),
+    point_id: z.string().uuid({ message: "point_id inválido." }).optional(),
     date: organizationDate.optional(),
     ...pointTimesShape,
     justification: zNonEmptyText("justification"),
@@ -41,7 +41,7 @@ export const createAdjustmentRequestBodySchema = z
 
 export const createRetroactiveAdjustmentBodySchema = z
   .object({
-    target_user_id: z.string().uuid({ message: "target_user_id invalido." }),
+    target_user_id: z.string().uuid({ message: "target_user_id inválido." }),
     date: organizationDate,
     ...pointTimesShape,
     justification: zNonEmptyText("justification"),
@@ -71,9 +71,9 @@ export const rejectAdjustmentBodySchema = approveAdjustmentBodySchema;
 export const approveAdjustmentsBulkBodySchema = z
   .object({
     request_ids: z
-      .array(z.string().uuid({ message: "request_id invalido." }))
-      .min(1, "Informe ao menos uma solicitacao.")
-      .max(100, "O lote pode conter no maximo 100 solicitacoes."),
+      .array(z.string().uuid({ message: "request_id inválido." }))
+      .min(1, "Informe ao menos uma solicitação.")
+      .max(100, "O lote pode conter no máximo 100 solicitações."),
     obs_approver: z
       .union([z.string(), z.number(), z.null()])
       .optional()
@@ -98,6 +98,6 @@ export const listAdjustmentRequestsQuerySchema = z
 
 export const uploadAdjustmentAttachmentParamsSchema = z
   .object({
-    requestId: z.string().uuid({ message: "requestId invalido." }),
+    requestId: z.string().uuid({ message: "requestId inválido." }),
   })
   .strict();

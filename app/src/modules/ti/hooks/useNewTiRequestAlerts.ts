@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { playNewTiRequestSound } from "../utils/newRequestSound";
 import { findUnseenTiRequestIds } from "../utils/requestQueue";
