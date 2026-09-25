@@ -222,6 +222,7 @@ export interface FiscalTriagePortfolioItem {
   responsible_name: string | null;
   can_edit: boolean;
   has_competence: boolean;
+  planned_checklist: Record<TriageFiscalChecklistField, TriageDocumentStatus> | null;
   monthly: Pick<TriageDocumentsMonthly, "id" | "checklist" | "item_notes"> | null;
 }
 

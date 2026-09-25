@@ -120,7 +120,17 @@ describe("TriageDocumentsService", () => {
 
     expect(prisma.client.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ organization_id: ORG_ID, fiscal: true }),
+        where: expect.objectContaining({
+          organization_id: ORG_ID,
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { fiscal: true },
+                expect.objectContaining({ triageMonthlys: expect.anything() }),
+              ]),
+            }),
+          ]),
+        }),
       }),
     );
     expect(result.items).toHaveLength(2);
@@ -167,6 +177,9 @@ describe("TriageDocumentsService", () => {
         triageCompetences: [
           {
             id: COMPETENCE_ID,
+            configuration_snapshot: {
+              configs: [{ type: "FISCAL", active_items: ["inbound_report"] }],
+            },
             responsible_snapshot: {
               responsibles: [{ type: "FISCAL", user_id: RESPONSIBLE_USER_ID }],
             },
@@ -189,6 +202,7 @@ describe("TriageDocumentsService", () => {
     expect(result.items[1]).toMatchObject({
       responsible_id: RESPONSIBLE_USER_ID,
       responsible_name: "Ana",
+      planned_checklist: { inbound_report: "PENDING", outbound_report: "NOT_APPLICABLE" },
     });
   });
 

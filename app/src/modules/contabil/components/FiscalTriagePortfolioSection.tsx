@@ -7,21 +7,22 @@ import { useFetch } from "@shared/hooks";
 import { formatCpfCnpjInput } from "@shared/utils/inputFormatting";
 
 import { triageDocumentsService, getContabilErrorMessage } from "../services";
-import type { ContabilCompetence, FiscalTriagePortfolioItem, TriageDocumentStatus } from "../types";
-import { triageMonthlyQueryKey } from "../hooks/queryKeys";
+import type { ContabilCompetence, FiscalTriagePortfolioItem, TriageDocumentStatus, TriageFiscalChecklistField } from "../types";
+import { triageFiscalPortfolioQueryKey, triageMonthlyQueryKey } from "../hooks/queryKeys";
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
+import { ContabilCompetenceSelect, CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
 import { FISCAL_DOCUMENTS, STATUSES } from "./TriageDocumentsSection";
 
 const PAGE_SIZE = 50;
 const STATUS_LABELS = Object.fromEntries(STATUSES) as Record<TriageDocumentStatus, string>;
 
-function cellStatus(row: FiscalTriagePortfolioItem, field: string) {
-  return row.monthly?.checklist[field] ?? "NOT_STARTED";
+function cellStatus(row: FiscalTriagePortfolioItem, field: TriageFiscalChecklistField) {
+  return row.monthly?.checklist[field] ?? row.planned_checklist?.[field] ?? "NOT_STARTED";
 }
 
 function statusLabel(status: string) {
   return status === "NOT_STARTED"
-    ? "Não iniciado"
+    ? "A configurar"
     : (STATUS_LABELS[status as TriageDocumentStatus] ?? status);
 }
 
@@ -30,16 +31,9 @@ function csvCell(value: string) {
   return `"${safe.replaceAll('"', '""')}"`;
 }
 
-function exportCsv(competence: string, rows: FiscalTriagePortfolioItem[]) {
-  const headers = [
-    "Empresa",
-    "CNPJ",
-    "Regime",
-    "Responsável",
-    ...FISCAL_DOCUMENTS.map(([, label]) => label),
-  ];
-  const content = [
-    headers,
+function exportTable(rows: FiscalTriagePortfolioItem[]) {
+  return [
+    ["Empresa", "CNPJ", "Regime", "Responsável", ...FISCAL_DOCUMENTS.map(([, label]) => label)],
     ...rows.map((row) => [
       row.legal_name,
       row.cpf_cnpj,
@@ -47,7 +41,11 @@ function exportCsv(competence: string, rows: FiscalTriagePortfolioItem[]) {
       row.responsible_name ?? "",
       ...FISCAL_DOCUMENTS.map(([field]) => statusLabel(cellStatus(row, field))),
     ]),
-  ]
+  ];
+}
+
+function exportCsv(competence: string, rows: FiscalTriagePortfolioItem[]) {
+  const content = exportTable(rows)
     .map((line) => line.map(csvCell).join(","))
     .join("\r\n");
   const url = URL.createObjectURL(
@@ -73,13 +71,7 @@ function printPortfolio(competence: string, rows: FiscalTriagePortfolioItem[]) {
   title.textContent = `Triagem Fiscal · ${competence}`;
   printWindow.document.body.append(title);
   const table = printWindow.document.createElement("table");
-  const columns = [
-    "Empresa",
-    "CNPJ",
-    "Regime",
-    "Responsável",
-    ...FISCAL_DOCUMENTS.map(([, label]) => label),
-  ];
+  const [columns, ...bodyRows] = exportTable(rows);
   const head = printWindow.document.createElement("tr");
   for (const column of columns) {
     const cell = printWindow.document.createElement("th");
@@ -87,15 +79,8 @@ function printPortfolio(competence: string, rows: FiscalTriagePortfolioItem[]) {
     head.append(cell);
   }
   table.append(head);
-  for (const row of rows) {
+  for (const values of bodyRows) {
     const tr = printWindow.document.createElement("tr");
-    const values = [
-      row.legal_name,
-      row.cpf_cnpj,
-      row.regime ?? "",
-      row.responsible_name ?? "",
-      ...FISCAL_DOCUMENTS.map(([field]) => statusLabel(cellStatus(row, field))),
-    ];
     for (const value of values) {
       const cell = printWindow.document.createElement("td");
       cell.textContent = value;
@@ -118,7 +103,7 @@ export function FiscalTriagePortfolioSection({
   const [search, setSearch] = useState("");
   const [responsible, setResponsible] = useState("");
   const [regime, setRegime] = useState("");
-  const [documentField, setDocumentField] = useState<(typeof FISCAL_DOCUMENTS)[number][0]>(
+  const [documentField, setDocumentField] = useState<TriageFiscalChecklistField>(
     FISCAL_DOCUMENTS[0][0],
   );
   const [documentStatus, setDocumentStatus] = useState("");
@@ -126,7 +111,7 @@ export function FiscalTriagePortfolioSection({
   const [saving, setSaving] = useState("");
   const [actionError, setActionError] = useState("");
   const queryClient = useQueryClient();
-  const portfolio = useFetch(["triagem", "fiscal-portfolio", competence], () =>
+  const portfolio = useFetch(triageFiscalPortfolioQueryKey(competence), () =>
     triageDocumentsService.getFiscalPortfolio(competence),
   );
   const items = portfolio.data?.items ?? [];
@@ -185,7 +170,7 @@ export function FiscalTriagePortfolioSection({
 
   async function updateStatus(
     row: FiscalTriagePortfolioItem,
-    field: string,
+    field: TriageFiscalChecklistField,
     status: TriageDocumentStatus,
   ) {
     if (!row.monthly) return;
@@ -229,19 +214,14 @@ export function FiscalTriagePortfolioSection({
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <label className="text-sm text-gray-700 dark:text-slate-300">
-            Competência
-            <input
-              type="month"
-              aria-label="Competência da Triagem Fiscal"
-              value={competence}
-              onChange={(event) => {
-                setCompetence(event.target.value as ContabilCompetence);
-                setPage(1);
-              }}
-              className="ml-2 rounded-lg border border-gray-300 bg-white px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
-            />
-          </label>
+          <ContabilCompetenceSelect
+            value={competence}
+            label="Competência da Triagem Fiscal"
+            onChange={(value) => {
+              setCompetence(value);
+              setPage(1);
+            }}
+          />
           <button
             type="button"
             onClick={() => exportCsv(competence, filtered)}
@@ -259,7 +239,7 @@ export function FiscalTriagePortfolioSection({
             disabled={!filtered.length}
             className="inline-flex items-center gap-1 rounded-lg border px-3 py-1 text-sm disabled:opacity-50"
           >
-            <Printer className="h-4 w-4" /> PDF
+            <Printer className="h-4 w-4" /> Imprimir / PDF
           </button>
         </div>
       </div>
@@ -307,7 +287,7 @@ export function FiscalTriagePortfolioSection({
               aria-label="Filtrar responsável"
               value={responsible}
               onChange={(event) => updateFilter(setResponsible, event.target.value)}
-              className="rounded-lg border px-2 py-2 dark:bg-slate-800"
+              className={CONTABIL_SELECT_CLASS}
             >
               <option value="">Todos os responsáveis</option>
               {responsibles.map((name) => (
@@ -318,7 +298,7 @@ export function FiscalTriagePortfolioSection({
               aria-label="Filtrar regime"
               value={regime}
               onChange={(event) => updateFilter(setRegime, event.target.value)}
-              className="rounded-lg border px-2 py-2 dark:bg-slate-800"
+              className={CONTABIL_SELECT_CLASS}
             >
               <option value="">Todos os regimes</option>
               {regimes.map((name) => (
@@ -328,10 +308,11 @@ export function FiscalTriagePortfolioSection({
             <select
               aria-label="Documento para filtrar"
               value={documentField}
-              onChange={(event) =>
-                updateFilter(setDocumentField as (value: string) => void, event.target.value)
-              }
-              className="rounded-lg border px-2 py-2 dark:bg-slate-800"
+              onChange={(event) => {
+                setDocumentField(event.target.value as TriageFiscalChecklistField);
+                setPage(1);
+              }}
+              className={CONTABIL_SELECT_CLASS}
             >
               {FISCAL_DOCUMENTS.map(([field, label]) => (
                 <option key={field} value={field}>
@@ -343,10 +324,10 @@ export function FiscalTriagePortfolioSection({
               aria-label="Filtrar status documental"
               value={documentStatus}
               onChange={(event) => updateFilter(setDocumentStatus, event.target.value)}
-              className="rounded-lg border px-2 py-2 dark:bg-slate-800"
+              className={CONTABIL_SELECT_CLASS}
             >
               <option value="">Todos os status</option>
-              <option value="NOT_STARTED">Não iniciado</option>
+              <option value="NOT_STARTED">A configurar</option>
               {STATUSES.map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}

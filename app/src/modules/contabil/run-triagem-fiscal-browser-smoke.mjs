@@ -227,6 +227,7 @@ await page.route("**/*", async (route) => {
           responsible_name: user.name,
           can_edit: true,
           has_competence: true,
+          planned_checklist: null,
           monthly: {
             id: fiscalMonthlyId,
             checklist: fiscalFixture.checklist,
@@ -242,6 +243,7 @@ await page.route("**/*", async (route) => {
           responsible_name: null,
           can_edit: false,
           has_competence: false,
+          planned_checklist: null,
           monthly: null,
         },
       ],
@@ -301,7 +303,8 @@ try {
   assert.equal(fiscalChecklistFields.length, 13);
   await page.goto("/triagem", { waitUntil: "domcontentloaded", timeout: 60000 });
   await expect(page.getByRole("heading", { name: "Triagem Fiscal mensal" })).toBeVisible();
-  await expect(page.getByLabel("Competência da Triagem Fiscal")).toHaveValue(competence);
+  await expect(page.getByLabel("Competência da Triagem Fiscal (mês)")).toHaveValue("09");
+  await expect(page.getByLabel("Competência da Triagem Fiscal (ano)")).toHaveValue("2026");
   await expect(page.getByText("Empresa sem rotina")).toBeVisible();
   await page.getByLabel("Cliente Demonstração: Relatório de entradas").selectOption("COMPLETED");
   await expect.poll(() => fiscalFixture.checklist.inbound_report).toBe("COMPLETED");
@@ -311,7 +314,7 @@ try {
   assert.equal(csv.suggestedFilename(), `triagem-fiscal-${competence}.csv`);
   assert.match(readFileSync(await csv.path(), "utf8"), /Empresa sem rotina/);
   const popup = page.waitForEvent("popup");
-  await page.getByRole("button", { name: "PDF" }).click();
+  await page.getByRole("button", { name: "Imprimir / PDF" }).click();
   const pdfPage = await popup;
   await expect(pdfPage.getByRole("heading", { name: `Triagem Fiscal · ${competence}` })).toBeVisible();
   await pdfPage.close();

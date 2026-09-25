@@ -141,6 +141,7 @@ export interface FiscalTriagePortfolioItem {
   responsible_name: string | null;
   can_edit: boolean;
   has_competence: boolean;
+  planned_checklist: Record<string, TriageDocumentStatus> | null;
   monthly: {
     id: string;
     checklist: Record<string, TriageDocumentStatus>;
@@ -357,8 +358,22 @@ export class TriageDocumentsService {
     const clients = await this.prisma.client.findMany({
       where: {
         organization_id: auth.organizationId,
-        fiscal: true,
         AND: [
+          {
+            OR: [
+              { fiscal: true },
+              {
+                triageMonthlys: {
+                  some: {
+                    organization_id: auth.organizationId,
+                    competence,
+                    type: "FISCAL",
+                    archived_at: null,
+                  },
+                },
+              },
+            ],
+          },
           { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
           { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
         ],
@@ -381,7 +396,7 @@ export class TriageDocumentsService {
         },
         triageCompetences: {
           where: { organization_id: auth.organizationId, competence, archived_at: null },
-          select: { id: true, responsible_snapshot: true },
+          select: { id: true, responsible_snapshot: true, configuration_snapshot: true },
           take: 1,
         },
         responsiblesTriage: {
@@ -409,10 +424,12 @@ export class TriageDocumentsService {
       ) as Record<string, unknown> | undefined;
       return typeof fiscal?.user_id === "string" ? fiscal.user_id : null;
     });
-    const userIds = clients.flatMap((client, index) => {
-      const id = client.triageCompetences[0]
+    const responsibleIds = clients.map((client, index) =>
+      client.triageCompetences[0]
         ? snapshotResponsibleIds[index]
-        : client.responsiblesTriage[0]?.user_id;
+        : (client.responsiblesTriage[0]?.user_id ?? null),
+    );
+    const userIds = responsibleIds.flatMap((id) => {
       return id ? [id] : [];
     });
     const users = userIds.length
@@ -427,9 +444,11 @@ export class TriageDocumentsService {
       competence,
       items: clients.map((client, index) => {
         const monthly = client.triageMonthlys[0];
-        const responsibleId = client.triageCompetences[0]
-          ? (snapshotResponsibleIds[index] ?? null)
-          : (client.responsiblesTriage[0]?.user_id ?? null);
+        const competenceSnapshot = client.triageCompetences[0];
+        const plannedItems = competenceSnapshot
+          ? fiscalSnapshotItems(competenceSnapshot.configuration_snapshot)
+          : null;
+        const responsibleId = responsibleIds[index];
         return {
           client_id: client.id,
           legal_name: client.company_name?.trim() || client.name,
@@ -438,9 +457,17 @@ export class TriageDocumentsService {
           responsible_id: responsibleId,
           responsible_name: responsibleId ? (userNames.get(responsibleId) ?? null) : null,
           can_edit:
-            Number(auth.modules?.fiscal ?? auth.permission ?? 0) >= 2 ||
+            Number(auth.modules?.fiscal ?? 0) >= 2 ||
             client.responsiblesTriage[0]?.user_id === auth.userId,
-          has_competence: client.triageCompetences.length > 0,
+          has_competence: Boolean(competenceSnapshot),
+          planned_checklist: plannedItems
+            ? Object.fromEntries(
+                TRIAGE_FISCAL_CHECKLIST_FIELDS.map((field) => [
+                  field,
+                  plannedItems[field]?.required === true ? "PENDING" : "NOT_APPLICABLE",
+                ]),
+              )
+            : null,
           monthly: monthly
             ? {
                 id: monthly.id,
