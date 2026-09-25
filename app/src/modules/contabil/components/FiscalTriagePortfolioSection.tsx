@@ -14,13 +14,10 @@ import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect, CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { FISCAL_DOCUMENTS, STATUSES } from "./TriageDocumentsSection";
+import { CONTABIL_OUTLINE_ACTION_CLASS, CONTABIL_TABLE_FILTER_CLASS } from "./contabilUiClasses";
 
 const PAGE_SIZE = 50;
 const STATUS_LABELS = Object.fromEntries(STATUSES) as Record<TriageDocumentStatus, string>;
-const EXPORT_BUTTON_CLASS =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700";
-const TABLE_FILTER_CLASS =
-  "mt-1 w-full min-w-[7rem] rounded-md border border-gray-300 bg-white px-1 py-1 text-xs font-normal normal-case tracking-normal text-gray-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200";
 
 function cellStatus(row: FiscalTriagePortfolioItem, field: TriageFiscalChecklistField) {
   return row.monthly?.checklist[field] ?? row.planned_checklist?.[field] ?? "NOT_STARTED";
@@ -236,7 +233,7 @@ export function FiscalTriagePortfolioSection({
             type="button"
             onClick={() => exportCsv(competence, filtered)}
             disabled={!filtered.length}
-            className={EXPORT_BUTTON_CLASS}
+            className={CONTABIL_OUTLINE_ACTION_CLASS}
           >
             <FileDown aria-hidden="true" className="h-4 w-4" /> CSV
           </button>
@@ -247,7 +244,7 @@ export function FiscalTriagePortfolioSection({
                 setActionError("Permita a abertura da janela para salvar o PDF.");
             }}
             disabled={!filtered.length}
-            className={EXPORT_BUTTON_CLASS}
+            className={CONTABIL_OUTLINE_ACTION_CLASS}
           >
             <Printer aria-hidden="true" className="h-4 w-4" /> Imprimir / PDF
           </button>
@@ -349,7 +346,7 @@ export function FiscalTriagePortfolioSection({
                         aria-label="Filtrar regime"
                         value={regime}
                         onChange={(event) => updateFilter(setRegime, event.target.value)}
-                        className={TABLE_FILTER_CLASS}
+                        className={CONTABIL_TABLE_FILTER_CLASS}
                       >
                         <option value="">Todos</option>
                         {regimes.map((value) => <option key={value} value={value}>{value}</option>)}
@@ -361,7 +358,7 @@ export function FiscalTriagePortfolioSection({
                         aria-label="Filtrar responsável"
                         value={responsible}
                         onChange={(event) => updateFilter(setResponsible, event.target.value)}
-                        className={TABLE_FILTER_CLASS}
+                        className={CONTABIL_TABLE_FILTER_CLASS}
                       >
                         <option value="">Todos</option>
                         {responsibles.map((value) => <option key={value} value={value}>{value}</option>)}
@@ -376,7 +373,7 @@ export function FiscalTriagePortfolioSection({
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
                   {visible.length === 0 ? (
-                    <tr><td colSpan={5 + FISCAL_DOCUMENTS.length} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">Nenhuma empresa corresponde aos filtros.</td></tr>
+                    <tr><td colSpan={5 + FISCAL_DOCUMENTS.length} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">{items.length === 0 ? "Nenhuma empresa nesta competência." : "Nenhuma empresa corresponde aos filtros."}</td></tr>
                   ) : null}
                   {visible.map((row, index) => (
                     <tr

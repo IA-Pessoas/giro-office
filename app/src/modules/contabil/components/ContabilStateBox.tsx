@@ -22,7 +22,7 @@ export function ContabilStateBox({
       : "border-dashed border-gray-200 bg-gray-50/70 text-gray-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300";
 
   return (
-    <div className={`rounded-2xl border ${compact ? "p-4" : "p-5"} ${className}`}>
+    <div role={tone === "danger" ? "alert" : tone === "loading" ? "status" : undefined} className={`rounded-2xl border ${compact ? "p-4" : "p-5"} ${className}`}>
       <div className={`flex items-start ${Icon ? "gap-3" : ""}`}>
         {Icon ? (
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/70 dark:bg-slate-800/80">
@@ -31,7 +31,7 @@ export function ContabilStateBox({
         ) : null}
         <div>
           <p className="text-sm font-semibold">{title}</p>
-          <p className="mt-1 text-sm leading-6">{children}</p>
+          <div className="mt-1 text-sm leading-6">{children}</div>
         </div>
       </div>
     </div>
