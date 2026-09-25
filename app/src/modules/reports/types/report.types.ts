@@ -54,14 +54,53 @@ export type ReportsCatalogSource = {
 
 export type ReportsCatalog = {
   items: ReportsCatalogSource[];
+  letterheads?: {
+    personal: ReportLetterheadOption[];
+    shared: ReportLetterheadOption[];
+  };
 };
+
+export type ReportLetterheadOption = {
+  id: string;
+  label: string;
+  kind: "organization" | "department";
+  sha256: string;
+};
+
+export type ReportLetterheadSelection = { id: string; sha256: string };
 
 export type ReportComposition = {
   version: 2;
   areas: ReportArea[];
+  letterhead?: ReportLetterheadSelection;
 };
 
-export type ReportModelDefinition = ReportDefinition | ReportComposition;
+export type ReportRelationship = {
+  layout: "grouped_list" | "summary";
+  dimensions: string[];
+  measures: { key: string; function: "count_rows" | "count" | "sum" | "avg" | "min" | "max"; field?: string }[];
+  visibleColumns: string[];
+  order?: { key: string; direction: "asc" | "desc" };
+};
+
+export type ReportCompositionV3 = {
+  version: 3;
+  areas: {
+    source: string;
+    layout: ReportRelationship["layout"];
+    dimensions: string[];
+    details: string[];
+    measures: ReportRelationship["measures"];
+    display: { columns: string[]; groupHeadings?: boolean };
+    filters?: ReportArea["filters"];
+    filterLogic?: ReportArea["filterLogic"];
+    parameterValues?: ReportArea["parameterValues"];
+    orderBy?: ({ field: string; direction: "asc" | "desc" } | { measure: string; direction: "asc" | "desc" })[];
+  }[];
+  letterhead?: ReportLetterheadSelection;
+};
+
+export type ReportModelDefinition = ReportDefinition | ReportComposition | ReportCompositionV3;
 
 export type ReportArea = {
   source: string;
@@ -72,9 +111,10 @@ export type ReportArea = {
   groupBy?: string[];
   aggregations?: { field: string; function: string }[];
   orderBy?: { field: string; direction: "asc" | "desc" }[];
+  relationship?: ReportRelationship;
 };
 export type ReportCompositionPreview = {
-  blocks: (ReportPreviewResult & { source: string; label: string })[];
+  blocks: (ReportPreviewResult & { source: string; label: string; layout?: "grouped_list" | "summary"; dimensions?: string[] })[];
 };
 
 export type ReportsServiceError = {
@@ -88,6 +128,7 @@ export type ReportAggregation = { fieldKey: string; function: string };
 export type ReportSort = { fieldKey: string; direction: "asc" | "desc" };
 
 export type ReportDefinition = {
+  letterhead?: ReportLetterheadSelection;
   sources: string[];
   columns: { source: string; field: string; alias: string }[];
   joins: { relation: string; type: ReportJoinType }[];
@@ -117,7 +158,7 @@ export type ReportPreviewPayload = {
   parameterValues?: Record<string, unknown>;
 };
 
-export type ReportPreviewColumn = { key: string; label: string };
+export type ReportPreviewColumn = { key: string; label: string; hidden?: boolean };
 export type ReportPreviewResult = {
   columns: ReportPreviewColumn[];
   rows: Record<string, unknown>[];
@@ -129,6 +170,9 @@ export type ReportResultBlock = {
   label: string;
   columns: ReportPreviewColumn[];
   rows: Record<string, unknown>[];
+  layout?: "grouped_list" | "summary";
+  dimensions?: string[];
+  hasMore?: boolean;
 };
 export type ReportSnapshotBlock = {
   source: string;
@@ -137,6 +181,8 @@ export type ReportSnapshotBlock = {
   rowCount: number;
   rows: Array<{ row_number: number; values: Record<string, unknown> }>;
   nextCursor: number | null;
+  layout?: "grouped_list" | "summary";
+  dimensions?: string[];
 };
 export type ReportJob = {
   id: string;

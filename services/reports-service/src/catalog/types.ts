@@ -92,11 +92,14 @@ export function deriveReportCatalogGrant(definition: {
 export function deriveReportCatalogGrantFromComposition(composition: {
   areas: readonly {
     source: string;
-    fields: readonly string[];
+    fields?: readonly string[];
+    dimensions?: readonly string[];
+    details?: readonly string[];
+    measures?: readonly { field?: string }[];
     filters?: readonly { field: string }[];
     aggregations?: readonly { field: string }[];
     groupBy?: readonly string[];
-    orderBy?: readonly { field: string }[];
+    orderBy?: readonly { field?: string }[];
   }[];
 }): ReportCatalogGrant {
   const sources: Record<string, string[]> = {};
@@ -108,11 +111,18 @@ export function deriveReportCatalogGrantFromComposition(composition: {
 
   for (const area of composition.areas) {
     sources[area.source] ??= [];
-    for (const field of area.fields) addField(area.source, field);
+    for (const field of area.fields ?? []) addField(area.source, field);
+    for (const field of area.dimensions ?? []) addField(area.source, field);
+    for (const field of area.details ?? []) addField(area.source, field);
+    for (const measure of area.measures ?? []) {
+      if (measure.field) addField(area.source, measure.field);
+    }
     for (const filter of area.filters ?? []) addField(area.source, filter.field);
     for (const aggregation of area.aggregations ?? []) addField(area.source, aggregation.field);
     for (const field of area.groupBy ?? []) addField(area.source, field);
-    for (const order of area.orderBy ?? []) addField(area.source, order.field);
+    for (const order of area.orderBy ?? []) {
+      if (order.field) addField(area.source, order.field);
+    }
   }
 
   return { sources, relations: [] };

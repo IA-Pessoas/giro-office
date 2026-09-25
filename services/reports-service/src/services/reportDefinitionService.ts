@@ -6,7 +6,11 @@ import type {
 } from "../catalog/sourceCatalogService.js";
 import type { ReportCatalogScope } from "../catalog/types.js";
 import { reportAggregationAlias, reportCriteria } from "../integrations/reportCriteria.js";
-import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
+import type {
+  ReportComposition,
+  ReportCompositionV2,
+  ReportCompositionV3,
+} from "../schemas/reportComposition.schemas.js";
 import {
   MAX_DECLARED_REPORT_BYTES,
   MAX_DECLARED_REPORT_ROWS,
@@ -25,13 +29,110 @@ export class ReportDefinitionService {
 
   validateComposition(definition: ReportComposition, scope: ReportCatalogScope): ReportComposition {
     for (const area of definition.areas) {
-      this.prepareArea(area, scope);
+      if (definition.version === 3)
+        this.prepareV3Area(area as ReportCompositionV3["areas"][number], scope);
+      else this.prepareArea(area as ReportCompositionV2["areas"][number], scope);
     }
     return definition;
   }
 
+  prepareV3Area(
+    area: ReportCompositionV3["areas"][number],
+    scope: ReportCatalogScope,
+  ): { definition: ReportDefinition; parameterValues: Record<string, unknown> } {
+    const source = this.sourceCatalog
+      .getAuthorizedCatalog(scope)
+      .sources.find((item) => item.key === area.source);
+    if (!source) throw new ServiceError(403, "Confira as áreas disponíveis para seu acesso.");
+    const fields = new Map(source.fields.map((field) => [field.key, field]));
+    const measureKeys = new Set(area.measures.map((measure) => measure.key));
+    for (const field of [
+      ...area.dimensions,
+      ...area.details,
+      ...area.measures.flatMap((measure) => (measure.field ? [measure.field] : [])),
+    ]) {
+      if (!fields.has(field))
+        throw new ServiceError(403, "O campo não está autorizado para este relatório.");
+    }
+    if (
+      area.dimensions.some((field) => fields.get(field)?.groupable !== true) ||
+      (area.layout === "grouped_list" &&
+        area.dimensions.some((field) => fields.get(field)?.sortable !== true)) ||
+      area.measures.some(
+        (measure) =>
+          measure.function !== "count_rows" &&
+          !fields.get(measure.field ?? "")?.aggregations.includes(measure.function),
+      ) ||
+      (area.orderBy ?? []).some((order) =>
+        order.measure
+          ? !measureKeys.has(order.measure)
+          : !fields.get(order.field ?? "")?.sortable ||
+            (area.layout === "summary" && !area.dimensions.includes(order.field ?? "")),
+      )
+    )
+      throw new ServiceError(
+        400,
+        "Confira as capacidades de agrupamento, resumo e ordenação da área.",
+      );
+
+    const selectedFields = [
+      ...new Set([
+        ...area.dimensions,
+        ...area.details,
+        ...area.measures.flatMap((measure) => (measure.field ? [measure.field] : [])),
+      ]),
+    ];
+    const rawOrder =
+      area.layout === "grouped_list"
+        ? [
+            ...area.dimensions.map((field) => ({
+              field,
+              direction:
+                area.orderBy?.find((order) => order.field === field)?.direction ?? ("asc" as const),
+            })),
+            ...(area.orderBy ?? [])
+              .filter((order) => order.field && !area.dimensions.includes(order.field))
+              .map((order) => ({ field: order.field ?? "", direction: order.direction })),
+          ]
+        : [];
+    const prepared = this.prepareArea(
+      {
+        source: area.source,
+        fields: selectedFields,
+        filters: area.filters,
+        filterLogic: area.filterLogic,
+        parameterValues: area.parameterValues,
+        groupBy: area.layout === "summary" ? area.dimensions : undefined,
+        aggregations:
+          area.layout === "summary"
+            ? area.measures.map((measure) => ({
+                field: measure.field ?? area.dimensions[0],
+                function: measure.function,
+                alias: measure.key,
+              }))
+            : undefined,
+        orderBy: rawOrder,
+      },
+      scope,
+    );
+    if (area.layout === "summary") {
+      prepared.definition.order_by = (
+        area.orderBy?.length
+          ? area.orderBy
+          : area.dimensions.map((field) => ({ field, direction: "asc" as const }))
+      ).map((order) => ({
+        source: area.source,
+        field: order.field ?? ("measure" in order ? order.measure : undefined) ?? "",
+        direction: order.direction,
+      }));
+      this.validate(prepared.definition, scope);
+      reportCriteria(prepared.definition, prepared.parameterValues);
+    }
+    return prepared;
+  }
+
   prepareArea(
-    area: ReportComposition["areas"][number],
+    area: ReportCompositionV2["areas"][number],
     scope: ReportCatalogScope,
   ): { definition: ReportDefinition; parameterValues: Record<string, unknown> } {
     const source = this.sourceCatalog
@@ -185,12 +286,23 @@ export class ReportDefinitionService {
 
     for (const aggregation of definition.aggregations) {
       const field = findField(aggregation.source, aggregation.field);
-      if (!field.aggregations.includes(aggregation.function)) {
+      if (
+        aggregation.function !== "count_rows" &&
+        !field.aggregations.includes(aggregation.function)
+      ) {
         throw new ServiceError(400, "A agregação não é compatível com o campo publicado.");
       }
     }
 
-    for (const orderBy of definition.order_by) findField(orderBy.source, orderBy.field);
+    for (const orderBy of definition.order_by) {
+      const aggregationSources = definition.aggregations
+        .filter((aggregation) => reportAggregationAlias(aggregation) === orderBy.field)
+        .map((aggregation) => aggregation.source);
+      if (aggregationSources.length) {
+        if (!aggregationSources.includes(orderBy.source))
+          throw new ServiceError(400, "A ordenação deve usar a área da agregação.");
+      } else findField(orderBy.source, orderBy.field);
+    }
     for (const groupBy of definition.group_by ?? []) {
       if (!sourceKeys.has(groupBy.source))
         throw new ServiceError(400, "Agrupamento deve usar uma área selecionada.");

@@ -21,7 +21,7 @@ function modelSummary(model: ReportModel | SharedReportModel) {
   if ("version" in model.definition) {
     return {
       areas: model.definition.areas.length,
-      fields: model.definition.areas.reduce((total, area) => total + area.fields.length, 0),
+      fields: model.definition.areas.reduce((total, area) => total + ("fields" in area ? area.fields.length : area.display.columns.length), 0),
       criteria: model.definition.areas.reduce(
         (total, area) => total + (area.filters?.length ?? 0),
         0,

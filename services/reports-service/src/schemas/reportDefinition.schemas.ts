@@ -5,6 +5,7 @@ import {
   reportFilterOperatorSchema,
   reportSourceKeySchema,
 } from "./catalog.schemas.js";
+import { reportLetterheadReferenceSchema } from "./reportLetterhead.schemas.js";
 
 export const MAX_REPORT_SOURCES = 2;
 export const MAX_REPORT_COLUMNS = 25;
@@ -75,7 +76,7 @@ const aggregationSchema = z
     alias: aliasSchema.optional(),
     source: reportSourceKeySchema,
     field: fieldNameSchema,
-    function: reportAggregationSchema,
+    function: z.union([reportAggregationSchema, z.literal("count_rows")]),
   })
   .strict();
 
@@ -96,6 +97,7 @@ const declaredCostSchema = z
 
 export const reportDefinitionSchema = z
   .object({
+    letterhead: reportLetterheadReferenceSchema.optional(),
     sources: z.array(reportSourceKeySchema).min(1).max(MAX_REPORT_SOURCES),
     columns: z.array(columnSchema).min(1).max(MAX_REPORT_COLUMNS),
     joins: z.array(joinSchema).max(MAX_REPORT_JOINS).default([]),

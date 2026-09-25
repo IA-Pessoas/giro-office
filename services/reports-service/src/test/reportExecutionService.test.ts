@@ -239,4 +239,59 @@ describe("ReportExecutionService", () => {
         "Não foi possível gerar o bloco Processos do Regularize. Confira o acesso e os critérios e tente novamente.",
     });
   });
+
+  it("persiste composição v3 com coluna visível e medida oculta autorizada", async () => {
+    const summaryAdapter: ReportSourceAdapter = {
+      ...adapter,
+      sources: [
+        {
+          ...adapter.sources[0],
+          fields: [
+            {
+              key: "state",
+              label: "Estado",
+              value_type: "string",
+              filter_operators: ["eq"],
+              aggregations: [],
+              sortable: true,
+              groupable: true,
+            },
+          ],
+        },
+      ],
+      preview: vi
+        .fn()
+        .mockResolvedValue({ rows: [{ state: "SP", total: 2 }], reachedLimit: false }),
+    };
+    const catalog = new SourceCatalogService([summaryAdapter]);
+    const service = new ReportExecutionService(catalog, new ReportDefinitionService(catalog));
+    const definition = reportCompositionSchema.parse({
+      version: 3,
+      areas: [
+        {
+          source: "regularize.licenses",
+          layout: "summary",
+          dimensions: ["state"],
+          details: [],
+          measures: [{ key: "total", function: "count_rows" }],
+          orderBy: [{ measure: "total", direction: "desc" }],
+          display: { columns: ["state"] },
+        },
+      ],
+    });
+    const result = await service.executeComposition({
+      definition,
+      scope: {
+        organization_id: "10000000-0000-4000-8000-000000000001",
+        modules: { regularize: 1 },
+      },
+      requestId: "request-v3",
+    });
+    expect(result.blocks[0]).toMatchObject({
+      columns: [{ key: "state", label: "Estado" }],
+      rows: [{ state: "SP", total: 2 }],
+      layout: "summary",
+      dimensions: ["state"],
+    });
+  });
 });

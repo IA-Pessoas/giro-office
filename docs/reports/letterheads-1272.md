@@ -1,0 +1,5 @@
+# Timbrados de relatórios (#1272)
+
+O catálogo de relatórios retorna `letterheads.personal` e `letterheads.shared` com `id`, `label`, `kind` e `sha256`. Apenas ativos aprovados, autorizados, disponíveis, de imagem PNG/JPEG e com SHA-256 correspondente entram nas opções. O criador de relatórios pessoais permite escolher uma dessas opções ou o padrão institucional. A definição v2, v3 ou legada pode guardar `letterhead: {id, sha256}`; o serviço valida a referência durante revisão, criação e execução, e a exportação PDF usa a referência fixada na versão do modelo. Uma referência ausente, alterada ou não autorizada falha de forma explícita. Sem seleção, permanece a escolha padrão e o fallback institucional existente.
+
+A origem dos timbrados legados não está disponível neste repositório. Não foram importados arquivos nem criados substitutos visuais. Para disponibilizar ativos reais, é necessário fornecer os arquivos ou uma fonte acessível e instanciá-los em `ReportLetterheadService` com organização, departamento quando aplicável, identificador, rótulo e SHA-256. O catálogo ficará vazio enquanto não houver ativos registrados.

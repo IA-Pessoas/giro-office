@@ -76,6 +76,7 @@ export interface ReportPdfRenderInput {
   organizationId: string;
   departmentId?: string;
   scope: "personal" | "shared";
+  letterhead?: { id: string; sha256: string };
   presentation_json: unknown;
   rows: readonly Record<string, unknown>[];
   blocks?: readonly ReportPdfBlock[];
@@ -204,6 +205,7 @@ export class ReportPdfService implements ReportPdfRenderer {
       organizationId: input.organizationId,
       departmentId: input.departmentId,
       scope: input.scope,
+      selected: input.letterhead,
     });
     const document = this.createDocument({
       size: "A4",

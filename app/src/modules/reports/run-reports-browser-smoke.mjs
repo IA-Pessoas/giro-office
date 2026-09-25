@@ -250,9 +250,15 @@ async function run() {
               {
                 source: "integracao.projects",
                 label: "Projetos",
-                columns: [{ key: "name", label: "Nome" }],
-                rowCount: 1,
-                rows: [{ row_number: 1, values: { name: "Projeto gerado" } }],
+                columns: [{ key: "name", label: "Nome" }, { key: "status", label: "Situação" }, { key: "category", label: "Categoria" }, { key: "status_count", label: "Contagem de Situação" }],
+                rowCount: 5,
+                rows: [
+                  { row_number: 1, values: { name: "Projeto gerado", status: "A", category: "Um", status_count: 7 } },
+                  { row_number: 2, values: { name: "Projeto gerado", status: "B", category: "Dois", status_count: 3 } },
+                  { row_number: 3, values: { name: "Outro projeto", status: "A", category: "Três", status_count: 2 } },
+                  { row_number: 4, values: { name: "Sem categoria", status: "A", category: null, status_count: 4 } },
+                  { row_number: 5, values: { name: "Categoria literal", status: "B", category: "Sem valor", status_count: 5 } },
+                ],
                 nextCursor: null,
               },
               {
@@ -522,6 +528,26 @@ async function run() {
     await expect(
       panel.getByRole("region", { name: "Resultado de Projetos", exact: true }),
     ).toContainText("Projeto gerado");
+    const chartResult = panel.getByRole("region", { name: "Resultado de Projetos", exact: true });
+    const chartType = chartResult.locator('section[aria-label="Visualização gráfica"] select').first();
+    await chartType.selectOption("line");
+    await expect(chartResult.getByRole("alert")).toContainText("dimensão de data ou número");
+    await chartType.selectOption("bar");
+    await expect(chartResult.getByRole("alert")).toContainText("mesma categoria e série");
+    await chartResult.locator('section[aria-label="Visualização gráfica"] select').nth(3).selectOption("status");
+    await expect(chartResult.getByRole("img", { name: /Gráfico de barras/ })).toBeVisible();
+    await expect(chartResult.getByRole("table").first()).toContainText("Projeto gerado");
+    await chartResult.getByText("Ver valores do gráfico", { exact: true }).click();
+    await expect(chartResult.getByRole("table").first()).toContainText("7");
+    await chartType.selectOption("pie");
+    await chartResult.locator('section[aria-label="Visualização gráfica"] select').nth(1).selectOption("category");
+    await expect(chartResult.getByRole("img", { name: /Gráfico de setores/ })).toBeVisible();
+    const chartValues = chartResult.locator('section[aria-label="Visualização gráfica"] details');
+    if (!(await chartValues.evaluate((element) => element.open))) {
+      await chartValues.getByText("Ver valores do gráfico").click();
+    }
+    await expect(chartValues.getByRole("table")).toContainText("Sem valor (ausente)");
+    await expect(chartValues.getByRole("table")).toContainText("Sem valor (texto)");
     await expect(
       panel.getByRole("region", { name: "Resultado de Clientes", exact: true }),
     ).toContainText("Nenhum registro encontrado");
@@ -589,6 +615,21 @@ async function run() {
       panel.getByRole("heading", { name: "Revisar relatório", exact: true }),
     ).toBeVisible();
     assert.deepEqual(definitions.at(-1).areas[0].parameterValues, { period: "2026-09-01" });
+    await panel.getByRole("button", { name: "2. Escolher campos", exact: true }).click();
+    await projects.getByRole("checkbox", { name: "Situação", exact: true }).check();
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    await panel.getByRole("checkbox", { name: /Organizar relações entre campos/ }).check();
+    await expect(panel.getByRole("group", { name: "Relações entre campos" })).toBeVisible();
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByRole("heading", { name: "Revisar relatório", exact: true })).toBeVisible();
+    assert.equal(definitions.at(-1).version, 3);
+    assert.deepEqual(definitions.at(-1).areas[0].dimensions, ["name"]);
+    assert.deepEqual(definitions.at(-1).areas[0].details, ["status"]);
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    const relationships = panel.getByRole("group", { name: "Relações entre campos" });
+    await relationships.getByLabel("Apresentação desta área").selectOption("summary");
+    await relationships.getByText("Colunas visíveis", { exact: true }).locator("..").getByRole("checkbox", { name: "Nome" }).uncheck();
+    await expect(relationships).toContainText("grupos diferentes podem parecer linhas iguais");
     const unexpectedConsoleErrors = consoleErrors.filter(
       (message) =>
         !message.includes("403 (Forbidden)") && !message.includes("422 (Unprocessable Entity)"),

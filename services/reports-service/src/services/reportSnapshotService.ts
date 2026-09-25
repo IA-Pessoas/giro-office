@@ -1,6 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { ReportsPrismaClient } from "../prisma/index.js";
+import { reportCompositionSchema } from "../schemas/reportComposition.schemas.js";
 import type { ReportResultColumn } from "./reportExecutionService.js";
 
 export class ReportSnapshotService {
@@ -25,6 +26,8 @@ export class ReportSnapshotService {
       rowCount: number;
       rows: Array<{ row_number: number; values: Record<string, unknown> }>;
       nextCursor: number | null;
+      layout?: "grouped_list" | "summary";
+      dimensions?: string[];
     }>;
   }> {
     const job = await this.prisma.reportJob.findFirst({
@@ -77,8 +80,13 @@ export class ReportSnapshotService {
         })
       : [];
     if (blocks.length > 0) {
+      const version = await this.prisma.reportModelVersion?.findFirst({
+        where: { id: job.report_model_version_id, organization_id: input.organizationId },
+      });
+      const parsed = reportCompositionSchema.safeParse(version?.definition_json);
+      const v3Areas = parsed.success && parsed.data.version === 3 ? parsed.data.areas : [];
       const blockPages = await Promise.all(
-        blocks.map(async (block) => {
+        blocks.map(async (block, index) => {
           const records = await this.prisma.reportSnapshotRow.findMany({
             where: {
               snapshot_id: snapshot.id,
@@ -102,6 +110,9 @@ export class ReportSnapshotService {
               records.length > input.limit
                 ? (visible[visible.length - 1]?.row_number ?? null)
                 : null,
+            ...(v3Areas[index]?.source === block.source
+              ? { layout: v3Areas[index].layout, dimensions: v3Areas[index].dimensions }
+              : {}),
           };
         }),
       );

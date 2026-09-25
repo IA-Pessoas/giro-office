@@ -1,5 +1,5 @@
 import { ServiceError } from "@workspace/shared";
-
+import { reportLetterheadReferenceSchema } from "../schemas/reportLetterhead.schemas.js";
 import type { ReportAuditService } from "./reportAuditService.js";
 import type { ReportAuthorizationService } from "./reportAuthorizationService.js";
 import { ReportCsvService, type ReportTable } from "./reportCsvService.js";
@@ -55,6 +55,7 @@ interface ReportTableRenderer {
 interface SnapshotExportContext {
   scope: "personal" | "shared";
   departmentId?: string;
+  letterhead?: { id: string; sha256: string };
 }
 
 interface ReportAuthorContextClient {
@@ -219,11 +220,21 @@ export class ReportExportService {
       modelVersionId: source.job.report_model_version_id,
       includeEphemeral: true,
     });
+    const definition = version.version.definition_json;
+    const reference =
+      definition && typeof definition === "object" && !Array.isArray(definition)
+        ? (definition as { letterhead?: unknown }).letterhead
+        : undefined;
+    const selected =
+      reference === undefined ? undefined : reportLetterheadReferenceSchema.safeParse(reference);
+    if (selected && !selected.success)
+      throw new ServiceError(400, "A seleção do timbrado do relatório é inválida.");
+    const letterhead = selected?.success ? { letterhead: selected.data } : {};
     if (version.model.created_by_user_id !== null) {
       if (source.job.requester_id !== input.userId) {
         throw new ServiceError(404, "Resultado do relatório não encontrado.");
       }
-      return { scope: "personal" };
+      return { scope: "personal", ...letterhead };
     }
 
     const authorized = await this.authorization.validateSharedDefinition({
@@ -235,7 +246,7 @@ export class ReportExportService {
     if (version.model.department_id !== authorized.department_id) {
       throw new ServiceError(403, "O modelo compartilhado não pertence ao departamento atual.");
     }
-    return { scope: "shared", departmentId: authorized.department_id };
+    return { scope: "shared", departmentId: authorized.department_id, ...letterhead };
   }
 
   private async resolveAuthorName(

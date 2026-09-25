@@ -31,7 +31,7 @@ const {
   sanitizeReportPreviewResult,
 } = await import("./utils/reportBuilder.ts");
 const appPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url)));
-const { buildReportComposition } = await import("./utils/reportCriteria.ts");
+const { buildReportComposition, buildReportCompositionV3 } = await import("./utils/reportCriteria.ts");
 const { getPessoalReportPresets } = await import("./utils/pessoalReportPresets.ts");
 const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
 const { getReportAuthorLabel, getReportForbiddenMessage, isReportCsrfError } = await import(
@@ -130,6 +130,29 @@ runTest("rejects fields that disappeared from the authorized catalog", () => {
     () => buildReportComposition([{ source: source.key, fields: ["removed_field"] }], [source]),
     /não está mais disponível/,
   );
+});
+
+runTest("builds grouped summaries with hidden authorized dimensions and row counts", () => {
+  const source = {
+    key: "test.items", label: "Itens", module: "test",
+    fields: [
+      { key: "status", label: "Situação", type: "string", selectable: true, groupable: true },
+      { key: "amount", label: "Valor", type: "number", selectable: true, aggregatable: true, aggregationFunctions: ["sum"] },
+    ],
+  };
+  const result = buildReportCompositionV3([{ source: source.key, fields: ["status", "amount"],
+    relationship: { layout: "summary", dimensions: ["status"],
+      measures: [{ key: "report_total", function: "count_rows" }, { key: "report_sum", function: "sum", field: "amount" }],
+      visibleColumns: ["report_total", "report_sum"], order: { key: "report_total", direction: "desc" } } }], [source]);
+  assert.equal(result.version, 3);
+  assert.deepEqual(result.areas[0].display.columns, ["report_total", "report_sum"]);
+  assert.deepEqual(result.areas[0].orderBy, [{ measure: "report_total", direction: "desc" }]);
+});
+
+runTest("keeps authorized letterhead options in the catalog contract", () => {
+  const option = { id: "approved", label: "Timbrado aprovado", kind: "organization", sha256: "a".repeat(64) };
+  const parsed = unwrapReportsCatalogEnvelope({ success: true, data: { items: [], letterheads: { personal: [option], shared: [] } } });
+  assert.deepEqual(parsed.letterheads?.personal, [option]);
 });
 
 runTest("distinguishes a CSRF failure from a report authorization denial", () => {

@@ -93,6 +93,67 @@ describe("ReportXlsxService", () => {
 });
 
 describe("ReportExportService", () => {
+  it("inclui a dimensão oculta da lista agrupada na exportação tabular", async () => {
+    const service = new ReportExportService({
+      getForExport: vi.fn().mockResolvedValue({
+        snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
+        job: { id: "job-1", report_model_version_id: "version-1", requester_id: "user-1" },
+        rows: [],
+        blocks: [
+          {
+            source: "projects",
+            label: "Projetos",
+            columns: [
+              { key: "state", label: "Grupo: Estado", hidden: true },
+              { key: "name", label: "Nome" },
+            ],
+            rows: [{ state: "SP", name: "Ana" }],
+          },
+        ],
+      }),
+      assertExportable: vi.fn().mockResolvedValue(undefined),
+    } as never);
+    const result = await service.export({
+      snapshotId: "snapshot-1",
+      userId: "user-1",
+      organizationId: "org-1",
+      requestId: "request-1",
+      format: "csv",
+    });
+    expect(result.body.toString("utf8")).toBe("Grupo: Estado,Nome\r\nSP,Ana\r\n");
+  });
+  it("usa no PDF a versão do timbrado escolhida no modelo do snapshot", async () => {
+    const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-1.3"));
+    const letterhead = { id: "office-v1", sha256: "a".repeat(64) };
+    const service = new ReportExportService(
+      {
+        getForExport: vi.fn().mockResolvedValue({
+          snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
+          job: { id: "job-1", report_model_version_id: "version-1", requester_id: "user-1" },
+          rows: [{ name: "Ana" }],
+        }),
+        assertExportable: vi.fn().mockResolvedValue(undefined),
+      } as never,
+      { pdf: { format: "pdf", contentType: "application/pdf", render } } as never,
+      { record: vi.fn() } as never,
+      {
+        getVersion: vi.fn().mockResolvedValue({
+          version: { definition_json: { version: 2, areas: [], letterhead } },
+          model: { created_by_user_id: "user-1" },
+        }),
+      } as never,
+      { validateSharedDefinition: vi.fn() } as never,
+    );
+
+    await service.export({
+      snapshotId: "snapshot-1",
+      userId: "user-1",
+      organizationId: "org-1",
+      requestId: "request-1",
+      format: "pdf",
+    });
+    expect(render).toHaveBeenCalledWith(expect.objectContaining({ letterhead }));
+  });
   it("gera um arquivo por área em ZIP para CSV e preserva nomes amigáveis", async () => {
     const render = vi.fn((table) =>
       Buffer.from(`${table.columns[0]?.label}\r\n${table.rows[0]?.name ?? ""}\r\n`),

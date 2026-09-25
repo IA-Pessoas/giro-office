@@ -44,7 +44,24 @@ export class ReportAuthorizationService {
   constructor(
     private readonly accessContextClient: ReportingAccessContextClient,
     private readonly definitionService: ReportDefinitionService,
+    private readonly letterheads?: import("./reportLetterheadService.js").ReportLetterheadService,
   ) {}
+
+  private async validateLetterhead(
+    definition: ReportModelDefinition,
+    organizationId: string,
+    scope: "personal" | "shared",
+    departmentId?: string,
+  ): Promise<void> {
+    if (!definition.letterhead) return;
+    if (!this.letterheads) throw new ServiceError(404, "Timbrado selecionado indisponível.");
+    await this.letterheads.select({
+      organizationId,
+      scope,
+      departmentId,
+      selected: definition.letterhead,
+    });
+  }
 
   async validateDefinition(
     input: ValidateReportDefinitionInput,
@@ -53,6 +70,7 @@ export class ReportAuthorizationService {
       throw new ServiceError(400, "A composição deve ser validada como relatório composto.");
     }
     const scope = await getReportingCatalogScope(this.accessContextClient, input);
+    await this.validateLetterhead(input.definition, input.organizationId, "personal");
     return this.definitionService.validate(input.definition, scope);
   }
 
@@ -63,6 +81,7 @@ export class ReportAuthorizationService {
     definition: ReportComposition;
   }): Promise<{ definition: ReportComposition }> {
     const scope = await getReportingCatalogScope(this.accessContextClient, input);
+    await this.validateLetterhead(input.definition, input.organizationId, "personal");
     return {
       definition: this.definitionService.validateComposition(input.definition, scope),
     };
@@ -93,6 +112,7 @@ export class ReportAuthorizationService {
   ): Promise<AuthorizedSharedReportDefinition> {
     const context = await getReportingAccessContext(this.accessContextClient, input);
     const department = this.requireSharedDepartment(context);
+    await this.validateLetterhead(input.definition, input.organizationId, "shared", department.id);
     if ((context.modules[department.module] ?? 0) < 3) {
       throw new ServiceError(
         403,
@@ -126,6 +146,12 @@ export class ReportAuthorizationService {
     input: ValidateReportDefinitionInput,
   ): Promise<AuthorizedSharedReportDefinition> {
     const execution = await this.getSharedExecutionContext(input);
+    await this.validateLetterhead(
+      input.definition,
+      input.organizationId,
+      "shared",
+      execution.department.id,
+    );
     const definition =
       "version" in input.definition
         ? {

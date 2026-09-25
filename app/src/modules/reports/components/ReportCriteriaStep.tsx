@@ -9,11 +9,13 @@ export function ReportCriteriaStep({
   source,
   onChange,
   disabled,
+  relationshipMode = false,
 }: {
   area: ReportArea;
   source: ReportsCatalogSource;
   onChange: (area: ReportArea) => void;
   disabled: boolean;
+  relationshipMode?: boolean;
 }) {
   const fields = getSelectableReportFields(source);
   const filterFields = fields.filter(
@@ -212,7 +214,7 @@ export function ReportCriteriaStep({
           Esta área não oferece critérios adicionais.
         </p>
       )}
-      <details className="border-t border-gray-200 pt-4 dark:border-slate-700">
+      {!relationshipMode ? <details className="border-t border-gray-200 pt-4 dark:border-slate-700">
         <summary className="cursor-pointer rounded text-sm font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-white">
           Mais opções
         </summary>
@@ -324,7 +326,7 @@ export function ReportCriteriaStep({
               ))}
           </fieldset>
         </div>
-      </details>
+      </details> : null}
     </fieldset>
   );
 }
