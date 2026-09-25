@@ -447,9 +447,18 @@ export function ReportsCreatePanel({
                     fieldKeys={area.fields}
                     disabled={busy}
                     onFieldKeysChange={(fields) => {
+                      const selectedFields = new Set(fields);
                       builder.setAreas((current) =>
                         current.map((item) =>
-                          item.source === area.source ? { ...item, fields } : item,
+                          item.source === area.source
+                            ? {
+                                ...item,
+                                fields,
+                                aggregations: item.aggregations?.filter((aggregation) =>
+                                  selectedFields.has(aggregation.field),
+                                ),
+                              }
+                            : item,
                         ),
                       );
                       clearLoadedModel();
