@@ -117,7 +117,10 @@ export function ReportsCreatePanel({
   }, [model]);
 
   const sources = catalog.data?.items ?? [];
-  const pessoalPresets = getPessoalReportPresets(sources);
+  // Presets de Pessoal só fazem sentido antes de escolher áreas ou com áreas de Pessoal.
+  const pessoalPresets = builder.areas.every((area) => area.source.startsWith("pessoal."))
+    ? getPessoalReportPresets(sources)
+    : [];
   const selected = builder.areas.map((area) => ({
     ...area,
     catalog: sources.find((source) => source.key === area.source),
@@ -776,6 +779,9 @@ export function ReportsCreatePanel({
           </Button>
         ) : (
           <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" disabled={busy || unavailable} onClick={() => setSaveDialogOpen(true)}>
+              Salvar como modelo
+            </Button>
             <Button type="button" variant="outline" disabled={busy || unavailable} onClick={() => void showPreview()}>
               {preview.isPending ? "Carregando prévia..." : "Visualizar prévia"}
             </Button>
