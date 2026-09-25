@@ -18,6 +18,10 @@ import type {
   PatchPanoramaBody,
 } from "@workspace/parcelamento-service/src/schemas/panorama.schemas.js";
 import {
+  attachInstallmentClients,
+  loadInstallmentSummary,
+} from "@workspace/parcelamento-service/src/services/installmentListExtras.js";
+import {
   executeReportingQuery,
   getParcelamentoReportingFields,
   type ParcelamentoReportingSource,
@@ -351,7 +355,7 @@ export function createInstallmentService(
               ]
             : undefined,
         });
-        const [total, items] = await Promise.all([
+        const [total, items, summary] = await Promise.all([
           prisma.installment.count({ where }),
           prisma.installment.findMany({
             where,
@@ -360,8 +364,14 @@ export function createInstallmentService(
             skip,
             take,
           }),
+          loadInstallmentSummary(prisma, where),
         ]);
-        return createPage({ items: items.map(withoutOrganizationId), total, page, pageSize });
+        const withClients = await attachInstallmentClients(
+          prisma,
+          context.organizationId,
+          items.map(withoutOrganizationId),
+        );
+        return { ...createPage({ items: withClients, total, page, pageSize }), summary };
       }),
 
     getById: (context: ParcelamentoRequestContext, id: string) =>

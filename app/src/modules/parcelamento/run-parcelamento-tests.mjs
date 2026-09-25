@@ -497,9 +497,7 @@ runTest("parcelamento shell wires access, client selector and dashboard", () => 
   assert.match(clientSelector, /contentClassName="w-\[min\(92vw,520px\)\]"/);
   assert.match(clientSelector, /bodyClassName="max-h-\[72vh\] overflow-y-auto space-y-4"/);
   assert.match(clientSelector, /handleSelect\(null\)/);
-  assert.match(dashboard, /overdue_installments_count/);
-  assert.match(dashboard, /paid_installments_count/);
-  assert.match(dashboard, /agreed_installments_count/);
+  assert.match(dashboard, /installmentsPage\?\.summary/);
   assert.doesNotMatch(dashboard, /const\s+(cards|metrics|installments|panoramas)\s*=\s*\[/);
 });
 
@@ -849,6 +847,28 @@ runTest("parcelamento date defaults avoid timezone drift", () => {
   assert.match(competencyForm, /getCurrentParcelamentoMonth\(\)/);
   assert.match(panoramaForm, /getCurrentParcelamentoMonth\(\)/);
   assert.match(panoramasSection, /getCurrentParcelamentoMonth\(\)/);
+});
+
+runTest("parcelamento dashboard KPIs come from the backend summary, not the page (#1348)", () => {
+  const dashboard = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoDashboard.tsx",
+  );
+
+  assert.match(dashboard, /installmentsPage\?\.summary/);
+  assert.match(dashboard, /summary\?\.active/);
+  assert.match(dashboard, /summary\?\.overdue/);
+  assert.match(dashboard, /summary\?\.progress_percent/);
+  assert.doesNotMatch(dashboard, /na página|nesta página/);
+  assert.doesNotMatch(dashboard, /getAverageProgress|installmentItems\.filter/);
+});
+
+runTest("parcelamento installment cards show the client name and document (#1348)", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+
+  assert.match(section, /installment\.client\?\.name/);
+  assert.match(section, /formatCPF_CNPJ\(installment\.client\.cpf_cnpj\)/);
 });
 
 console.log("parcelamento frontend tests passed");
