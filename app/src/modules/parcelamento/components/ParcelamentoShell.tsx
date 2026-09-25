@@ -52,8 +52,10 @@ export function ParcelamentoShell() {
     }),
     [selectedClient?.id],
   );
-  const installmentsQuery = useParcelamentoInstallments(filters, { enabled: access.canView });
-  const panoramasQuery = useParcelamentoPanoramas(filters, { enabled: access.canView });
+  // Dados do dashboard só com a aba aberta: as outras abas têm as próprias listas (#1349).
+  const isDashboardActive = access.canView && activeTab === "dashboard";
+  const installmentsQuery = useParcelamentoInstallments(filters, { enabled: isDashboardActive });
+  const panoramasQuery = useParcelamentoPanoramas(filters, { enabled: isDashboardActive });
 
   function selectClientById(clientId: string) {
     if (selectedClient?.id === clientId) {

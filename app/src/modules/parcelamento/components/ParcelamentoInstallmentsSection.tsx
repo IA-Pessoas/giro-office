@@ -32,6 +32,8 @@ import {
 import { ParcelamentoNativeSelect } from "./ParcelamentoNativeSelect";
 import { ParcelamentoStateBox } from "./ParcelamentoStateBox";
 import {
+  INSTALLMENT_JURISDICTION_OPTIONS,
+  INSTALLMENT_TYPE_OPTIONS,
   parcelamentoPrimaryButtonClassName,
   parcelamentoSecondaryButtonClassName,
   parcelamentoTextFieldClassName,
@@ -46,8 +48,6 @@ interface ParcelamentoInstallmentsSectionProps {
 
 const FIRST_PAGE = 1;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
-const INSTALLMENT_TYPE_OPTIONS = ["Federal", "Estadual", "Municipal", "Simplificado", "SIMPLES"];
-const INSTALLMENT_JURISDICTION_OPTIONS = ["PGFN", "RFB", "Federal", "Estadual", "Municipal"];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -115,11 +115,8 @@ export function ParcelamentoInstallmentsSection({
   const installmentsQuery = useParcelamentoInstallments(listFilters, {
     enabled: true,
   });
-  const createMutation = useCreateParcelamentoInstallmentMutation(listFilters);
-  const updateMutation = useUpdateParcelamentoInstallmentMutation(
-    editingInstallment?.id ?? "",
-    listFilters,
-  );
+  const createMutation = useCreateParcelamentoInstallmentMutation();
+  const updateMutation = useUpdateParcelamentoInstallmentMutation(editingInstallment?.id ?? "");
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const installments = installmentsQuery.data?.items ?? [];
   const total = installmentsQuery.data?.total ?? installments.length;
