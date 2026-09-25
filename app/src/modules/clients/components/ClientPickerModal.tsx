@@ -126,6 +126,7 @@ export function ClientPickerModal({
                 </h2>
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                   Busque por nome, razão social ou CPF/CNPJ.
+                  {filters.status === "Ativo" ? " Só clientes ativos aparecem aqui." : null}
                 </p>
               </div>
               <button

@@ -662,7 +662,6 @@ await runTest("regularize dashboard enables only its aggregate query", async () 
     clientPfs: false,
     sitePasswords: false,
     municipalTaxes: false,
-    processes: false,
     licenses: false,
     partners: false,
     passwords: false,
@@ -678,7 +677,6 @@ await runTest("regularize tab query policy enables only owning contexts", async 
     clientPfs: false,
     sitePasswords: true,
     municipalTaxes: false,
-    processes: false,
     licenses: false,
     partners: false,
     passwords: true,
@@ -746,7 +744,9 @@ await runTest("regularize page renders aggregate dashboard and lazy list options
   assert.match(pageSource, /enabled: queryPolicy\.clientPfs/);
   assert.match(pageSource, /enabled: queryPolicy\.sitePasswords/);
   assert.match(pageSource, /enabled: queryPolicy\.municipalTaxes/);
-  assert.match(pageSource, /enabled: queryPolicy\.processes/);
+  // Lista completa de processos só alimenta o formulário de orientação (#1347).
+  assert.match(pageSource, /useRegularizeProcesses\(\s*\{ status: "Todos" \},\s*\{ enabled: activeForm\?\.type === "guidance" \}/);
+  assert.match(pageSource, /if \(activeTab === "processes"\) refreshes\.push\(processPageQuery\.refetch\(\)\)/);
   assert.match(pageSource, /enabled: activeTab === "licenses"/);
   assert.match(pageSource, /dashboardQuery\.data\.metrics/);
   assert.match(pageSource, /getRegularizeRequestId\(dashboardQuery\.error\)/);
@@ -1099,13 +1099,17 @@ await runTest("regularize operational tabs expose write actions", async () => {
   }
 });
 
-await runTest("regularize partners render client names instead of internal ids", async () => {
+await runTest("regularize partners follow the header client and name both sides (#1347)", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
 
-  assert.match(pageSource, /const pfNameById = new Map\(\s*\(pfPageQuery\.data\?\.data \?\? \[\]\)/);
-  assert.match(pageSource, /const pjNameById = new Map\(\s*\(clientQuery\.data\?\.items \?\? \[\]\)/);
-  assert.match(pageSource, /pfNameById\.get\(item\.pf_id\)\s*(?:\?\?|\|\|)\s*"PF não identificado"/);
-  assert.match(pageSource, /pjNameById\.get\(item\.pj_id\)\s*(?:\?\?|\|\|)\s*"PJ não identificado"/);
+  assert.match(
+    pageSource,
+    /useRegularizePartners\(\s*currentCredentialClientId\s*\?\s*\{ type: "pj", client_id: currentCredentialClientId \}/,
+  );
+  assert.match(pageSource, /item\.clientPF\?\.name \|\| "PF não identificado"/);
+  assert.match(pageSource, /selectedCredentialClient\?\.name \|\| "PJ não identificado"/);
+  assert.match(pageSource, /Selecione um cliente no topo para ver os sócios\./);
+  assert.doesNotMatch(pageSource, /useClients\(/);
   assert.doesNotMatch(pageSource, /formatText\(item\.pf_id\)\.slice\(0, 8\)/);
   assert.doesNotMatch(pageSource, /formatText\(item\.pj_id\)\.slice\(0, 8\)/);
 });
@@ -1309,7 +1313,7 @@ await runTest("regularize PF uses fixed options, automatic code and field errors
   assert.match(clientPfSource, /<RegularizeFormField label="Pai">/);
 });
 
-await runTest("regularize process task id uses the real task selector", async () => {
+await runTest("regularize process task uses the real task selector", async () => {
   const processSource = await readModuleSource("components/RegularizeProcessForm.tsx");
   const tasksHookSource = await readFile(
     join(appRoot, "src/modules/integracao/hooks/useIntegracaoTasks.ts"),
@@ -1318,17 +1322,17 @@ await runTest("regularize process task id uses the real task selector", async ()
 
   assert.match(tasksHookSource, /options\??: \{\s*enabled\??: boolean/);
   assert.match(tasksHookSource, /enabled: options\.enabled \?\? true/);
-  assert.match(processSource, /useIntegracaoTasksList/);
-  assert.match(processSource, /status: "Todos",\s*limit: 100,\s*search: taskSearch/);
-  assert.match(processSource, /\{\s*enabled: open\s*\}/);
-  assert.match(processSource, /value=\{taskSearch\}/);
-  assert.match(processSource, /taskSearch/);
-  assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.task_id\}/);
-  assert.match(processSource, /taskOptions\.map/);
-  assert.match(processSource, /tasksQuery\.isLoading/);
-  assert.match(processSource, /tasksQuery\.error/);
-  assert.match(processSource, /disabled=/);
-  assert.match(processSource, /Sem task vinculada/);
+  const taskSelectSource = await readModuleSource("components/RegularizeTaskSelect.tsx");
+  assert.match(processSource, /<RegularizeTaskSelect\s+enabled=\{open\}\s+value=\{formState\.task_id\}/);
+  assert.match(taskSelectSource, /useIntegracaoTasksList/);
+  assert.match(taskSelectSource, /status: "Todos", limit: 100, search/);
+  assert.match(taskSelectSource, /\{ enabled \}/);
+  assert.match(taskSelectSource, /value=\{search\}/);
+  assert.match(taskSelectSource, /options\.map/);
+  assert.match(taskSelectSource, /tasksQuery\.isLoading/);
+  assert.match(taskSelectSource, /tasksQuery\.error/);
+  assert.match(taskSelectSource, /disabled=/);
+  assert.match(taskSelectSource, /Nenhuma tarefa/);
   assert.doesNotMatch(processSource, /<input\s+value=\{formState\.task_id\}/);
 });
 
@@ -1613,4 +1617,48 @@ await runTest("partner table shows masked CPF and distinct action tooltips", asy
   assert.match(source, /excludePfIds=/);
   assert.match(source, /<ConfirmationDialog/);
   assert.doesNotMatch(source, /window\.confirm/);
+});
+
+await runTest("regularize dashboard and lists stay consistent with the tabs (#1347)", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.doesNotMatch(pageSource, /DashboardHeroCard/);
+  assert.match(pageSource, /label="Processos em aberto"/);
+  assert.match(
+    pageSource,
+    /headers=\{\["Licença", "Cliente", "Protocolo", "Contato", "Status", "Vencimento", ""\]\}/,
+  );
+  assert.match(pageSource, /formatText\(item\.client_name\)/);
+  assert.match(pageSource, /formatSiteSphere\(item\.sphere\)/);
+  assert.match(pageSource, /formatSiteSphere\(item\.site\?\.sphere\)/);
+});
+
+await runTest("regularize forms avoid technical jargon and prefill the client document (#1347)", async () => {
+  const processForm = await readModuleSource("components/RegularizeProcessForm.tsx");
+  const licenseForm = await readModuleSource("components/RegularizeLicenseForm.tsx");
+
+  for (const source of [processForm, licenseForm]) {
+    assert.doesNotMatch(source, /Task ID|Buscar task/);
+    assert.match(source, /<RegularizeTaskSelect/);
+  }
+  assert.match(processForm, /useClient\(/);
+  assert.match(processForm, /list=\{processTypeListId\}/);
+
+  const taskSelect = await readModuleSource("components/RegularizeTaskSelect.tsx");
+  assert.match(taskSelect, /<legend[^>]*>Tarefa vinculada<\/legend>/);
+
+  const { formatSiteSphere } = await import("./utils/regularizeForm.ts");
+  assert.equal(formatSiteSphere("legacy"), "Não informado");
+  assert.equal(formatSiteSphere("Municipal"), "Municipal");
+  assert.equal(formatSiteSphere(null), "-");
+});
+
+await runTest("client picker warns when only active clients are listed (#1347)", async () => {
+  const source = await readFile(
+    join(appRoot, "src/modules/clients/components/ClientPickerModal.tsx"),
+    "utf8",
+  );
+
+  assert.match(source, /filters\.status === "Ativo"/);
+  assert.match(source, /Só clientes ativos aparecem aqui\./);
 });

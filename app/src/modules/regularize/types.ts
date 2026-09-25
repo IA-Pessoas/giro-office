@@ -588,6 +588,7 @@ export type RemoveRegularizeGuidancePartnerPayload = RemoveRegularizeGuidanceAct
 export type RegularizeLicenseListItem = {
   id: RegularizeId;
   client_id?: RegularizeId | null;
+  client_name?: string | null;
   has?: boolean | null;
   type_license: string;
   entry_date?: string | null;
