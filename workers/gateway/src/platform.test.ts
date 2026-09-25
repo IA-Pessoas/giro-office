@@ -203,6 +203,21 @@ describe("gateway Worker: superfície /platform", () => {
     expect(bindings.ORGANIZATION_SERVICE.fetch).toHaveBeenCalledOnce();
   });
 
+  it("super admins e permissão de personificação vão ao user-service (#1528)", async () => {
+    const { app, bindings } = setup();
+
+    const list = await call(app, "GET", "/platform/super-admins", superAdmin());
+    const patch = await call(
+      app,
+      "PATCH",
+      "/platform/super-admins/20000000-0000-4000-8000-000000000009/impersonation-permission",
+      superAdmin(),
+    );
+
+    expect([list.status, patch.status]).toEqual([200, 200]);
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("path de plataforma não mapeado não é roteado", async () => {
     const { app, bindings } = setup();
     const response = await call(app, "GET", "/platform/inexistente", superAdmin());
