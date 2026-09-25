@@ -261,13 +261,11 @@ export class CertificatePfService {
 
     const passwordCrypto = this.requirePasswordCrypto();
     if (isJsonValue(record.password)) {
+      let password: string;
       try {
-        return removeFilePrivateMetadata({
-          ...record,
-          password: passwordCrypto.decrypt(record.password),
-        });
+        password = passwordCrypto.decrypt(record.password);
       } catch (err: unknown) {
-        logWarn("Senha do certificado PF indisponível para descriptografia", {
+        logError("Senha do certificado PF indisponível para descriptografia", {
           certificateId: record.id,
           err,
         });
@@ -276,6 +274,7 @@ export class CertificatePfService {
           password_unavailable: true,
         };
       }
+      return removeFilePrivateMetadata({ ...record, password });
     }
 
     await this.prisma.certificatePF.updateMany({
