@@ -77,6 +77,20 @@ export const regularizeProcessStatusOptions = [
   "Paralisado",
 ] as const;
 
+// Sugestões do campo "Tipo do processo"; o valor continua livre para tipos já gravados (#1347).
+export const regularizeProcessTypeOptions = [
+  "Abertura de empresa",
+  "Alteração contratual",
+  "Baixa de empresa",
+  "Alvará de funcionamento",
+  "Licença sanitária",
+  "Licença ambiental",
+  "Certificado do Corpo de Bombeiros",
+  "Inscrição municipal",
+  "Inscrição estadual",
+  "Certidão negativa de débitos",
+] as const;
+
 export const regularizeFinancialStatusOptions = [
   "Pendente",
   "Regular",

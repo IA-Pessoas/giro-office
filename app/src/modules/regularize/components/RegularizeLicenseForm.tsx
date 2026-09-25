@@ -27,6 +27,7 @@ import {
   regularizeUrgencyOptions,
 } from "./regularizeFormControls";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
+import { RegularizeTaskSelect } from "./RegularizeTaskSelect";
 
 type RegularizeLicenseFormState = {
   client_id: string;
@@ -396,13 +397,11 @@ export function RegularizeLicenseForm({
               </RegularizeNativeSelect>
             </RegularizeFormField>
 
-            <RegularizeFormField label="Código da tarefa">
-              <input
-                value={formState.task_id}
-                onChange={(event) => handleChange("task_id", event.target.value)}
-                className={regularizeTextFieldClassName}
-              />
-            </RegularizeFormField>
+            <RegularizeTaskSelect
+              enabled={open}
+              value={formState.task_id}
+              onChange={(taskId) => handleChange("task_id", taskId)}
+            />
 
             <RegularizeFormField label="Observação" className="md:col-span-3">
               <textarea

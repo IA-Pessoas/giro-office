@@ -9,6 +9,14 @@ import type {
   PatchInstallmentBody,
 } from "../schemas/installment.schemas.js";
 import { createPage, getPaginationParams } from "../schemas/pagination.schemas.js";
+import { computeOutstandingBalance } from "./installmentBalance.js";
+import {
+  ACTIVE_INSTALLMENT_STATUS,
+  attachInstallmentClients,
+  type InstallmentListClient,
+  type InstallmentListSummary,
+  loadInstallmentSummary,
+} from "./installmentListExtras.js";
 import {
   createAuditDiff,
   type ParcelamentoAuditAction,
@@ -17,7 +25,6 @@ import {
 } from "./parcelamentoAuditService.js";
 
 const CLOSED_INSTALLMENT_STATUSES = new Set(["Liquidado", "Cancelado", "Encerrado", "Inativo"]);
-const ACTIVE_INSTALLMENT_STATUS = "Ativo";
 const SETTLED_INSTALLMENT_STATUS = "Liquidado";
 
 type InstallmentDateInput = Date | string | null | undefined;
@@ -143,7 +150,11 @@ export class InstallmentService {
   async list(
     context: Pick<ParcelamentoRequestContext, "organizationId" | "userId">,
     query: ListInstallmentsQuery,
-  ): Promise<ParcelamentoPage<InstallmentDto>> {
+  ): Promise<
+    ParcelamentoPage<InstallmentDto & { client: InstallmentListClient | null }> & {
+      summary: InstallmentListSummary;
+    }
+  > {
     try {
       const { organizationId } = requireContext(context);
       const { page, pageSize, skip, take } = getPaginationParams(query);
@@ -165,7 +176,7 @@ export class InstallmentService {
           : {}),
       });
 
-      const [total, items] = await Promise.all([
+      const [total, items, summary] = await Promise.all([
         this.prisma.installment.count({ where }),
         this.prisma.installment.findMany({
           where,
@@ -174,9 +185,16 @@ export class InstallmentService {
           skip,
           take,
         }),
+        loadInstallmentSummary(this.prisma, where),
       ]);
 
-      return createPage({ items: items.map(toInstallmentDto), total, page, pageSize });
+      const withClients = await attachInstallmentClients(
+        this.prisma,
+        organizationId,
+        items.map(toInstallmentDto),
+      );
+
+      return { ...createPage({ items: withClients, total, page, pageSize }), summary };
     } catch (err: unknown) {
       logError("Erro ao listar parcelamentos", { err });
       if (err instanceof ServiceError) throw err;
@@ -210,10 +228,15 @@ export class InstallmentService {
         type: input.type,
         jurisdiction: input.jurisdiction,
         is_automatic_debit: input.is_automatic_debit,
-        consolidated_total_amount: 0,
+        consolidated_total_amount: input.consolidated_total_amount ?? 0,
         first_installment_amount: input.first_installment_amount,
         current_month_installment_amount: input.current_month_installment_amount,
-        outstanding_balance: 0,
+        outstanding_balance: computeOutstandingBalance({
+          total: input.consolidated_total_amount ?? 0,
+          agreed: input.agreed_installments_count,
+          remaining: input.agreed_installments_count,
+          currentAmount: input.current_month_installment_amount,
+        }),
         paid_installments_count: 0,
         agreed_installments_count: input.agreed_installments_count,
         remaining_installments_count: input.agreed_installments_count,
@@ -384,8 +407,12 @@ export class InstallmentService {
         installment.agreed_installments_count - paidInstallmentsCount,
         0,
       );
-      const outstandingBalance =
-        remainingInstallmentsCount * installment.current_month_installment_amount;
+      const outstandingBalance = computeOutstandingBalance({
+        total: installment.consolidated_total_amount,
+        agreed: installment.agreed_installments_count,
+        remaining: remainingInstallmentsCount,
+        currentAmount: installment.current_month_installment_amount,
+      });
 
       const statusData =
         remainingInstallmentsCount === 0

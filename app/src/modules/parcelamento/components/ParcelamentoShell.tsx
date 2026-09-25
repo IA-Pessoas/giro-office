@@ -52,8 +52,19 @@ export function ParcelamentoShell() {
     }),
     [selectedClient?.id],
   );
-  const installmentsQuery = useParcelamentoInstallments(filters, { enabled: access.canView });
-  const panoramasQuery = useParcelamentoPanoramas(filters, { enabled: access.canView });
+  // Dados do dashboard só com a aba aberta: as outras abas têm as próprias listas (#1349). O
+  // dashboard lê só total e summary, então um item por página basta.
+  const isDashboardActive = access.canView && activeTab === "dashboard";
+  const dashboardFilters = useMemo<ParcelamentoListFilters>(
+    () => ({ ...filters, page_size: 1 }),
+    [filters],
+  );
+  const installmentsQuery = useParcelamentoInstallments(dashboardFilters, {
+    enabled: isDashboardActive,
+  });
+  const panoramasQuery = useParcelamentoPanoramas(dashboardFilters, {
+    enabled: isDashboardActive,
+  });
 
   function selectClientById(clientId: string) {
     if (selectedClient?.id === clientId) {

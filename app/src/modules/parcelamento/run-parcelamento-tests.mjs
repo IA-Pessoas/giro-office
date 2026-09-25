@@ -491,15 +491,13 @@ runTest("parcelamento shell wires access, client selector and dashboard", () => 
   assert.match(shell, /ParcelamentoDashboard/);
   assert.match(shell, /role="tablist"/);
   assert.match(shell, /role="tab"/);
-  assert.match(shell, /enabled: access\.canView/);
+  assert.match(shell, /access\.canView && activeTab === "dashboard"/);
   assert.match(clientSelector, /useClients\(/);
   assert.match(clientSelector, /Dialog/);
   assert.match(clientSelector, /contentClassName="w-\[min\(92vw,520px\)\]"/);
   assert.match(clientSelector, /bodyClassName="max-h-\[72vh\] overflow-y-auto space-y-4"/);
   assert.match(clientSelector, /handleSelect\(null\)/);
-  assert.match(dashboard, /overdue_installments_count/);
-  assert.match(dashboard, /paid_installments_count/);
-  assert.match(dashboard, /agreed_installments_count/);
+  assert.match(dashboard, /installmentsPage\?\.summary/);
   assert.doesNotMatch(dashboard, /const\s+(cards|metrics|installments|panoramas)\s*=\s*\[/);
 });
 
@@ -674,7 +672,7 @@ runTest("parcelamento installments filters and form use compact controls", () =>
   assert.match(section, /className="inline-flex h-8 items-center justify-center gap-1\.5 rounded-lg border/);
   assert.match(form, /export const INSTALLMENT_STATUS_OPTIONS/);
   assert.match(form, /<ParcelamentoNativeSelect/);
-  assert.match(form, /<form onSubmit=\{handleSubmit\} className="space-y-4"/);
+  assert.match(form, /<form onSubmit=\{handleSubmit\} noValidate className="space-y-4"/);
   assert.doesNotMatch(form, /border-blue-100 bg-blue-50/);
   assert.match(nativeSelect, /ChevronDown/);
   assert.match(nativeSelect, /appearance-none pr-9/);
@@ -804,12 +802,9 @@ runTest("parcelamento panorama form keeps responsible select without create help
   );
   const hooksIndex = readWorkspaceFile("src/modules/parcelamento/hooks/index.ts");
 
-  assert.match(hook, /listAdminUsers\("active"\)/);
-  assert.match(hook, /resolveDepartmentModuleKey/);
-  assert.match(hook, /"parcelamento"/);
-  assert.match(hook, /isAdminPermission\(user\.permission\)/);
-  assert.match(hook, /user\.type === "owner"/);
-  assert.match(hook, /user\.type === "admin"/);
+  // Catálogo enxuto do RH em vez de paginar a tabela inteira de usuários (#1349).
+  assert.match(hook, /useAssignableUsers\(\{\s*module: "parcelamento"/);
+  assert.doesNotMatch(hook, /listAdminUsers/);
   assert.match(hooksIndex, /useParcelamentoResponsibleUsers/);
   assert.match(section, /useParcelamentoResponsibleUsers/);
   assert.match(section, /useParcelamentoResponsibleUsers\(\{\s*enabled: canEdit && Boolean\(selectedClient\),\s*\}\)/);
@@ -849,6 +844,83 @@ runTest("parcelamento date defaults avoid timezone drift", () => {
   assert.match(competencyForm, /getCurrentParcelamentoMonth\(\)/);
   assert.match(panoramaForm, /getCurrentParcelamentoMonth\(\)/);
   assert.match(panoramasSection, /getCurrentParcelamentoMonth\(\)/);
+});
+
+runTest("parcelamento dashboard KPIs come from the backend summary, not the page (#1348)", () => {
+  const dashboard = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoDashboard.tsx",
+  );
+
+  assert.match(dashboard, /installmentsPage\?\.summary/);
+  assert.match(dashboard, /summary\?\.active/);
+  assert.match(dashboard, /summary\?\.overdue/);
+  assert.match(dashboard, /summary\?\.progress_percent/);
+  assert.doesNotMatch(dashboard, /na página|nesta página/);
+  assert.doesNotMatch(dashboard, /getAverageProgress|installmentItems\.filter/);
+});
+
+runTest("parcelamento installment cards show the client name and document (#1348)", () => {
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+
+  assert.match(section, /installment\.client\?\.name/);
+  assert.match(section, /formatCPF_CNPJ\(installment\.client\.cpf_cnpj\)/);
+});
+
+runTest("parcelamento installment form marks required fields and uses filter selects (#1349)", () => {
+  const form = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentForm.tsx",
+  );
+  const section = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentsSection.tsx",
+  );
+
+  assert.match(form, /<form[^>]*noValidate/);
+  assert.match(form, /aria-hidden="true">\*/);
+  assert.match(form, /label="Valor total do parcelamento"/);
+  assert.match(form, /label="Valor da 1ª parcela"/);
+  assert.match(form, /label="Valor da parcela atual"/);
+  assert.doesNotMatch(form, /label="Primeira parcela"|label="Parcela atual"/);
+  assert.match(form, /consolidated_total_amount/);
+  for (const source of [form, section]) {
+    assert.match(source, /INSTALLMENT_TYPE_OPTIONS/);
+    assert.match(source, /INSTALLMENT_JURISDICTION_OPTIONS/);
+  }
+  assert.doesNotMatch(section, /const INSTALLMENT_TYPE_OPTIONS =/);
+});
+
+runTest("parcelamento client selector focuses search and lists every active client (#1349)", () => {
+  const selector = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoClientSelector.tsx",
+  );
+
+  assert.match(selector, /legacyIntegrationStatusFilter: false/);
+  assert.match(selector, /autoFocus/);
+  assert.match(selector, /Só clientes ativos aparecem aqui\./);
+});
+
+runTest("parcelamento installment mutations refetch the list once (#1349)", () => {
+  const hooks = readWorkspaceFile("src/modules/parcelamento/hooks/useParcelamentoInstallments.ts");
+
+  assert.equal((hooks.match(/invalidateQueries/g) ?? []).length, 2);
+});
+
+runTest("parcelamento review fixes: named missing fields, no raw ids, dashboard-only queries (#1349)", () => {
+  const form = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoInstallmentForm.tsx",
+  );
+  const panoramas = readWorkspaceFile(
+    "src/modules/parcelamento/components/ParcelamentoPanoramasSection.tsx",
+  );
+  const shell = readWorkspaceFile("src/modules/parcelamento/components/ParcelamentoShell.tsx");
+
+  assert.equal((form.match(/getMissingRequiredFields\(formState\)/g) ?? []).length, 2);
+  assert.match(form, /Preencha os campos obrigatórios: \$\{missingFields\.join/);
+  assert.doesNotMatch(panoramas, /responsibleUserNames\.get\(value\) \?\? value/);
+  assert.match(shell, /activeTab === "dashboard"/);
+  assert.match(shell, /useParcelamentoInstallments\(dashboardFilters, \{\s*enabled: isDashboardActive,\s*\}\)/);
+  assert.match(shell, /\.\.\.filters, page_size: 1/);
 });
 
 console.log("parcelamento frontend tests passed");

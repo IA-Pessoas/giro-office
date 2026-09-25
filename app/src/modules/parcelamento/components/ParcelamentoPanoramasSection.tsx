@@ -69,7 +69,8 @@ function formatResponsible(value: string | null, responsibleUserNames: Map<strin
     return "Sem responsável";
   }
 
-  return responsibleUserNames.get(value) ?? value;
+  // Responsável fora do catálogo (ex.: owner sem permissão no módulo) não vira UUID na tela.
+  return responsibleUserNames.get(value) ?? "Responsável atual";
 }
 
 function GenerateResultSummary({ result }: { result: ParcelamentoPanoramaGenerateResult }) {

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { Dialog, PaginationControls } from "@shared/components";
+import { formatCPF_CNPJ } from "@shared/utils/formatters";
 
 import {
   useCreateParcelamentoInstallmentMutation,
@@ -31,6 +32,8 @@ import {
 import { ParcelamentoNativeSelect } from "./ParcelamentoNativeSelect";
 import { ParcelamentoStateBox } from "./ParcelamentoStateBox";
 import {
+  INSTALLMENT_JURISDICTION_OPTIONS,
+  INSTALLMENT_TYPE_OPTIONS,
   parcelamentoPrimaryButtonClassName,
   parcelamentoSecondaryButtonClassName,
   parcelamentoTextFieldClassName,
@@ -46,8 +49,6 @@ interface ParcelamentoInstallmentsSectionProps {
 
 const FIRST_PAGE = 1;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
-const INSTALLMENT_TYPE_OPTIONS = ["Federal", "Estadual", "Municipal", "Simplificado", "SIMPLES"];
-const INSTALLMENT_JURISDICTION_OPTIONS = ["PGFN", "RFB", "Federal", "Estadual", "Municipal"];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -115,11 +116,8 @@ export function ParcelamentoInstallmentsSection({
   const installmentsQuery = useParcelamentoInstallments(listFilters, {
     enabled: true,
   });
-  const createMutation = useCreateParcelamentoInstallmentMutation(listFilters);
-  const updateMutation = useUpdateParcelamentoInstallmentMutation(
-    editingInstallment?.id ?? "",
-    listFilters,
-  );
+  const createMutation = useCreateParcelamentoInstallmentMutation();
+  const updateMutation = useUpdateParcelamentoInstallmentMutation(editingInstallment?.id ?? "");
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const installments = installmentsQuery.data?.items ?? [];
   const total = installmentsQuery.data?.total ?? installments.length;
@@ -412,7 +410,15 @@ export function ParcelamentoInstallmentsSection({
               >
                 <div className="min-w-0">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {installment.client?.name || "Cliente não identificado"}
+                      {installment.client?.cpf_cnpj ? (
+                        <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                          {formatCPF_CNPJ(installment.client.cpf_cnpj)}
+                        </span>
+                      ) : null}
+                    </p>
+                    <h3 className="text-sm text-gray-700 dark:text-gray-300">
                       {installment.type} - {installment.jurisdiction}
                     </h3>
                     <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">

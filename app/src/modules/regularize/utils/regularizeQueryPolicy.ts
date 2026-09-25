@@ -13,7 +13,6 @@ export interface RegularizeQueryPolicy {
   clientPfs: boolean;
   sitePasswords: boolean;
   municipalTaxes: boolean;
-  processes: boolean;
   licenses: boolean;
   partners: boolean;
   passwords: boolean;
@@ -29,7 +28,6 @@ export function getRegularizeQueryPolicy(
       activeTab === "pf" || activeTab === "partners" || activeTab === "processes",
     sitePasswords: activeTab === "sites" || activeTab === "passwords",
     municipalTaxes: activeTab === "taxes",
-    processes: activeTab === "processes",
     licenses: activeTab === "licenses",
     partners: activeTab === "partners",
     passwords: activeTab === "passwords",

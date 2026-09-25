@@ -71,6 +71,10 @@ import {
   GuidanceService,
   type GuidanceService as GuidanceServiceType,
 } from "@workspace/regularize-service/src/services/guidanceService.js";
+import {
+  licenseListClientSelect,
+  withLicenseClientName,
+} from "@workspace/regularize-service/src/services/licenseService.js";
 import { MunicipalTaxesService } from "@workspace/regularize-service/src/services/municipalTaxesService.js";
 import { PartnersService } from "@workspace/regularize-service/src/services/partnersService.js";
 import { PasswordService } from "@workspace/regularize-service/src/services/passwordService.js";
@@ -368,14 +372,16 @@ function localService(
       const args = {
         where,
         orderBy: { entry_date: "desc" },
-        select,
+        select: { ...select, client: licenseListClientSelect },
         ...(paginated ? { skip: (page - 1) * limit, take: limit } : {}),
       };
       const rows = await prisma.license.findMany(args);
-      if (!paginated) return rows.map(publicLicense);
+      const toListItem = (row: LicenseRow) =>
+        withLicenseClientName(publicLicense(row), organizationId);
+      if (!paginated) return rows.map(toListItem);
       const total = await prisma.license.count({ where });
       return {
-        data: rows.map(publicLicense),
+        data: rows.map(toListItem),
         total,
         page,
         limit,

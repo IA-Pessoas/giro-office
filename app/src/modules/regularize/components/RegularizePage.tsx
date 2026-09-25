@@ -30,7 +30,7 @@ import {
   ClientPickerModal,
   ClientSelectionField,
   type ClientPickerOption,
-  useClients,
+  useClient,
 } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { PaginationControls } from "@shared/components";
@@ -139,6 +139,7 @@ import type {
 } from "../types";
 import { getRegularizeRequestId } from "../utils/regularizeApiError";
 import {
+  formatSiteSphere,
   getRegularizeErrorMessage,
   getRegularizeMutationErrorMessage,
 } from "../utils/regularizeForm";
@@ -1159,12 +1160,6 @@ export function RegularizePage() {
     },
     { enabled: queryPolicy.clientPfs },
   );
-  const clientQuery = useClients({
-    status: "Ativo",
-    legacyIntegrationStatusFilter: false,
-    page: 1,
-    limit: 50,
-  });
   const siteQuery = useRegularizeSitePasswords(
     { status: true },
     { enabled: queryPolicy.sitePasswords },
@@ -1182,7 +1177,7 @@ export function RegularizePage() {
   );
   const processQuery = useRegularizeProcesses(
     { status: "Todos" },
-    { enabled: queryPolicy.processes },
+    { enabled: activeForm?.type === "guidance" },
   );
   const licensePageQuery = usePaginatedRegularizeLicenses(
     {
@@ -1239,15 +1234,6 @@ export function RegularizePage() {
   const licenseProtocolAccessMutation = useRegularizeLicenseProtocolAccessMutation();
 
   const visiblePfRows = isPfSearchPending ? [] : pfPageQuery.data?.data ?? [];
-  const pfNameById = new Map(
-    (pfPageQuery.data?.data ?? []).map((client) => [client.id, client.name]),
-  );
-  const pjNameById = new Map(
-    (clientQuery.data?.items ?? []).map((client) => [
-      client.id,
-      client.name || client.company_name,
-    ]),
-  );
   const firstClientPfId = visiblePfRows[0]?.id;
   const visibleProcessRows = isProcessSearchPending ? [] : processPageQuery.data?.data ?? [];
   const automaticProcessId = visibleProcessRows[0]?.id;
@@ -1255,8 +1241,16 @@ export function RegularizePage() {
   const currentClientPfId = selectedClientPfId ?? firstClientPfId;
   const currentProcessId = selectedProcessId ?? automaticProcessId;
 
+  // Salvar senha de outro cliente limpa o objeto do topo e mantém só o id; o nome vem do cadastro.
+  const headerClientDetailQuery = useClient(
+    activeTab === "partners" && !selectedCredentialClient ? currentCredentialClientId : undefined,
+  );
+  const headerClientName =
+    selectedCredentialClient?.name ||
+    headerClientDetailQuery.data?.company_name ||
+    headerClientDetailQuery.data?.name;
   const partnerQuery = useRegularizePartners(
-    currentClientPfId ? { type: "pf", client_id: currentClientPfId } : undefined,
+    currentCredentialClientId ? { type: "pj", client_id: currentCredentialClientId } : undefined,
     { enabled: queryPolicy.partners },
   );
   const credentialQuery = useRegularizePasswords(
@@ -1371,7 +1365,7 @@ export function RegularizePage() {
       (siteQuery.data ?? []).map((site) => ({
         id: site.id,
         label: site.name,
-        description: site.sphere,
+        description: formatSiteSphere(site.sphere),
       })),
     [siteQuery.data],
   );
@@ -1461,7 +1455,7 @@ export function RegularizePage() {
     if (queryPolicy.clientPfs) refreshes.push(pfPageQuery.refetch());
     if (queryPolicy.sitePasswords) refreshes.push(siteQuery.refetch());
     if (queryPolicy.municipalTaxes) refreshes.push(taxQuery.refetch());
-    if (queryPolicy.processes) refreshes.push(processQuery.refetch());
+    if (activeTab === "processes") refreshes.push(processPageQuery.refetch());
     if (activeTab === "licenses") refreshes.push(licensePageQuery.refetch());
     if (queryPolicy.partners) refreshes.push(partnerQuery.refetch());
     if (queryPolicy.passwords) refreshes.push(credentialQuery.refetch());
@@ -1791,12 +1785,10 @@ export function RegularizePage() {
             : currentForm,
         );
       }
-      const message = getRegularizeMutationErrorMessage(
-        error,
-        savedLicenseId
-          ? "A licença foi salva, mas não foi possível armazenar o protocolo."
-          : "Não foi possível salvar a licença.",
-      );
+      const message =
+        savedLicenseId && protocolFile
+          ? `A licença foi salva, mas não foi possível armazenar o protocolo. ${getRegularizeMutationErrorMessage(error, "Tente novamente.")}`
+          : getRegularizeMutationErrorMessage(error, "Não foi possível salvar a licença.");
       toast.error(message);
       throw new Error(message);
     }
@@ -2257,10 +2249,13 @@ export function RegularizePage() {
           >
             {(licenseRows) => (
               <div>
-                <DataTable headers={["Licença", "Protocolo", "Contato", "Status", "Vencimento", ""]}>
+                <DataTable
+                  headers={["Licença", "Cliente", "Protocolo", "Contato", "Status", "Vencimento", ""]}
+                >
                   {licenseRows.map((item: RegularizeLicenseListItem) => (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.type_license)}</td>
+                      <td className="px-4 py-3">{formatText(item.client_name)}</td>
                       <td className="px-4 py-3">{formatText(item.protocol)}</td>
                       <td className="px-4 py-3">{formatText(item.contact)}</td>
                       <td className="px-4 py-3">
@@ -2463,16 +2458,23 @@ export function RegularizePage() {
             }
           />
 
-          <QueryStatePanel query={partnerQuery} emptyTitle="Nenhum sócio encontrado.">
+          <QueryStatePanel
+            query={partnerQuery}
+            emptyTitle={
+              currentCredentialClientId
+                ? "Nenhum sócio encontrado."
+                : "Selecione um cliente no topo para ver os sócios."
+            }
+          >
             {(partnerRows) => (
               <DataTable headers={["PF", "PJ", "Participação", "Entrada", "Saída", ""]}>
                 {partnerRows.map((item: RegularizePartner) => (
                   <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                     <td className="px-4 py-3 font-medium">
-                      {pfNameById.get(item.pf_id) || "PF não identificado"}
+                      {item.clientPF?.name || "PF não identificado"}
                     </td>
                     <td className="px-4 py-3">
-                      {pjNameById.get(item.pj_id) || "PJ não identificado"}
+                      {headerClientName || "PJ não identificado"}
                     </td>
                     <td className="px-4 py-3">{formatText(item.part)}</td>
                     <td className="px-4 py-3">{formatDate(item.entry)}</td>
@@ -2537,7 +2539,7 @@ export function RegularizePage() {
                     {credentialRows.map((item: RegularizePasswordListItem) => (
                       <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                         <td className="px-4 py-3 font-medium">{formatText(item.site?.name)}</td>
-                        <td className="px-4 py-3">{formatText(item.site?.sphere)}</td>
+                        <td className="px-4 py-3">{formatSiteSphere(item.site?.sphere)}</td>
                         <td className="px-4 py-3">{formatText(item.notes)}</td>
                         <td className="px-4 py-3">
                           <MaskedValue />
@@ -2657,7 +2659,7 @@ export function RegularizePage() {
                     {siteRows.map((item: RegularizeSitePasswordListItem) => (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                      <td className="px-4 py-3">{formatText(item.sphere)}</td>
+                      <td className="px-4 py-3">{formatSiteSphere(item.sphere)}</td>
                       <td className="px-4 py-3">{formatText(item.user)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />

@@ -30,6 +30,7 @@ const OPERATIONAL_USER_CATALOG_MODULES = [
   "ti",
   "integracao",
   "triagem",
+  "parcelamento",
 ] as const;
 const OPERATIONAL_USER_CATALOG_MIN_PERMISSION = RH_SELF_SERVICE_PERMISSION;
 

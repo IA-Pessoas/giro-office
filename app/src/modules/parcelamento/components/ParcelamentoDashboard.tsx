@@ -30,20 +30,6 @@ function formatCount(value: number, isLoading: boolean) {
   return isLoading ? "..." : value.toLocaleString("pt-BR");
 }
 
-function getAverageProgress(items: ParcelamentoInstallment[]) {
-  const progressItems = items.filter((item) => item.agreed_installments_count > 0);
-
-  if (progressItems.length === 0) {
-    return 0;
-  }
-
-  const totalProgress = progressItems.reduce((sum, item) => {
-    return sum + item.paid_installments_count / item.agreed_installments_count;
-  }, 0);
-
-  return Math.round((totalProgress / progressItems.length) * 100);
-}
-
 function MetricTile({
   icon: Icon,
   label,
@@ -148,17 +134,12 @@ export function ParcelamentoDashboard({
   isError,
   onSelectTab,
 }: ParcelamentoDashboardProps) {
-  const installmentItems = installmentsPage?.items ?? [];
-  const panoramaItems = panoramasPage?.items ?? [];
-  const activeInstallments = installmentItems.filter((item) => item.status === "Ativo").length;
-  const overdueInstallments = installmentItems.filter(
-    (item) => item.overdue_installments_count > 0,
-  ).length;
-  const averageProgress = getAverageProgress(installmentItems);
+  const summary = installmentsPage?.summary;
+  const activeInstallments = summary?.active ?? 0;
+  const overdueInstallments = summary?.overdue ?? 0;
   const totalInstallments = formatCount(installmentsPage?.total ?? 0, isLoading);
   const totalPanoramas = formatCount(panoramasPage?.total ?? 0, isLoading);
-  const pagePanoramas = formatCount(panoramaItems.length, isLoading);
-  const progressValue = isLoading ? "..." : `${averageProgress}%`;
+  const progressValue = isLoading ? "..." : `${summary?.progress_percent ?? 0}%`;
 
   if (isError) {
     return (
@@ -184,21 +165,26 @@ export function ParcelamentoDashboard({
           icon={CheckCircle2}
           label="Ativos"
           value={formatCount(activeInstallments, isLoading)}
-          supporting="Parcelamentos ativos na página."
+          supporting="Parcelamentos ativos no filtro atual."
         />
         <MetricTile
           icon={Clock3}
           label="Em atraso"
           value={formatCount(overdueInstallments, isLoading)}
-          supporting="Com parcelas vencidas na página."
+          supporting="Com parcelas vencidas no filtro atual."
         />
         <MetricTile
           icon={WalletCards}
           label="Panoramas"
           value={totalPanoramas}
-          supporting={`${pagePanoramas} nesta página.`}
+          supporting="Panoramas no filtro atual."
         />
-        <MetricTile icon={BarChart3} label="Progresso" value={progressValue} />
+        <MetricTile
+          icon={BarChart3}
+          label="Progresso"
+          value={progressValue}
+          supporting="Parcelas pagas sobre acordadas."
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
@@ -231,8 +217,7 @@ export function ParcelamentoDashboard({
         >
           <div className="space-y-3">
             <DashboardSummaryRow icon={WalletCards} label="Total" value={totalPanoramas} />
-            <DashboardSummaryRow icon={BarChart3} label="Página atual" value={pagePanoramas} />
-            <DashboardSummaryRow icon={CheckCircle2} label="Progresso médio" value={progressValue} />
+            <DashboardSummaryRow icon={CheckCircle2} label="Progresso" value={progressValue} />
           </div>
         </DashboardSectionCard>
       </div>

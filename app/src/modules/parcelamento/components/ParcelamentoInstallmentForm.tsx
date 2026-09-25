@@ -11,6 +11,8 @@ import type {
 import { formatBrlAmount, formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
 import {
+  INSTALLMENT_JURISDICTION_OPTIONS,
+  INSTALLMENT_TYPE_OPTIONS,
   parcelamentoCheckboxCardClassName,
   parcelamentoPrimaryButtonClassName,
   parcelamentoSecondaryButtonClassName,
@@ -37,6 +39,7 @@ interface ParcelamentoInstallmentFormState {
   legal_nature: string;
   jurisdiction: string;
   is_automatic_debit: boolean;
+  consolidated_total_amount: string;
   first_installment_amount: string;
   current_month_installment_amount: string;
   agreed_installments_count: string;
@@ -61,6 +64,7 @@ const emptyInstallmentFormState: ParcelamentoInstallmentFormState = {
   legal_nature: "",
   jurisdiction: "",
   is_automatic_debit: false,
+  consolidated_total_amount: "",
   first_installment_amount: "",
   current_month_installment_amount: "",
   agreed_installments_count: "",
@@ -88,6 +92,7 @@ function buildFormState(
     legal_nature: installment.legal_nature,
     jurisdiction: installment.jurisdiction,
     is_automatic_debit: installment.is_automatic_debit,
+    consolidated_total_amount: formatBrlAmount(installment.consolidated_total_amount),
     first_installment_amount: formatBrlAmount(installment.first_installment_amount),
     current_month_installment_amount: formatBrlAmount(installment.current_month_installment_amount),
     agreed_installments_count: String(installment.agreed_installments_count),
@@ -99,8 +104,29 @@ function buildFormState(
   };
 }
 
+const REQUIRED_FIELD_LABELS: Array<[keyof ParcelamentoInstallmentFormState, string]> = [
+  ["type", "Tipo"],
+  ["legal_nature", "Natureza jurídica"],
+  ["jurisdiction", "Jurisdição"],
+  ["consolidated_total_amount", "Valor total do parcelamento"],
+  ["first_installment_amount", "Valor da 1ª parcela"],
+  ["current_month_installment_amount", "Valor da parcela atual"],
+  ["agreed_installments_count", "Quantidade de parcelas"],
+];
+
+function getMissingRequiredFields(formState: ParcelamentoInstallmentFormState) {
+  return REQUIRED_FIELD_LABELS.filter(([field]) => !String(formState[field]).trim()).map(
+    ([, label]) => label,
+  );
+}
+
 function readRequiredNumber(value: string) {
   return value.trim().length > 0 ? Number(value) : 0;
+}
+
+// Campos de moeda usam a máscara BRL; Number("R$ 1.234,56") seria NaN.
+function readChangedBrl(value: string) {
+  return parseBrlInput(value) ?? Number.NaN;
 }
 
 function readChangedNumber(value: string) {
@@ -149,21 +175,25 @@ export function ParcelamentoInstallmentForm({
       return null;
     }
 
-    const firstAmount = parseBrlInput(formState.first_installment_amount) ?? 0;
-    const currentAmount = parseBrlInput(formState.current_month_installment_amount) ?? 0;
-    const installmentsCount = Math.trunc(readRequiredNumber(formState.agreed_installments_count));
-
-    if (!formState.type.trim() || !formState.legal_nature.trim() || !formState.jurisdiction.trim()) {
-      setFormError("Preencha tipo, natureza jurídica e jurisdição.");
+    const missingFields = getMissingRequiredFields(formState);
+    if (missingFields.length > 0) {
+      setFormError(`Preencha os campos obrigatórios: ${missingFields.join(", ")}.`);
       return null;
     }
 
+    const totalAmount = parseBrlInput(formState.consolidated_total_amount) ?? Number.NaN;
+    const firstAmount = parseBrlInput(formState.first_installment_amount) ?? Number.NaN;
+    const currentAmount = parseBrlInput(formState.current_month_installment_amount) ?? Number.NaN;
+    const installmentsCount = Math.trunc(readRequiredNumber(formState.agreed_installments_count));
+
+
     if (
+      isInvalidNonNegativeNumber(totalAmount) ||
       isInvalidNonNegativeNumber(firstAmount) ||
       isInvalidNonNegativeNumber(currentAmount) ||
       installmentsCount < 1
     ) {
-      setFormError("Revise os campos numéricos.");
+      setFormError("Valores não podem ser negativos e a quantidade de parcelas deve ser ao menos 1.");
       return null;
     }
 
@@ -174,6 +204,7 @@ export function ParcelamentoInstallmentForm({
       legal_nature: formState.legal_nature.trim(),
       jurisdiction: formState.jurisdiction.trim(),
       is_automatic_debit: formState.is_automatic_debit,
+      consolidated_total_amount: totalAmount,
       first_installment_amount: firstAmount,
       current_month_installment_amount: currentAmount,
       agreed_installments_count: installmentsCount,
@@ -182,6 +213,12 @@ export function ParcelamentoInstallmentForm({
   }
 
   function buildUpdatePayload(): PatchParcelamentoInstallmentPayload | null {
+    const missingFields = getMissingRequiredFields(formState);
+    if (missingFields.length > 0) {
+      setFormError(`Preencha os campos obrigatórios: ${missingFields.join(", ")}.`);
+      return null;
+    }
+
     const patch: PatchParcelamentoInstallmentPayload = {};
 
     if (formState.agreement_number !== initialFormState.agreement_number) {
@@ -204,15 +241,19 @@ export function ParcelamentoInstallmentForm({
       patch.is_automatic_debit = formState.is_automatic_debit;
     }
 
+    if (formState.consolidated_total_amount !== initialFormState.consolidated_total_amount) {
+      patch.consolidated_total_amount = readChangedBrl(formState.consolidated_total_amount);
+    }
+
     if (formState.first_installment_amount !== initialFormState.first_installment_amount) {
-      patch.first_installment_amount = readChangedNumber(formState.first_installment_amount);
+      patch.first_installment_amount = readChangedBrl(formState.first_installment_amount);
     }
 
     if (
       formState.current_month_installment_amount !==
       initialFormState.current_month_installment_amount
     ) {
-      patch.current_month_installment_amount = readChangedNumber(
+      patch.current_month_installment_amount = readChangedBrl(
         formState.current_month_installment_amount,
       );
     }
@@ -244,6 +285,7 @@ export function ParcelamentoInstallmentForm({
     }
 
     const numericValues = [
+      patch.consolidated_total_amount,
       patch.first_installment_amount,
       patch.current_month_installment_amount,
       patch.agreed_installments_count,
@@ -256,7 +298,7 @@ export function ParcelamentoInstallmentForm({
       (typeof patch.agreed_installments_count === "number" &&
         patch.agreed_installments_count < 1)
     ) {
-      setFormError("Revise os campos numéricos.");
+      setFormError("Valores não podem ser negativos e a quantidade de parcelas deve ser ao menos 1.");
       return null;
     }
 
@@ -295,7 +337,8 @@ export function ParcelamentoInstallmentForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    // noValidate: a validação é nossa, em português, em vez da nativa do navegador (#1349).
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <p className="text-sm text-gray-600 dark:text-gray-400">
         {selectedClient?.name ?? "Selecione um cliente antes de criar."}
       </p>
@@ -307,12 +350,12 @@ export function ParcelamentoInstallmentForm({
           onChange={(value) => handleFieldChange("agreement_number", value)}
           disabled={isDisabled}
         />
-        <TextField
+        <SelectField
           label="Tipo"
+          options={INSTALLMENT_TYPE_OPTIONS}
           value={formState.type}
           onChange={(value) => handleFieldChange("type", value)}
           disabled={isDisabled}
-          required
         />
         <TextField
           label="Natureza jurídica"
@@ -321,15 +364,24 @@ export function ParcelamentoInstallmentForm({
           disabled={isDisabled}
           required
         />
-        <TextField
+        <SelectField
           label="Jurisdição"
+          options={INSTALLMENT_JURISDICTION_OPTIONS}
           value={formState.jurisdiction}
           onChange={(value) => handleFieldChange("jurisdiction", value)}
+          disabled={isDisabled}
+        />
+        <TextField
+          label="Valor total do parcelamento"
+          inputMode="decimal"
+          placeholder="R$ 0,00"
+          value={formState.consolidated_total_amount}
+          onChange={(value) => handleFieldChange("consolidated_total_amount", formatBrlInput(value))}
           disabled={isDisabled}
           required
         />
         <TextField
-          label="Primeira parcela"
+          label="Valor da 1ª parcela"
           inputMode="decimal"
           placeholder="R$ 0,00"
           value={formState.first_installment_amount}
@@ -338,7 +390,7 @@ export function ParcelamentoInstallmentForm({
           required
         />
         <TextField
-          label="Parcela atual"
+          label="Valor da parcela atual"
           inputMode="decimal"
           placeholder="R$ 0,00"
           value={formState.current_month_installment_amount}
@@ -347,7 +399,7 @@ export function ParcelamentoInstallmentForm({
           required
         />
         <TextField
-          label="Quantidade acordada"
+          label="Quantidade de parcelas"
           type="number"
           min="1"
           step="1"
@@ -439,6 +491,53 @@ export function ParcelamentoInstallmentForm({
   );
 }
 
+function FieldLabel({ label, required }: { label: string; required: boolean }) {
+  return (
+    <span>
+      {label}
+      {required ? (
+        <span className="ml-0.5 text-red-500" aria-hidden="true">*</span>
+      ) : null}
+    </span>
+  );
+}
+
+function SelectField({
+  disabled,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  disabled: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  options: string[];
+  value: string;
+}) {
+  // Valor legado fora da lista continua selecionável na edição.
+  const choices = value && !options.includes(value) ? [...options, value] : options;
+
+  return (
+    <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
+      <FieldLabel label={label} required />
+      <ParcelamentoNativeSelect
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        aria-required="true"
+      >
+        <option value="">Selecione</option>
+        {choices.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </ParcelamentoNativeSelect>
+    </label>
+  );
+}
+
 function TextField({
   disabled,
   inputMode,
@@ -464,14 +563,14 @@ function TextField({
 }) {
   return (
     <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-      {label}
+      <FieldLabel label={label} required={required} />
       <input
         type={type}
         inputMode={inputMode}
         placeholder={placeholder}
         min={min}
         step={step}
-        required={required}
+        aria-required={required || undefined}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
