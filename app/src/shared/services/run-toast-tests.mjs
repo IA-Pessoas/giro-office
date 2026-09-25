@@ -72,9 +72,31 @@ runTest("success dismisses previous errors", () => {
 runTest("the 5xx toast with requestId wins over the caller error, so one failure shows one toast", () => {
   const { adapter, active } = createFakeAdapter();
   const toast = createAppToast(adapter);
-  adapter.error("genérico", { toastId: SERVER_ERROR_TOAST_ID });
+  toast.error("genérico", { toastId: SERVER_ERROR_TOAST_ID });
   toast.error("Não foi possível salvar o cliente.");
   assert.deepEqual([...active], [SERVER_ERROR_TOAST_ID]);
+});
+
+runTest("only errors right after the 5xx toast are suppressed; later unrelated errors show", () => {
+  const { adapter, active } = createFakeAdapter();
+  let now = 1_000;
+  const toast = createAppToast(adapter, () => now);
+  toast.error("genérico", { toastId: SERVER_ERROR_TOAST_ID });
+  now += 200;
+  toast.error("Erro do chamador que falhou.");
+  assert.deepEqual([...active], [SERVER_ERROR_TOAST_ID]);
+  now += 3_000;
+  toast.error("Preencha o nome.");
+  assert.deepEqual([...active].sort(), ["error:Preencha o nome.", SERVER_ERROR_TOAST_ID].sort());
+});
+
+runTest("success does not dismiss the 5xx toast with the support code", () => {
+  const { adapter, active } = createFakeAdapter();
+  const toast = createAppToast(adapter);
+  toast.error("genérico", { toastId: SERVER_ERROR_TOAST_ID });
+  toast.error("Erro de validação.");
+  toast.success("Salvo.");
+  assert.equal(active.has(SERVER_ERROR_TOAST_ID), true);
 });
 
 runTest("5xx toast shows the backend message and the requestId for support", () => {
