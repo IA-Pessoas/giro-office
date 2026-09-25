@@ -35,6 +35,16 @@ export function normalizeDigits(value: string | null | undefined): string {
   return value?.replace(/\D/g, "") ?? "";
 }
 
+/** Máscara HH:MM: o `<input type="time">` segue o locale do navegador e vira 12h em en-US. */
+export function formatTimeInput(value: string): string {
+  const digits = normalizeDigits(value).slice(0, 4);
+  return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
+}
+
+export function isValidTimeInput(value: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
 export function formatCpfInput(value: string): string {
   const digits = normalizeDigits(value).slice(0, 11);
 

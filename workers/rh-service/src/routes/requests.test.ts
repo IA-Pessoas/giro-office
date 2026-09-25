@@ -21,6 +21,7 @@ function snapshot(overrides: Record<string, unknown> = {}) {
     description: "Pedido",
     requester_user_id: TEST_USER_ID,
     assigned_to_user_id: OTHER_USER,
+    assigned_to: { id: OTHER_USER, name: "Responsável", status: "active" },
     category_id: CATEGORY_ID,
     urgency: "Low",
     status: "New",
@@ -151,6 +152,23 @@ describe("/rh/requests", () => {
     );
   });
 
+  it("refuses to resolve a request whose assignee no longer exists", async () => {
+    const fake = db(snapshot({ status: "In_Progress", assigned_to: null }));
+    const response = await call(testApp(fake), "PUT", "/rh/requests", {
+      body: { id: REQUEST_ID, status: "Resolved" },
+    });
+    expect(response.status).toBe(409);
+    expect(fake.rhRequest.update).not.toHaveBeenCalled();
+  });
+
+  it("resolves a request once a valid assignee is set in the same update", async () => {
+    const fake = db(snapshot({ status: "In_Progress", assigned_to: null }));
+    const response = await call(testApp(fake), "PUT", "/rh/requests", {
+      body: { id: REQUEST_ID, status: "Resolved", assigned_to_user_id: OTHER_USER },
+    });
+    expect(response.status).toBe(200);
+  });
+
   it("rejects updates below management permission", async () => {
     const response = await call(testApp(db()), "PUT", "/rh/requests", {
       permission: 2,
@@ -204,6 +222,15 @@ describe("/rh/messages", () => {
       body: { request_id: REQUEST_ID, message: "ok", type: "Solution" },
     });
     expect(response.status).toBe(403);
+    expect(fake.rhMessage.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a solution while the request has no existing assignee", async () => {
+    const fake = db(snapshot({ status: "In_Progress", assigned_to: null }));
+    const response = await call(testApp(fake), "POST", "/rh/messages", {
+      body: { request_id: REQUEST_ID, message: "ok", type: "Solution" },
+    });
+    expect(response.status).toBe(409);
     expect(fake.rhMessage.create).not.toHaveBeenCalled();
   });
 

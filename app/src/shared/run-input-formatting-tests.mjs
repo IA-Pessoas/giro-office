@@ -8,7 +8,9 @@ import {
   formatCnpjInput,
   formatCpfCnpjInput,
   formatCpfInput,
+  formatTimeInput,
   isValidCnpj,
+  isValidTimeInput,
   normalizeDigits,
   parseBrlDecimalInput,
   parseBrlInput,
@@ -105,3 +107,13 @@ assert.equal(formatBrlDecimalInput("100"), "R$ 100,00");
 assert.equal(formatBrlDecimalInput("1234,5"), "R$ 1.234,50");
 assert.equal(formatBrlDecimalInput(formatBrlDecimalInput("100")), "R$ 100,00");
 assert.equal(formatBrlDecimalInput(""), "");
+
+// #1359: horário 24h digitado, sem depender do locale do navegador.
+assert.equal(formatTimeInput("0800"), "08:00");
+assert.equal(formatTimeInput("8"), "8");
+assert.equal(formatTimeInput("173"), "17:3");
+assert.equal(formatTimeInput("17:30:15"), "17:30");
+assert.equal(isValidTimeInput("08:00"), true);
+assert.equal(isValidTimeInput("23:59"), true);
+assert.equal(isValidTimeInput("24:00"), false);
+assert.equal(isValidTimeInput("8:00"), false);

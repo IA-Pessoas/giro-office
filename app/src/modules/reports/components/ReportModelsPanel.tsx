@@ -154,7 +154,7 @@ export function ReportModelsPanel({ canManageShared, onOpenModel }: { canManageS
             {personalQuery.data?.length ? <ul className="grid gap-3 lg:grid-cols-2">{personalQuery.data.map((model) => <ModelCard key={model.id} model={model} onOpen={() => void openModel(model)} opening={openingId === model.id} />)}</ul> : <p className="text-sm text-gray-500 dark:text-slate-500">Você ainda não possui modelos pessoais.</p>}
           </div>
           <div>
-            <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Modelos compartilhados</h3>{isAdmin ? <span className="text-xs text-blue-600 dark:text-blue-300">Administração habilitada</span> : null}</div>
+            <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Modelos compartilhados</h3>{isAdmin ? <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-slate-800 dark:text-slate-300">Administração habilitada</span> : null}</div>
             {sharedQuery.data?.length ? <ul className="grid gap-3 lg:grid-cols-2">{sharedQuery.data.map((model) => <ModelCard key={model.id} model={model} shared canManageShared={isAdmin} onEdit={() => setEditing(model)} onOpen={() => void openModel(model)} opening={openingId === model.id} />)}</ul> : <p className="text-sm text-gray-500 dark:text-slate-500">Nenhum modelo compartilhado disponível.</p>}
           </div>
         </div>

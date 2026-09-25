@@ -82,6 +82,9 @@ export interface RhRequestListPage {
   hasMore: boolean;
 }
 
+export const RH_RESOLVE_WITHOUT_ASSIGNEE_MESSAGE =
+  "Atribua um responsável antes de resolver a solicitação.";
+
 class RequestService {
   private readonly rhNotificationService: RhNotificationService;
 
@@ -270,6 +273,12 @@ class RequestService {
           }
         }
         data.status = input.status;
+      }
+
+      const isFinishing =
+        data.status !== existing.status && (data.status === "Resolved" || data.status === "Closed");
+      if (isFinishing && data.assigned_to_user_id === undefined && !existing.assigned_to) {
+        throw new ServiceError(409, RH_RESOLVE_WITHOUT_ASSIGNEE_MESSAGE);
       }
 
       const assigneeAfterUpdate = assertNonEmptyString(
