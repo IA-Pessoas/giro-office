@@ -96,9 +96,11 @@ export function createReportsApp({
     definitionService,
     env.previewRowLimit,
   );
+  const letterheadService = new ReportLetterheadService(reporting?.letterheads ?? []);
   const authorizationService = new ReportAuthorizationService(
     accessContextClient,
     definitionService,
+    letterheadService,
   );
   const modelService = new ReportModelService(prisma);
   const jobService = new ReportJobService(prisma);
@@ -109,7 +111,6 @@ export function createReportsApp({
     serviceToken: env.auditServiceToken,
     logger,
   });
-  const letterheadService = new ReportLetterheadService(reporting?.letterheads ?? []);
   const exportService = new ReportExportService(
     snapshotService,
     {
@@ -125,7 +126,14 @@ export function createReportsApp({
   const retentionService = new ReportRetentionService(prisma, auditService);
   const lifecycleService = new ReportLifecycleService(prisma as never, auditService);
 
-  app.use("/reports", createReportCatalogRouter({ sourceCatalog, accessContextClient }));
+  app.use(
+    "/reports",
+    createReportCatalogRouter({
+      sourceCatalog,
+      accessContextClient,
+      letterheads: letterheadService,
+    }),
+  );
   app.use("/reports", createReportPreviewRouter({ previewService, accessContextClient }));
   app.use("/reports", createReportExportRouter({ exportService }));
   app.use(

@@ -9,6 +9,7 @@ import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const baseUrl = process.env.REPORTS_BROWSER_BASE_URL || "http://127.0.0.1:3115";
 const evidenceDir = process.env.REPORTS_EVIDENCE_DIR;
+const letterhead = { id: "approved-letterhead", label: "Timbrado aprovado", kind: "organization", sha256: "a".repeat(64) };
 const user = {
   id: "reports-fixture-user",
   login: "reports.fixture",
@@ -269,9 +270,15 @@ async function run() {
               {
                 source: "integracao.projects",
                 label: "Projetos",
-                columns: [{ key: "name", label: "Nome" }],
-                rowCount: 1,
-                rows: [{ row_number: 1, values: { name: "Projeto gerado" } }],
+                columns: [{ key: "name", label: "Nome" }, { key: "status", label: "Situação" }, { key: "category", label: "Categoria" }, { key: "status_count", label: "Contagem de Situação", hidden: true }],
+                rowCount: 5,
+                rows: [
+                  { row_number: 1, values: { name: "Projeto gerado", status: "A", category: "Um", status_count: 7 } },
+                  { row_number: 2, values: { name: "Projeto gerado", status: "B", category: "Dois", status_count: 3 } },
+                  { row_number: 3, values: { name: "Outro projeto", status: "A", category: "Três", status_count: 2 } },
+                  { row_number: 4, values: { name: "Sem categoria", status: "A", category: null, status_count: 4 } },
+                  { row_number: 5, values: { name: "Categoria literal", status: "B", category: "Sem valor", status_count: 5 } },
+                ],
                 nextCursor: null,
               },
               {
@@ -351,7 +358,8 @@ async function run() {
       path === "/user/me"
         ? user
           : path === "/reports/catalog"
-            ? { items: catalogMode === "empty" ? [] : catalogMode === "invalid" ? null : items }
+            ? { items: catalogMode === "empty" ? [] : catalogMode === "invalid" ? null : items,
+                letterheads: { personal: [letterhead], shared: [] } }
             : path === "/reports/models/list"
               ? { items: models }
               : path === "/reports/models/shared/list"
@@ -365,6 +373,15 @@ async function run() {
     await page.screenshot({
       path: `${evidenceDir}/${name}.png`,
       fullPage: true,
+      animations: "disabled",
+    });
+  }
+  async function screenshotRegion(name, locator) {
+    if (!evidenceDir) return;
+    await mkdir(evidenceDir, { recursive: true });
+    await page.waitForTimeout(1800);
+    await locator.screenshot({
+      path: `${evidenceDir}/${name}.png`,
       animations: "disabled",
     });
   }
@@ -424,6 +441,12 @@ async function run() {
       version: 2,
       areas: [{ source: "integracao.projects", fields: ["name"], filters: [] }],
     });
+    await panel.getByLabel("Timbrado do PDF").selectOption(letterhead.id);
+    await screenshotRegion("01-timbrado-selecionado", panel.getByLabel("Timbrado do PDF").locator(".."));
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    assert.deepEqual(definitions.at(-1).letterhead, { id: letterhead.id, sha256: letterhead.sha256 });
+    await panel.getByLabel("Timbrado do PDF").selectOption("");
     await checkLanguage();
     await page.evaluate(() => {
       document.documentElement.classList.replace("light", "dark");
@@ -565,6 +588,29 @@ async function run() {
     await expect(
       panel.getByRole("region", { name: "Resultado de Projetos", exact: true }),
     ).toContainText("Projeto gerado");
+    const chartResult = panel.getByRole("region", { name: "Resultado de Projetos", exact: true });
+    const chartType = chartResult.locator('section[aria-label="Visualização gráfica"] select').first();
+    await chartType.selectOption("line");
+    await expect(chartResult.getByRole("alert")).toContainText("dimensão de data ou número");
+    await chartType.selectOption("bar");
+    await expect(chartResult.getByRole("option", { name: "Contagem de Situação" })).toBeAttached();
+    await expect(chartResult.getByRole("alert")).toContainText("mesma categoria e série");
+    await chartResult.locator('section[aria-label="Visualização gráfica"] select').nth(3).selectOption("status");
+    await expect(chartResult.getByRole("img", { name: /Gráfico de barras/ })).toBeVisible();
+    await screenshotRegion("04-grafico-barras", chartResult.locator('section[aria-label="Visualização gráfica"]'));
+    await expect(chartResult.getByRole("table").first()).toContainText("Projeto gerado");
+    await chartResult.getByText("Ver valores do gráfico", { exact: true }).click();
+    await expect(chartResult.getByRole("table").first()).toContainText("7");
+    await chartType.selectOption("pie");
+    await chartResult.locator('section[aria-label="Visualização gráfica"] select').nth(1).selectOption("category");
+    await expect(chartResult.getByRole("img", { name: /Gráfico de setores/ })).toBeVisible();
+    await screenshotRegion("05-grafico-setores", chartResult.locator('section[aria-label="Visualização gráfica"]'));
+    const chartValues = chartResult.locator('section[aria-label="Visualização gráfica"] details');
+    if (!(await chartValues.evaluate((element) => element.open))) {
+      await chartValues.getByText("Ver valores do gráfico").click();
+    }
+    await expect(chartValues.getByRole("table")).toContainText("Sem valor (ausente)");
+    await expect(chartValues.getByRole("table")).toContainText("Sem valor (texto)");
     await expect(
       panel.getByRole("region", { name: "Resultado de Clientes", exact: true }),
     ).toContainText("Nenhum registro encontrado");
@@ -632,6 +678,24 @@ async function run() {
       panel.getByRole("heading", { name: "Revisar relatório", exact: true }),
     ).toBeVisible();
     assert.deepEqual(definitions.at(-1).areas[0].parameterValues, { period: "2026-09-01" });
+    await panel.getByRole("button", { name: "2. Escolher campos", exact: true }).click();
+    await projects.getByRole("checkbox", { name: "Situação", exact: true }).check();
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    await panel.getByRole("checkbox", { name: /Organizar relações entre campos/ }).check();
+    await expect(panel.getByRole("group", { name: "Relações entre campos" })).toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await screenshotRegion("02-relacoes-lista-agrupada", panel.getByRole("group", { name: "Relações entre campos" }));
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    await expect(panel.getByRole("heading", { name: "Revisar relatório", exact: true })).toBeVisible();
+    assert.equal(definitions.at(-1).version, 3);
+    assert.deepEqual(definitions.at(-1).areas[0].dimensions, ["name"]);
+    assert.deepEqual(definitions.at(-1).areas[0].details, ["status"]);
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    const relationships = panel.getByRole("group", { name: "Relações entre campos" });
+    await relationships.getByLabel("Apresentação desta área").selectOption("summary");
+    await relationships.getByText("Colunas visíveis", { exact: true }).locator("..").getByRole("checkbox", { name: "Nome" }).uncheck();
+    await expect(relationships).toContainText("grupos diferentes podem parecer linhas iguais");
+    await screenshotRegion("03-relacoes-resumo", relationships);
     const unexpectedConsoleErrors = consoleErrors.filter(
       (message) =>
         !message.includes("403 (Forbidden)") && !message.includes("422 (Unprocessable Entity)"),

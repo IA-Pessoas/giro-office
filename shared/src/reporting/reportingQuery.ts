@@ -71,7 +71,7 @@ export const reportingQuerySchema = z
         z
           .object({
             field: nameSchema,
-            function: z.enum(["count", "sum", "avg", "min", "max"], queryError),
+            function: z.enum(["count_rows", "count", "sum", "avg", "min", "max"], queryError),
             alias: nameSchema,
           })
           .strict("O critério contém propriedades não permitidas."),
@@ -93,7 +93,7 @@ export interface ReportingQuery {
   group_by?: readonly string[];
   aggregations?: readonly {
     field: string;
-    function: "count" | "sum" | "avg" | "min" | "max";
+    function: "count_rows" | "count" | "sum" | "avg" | "min" | "max";
     alias: string;
   }[];
 }
@@ -173,13 +173,16 @@ export async function collectReportingRows(
 }
 
 export function reportingQueryFields(fields: readonly string[], query?: ReportingQuery): string[] {
+  const aliases = new Set((query?.aggregations ?? []).map((aggregation) => aggregation.alias));
   return [
     ...new Set([
       ...fields,
       ...(query?.filters ?? []).map((filter) => filter.field),
       ...(query?.group_by ?? []),
       ...(query?.aggregations ?? []).map((aggregation) => aggregation.field),
-      ...(query?.order_by ?? []).map((order) => order.field),
+      ...(query?.order_by ?? [])
+        .filter((order) => !aliases.has(order.field))
+        .map((order) => order.field),
     ]),
   ];
 }
@@ -287,6 +290,7 @@ export async function executeReportingQuery(
   }
   for (const aggregation of aggregations) {
     if (
+      aggregation.function !== "count_rows" &&
       !reportingAggregations(metadata.get(aggregation.field)?.value_type ?? "").includes(
         aggregation.function,
       )
@@ -296,7 +300,7 @@ export async function executeReportingQuery(
   }
   if (
     (groupBy.length || aggregations.length) &&
-    orderBy.some((order) => !groupBy.includes(order.field))
+    orderBy.some((order) => !groupBy.includes(order.field) && !aliases.has(order.field))
   ) {
     throw new ServiceError(400, "Ordene o resumo somente pelos campos agrupados.");
   }
@@ -370,24 +374,33 @@ export async function executeReportingQuery(
               }, values[0])
             : null;
         row[aggregation.alias] =
-          aggregation.function === "count"
-            ? values.length
-            : !values.length
-              ? null
-              : aggregation.function === "sum"
-                ? sum
-                : aggregation.function === "avg"
-                  ? sum / values.length
-                  : extreme;
+          aggregation.function === "count_rows"
+            ? bucket.length
+            : aggregation.function === "count"
+              ? values.length
+              : !values.length
+                ? null
+                : aggregation.function === "sum"
+                  ? sum
+                  : aggregation.function === "avg"
+                    ? sum / values.length
+                    : extreme;
       }
       return row;
     });
   }
   rows.sort((left, right) => {
     for (const order of orderBy) {
-      const type = metadata.get(order.field)?.value_type ?? "string";
+      const aggregation = aggregations.find((item) => item.alias === order.field);
+      const type = aggregation
+        ? aggregation.function === "min" || aggregation.function === "max"
+          ? (metadata.get(aggregation.field)?.value_type ?? "string")
+          : "number"
+        : (metadata.get(order.field)?.value_type ?? "string");
       const a = scalar(left[order.field], type);
       const b = scalar(right[order.field], type);
+      if (a === null && b !== null) return 1;
+      if (b === null && a !== null) return -1;
       const comparison = compare(a, b);
       if (comparison) return order.direction === "asc" ? comparison : -comparison;
     }

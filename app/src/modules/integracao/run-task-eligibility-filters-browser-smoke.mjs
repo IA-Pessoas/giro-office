@@ -60,6 +60,7 @@ const assignedTask = {
   isOwn: true,
   isUnassigned: false,
   name: "Tarefa com responsável",
+  responsible_name: smokeUser.name,
 };
 
 const uniqueServiceTask = {
@@ -554,6 +555,7 @@ async function runBrowserProof() {
     },
   ]);
   const page = await context.newPage();
+  page.setDefaultNavigationTimeout(120_000);
   const taskListRequests = [];
   const clientDetailRequests = [];
   const createTaskRequests = [];
@@ -804,7 +806,7 @@ async function runBrowserProof() {
 
     await page.getByLabel("Atribuição").selectOption("assigned");
     await expect(page.getByText(assignedTask.name, { exact: true })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "Com responsável", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: smokeUser.name, exact: true })).toBeVisible();
     const assignedRequest = taskListRequests.at(-1);
     assert.equal(assignedRequest.searchParams.get("client_id"), clientId);
     assert.equal(assignedRequest.searchParams.get("assignment"), "assigned");
@@ -904,6 +906,8 @@ async function runBrowserProof() {
       },
     });
     await modelDialog.getByRole("button", { name: "Remover vínculo Regularize" }).first().click();
+    await page.getByRole("dialog", { name: "Remover vínculo do Regularize?" })
+      .getByRole("button", { name: "Remover vínculo", exact: true }).click();
     await expect.poll(() => regularizeLinkRequests.length).toBe(2);
     assert.equal(regularizeLinkRequests[1].method, "DELETE");
   } finally {

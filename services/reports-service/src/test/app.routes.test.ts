@@ -136,6 +136,9 @@ describe("reports-service app", () => {
       .set(FORWARDED_AUTH_ORGANIZATION_ID_HEADER, "00000000-0000-4000-8000-000000000002")
       .expect(200);
 
-    expect(catalog.body).toEqual({ success: true, data: { items: [] } });
+    expect(catalog.body).toEqual({
+      success: true,
+      data: { items: [], letterheads: { personal: [], shared: [] } },
+    });
   });
 });

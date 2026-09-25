@@ -283,8 +283,8 @@ async function assertContabilPageRendered(page, pageErrors, consoleErrors, label
   const controlTab = page.getByRole("tab", { name: "Controle", exact: true });
   const portfolio = page.getByRole("heading", { name: "Carteira operacional", exact: true });
   const competence = page.getByLabel("Competência da carteira", { exact: true });
-  const initializedClient = page.getByRole("cell", { name: "Alfa Contábil Ltda.", exact: true });
-  const missingClient = page.getByRole("cell", { name: "Beta Contábil Ltda.", exact: true });
+  const initializedClient = page.getByRole("checkbox", { name: "Alfa Contábil Ltda.", exact: true });
+  const missingClient = page.getByRole("checkbox", { name: "Beta Contábil Ltda.", exact: true });
 
   await heading.waitFor({ state: "visible" });
   await description.waitFor({ state: "visible" });
@@ -307,9 +307,9 @@ async function assertContabilPageRendered(page, pageErrors, consoleErrors, label
   const competenceMonth = page.getByLabel("Competência da carteira (mês)", { exact: true });
   await competenceYear.selectOption("2026");
   await competenceMonth.selectOption("08");
-  await page.getByText("2 clientes, 1 controle iniciado e 1 sem controle mensal.", { exact: true }).waitFor({
-    state: "visible",
-  });
+  await page.getByRole("heading", { name: "Selecione as empresas", exact: true }).waitFor({ state: "visible" });
+  await initializedClient.waitFor({ state: "visible" });
+  await missingClient.waitFor({ state: "visible" });
   assert.equal(
     `${await competenceYear.inputValue()}-${await competenceMonth.inputValue()}`,
     "2026-08",

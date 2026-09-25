@@ -3,6 +3,7 @@ import { api } from "@shared/services/apiClient";
 
 import type {
   ReportComposition,
+  ReportCompositionV3,
   ReportCompositionPreview,
   ReportDownloadResult,
   ReportHistoryPage,
@@ -29,11 +30,11 @@ import {
 } from "./reportsService.contract";
 
 export const reportsService = {
-  async previewComposition(definition: ReportComposition): Promise<ReportCompositionPreview> {
+  async previewComposition(definition: ReportComposition | ReportCompositionV3): Promise<ReportCompositionPreview> {
     const response = await api.post(REPORTS_ENDPOINTS.preview, { definition });
     return unwrapReportCompositionPreview(response.data);
   },
-  async validateDefinition(definition: ReportComposition): Promise<void> {
+  async validateDefinition(definition: ReportComposition | ReportCompositionV3): Promise<void> {
     const response = await api.post("/reports/definitions/validate", { definition });
     unwrapReportsEnvelope(response.data);
   },

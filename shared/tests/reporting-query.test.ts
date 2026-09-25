@@ -226,6 +226,35 @@ test("defines empty summaries and date extrema without losing value types", asyn
   assert.deepEqual(dates.rows, [{ first: "2026-09-01", total: 2 }]);
 });
 
+test("sorts string and date extrema by their source value types", async () => {
+  const rows = [
+    { status: "A", name: "Zulu", start_date: "2026-09-02" },
+    { status: "B", name: "Alfa", start_date: "2026-09-01" },
+  ];
+  for (const [field, alias, expected] of [
+    ["name", "first_name", ["B", "A"]],
+    ["start_date", "first_date", ["B", "A"]],
+  ] as const) {
+    const result = await executeReportingQuery(
+      {
+        source: "integracao.projects",
+        fields: ["status"],
+        limit: 2,
+        query: {
+          group_by: ["status"],
+          aggregations: [{ field, function: "min", alias }],
+          order_by: [{ field: alias, direction: "asc" }],
+        },
+      },
+      async () => ({ rows, reachedLimit: false }),
+    );
+    assert.deepEqual(
+      result.rows.map((row) => row.status),
+      expected,
+    );
+  }
+});
+
 test("stops loading pages as soon as the byte budget is exceeded", async () => {
   let calls = 0;
   await assert.rejects(

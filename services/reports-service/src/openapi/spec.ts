@@ -6,6 +6,31 @@ const fieldReference = {
   source: { type: "string" },
   field: { type: "string", pattern: "^[a-z][a-z0-9_]*$", maxLength: 64 },
 } as const;
+const letterheadReference = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "sha256"],
+  properties: {
+    id: { type: "string", maxLength: 128 },
+    sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+  },
+} as const;
+const typedFilterValue = {
+  nullable: true,
+  oneOf: [
+    { type: "string", maxLength: 2048 },
+    { type: "number" },
+    { type: "boolean" },
+    {
+      type: "array",
+      maxItems: 100,
+      items: {
+        nullable: true,
+        oneOf: [{ type: "string", maxLength: 2048 }, { type: "number" }, { type: "boolean" }],
+      },
+    },
+  ],
+} as const;
 const reportDefinition = {
   type: "object",
   additionalProperties: false,
@@ -13,6 +38,7 @@ const reportDefinition = {
   description:
     "Definição legada compatível. Critérios são independentes por área. Resumos retornam group_by e aliases (padrão field_function); não retornam colunas não agrupadas. count ignora nulos; demais resumos vazios retornam null. Valores dos parâmetros devem corresponder ao tipo declarado/campo e ao operador.",
   properties: {
+    letterhead: letterheadReference,
     sources: {
       type: "array",
       minItems: 1,
@@ -92,7 +118,7 @@ const reportDefinition = {
         additionalProperties: false,
         properties: {
           ...fieldReference,
-          function: { type: "string", enum: ["count", "sum", "avg", "min", "max"] },
+          function: { type: "string", enum: ["count_rows", "count", "sum", "avg", "min", "max"] },
           alias: {
             type: "string",
             description: "Opcional; padrão field_function. Deve ser único no resultado.",
@@ -167,6 +193,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           oneOf: [
             { $ref: "#/components/schemas/ReportDefinition" },
             { $ref: "#/components/schemas/ReportComposition" },
+            { $ref: "#/components/schemas/ReportCompositionV3" },
           ],
         },
         ReportComposition: {
@@ -174,6 +201,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           additionalProperties: false,
           required: ["version", "areas"],
           properties: {
+            letterhead: letterheadReference,
             version: { type: "integer", enum: [2] },
             areas: {
               type: "array",
@@ -271,6 +299,155 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
             },
           },
         },
+        ReportCompositionV3: {
+          type: "object",
+          additionalProperties: false,
+          required: ["version", "areas"],
+          description:
+            "Composição de relações dentro de cada área; não faz junções entre áreas. Dimensões formam grupos, detalhes compõem listas e medidas compõem resumos. A projeção pode ocultar campos autorizados.",
+          properties: {
+            version: { type: "integer", enum: [3] },
+            letterhead: letterheadReference,
+            areas: {
+              type: "array",
+              minItems: 1,
+              maxItems: 32,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["source", "layout", "dimensions", "details", "measures", "display"],
+                properties: {
+                  source: { type: "string" },
+                  layout: { type: "string", enum: ["grouped_list", "summary"] },
+                  dimensions: {
+                    type: "array",
+                    minItems: 1,
+                    maxItems: 25,
+                    uniqueItems: true,
+                    items: { type: "string" },
+                  },
+                  details: {
+                    type: "array",
+                    maxItems: 25,
+                    uniqueItems: true,
+                    items: { type: "string" },
+                  },
+                  measures: {
+                    type: "array",
+                    maxItems: 25,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["key", "function"],
+                      properties: {
+                        key: { type: "string" },
+                        field: { type: "string" },
+                        function: {
+                          type: "string",
+                          enum: ["count_rows", "count", "sum", "avg", "min", "max"],
+                        },
+                      },
+                    },
+                  },
+                  filters: {
+                    type: "array",
+                    maxItems: 100,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["field", "operator", "value"],
+                      properties: {
+                        field: { type: "string" },
+                        operator: reportDefinition.properties.filters.items.properties.operator,
+                        value: typedFilterValue,
+                      },
+                    },
+                  },
+                  filterLogic: { type: "string", enum: ["and", "or"] },
+                  parameterValues: { type: "object", additionalProperties: true },
+                  orderBy: {
+                    type: "array",
+                    maxItems: 25,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["direction"],
+                      properties: {
+                        field: { type: "string" },
+                        measure: { type: "string" },
+                        direction: { type: "string", enum: ["asc", "desc"] },
+                      },
+                    },
+                  },
+                  display: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["columns"],
+                    properties: {
+                      columns: {
+                        type: "array",
+                        minItems: 1,
+                        maxItems: 25,
+                        uniqueItems: true,
+                        items: { type: "string" },
+                      },
+                      groupHeadings: { type: "boolean" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        ReportCatalog: {
+          type: "object",
+          required: ["items", "letterheads"],
+          additionalProperties: false,
+          properties: {
+            items: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: true,
+                required: ["key", "label", "module", "fields"],
+                properties: {
+                  key: { type: "string" },
+                  label: { type: "string" },
+                  module: { type: "string" },
+                  department_label: { type: "string" },
+                  description: { type: "string" },
+                  fields: { type: "array", items: { type: "object", additionalProperties: true } },
+                },
+              },
+            },
+            letterheads: {
+              type: "object",
+              required: ["personal", "shared"],
+              additionalProperties: false,
+              properties: {
+                personal: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/ReportLetterheadOption" },
+                },
+                shared: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/ReportLetterheadOption" },
+                },
+              },
+            },
+          },
+        },
+        ReportLetterheadOption: {
+          type: "object",
+          required: ["id", "label", "kind", "sha256"],
+          additionalProperties: false,
+          properties: {
+            id: { type: "string" },
+            label: { type: "string" },
+            kind: { type: "string", enum: ["organization", "department"] },
+            sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+          },
+        },
         SuccessEnvelope: {
           type: "object",
           required: ["success", "data"],
@@ -308,6 +485,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                     definition: {
                       oneOf: [
                         { $ref: "#/components/schemas/ReportComposition" },
+                        { $ref: "#/components/schemas/ReportCompositionV3" },
                         { $ref: "#/components/schemas/ReportDefinition" },
                       ],
                     },
@@ -349,8 +527,19 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
           responses: {
             "200": {
               description:
-                "Áreas autorizadas com key, label, module, department_label, description e fields autorizados. Agrupar por department_label; identificadores internos não são rótulos de interface.",
-              ...successResponse,
+                "Áreas e campos autorizados, mais timbrados pessoais ou departamentais íntegros. Opções departamentais exigem módulo de departamento válido. O catálogo não expõe bytes dos arquivos.",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["success", "data"],
+                    properties: {
+                      success: { type: "boolean" },
+                      data: { $ref: "#/components/schemas/ReportCatalog" },
+                    },
+                  },
+                },
+              },
             },
             "401": {
               description: "Contexto autenticado ausente",
@@ -381,6 +570,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                       oneOf: [
                         { $ref: "#/components/schemas/ReportDefinition" },
                         { $ref: "#/components/schemas/ReportComposition" },
+                        { $ref: "#/components/schemas/ReportCompositionV3" },
                       ],
                     },
                     parameterValues: { type: "object", additionalProperties: true },
@@ -426,6 +616,7 @@ export function buildReportsServiceOpenApiSpec(env: ReportsServiceEnv): OpenApiD
                     definition: {
                       oneOf: [
                         { $ref: "#/components/schemas/ReportComposition" },
+                        { $ref: "#/components/schemas/ReportCompositionV3" },
                         { $ref: "#/components/schemas/ReportDefinition" },
                       ],
                     },

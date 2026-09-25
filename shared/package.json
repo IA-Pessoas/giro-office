@@ -19,7 +19,6 @@
     },
     "./auth/modules": {
       "types": "./dist/auth/modules.d.ts",
-      "development": "./src/auth/modules.ts",
       "import": "./dist/auth/modules.js",
       "default": "./dist/auth/modules.js"
     },

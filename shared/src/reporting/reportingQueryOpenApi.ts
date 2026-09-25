@@ -11,7 +11,7 @@ export const reportingQueryOpenApiSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Critérios executados sobre o conjunto autorizado completo antes do limite de saída. Grupos são combinados com AND; filtros fora de grupos também. Capacidade: 50 mil registros/20 MiB; excesso retorna 422, nunca resultado parcial. Leitura em páginas de 100. count conta valores não nulos; outros resumos vazios retornam null. Sem grupos, resumo vazio retorna uma linha; agrupamento vazio retorna nenhuma. Ordenação por campos agrupados nos resumos; nulos ao final em asc e início em desc.",
+    "Critérios executados sobre o conjunto autorizado completo antes do limite de saída. Grupos são combinados com AND; filtros fora de grupos também. Capacidade: 50 mil registros/20 MiB; excesso retorna 422, nunca resultado parcial. Leitura em páginas de 100. count conta valores não nulos; count_rows conta registros do grupo; outros resumos vazios retornam null. Sem grupos, resumo vazio retorna uma linha; agrupamento vazio retorna nenhuma. Ordenação por campos agrupados ou aliases de medida nos resumos; nulos sempre ao final.",
   properties: {
     filters: {
       type: "array",
@@ -58,7 +58,7 @@ export const reportingQueryOpenApiSchema = {
         required: ["field", "function", "alias"],
         properties: {
           field: name,
-          function: { type: "string", enum: ["count", "sum", "avg", "min", "max"] },
+          function: { type: "string", enum: ["count_rows", "count", "sum", "avg", "min", "max"] },
           alias: name,
         },
       },

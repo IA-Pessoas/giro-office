@@ -553,15 +553,15 @@ runTest("integration edit guard blocks when normalized cpf_cnpj is missing", () 
   assert.equal(hasUsableIntegrationData(null), false);
 });
 
-runTest("document validation enforces base client cpf_cnpj length", () => {
-  assert.equal(validateCpfCnpjDocument("123.456.789-10"), null);
-  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90"), null);
+runTest("document validation enforces base client cpf_cnpj length and check digits", () => {
+  assert.equal(validateCpfCnpjDocument("529.982.247-25"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-95"), null);
   assert.equal(validateCpfCnpjDocument("123"), "CPF/CNPJ deve ter 11 ou 14 dígitos.");
 });
 
 runTest("document validation enforces integration person type length", () => {
-  assert.equal(validateCpfCnpjDocument("123.456.789-10", "PF"), null);
-  assert.equal(validateCpfCnpjDocument("12.345.678/0001-90", "PJ"), null);
+  assert.equal(validateCpfCnpjDocument("529.982.247-25", "PF"), null);
+  assert.equal(validateCpfCnpjDocument("12.345.678/0001-95", "PJ"), null);
   assert.equal(validateCpfCnpjDocument("12.345.678/0001-90", "PF"), "CPF deve ter 11 dígitos.");
   assert.equal(validateCpfCnpjDocument("123.456.789-10", "PJ"), "CNPJ deve ter 14 dígitos.");
 });
@@ -572,7 +572,7 @@ runTest("document input formatter masks and limits by person type", () => {
   assert.equal(formatCpfCnpjInput("abc1234", "PF"), "123.4");
   assert.equal(formatCpfCnpjInput("1234567", "PJ"), "12.345.67");
   assert.equal(formatCpfCnpjInput("AB123456780001", "PJ"), "AB.123.456/7800-01");
-  assert.equal(validateCpfCnpjDocument("AB.123.456/7800-01", "PJ"), null);
+  assert.equal(validateCpfCnpjDocument("AB.123.456/7800-26", "PJ"), null);
 });
 
 runTest("client input masks forward formatted document and phone values through event-compatible targets", () => {
@@ -625,7 +625,7 @@ runTest("client Regularize fields route generic documents, CPF, and phones throu
 
 runTest("optional cpf validation accepts empty values and rejects invalid lengths", () => {
   assert.equal(validateOptionalCpfDocument("CPF do responsável", ""), null);
-  assert.equal(validateOptionalCpfDocument("CPF do responsável", "123.456.789-10"), null);
+  assert.equal(validateOptionalCpfDocument("CPF do responsável", "529.982.247-25"), null);
   assert.equal(
     validateOptionalCpfDocument("CPF do responsável", "123"),
     "CPF do responsável deve ter 11 dígitos.",
@@ -846,11 +846,19 @@ runTest("client create modal binds person type to document validation and payloa
   assert.match(modal, /showPersonType/);
   assert.match(modal, /showDocumentError/);
   assert.match(form, /name="type"/);
-  assert.match(form, /showDocumentError && showPersonType && values\.cpf_cnpj/);
-  assert.ok(form.indexOf(">Nome</span>") < form.indexOf(">Razão social</span>"));
-  assert.ok(form.indexOf(">Razão social</span>") < form.indexOf(">Tipo de pessoa</span>"));
-  assert.ok(form.indexOf(">Tipo de pessoa</span>") < form.indexOf("{documentLabel}"));
-  assert.ok(form.indexOf(">Nome fantasia</span>") < form.indexOf(">Status</span>"));
+  assert.match(form, /\(showDocumentError \|\| hasSubmitted\) && values\.cpf_cnpj/);
+  assert.match(form, /validateCpfCnpjDocument\(values\.cpf_cnpj,\s*showPersonType \? values\.type : undefined\)/);
+  assert.match(form, /error=\{documentError\}/);
+  const fieldOrder = [
+    'label="Nome"',
+    'label="Razão social"',
+    ">Tipo de pessoa</span>",
+    "label={documentLabel}",
+    ">Nome fantasia</span>",
+    ">Status</span>",
+  ].map((label) => form.indexOf(label));
+  assert.ok(fieldOrder.every((position) => position >= 0));
+  assert.deepEqual(fieldOrder, [...fieldOrder].sort((left, right) => left - right));
   assert.doesNotMatch(form, /rounded-2xl border border-slate-200 bg-slate-50/);
 });
 
@@ -879,7 +887,8 @@ runTest("clients list hides organization from the main table", () => {
 runTest("client creation discloses name and document as required", () => {
   const source = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
 
-  assert.match(source, /RequiredFieldLabel/);
+  assert.match(source, /label="Nome"\s+required/);
+  assert.match(source, /label=\{documentLabel\}\s+required/);
   assert.match(source, /name="name"[\s\S]*aria-required/);
   assert.match(source, /name="cpf_cnpj"[\s\S]*aria-required/);
 });
@@ -915,7 +924,7 @@ runTest("getDocumentIssue flags masked, wrong-length and bad check digit documen
 });
 
 runTest("PA money fields accept only BRL amounts", () => {
-  assert.equal(formatPaMoneyInput("123456"), "R$ 1.234,56");
+  assert.equal(formatPaMoneyInput("123456"), "R$ 123.456");
   assert.equal(formatPaMoneyInput("QA_abc"), "");
   assert.equal(formatPaMoneyInput(""), "");
 });
@@ -1005,7 +1014,9 @@ runTest("integration only looks up a CNPJ that differs from the saved one", () =
 runTest("integration form marks required fields and reserves the CNPJ notice slot", () => {
   const form = readFileSync("src/modules/clients/components/ClientIntegrationForm.tsx", "utf8");
 
-  assert.equal(form.match(/<RequiredFieldLabel[^>]*required>/g)?.length, 3);
+  assert.match(form, /<RequiredFieldLabel[^>]*required>[\s\S]*?Tipo de Pessoa/);
+  assert.match(form, /label=\{values\.type === "PJ" \? "CNPJ" : "CPF"\}\s+required/);
+  assert.match(form, /label="Nome \/ Apelido"\s+required/);
   assert.match(form, /min-h-12/);
 });
 

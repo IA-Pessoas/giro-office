@@ -5,6 +5,7 @@ import { reportAggregationAlias } from "../integrations/reportCriteria.js";
 import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import type { ReportDefinitionService } from "./reportDefinitionService.js";
+import { v3Columns, v3Rows } from "./reportV3Presentation.js";
 
 export class ReportPreviewService {
   constructor(
@@ -22,6 +23,33 @@ export class ReportPreviewService {
       { source: string; label: string } & Awaited<ReturnType<ReportPreviewService["preview"]>>
     >;
   }> {
+    if (definition.version === 3) {
+      const prepared = definition.areas.map((area) =>
+        this.definitionService.prepareV3Area(area, scope),
+      );
+      const catalog = this.sourceCatalog.getAuthorizedCatalog(scope);
+      const blocks = [];
+      for (const [index, area] of definition.areas.entries()) {
+        const source = catalog.sources.find((item) => item.key === area.source);
+        if (!source) throw new ServiceError(403, "Confira as áreas disponíveis para seu acesso.");
+        const result = await this.preview(
+          prepared[index].definition,
+          scope,
+          requestId,
+          prepared[index].parameterValues,
+        );
+        blocks.push({
+          ...result,
+          source: area.source,
+          label: source.label,
+          layout: area.layout,
+          dimensions: area.dimensions,
+          presentation: { columns: v3Columns(area, source) },
+          rows: v3Rows(area, result.rows),
+        });
+      }
+      return { blocks };
+    }
     const prepared = definition.areas.map((area) =>
       this.definitionService.prepareArea(area, scope),
     );
