@@ -4,11 +4,23 @@ const brlFormatter = new Intl.NumberFormat("pt-BR", {
 });
 
 /**
+ * Ponto como decimal, sem vírgula no texto: no fim ("R$ 150." do teclado numérico) ou colado
+ * de fora com 1 ou 2 casas ("150.50"). No texto que a própria máscara exibe, ponto é milhar.
+ */
+function decimalDotToComma(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.includes(",")) return trimmed;
+  if (trimmed.endsWith(".")) return `${trimmed.slice(0, -1)},`;
+  if (!trimmed.startsWith("R$") && /^\d*\.\d{1,2}$/u.test(trimmed)) return trimmed.replace(".", ",");
+  return trimmed;
+}
+
+/**
  * Partes de um valor em reais digitado: vírgula é o decimal e ponto é milhar, como na própria
  * exibição ("R$ 1.234,56"). Assim apagar um dígito de "R$ 1.234" não vira 1,23.
  */
 function splitBrlTyped(value: string): { integer: string; fraction: string | null } | null {
-  const cleaned = value.replace(/[^\d,]/g, "");
+  const cleaned = decimalDotToComma(value).replace(/[^\d,]/g, "");
   if (!/\d/u.test(cleaned)) return null;
   const comma = cleaned.indexOf(",");
   const integer = normalizeDigits(comma === -1 ? cleaned : cleaned.slice(0, comma)).replace(
@@ -124,7 +136,7 @@ export function formatBrlAmount(value: number): string {
 
 /**
  * Valor em reais digitado como decimal pt-BR: "100" é R$ 100,00 e "1.234,56" é R$ 1.234,56.
- * Diferente de parseBrlInput, que lê os dígitos como centavos.
+ * Diferente de parseBrlInput (máscara), aceita ponto decimal no texto livre.
  */
 export function parseBrlDecimalInput(value: string): number | null {
   const cleaned = value.replace(/[^\d,.]/g, "");

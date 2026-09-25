@@ -69,6 +69,14 @@ assert.equal(parseBrlInput("R$ 1.234,56"), 1234.56);
 assert.equal(parseBrlInput(""), null);
 assert.equal(parseBrlInput("R$ 12,34"), 12.34);
 assert.equal(parseBrlInput("9007199254740992"), null);
+// Ponto decimal colado ("150.50") ou do teclado numérico no fim vira vírgula; no meio do nosso
+// próprio "R$ 1.234" continua sendo milhar.
+assert.equal(formatBrlInput("150.50"), "R$ 150,50");
+assert.equal(formatBrlInput("150.5"), "R$ 150,5");
+assert.equal(formatBrlInput("1.000"), "R$ 1.000");
+assert.equal(formatBrlInput("R$ 150."), "R$ 150,");
+assert.equal(typeInto("150.50"), "R$ 150,50");
+assert.equal(parseBrlInput("150.50"), 150.5);
 assert.equal(formatBrlAmount(1234.5), "R$ 1.234,50");
 assert.equal(formatBrlAmount(0), "R$ 0,00");
 assert.equal(parseBrlInput(formatBrlAmount(1234.5)), 1234.5);
