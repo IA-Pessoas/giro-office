@@ -51,7 +51,14 @@ describe("LicenseService", () => {
 
   it("lists the client name of the organization only (#1347)", async () => {
     const findMany = vi.fn(async () => [
-      { id: "license-1", client: { name: "Castelo", organization_id: "org-1" } },
+      {
+        id: "license-1",
+        client: { name: "Castelo", company_name: "Castelo Ltda", organization_id: "org-1" },
+      },
+      {
+        id: "license-1b",
+        client: { name: "Só nome", company_name: null, organization_id: "org-1" },
+      },
       { id: "license-2", client: { name: "Outra org", organization_id: "org-2" } },
       { id: "license-3", client: null },
     ]);
@@ -71,12 +78,13 @@ describe("LicenseService", () => {
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         select: expect.objectContaining({
-          client: { select: { name: true, organization_id: true } },
+          client: { select: { name: true, company_name: true, organization_id: true } },
         }),
       }),
     );
     expect(rows).toEqual([
-      { id: "license-1", client_name: "Castelo" },
+      { id: "license-1", client_name: "Castelo Ltda" },
+      { id: "license-1b", client_name: "Só nome" },
       { id: "license-2", client_name: null },
       { id: "license-3", client_name: null },
     ]);
