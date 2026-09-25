@@ -2678,4 +2678,54 @@ describe("personificação (#1529)", () => {
       }),
     );
   });
+
+  it("logout durante a personificação audita o fim e não reabre a plataforma", async () => {
+    const db = prisma();
+    db.authSession.findFirst.mockResolvedValueOnce(sessionRow()).mockResolvedValueOnce({
+      id: "session-1",
+      created_at: new Date(Date.now() - 60 * 1000),
+      impersonatorPlatformUser: platformUser(),
+      user: { id: USER_ID, name: "Usuário", organization_id: ORGANIZATION_ID, department: null },
+    });
+    const audit = vi.fn(async () => {});
+    const app = createUserWorkerApp({ env: env(), prisma: db, audit } as never);
+
+    const response = await app.request("https://user.test/user/session", {
+      method: "DELETE",
+      headers: impersonatedHeaders(),
+    });
+
+    expect(response.status).toBe(200);
+    expect(db.platformAuthSession.create).not.toHaveBeenCalled();
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "platform.impersonation.ended",
+        changes: expect.objectContaining({ reason: "saída" }),
+      }),
+    );
+  });
+
+  it("a varredura fecha sessão vencida sem organização sem travar a fila", async () => {
+    const db = prisma();
+    db.authSession.findMany.mockResolvedValue([
+      {
+        id: "imp-orfa",
+        created_at: new Date("2026-09-25T10:00:00.000Z"),
+        expires_at: new Date("2026-09-25T11:00:00.000Z"),
+        impersonator_platform_user_id: PLATFORM_USER_ID,
+        user: { id: USER_ID, name: "Usuário", organization_id: null, department: null },
+      },
+    ]);
+    const audit = vi.fn(async () => {});
+
+    const expired = await expireImpersonationSessions(
+      db as never,
+      audit,
+      new Date("2026-09-25T12:00:00.000Z"),
+    );
+
+    expect(expired).toBe(1);
+    expect(db.authSession.updateMany).toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
 });
