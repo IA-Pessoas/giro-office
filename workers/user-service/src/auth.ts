@@ -46,6 +46,7 @@ export interface PlatformIdentity {
   email: string;
   auth_kind: "platform";
   platform_role: "super_admin";
+  can_impersonate: boolean;
 }
 
 function header(request: Request, name: string): string | undefined {
@@ -355,6 +356,7 @@ export async function validatePlatformSession(
           platform_role: true,
           status: true,
           session_version: true,
+          can_impersonate: true,
         },
       },
     },
@@ -376,6 +378,7 @@ export async function validatePlatformSession(
     email: String(user.email),
     auth_kind: "platform",
     platform_role: "super_admin",
+    can_impersonate: user.can_impersonate === true,
   };
 }
 

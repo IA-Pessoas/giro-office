@@ -1159,6 +1159,7 @@ async function createPlatformSession(
       platform_role: true,
       status: true,
       session_version: true,
+      can_impersonate: true,
     },
   });
   const valid = await verifyPassword(input.password, String(user?.password ?? ""));
@@ -1171,6 +1172,7 @@ async function createPlatformSession(
     email: user.email as string,
     auth_kind: "platform",
     platform_role: "super_admin",
+    can_impersonate: user.can_impersonate === true,
   };
   const csrfToken = createCsrfToken();
   const csrfHash = await hashCsrfToken(csrfToken);
