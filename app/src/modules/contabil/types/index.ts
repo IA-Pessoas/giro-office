@@ -213,6 +213,23 @@ export interface TriageDocumentsMonthly {
   summary: { applicable: number; completed: number; attention: number; pending: number; notApplicable: number; notPresent: number; percentage: number };
 }
 
+export interface FiscalTriagePortfolioItem {
+  client_id: string;
+  legal_name: string;
+  cpf_cnpj: string;
+  regime: string | null;
+  responsible_id: string | null;
+  responsible_name: string | null;
+  can_edit: boolean;
+  has_competence: boolean;
+  monthly: Pick<TriageDocumentsMonthly, "id" | "checklist" | "item_notes"> | null;
+}
+
+export interface FiscalTriagePortfolio {
+  competence: ContabilCompetence;
+  items: FiscalTriagePortfolioItem[];
+}
+
 export interface TriageBankStatement {
   id: string;
   bank_id: string;

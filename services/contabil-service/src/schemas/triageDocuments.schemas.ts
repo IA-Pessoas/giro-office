@@ -24,6 +24,8 @@ const monthlyIdentityShape = {
 
 export const triageMonthlyRequestSchema = z.object(monthlyRequestShape).strict();
 
+export const fiscalTriagePortfolioQuerySchema = z.object({ competence: competenceSchema }).strict();
+
 export const triageEditabilityRequestSchema = z
   .object({
     client_id: monthlyRequestShape.client_id,

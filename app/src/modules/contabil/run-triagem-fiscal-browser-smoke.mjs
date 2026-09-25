@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { chromium, expect } from "@playwright/test";
 
 const baseUrl = (process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3125").replace(/\/$/, "");
@@ -141,6 +142,10 @@ await context.addCookies([
 ]);
 
 const page = await context.newPage();
+page.on("pageerror", (error) => console.error("[triagem-fiscal browser]", error));
+page.on("console", (message) => {
+  if (message.type() === "error") console.error("[triagem-fiscal console]", message.text());
+});
 const requests = [];
 let holdFiscalMonthly = true;
 let releaseFiscalMonthly;
@@ -161,6 +166,21 @@ await page.route("**/*", async (route) => {
 
   requests.push(request.method() + " " + apiPath + url.search);
   if (request.method() === "GET" && apiPath === "/user/me") return json(route, user);
+  if (request.method() === "GET" && apiPath === "/triagem/overview") {
+    return json(route, {
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 20,
+      indicators: { urgent_open: 0, routine_pending: 0, bank_pending: 0, complete: 0, no_applicable_items: 0 },
+    });
+  }
+  if (request.method() === "GET" && apiPath === "/triagem/catalogs") {
+    return json(route, url.searchParams.get("kind") === "DELIVERY_METHOD" ? [
+      { id: "delivery-email", code: "EMAIL", label: "E-mail" },
+      { id: "delivery-portal", code: "PORTAL", label: "Portal" },
+    ] : []);
+  }
   if (request.method() === "GET" && apiPath === "/client/list") {
     return json(route, {
       items: [
@@ -193,6 +213,39 @@ await page.route("**/*", async (route) => {
   }
   if (request.method() === "GET" && apiPath === "/triagem/editability") {
     return json(route, { can_edit: true });
+  }
+  if (request.method() === "GET" && apiPath === "/triagem/fiscal-portfolio") {
+    return json(route, {
+      competence,
+      items: [
+        {
+          client_id: clientId,
+          legal_name: "Cliente Demonstração",
+          cpf_cnpj: "00000000000100",
+          regime: "MEI",
+          responsible_id: user.id,
+          responsible_name: user.name,
+          can_edit: true,
+          has_competence: true,
+          monthly: {
+            id: fiscalMonthlyId,
+            checklist: fiscalFixture.checklist,
+            item_notes: fiscalFixture.item_notes,
+          },
+        },
+        {
+          client_id: "c1000000-0000-4000-8000-000000000002",
+          legal_name: "Empresa sem rotina",
+          cpf_cnpj: "11111111000111",
+          regime: "Lucro Presumido",
+          responsible_id: null,
+          responsible_name: null,
+          can_edit: false,
+          has_competence: false,
+          monthly: null,
+        },
+      ],
+    });
   }
   if (request.method() === "GET" && apiPath === "/triagem/monthly") {
     if (url.searchParams.get("type") === "FISCAL") {
@@ -247,6 +300,22 @@ try {
   assert.equal(fiscalFields.length, 14);
   assert.equal(fiscalChecklistFields.length, 13);
   await page.goto("/triagem", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await expect(page.getByRole("heading", { name: "Triagem Fiscal mensal" })).toBeVisible();
+  await expect(page.getByLabel("Competência da Triagem Fiscal")).toHaveValue(competence);
+  await expect(page.getByText("Empresa sem rotina")).toBeVisible();
+  await page.getByLabel("Cliente Demonstração: Relatório de entradas").selectOption("COMPLETED");
+  await expect.poll(() => fiscalFixture.checklist.inbound_report).toBe("COMPLETED");
+  const csvDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "CSV" }).click();
+  const csv = await csvDownload;
+  assert.equal(csv.suggestedFilename(), `triagem-fiscal-${competence}.csv`);
+  assert.match(readFileSync(await csv.path(), "utf8"), /Empresa sem rotina/);
+  const popup = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "PDF" }).click();
+  const pdfPage = await popup;
+  await expect(pdfPage.getByRole("heading", { name: `Triagem Fiscal · ${competence}` })).toBeVisible();
+  await pdfPage.close();
+  await page.bringToFront();
   await page.getByRole("button", { name: "Selecionar cliente" }).click();
   await page.getByRole("option", { name: /Cliente Demonstração/ }).click();
   await expect(page.getByText("Carregando pendências").first()).toBeVisible();
