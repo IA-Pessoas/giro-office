@@ -48,6 +48,9 @@ Esta matriz documenta nomes e escopo. Ela não contém valores, tokens ou URLs p
 | `CERTIFICATE_STORAGE_BUCKET` | var | certificate-service | bucket privado de certificados; default legado `Certificados` |
 | `CERTIFICATE_FILE_ENCRYPTION_KEY` | Secret | certificate-service | chave AES-256-GCM dos arquivos; preservar durante a transição |
 | `CERTIFICATE_FILE_ENCRYPTION_KEY_VERSION` | var | certificate-service | versão da chave usada nos metadados; default `v1` |
+| `CERTIFICATE_PASSWORD_ENCRYPTION_KEY` | Secret | certificate-service | chave AES-256-GCM das senhas novas |
+| `CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION` | var | certificate-service | versão gravada nos envelopes de senha; default `v1` |
+| `CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY` | Secret | certificate-service | opcional; chave das senhas migradas, só leitura |
 | `CERTIFICATE_FILE_MAX_SIZE_BYTES` | var | certificate-service | limite de upload; default legado 5 MiB |
 | `CERTIFICATE_NOTIFICATION_WINDOW_DAYS` | var | certificate-service | janela da reconciliação interna; default legado 30 dias |
 | `PESSOAL_PASSWORD_ENCRYPTION_KEY` | Secret | pessoal-service | chave AES-256-GCM das senhas; preservar durante a transição |

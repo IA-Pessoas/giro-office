@@ -5,12 +5,25 @@ export interface CertificatePaginationParams {
   page_size?: number;
 }
 
-export interface CertificateListPage<T> {
+export interface CertificateListSummary {
+  expired: number;
+  expiring_30_days: number;
+  with_certificate: number;
+}
+
+export interface CertificateNotificationSummary {
+  pj: number;
+  pf: number;
+}
+
+export interface CertificateListPage<T, S = CertificateListSummary> {
   data: T[];
   total: number;
   page: number;
   page_size: number;
   hasMore: boolean;
+  /** KPIs sobre todos os registros filtrados, não só a página. */
+  summary?: S;
 }
 
 export interface CertificatePjListParams extends CertificatePaginationParams {
@@ -47,6 +60,7 @@ export interface CertificatePj {
   model: string;
   legal_nature: string;
   password?: string | null;
+  password_unavailable?: boolean;
   expiration_date: string;
   notes: string | null;
   was_paid: boolean;
@@ -64,6 +78,7 @@ export interface CertificatePf {
   cpf: string;
   model: string;
   password?: string | null;
+  password_unavailable?: boolean;
   expiration_date: string;
   notes: string | null;
   enterprise: string | null;

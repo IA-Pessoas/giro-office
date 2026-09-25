@@ -18,9 +18,11 @@ import {
 } from "./hooks/queryKeys.ts";
 import * as certificateWorkspaceUi from "./components/certificateWorkspaceUi.ts";
 import {
+  certificateModelOptions,
   getCreatePfPayload,
   getCreatePjPayload,
   getPaymentAmountValidationError,
+  getPaymentDateValidationError,
   getUpdatePfPayload,
   getUpdatePjPayload,
   normalizeCertificateDocumentFilter,
@@ -280,8 +282,8 @@ runTest("certificate workspace shows PF and PJ details in a shared dialog", () =
     detailDialogBlock,
     /\{activeDetailIsLoading \? \([\s\S]*?\{activeDetailErrorMessage \? \([\s\S]*?selected\?\.type === "pj"[\s\S]*?selected\?\.type === "pf"/,
   );
-  assert.match(detailDialogBlock, /renderPasswordBlock\(pjDetail\?\.password\)/);
-  assert.match(detailDialogBlock, /renderPasswordBlock\(pfDetail\?\.password\)/);
+  assert.match(detailDialogBlock, /renderPasswordBlock\(pjDetail\?\.password, pjDetail\?\.password_unavailable\)/);
+  assert.match(detailDialogBlock, /renderPasswordBlock\(pfDetail\?\.password, pfDetail\?\.password_unavailable\)/);
   assert.match(detailDialogBlock, /<CertificateFileActions[\s\S]*?kind="pj"/);
   assert.match(detailDialogBlock, /<CertificateFileActions[\s\S]*?kind="pf"/);
   assert.ok(startEditSelectedBlock, "handler de edição não encontrado");
@@ -388,6 +390,7 @@ runTest("certificate list contract preserves server pagination metadata", () => 
           page: 2,
           page_size: 20,
           has_more: true,
+          summary: { expired: 17, expiring_30_days: 3, with_certificate: 9 },
         },
       },
       { page: 2, page_size: 20 },
@@ -398,8 +401,22 @@ runTest("certificate list contract preserves server pagination metadata", () => 
       page: 2,
       page_size: 20,
       hasMore: true,
+      summary: { expired: 17, expiring_30_days: 3, with_certificate: 9 },
     },
   );
+});
+
+runTest("certificate KPI cards use the server summary, not the current page", () => {
+  const source = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /buildStats\(pjTotal, pjListQuery\.data\?\.summary\)/);
+  assert.match(source, /buildStats\(pfTotal, pfListQuery\.data\?\.summary\)/);
+  assert.doesNotMatch(source, /pjItems\.filter\(\(item\) => item\.has_certificate\)/);
+  assert.match(source, /notificationSummary\?\.pj/);
+  assert.doesNotMatch(source, /notificationItems\.filter\(\(item\) => item\.type === "PJ"\)/);
 });
 
 runTest("certificate workspace uses full pagination controls", () => {
@@ -907,6 +924,82 @@ runTest("issue 743 detail cards use asymmetric grid and break long values", () =
       ),
     );
     assert.ok(cardBlock, `expected ${label} card to use detail value class`);
+  }
+});
+
+runTest("certificate dates stay on the registered civil day in negative time zones", () => {
+  const previousTimeZone = process.env.TZ;
+  const { formatDateBR, formatDaysUntilExpiration } = certificateWorkspaceUi;
+  try {
+    for (const timeZone of ["America/Sao_Paulo", "America/Manaus"]) {
+      process.env.TZ = timeZone;
+
+      assert.equal(formatDateBR("2026-10-10T00:00:00.000Z"), "10/10/2026", timeZone);
+      assert.equal(formatDateBR("2026-11-30T00:00:00.000Z"), "30/11/2026", timeZone);
+
+      // A API grava o vencimento como meia-noite UTC do dia cadastrado.
+      const today = new Date();
+      const inTenDays = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 10);
+      const pad = (value) => String(value).padStart(2, "0");
+      const expiresOn = `${inTenDays.getFullYear()}-${pad(inTenDays.getMonth() + 1)}-${pad(inTenDays.getDate())}`;
+      assert.equal(formatDaysUntilExpiration(`${expiresOn}T00:00:00.000Z`), "10 dias", timeZone);
+    }
+  } finally {
+    if (previousTimeZone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimeZone;
+  }
+});
+
+runTest("certificate documents are masked only when they have a full CPF/CNPJ length", () => {
+  const { formatCertificateDocument } = certificateWorkspaceUi;
+
+  assert.equal(formatCertificateDocument("12345678000195"), "12.345.678/0001-95");
+  assert.equal(formatCertificateDocument("12.345.678/0001-95"), "12.345.678/0001-95");
+  assert.equal(formatCertificateDocument("12345678909"), "123.456.789-09");
+  // Documento legado fora do padrão aparece como está, sem truncar.
+  assert.equal(formatCertificateDocument("123456789012"), "123456789012");
+  assert.equal(formatCertificateDocument(null), "-");
+  assert.equal(formatCertificateDocument(""), "-");
+});
+
+runTest("certificate requires a payment date when marked as paid", () => {
+  assert.equal(getPaymentDateValidationError("", true), "Informe a data de pagamento.");
+  assert.equal(getPaymentDateValidationError("2026-09-25", true), null);
+  assert.equal(getPaymentDateValidationError("", false), null);
+});
+
+runTest("certificate model is chosen among A1/A3 without losing a legacy value", () => {
+  assert.deepEqual(certificateModelOptions(""), ["A1", "A3"]);
+  assert.deepEqual(certificateModelOptions("A3"), ["A1", "A3"]);
+  assert.deepEqual(certificateModelOptions("e-CPF A1"), ["A1", "A3", "e-CPF A1"]);
+});
+
+runTest("certificate form hides the password and uses a model select", () => {
+  const source = readFileSync(new URL("./components/CertificateForm.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /type=\{showPassword \? "text" : "password"\}/);
+  assert.match(source, /aria-label=\{showPassword \? "Ocultar senha" : "Mostrar senha"\}/);
+  assert.match(source, /certificateModelOptions\(formState\.model\)\.map/);
+  assert.match(source, /field: "paymentDate"/);
+});
+
+runTest("certificate tables and detail show masked documents", () => {
+  const source = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  for (const expression of [
+    "item.cnpj",
+    "item.cpf",
+    "pjDetail?.cnpj",
+    "pfDetail?.cpf",
+    "pfDetail?.cnpj",
+  ]) {
+    assert.ok(
+      source.includes(`formatCertificateDocument(${expression})`),
+      `${expression} deve passar por formatCertificateDocument`,
+    );
   }
 });
 
