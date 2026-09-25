@@ -1,6 +1,8 @@
 // KPIs e cliente de cada card da lista de parcelamentos (#1348). Usado pelo service e pelo
 // Worker: o resumo segue o mesmo `where` da lista (filtros, sem paginação).
 
+export const ACTIVE_INSTALLMENT_STATUS = "Ativo";
+
 export type InstallmentListSummary = {
   active: number;
   overdue: number;
@@ -12,7 +14,7 @@ export type InstallmentListClient = { name: string; cpf_cnpj: string };
 
 type Where = Record<string, unknown>;
 
-export type InstallmentListExtrasDb = {
+export type InstallmentSummaryDb = {
   installment: {
     count(args: { where: Where }): Promise<number>;
     aggregate(args: {
@@ -25,6 +27,9 @@ export type InstallmentListExtrasDb = {
       };
     }>;
   };
+};
+
+export type InstallmentClientsDb = {
   client: {
     findMany(args: {
       where: { id: { in: string[] }; organization_id: string };
@@ -33,33 +38,43 @@ export type InstallmentListExtrasDb = {
   };
 };
 
-export async function loadInstallmentListExtras<T extends { client_id: string }>(
-  db: InstallmentListExtrasDb,
-  organizationId: string,
+export async function loadInstallmentSummary(
+  db: InstallmentSummaryDb,
   where: Where,
-  items: T[],
-): Promise<{
-  summary: InstallmentListSummary;
-  items: Array<T & { client: InstallmentListClient | null }>;
-}> {
-  const clientIds = [...new Set(items.map((item) => item.client_id))];
-  const [active, overdue, progress, clients] = await Promise.all([
-    db.installment.count({ where: { ...where, status: "Ativo" } }),
-    db.installment.count({ where: { ...where, overdue_installments_count: { gt: 0 } } }),
+): Promise<InstallmentListSummary> {
+  // AND preserva o filtro de status do usuário: com status=Encerrado, "ativos" é 0.
+  const [active, overdue, progress] = await Promise.all([
+    db.installment.count({ where: { AND: [where, { status: ACTIVE_INSTALLMENT_STATUS }] } }),
+    db.installment.count({ where: { AND: [where, { overdue_installments_count: { gt: 0 } }] } }),
     db.installment.aggregate({
-      where: { ...where, agreed_installments_count: { gt: 0 } },
+      where,
       _sum: { paid_installments_count: true, agreed_installments_count: true },
     }),
-    clientIds.length > 0
-      ? db.client.findMany({
-          where: { id: { in: clientIds }, organization_id: organizationId },
-          select: { id: true, name: true, company_name: true, cpf_cnpj: true },
-        })
-      : Promise.resolve([]),
   ]);
 
   const paid = progress._sum.paid_installments_count ?? 0;
   const agreed = progress._sum.agreed_installments_count ?? 0;
+
+  return {
+    active,
+    overdue,
+    progress_percent: agreed > 0 ? Math.round((paid / agreed) * 100) : 0,
+  };
+}
+
+export async function attachInstallmentClients<T extends { client_id: string }>(
+  db: InstallmentClientsDb,
+  organizationId: string,
+  items: T[],
+): Promise<Array<T & { client: InstallmentListClient | null }>> {
+  const clientIds = [...new Set(items.map((item) => item.client_id))];
+  const clients =
+    clientIds.length > 0
+      ? await db.client.findMany({
+          where: { id: { in: clientIds }, organization_id: organizationId },
+          select: { id: true, name: true, company_name: true, cpf_cnpj: true },
+        })
+      : [];
   const clientsById = new Map(
     clients.map((client) => [
       client.id,
@@ -67,12 +82,5 @@ export async function loadInstallmentListExtras<T extends { client_id: string }>
     ]),
   );
 
-  return {
-    summary: {
-      active,
-      overdue,
-      progress_percent: agreed > 0 ? Math.round((paid / agreed) * 100) : 0,
-    },
-    items: items.map((item) => ({ ...item, client: clientsById.get(item.client_id) ?? null })),
-  };
+  return items.map((item) => ({ ...item, client: clientsById.get(item.client_id) ?? null }));
 }

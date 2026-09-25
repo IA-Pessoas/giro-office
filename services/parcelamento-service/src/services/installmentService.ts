@@ -10,9 +10,11 @@ import type {
 } from "../schemas/installment.schemas.js";
 import { createPage, getPaginationParams } from "../schemas/pagination.schemas.js";
 import {
+  ACTIVE_INSTALLMENT_STATUS,
+  attachInstallmentClients,
   type InstallmentListClient,
   type InstallmentListSummary,
-  loadInstallmentListExtras,
+  loadInstallmentSummary,
 } from "./installmentListExtras.js";
 import {
   createAuditDiff,
@@ -22,7 +24,6 @@ import {
 } from "./parcelamentoAuditService.js";
 
 const CLOSED_INSTALLMENT_STATUSES = new Set(["Liquidado", "Cancelado", "Encerrado", "Inativo"]);
-const ACTIVE_INSTALLMENT_STATUS = "Ativo";
 const SETTLED_INSTALLMENT_STATUS = "Liquidado";
 
 type InstallmentDateInput = Date | string | null | undefined;
@@ -174,7 +175,7 @@ export class InstallmentService {
           : {}),
       });
 
-      const [total, items] = await Promise.all([
+      const [total, items, summary] = await Promise.all([
         this.prisma.installment.count({ where }),
         this.prisma.installment.findMany({
           where,
@@ -183,19 +184,16 @@ export class InstallmentService {
           skip,
           take,
         }),
+        loadInstallmentSummary(this.prisma, where),
       ]);
 
-      const extras = await loadInstallmentListExtras(
+      const withClients = await attachInstallmentClients(
         this.prisma,
         organizationId,
-        where,
         items.map(toInstallmentDto),
       );
 
-      return {
-        ...createPage({ items: extras.items, total, page, pageSize }),
-        summary: extras.summary,
-      };
+      return { ...createPage({ items: withClients, total, page, pageSize }), summary };
     } catch (err: unknown) {
       logError("Erro ao listar parcelamentos", { err });
       if (err instanceof ServiceError) throw err;

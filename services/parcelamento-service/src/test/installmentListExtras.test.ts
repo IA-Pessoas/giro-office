@@ -1,17 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { loadInstallmentListExtras } from "../services/installmentListExtras.js";
+import {
+  attachInstallmentClients,
+  loadInstallmentSummary,
+} from "../services/installmentListExtras.js";
 
 const organizationId = "org-1";
 
 function createDb() {
   return {
     installment: {
-      count: vi.fn(async ({ where }: { where: Record<string, unknown> }) =>
-        where.status === "Ativo" ? 7 : 3,
-      ),
+      count: vi.fn(async () => 3),
       aggregate: vi.fn(async () => ({
-        _sum: { paid_installments_count: 30, agreed_installments_count: 120 },
+        _sum: {
+          paid_installments_count: 30 as number | null,
+          agreed_installments_count: 120 as number | null,
+        },
       })),
     },
     client: {
@@ -23,39 +27,41 @@ function createDb() {
   };
 }
 
-describe("loadInstallmentListExtras (#1348)", () => {
-  it("agrega KPIs sobre o filtro inteiro, não sobre a página", async () => {
+describe("loadInstallmentSummary (#1348)", () => {
+  it("agrega KPIs sobre o filtro inteiro, preservando o filtro do usuário", async () => {
     const db = createDb();
-    const where = { organization_id: organizationId, client_id: "c1" };
+    const where = { organization_id: organizationId, client_id: "c1", status: "Encerrado" };
 
-    const { summary } = await loadInstallmentListExtras(db, organizationId, where, []);
+    const summary = await loadInstallmentSummary(db, where);
 
-    expect(db.installment.count).toHaveBeenCalledWith({ where: { ...where, status: "Ativo" } });
     expect(db.installment.count).toHaveBeenCalledWith({
-      where: { ...where, overdue_installments_count: { gt: 0 } },
+      where: { AND: [where, { status: "Ativo" }] },
+    });
+    expect(db.installment.count).toHaveBeenCalledWith({
+      where: { AND: [where, { overdue_installments_count: { gt: 0 } }] },
     });
     expect(db.installment.aggregate).toHaveBeenCalledWith({
-      where: { ...where, agreed_installments_count: { gt: 0 } },
+      where,
       _sum: { paid_installments_count: true, agreed_installments_count: true },
     });
-    expect(summary).toEqual({ active: 7, overdue: 3, progress_percent: 25 });
+    expect(summary).toEqual({ active: 3, overdue: 3, progress_percent: 25 });
   });
 
   it("progresso é 0 sem parcelas acordadas", async () => {
     const db = createDb();
     db.installment.aggregate.mockResolvedValueOnce({
       _sum: { paid_installments_count: null, agreed_installments_count: null },
-    } as never);
+    });
 
-    const { summary } = await loadInstallmentListExtras(db, organizationId, {}, []);
-
-    expect(summary.progress_percent).toBe(0);
+    expect((await loadInstallmentSummary(db, {})).progress_percent).toBe(0);
   });
+});
 
+describe("attachInstallmentClients (#1348)", () => {
   it("anexa nome e documento do cliente da mesma organização a cada item", async () => {
     const db = createDb();
 
-    const { items } = await loadInstallmentListExtras(db, organizationId, {}, [
+    const items = await attachInstallmentClients(db, organizationId, [
       { id: "i1", client_id: "c1" },
       { id: "i2", client_id: "c2" },
       { id: "i3", client_id: "c9" },
@@ -76,7 +82,7 @@ describe("loadInstallmentListExtras (#1348)", () => {
 
   it("não consulta clientes com página vazia", async () => {
     const db = createDb();
-    await loadInstallmentListExtras(db, organizationId, {}, []);
+    await attachInstallmentClients(db, organizationId, []);
     expect(db.client.findMany).not.toHaveBeenCalled();
   });
 });
