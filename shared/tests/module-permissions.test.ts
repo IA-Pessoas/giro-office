@@ -6,6 +6,7 @@ import {
   normalizeModulePermission,
   normalizeModulePermissions,
   RETIRED_MODULE_KEYS,
+  resolveDepartmentModuleKey,
 } from "../src/auth/modules.js";
 
 test("mantém os 13 módulos ativos e separa os módulos aposentados", () => {
@@ -54,4 +55,27 @@ test("produz somente chaves ativas e preenche módulo omitido com zero", () => {
       triagem: 0,
     },
   );
+});
+
+test("resolve nomes de departamento para a mesma chave canônica de módulo", () => {
+  const cases = {
+    Certificado: "certificado",
+    Comercial: "comercial",
+    Contabilidade: "contabil",
+    "Contábil Fiscal": "contabil",
+    "Contábil Societário": "contabil",
+    Financeiro: "financeiro",
+    Fiscal: "fiscal",
+    "Integração de Clientes": "integracao",
+    Marketing: "marketing",
+    "Departamento Pessoal": "pessoal",
+    "Recursos Humanos": "rh",
+    Tecnologia: "ti",
+    Triagem: "triagem",
+  } as const;
+
+  for (const [departmentName, moduleKey] of Object.entries(cases)) {
+    assert.equal(resolveDepartmentModuleKey(departmentName), moduleKey, departmentName);
+  }
+  assert.equal(resolveDepartmentModuleKey("Atendimento"), null);
 });

@@ -593,6 +593,14 @@ runTest("salva modelos somente depois do resultado e reabre com nomes amigáveis
   assert.doesNotMatch(reportsModelsSource, /\{model\.(organization_id|department_id|version_id)\}/);
 });
 
+runTest("separa modelos pessoais do acervo compartilhado sem departamento", () => {
+  assert.match(reportsModelsSource, /useModuleAccessMap/);
+  assert.match(reportsModelsSource, /useSharedReportModels\(Boolean\(departmentModule\)\)/);
+  assert.match(reportsModelsSource, /personalQuery\.isError/);
+  assert.match(reportsModelsSource, /sharedQuery\.isError/);
+  assert.doesNotMatch(reportsModelsSource, /personalQuery\.isError \|\| sharedQuery\.isError/);
+});
+
 runTest("uses the materialized snapshot id for in-memory downloads", () => {
   assert.match(snapshotTableSource, /snapshotQuery\.data\?\.snapshot\.id/);
   assert.match(snapshotTableSource, /snapshotId \? <ReportDownloadActions id=\{snapshotId\}/);

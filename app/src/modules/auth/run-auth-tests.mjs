@@ -580,6 +580,9 @@ await (async () => {
 
   await runTest("module access helpers normalize aliases and additional permission levels", () => {
     assert.equal(resolveDepartmentModuleKey("Departamento Pessoal"), "pessoal");
+    assert.equal(resolveDepartmentModuleKey("Contabilidade"), "contabil");
+    assert.equal(resolveDepartmentModuleKey("Integração de Clientes"), "integracao");
+    assert.equal(resolveDepartmentModuleKey("Contábil Societário"), "contabil");
     assert.equal(resolveDepartmentModuleKey("Tecnologia"), "ti");
     assert.equal(resolveDepartmentModuleKey("Atendimento"), null);
     assert.equal(resolveDepartmentModuleKey("PEC"), null);

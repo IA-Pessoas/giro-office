@@ -16,9 +16,12 @@ export function ReportsCatalogPage() {
   const { accessMap, departmentModule, user } = useModuleAccessMap();
   const [libraryAvailable, setLibraryAvailable] = useState(true);
   const canManageShared =
-    user?.type === "admin" ||
-    user?.type === "owner" ||
-    Boolean(departmentModule && accessMap[departmentModule]?.isAdmin);
+    Boolean(
+      departmentModule &&
+        (user?.type === "admin" ||
+          user?.type === "owner" ||
+          accessMap[departmentModule]?.isAdmin),
+    );
   const tabs: Array<{ id: ReportsTab; label: string; icon: typeof Plus }> = [
     { id: "create", label: "Criar", icon: Plus },
     { id: "models", label: "Modelos", icon: Layers3 },
