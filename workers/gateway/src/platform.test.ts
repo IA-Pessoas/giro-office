@@ -271,6 +271,29 @@ describe("gateway Worker: superfície /platform", () => {
     expect(forwarded.headers.get("x-auth-impersonator-id")).toBeNull();
   });
 
+  it("auditoria da plataforma vai ao audit-service em /audit/requests (#1530)", async () => {
+    const { app, bindings } = setup();
+
+    const response = await call(
+      app,
+      "GET",
+      "/platform/audit/requests?page=2&method=POST",
+      superAdmin(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(bindings.AUDIT_SERVICE.fetch).toHaveBeenCalledOnce();
+    const forwarded = bindings.AUDIT_SERVICE.fetch.mock.calls[0]?.[0] as Request;
+    const url = new URL(forwarded.url);
+    expect(url.pathname).toBe("/audit/requests");
+    expect(url.search).toBe("?page=2&method=POST");
+    expect(forwarded.headers.get("x-auth-kind")).toBe("platform");
+
+    const denied = await call(app, "GET", "/platform/audit/requests", member(), "bearer");
+    expect(denied.status).toBe(403);
+    expect(bindings.AUDIT_SERVICE.fetch).toHaveBeenCalledOnce();
+  });
+
   it("path de plataforma não mapeado não é roteado", async () => {
     const { app, bindings } = setup();
     const response = await call(app, "GET", "/platform/inexistente", superAdmin());

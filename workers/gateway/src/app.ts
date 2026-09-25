@@ -43,6 +43,8 @@ type Route = {
   prefix: string;
   binding: keyof GatewayWorkerEnv;
   module?: string;
+  /** Caminho no serviço de destino, quando difere do público (o `stripPathPrefix` do Node). */
+  targetPath?: string;
 };
 type FetchBinding = { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> };
 
@@ -99,9 +101,18 @@ type RouteMatcher = {
   methods: readonly string[];
   path: RegExp;
   binding: keyof GatewayWorkerEnv;
+  targetPath?: string;
 };
 
 const platformMatchers: RouteMatcher[] = [
+  // audit-service: o Node remove o prefixo `/platform` (stripPathPrefix) e a busca de
+  // plataforma é a mesma rota `/audit/requests`, escopada pela identidade super_admin.
+  {
+    methods: ["GET"],
+    path: /^\/platform\/audit\/requests\/?$/u,
+    binding: "AUDIT_SERVICE",
+    targetPath: "/audit/requests",
+  },
   // organization-service
   {
     methods: ["GET", "POST"],
@@ -201,7 +212,13 @@ function routeFor(method: string, path: string): Route | undefined {
     (entry) => entry.methods.includes(verb) && entry.path.test(path),
   );
   // `/platform` não tem permissionModule no Node: a permissão global é encaminhada.
-  if (matcher) return { prefix: path, binding: matcher.binding };
+  if (matcher) {
+    return {
+      prefix: path,
+      binding: matcher.binding,
+      ...(matcher.targetPath ? { targetPath: matcher.targetPath } : {}),
+    };
+  }
   return routes.find(({ prefix }) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
@@ -433,9 +450,11 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     headers.set(REQUEST_ID_HEADER, requestId);
     if (auth) forwardIdentity(headers, auth, env, route.module);
     else clearForwardedIdentity(headers, env);
-    const forwardedRequest = new Request(c.req.raw, { headers });
+    const upstreamUrl = new URL(c.req.url);
+    if (route.targetPath) upstreamUrl.pathname = route.targetPath;
+    const forwardedRequest = new Request(upstreamUrl, new Request(c.req.raw, { headers }));
 
-    if (route.prefix === "/audit")
+    if (route.prefix === "/audit" || route.targetPath?.startsWith("/audit/"))
       return withRequestId(await binding.fetch(forwardedRequest), requestId);
 
     const audit = auditAvailability(env);
