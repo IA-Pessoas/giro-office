@@ -637,6 +637,9 @@ importers:
       express-async-errors:
         specifier: ^3.1.1
         version: 3.1.1(express@4.22.1)
+      pdfkit:
+        specifier: 0.19.1
+        version: 0.19.1
       pg:
         specifier: ^8.13.0
         version: 8.20.0

@@ -56,6 +56,61 @@ function gatewayHeaders(overrides: Record<string, string> = {}): HeadersInit {
 }
 
 describe("fiscal Worker", () => {
+  it("registra alíquota manual e entrega PDF no tenant autenticado", async () => {
+    const rate = {
+      id: ICMS_ID,
+      client_id: "d0000000-0000-4000-8000-000000000001",
+      client_name: "Empresa de Exemplo Ltda",
+      client_document: "12.345.678/0001-90",
+      competence: "2026-08",
+      tax_type: "ICMS",
+      rate: "18.0000",
+      issued_by: USER_ID,
+      createdAt: "2026-09-25T12:00:00.000Z",
+    };
+    const rates = {
+      create: vi.fn(async () => rate),
+      list: vi.fn(async () => ({ data: [rate], total: 1, page: 1, limit: 50, hasMore: false })),
+      get: vi.fn(async () => rate),
+    };
+    const app = createFiscalWorkerApp({ env: env(), rateService: rates });
+    const created = await app.request("https://fiscal.test/fiscal/rates", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: rate.client_id,
+        competence: "2026-08",
+        tax_type: "ICMS",
+        rate: "18",
+      }),
+    });
+    expect(created.status).toBe(201);
+    expect(rates.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+
+    const listed = await app.request(
+      `https://fiscal.test/fiscal/rates/list?client_id=${rate.client_id}`,
+      {
+        headers: gatewayHeaders(),
+      },
+    );
+    expect(listed.status).toBe(200);
+    expect(rates.list).toHaveBeenCalledWith(
+      expect.objectContaining({ client_id: rate.client_id }),
+      ORGANIZATION_ID,
+    );
+
+    const pdf = await app.request(`https://fiscal.test/fiscal/rates/${ICMS_ID}/pdf`, {
+      headers: gatewayHeaders(),
+    });
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    expect(pdf.headers.get("cache-control")).toBe("no-store");
+    expect((await pdf.arrayBuffer()).byteLength).toBeGreaterThan(100);
+    expect(rates.get).toHaveBeenCalledWith(ICMS_ID, ORGANIZATION_ID);
+  });
+
   it("returns success envelopes for health and ready", async () => {
     const app = createFiscalWorkerApp({ env: env(), icmsService: service() });
 

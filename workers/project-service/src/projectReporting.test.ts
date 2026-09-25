@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 
 import { executeProjectReportingQuery } from "./projectReporting.js";
 
-it("conta todas as linhas do grupo, inclusive valores nulos", async () => {
+it("conta linhas do grupo separadamente dos valores preenchidos", async () => {
   const result = await executeProjectReportingQuery(
     {
       source: "integracao.projects",
@@ -10,7 +10,10 @@ it("conta todas as linhas do grupo, inclusive valores nulos", async () => {
       limit: 10,
       query: {
         group_by: ["status"],
-        aggregations: [{ field: "name", function: "count_rows", alias: "total" }],
+        aggregations: [
+          { field: "name", function: "count_rows", alias: "rows" },
+          { field: "name", function: "count", alias: "named" },
+        ],
       },
     },
     async () => ({
@@ -22,5 +25,5 @@ it("conta todas as linhas do grupo, inclusive valores nulos", async () => {
     }),
   );
 
-  expect(result.rows).toEqual([{ status: "Ativo", total: 2 }]);
+  expect(result.rows).toEqual([{ status: "Ativo", rows: 2, named: 1 }]);
 });

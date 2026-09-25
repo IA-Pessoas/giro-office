@@ -16,6 +16,7 @@ import { createLog, logUpdateIfChanged } from "./integrations/audit.js";
 import prismaClient from "./integrations/prisma.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
+import { createFiscalRateRoutes, type FiscalRateRouteDeps } from "./routes/fiscalRate.routes.js";
 import {
   createFiscalSearchRoutes,
   type FiscalSearchRouteDeps,
@@ -24,6 +25,7 @@ import { createIcmsRoutes, type IcmsRouteDeps } from "./routes/icms.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createIpiRoutes, type IpiRouteDeps } from "./routes/ipi.routes.js";
 import { createNcmRoutes, type NcmRouteDeps } from "./routes/ncm.routes.js";
+import { FiscalRateService } from "./services/fiscalRateService.js";
 import { FiscalSearchService } from "./services/fiscalSearchService.js";
 import { IcmsService } from "./services/icmsService.js";
 import { IpiService } from "./services/ipiService.js";
@@ -50,6 +52,7 @@ export function createFiscalApp(options: {
   env: FiscalServiceEnv;
   logger: Logger;
   fiscalSearchRouteDeps?: FiscalSearchRouteDeps;
+  fiscalRateRouteDeps?: FiscalRateRouteDeps;
   icmsRouteDeps?: IcmsRouteDeps;
   ipiRouteDeps?: IpiRouteDeps;
   ncmRouteDeps?: NcmRouteDeps;
@@ -57,6 +60,8 @@ export function createFiscalApp(options: {
 }): express.Express {
   const { env, logger } = options;
   const fiscalSearchRouteDeps = options.fiscalSearchRouteDeps ?? new FiscalSearchService();
+  const fiscalRateRouteDeps =
+    options.fiscalRateRouteDeps ?? new FiscalRateService(prismaClient, { createLog });
   const icmsRouteDeps =
     options.icmsRouteDeps ?? new IcmsService(prismaClient, { createLog, logUpdateIfChanged });
   const ipiRouteDeps = options.ipiRouteDeps ?? new IpiService();
@@ -86,6 +91,7 @@ export function createFiscalApp(options: {
   app.use("/fiscal", createIcmsRoutes(icmsRouteDeps));
   app.use("/fiscal", createIpiRoutes(ipiRouteDeps));
   app.use("/fiscal", createFiscalSearchRoutes(fiscalSearchRouteDeps));
+  app.use("/fiscal", createFiscalRateRoutes(fiscalRateRouteDeps));
   app.use(
     "/internal",
     createInternalReportingRouter({ env, reportingService: internalReportingService }),
