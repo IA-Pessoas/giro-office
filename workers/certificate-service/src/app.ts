@@ -21,7 +21,10 @@ import {
   type CertificateUploadFile,
   validateCertificateUploadFile,
 } from "@workspace/certificate-service/src/services/certificateFileValidation.js";
-import { CertificateNotificationService } from "@workspace/certificate-service/src/services/certificateNotificationService.js";
+import {
+  type CertificateNotificationRunResult,
+  CertificateNotificationService,
+} from "@workspace/certificate-service/src/services/certificateNotificationService.js";
 import { createCertificatePasswordCrypto } from "@workspace/certificate-service/src/services/certificatePasswordCrypto.js";
 import { CertificatePfService } from "@workspace/certificate-service/src/services/certificatePfService.js";
 import type { CertificatePjFileDeps } from "@workspace/certificate-service/src/services/certificatePjService.js";
@@ -31,7 +34,7 @@ import {
   type WorkerAuthContext,
   withWorkerPrisma,
 } from "@workspace/runtime";
-import { parseWithZod } from "@workspace/shared";
+import { error as logError, info as logInfo, parseWithZod } from "@workspace/shared";
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -178,6 +181,14 @@ function attachmentFileName(originalName: string): string {
   return originalName.replace(/[^a-zA-Z0-9._-]/g, "_") || "certificate.p12";
 }
 
+function createPasswordCrypto(env: CertificateWorkerOptions["env"]) {
+  return createCertificatePasswordCrypto({
+    keyBase64: env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
+    keyVersion: env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
+    legacyKeyBase64: env.CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY,
+  });
+}
+
 async function withCertificateService<T>(
   options: CertificateWorkerOptions,
   callback: (service: CertificatePjServiceLike) => Promise<T>,
@@ -185,10 +196,7 @@ async function withCertificateService<T>(
   if (options.service) return callback(options.service);
 
   return withWorkerPrisma(options.env, PrismaClient, async (client) => {
-    const passwordCrypto = createCertificatePasswordCrypto({
-      keyBase64: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
-      keyVersion: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
-    });
+    const passwordCrypto = createPasswordCrypto(options.env);
     const service = new CertificatePjService(
       client as unknown as ConstructorParameters<typeof CertificatePjService>[0],
       createCertificateFileDeps(options.env),
@@ -205,10 +213,7 @@ async function withCertificatePfService<T>(
   if (options.pfService) return callback(options.pfService);
 
   return withWorkerPrisma(options.env, PrismaClient, async (client) => {
-    const passwordCrypto = createCertificatePasswordCrypto({
-      keyBase64: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY,
-      keyVersion: options.env.CERTIFICATE_PASSWORD_ENCRYPTION_KEY_VERSION ?? "v1",
-    });
+    const passwordCrypto = createPasswordCrypto(options.env);
     const service = new CertificatePfService(
       client as unknown as ConstructorParameters<typeof CertificatePfService>[0],
       createCertificateFileDeps(options.env),
@@ -240,6 +245,29 @@ async function withCertificateReportingService<T>(
   return withWorkerPrisma(options.env, PrismaClient, (client) =>
     callback(new CertificateReportingService(client as unknown as CertificateReportingPrisma)),
   );
+}
+
+function notificationWindowDays(env: CertificateWorkerEnv): number {
+  const days = Number(env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30);
+  return Number.isInteger(days) && days > 0 ? days : 30;
+}
+
+/** Execução do cron diário (`triggers.crons`): materializa os alertas de vencimento. */
+export async function runScheduledCertificateNotifications(
+  options: Pick<CertificateWorkerOptions, "env" | "notificationService">,
+): Promise<CertificateNotificationRunResult> {
+  try {
+    const result = await withCertificateNotificationService(options, (service) =>
+      service.runCertificateNotificationReconciliation({
+        windowDays: notificationWindowDays(options.env),
+      }),
+    );
+    logInfo("Notificacoes de certificados reconciliadas", { ...result });
+    return result;
+  } catch (err: unknown) {
+    logError("Falha no cron de notificacoes de certificados", { err });
+    throw err;
+  }
 }
 
 export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
@@ -291,7 +319,7 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
       createSuccessResponse(
         await withCertificateNotificationService(options, (service) =>
           service.runCertificateNotificationReconciliation({
-            windowDays: options.env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30,
+            windowDays: notificationWindowDays(options.env),
           }),
         ),
       ),

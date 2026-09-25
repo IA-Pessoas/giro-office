@@ -68,6 +68,20 @@ export function getPaymentAmountValidationError(
   return parseBrlInput(value) === null ? "Informe um valor de pagamento válido." : null;
 }
 
+export function getPaymentDateValidationError(value: string, wasPaid: boolean): string | null {
+  return wasPaid && !value ? "Informe a data de pagamento." : null;
+}
+
+const CERTIFICATE_MODELS = ["A1", "A3"];
+
+/** Modelos do select: A1/A3 e, se houver, o valor legado atual, para não se perder na edição. */
+export function certificateModelOptions(current: string): string[] {
+  const value = current.trim();
+  return value && !CERTIFICATE_MODELS.includes(value)
+    ? [...CERTIFICATE_MODELS, value]
+    : CERTIFICATE_MODELS;
+}
+
 export function getCreatePjPayload(state: PjFormState): CreateCertificatePjBody {
   return {
     client_castelo_status: state.clientCasteloStatus,

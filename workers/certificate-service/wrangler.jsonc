@@ -7,5 +7,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "services": [{ "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }],
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
+  // Reconciliação diária dos alertas de vencimento (09:00 UTC = 06:00 em São Paulo).
+  "triggers": { "crons": ["0 9 * * *"] },
   "observability": { "enabled": true }
 }

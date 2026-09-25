@@ -17,6 +17,12 @@
       "import": "./dist/auth/index.js",
       "default": "./dist/auth/index.js"
     },
+    "./auth/modules": {
+      "types": "./dist/auth/modules.d.ts",
+      "development": "./src/auth/modules.ts",
+      "import": "./dist/auth/modules.js",
+      "default": "./dist/auth/modules.js"
+    },
     "./audit": {
       "types": "./dist/audit/index.d.ts",
       "import": "./dist/audit/index.js",

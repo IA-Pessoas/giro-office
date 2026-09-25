@@ -1,4 +1,5 @@
 import { formatCivilDate } from "../../../shared/utils/dateFormat.ts";
+import { formatCnpjInput, formatCpfInput } from "../../../shared/utils/inputFormatting.ts";
 import type { CSSProperties } from "react";
 
 import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "../../../shared/ui/newLayout/scrollbar.ts";
@@ -199,6 +200,15 @@ export const CERTIFICATE_DATE_STATUS_OK_CLASSNAME =
 
 export const CERTIFICATE_DATE_STATUS_EXPIRED_CLASSNAME =
   "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
+
+/** CPF/CNPJ com máscara só quando o tamanho é completo; valor legado fora do padrão fica como está. */
+export function formatCertificateDocument(value: string | null | undefined): string {
+  if (!value) return "-";
+  const normalized = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  if (normalized.length === 14) return formatCnpjInput(normalized);
+  if (normalized.length === 11 && /^\d+$/u.test(normalized)) return formatCpfInput(normalized);
+  return value;
+}
 
 // Vencimento é data civil: a API manda meia-noite UTC, que em UTC-3 virava o dia anterior (#1366).
 export function formatDateBR(value: string | null | undefined): string {
