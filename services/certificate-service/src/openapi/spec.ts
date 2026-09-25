@@ -183,6 +183,24 @@ function paginatedListSchema(name: string) {
   };
 }
 
+function certificateListSchema(name: string) {
+  const schema = paginatedListSchema(name);
+  const count = { type: "integer", minimum: 0 };
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      summary: {
+        type: "object",
+        description: "KPIs sobre todos os registros filtrados, não só a página.",
+        properties: { expired: count, expiring_30_days: count, with_certificate: count },
+        required: ["expired", "expiring_30_days", "with_certificate"],
+      },
+    },
+    required: [...schema.required, "summary"],
+  };
+}
+
 function certificateFileUploadOperation({
   idParameter,
   operationIdSuffix,
@@ -498,7 +516,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PJ",
           summary: "Lista certificados PJ da organizacao autenticada",
           successDescription: "Certificados PJ listados",
-          successDataSchema: paginatedListSchema("CertificatePj"),
+          successDataSchema: certificateListSchema("CertificatePj"),
           notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [
             ...paginationQueryParameters(),
@@ -597,7 +615,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PF",
           summary: "Lista certificados PF da organizacao autenticada",
           successDescription: "Certificados PF listados",
-          successDataSchema: paginatedListSchema("CertificatePf"),
+          successDataSchema: certificateListSchema("CertificatePf"),
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [
             ...paginationQueryParameters(),

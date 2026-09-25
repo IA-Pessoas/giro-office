@@ -17,6 +17,10 @@ import {
   type CertificateFileStorage,
 } from "./certificateFileStorage.js";
 import type { CertificateUploadFile } from "./certificateFileValidation.js";
+import {
+  type CertificateListSummary,
+  countCertificateListSummary,
+} from "./certificateListSummary.js";
 import type { CertificatePasswordCrypto } from "./certificatePasswordCrypto.js";
 import { isPrismaUniqueConstraintError } from "./prismaErrors.js";
 
@@ -26,6 +30,7 @@ export interface CertificatePjContext {
 
 export interface CertificatePjListInput extends CertificatePjContext {
   query: CertificatePjListQuery;
+  now?: Date;
 }
 
 export interface CertificatePjGetInput extends CertificatePjContext {
@@ -80,7 +85,9 @@ export interface CertificatePjDetailResult extends CertificatePjPublicResult {
   password_unavailable?: true;
 }
 
-export type CertificatePjListResult = PaginatedResult<CertificatePjPublicResult>;
+export type CertificatePjListResult = PaginatedResult<CertificatePjPublicResult> & {
+  summary: CertificateListSummary;
+};
 
 export interface CertificatePjFileMetadataResult {
   file_original_name: string;
@@ -211,8 +218,16 @@ export class CertificatePjService {
   async listCertificatePj(input: CertificatePjListInput): Promise<CertificatePjListResult> {
     const pagination = getPaginationParams(input.query);
     const where = buildListWhere(input.organizationId, input.query);
-    const [total, records] = await Promise.all([
+    const [total, summary, records] = await Promise.all([
       this.prisma.certificatePJ.count({ where }),
+      countCertificateListSummary(
+        (args) =>
+          this.prisma.certificatePJ.count(
+            args as Parameters<typeof this.prisma.certificatePJ.count>[0],
+          ),
+        where,
+        input.now,
+      ),
       this.prisma.certificatePJ.findMany({
         where,
         orderBy: [{ expiration_date: "asc" }, { name: "asc" }],
@@ -221,11 +236,14 @@ export class CertificatePjService {
       }),
     ]);
 
-    return buildPaginatedResult(
-      records.map((record) => removePassword(removeFilePrivateMetadata(record))),
-      total,
-      input.query,
-    );
+    return {
+      ...buildPaginatedResult(
+        records.map((record) => removePassword(removeFilePrivateMetadata(record))),
+        total,
+        input.query,
+      ),
+      summary,
+    };
   }
 
   async getCertificatePj(input: CertificatePjGetInput): Promise<CertificatePjDetailResult> {

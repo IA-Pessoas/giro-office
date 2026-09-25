@@ -388,6 +388,7 @@ runTest("certificate list contract preserves server pagination metadata", () => 
           page: 2,
           page_size: 20,
           has_more: true,
+          summary: { expired: 17, expiring_30_days: 3, with_certificate: 9 },
         },
       },
       { page: 2, page_size: 20 },
@@ -398,8 +399,20 @@ runTest("certificate list contract preserves server pagination metadata", () => 
       page: 2,
       page_size: 20,
       hasMore: true,
+      summary: { expired: 17, expiring_30_days: 3, with_certificate: 9 },
     },
   );
+});
+
+runTest("certificate KPI cards use the server summary, not the current page", () => {
+  const source = readFileSync(
+    new URL("./components/CertificatesWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /buildStats\(pjTotal, pjListQuery\.data\?\.summary\)/);
+  assert.match(source, /buildStats\(pfTotal, pfListQuery\.data\?\.summary\)/);
+  assert.doesNotMatch(source, /pjItems\.filter\(\(item\) => item\.has_certificate\)/);
 });
 
 runTest("certificate workspace uses full pagination controls", () => {
