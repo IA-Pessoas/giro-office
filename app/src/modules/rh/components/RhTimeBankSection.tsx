@@ -115,7 +115,6 @@ export function RhTimeBankSection() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Não foi possível aprovar o lançamento.";
-      toast.error(message);
       setApprovalError(message);
       // Relança para o diálogo permanecer aberto com o erro.
       throw error;

@@ -116,9 +116,11 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<CatalogFormValues>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
+  // O item fica guardado após fechar para o texto não sumir durante a animação de saída.
   const [pendingArchive, setPendingArchive] = useState<TriageCatalogItem | null>(null);
-  const actionError =
-    catalogs.error ?? mutations.create.error ?? mutations.update.error ?? mutations.archive.error;
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  // Erro de arquivamento aparece dentro do diálogo de confirmação.
+  const actionError = catalogs.error ?? mutations.create.error ?? mutations.update.error;
   const isMutating =
     mutations.create.isPending || mutations.update.isPending || mutations.archive.isPending;
 
@@ -286,7 +288,10 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
                       <button
                         type="button"
                         className={BUTTON_CLASSNAME}
-                        onClick={() => setPendingArchive(item)}
+                        onClick={() => {
+                          setPendingArchive(item);
+                          setIsArchiveOpen(true);
+                        }}
                         disabled={isMutating}
                       >
                         <Archive className="h-4 w-4" aria-hidden="true" />
@@ -313,15 +318,19 @@ export function TriageCatalogSection({ canEdit }: { canEdit: boolean }) {
       ) : null}
 
       <ConfirmationDialog
-        open={pendingArchive !== null}
+        open={isArchiveOpen}
         onOpenChange={(open) => {
-          if (!open) setPendingArchive(null);
+          if (open) return;
+          setIsArchiveOpen(false);
+          mutations.archive.reset();
         }}
         title="Arquivar item do catálogo"
         description={`Arquivar o item "${pendingArchive?.label ?? ""}" do catálogo?`}
         onConfirm={confirmArchive}
         isConfirming={mutations.archive.isPending}
-        errorMessage={null}
+        errorMessage={
+          mutations.archive.error ? getContabilErrorMessage(mutations.archive.error) : null
+        }
         confirmLabel="Arquivar"
         cancelLabel="Cancelar"
       />

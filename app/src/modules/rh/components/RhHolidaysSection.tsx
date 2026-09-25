@@ -53,7 +53,6 @@ export function RhHolidaysSection() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Não foi possível excluir o feriado.";
-      toast.error(message);
       setDeleteError(message);
       // Relança para o diálogo permanecer aberto com o erro.
       throw error;

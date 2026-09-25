@@ -217,7 +217,6 @@ export function RhRequestsSection({ initialRequestId }: { initialRequestId?: str
         mutationError instanceof Error
           ? mutationError.message
           : "Não foi possível excluir a solicitação.";
-      toast.error(errorMessage);
       setDeleteError(errorMessage);
       // Relança para o diálogo permanecer aberto com o erro.
       throw mutationError;

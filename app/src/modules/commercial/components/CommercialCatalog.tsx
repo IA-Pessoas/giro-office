@@ -470,9 +470,9 @@ export function CommercialCatalog() {
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
               <Briefcase className="h-5 w-5 text-white" aria-hidden="true" />
-            </div>
+            </span>
             Catálogo de propostas
           </h1>
           <p className="text-gray-600 dark:text-gray-400">

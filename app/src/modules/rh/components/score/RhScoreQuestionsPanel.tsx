@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Eye, Loader2, Plus } from "lucide-react";
+import { ConfirmationDialog } from "@shared/components";
 import { toast } from "@shared/services/toast";
 import {
   useDeleteRhScoreQuestionMutation,
@@ -7,7 +8,6 @@ import {
   useUpdateRhScoreQuestionMutation,
 } from "../../hooks/useRhScore";
 import type { RhScoreQuestion } from "../../types";
-import { RhScoreQuestionDeleteDialog } from "./RhScoreQuestionDeleteDialog";
 import { RhScoreQuestionEditor } from "./RhScoreQuestionEditor";
 import { RhScoreQuestionsListDialog } from "./RhScoreQuestionsListDialog";
 import { RhScoreQuarterGenerationPanel } from "./RhScoreQuarterGenerationPanel";
@@ -86,7 +86,6 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
       toast.success("Pergunta excluída com sucesso.");
     } catch (error) {
       const message = getErrorMessage(error, "Não foi possível excluir a pergunta.");
-      toast.error(message);
       setDeleteError(message);
       // Relança para o diálogo permanecer aberto com o erro.
       throw error;
@@ -182,12 +181,20 @@ export function RhScoreQuestionsPanel({ canManageScore }: { canManageScore: bool
         onDelete={handleRequestDeleteQuestion}
       />
 
-      <RhScoreQuestionDeleteDialog
-        question={questionPendingDelete}
-        isDeleting={deleteMutation.isPending}
-        errorMessage={deleteError}
-        onClose={handleCloseDeleteDialog}
+      <ConfirmationDialog
+        open={Boolean(questionPendingDelete)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            handleCloseDeleteDialog();
+          }
+        }}
+        title="Excluir pergunta de score"
+        description={`Excluir a pergunta "${questionPendingDelete?.question ?? ""}"? Esta ação remove a pergunta de score e não poderá ser desfeita.`}
         onConfirm={handleConfirmDeleteQuestion}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={deleteError}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
       />
 
       <RhScoreQuestionEditor

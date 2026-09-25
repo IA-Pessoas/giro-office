@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Archive, CheckCircle2, CheckSquare, Loader2, Lock, RotateCcw } from "lucide-react";
 
+import { ConfirmationDialog } from "@shared/components";
+
 import {
   useContabilControlBootstrapMutation,
   useArchiveContabilCompetenceMutation,
@@ -10,8 +12,6 @@ import {
   usePatchContabilControlFieldMutation,
   useRestoreContabilCompetenceMutation,
 } from "../hooks";
-import { ConfirmationDialog } from "@shared/components";
-
 import { getContabilErrorMessage } from "../services";
 import type {
   ContabilCompetence,
@@ -299,9 +299,6 @@ export function ContabilControlSection({
     } catch (error) {
       setOperationMessage(null);
       setOperationError(getContabilErrorMessage(error));
-    } finally {
-      setConfirmYearCreation(false);
-      setConfirmArchive(false);
     }
   }
 

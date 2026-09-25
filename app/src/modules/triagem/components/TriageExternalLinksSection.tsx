@@ -148,7 +148,9 @@ export function TriageExternalLinksSection({
   const [createValues, setCreateValues] = useState<LinkFormValues>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<LinkFormValues>(EMPTY_FORM);
+  // O item fica guardado após fechar para o texto não sumir durante a animação de saída.
   const [pendingArchive, setPendingArchive] = useState<TriageExternalLink | null>(null);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const users = (usersQuery.data ?? []).map((user) => ({ id: user.id, name: user.name }));
   const createLinkTypes = linkTypeOptions(linkTypesQuery.data);
   const actionError =
@@ -156,8 +158,8 @@ export function TriageExternalLinksSection({
     linkTypesQuery.error ??
     usersQuery.error ??
     mutations.create.error ??
-    mutations.update.error ??
-    mutations.archive.error;
+    // Erro de arquivamento aparece dentro do diálogo de confirmação.
+    mutations.update.error;
   const isMutating =
     mutations.create.isPending || mutations.update.isPending || mutations.archive.isPending;
 
@@ -289,7 +291,10 @@ export function TriageExternalLinksSection({
                       <button
                         type="button"
                         className={BUTTON_CLASSNAME}
-                        onClick={() => setPendingArchive(link)}
+                        onClick={() => {
+                          setPendingArchive(link);
+                          setIsArchiveOpen(true);
+                        }}
                         disabled={isMutating}
                       >
                         <Archive className="h-4 w-4" aria-hidden="true" />
@@ -311,15 +316,19 @@ export function TriageExternalLinksSection({
       ) : null}
 
       <ConfirmationDialog
-        open={pendingArchive !== null}
+        open={isArchiveOpen}
         onOpenChange={(open) => {
-          if (!open) setPendingArchive(null);
+          if (open) return;
+          setIsArchiveOpen(false);
+          mutations.archive.reset();
         }}
         title="Arquivar link externo"
         description={`Arquivar o link "${pendingArchive?.description || pendingArchive?.url || ""}"?`}
         onConfirm={confirmArchive}
         isConfirming={mutations.archive.isPending}
-        errorMessage={null}
+        errorMessage={
+          mutations.archive.error ? getContabilErrorMessage(mutations.archive.error) : null
+        }
         confirmLabel="Arquivar"
         cancelLabel="Cancelar"
       />
