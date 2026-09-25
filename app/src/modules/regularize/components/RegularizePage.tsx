@@ -30,6 +30,7 @@ import {
   ClientPickerModal,
   ClientSelectionField,
   type ClientPickerOption,
+  useClient,
 } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { PaginationControls } from "@shared/components";
@@ -1240,6 +1241,14 @@ export function RegularizePage() {
   const currentClientPfId = selectedClientPfId ?? firstClientPfId;
   const currentProcessId = selectedProcessId ?? automaticProcessId;
 
+  // Salvar senha de outro cliente limpa o objeto do topo e mantém só o id; o nome vem do cadastro.
+  const headerClientDetailQuery = useClient(
+    activeTab === "partners" && !selectedCredentialClient ? currentCredentialClientId : undefined,
+  );
+  const headerClientName =
+    selectedCredentialClient?.name ||
+    headerClientDetailQuery.data?.company_name ||
+    headerClientDetailQuery.data?.name;
   const partnerQuery = useRegularizePartners(
     currentCredentialClientId ? { type: "pj", client_id: currentCredentialClientId } : undefined,
     { enabled: queryPolicy.partners },
@@ -2462,7 +2471,7 @@ export function RegularizePage() {
                       {item.clientPF?.name || "PF não identificado"}
                     </td>
                     <td className="px-4 py-3">
-                      {selectedCredentialClient?.name || "PJ não identificado"}
+                      {headerClientName || "PJ não identificado"}
                     </td>
                     <td className="px-4 py-3">{formatText(item.part)}</td>
                     <td className="px-4 py-3">{formatDate(item.entry)}</td>

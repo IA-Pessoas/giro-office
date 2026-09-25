@@ -177,14 +177,6 @@ export function RegularizeProcessForm({
   );
   const pjClientDocument = pjClientQuery.data?.cpf_cnpj;
 
-  useEffect(() => {
-    if (!pjClientDocument) return;
-    setFormState((current) =>
-      current.cpf_cnpj.trim()
-        ? current
-        : { ...current, cpf_cnpj: formatCpfCnpjInput(pjClientDocument) },
-    );
-  }, [pjClientDocument]);
 
   useEffect(() => {
     if (open) {
@@ -192,6 +184,16 @@ export function RegularizeProcessForm({
       setFormError(null);
     }
   }, [defaultClientId, open, process]);
+
+  useEffect(() => {
+    // Depois do reset ao abrir: com o cliente em cache, o documento não pode se perder.
+    if (!open || !pjClientDocument) return;
+    setFormState((current) =>
+      current.cpf_cnpj.trim()
+        ? current
+        : { ...current, cpf_cnpj: formatCpfCnpjInput(pjClientDocument) },
+    );
+  }, [open, pjClientDocument]);
 
   function handleChange<K extends keyof RegularizeProcessFormState>(
     key: K,
@@ -207,7 +209,8 @@ export function RegularizeProcessForm({
     setFormState((current) => ({
       ...current,
       clientKind: value,
-      client_id: "",
+      client_id: value === "pj" ? defaultClientId : "",
+      cpf_cnpj: "",
     }));
   }
 

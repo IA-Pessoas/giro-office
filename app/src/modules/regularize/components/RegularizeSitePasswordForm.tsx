@@ -47,8 +47,7 @@ function buildSitePasswordFormState(
 
   return {
     name: sitePassword.name ?? "",
-    // "legacy" veio da migração; o usuário precisa escolher o escopo real ao editar (#1347).
-    sphere: sitePassword.sphere === "legacy" ? "" : (sitePassword.sphere ?? ""),
+    sphere: sitePassword.sphere ?? "",
     link: sitePassword.link ?? "",
     user: sitePassword.user ?? "",
     password: sitePassword.password ?? "",

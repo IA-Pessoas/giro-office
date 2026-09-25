@@ -48,10 +48,10 @@ export function RegularizeTaskSelect({
         className={regularizeTextFieldClassName}
       />
       <RegularizeNativeSelect
-        aria-label="Tarefa vinculada"
+        aria-label="Selecionar tarefa"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        disabled={tasksQuery.isLoading || Boolean(tasksQuery.error)}
+        disabled={Boolean(tasksQuery.error)}
       >
         <option value="">Nenhuma tarefa</option>
         {options.map((task) => (

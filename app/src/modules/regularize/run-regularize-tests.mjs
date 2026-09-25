@@ -1107,7 +1107,8 @@ await runTest("regularize partners follow the header client and name both sides 
     /useRegularizePartners\(\s*currentCredentialClientId\s*\?\s*\{ type: "pj", client_id: currentCredentialClientId \}/,
   );
   assert.match(pageSource, /item\.clientPF\?\.name \|\| "PF não identificado"/);
-  assert.match(pageSource, /selectedCredentialClient\?\.name \|\| "PJ não identificado"/);
+  assert.match(pageSource, /headerClientName \|\| "PJ não identificado"/);
+  assert.match(pageSource, /headerClientDetailQuery\.data\?\.company_name/);
   assert.match(pageSource, /Selecione um cliente no topo para ver os sócios\./);
   assert.doesNotMatch(pageSource, /useClients\(/);
   assert.doesNotMatch(pageSource, /formatText\(item\.pf_id\)\.slice\(0, 8\)/);
@@ -1642,6 +1643,11 @@ await runTest("regularize forms avoid technical jargon and prefill the client do
     assert.match(source, /<RegularizeTaskSelect/);
   }
   assert.match(processForm, /useClient\(/);
+  // Preenchimento roda depois do reset do formulário, senão o documento some ao reabrir.
+  assert.ok(
+    processForm.indexOf("}, [defaultClientId, open, process]);") <
+      processForm.indexOf("}, [open, pjClientDocument]);"),
+  );
   assert.match(processForm, /list=\{processTypeListId\}/);
 
   const taskSelect = await readModuleSource("components/RegularizeTaskSelect.tsx");
