@@ -52,6 +52,7 @@ import {
   assertModulesWithinActor,
   authenticatePlatformValidationRequest,
   authenticateUserRequest,
+  hasImpersonationPermission,
   type PlatformIdentity,
   requireCsrf,
   requireManageUsers,
@@ -238,13 +239,17 @@ function base64url(value: Uint8Array | string): string {
   return btoa(binary).replace(/\+/gu, "-").replace(/\//gu, "_").replace(/=+$/u, "");
 }
 
-async function signSessionToken(claims: Record<string, unknown>, secret: string): Promise<string> {
+async function signSessionToken(
+  claims: Record<string, unknown>,
+  secret: string,
+  expiresInSeconds = SESSION_MAX_AGE_SECONDS,
+): Promise<string> {
   const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const payload = base64url(
     JSON.stringify({
       ...claims,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS,
+      exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
     }),
   );
   const input = `${header}.${payload}`;
@@ -485,6 +490,7 @@ async function refreshOrganizationSession(
       id: sessionId,
       user_id: auth.userId,
       csrf_hash: csrfHash,
+      impersonator_platform_user_id: null,
       revoked_at: null,
       expires_at: { gt: new Date() },
     },
@@ -496,8 +502,11 @@ async function refreshOrganizationSession(
   if (updated.count !== 1) {
     const currentSession = await db.authSession.findFirst({
       where: { id: sessionId, user_id: auth.userId, revoked_at: null },
-      select: { csrf_hash: true },
+      select: { csrf_hash: true, impersonator_platform_user_id: true },
     });
+    if (currentSession?.impersonator_platform_user_id) {
+      throw new ServiceError(403, "Sessões de personificação não podem ser renovadas.");
+    }
     if (currentSession?.csrf_hash !== csrfHash) {
       throw new ServiceError(409, "Sessão substituída por uma renovação mais recente.");
     }
@@ -1065,6 +1074,360 @@ async function authFor(
   return authenticateUserRequest(c.req.raw, envOf(c, options));
 }
 
+export const IMPERSONATION_SESSION_MAX_AGE_SECONDS = 60 * 60;
+
+type ImpersonationEnd = {
+  sessionId: string;
+  organizationId: string;
+  targetUserId: string;
+  targetName: string;
+  platformUserId: string;
+  startedAt: Date;
+  endedAt: Date;
+  reason: "saída" | "revogação" | "expiração";
+};
+
+function organizationIdOf(user: Row): string {
+  const department = user.department as Row | undefined;
+  return String(user.organization_id ?? department?.organization_id ?? "");
+}
+
+function impersonationEndAudit(event: ImpersonationEnd): UserAuditParams {
+  return {
+    required: true,
+    actorUserId: event.targetUserId,
+    platformActorUserId: event.platformUserId,
+    organizationId: event.organizationId,
+    action: "platform.impersonation.ended",
+    referring: "user",
+    referringId: event.targetUserId,
+    changes: {
+      operatorPlatformUserId: event.platformUserId,
+      target: { id: event.targetUserId, name: event.targetName },
+      startedAt: event.startedAt.toISOString(),
+      endedAt: event.endedAt.toISOString(),
+      durationMs: Math.max(0, event.endedAt.getTime() - event.startedAt.getTime()),
+      reason: event.reason,
+    },
+  };
+}
+
+const IMPERSONATION_TARGET_SELECT = {
+  ...userSelect(),
+  session_version: true,
+  organization: { select: { id: true, status: true } },
+  department: {
+    select: { organization_id: true, organization: { select: { id: true, status: true } } },
+  },
+};
+
+/**
+ * Abre uma sessão de organização do usuário-alvo por 60 minutos em nome do super admin e
+ * revoga a sessão de plataforma usada, tudo numa transação.
+ */
+async function startImpersonation(
+  db: UserPrismaClient,
+  audit: UserAuditRecorder,
+  input: {
+    organizationId: string;
+    targetUserId: string;
+    platformUserId: string;
+    platformSessionId: string;
+    platformSessionCsrfHash: string;
+  },
+  env: UserWorkerEnv,
+): Promise<{ user: Row; token: string; csrfToken: string; startedAt: Date }> {
+  if (!db.$transaction) throw new ServiceError(503, "Personificação não configurada.");
+  return db.$transaction(
+    async (transaction) => {
+      const operator = await transaction.platformUser.findFirst({
+        where: { id: input.platformUserId },
+        select: { id: true, platform_role: true, status: true, can_impersonate: true },
+      });
+      if (!hasImpersonationPermission(operator)) {
+        throw new ServiceError(403, "Você não tem permissão para personificar usuários.");
+      }
+
+      const target = await transaction.user.findFirst({
+        where: organizationUserWhere(input.targetUserId, input.organizationId),
+        select: IMPERSONATION_TARGET_SELECT,
+      });
+      if (!target) throw new ServiceError(404, "Usuário não encontrado nesta organização.");
+      if (activeOrganizationId(target) !== input.organizationId) {
+        throw new ServiceError(403, "Não é possível personificar usuário ou organização inativa.");
+      }
+
+      const startedAt = new Date();
+      if (!transaction.platformAuthSession.updateMany || !transaction.authSession.create) {
+        throw new ServiceError(503, "Personificação não configurada.");
+      }
+      const revoked = await transaction.platformAuthSession.updateMany({
+        where: {
+          id: input.platformSessionId,
+          platform_user_id: input.platformUserId,
+          csrf_hash: input.platformSessionCsrfHash,
+          revoked_at: null,
+          expires_at: { gt: startedAt },
+        },
+        data: { revoked_at: startedAt },
+      });
+      if (revoked.count !== 1) {
+        throw new ServiceError(401, "Sessão da plataforma expirada ou substituída.");
+      }
+
+      const csrfToken = createCsrfToken();
+      const csrfHash = await hashCsrfToken(csrfToken);
+      const sessionId = crypto.randomUUID();
+      await transaction.authSession.create({
+        data: {
+          id: sessionId,
+          user_id: target.id,
+          impersonator_platform_user_id: input.platformUserId,
+          csrf_hash: csrfHash,
+          expires_at: new Date(startedAt.getTime() + IMPERSONATION_SESSION_MAX_AGE_SECONDS * 1000),
+        },
+      });
+      const permission = await transaction.permission.findFirst({
+        where: { user_id: target.id, organization_id: input.organizationId },
+        select: Object.fromEntries(ACTIVE_MODULE_KEYS.map((key) => [key, true])),
+      });
+      const modules = normalizeModulePermissions(permission);
+      // Último passo da transação: sem auditoria gravada, a sessão não é criada.
+      await audit({
+        required: true,
+        actorUserId: String(target.id),
+        platformActorUserId: input.platformUserId,
+        organizationId: input.organizationId,
+        action: "platform.impersonation.started",
+        referring: "user",
+        referringId: String(target.id),
+        changes: {
+          operatorPlatformUserId: input.platformUserId,
+          target: { id: target.id, name: target.name },
+          startedAt: startedAt.toISOString(),
+        },
+      });
+      const token = await signSessionToken(
+        {
+          user_id: target.id,
+          organization_id: input.organizationId,
+          name: target.name,
+          login: target.login,
+          permission: target.permission,
+          type: target.type,
+          session_version: target.session_version,
+          session_id: sessionId,
+          modules,
+          csrf_hash: csrfHash,
+          impersonator_platform_user_id: input.platformUserId,
+        },
+        env.JWT_SECRET,
+        IMPERSONATION_SESSION_MAX_AGE_SECONDS,
+      );
+      return {
+        user: sessionUserData(target, input.organizationId, modules),
+        token,
+        csrfToken,
+        startedAt,
+      };
+    },
+    { isolationLevel: "Serializable" },
+  );
+}
+
+/** Encerra a personificação atual e devolve o operador à plataforma, se ele seguir ativo. */
+async function exitImpersonation(
+  db: UserPrismaClient,
+  audit: UserAuditRecorder,
+  auth: UserAuthContext,
+  env: UserWorkerEnv,
+): Promise<{
+  platformSession: { identity: PlatformIdentity; token: string; csrfToken: string } | null;
+}> {
+  const sessionId = auth.claims.session_id;
+  const csrfHash = auth.claims.csrf_hash;
+  const impersonator = auth.claims.impersonator_platform_user_id;
+  if (!sessionId || !csrfHash || !impersonator || !auth.organizationId) {
+    throw new ServiceError(401, "Sessão de personificação inválida.");
+  }
+  if (!db.$transaction) throw new ServiceError(503, "Personificação não configurada.");
+  return db.$transaction(
+    async (transaction) => {
+      const endedAt = new Date();
+      const session = await transaction.authSession.findFirst({
+        where: {
+          id: sessionId,
+          user_id: auth.userId,
+          csrf_hash: csrfHash,
+          impersonator_platform_user_id: impersonator,
+          revoked_at: null,
+          expires_at: { gt: endedAt },
+        },
+        select: {
+          id: true,
+          created_at: true,
+          impersonatorPlatformUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              platform_role: true,
+              status: true,
+              can_impersonate: true,
+              session_version: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              organization_id: true,
+              department: { select: { organization_id: true } },
+            },
+          },
+        },
+      });
+      const user = session?.user as Row | undefined;
+      const operator = session?.impersonatorPlatformUser as Row | undefined;
+      if (!session || !user || !operator || organizationIdOf(user) !== auth.organizationId) {
+        throw new ServiceError(401, "Sessão de personificação inválida.");
+      }
+      if (!transaction.authSession.updateMany) {
+        throw new ServiceError(503, "Personificação não configurada.");
+      }
+      const revoked = await transaction.authSession.updateMany({
+        where: {
+          id: sessionId,
+          user_id: auth.userId,
+          csrf_hash: csrfHash,
+          impersonator_platform_user_id: impersonator,
+          revoked_at: null,
+          expires_at: { gt: endedAt },
+        },
+        data: { revoked_at: endedAt },
+      });
+      if (revoked.count !== 1) throw new ServiceError(401, "Sessão de personificação inválida.");
+
+      const operatorActive =
+        operator.status === "active" && operator.platform_role === "super_admin";
+      const platformSession = operatorActive
+        ? await openPlatformSession(transaction, operator, env)
+        : null;
+      await audit(
+        impersonationEndAudit({
+          sessionId,
+          organizationId: auth.organizationId,
+          targetUserId: String(user.id),
+          targetName: String(user.name),
+          platformUserId: impersonator,
+          startedAt: new Date(String(session.created_at)),
+          endedAt,
+          reason: "saída",
+        }),
+      );
+      return { platformSession };
+    },
+    { isolationLevel: "Serializable" },
+  );
+}
+
+/**
+ * Varredura do cron: encerra e audita personificações vencidas que ninguém fechou.
+ * Cada sessão tem transação própria; auditoria falha desfaz só aquela.
+ */
+export async function expireImpersonationSessions(
+  db: UserPrismaClient,
+  audit: UserAuditRecorder,
+  now = new Date(),
+): Promise<number> {
+  if (!db.authSession.findMany || !db.$transaction) return 0;
+  const sessions = await db.authSession.findMany({
+    where: {
+      impersonator_platform_user_id: { not: null },
+      revoked_at: null,
+      expires_at: { lte: now },
+    },
+    orderBy: { expires_at: "asc" },
+    take: 100,
+    select: {
+      id: true,
+      created_at: true,
+      expires_at: true,
+      impersonator_platform_user_id: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          organization_id: true,
+          department: { select: { organization_id: true } },
+        },
+      },
+    },
+  });
+  let expired = 0;
+  for (const session of sessions) {
+    const user = session.user as Row;
+    const platformUserId = String(session.impersonator_platform_user_id ?? "");
+    const organizationId = organizationIdOf(user);
+    if (!platformUserId || !organizationId) continue;
+    const ended = await db.$transaction(async (transaction) => {
+      if (!transaction.authSession.updateMany) return false;
+      const revoked = await transaction.authSession.updateMany({
+        where: {
+          id: session.id,
+          impersonator_platform_user_id: platformUserId,
+          revoked_at: null,
+          expires_at: { lte: now },
+        },
+        data: { revoked_at: now },
+      });
+      if (revoked.count !== 1) return false;
+      await audit(
+        impersonationEndAudit({
+          sessionId: String(session.id),
+          organizationId,
+          targetUserId: String(user.id),
+          targetName: String(user.name),
+          platformUserId,
+          startedAt: new Date(String(session.created_at)),
+          endedAt: new Date(String(session.expires_at)),
+          reason: "expiração",
+        }),
+      );
+      return true;
+    });
+    if (ended) expired += 1;
+  }
+  return expired;
+}
+
+/** Dados do banner de personificação para o `/user/me`. */
+async function impersonationInfo(db: UserPrismaClient, auth: UserAuthContext): Promise<Row | null> {
+  const impersonator = auth.claims.impersonator_platform_user_id;
+  if (!impersonator || !auth.claims.session_id) return null;
+  const session = await db.authSession.findFirst({
+    where: {
+      id: auth.claims.session_id,
+      user_id: auth.userId,
+      impersonator_platform_user_id: impersonator,
+      revoked_at: null,
+      expires_at: { gt: new Date() },
+    },
+    select: { expires_at: true, impersonatorPlatformUser: { select: { id: true, name: true } } },
+  });
+  const operator = session?.impersonatorPlatformUser as Row | undefined;
+  if (!session || !operator) return null;
+  const organization = await db.organization.findFirst({
+    where: { id: auth.organizationId },
+    select: { name: true },
+  });
+  return {
+    operator: { id: operator.id, name: operator.name },
+    expires_at: new Date(String(session.expires_at)).toISOString(),
+    organization_name: organization?.name ?? "",
+  };
+}
+
 const PLATFORM_SUPER_ADMIN_SELECT = {
   id: true,
   name: true,
@@ -1079,10 +1442,11 @@ const PLATFORM_SUPER_ADMIN_SELECT = {
  */
 async function updateSuperAdminImpersonationPermission(
   db: UserPrismaClient,
+  audit: UserAuditRecorder,
   actorId: string,
   superAdminId: string,
   canImpersonate: boolean,
-): Promise<{ superAdmin: Row; changed: boolean; revokedSessions: number }> {
+): Promise<{ superAdmin: Row; changed: boolean }> {
   if (actorId === superAdminId) {
     throw new ServiceError(409, "Não é permitido alterar a própria permissão.");
   }
@@ -1110,7 +1474,7 @@ async function updateSuperAdminImpersonationPermission(
       });
       if (!target) throw new ServiceError(404, "Super admin não encontrado.");
       if (target.can_impersonate === canImpersonate) {
-        return { superAdmin: target, changed: false, revokedSessions: 0 };
+        return { superAdmin: target, changed: false };
       }
       if (!transaction.platformUser.updateMany) {
         throw new ServiceError(503, "Atualização não configurada.");
@@ -1134,28 +1498,60 @@ async function updateSuperAdminImpersonationPermission(
         );
       }
 
-      let revokedSessions = 0;
+      const ended: ImpersonationEnd[] = [];
       if (!canImpersonate) {
-        if (!transaction.authSession.updateMany) {
+        if (!transaction.authSession.updateMany || !transaction.authSession.findMany) {
           throw new ServiceError(503, "Revogação de sessões não configurada.");
         }
         const now = new Date();
-        const revoked = await transaction.authSession.updateMany({
-          where: {
-            impersonator_platform_user_id: superAdminId,
-            revoked_at: null,
-            expires_at: { gt: now },
+        const active = {
+          impersonator_platform_user_id: superAdminId,
+          revoked_at: null,
+          expires_at: { gt: now },
+        };
+        const sessions = await transaction.authSession.findMany({
+          where: active,
+          select: {
+            id: true,
+            created_at: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                organization_id: true,
+                department: { select: { organization_id: true } },
+              },
+            },
           },
-          data: { revoked_at: now },
         });
-        revokedSessions = revoked.count;
+        await transaction.authSession.updateMany({ where: active, data: { revoked_at: now } });
+        for (const session of sessions) {
+          const user = session.user as Row;
+          ended.push({
+            sessionId: String(session.id),
+            organizationId: organizationIdOf(user),
+            targetUserId: String(user.id),
+            targetName: String(user.name),
+            platformUserId: superAdminId,
+            startedAt: new Date(String(session.created_at)),
+            endedAt: now,
+            reason: "revogação",
+          });
+        }
       }
 
-      return {
-        superAdmin: { ...target, can_impersonate: canImpersonate },
-        changed: true,
-        revokedSessions,
-      };
+      await audit({
+        required: true,
+        platformActorUserId: actorId,
+        organizationId: null,
+        action: "platform.super_admin.impersonation_permission.updated",
+        referring: "platform_user",
+        referringId: superAdminId,
+        changes: { can_impersonate: { from: !canImpersonate, to: canImpersonate } },
+      });
+      for (const event of ended) await audit(impersonationEndAudit(event));
+
+      return { superAdmin: { ...target, can_impersonate: canImpersonate }, changed: true };
     },
     { isolationLevel: "Serializable" },
   );
@@ -1264,6 +1660,15 @@ async function createPlatformSession(
   if (!user || !valid || user.status !== "active" || user.platform_role !== "super_admin") {
     throw new ServiceError(401, "Login ou senha inválidos.");
   }
+  return openPlatformSession(db, user, env);
+}
+
+/** Abre sessão de plataforma para um super admin já verificado. */
+async function openPlatformSession(
+  db: UserPrismaClient,
+  user: Row,
+  env: UserWorkerEnv,
+): Promise<{ identity: PlatformIdentity; token: string; csrfToken: string }> {
   const identity: PlatformIdentity = {
     id: user.id as string,
     name: user.name as string,
@@ -1609,9 +2014,11 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         where: { user_id: auth.userId, organization_id: auth.organizationId },
         select: { task_completion: true },
       });
+      const impersonation = await impersonationInfo(db, auth);
       return c.json(
         createSuccessResponse({
           ...toUser(row, auth.organizationId),
+          ...(impersonation ? { impersonation } : {}),
           modules: modulesFrom(permission),
           task_completion: specific?.task_completion === true,
           service: "user-service",
@@ -1775,6 +2182,9 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         );
       }
       const ownPasswordChange = body.password !== undefined;
+      if (ownPasswordChange && auth.claims.impersonator_platform_user_id) {
+        throw new ServiceError(403, "Não é permitido alterar a senha durante a personificação.");
+      }
       const selfPasswordUpdate =
         ownPasswordChange &&
         Object.keys(body).every((key) => key === "password" || key === "current_password");
@@ -2168,24 +2578,68 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       );
       const result = await updateSuperAdminImpersonationPermission(
         db,
+        options.audit,
         identity.id,
         superAdminId,
         canImpersonate,
       );
-      if (result.changed) {
-        await options.audit({
-          platformActorUserId: identity.id,
-          organizationId: null,
-          action: "platform.super_admin.impersonation_permission.updated",
-          referring: "platform_user",
-          referringId: superAdminId,
-          changes: {
-            can_impersonate: { from: !canImpersonate, to: canImpersonate },
-            ...(canImpersonate ? {} : { revoked_impersonation_sessions: result.revokedSessions }),
-          },
-        });
-      }
       return c.json(createSuccessResponse(result.superAdmin));
+    }),
+  );
+
+  app.post("/platform/organizations/:organizationId/users/:userId/impersonate", async (c) =>
+    withDb(c, options, async (db) => {
+      const { auth, identity } = await platformContext(c, options, db);
+      await requireCsrf(c.req.raw, auth);
+      if (!options.audit)
+        throw new ServiceError(503, "Auditoria indisponível para iniciar personificação.");
+      const { organizationId, userId } = parse(platformOrganizationUserParamsSchema, c.req.param());
+      const { sessionId, csrfHash } = {
+        sessionId: auth.claims.session_id ?? "",
+        csrfHash: auth.claims.csrf_hash ?? "",
+      };
+      const issued = await startImpersonation(
+        db,
+        options.audit,
+        {
+          organizationId,
+          targetUserId: userId,
+          platformUserId: identity.id,
+          platformSessionId: sessionId,
+          platformSessionCsrfHash: csrfHash,
+        },
+        envOf(c, options),
+      );
+      sessionCookies(
+        c,
+        createSessionCookieHeaders(issued.token, issued.csrfToken, {
+          secure: envOf(c, options).AUTH_COOKIE_SECURE ?? false,
+          maxAgeSeconds: IMPERSONATION_SESSION_MAX_AGE_SECONDS,
+        }),
+      );
+      return c.json(createSuccessResponse(issued.user));
+    }),
+  );
+
+  app.post("/platform/impersonation/exit", async (c) =>
+    withDb(c, options, async (db) => {
+      const auth = await authFor(c, options);
+      if (auth.actorKind !== "organization" || !auth.claims.impersonator_platform_user_id) {
+        throw new ServiceError(403, "Acesso negado para esta rota.");
+      }
+      await requireCsrf(c.req.raw, auth);
+      if (!options.audit)
+        throw new ServiceError(503, "Auditoria indisponível para encerrar personificação.");
+      const exited = await exitImpersonation(db, options.audit, auth, envOf(c, options));
+      const secure = envOf(c, options).AUTH_COOKIE_SECURE ?? false;
+      const session = exited.platformSession;
+      sessionCookies(
+        c,
+        session
+          ? createSessionCookieHeaders(session.token, session.csrfToken, { secure })
+          : createExpiredSessionCookieHeaders({ secure }),
+      );
+      return c.json(createSuccessResponse({ identity: session?.identity ?? null }));
     }),
   );
 
