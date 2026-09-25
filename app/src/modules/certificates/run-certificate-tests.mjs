@@ -923,4 +923,27 @@ runTest("issue 743 detail cards use asymmetric grid and break long values", () =
   }
 });
 
+runTest("certificate dates stay on the registered civil day in negative time zones", () => {
+  const previousTimeZone = process.env.TZ;
+  const { formatDateBR, formatDaysUntilExpiration } = certificateWorkspaceUi;
+  try {
+    for (const timeZone of ["America/Sao_Paulo", "America/Manaus"]) {
+      process.env.TZ = timeZone;
+
+      assert.equal(formatDateBR("2026-10-10T00:00:00.000Z"), "10/10/2026", timeZone);
+      assert.equal(formatDateBR("2026-11-30T00:00:00.000Z"), "30/11/2026", timeZone);
+
+      // A API grava o vencimento como meia-noite UTC do dia cadastrado.
+      const today = new Date();
+      const inTenDays = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 10);
+      const pad = (value) => String(value).padStart(2, "0");
+      const expiresOn = `${inTenDays.getFullYear()}-${pad(inTenDays.getMonth() + 1)}-${pad(inTenDays.getDate())}`;
+      assert.equal(formatDaysUntilExpiration(`${expiresOn}T00:00:00.000Z`), "10 dias", timeZone);
+    }
+  } finally {
+    if (previousTimeZone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimeZone;
+  }
+});
+
 console.log("certificates contract tests passed");
