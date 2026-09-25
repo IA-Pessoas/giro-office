@@ -37,6 +37,7 @@ export const createInstallmentBodySchema = z
     legal_nature: nonEmptyText("legal_nature"),
     jurisdiction: nonEmptyText("jurisdiction"),
     is_automatic_debit: z.boolean(),
+    consolidated_total_amount: nonNegativeNumber.optional(),
     first_installment_amount: nonNegativeNumber,
     current_month_installment_amount: nonNegativeNumber,
     agreed_installments_count: positiveInteger,

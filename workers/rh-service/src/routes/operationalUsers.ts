@@ -14,6 +14,7 @@ const OPERATIONAL_USER_CATALOG_MODULES = [
   "ti",
   "integracao",
   "triagem",
+  "parcelamento",
 ] as const;
 
 export function registerOperationalUserRoutes(app: RhApp, deps: RhRouteDeps): void {

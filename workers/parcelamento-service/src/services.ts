@@ -17,6 +17,7 @@ import type {
   ListPanoramasQuery,
   PatchPanoramaBody,
 } from "@workspace/parcelamento-service/src/schemas/panorama.schemas.js";
+import { computeOutstandingBalance } from "@workspace/parcelamento-service/src/services/installmentBalance.js";
 import {
   attachInstallmentClients,
   loadInstallmentSummary,
@@ -325,7 +326,12 @@ export function createInstallmentService(
             paid_installments_count: paid,
             overdue_installments_count: Math.max(overdueRaw - paid, 0),
             remaining_installments_count: remaining,
-            outstanding_balance: remaining * installment.current_month_installment_amount,
+            outstanding_balance: computeOutstandingBalance({
+              total: installment.consolidated_total_amount,
+              agreed: installment.agreed_installments_count,
+              remaining,
+              currentAmount: installment.current_month_installment_amount,
+            }),
             ...statusData,
           },
         });
@@ -403,10 +409,15 @@ export function createInstallmentService(
                 type: input.type,
                 jurisdiction: input.jurisdiction,
                 is_automatic_debit: input.is_automatic_debit,
-                consolidated_total_amount: 0,
+                consolidated_total_amount: input.consolidated_total_amount ?? 0,
                 first_installment_amount: input.first_installment_amount,
                 current_month_installment_amount: input.current_month_installment_amount,
-                outstanding_balance: 0,
+                outstanding_balance: computeOutstandingBalance({
+                  total: input.consolidated_total_amount ?? 0,
+                  agreed: input.agreed_installments_count,
+                  remaining: input.agreed_installments_count,
+                  currentAmount: input.current_month_installment_amount,
+                }),
                 paid_installments_count: 0,
                 agreed_installments_count: input.agreed_installments_count,
                 remaining_installments_count: input.agreed_installments_count,

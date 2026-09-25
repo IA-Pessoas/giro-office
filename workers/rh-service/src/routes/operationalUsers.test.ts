@@ -37,6 +37,22 @@ describe("GET /rh/operational-users", () => {
     });
   });
 
+  it("lets Parcelamento users load their responsible catalog (#1349)", async () => {
+    const fake = db();
+    const response = await call(testApp(fake), "GET", "/rh/operational-users?module=parcelamento", {
+      permission: 0,
+      modules: { parcelamento: 1 },
+    });
+
+    expect(response.status).toBe(200);
+    const where = (
+      fake.user.findMany.mock.calls[0] as unknown as [{ where: Record<string, unknown> }]
+    )[0].where;
+    expect(where.permissions).toEqual({
+      some: { organization_id: TEST_ORGANIZATION_ID, parcelamento: { gt: 0 } },
+    });
+  });
+
   it("returns 403 without RH management or any catalog module", async () => {
     const fake = db();
     const response = await call(testApp(fake), "GET", "/rh/operational-users", {
