@@ -1,3 +1,4 @@
+import { formatTime } from "@shared/utils/dateFormat";
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { GrSend } from "react-icons/gr";
@@ -208,7 +209,7 @@ const MessageBubble = ({ message, isSentByMe, chatType, isHighlighted }) => {
                 )}
                 {renderContent()}
                 <span style={{ fontSize: '0.7em', color: '#667781', float: 'right', marginLeft: '10px', marginTop: '5px' }}>
-                    {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatTime(message.createdAt)}
                 </span>
                 <Box display={'flex'} alignItems={'center'} float={'right'} ml={'10px'} mt={'5px'}>
                     {message.isEdited && <span style={{ fontSize: '0.7em', color: '#888', marginRight: '5px' }}><FaRegEdit /></span> }

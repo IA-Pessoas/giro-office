@@ -1,3 +1,4 @@
+import { formatCivilDate } from "../../../shared/utils/dateFormat.ts";
 import type { CSSProperties } from "react";
 
 import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "../../../shared/ui/newLayout/scrollbar.ts";
@@ -197,17 +198,13 @@ export const CERTIFICATE_DATE_STATUS_OK_CLASSNAME =
 export const CERTIFICATE_DATE_STATUS_EXPIRED_CLASSNAME =
   "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
 
+// Vencimento é data civil: a API manda meia-noite UTC, que em UTC-3 virava o dia anterior (#1366).
 export function formatDateBR(value: string | null | undefined): string {
   if (!value) {
     return "Sem informação";
   }
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Data inválida";
-  }
-
-  return date.toLocaleDateString("pt-BR");
+  return formatCivilDate(value, "Data inválida");
 }
 
 export function formatDaysUntilExpiration(value: string): string {
