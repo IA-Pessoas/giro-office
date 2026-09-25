@@ -376,6 +376,15 @@ async function run() {
       animations: "disabled",
     });
   }
+  async function screenshotRegion(name, locator) {
+    if (!evidenceDir) return;
+    await mkdir(evidenceDir, { recursive: true });
+    await page.waitForTimeout(1800);
+    await locator.screenshot({
+      path: `${evidenceDir}/${name}.png`,
+      animations: "disabled",
+    });
+  }
   async function checkLanguage() {
     assert.doesNotMatch(
       await page.getByRole("tabpanel").innerText(),
@@ -433,6 +442,7 @@ async function run() {
       areas: [{ source: "integracao.projects", fields: ["name"], filters: [] }],
     });
     await panel.getByLabel("Timbrado do PDF").selectOption(letterhead.id);
+    await screenshotRegion("01-timbrado-selecionado", panel.getByLabel("Timbrado do PDF").locator(".."));
     await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
     await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
     assert.deepEqual(definitions.at(-1).letterhead, { id: letterhead.id, sha256: letterhead.sha256 });
@@ -587,12 +597,14 @@ async function run() {
     await expect(chartResult.getByRole("alert")).toContainText("mesma categoria e série");
     await chartResult.locator('section[aria-label="Visualização gráfica"] select').nth(3).selectOption("status");
     await expect(chartResult.getByRole("img", { name: /Gráfico de barras/ })).toBeVisible();
+    await screenshotRegion("04-grafico-barras", chartResult.locator('section[aria-label="Visualização gráfica"]'));
     await expect(chartResult.getByRole("table").first()).toContainText("Projeto gerado");
     await chartResult.getByText("Ver valores do gráfico", { exact: true }).click();
     await expect(chartResult.getByRole("table").first()).toContainText("7");
     await chartType.selectOption("pie");
     await chartResult.locator('section[aria-label="Visualização gráfica"] select').nth(1).selectOption("category");
     await expect(chartResult.getByRole("img", { name: /Gráfico de setores/ })).toBeVisible();
+    await screenshotRegion("05-grafico-setores", chartResult.locator('section[aria-label="Visualização gráfica"]'));
     const chartValues = chartResult.locator('section[aria-label="Visualização gráfica"] details');
     if (!(await chartValues.evaluate((element) => element.open))) {
       await chartValues.getByText("Ver valores do gráfico").click();
@@ -671,6 +683,8 @@ async function run() {
     await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
     await panel.getByRole("checkbox", { name: /Organizar relações entre campos/ }).check();
     await expect(panel.getByRole("group", { name: "Relações entre campos" })).toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await screenshotRegion("02-relacoes-lista-agrupada", panel.getByRole("group", { name: "Relações entre campos" }));
     await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
     await expect(panel.getByRole("heading", { name: "Revisar relatório", exact: true })).toBeVisible();
     assert.equal(definitions.at(-1).version, 3);
@@ -681,6 +695,7 @@ async function run() {
     await relationships.getByLabel("Apresentação desta área").selectOption("summary");
     await relationships.getByText("Colunas visíveis", { exact: true }).locator("..").getByRole("checkbox", { name: "Nome" }).uncheck();
     await expect(relationships).toContainText("grupos diferentes podem parecer linhas iguais");
+    await screenshotRegion("03-relacoes-resumo", relationships);
     const unexpectedConsoleErrors = consoleErrors.filter(
       (message) =>
         !message.includes("403 (Forbidden)") && !message.includes("422 (Unprocessable Entity)"),
