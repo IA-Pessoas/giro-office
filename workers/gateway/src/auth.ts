@@ -12,6 +12,7 @@ import {
 import {
   AUTH_SESSION_TRANSPORT_HEADER,
   FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -28,6 +29,7 @@ import type { GatewayWorkerEnv } from "./env.js";
 
 const FORWARDED_IDENTITY_HEADERS = [
   FORWARDED_AUTH_USER_ID_HEADER,
+  FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
@@ -125,4 +127,7 @@ export function forwardIdentity(
     headers.set(FORWARDED_AUTH_SESSION_VERSION_HEADER, String(sessionVersion));
   }
   if (auth.claims.csrf_hash) headers.set(FORWARDED_AUTH_CSRF_HASH_HEADER, auth.claims.csrf_hash);
+  if (auth.claims.impersonator_platform_user_id) {
+    headers.set(FORWARDED_AUTH_IMPERSONATOR_ID_HEADER, auth.claims.impersonator_platform_user_id);
+  }
 }

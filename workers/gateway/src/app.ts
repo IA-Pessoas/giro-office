@@ -43,6 +43,8 @@ type Route = {
   prefix: string;
   binding: keyof GatewayWorkerEnv;
   module?: string;
+  /** Caminho no serviço de destino, quando difere do público (o `stripPathPrefix` do Node). */
+  targetPath?: string;
 };
 type FetchBinding = { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> };
 
@@ -99,9 +101,18 @@ type RouteMatcher = {
   methods: readonly string[];
   path: RegExp;
   binding: keyof GatewayWorkerEnv;
+  targetPath?: string;
 };
 
 const platformMatchers: RouteMatcher[] = [
+  // audit-service: o Node remove o prefixo `/platform` (stripPathPrefix) e a busca de
+  // plataforma é a mesma rota `/audit/requests`, escopada pela identidade super_admin.
+  {
+    methods: ["GET"],
+    path: /^\/platform\/audit\/requests\/?$/u,
+    binding: "AUDIT_SERVICE",
+    targetPath: "/audit/requests",
+  },
   // organization-service
   {
     methods: ["GET", "POST"],
@@ -117,6 +128,12 @@ const platformMatchers: RouteMatcher[] = [
   { methods: ["POST", "DELETE"], path: /^\/platform\/session\/?$/u, binding: "USER_SERVICE" },
   { methods: ["POST"], path: /^\/platform\/session\/refresh\/?$/u, binding: "USER_SERVICE" },
   { methods: ["GET"], path: /^\/platform\/me\/?$/u, binding: "USER_SERVICE" },
+  { methods: ["GET"], path: /^\/platform\/super-admins\/?$/u, binding: "USER_SERVICE" },
+  {
+    methods: ["PATCH"],
+    path: /^\/platform\/super-admins\/[^/]+\/impersonation-permission\/?$/u,
+    binding: "USER_SERVICE",
+  },
   {
     methods: ["GET", "POST"],
     path: /^\/platform\/organizations\/[^/]+\/users\/?$/u,
@@ -147,6 +164,14 @@ const platformMatchers: RouteMatcher[] = [
     path: /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/u,
     binding: "USER_SERVICE",
   },
+  {
+    methods: ["POST"],
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate\/?$/u,
+    binding: "USER_SERVICE",
+  },
+  // Chamado pela sessão personificada (identidade de organização); a policy impersonationOnly
+  // vem de getRoutePolicy (services/gateway/src/security/policies.ts).
+  { methods: ["POST"], path: /^\/platform\/impersonation\/exit\/?$/u, binding: "USER_SERVICE" },
   // Precisa vir depois dos matchers mais específicos acima, senão engoliria
   // `/platform/organizations/:id/users` e `/platform/organizations/:id/status`.
   {
@@ -187,8 +212,38 @@ function routeFor(method: string, path: string): Route | undefined {
     (entry) => entry.methods.includes(verb) && entry.path.test(path),
   );
   // `/platform` não tem permissionModule no Node: a permissão global é encaminhada.
-  if (matcher) return { prefix: path, binding: matcher.binding };
+  if (matcher) {
+    return {
+      prefix: path,
+      binding: matcher.binding,
+      ...(matcher.targetPath ? { targetPath: matcher.targetPath } : {}),
+    };
+  }
   return routes.find(({ prefix }) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
+/** Valida no user-service que a sessão do token segue ativa (logout e revogação valem na hora). */
+async function validateGatewaySession(
+  request: Request,
+  auth: Awaited<ReturnType<typeof authenticateGatewayRequest>>,
+  env: GatewayWorkerEnv,
+): Promise<void> {
+  if (!isServiceBinding(env.USER_SERVICE)) {
+    throw new ServiceError(503, "Validação de sessão indisponível.");
+  }
+  const hasCookie = Boolean(
+    readCookie(request.headers.get("cookie") ?? undefined, AUTH_SESSION_COOKIE_NAME),
+  );
+  try {
+    await validateWorkerSession(auth, env.USER_SERVICE, hasCookie ? "cookie" : "bearer", {
+      internalServiceToken: env.INTERNAL_SERVICE_TOKEN,
+    });
+  } catch (error) {
+    if (error instanceof WorkerSessionValidationError) {
+      throw new ServiceError(error.statusCode, error.message);
+    }
+    throw error;
+  }
 }
 
 function isServiceBinding(value: unknown): value is FetchBinding {
@@ -275,6 +330,10 @@ function auditPayload(
     metadata: {
       actorKind: auth?.actorKind ?? "public",
       ...(auth?.actorKind === "platform" ? { platformUserId: auth.userId } : {}),
+      // Sessão personificada: a requisição é do usuário, mas quem age é o super admin.
+      ...(auth?.claims.impersonator_platform_user_id
+        ? { actorPlatformUserId: auth.claims.impersonator_platform_user_id }
+        : {}),
       routeTarget: route.binding,
       routePrefix: route.prefix,
     },
@@ -345,22 +404,7 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     }
     if (!auth.organizationId) throw new ServiceError(401, "Contexto autenticado não informado.");
     // Sem proxy nao ha servico para validar a sessao; o gateway valida aqui, como os Workers.
-    if (!isServiceBinding(env.USER_SERVICE)) {
-      throw new ServiceError(503, "Validação de sessão indisponível.");
-    }
-    const hasCookie = Boolean(
-      readCookie(c.req.header("cookie") ?? undefined, AUTH_SESSION_COOKIE_NAME),
-    );
-    try {
-      await validateWorkerSession(auth, env.USER_SERVICE, hasCookie ? "cookie" : "bearer", {
-        internalServiceToken: env.INTERNAL_SERVICE_TOKEN,
-      });
-    } catch (error) {
-      if (error instanceof WorkerSessionValidationError) {
-        throw new ServiceError(error.statusCode, error.message);
-      }
-      throw error;
-    }
+    await validateGatewaySession(c.req.raw, auth, env);
 
     const connectionString = env.HYPERDRIVE?.connectionString || env.DATABASE_URL;
     if (!connectionString)
@@ -408,6 +452,13 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
       if (!isSelfUserPut && !canAccessRoute({ ...auth, claims: { ...auth.claims } }, policy)) {
         throw new ServiceError(403, "Acesso negado para esta rota.");
       }
+      // Sessão personificada sempre revalida no user-service: revogar a permissão, sair ou
+      // expirar corta o acesso na hora, inclusive nos Workers que confiam só na identidade
+      // repassada. O Node revalidava toda rota; a paridade total segue em issue própria.
+      // A busca de auditoria da plataforma lê todas as organizações e também revalida.
+      if (auth.claims.impersonator_platform_user_id || route.targetPath === "/audit/requests") {
+        await validateGatewaySession(c.req.raw, auth, env);
+      }
     }
     const requestId = requestIdFor(c.req.raw);
     c.set("requestId", requestId);
@@ -415,10 +466,13 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     headers.set(REQUEST_ID_HEADER, requestId);
     if (auth) forwardIdentity(headers, auth, env, route.module);
     else clearForwardedIdentity(headers, env);
-    const forwardedRequest = new Request(c.req.raw, { headers });
+    const upstreamUrl = new URL(c.req.url);
+    if (route.targetPath) upstreamUrl.pathname = route.targetPath;
+    const forwardedRequest = new Request(upstreamUrl, new Request(c.req.raw, { headers }));
 
-    if (route.prefix === "/audit")
+    if (route.binding === "AUDIT_SERVICE") {
       return withRequestId(await binding.fetch(forwardedRequest), requestId);
+    }
 
     const audit = auditAvailability(env);
     if (!audit) {

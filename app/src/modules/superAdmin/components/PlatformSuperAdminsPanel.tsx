@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { serverErrorMessage } from "@shared/services/serverErrorToast";
 import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "@shared/ui/newLayout/scrollbar";
 
 import {
@@ -33,7 +34,7 @@ export function PlatformSuperAdminsPanel() {
       ) : null}
       {permissionMutation.isError ? (
         <p className="text-sm text-rose-700 dark:text-rose-300" role="alert">
-          Não foi possível atualizar a permissão de personificação.
+          {serverErrorMessage(permissionMutation.error)}
         </p>
       ) : null}
       {permissionMutation.isSuccess ? (

@@ -11,6 +11,8 @@ const textEncoder = new TextEncoder();
 
 export interface SessionCookieOptions {
   secure: boolean;
+  /** Padrão: SESSION_MAX_AGE_SECONDS. A personificação usa 60 minutos. */
+  maxAgeSeconds?: number;
 }
 
 function byteLength(value: string): number {
@@ -99,9 +101,12 @@ export function stripBrowserAuth(cookieHeader: string | undefined): string | und
   return remaining.length > 0 ? remaining.join("; ") : undefined;
 }
 
-function cookieAttributes({ secure }: SessionCookieOptions, httpOnly: boolean): string {
+function cookieAttributes(
+  { secure, maxAgeSeconds = SESSION_MAX_AGE_SECONDS }: SessionCookieOptions,
+  httpOnly: boolean,
+): string {
   return [
-    `Max-Age=${SESSION_MAX_AGE_SECONDS}`,
+    `Max-Age=${maxAgeSeconds}`,
     "Path=/",
     httpOnly ? "HttpOnly" : undefined,
     secure ? "Secure" : undefined,

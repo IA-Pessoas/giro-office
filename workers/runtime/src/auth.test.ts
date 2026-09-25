@@ -98,6 +98,22 @@ describe("authenticateWorkerRequest", () => {
     });
   });
 
+  it("preserva o personificador da sessão de organização (#1529)", async () => {
+    const token = await signToken({
+      user_id: "user-1",
+      organization_id: "org-1",
+      auth_kind: "organization",
+      impersonator_platform_user_id: "platform-1",
+    });
+
+    const auth = await authenticateWorkerRequest(
+      request({ cookie: `cw.session=${encodeURIComponent(token)}` }),
+      { jwtSecret: SECRET },
+    );
+
+    expect(auth.claims.impersonator_platform_user_id).toBe("platform-1");
+  });
+
   it("rejeita Bearer quando a compatibilidade está desabilitada", async () => {
     const token = await signToken({ user_id: "user-1" });
 

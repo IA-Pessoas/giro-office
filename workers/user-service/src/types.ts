@@ -18,6 +18,7 @@ export interface UserPrismaClient {
   };
   authSession: {
     findFirst(args: Record<string, unknown>): Promise<Row | null>;
+    findMany?(args: Record<string, unknown>): Promise<Row[]>;
     create?(args: Record<string, unknown>): Promise<Row>;
     updateMany?(args: Record<string, unknown>): Promise<{ count: number }>;
   };
@@ -34,6 +35,8 @@ export interface UserPrismaClient {
   platformUser: {
     findFirst(args: Record<string, unknown>): Promise<Row | null>;
     findUnique(args: Record<string, unknown>): Promise<Row | null>;
+    findMany?(args: Record<string, unknown>): Promise<Row[]>;
+    updateMany?(args: Record<string, unknown>): Promise<{ count: number }>;
   };
   department: {
     findMany(args: Record<string, unknown>): Promise<Row[]>;

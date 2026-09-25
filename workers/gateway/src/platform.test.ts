@@ -91,6 +91,20 @@ function member(): Promise<string> {
   });
 }
 
+/** Sessão de organização aberta por um super admin (personificação). */
+async function impersonated(): Promise<string> {
+  return signJwt({
+    user_id: "user-1",
+    organization_id: "org-1",
+    auth_kind: "organization",
+    type: "user",
+    permission: 1,
+    modules: {},
+    csrf_hash: await hashCsrfToken(CSRF),
+    impersonator_platform_user_id: "platform-1",
+  });
+}
+
 /**
  * Ator de plataforma só autentica por cookie de sessão: `auth.ts:159` recusa
  * `auth_kind: "platform"` quando o transporte é Bearer. Ator de organização
@@ -201,6 +215,113 @@ describe("gateway Worker: superfície /platform", () => {
     await call(app, "POST", "/platform/organizations/org-9/users", superAdmin());
     expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledOnce();
     expect(bindings.ORGANIZATION_SERVICE.fetch).toHaveBeenCalledOnce();
+  });
+
+  it("super admins e permissão de personificação vão ao user-service (#1528)", async () => {
+    const { app, bindings } = setup();
+
+    const list = await call(app, "GET", "/platform/super-admins", superAdmin());
+    const patch = await call(
+      app,
+      "PATCH",
+      "/platform/super-admins/20000000-0000-4000-8000-000000000009/impersonation-permission",
+      superAdmin(),
+    );
+
+    expect([list.status, patch.status]).toEqual([200, 200]);
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("iniciar personificação vai ao user-service só para super admin (#1529)", async () => {
+    const { app, bindings } = setup();
+    const path = "/platform/organizations/org-1/users/user-1/impersonate";
+
+    expect((await call(app, "POST", path, superAdmin())).status).toBe(200);
+    expect((await call(app, "POST", path, member(), "bearer")).status).toBe(403);
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledOnce();
+  });
+
+  it("sair da personificação aceita só a sessão personificada e repassa o operador (#1529)", async () => {
+    const { app, bindings } = setup();
+
+    const exit = await call(app, "POST", "/platform/impersonation/exit", impersonated());
+    expect(exit.status).toBe(200);
+    // 1ª chamada: validação da sessão personificada; 2ª: a própria rota.
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledTimes(2);
+    const forwarded = bindings.USER_SERVICE.fetch.mock.calls[1]?.[0] as Request;
+    expect(forwarded.headers.get("x-auth-impersonator-id")).toBe("platform-1");
+
+    expect(
+      (await call(app, "POST", "/platform/impersonation/exit", member(), "bearer")).status,
+    ).toBe(403);
+    expect((await call(app, "POST", "/platform/impersonation/exit", superAdmin())).status).toBe(
+      403,
+    );
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("sessão personificada revogada é barrada no gateway, antes do serviço", async () => {
+    const { app, bindings } = setup();
+    // user-service responde 401 à validação: a personificação foi encerrada ou revogada.
+    bindings.USER_SERVICE.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+
+    const response = await call(app, "GET", "/user/me", impersonated());
+
+    expect(response.status).toBe(401);
+    // Só a validação chegou ao user-service; a rota em si não foi encaminhada.
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledOnce();
+  });
+
+  it("o cliente não forja o header do personificador", async () => {
+    const { app, bindings } = setup();
+    const token = await member();
+
+    await app.request("https://gateway.test/user/me", {
+      headers: { authorization: `Bearer ${token}`, "x-auth-impersonator-id": "platform-9" },
+    });
+
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledOnce();
+    const forwarded = bindings.USER_SERVICE.fetch.mock.calls[0]?.[0] as Request;
+    expect(forwarded.headers.get("x-auth-impersonator-id")).toBeNull();
+  });
+
+  it("auditoria da plataforma vai ao audit-service em /audit/requests (#1530)", async () => {
+    const { app, bindings } = setup();
+
+    const response = await call(
+      app,
+      "GET",
+      "/platform/audit/requests?page=2&method=POST",
+      superAdmin(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(bindings.AUDIT_SERVICE.fetch).toHaveBeenCalledOnce();
+    const forwarded = bindings.AUDIT_SERVICE.fetch.mock.calls[0]?.[0] as Request;
+    const url = new URL(forwarded.url);
+    expect(url.pathname).toBe("/audit/requests");
+    expect(url.search).toBe("?page=2&method=POST");
+    expect(forwarded.headers.get("x-auth-kind")).toBe("platform");
+  });
+
+  it("auditoria da plataforma barra organização e sessão personificada", async () => {
+    const { app, bindings } = setup();
+
+    const member403 = await call(app, "GET", "/platform/audit/requests", member(), "bearer");
+    const impersonated403 = await call(app, "GET", "/platform/audit/requests", impersonated());
+
+    expect([member403.status, impersonated403.status]).toEqual([403, 403]);
+    expect(bindings.AUDIT_SERVICE.fetch).not.toHaveBeenCalled();
+  });
+
+  it("auditoria da plataforma revalida a sessão do super admin", async () => {
+    const { app, bindings } = setup();
+    bindings.USER_SERVICE.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+
+    const response = await call(app, "GET", "/platform/audit/requests", superAdmin());
+
+    expect(response.status).toBe(401);
+    expect(bindings.AUDIT_SERVICE.fetch).not.toHaveBeenCalled();
   });
 
   it("path de plataforma não mapeado não é roteado", async () => {
