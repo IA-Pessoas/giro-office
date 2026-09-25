@@ -472,6 +472,7 @@ await runTest("regularize license upload failure retries from the persisted lice
     pageSource,
     /isCreateSubmission && persistedLicenseId[\s\S]*mode: "edit", id: persistedLicenseId/,
   );
+  assert.match(pageSource, /A licença foi salva, mas não foi possível armazenar o protocolo/);
   assert.match(pageSource, /key=\{licenseFormSessionKey\}/);
   assert.doesNotMatch(
     formSource,
