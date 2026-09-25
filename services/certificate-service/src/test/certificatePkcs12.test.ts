@@ -32,6 +32,10 @@ describe("certificate PKCS#12 check", () => {
     ["um byte", Buffer.from([1])],
     ["DER truncado", sha256Fixture.subarray(0, 200)],
     ["SEQUENCE vazia", Buffer.from([0x30, 0x00])],
+    [
+      "BER indefinido aninhado",
+      Buffer.from(Array.from({ length: 5000 }, () => [0x30, 0x80]).flat()),
+    ],
   ])("rejects a file that is not PKCS#12: %s", (_label, buffer) => {
     expect(checkPkcs12(buffer, "secret-password")).toBe("invalid");
   });

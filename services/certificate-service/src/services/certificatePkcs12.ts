@@ -28,12 +28,15 @@ const MAC_ALGORITHMS: Record<string, { hash: string; blockSize: number }> = {
   "608648016503040202": { hash: "sha384", blockSize: 128 },
   "608648016503040203": { hash: "sha512", blockSize: 128 },
 };
-const MAX_MAC_ITERATIONS = 1_000_000;
+// Arquivos reais usam ~2.048; acima disso o custo de CPU no Worker não compensa a checagem.
+const MAX_MAC_ITERATIONS = 100_000;
+// PFX real tem poucos níveis; o limite barra BER indefinido aninhado de propósito.
+const MAX_DEPTH = 32;
 
 class Pkcs12FormatError extends Error {}
 
-function readTlv(buffer: Buffer, offset: number): Tlv {
-  if (offset + 2 > buffer.length) throw new Pkcs12FormatError();
+function readTlv(buffer: Buffer, offset: number, depth = 0): Tlv {
+  if (depth > MAX_DEPTH || offset + 2 > buffer.length) throw new Pkcs12FormatError();
   const tag = buffer[offset] as number;
   let position = offset + 1;
   let length = buffer[position++] as number;
@@ -42,7 +45,7 @@ function readTlv(buffer: Buffer, offset: number): Tlv {
     // Comprimento indefinido (BER): filhos até o marcador 00 00.
     let child = position;
     while (buffer[child] !== 0 || buffer[child + 1] !== 0) {
-      child = readTlv(buffer, child).end;
+      child = readTlv(buffer, child, depth + 1).end;
     }
     return { tag, value: buffer.subarray(position, child), end: child + 2 };
   }
@@ -78,10 +81,11 @@ function expectTag(tlv: Tlv | undefined, tag: number): Tlv {
   return tlv;
 }
 
-function octetStringContent(tlv: Tlv | undefined): Buffer {
+function octetStringContent(tlv: Tlv | undefined, depth = 0): Buffer {
+  if (depth > MAX_DEPTH) throw new Pkcs12FormatError();
   if (tlv?.tag === TAG_OCTET_STRING) return tlv.value;
   if (tlv?.tag === TAG_CONSTRUCTED_OCTET_STRING) {
-    return Buffer.concat(children(tlv.value).map(octetStringContent));
+    return Buffer.concat(children(tlv.value).map((child) => octetStringContent(child, depth + 1)));
   }
   throw new Pkcs12FormatError();
 }
@@ -150,7 +154,8 @@ export function checkPkcs12(buffer: Buffer, password: string | undefined): Pkcs1
     const expected = octetStringContent(digestTlv);
     const salt = octetStringContent(saltTlv);
     const iterations = iterationsTlv ? readInteger(expectTag(iterationsTlv, TAG_INTEGER)) : 1;
-    if (iterations < 1 || iterations > MAX_MAC_ITERATIONS) return "invalid";
+    if (iterations < 1) return "invalid";
+    if (iterations > MAX_MAC_ITERATIONS) return "valid";
 
     const key = deriveMacKey(mac.hash, mac.blockSize, bmpPassword(password), salt, iterations);
     const actual = createHmac(mac.hash, key).update(authSafeBytes).digest();
@@ -158,7 +163,7 @@ export function checkPkcs12(buffer: Buffer, password: string | undefined): Pkcs1
       ? "valid"
       : "wrong_password";
   } catch (err: unknown) {
-    if (err instanceof Pkcs12FormatError || err instanceof RangeError) return "invalid";
+    if (err instanceof Pkcs12FormatError) return "invalid";
     throw err;
   }
 }
