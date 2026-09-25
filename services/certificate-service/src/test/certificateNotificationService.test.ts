@@ -86,7 +86,6 @@ describe("CertificateNotificationService", () => {
 
     expect(prisma.certificatePJ.findMany).toHaveBeenCalledWith({
       where: {
-        has_certificate: true,
         expiration_date: { lte: windowEnd },
       },
       select: {
@@ -98,7 +97,6 @@ describe("CertificateNotificationService", () => {
     });
     expect(prisma.certificatePF.findMany).toHaveBeenCalledWith({
       where: {
-        has_certificate: true,
         expiration_date: { lte: windowEnd },
       },
       select: {

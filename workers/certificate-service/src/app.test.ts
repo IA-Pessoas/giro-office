@@ -1,6 +1,10 @@
 import { ServiceError } from "@workspace/shared/http";
 import { describe, expect, it, vi } from "vitest";
-import { type CertificateWorkerEnv, createCertificateWorkerApp } from "./app.js";
+import {
+  type CertificateWorkerEnv,
+  createCertificateWorkerApp,
+  runScheduledCertificateNotifications,
+} from "./app.js";
 
 const USER_ID = "c0000000-0000-4000-8000-000000000001";
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
@@ -226,6 +230,20 @@ describe("certificate Worker PJ slice", () => {
     expect(
       certificateNotificationService.runCertificateNotificationReconciliation,
     ).toHaveBeenCalledWith({ windowDays: 30 });
+  });
+
+  it("runs the scheduled notification reconciliation with the configured window", async () => {
+    const certificateNotificationService = notificationService();
+
+    await expect(
+      runScheduledCertificateNotifications({
+        env: { ...env(), CERTIFICATE_NOTIFICATION_WINDOW_DAYS: 15 },
+        notificationService: certificateNotificationService,
+      }),
+    ).resolves.toEqual({ evaluated: 2, created: 1, updated: 1 });
+    expect(
+      certificateNotificationService.runCertificateNotificationReconciliation,
+    ).toHaveBeenCalledWith({ windowDays: 15 });
   });
 
   it("keeps the authenticated organization on the PJ CRUD flow", async () => {

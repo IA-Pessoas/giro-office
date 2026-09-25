@@ -110,14 +110,12 @@ export class CertificateNotificationService {
       const [certificatePj, certificatePf] = await Promise.all([
         this.prisma.certificatePJ.findMany({
           where: {
-            has_certificate: true,
             expiration_date: { lte: windowEnd },
           },
           select: certificateNotificationCandidateSelect,
         }),
         this.prisma.certificatePF.findMany({
           where: {
-            has_certificate: true,
             expiration_date: { lte: windowEnd },
           },
           select: certificateNotificationCandidateSelect,

@@ -31,7 +31,7 @@ import {
   type WorkerAuthContext,
   withWorkerPrisma,
 } from "@workspace/runtime";
-import { parseWithZod } from "@workspace/shared";
+import { info as logInfo, parseWithZod } from "@workspace/shared";
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -244,6 +244,23 @@ async function withCertificateReportingService<T>(
   );
 }
 
+function notificationWindowDays(env: CertificateWorkerEnv): number {
+  return env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30;
+}
+
+/** Execução do cron diário (`triggers.crons`): materializa os alertas de vencimento. */
+export async function runScheduledCertificateNotifications(
+  options: Pick<CertificateWorkerOptions, "env" | "notificationService">,
+) {
+  const result = await withCertificateNotificationService(options, (service) =>
+    service.runCertificateNotificationReconciliation({
+      windowDays: notificationWindowDays(options.env),
+    }),
+  );
+  logInfo("Notificacoes de certificados reconciliadas", { ...result });
+  return result;
+}
+
 export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
   const app = new Hono<CertificateHonoEnv>();
 
@@ -293,7 +310,7 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
       createSuccessResponse(
         await withCertificateNotificationService(options, (service) =>
           service.runCertificateNotificationReconciliation({
-            windowDays: options.env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30,
+            windowDays: notificationWindowDays(options.env),
           }),
         ),
       ),
