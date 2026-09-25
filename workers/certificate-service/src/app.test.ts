@@ -128,6 +128,7 @@ function notificationService() {
       evaluated: 2,
       created: 1,
       updated: 1,
+      removed: 0,
     })),
   };
 }
@@ -240,7 +241,7 @@ describe("certificate Worker PJ slice", () => {
         env: { ...env(), CERTIFICATE_NOTIFICATION_WINDOW_DAYS: 15 },
         notificationService: certificateNotificationService,
       }),
-    ).resolves.toEqual({ evaluated: 2, created: 1, updated: 1 });
+    ).resolves.toEqual({ evaluated: 2, created: 1, updated: 1, removed: 0 });
     expect(
       certificateNotificationService.runCertificateNotificationReconciliation,
     ).toHaveBeenCalledWith({ windowDays: 15 });

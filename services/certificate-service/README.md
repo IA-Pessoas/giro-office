@@ -113,12 +113,14 @@ interno e grants HMAC curtos compartilhados com o `reports-service`, usando
 
 Em producao, o Worker `giro-certificate-service` roda a reconciliacao todo dia as 09:00 UTC
 (`triggers.crons` em `workers/certificate-service/wrangler.jsonc`) e registra no log
-"Notificacoes de certificados reconciliadas" com `evaluated`, `created` e `updated`. O service Node
+"Notificacoes de certificados reconciliadas" com `evaluated`, `created`, `updated` e `removed`. O service Node
 nao agenda nada; nele, a reconciliacao e chamada por `POST /internal/notifications/run`.
 
 Regra: todo certificado PJ/PF ja vencido ou que vence em ate `CERTIFICATE_NOTIFICATION_WINDOW_DAYS`
 dias (padrao 30) tem uma notificacao, com ou sem arquivo (`has_certificate`). A notificacao e unica
-por organizacao, certificado e tipo (PJ/PF): cada execucao atualiza nome e data em vez de duplicar.
+por organizacao, certificado e tipo (PJ/PF): cada execucao regrava nome e data em vez de duplicar, e
+apaga a notificacao de quem saiu da janela (ex.: certificado renovado). Nao ha marcos separados
+(30/15/7 dias): a data da notificacao e o proprio vencimento.
 
 ## Desenvolvimento
 
