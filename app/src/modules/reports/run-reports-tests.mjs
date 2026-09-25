@@ -15,6 +15,7 @@ const {
   unwrapReportsEnvelope,
 } = await import("./services/reportsService.contract.ts");
 const {
+  reportJobPollInterval,
   reportsCatalogQueryKey,
   reportsHistoryQueryKey,
   reportsModelsQueryKey,
@@ -650,4 +651,21 @@ runTest("does not render preview columns outside the published catalog", () => {
 
 runTest("includes reports coverage in the app test suite", () => {
   assert.match(appPackage.scripts.test, /test:reports/);
+});
+
+runTest("polls an active report job with capped backoff and stops on terminal states", () => {
+  assert.equal(reportJobPollInterval("queued", 0), 1000);
+  assert.equal(reportJobPollInterval("processing", 1), 1500);
+  assert.equal(reportJobPollInterval("processing", 3), 3375);
+  assert.equal(reportJobPollInterval("processing", 20), 4000);
+  for (const status of ["completed", "failed", "cancelled", "expired", "deleted", undefined]) {
+    assert.equal(reportJobPollInterval(status, 0), false);
+  }
+});
+
+const reportHooks = await readFile(new URL("./hooks/useReports.ts", import.meta.url), "utf8");
+runTest("report job keeps polling while the tab is hidden", () => {
+  const hooks = reportHooks;
+  assert.match(hooks, /reportJobPollInterval\(query\.state\.data\?\.status, query\.state\.dataUpdateCount\)/);
+  assert.match(hooks, /refetchIntervalInBackground: true/);
 });
