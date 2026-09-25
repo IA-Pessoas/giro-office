@@ -1,3 +1,4 @@
+import Head from "next/head";
 import React from "react";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -23,7 +24,14 @@ export default function User({
     return null;
   }
 
-  return <UserProfile userId={user.id} me={me} departments={deps} />;
+  return (
+    <>
+      <Head>
+        <title>{`Usuário ${user.name ?? ""} | Office`.replace("  ", " ")}</title>
+      </Head>
+      <UserProfile userId={user.id} me={me} departments={deps} />
+    </>
+  );
 }
 
 export const getServerSideProps = canSSRAdmin<UserDetailsPageProps>(
