@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 
-import { SERVER_ERROR_TOAST_ID } from "./serverErrorToast.ts";
+import {
+  SERVER_ERROR_TOAST_ID,
+  SERVER_ERROR_TOAST_MESSAGE,
+  serverErrorMessage,
+} from "./serverErrorToast.ts";
 import { createAppToast } from "./appToast.ts";
 
 function createFakeAdapter() {
@@ -65,12 +69,30 @@ runTest("success dismisses previous errors", () => {
   assert.deepEqual([...active].sort(), ["success:Cliente salvo.", "warn:Atenção"]);
 });
 
-runTest("caller error replaces the generic 5xx toast so one failure shows one toast", () => {
+runTest("the 5xx toast with requestId wins over the caller error, so one failure shows one toast", () => {
   const { adapter, active } = createFakeAdapter();
   const toast = createAppToast(adapter);
   adapter.error("genérico", { toastId: SERVER_ERROR_TOAST_ID });
   toast.error("Não foi possível salvar o cliente.");
-  assert.deepEqual([...active], ["error:Não foi possível salvar o cliente."]);
+  assert.deepEqual([...active], [SERVER_ERROR_TOAST_ID]);
+});
+
+runTest("5xx toast shows the backend message and the requestId for support", () => {
+  const error = {
+    response: {
+      data: { error: "Extração por IA indisponível no momento.", requestId: "req-9" },
+      headers: {},
+    },
+  };
+  assert.equal(
+    serverErrorMessage(error),
+    "Extração por IA indisponível no momento. Código para o suporte: req-9",
+  );
+  assert.equal(
+    serverErrorMessage({ response: { data: "<html>", headers: { "x-request-id": "req-h" } } }),
+    `${SERVER_ERROR_TOAST_MESSAGE} Código para o suporte: req-h`,
+  );
+  assert.equal(serverErrorMessage(new Error("network")), SERVER_ERROR_TOAST_MESSAGE);
 });
 
 runTest("keeps the rest of the react-toastify API", () => {

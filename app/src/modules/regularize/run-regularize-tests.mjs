@@ -731,7 +731,7 @@ await runTest("simultaneous server errors produce one active toast", async () =>
 await runTest("API client delegates 5xx feedback to the deduplicated notifier", async () => {
   const apiSource = await readFile(join(appRoot, "src/shared/services/api.ts"), "utf8");
 
-  assert.match(apiSource, /notifyServerError\(toast\)/);
+  assert.match(apiSource, /notifyServerError\(toast, error\)/);
   assert.doesNotMatch(apiSource, /toast\.error\(SERVER_ERROR_TOAST_MESSAGE\)/);
 });
 
