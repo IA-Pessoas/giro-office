@@ -274,7 +274,7 @@ runTest("MyOrganizationSection opens organization editing in a shared Dialog", (
 });
 
 runTest("Configuracoes opens access editing in a shared Dialog", () => {
-  assert.match(configuracoesSource, /import \{ Dialog \} from "@shared\/components";/);
+  assert.match(configuracoesSource, /import \{ ConfirmationDialog, Dialog \} from "@shared\/components";/);
   assert.match(configuracoesSource, /<Dialog[\s\S]*title="Editar dados de acesso"/);
   assert.match(configuracoesSource, /open=\{isAccessDialogOpen\}/);
   assert.equal(configuracoesSource.includes("isAccessSectionOpen ?"), false);

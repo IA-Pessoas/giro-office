@@ -1,5 +1,6 @@
 import { ExternalLink, FileUp, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { ConfirmationDialog } from "@shared/components";
 import { toast } from "@shared/services/toast";
 
 import type { ModuleAccess } from "@modules/auth";
@@ -10,7 +11,7 @@ import {
   useUploadTaskAttachmentMutation,
 } from "../hooks";
 import { integracaoTasksService } from "../services";
-import type { IntegracaoTaskDetail } from "../types";
+import type { IntegracaoTaskAttachment, IntegracaoTaskDetail } from "../types";
 import { PROJECT_COMPACT_BUTTON_CLASSNAME, PROJECT_INPUT_CLASSNAME } from "./projectUi";
 
 interface TaskAttachmentPanelProps {
@@ -44,6 +45,8 @@ export function TaskAttachmentPanel({
 }: TaskAttachmentPanelProps) {
   const [file, setFile] = useState<File | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [pendingDelete, setPendingDelete] = useState<IntegracaoTaskAttachment | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const attachmentsQuery = useIntegracaoTaskAttachments(task.id);
   const uploadMutation = useUploadTaskAttachmentMutation();
   const deleteMutation = useDeleteTaskAttachmentMutation();
@@ -77,12 +80,16 @@ export function TaskAttachmentPanel({
     }
   }
 
-  async function deleteAttachment(attachmentId: string) {
+  async function deleteAttachment() {
+    if (!pendingDelete) return;
+    setDeleteError(null);
     try {
-      await deleteMutation.mutateAsync({ taskId: task.id, attachmentId });
+      await deleteMutation.mutateAsync({ taskId: task.id, attachmentId: pendingDelete.id });
       toast.success("Anexo removido da tarefa.");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Não foi possível remover o anexo."));
+      setDeleteError(getErrorMessage(error, "Não foi possível remover o anexo."));
+      // Relança para o diálogo permanecer aberto exibindo o erro.
+      throw error;
     }
   }
 
@@ -141,7 +148,7 @@ export function TaskAttachmentPanel({
                 {canDelete ? (
                   <button
                     type="button"
-                    onClick={() => void deleteAttachment(attachment.id)}
+                    onClick={() => setPendingDelete(attachment)}
                     className={PROJECT_COMPACT_BUTTON_CLASSNAME}
                     disabled={deleteMutation.isPending}
                   >
@@ -154,6 +161,22 @@ export function TaskAttachmentPanel({
           ))}
         </ul>
       )}
+      <ConfirmationDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDelete(null);
+            setDeleteError(null);
+          }
+        }}
+        title="Remover anexo"
+        description={`Remover o anexo "${pendingDelete?.original_name ?? ""}" desta tarefa?`}
+        onConfirm={deleteAttachment}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={deleteError}
+        confirmLabel="Remover"
+        cancelLabel="Cancelar"
+      />
     </section>
   );
 }
