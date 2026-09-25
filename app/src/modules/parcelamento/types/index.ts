@@ -88,6 +88,7 @@ export interface CreateParcelamentoInstallmentPayload {
   legal_nature: string;
   jurisdiction: string;
   is_automatic_debit: boolean;
+  consolidated_total_amount: number;
   first_installment_amount: number;
   current_month_installment_amount: number;
   agreed_installments_count: number;

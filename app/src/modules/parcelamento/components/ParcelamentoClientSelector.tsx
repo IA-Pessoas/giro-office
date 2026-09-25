@@ -25,6 +25,8 @@ export function ParcelamentoClientSelector({
   const deferredSearch = useDeferredValue(search.trim());
   const clientsQuery = useClients({
     status: "Ativo",
+    // Sem o filtro legado ref=integracao: clientes do "Novo cliente" comum também entram (#1349).
+    legacyIntegrationStatusFilter: false,
     search: deferredSearch,
     page,
     limit: CLIENT_PICKER_LIMIT,
@@ -73,7 +75,7 @@ export function ParcelamentoClientSelector({
         open={isOpen}
         onOpenChange={setIsOpen}
         title="Selecionar cliente"
-        description="Busque por nome, razão social ou CPF/CNPJ."
+        description="Busque por nome, razão social ou CPF/CNPJ. Só clientes ativos aparecem aqui."
         contentClassName="w-[min(92vw,520px)]"
         bodyClassName="max-h-[72vh] overflow-y-auto space-y-4"
       >
@@ -81,6 +83,9 @@ export function ParcelamentoClientSelector({
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="search"
+            aria-label="Buscar cliente"
+            // biome-ignore lint/a11y/noAutofocus: a busca é a única ação do diálogo de seleção.
+            autoFocus
             value={search}
             onChange={(event) => handleSearchChange(event.target.value)}
             placeholder="Buscar cliente"
