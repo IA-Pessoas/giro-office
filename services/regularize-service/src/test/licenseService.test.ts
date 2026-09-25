@@ -38,7 +38,7 @@ describe("LicenseService", () => {
       select: expect.any(Object),
     });
     expect(findMany).toHaveBeenNthCalledWith(2, {
-      where: { organization_id: "org-1", status: "Ativo" },
+      where: { organization_id: "org-1", status: { in: ["Em Andamento", "Ativo"] } },
       orderBy: { entry_date: "desc" },
       select: expect.any(Object),
     });
@@ -63,14 +63,14 @@ describe("LicenseService", () => {
     });
 
     expect(findMany).toHaveBeenCalledWith({
-      where: { organization_id: "org-1", status: "Ativo" },
+      where: { organization_id: "org-1", status: { in: ["Em Andamento", "Ativo"] } },
       orderBy: { entry_date: "desc" },
       skip: 10,
       take: 10,
       select: expect.any(Object),
     });
     expect(count).toHaveBeenCalledWith({
-      where: { organization_id: "org-1", status: "Ativo" },
+      where: { organization_id: "org-1", status: { in: ["Em Andamento", "Ativo"] } },
     });
     expect(page).toEqual({
       data: [{ id: "license-1", status: "Ativo" }],
