@@ -104,7 +104,7 @@ describe("ReportExportService", () => {
             source: "projects",
             label: "Projetos",
             columns: [
-              { key: "state", label: "Grupo: Estado", hidden: true },
+              { key: "state", label: "Grupo: Estado", hidden: true, exportable: true },
               { key: "name", label: "Nome" },
             ],
             rows: [{ state: "SP", name: "Ana" }],
@@ -121,6 +121,35 @@ describe("ReportExportService", () => {
       format: "csv",
     });
     expect(result.body.toString("utf8")).toBe("Grupo: Estado,Nome\r\nSP,Ana\r\n");
+  });
+  it("não exporta medidas ocultas usadas apenas em gráficos ou ordenação", async () => {
+    const service = new ReportExportService({
+      getForExport: vi.fn().mockResolvedValue({
+        snapshot: { id: "snapshot-1", created_at: new Date("2026-08-26T12:00:00.000Z") },
+        job: { id: "job-1", report_model_version_id: "version-1", requester_id: "user-1" },
+        rows: [],
+        blocks: [
+          {
+            source: "projects",
+            label: "Projetos",
+            columns: [
+              { key: "state", label: "Estado" },
+              { key: "total", label: "Contagem de registros", hidden: true },
+            ],
+            rows: [{ state: "SP", total: 2 }],
+          },
+        ],
+      }),
+      assertExportable: vi.fn().mockResolvedValue(undefined),
+    } as never);
+    const result = await service.export({
+      snapshotId: "snapshot-1",
+      userId: "user-1",
+      organizationId: "org-1",
+      requestId: "request-1",
+      format: "csv",
+    });
+    expect(result.body.toString("utf8")).toBe("Estado\r\nSP\r\n");
   });
   it("usa no PDF a versão do timbrado escolhida no modelo do snapshot", async () => {
     const render = vi.fn().mockResolvedValue(Buffer.from("%PDF-1.3"));

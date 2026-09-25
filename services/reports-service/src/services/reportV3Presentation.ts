@@ -7,7 +7,7 @@ export function v3Columns(
   area: Area,
   source: ReportCatalogSource,
   includeHiddenGroups = false,
-): Array<{ key: string; label: string; hidden?: boolean }> {
+): Array<{ key: string; label: string; hidden?: boolean; exportable?: boolean }> {
   const labels: Record<string, string> = {
     count_rows: "Contagem de registros",
     count: "Contagem",
@@ -16,31 +16,38 @@ export function v3Columns(
     min: "Mínimo",
     max: "Máximo",
   };
-  const groupColumns =
-    includeHiddenGroups && area.layout === "grouped_list"
-      ? area.dimensions
-          .filter((key) => !area.display.columns.includes(key))
-          .map((key) => ({
-            key,
-            label: `Grupo: ${source.fields.find((field) => field.key === key)?.label ?? key}`,
-            hidden: true,
-          }))
-      : [];
-  return [
-    ...groupColumns,
-    ...area.display.columns.map((key) => {
-      const measure = area.measures.find((item) => item.key === key);
-      const field = source.fields.find((item) => item.key === (measure?.field ?? key));
-      return {
-        key,
-        label: measure
-          ? measure.function === "count_rows"
-            ? labels.count_rows
-            : `${labels[measure.function]} de ${field?.label ?? "campo"}`
-          : (field?.label ?? key),
-      };
-    }),
+  const visible = new Set(area.display.columns);
+  const keys = [
+    ...(includeHiddenGroups && area.layout === "grouped_list" ? area.dimensions : []),
+    ...area.display.columns,
+    ...area.dimensions,
+    ...area.details,
+    ...area.measures.map((item) => item.key),
   ];
+  return [...new Set(keys)].map((key) => {
+    const measure = area.measures.find((item) => item.key === key);
+    const field = source.fields.find((item) => item.key === (measure?.field ?? key));
+    return {
+      key,
+      ...(!visible.has(key) ? { hidden: true } : {}),
+      ...(includeHiddenGroups &&
+      area.layout === "grouped_list" &&
+      area.dimensions.includes(key) &&
+      !visible.has(key)
+        ? { exportable: true }
+        : {}),
+      label: measure
+        ? measure.function === "count_rows"
+          ? labels.count_rows
+          : `${labels[measure.function]} de ${field?.label ?? "campo"}`
+        : includeHiddenGroups &&
+            area.layout === "grouped_list" &&
+            area.dimensions.includes(key) &&
+            !visible.has(key)
+          ? `Grupo: ${field?.label ?? key}`
+          : (field?.label ?? key),
+    };
+  });
 }
 
 export function v3Rows(

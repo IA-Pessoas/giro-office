@@ -134,7 +134,9 @@ export function buildReportCompositionV3(
       const dimensions = settings.dimensions.filter((key) => area.fields.includes(key));
       const details = settings.layout === "grouped_list"
         ? area.fields.filter((key) => !dimensions.includes(key)) : [];
-      const measures = settings.layout === "summary" ? settings.measures : [];
+      const measures = settings.layout === "summary"
+        ? settings.measures.filter((item) => item.function === "count_rows" || (item.field !== undefined && area.fields.includes(item.field)))
+        : [];
       if (!dimensions.length || (settings.layout === "grouped_list" && !details.length) ||
         (settings.layout === "summary" && !measures.length)) {
         throw new Error(`Defina dimensões e ${settings.layout === "summary" ? "medidas" : "detalhes"} em ${source.label}.`);
@@ -144,7 +146,7 @@ export function buildReportCompositionV3(
       if (!columns.length) throw new Error(`Escolha ao menos uma coluna visível em ${source.label}.`);
       if (settings.layout === "grouped_list" && !details.some((key) => columns.includes(key)))
         throw new Error(`Mostre ao menos um detalhe na lista por grupo de ${source.label}.`);
-      const orderBy = settings.order
+      const orderBy = settings.order && available.has(settings.order.key)
         ? [measures.some((item) => item.key === settings.order?.key)
           ? { measure: settings.order.key, direction: settings.order.direction }
           : { field: settings.order.key, direction: settings.order.direction }]

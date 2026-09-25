@@ -488,17 +488,27 @@ export function ReportsCreatePanel({
                     onFieldKeysChange={(fields) => {
                       const selectedFields = new Set(fields);
                       builder.setAreas((current) =>
-                        current.map((item) =>
-                          item.source === area.source
-                            ? {
-                                ...item,
-                                fields,
-                                aggregations: item.aggregations?.filter((aggregation) =>
-                                  selectedFields.has(aggregation.field),
-                                ),
-                              }
-                            : item,
-                        ),
+                        current.map((item) => {
+                          if (item.source !== area.source) return item;
+                          const relationship = item.relationship;
+                          const dimensions = relationship?.dimensions.filter((key) => selectedFields.has(key)) ?? [];
+                          const measures = relationship?.measures.filter((measure) =>
+                            measure.function === "count_rows" || (measure.field !== undefined && selectedFields.has(measure.field)),
+                          ) ?? [];
+                          const available = new Set([...fields, ...measures.map((measure) => measure.key)]);
+                          return {
+                            ...item,
+                            fields,
+                            aggregations: item.aggregations?.filter((aggregation) => selectedFields.has(aggregation.field)),
+                            ...(relationship ? { relationship: {
+                              ...relationship,
+                              dimensions,
+                              measures,
+                              visibleColumns: relationship.visibleColumns.filter((key) => available.has(key)),
+                              order: relationship.order && available.has(relationship.order.key) ? relationship.order : undefined,
+                            } } : {}),
+                          };
+                        }),
                       );
                       clearLoadedModel();
                       clearGeneratedResult();

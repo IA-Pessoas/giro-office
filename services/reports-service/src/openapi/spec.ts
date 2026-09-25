@@ -11,7 +11,7 @@ const letterheadReference = {
   additionalProperties: false,
   required: ["id", "sha256"],
   properties: {
-    id: { type: "string", maxLength: 120 },
+    id: { type: "string", maxLength: 128 },
     sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
   },
 } as const;

@@ -38,7 +38,7 @@ export interface ReportExportResult {
 type ReportExportBlock = {
   source: string;
   label: string;
-  columns: readonly { key: string; label: string }[];
+  columns: readonly { key: string; label: string; hidden?: boolean; exportable?: boolean }[];
   rows: readonly Record<string, unknown>[];
 };
 
@@ -305,11 +305,11 @@ function inferValueType(value: unknown): ReportTable["columns"][number]["valueTy
 
 function createTable(
   rows: readonly Record<string, unknown>[],
-  columns: readonly { key: string; label: string }[] = [],
+  columns: readonly { key: string; label: string; hidden?: boolean; exportable?: boolean }[] = [],
 ): ReportTable {
   const keys =
     columns.length > 0
-      ? columns.map((column) => column.key)
+      ? columns.filter((column) => !column.hidden || column.exportable).map((column) => column.key)
       : Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
   return {
     columns: keys.map((key) => ({

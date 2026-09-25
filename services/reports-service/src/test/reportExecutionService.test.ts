@@ -288,7 +288,10 @@ describe("ReportExecutionService", () => {
       requestId: "request-v3",
     });
     expect(result.blocks[0]).toMatchObject({
-      columns: [{ key: "state", label: "Estado" }],
+      columns: [
+        { key: "state", label: "Estado" },
+        { key: "total", label: "Contagem de registros", hidden: true },
+      ],
       rows: [{ state: "SP", total: 2 }],
       layout: "summary",
       dimensions: ["state"],

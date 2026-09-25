@@ -6,6 +6,7 @@
     "node": ">=22.15.0"
   },
   "scripts": {
+    "predev": "pnpm --filter @workspace/shared build",
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "cf:build": "opennextjs-cloudflare build && node scripts/patch-open-next-react18.mjs",

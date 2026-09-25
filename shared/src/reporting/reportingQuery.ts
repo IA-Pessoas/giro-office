@@ -391,8 +391,11 @@ export async function executeReportingQuery(
   }
   rows.sort((left, right) => {
     for (const order of orderBy) {
-      const type = aliases.has(order.field)
-        ? "number"
+      const aggregation = aggregations.find((item) => item.alias === order.field);
+      const type = aggregation
+        ? aggregation.function === "min" || aggregation.function === "max"
+          ? (metadata.get(aggregation.field)?.value_type ?? "string")
+          : "number"
         : (metadata.get(order.field)?.value_type ?? "string");
       const a = scalar(left[order.field], type);
       const b = scalar(right[order.field], type);

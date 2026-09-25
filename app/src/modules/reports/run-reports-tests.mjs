@@ -149,6 +149,21 @@ runTest("builds grouped summaries with hidden authorized dimensions and row coun
   assert.deepEqual(result.areas[0].orderBy, [{ measure: "report_total", direction: "desc" }]);
 });
 
+runTest("removes v3 measures when their source field is no longer selected", () => {
+  const source = { key: "test.items", label: "Itens", module: "test", fields: [
+    { key: "status", label: "Situação", type: "string", selectable: true, groupable: true },
+    { key: "amount", label: "Valor", type: "number", selectable: true, aggregatable: true, aggregationFunctions: ["sum"] },
+  ] };
+  const result = buildReportCompositionV3([{ source: source.key, fields: ["status"], relationship: {
+    layout: "summary", dimensions: ["status"],
+    measures: [{ key: "report_total", function: "count_rows" }, { key: "report_sum", function: "sum", field: "amount" }],
+    visibleColumns: ["status", "report_sum"], order: { key: "report_sum", direction: "desc" },
+  } }], [source]);
+  assert.deepEqual(result.areas[0].measures, [{ key: "report_total", function: "count_rows" }]);
+  assert.deepEqual(result.areas[0].display.columns, ["status"]);
+  assert.equal(result.areas[0].orderBy, undefined);
+});
+
 runTest("keeps authorized letterhead options in the catalog contract", () => {
   const option = { id: "approved", label: "Timbrado aprovado", kind: "organization", sha256: "a".repeat(64) };
   const parsed = unwrapReportsCatalogEnvelope({ success: true, data: { items: [], letterheads: { personal: [option], shared: [] } } });

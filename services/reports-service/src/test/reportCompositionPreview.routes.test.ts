@@ -211,7 +211,12 @@ it("returns a grouped list with a hidden organizing dimension", async () => {
   expect(response.body.data.blocks[0]).toMatchObject({
     layout: "grouped_list",
     dimensions: ["state"],
-    presentation: { columns: [{ key: "name", label: "Nome" }] },
+    presentation: {
+      columns: [
+        { key: "name", label: "Nome" },
+        { key: "state", label: "Estado", hidden: true },
+      ],
+    },
     rows: [
       { name: "Ana", state: "SP" },
       { name: "Bia", state: "SP" },
@@ -270,7 +275,12 @@ it("keeps an authorized hidden count for ordering while projecting only the dime
   }).expect(200);
   expect(response.body.data.blocks[0]).toMatchObject({
     layout: "summary",
-    presentation: { columns: [{ key: "name", label: "Nome" }] },
+    presentation: {
+      columns: [
+        { key: "name", label: "Nome" },
+        { key: "total", label: "Contagem de registros", hidden: true },
+      ],
+    },
     rows: [
       { name: "SP", total: 2 },
       { name: "RJ", total: 1 },
@@ -366,6 +376,12 @@ it("counts filtered source records before the preview limit, including null name
   expect(response.body.data.blocks[0]).toMatchObject({
     rows: [{ state: "SP", total: 2 }],
     hasMore: true,
+    presentation: {
+      columns: [
+        { key: "state", label: "Estado" },
+        { key: "total", label: "Contagem de registros", hidden: true },
+      ],
+    },
   });
 });
 

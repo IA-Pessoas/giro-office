@@ -9,6 +9,7 @@ import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const baseUrl = process.env.REPORTS_BROWSER_BASE_URL || "http://127.0.0.1:3115";
 const evidenceDir = process.env.REPORTS_EVIDENCE_DIR;
+const letterhead = { id: "approved-letterhead", label: "Timbrado aprovado", kind: "organization", sha256: "a".repeat(64) };
 const user = {
   id: "reports-fixture-user",
   login: "reports.fixture",
@@ -269,7 +270,7 @@ async function run() {
               {
                 source: "integracao.projects",
                 label: "Projetos",
-                columns: [{ key: "name", label: "Nome" }, { key: "status", label: "Situação" }, { key: "category", label: "Categoria" }, { key: "status_count", label: "Contagem de Situação" }],
+                columns: [{ key: "name", label: "Nome" }, { key: "status", label: "Situação" }, { key: "category", label: "Categoria" }, { key: "status_count", label: "Contagem de Situação", hidden: true }],
                 rowCount: 5,
                 rows: [
                   { row_number: 1, values: { name: "Projeto gerado", status: "A", category: "Um", status_count: 7 } },
@@ -357,7 +358,8 @@ async function run() {
       path === "/user/me"
         ? user
           : path === "/reports/catalog"
-            ? { items: catalogMode === "empty" ? [] : catalogMode === "invalid" ? null : items }
+            ? { items: catalogMode === "empty" ? [] : catalogMode === "invalid" ? null : items,
+                letterheads: { personal: [letterhead], shared: [] } }
             : path === "/reports/models/list"
               ? { items: models }
               : path === "/reports/models/shared/list"
@@ -430,6 +432,11 @@ async function run() {
       version: 2,
       areas: [{ source: "integracao.projects", fields: ["name"], filters: [] }],
     });
+    await panel.getByLabel("Timbrado do PDF").selectOption(letterhead.id);
+    await panel.getByRole("button", { name: "3. Definir critérios", exact: true }).click();
+    await panel.getByRole("button", { name: "4. Revisar relatório", exact: true }).click();
+    assert.deepEqual(definitions.at(-1).letterhead, { id: letterhead.id, sha256: letterhead.sha256 });
+    await panel.getByLabel("Timbrado do PDF").selectOption("");
     await checkLanguage();
     await page.evaluate(() => {
       document.documentElement.classList.replace("light", "dark");
@@ -576,6 +583,7 @@ async function run() {
     await chartType.selectOption("line");
     await expect(chartResult.getByRole("alert")).toContainText("dimensão de data ou número");
     await chartType.selectOption("bar");
+    await expect(chartResult.getByRole("option", { name: "Contagem de Situação" })).toBeAttached();
     await expect(chartResult.getByRole("alert")).toContainText("mesma categoria e série");
     await chartResult.locator('section[aria-label="Visualização gráfica"] select').nth(3).selectOption("status");
     await expect(chartResult.getByRole("img", { name: /Gráfico de barras/ })).toBeVisible();

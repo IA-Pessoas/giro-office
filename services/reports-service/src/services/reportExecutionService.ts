@@ -12,7 +12,12 @@ import { MAX_SNAPSHOT_ROWS } from "../schemas/reportSnapshot.schemas.js";
 import type { ReportDefinitionService } from "./reportDefinitionService.js";
 import { v3Columns, v3Rows } from "./reportV3Presentation.js";
 
-export type ReportResultColumn = { key: string; label: string; hidden?: boolean };
+export type ReportResultColumn = {
+  key: string;
+  label: string;
+  hidden?: boolean;
+  exportable?: boolean;
+};
 export type ReportResultBlock = {
   source: string;
   label: string;
