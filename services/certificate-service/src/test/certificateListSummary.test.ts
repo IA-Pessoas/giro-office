@@ -2,6 +2,7 @@ import "./envBootstrap.js";
 
 import { describe, expect, it } from "vitest";
 
+import { countCertificateListSummary } from "../services/certificateListSummary.js";
 import { CertificatePfService } from "../services/certificatePfService.js";
 import { CertificatePjService } from "../services/certificatePjService.js";
 import { certificateOrganizationId } from "./testUtils.js";
@@ -18,6 +19,7 @@ type Where = Record<string, unknown>;
 function matches(row: Row, where: Where): boolean {
   return Object.entries(where).every(([field, condition]) => {
     if (field === "AND") return (condition as Where[]).every((part) => matches(row, part));
+    if (field === "OR") return (condition as Where[]).some((part) => matches(row, part));
     const value = row[field as keyof Row];
     if (condition && typeof condition === "object" && !(condition instanceof Date)) {
       const c = condition as { lt?: Date; gte?: Date; contains?: string };
@@ -129,5 +131,33 @@ describe("certificate list summary", () => {
 
     expect(result.items).toHaveLength(5);
     expect(result.summary).toEqual({ expired: 25, expiring_30_days: 12, with_certificate: 17 });
+  });
+
+  it("applies the PF search filter to the KPIs", async () => {
+    const service = new CertificatePfService({ certificatePF: fakeDelegate(buildRows()) } as never);
+
+    const result = await service.listCertificatePf({
+      organizationId: certificateOrganizationId,
+      query: { search: "pezinho", page: 1, page_size: 20 },
+      now,
+    });
+
+    expect(result.summary).toEqual({ expired: 0, expiring_30_days: 12, with_certificate: 12 });
+  });
+
+  it("uses the São Paulo calendar day as today", async () => {
+    const wheres: Where[] = [];
+    const count = async ({ where }: { where: Where }) => {
+      wheres.push(where);
+      return 0;
+    };
+
+    // 02:00Z de 26/09 ainda é 25/09 em São Paulo.
+    await countCertificateListSummary(count, {}, new Date("2026-09-26T02:00:00.000Z"));
+
+    expect(wheres[0]).toEqual({ AND: [{}, { expiration_date: { lt: day(0) } }] });
+    expect(wheres[1]).toEqual({
+      AND: [{}, { expiration_date: { gte: day(0), lt: day(31) } }],
+    });
   });
 });
