@@ -2087,6 +2087,9 @@ importers:
       '@prisma/client':
         specifier: 7.9.1
         version: 7.9.1(prisma@7.9.1(@types/node@25.5.2)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.3.3))(typescript@5.3.3)
+      '@workspace/reports-service':
+        specifier: workspace:*
+        version: link:../../services/reports-service
       '@workspace/runtime':
         specifier: workspace:*
         version: link:../runtime

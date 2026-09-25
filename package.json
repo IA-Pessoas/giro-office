@@ -7,7 +7,7 @@
     "dev:profile": "node scripts/dev-orchestrator.mjs",
     "dev:full": "node scripts/dev-orchestrator.mjs --profile full",
     "dev:recover": "node scripts/dev-orchestrator.mjs recover",
-    "build": "turbo run build",
+    "build": "turbo run build --filter=!@workspace/legacy-api",
     "pretypecheck": "pnpm prisma:generate",
     "typecheck": "turbo run typecheck",
     "test": "pnpm test:scripts && turbo run test && pnpm qa:integracao",
