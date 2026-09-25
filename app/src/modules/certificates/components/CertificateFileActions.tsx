@@ -262,7 +262,9 @@ export function CertificateFileActions({
 
   if (variant === "inline") {
     return (
-      <div className={CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME}>
+      // `relative` prende o input sr-only (absolute) aqui dentro; sem ele o input escapa do
+      // scroll da tabela e alarga a página no celular (#1372).
+      <div className={`relative ${CERTIFICATE_TABLE_ACTION_GROUP_CLASSNAME}`}>
         <input
           ref={fileInputRef}
           id={inputId}
@@ -294,7 +296,7 @@ export function CertificateFileActions({
   }
 
   return (
-    <div className={`${CERTIFICATE_FILE_ACTION_PANEL_CLASSNAME} space-y-3`}>
+    <div className={`relative ${CERTIFICATE_FILE_ACTION_PANEL_CLASSNAME} space-y-3`}>
       <div>
         <p className="text-xs text-slate-500 dark:text-slate-400">Arquivo</p>
         <p className="mt-1 font-semibold text-slate-900 dark:text-white">

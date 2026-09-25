@@ -159,8 +159,10 @@ export const CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME =
 export const CERTIFICATE_TABLE_CELL_CLASSNAME =
   "px-6 py-4 align-top text-sm text-gray-700 dark:text-gray-300";
 
+// #1372: em celular a tabela é mais larga que a tela e rola por dentro; centralizada, a
+// mensagem ficava fora da área visível. À esquerda até sm, centralizada a partir dele.
 export const CERTIFICATE_TABLE_EMPTY_CELL_CLASSNAME =
-  "px-6 py-7 text-center text-sm text-slate-500 dark:text-slate-400";
+  "px-6 py-7 text-left text-sm text-slate-500 sm:text-center dark:text-slate-400";
 
 export const CERTIFICATE_TABLE_NAME_HEAD_CELL_CLASSNAME = `${CERTIFICATE_TABLE_HEAD_CELL_CLASSNAME} min-w-48`;
 
