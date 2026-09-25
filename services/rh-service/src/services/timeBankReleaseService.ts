@@ -66,7 +66,7 @@ class TimeBankReleaseService {
       const addedByUserId = assertNonEmptyString(input.added_by_user_id, "added_by_user_id");
       const reason = assertNonEmptyString(input.reason, "reason");
       if (Number.isNaN(input.date.getTime())) {
-        throw new ServiceError(400, "date invalido.");
+        throw new ServiceError(400, "date inválido.");
       }
       if (!Number.isInteger(input.minutes)) {
         throw new ServiceError(400, "minutes deve ser um número inteiro.");
@@ -168,13 +168,13 @@ class TimeBankReleaseService {
       const dateFilter: { gte?: Date; lte?: Date } = {};
       if (filters.date_from !== undefined) {
         if (Number.isNaN(filters.date_from.getTime())) {
-          throw new ServiceError(400, "date_from invalido.");
+          throw new ServiceError(400, "date_from inválido.");
         }
         dateFilter.gte = TimeUtils.getUtcDayBounds(filters.date_from).dayStart;
       }
       if (filters.date_to !== undefined) {
         if (Number.isNaN(filters.date_to.getTime())) {
-          throw new ServiceError(400, "date_to invalido.");
+          throw new ServiceError(400, "date_to inválido.");
         }
         dateFilter.lte = TimeUtils.getUtcDayBounds(filters.date_to).dayEnd;
       }
@@ -269,7 +269,7 @@ class TimeBankReleaseService {
     } catch (err: unknown) {
       logError("Erro ao obter visao agregada de banco de horas", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro interno ao obter visao agregada de banco de horas.", err);
+      throw new ServiceError(500, "Erro interno ao obter visão agregada de banco de horas.", err);
     }
   }
 }

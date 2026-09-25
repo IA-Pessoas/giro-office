@@ -248,7 +248,7 @@ export function createTiRequestRoutes(
           });
 
           if (!isTiRequestImageObjectPath(objectPath, context.organizationId, params.id)) {
-            throw new ServiceError(500, "Armazenamento da imagem retornou uma chave invalida.");
+            throw new ServiceError(500, "Armazenamento da imagem retornou uma chave inválida.");
           }
 
           attachment = objectPath;

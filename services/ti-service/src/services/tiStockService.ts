@@ -301,7 +301,7 @@ export class TiStockService {
     } catch (err: unknown) {
       logError("Erro ao registrar saida de estoque de TI", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao registrar saida de estoque de TI.", err);
+      throw new ServiceError(500, "Erro ao registrar saída de estoque de TI.", err);
     }
   }
 
@@ -412,7 +412,7 @@ export class TiStockService {
     } catch (err: unknown) {
       logError("Erro ao listar movimentacoes de estoque de TI", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao listar movimentacoes de estoque de TI.", err);
+      throw new ServiceError(500, "Erro ao listar movimentações de estoque de TI.", err);
     }
   }
 

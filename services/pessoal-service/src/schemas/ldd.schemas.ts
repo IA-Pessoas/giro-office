@@ -3,13 +3,13 @@ import { z } from "zod";
 
 export const lddIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
 export const listLddQuerySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }).optional(),
+    client_id: z.string().uuid({ message: "client_id inválido." }).optional(),
   })
   .strict();
 
@@ -22,7 +22,7 @@ const optionalNonNegativeNumber = (fieldName: string) =>
 
 export const createLddBodySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
     type: zNonEmptyText("type"),
     period: z.string().trim().min(1, "period é obrigatório.").nullable().optional(),
     due_date: zIsoDate("due_date").nullable().optional(),

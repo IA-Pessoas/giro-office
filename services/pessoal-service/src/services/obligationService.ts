@@ -221,7 +221,7 @@ export class ObligationService {
     } catch (err: unknown) {
       logError("Erro ao criar obrigacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao criar obrigacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao criar obrigação de pessoal.", err);
     }
   }
 
@@ -283,7 +283,7 @@ export class ObligationService {
     } catch (err: unknown) {
       logError("Erro ao atualizar obrigacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao atualizar obrigacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao atualizar obrigação de pessoal.", err);
     }
   }
 
@@ -422,7 +422,7 @@ export class ObligationService {
     } catch (err: unknown) {
       logError("Erro ao gerar obrigacoes de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao gerar obrigacoes de pessoal.", err);
+      throw new ServiceError(500, "Erro ao gerar obrigações de pessoal.", err);
     }
   }
 

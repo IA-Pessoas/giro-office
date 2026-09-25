@@ -511,7 +511,7 @@ export class CertificatePjService {
 
   private requireFileDeps(): CertificatePjFileDeps {
     if (!this.fileDeps) {
-      throw new ServiceError(500, "Storage de arquivo de certificado nao configurado.");
+      throw new ServiceError(500, "Storage de arquivo de certificado não configurado.");
     }
 
     return this.fileDeps;
@@ -519,7 +519,7 @@ export class CertificatePjService {
 
   private requirePasswordCrypto(): CertificatePasswordCrypto {
     if (!this.passwordCrypto) {
-      throw new ServiceError(500, "Criptografia de senha de certificado nao configurada.");
+      throw new ServiceError(500, "Criptografia de senha de certificado não configurada.");
     }
 
     return this.passwordCrypto;

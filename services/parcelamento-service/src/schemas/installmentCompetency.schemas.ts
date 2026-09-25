@@ -20,7 +20,7 @@ export const installmentCompetencyParentParamsSchema = z
 
 export const installmentCompetencyIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 

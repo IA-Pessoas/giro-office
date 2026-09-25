@@ -492,13 +492,13 @@ class PointService {
       const clockInFilter: Prisma.DateTimeFilter = {};
       if (filters.date_from !== undefined) {
         if (Number.isNaN(filters.date_from.getTime())) {
-          throw new ServiceError(400, "date_from invalido.");
+          throw new ServiceError(400, "date_from inválido.");
         }
         clockInFilter.gte = organizationDayBounds(filters.date_from, timezone).start;
       }
       if (filters.date_to !== undefined) {
         if (Number.isNaN(filters.date_to.getTime())) {
-          throw new ServiceError(400, "date_to invalido.");
+          throw new ServiceError(400, "date_to inválido.");
         }
         clockInFilter.lte = organizationDayBounds(filters.date_to, timezone).end;
       }

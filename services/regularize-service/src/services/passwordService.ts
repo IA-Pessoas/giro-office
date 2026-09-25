@@ -364,7 +364,7 @@ export class PasswordService {
     } catch (err: unknown) {
       throw new ServiceError(
         422,
-        "Credencial indisponivel para revelacao. Atualize o cadastro da senha.",
+        "Credencial indisponível para revelação. Atualize o cadastro da senha.",
         err,
       );
     }

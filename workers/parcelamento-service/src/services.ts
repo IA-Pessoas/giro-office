@@ -537,7 +537,7 @@ export function createInstallmentCompetencyService(
     if (!competency) throw new ServiceError(404, "Competência de parcelamento não encontrada.");
     return competency;
   };
-  const conflict = "Ja existe competencia para este parcelamento.";
+  const conflict = "Já existe competência para este parcelamento.";
 
   return {
     list: (
@@ -545,7 +545,7 @@ export function createInstallmentCompetencyService(
       installmentId: string,
       query: ListInstallmentCompetenciesQuery,
     ) =>
-      guard("Erro ao listar competencias de parcelamento.", async () => {
+      guard("Erro ao listar competências de parcelamento.", async () => {
         await ensureParent(context.organizationId, installmentId);
         const { page, pageSize, skip, take } = getPaginationParams(query);
         const where = { installment_id: installmentId, organization_id: context.organizationId };
@@ -621,7 +621,7 @@ export function createInstallmentCompetencyService(
       id: string,
       input: PatchInstallmentCompetencyBody,
     ) =>
-      guard("Erro ao atualizar competencia de parcelamento.", async () => {
+      guard("Erro ao atualizar competência de parcelamento.", async () => {
         const { organizationId } = context;
         const existing = await findByIdOrThrow(organizationId, id);
         const data = omitUndefined({
@@ -678,7 +678,7 @@ export function createPanoramaService(prisma: ParcelamentoPrisma, audit: Parcela
     });
     if (!user) throw new ServiceError(404, "Responsável não encontrado para a organização.");
   };
-  const conflict = "Ja existe panorama para este cliente e competencia.";
+  const conflict = "Já existe panorama para este cliente e competência.";
 
   return {
     list: (context: ParcelamentoRequestContext, query: ListPanoramasQuery) =>

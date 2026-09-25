@@ -284,7 +284,7 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
 
   app.post("/internal/notifications/run", async (c) => {
     if (c.req.header(INTERNAL_SERVICE_TOKEN_HEADER) !== options.env.INTERNAL_SERVICE_TOKEN) {
-      throw new ServiceError(401, "Token interno do certificate-service inválido.");
+      throw new ServiceError(401, "Token interno inválido.");
     }
     parseWithZod(certificateNotificationRunBodySchema, await readJson(c));
     return c.json(

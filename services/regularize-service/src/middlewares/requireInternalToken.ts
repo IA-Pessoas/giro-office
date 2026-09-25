@@ -10,7 +10,7 @@ export function requireInternalToken(env: RegularizeServiceEnv) {
     next: NextFunction,
   ): void {
     if (!env.internalServiceToken) {
-      next(new ServiceError(503, "Endpoint interno nao configurado."));
+      next(new ServiceError(503, "Endpoint interno não configurado."));
       return;
     }
 

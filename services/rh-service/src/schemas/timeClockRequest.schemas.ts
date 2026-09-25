@@ -14,7 +14,7 @@ const organizationDate = z
       return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
     }
     return !Number.isNaN(new Date(value).getTime());
-  }, "date invalida.");
+  }, "date inválida.");
 
 const pointTimesShape = {
   clock_in: zIsoDate("clock_in"),
@@ -31,7 +31,7 @@ const optionalAttachment = z
 
 export const createAdjustmentRequestBodySchema = z
   .object({
-    point_id: z.string().uuid({ message: "point_id invalido." }).optional(),
+    point_id: z.string().uuid({ message: "point_id inválido." }).optional(),
     date: organizationDate.optional(),
     ...pointTimesShape,
     justification: zNonEmptyText("justification"),
@@ -41,7 +41,7 @@ export const createAdjustmentRequestBodySchema = z
 
 export const createRetroactiveAdjustmentBodySchema = z
   .object({
-    target_user_id: z.string().uuid({ message: "target_user_id invalido." }),
+    target_user_id: z.string().uuid({ message: "target_user_id inválido." }),
     date: organizationDate,
     ...pointTimesShape,
     justification: zNonEmptyText("justification"),
@@ -71,7 +71,7 @@ export const rejectAdjustmentBodySchema = approveAdjustmentBodySchema;
 export const approveAdjustmentsBulkBodySchema = z
   .object({
     request_ids: z
-      .array(z.string().uuid({ message: "request_id invalido." }))
+      .array(z.string().uuid({ message: "request_id inválido." }))
       .min(1, "Informe ao menos uma solicitação.")
       .max(100, "O lote pode conter no máximo 100 solicitações."),
     obs_approver: z

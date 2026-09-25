@@ -439,7 +439,7 @@ export class GroupAssignmentService {
       }),
     ]);
     if (!isPreviewTotals(preview.totals))
-      throw new ServiceError(500, "Previa de atribuicao invalida.");
+      throw new ServiceError(500, "Prévia de atribuição inválida.");
     return {
       preview_id: preview.id,
       fingerprint: preview.fingerprint,
@@ -622,7 +622,7 @@ export class GroupAssignmentService {
     });
     if (result.idempotent) return { ...result.response, idempotent: true };
     if (!result.auditPayload || !result.outboxId) {
-      throw new ServiceError(500, "Resultado de auditoria da atribuicao em lote invalido.");
+      throw new ServiceError(500, "Resultado de auditoria da atribuição em lote inválido.");
     }
     try {
       const auditRecorded = await this.audit(result.auditPayload);

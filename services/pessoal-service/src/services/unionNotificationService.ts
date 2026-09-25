@@ -92,7 +92,7 @@ export class UnionNotificationService {
     } catch (err: unknown) {
       logError("Erro ao executar notificacoes de sindicatos de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao executar notificacoes de sindicatos de pessoal.", err);
+      throw new ServiceError(500, "Erro ao executar notificações de sindicatos de pessoal.", err);
     }
   }
 

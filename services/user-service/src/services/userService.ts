@@ -878,7 +878,7 @@ class UserManagementService {
       if (prismaErr?.code === "P2003") {
         throw new ServiceError(409, "Não é possível desativar: usuário possui vínculos.");
       }
-      throw new ServiceError(500, "Erro ao desativar usuario.", err);
+      throw new ServiceError(500, "Erro ao desativar usuário.", err);
     }
   }
 

@@ -33,7 +33,7 @@ export const groupAssignmentPreviewQuerySchema = z.object(paginationFields).stri
 export const applyGroupAssignmentPreviewBodySchema = z
   .object({
     preview_id: uuidSchema("preview_id"),
-    fingerprint: z.string().regex(/^[a-f0-9]{64}$/, { message: "fingerprint invalido." }),
+    fingerprint: z.string().regex(/^[a-f0-9]{64}$/, { message: "fingerprint inválido." }),
   })
   .strict();
 

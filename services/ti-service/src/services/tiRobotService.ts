@@ -138,7 +138,7 @@ export class TiRobotService {
     } catch (err: unknown) {
       logError("Erro ao registrar execucao de robo de TI", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao registrar execucao de robo de TI.", err);
+      throw new ServiceError(500, "Erro ao registrar execução de robô de TI.", err);
     }
   }
 

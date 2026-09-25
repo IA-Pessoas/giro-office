@@ -449,7 +449,7 @@ class TimeClockRequestService {
         throw new ServiceError(409, "Já existe solicitação pendente para este colaborador e dia.");
       }
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao criar solicitacao de ajuste. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao criar solicitação de ajuste. ${msg}`, err);
     }
   }
 
@@ -470,7 +470,7 @@ class TimeClockRequestService {
       logError("Erro ao aprovar solicitacao de ajuste de ponto", { err });
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao aprovar solicitacao. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao aprovar solicitação. ${msg}`, err);
     }
   }
 
@@ -549,7 +549,7 @@ class TimeClockRequestService {
       logError("Erro ao rejeitar solicitacao de ajuste de ponto", { err });
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao rejeitar solicitacao. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao rejeitar solicitação. ${msg}`, err);
     }
   }
 
@@ -589,7 +589,7 @@ class TimeClockRequestService {
       logError("Erro ao listar solicitacoes de ajuste de ponto", { err });
       if (err instanceof ServiceError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      throw new ServiceError(500, `Erro interno ao listar solicitacoes de ajuste. ${msg}`, err);
+      throw new ServiceError(500, `Erro interno ao listar solicitações de ajuste. ${msg}`, err);
     }
   }
 
@@ -759,7 +759,7 @@ class TimeClockRequestService {
       },
     });
     if (!isRhPointAdjustmentObjectPath(objectPath, input.organization_id, request.id)) {
-      throw new ServiceError(500, "Armazenamento retornou uma chave de comprovante invalida.");
+      throw new ServiceError(500, "Armazenamento retornou uma chave de comprovante inválida.");
     }
 
     const updated = await this.db.timeClockRequest.update({

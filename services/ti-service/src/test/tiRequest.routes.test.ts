@@ -128,7 +128,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(401);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Token interno do ti-service inválido.",
+      error: "Token interno inválido.",
       code: "UNAUTHORIZED",
     });
   });
@@ -251,7 +251,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(401);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Token interno do ti-service inválido.",
+      error: "Token interno inválido.",
       code: "UNAUTHORIZED",
     });
   });

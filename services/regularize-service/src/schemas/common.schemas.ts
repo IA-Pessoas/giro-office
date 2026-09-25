@@ -10,12 +10,12 @@ function parseBoolean(value: unknown): boolean {
   if (value === "false" || value === "0") {
     return false;
   }
-  throw new Error("Booleano invalido.");
+  throw new Error("Booleano inválido.");
 }
 
 export const idQuerySchema = z
   .object({
-    id: z.string().uuid("id invalido."),
+    id: z.string().uuid("id inválido."),
   })
   .strict();
 

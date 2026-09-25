@@ -25,7 +25,7 @@ function datePartsInTimezone(date: Date, timezone: string): Record<string, strin
         .map((part) => [part.type, part.value]),
     );
   } catch (err: unknown) {
-    throw new ServiceError(500, "Fuso horario da organizacao invalido.", err);
+    throw new ServiceError(500, "Fuso horário da organização inválido.", err);
   }
 }
 
@@ -47,7 +47,7 @@ function dateTimePartsInTimezone(date: Date, timezone: string): Record<string, s
         .map((part) => [part.type, part.value]),
     );
   } catch (err: unknown) {
-    throw new ServiceError(500, "Fuso horario da organizacao invalido.", err);
+    throw new ServiceError(500, "Fuso horário da organização inválido.", err);
   }
 }
 

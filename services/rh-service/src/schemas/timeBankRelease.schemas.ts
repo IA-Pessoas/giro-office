@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const createTimeBankReleaseBodySchema = z
   .object({
-    user_id: z.string().uuid({ message: "user_id invalido." }),
+    user_id: z.string().uuid({ message: "user_id inválido." }),
     date: zIsoDate("date"),
     minutes: z.number().int({ message: "minutes deve ser um número inteiro." }),
     reason: zNonEmptyText("reason"),
@@ -12,7 +12,7 @@ export const createTimeBankReleaseBodySchema = z
 
 export const approveTimeBankReleaseBodySchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
@@ -30,7 +30,7 @@ function optionalIsoDateQuery(field: string) {
 
 export const listTimeBankReleasesQuerySchema = z
   .object({
-    user_id: z.string().uuid({ message: "user_id invalido." }).optional(),
+    user_id: z.string().uuid({ message: "user_id inválido." }).optional(),
     is_approved: z
       .enum(["true", "false"], { message: "is_approved deve ser true ou false." })
       .optional(),

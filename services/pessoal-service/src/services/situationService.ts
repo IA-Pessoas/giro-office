@@ -82,7 +82,7 @@ export class SituationService {
     } catch (err: unknown) {
       logError("Erro ao criar situacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao criar situacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao criar situação de pessoal.", err);
     }
   }
 
@@ -171,7 +171,7 @@ export class SituationService {
     } catch (err: unknown) {
       logError("Erro ao atualizar situacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao atualizar situacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao atualizar situação de pessoal.", err);
     }
   }
 
@@ -206,7 +206,7 @@ export class SituationService {
     } catch (err: unknown) {
       logError("Erro ao remover situacao de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao remover situacao de pessoal.", err);
+      throw new ServiceError(500, "Erro ao remover situação de pessoal.", err);
     }
   }
 

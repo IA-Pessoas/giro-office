@@ -1422,9 +1422,9 @@ await runTest("regularize site credential detail states are explicit", async () 
   assert.notEqual(taxesStart, -1);
   assert.match(sitesSource, /Selecione um site para revelar credenciais/);
   assert.match(sitesSource, /Acesso negado para revelar credenciais/);
-  assert.match(pageSource, /Credencial indispon[iÃ­]vel para revela[cÃ§][aÃ£]o/);
+  assert.match(pageSource, /Credencial indisponível para revelação/);
   assert.match(sitesSource, /getSiteCredentialDetailStatus\(sitePasswordDetailQuery\.error\)/);
-  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponivel para revelacao\."\)/);
+  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponível para revelação\."\)/);
   assert.match(pageSource, /403\|forbidden\|permission\|permiss\|acesso negado/);
   assert.doesNotMatch(sitesSource, /Acesso negado ou indispon[iÃ­]vel/);
 });

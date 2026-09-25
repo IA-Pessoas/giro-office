@@ -415,32 +415,32 @@ export function Dashboard() {
             </div>
           </div>
           {hasReceiptsData ? (
-          <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={receiptsData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-              <XAxis dataKey="month" stroke="#9ca3af" style={{ fontSize: "12px" }} />
-              <YAxis stroke="#9ca3af" style={{ fontSize: "12px" }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#fff",
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="amount"
-                stackId="1"
-                name="Recebimentos pagos"
-                stroke="#10b981"
-                fill="#10b981"
-                fillOpacity={0.6}
-                // Sem animação de entrada nos gráficos: ela parte do zero, e a 1ª carga parecia zerada (#1384).
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={receiptsData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                <XAxis dataKey="month" stroke="#9ca3af" style={{ fontSize: "12px" }} />
+                <YAxis stroke="#9ca3af" style={{ fontSize: "12px" }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1f2937",
+                    border: "none",
+                    borderRadius: "8px",
+                    color: "#fff",
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="amount"
+                  stackId="1"
+                  name="Recebimentos pagos"
+                  stroke="#10b981"
+                  fill="#10b981"
+                  fillOpacity={0.6}
+                  // Sem animação de entrada nos gráficos: ela parte do zero, e a 1ª carga parecia zerada (#1384).
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           ) : (
             <ChartEmptyState height={250} />
           )}
@@ -458,25 +458,25 @@ export function Dashboard() {
           </div>
           <div className="flex items-center gap-6">
             {hasProjectsData ? (
-            <ResponsiveContainer width="50%" height={200}>
-              <PieChart>
-                <Pie
-                  data={projectsData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                  isAnimationActive={false}
-                >
-                  {projectsData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+              <ResponsiveContainer width="50%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={projectsData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    isAnimationActive={false}
+                  >
+                    {projectsData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
             ) : (
               <div className="w-1/2">
                 <ChartEmptyState height={200} />
@@ -590,23 +590,23 @@ export function Dashboard() {
             </h3>
           </div>
           {hasPerformanceData ? (
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={performanceData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
-              <XAxis dataKey="week" stroke="#9ca3af" style={{ fontSize: "12px" }} />
-              <YAxis stroke="#9ca3af" style={{ fontSize: "12px" }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#fff",
-                }}
-              />
-              <Bar dataKey="tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-              <Bar dataKey="completed" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={performanceData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} />
+                <XAxis dataKey="week" stroke="#9ca3af" style={{ fontSize: "12px" }} />
+                <YAxis stroke="#9ca3af" style={{ fontSize: "12px" }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1f2937",
+                    border: "none",
+                    borderRadius: "8px",
+                    color: "#fff",
+                  }}
+                />
+                <Bar dataKey="tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="completed" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
           ) : (
             <ChartEmptyState height={200} />
           )}

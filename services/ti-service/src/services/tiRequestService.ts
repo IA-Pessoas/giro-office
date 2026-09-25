@@ -126,7 +126,7 @@ export class TiRequestService {
       }
 
       await this.ensureCategory(context.organizationId, body.category_id);
-      await this.ensureUser(context.organizationId, requesterId, "Solicitante nao encontrado.");
+      await this.ensureUser(context.organizationId, requesterId, "Solicitante não encontrado.");
 
       if (body.assigned_to_id) {
         await this.ensureUser(

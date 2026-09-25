@@ -230,7 +230,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao cadastrar plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel cadastrar o plano.", err);
+      throw new ServiceError(500, "Não foi possível cadastrar o plano.", err);
     }
   }
 
@@ -275,7 +275,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao atualizar plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel atualizar o plano.", err);
+      throw new ServiceError(500, "Não foi possível atualizar o plano.", err);
     }
   }
 
@@ -303,7 +303,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao detalhar plano de projeto", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel buscar o plano.", err);
+      throw new ServiceError(500, "Não foi possível buscar o plano.", err);
     }
   }
 
@@ -326,7 +326,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao listar planos de projeto", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel listar os planos.", err);
+      throw new ServiceError(500, "Não foi possível listar os planos.", err);
     }
   }
 
@@ -376,7 +376,7 @@ export class ProjectPlanService {
       if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
         throw new ServiceError(409, "Não é possível excluir um plano já contratado.");
       }
-      throw new ServiceError(500, "Nao foi possivel excluir o plano.", err);
+      throw new ServiceError(500, "Não foi possível excluir o plano.", err);
     }
   }
 
@@ -464,7 +464,7 @@ export class ProjectPlanService {
         throw new ServiceError(409, "Modelo de tarefa já está neste plano.", err);
       }
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel adicionar a tarefa ao plano.", err);
+      throw new ServiceError(500, "Não foi possível adicionar a tarefa ao plano.", err);
     }
   }
 
@@ -489,7 +489,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao listar tarefas do plano", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel listar as tarefas do plano.", err);
+      throw new ServiceError(500, "Não foi possível listar as tarefas do plano.", err);
     }
   }
 
@@ -559,7 +559,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao reordenar tarefa do plano", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel reordenar a tarefa do plano.", err);
+      throw new ServiceError(500, "Não foi possível reordenar a tarefa do plano.", err);
     }
   }
 
@@ -618,7 +618,7 @@ export class ProjectPlanService {
     } catch (err: unknown) {
       logError("Erro ao excluir tarefa do plano", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Nao foi possivel excluir a tarefa do plano.", err);
+      throw new ServiceError(500, "Não foi possível excluir a tarefa do plano.", err);
     }
   }
 
@@ -745,7 +745,7 @@ export class ProjectPlanService {
           err,
         );
       }
-      throw new ServiceError(500, "Nao foi possivel contratar o plano.", err);
+      throw new ServiceError(500, "Não foi possível contratar o plano.", err);
     }
   }
 }

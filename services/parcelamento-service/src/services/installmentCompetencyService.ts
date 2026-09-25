@@ -123,7 +123,7 @@ export class InstallmentCompetencyService {
     } catch (err: unknown) {
       logError("Erro ao listar competencias de parcelamento", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao listar competencias de parcelamento.", err);
+      throw new ServiceError(500, "Erro ao listar competências de parcelamento.", err);
     }
   }
 
@@ -170,7 +170,7 @@ export class InstallmentCompetencyService {
       if (isPrismaUniqueError(err)) {
         throw new ServiceError(409, "Já existe competência para este parcelamento.", err);
       }
-      throw new ServiceError(500, "Erro ao criar competencia de parcelamento.", err);
+      throw new ServiceError(500, "Erro ao criar competência de parcelamento.", err);
     }
   }
 
@@ -215,7 +215,7 @@ export class InstallmentCompetencyService {
     } catch (err: unknown) {
       logError("Erro ao atualizar competencia de parcelamento", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao atualizar competencia de parcelamento.", err);
+      throw new ServiceError(500, "Erro ao atualizar competência de parcelamento.", err);
     }
   }
 

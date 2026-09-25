@@ -851,7 +851,7 @@ function localPasswordService(
       })
     : undefined;
   const requireCrypto = () => {
-    if (!crypto) throw new ServiceError(500, "Criptografia de senha de pessoal nao configurada.");
+    if (!crypto) throw new ServiceError(500, "Criptografia de senha de pessoal não configurada.");
     return crypto;
   };
   const secretValue = (value: unknown): string | null =>

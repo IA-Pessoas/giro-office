@@ -253,7 +253,7 @@ export class GroupAssignmentService {
     } catch (err: unknown) {
       logError("Erro ao criar previa persistida de atribuicao em lote", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao criar previa de atribuicao em lote.", err);
+      throw new ServiceError(500, "Erro ao criar prévia de atribuição em lote.", err);
     }
   }
 
@@ -298,7 +298,7 @@ export class GroupAssignmentService {
       }),
     ]);
     if (!isPreviewTotals(preview.totals))
-      throw new ServiceError(500, "Previa de atribuicao invalida.");
+      throw new ServiceError(500, "Prévia de atribuição inválida.");
     return {
       preview_id: preview.id,
       fingerprint: preview.fingerprint,
@@ -470,7 +470,7 @@ export class GroupAssignmentService {
       });
       if (result.idempotent) return { ...result.response, idempotent: true };
       if (!result.auditPayload || !result.outboxId) {
-        throw new ServiceError(500, "Resultado de auditoria da atribuicao em lote invalido.");
+        throw new ServiceError(500, "Resultado de auditoria da atribuição em lote inválido.");
       }
       const auditRecorded = await this.auditService.recordChange(result.auditPayload);
       if (auditRecorded) {
@@ -483,7 +483,7 @@ export class GroupAssignmentService {
     } catch (err: unknown) {
       logError("Erro ao aplicar atribuicao de grupo em lote", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao aplicar atribuicao de grupo em lote.", err);
+      throw new ServiceError(500, "Erro ao aplicar atribuição de grupo em lote.", err);
     }
   }
 

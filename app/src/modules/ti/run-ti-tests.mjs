@@ -818,7 +818,7 @@ await runTest("ti stock tab renders operational item, movement, category and loc
   assert.match(tabSource, /className=\{cn\(tiFiveRowTableClassName/);
   assert.match(tabSource, /xl:min-h-\[280px\]/);
   assert.match(tabSource, /Saldo atual/);
-  assert.match(tabSource, /Movimentacoes/);
+  assert.match(tabSource, /Movimentações/);
   assert.match(tabSource, /stockMovementsQuery/);
   assert.match(tabSource, /selectedItemQuery\.isError/);
   assert.match(tabSource, /const \[movementItem, setMovementItem\]/);
