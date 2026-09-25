@@ -280,8 +280,8 @@ runTest("certificate workspace shows PF and PJ details in a shared dialog", () =
     detailDialogBlock,
     /\{activeDetailIsLoading \? \([\s\S]*?\{activeDetailErrorMessage \? \([\s\S]*?selected\?\.type === "pj"[\s\S]*?selected\?\.type === "pf"/,
   );
-  assert.match(detailDialogBlock, /renderPasswordBlock\(pjDetail\?\.password\)/);
-  assert.match(detailDialogBlock, /renderPasswordBlock\(pfDetail\?\.password\)/);
+  assert.match(detailDialogBlock, /renderPasswordBlock\(pjDetail\?\.password, pjDetail\?\.password_unavailable\)/);
+  assert.match(detailDialogBlock, /renderPasswordBlock\(pfDetail\?\.password, pfDetail\?\.password_unavailable\)/);
   assert.match(detailDialogBlock, /<CertificateFileActions[\s\S]*?kind="pj"/);
   assert.match(detailDialogBlock, /<CertificateFileActions[\s\S]*?kind="pf"/);
   assert.ok(startEditSelectedBlock, "handler de edição não encontrado");
