@@ -5,9 +5,11 @@ export const TASK_FORM_BODY_CLASSNAME = "max-h-[64vh] overflow-y-auto !px-4 !py-
 
 export const TASK_FORM_FORM_CLASSNAME = "space-y-3";
 
-export const TASK_FORM_GRID_CLASSNAME = "grid gap-3 md:grid-cols-2";
+// `grid-cols-1` (minmax(0, 1fr)) segura a coluna única do celular na largura do diálogo; sem ele
+// a trilha implícita cresce até o nome longo do cliente/projeto e corta o campo (#1372).
+export const TASK_FORM_GRID_CLASSNAME = "grid grid-cols-1 gap-3 md:grid-cols-2";
 
-export const TASK_FORM_THREE_COLUMN_GRID_CLASSNAME = "grid gap-3 md:grid-cols-3";
+export const TASK_FORM_THREE_COLUMN_GRID_CLASSNAME = "grid grid-cols-1 gap-3 md:grid-cols-3";
 
 export const TASK_FORM_LABEL_CLASSNAME = "space-y-1.5";
 

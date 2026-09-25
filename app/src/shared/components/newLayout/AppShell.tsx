@@ -828,6 +828,8 @@ export function AppShell({
         onClick={() => setIsMobileMenuOpen((v) => !v)}
         className={`lg:hidden fixed ${impersonation ? "top-14" : "top-4"} left-4 z-50 p-2 bg-white dark:bg-slate-900 rounded-lg shadow-lg`}
         type="button"
+        aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+        aria-expanded={isMobileMenuOpen}
       >
         {isMobileMenuOpen ? (
           <X className="w-6 h-6 text-gray-700 dark:text-white" />
