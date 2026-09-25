@@ -36,6 +36,7 @@ export const clientIntegrationReportingCatalog = {
         field("name", "Nome", "string", stringOperators),
         field("company_name", "Razão social", "string", stringOperators),
         field("fantasy_name", "Nome fantasia", "string", stringOperators),
+        field("cpf_cnpj", "CPF/CNPJ", "string", stringOperators),
         field("status", "Status", "string", stringOperators),
         field("type", "Tipo", "string", stringOperators),
         field("type_registration", "Tipo de cadastro", "string", stringOperators),

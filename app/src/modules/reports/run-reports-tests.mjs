@@ -34,7 +34,9 @@ const appPackage = JSON.parse(await readFile(new URL("../../../package.json", im
 const { buildReportComposition } = await import("./utils/reportCriteria.ts");
 const { getPessoalReportPresets } = await import("./utils/pessoalReportPresets.ts");
 const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
-const { getReportForbiddenMessage, isReportCsrfError } = await import("./components/reportUi.ts");
+const { getReportAuthorLabel, getReportForbiddenMessage, isReportCsrfError } = await import(
+  "./components/reportUi.ts"
+);
 const reportsPageSource = await readFile(
   new URL("./components/ReportsCatalogPage.tsx", import.meta.url),
   "utf8",
@@ -668,4 +670,25 @@ runTest("report job keeps polling while the tab is hidden", () => {
   const hooks = reportHooks;
   assert.match(hooks, /reportJobPollInterval\(query\.state\.data\?\.status, query\.state\.dataUpdateCount\)/);
   assert.match(hooks, /refetchIntervalInBackground: true/);
+});
+
+runTest("history shows a readable author instead of the requester UUID", () => {
+  const names = new Map([["user-2", "Ana"]]);
+  const current = { id: "user-1", name: "Eu" };
+  assert.equal(getReportAuthorLabel({ requester_id: "user-2" }, names, current), "Ana");
+  assert.equal(getReportAuthorLabel({ requester_id: "user-1" }, names, current), "Eu");
+  assert.equal(getReportAuthorLabel({ requester_id: "user-3", author_name: "Bia" }, names, current), "Bia");
+  assert.equal(getReportAuthorLabel({ requester_id: "user-9" }, names, current), "Usuário não encontrado");
+});
+
+const historyPanelSource = await readFile(new URL("./components/ReportHistoryPanel.tsx", import.meta.url), "utf8");
+const snapshotSource = await readFile(new URL("./components/ReportSnapshotTable.tsx", import.meta.url), "utf8");
+runTest("history shows failure reasons and scrolls to the opened snapshot", () => {
+  assert.match(historyPanelSource, /item\.status === "failed" && item\.error_message/);
+  assert.match(snapshotSource, /scrollIntoView\(/);
+});
+
+runTest("current configuration can be saved as a personal model before generating", () => {
+  assert.match(createPanelSource, /onClick=\{\(\) => setSaveDialogOpen\(true\)\}>\s*Salvar como modelo/);
+  assert.match(createPanelSource, /builder\.areas\.every\(\(area\) => area\.source\.startsWith\("pessoal\."\)\)/);
 });

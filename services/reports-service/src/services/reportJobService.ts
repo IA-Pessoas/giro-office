@@ -1,4 +1,5 @@
 import { ServiceError } from "@workspace/shared";
+import { departmentLabels } from "../catalog/sourceCatalogService.js";
 
 import type { Prisma } from "../generated/prisma/client.js";
 import type { ReportsPrismaClient } from "../prisma/index.js";
@@ -33,6 +34,28 @@ export interface ReportHistoryItem {
   started_at: Date | null;
   finished_at: Date | null;
   error_message: string | null;
+  model_name: string;
+  model_version: number | null;
+  expires_at: Date | null;
+}
+
+/** Nome de uma execução avulsa a partir das áreas: "Relatório de Recursos Humanos e Fiscal". */
+export function describeReportDefinition(definition: unknown): string {
+  const record = (definition ?? {}) as { areas?: { source?: unknown }[]; sources?: unknown[] };
+  const sources = record.areas?.map((area) => area.source) ?? record.sources ?? [];
+  const labels = [
+    ...new Set(
+      sources
+        .filter((source): source is string => typeof source === "string")
+        .map((source) => departmentLabels[source.split(".")[0] ?? ""] ?? source.split(".")[0]),
+    ),
+  ];
+  if (labels.length === 0) return "Relatório";
+  const list =
+    labels.length === 1
+      ? labels[0]
+      : `${labels.slice(0, -1).join(", ")} e ${labels[labels.length - 1]}`;
+  return `Relatório de ${list}`;
 }
 
 export interface ReportJobView {
@@ -287,11 +310,57 @@ export class ReportJobService {
         error_message: true,
       },
     });
-    const items = jobs.slice(0, input.limit) as ReportHistoryItem[];
     return {
-      items,
+      items: await this.describeHistory(input.organizationId, jobs.slice(0, input.limit)),
       nextCursor: jobs.length > input.limit ? cursor + input.limit : null,
     };
+  }
+
+  private async describeHistory(
+    organizationId: string,
+    jobs: Omit<ReportHistoryItem, "model_name" | "model_version" | "expires_at">[],
+  ): Promise<ReportHistoryItem[]> {
+    if (jobs.length === 0) return [];
+    const versions = await this.prisma.reportModelVersion.findMany({
+      where: {
+        organization_id: organizationId,
+        id: { in: [...new Set(jobs.map((job) => job.report_model_version_id))] },
+      },
+      select: { id: true, version: true, report_model_id: true, definition_json: true },
+    });
+    const [models, snapshots] = await Promise.all([
+      this.prisma.reportModel.findMany({
+        where: {
+          organization_id: organizationId,
+          id: { in: [...new Set(versions.map((version) => version.report_model_id))] },
+        },
+        select: { id: true, name: true, is_ephemeral: true },
+      }),
+      this.prisma.reportSnapshot.findMany({
+        where: {
+          organization_id: organizationId,
+          report_job_id: { in: jobs.map((job) => job.id) },
+        },
+        select: { report_job_id: true, expires_at: true },
+      }),
+    ]);
+    const versionById = new Map(versions.map((version) => [version.id, version]));
+    const modelById = new Map(models.map((model) => [model.id, model]));
+    const expiresByJob = new Map(
+      snapshots.map((snapshot) => [snapshot.report_job_id, snapshot.expires_at]),
+    );
+
+    return jobs.map((job) => {
+      const version = versionById.get(job.report_model_version_id);
+      const model = version ? modelById.get(version.report_model_id) : undefined;
+      const isSavedModel = model !== undefined && !model.is_ephemeral;
+      return {
+        ...job,
+        model_name: isSavedModel ? model.name : describeReportDefinition(version?.definition_json),
+        model_version: isSavedModel && version ? version.version : null,
+        expires_at: expiresByJob.get(job.id) ?? null,
+      };
+    });
   }
 
   async cancel(input: { organizationId: string; userId: string; id: string }): Promise<void> {
