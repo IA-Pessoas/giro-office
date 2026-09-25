@@ -222,6 +222,30 @@ function routeFor(method: string, path: string): Route | undefined {
   return routes.find(({ prefix }) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
+/** Valida no user-service que a sessão do token segue ativa (logout e revogação valem na hora). */
+async function validateGatewaySession(
+  request: Request,
+  auth: Awaited<ReturnType<typeof authenticateGatewayRequest>>,
+  env: GatewayWorkerEnv,
+): Promise<void> {
+  if (!isServiceBinding(env.USER_SERVICE)) {
+    throw new ServiceError(503, "Validação de sessão indisponível.");
+  }
+  const hasCookie = Boolean(
+    readCookie(request.headers.get("cookie") ?? undefined, AUTH_SESSION_COOKIE_NAME),
+  );
+  try {
+    await validateWorkerSession(auth, env.USER_SERVICE, hasCookie ? "cookie" : "bearer", {
+      internalServiceToken: env.INTERNAL_SERVICE_TOKEN,
+    });
+  } catch (error) {
+    if (error instanceof WorkerSessionValidationError) {
+      throw new ServiceError(error.statusCode, error.message);
+    }
+    throw error;
+  }
+}
+
 function isServiceBinding(value: unknown): value is FetchBinding {
   return (
     typeof value === "object" &&
@@ -380,22 +404,7 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     }
     if (!auth.organizationId) throw new ServiceError(401, "Contexto autenticado não informado.");
     // Sem proxy nao ha servico para validar a sessao; o gateway valida aqui, como os Workers.
-    if (!isServiceBinding(env.USER_SERVICE)) {
-      throw new ServiceError(503, "Validação de sessão indisponível.");
-    }
-    const hasCookie = Boolean(
-      readCookie(c.req.header("cookie") ?? undefined, AUTH_SESSION_COOKIE_NAME),
-    );
-    try {
-      await validateWorkerSession(auth, env.USER_SERVICE, hasCookie ? "cookie" : "bearer", {
-        internalServiceToken: env.INTERNAL_SERVICE_TOKEN,
-      });
-    } catch (error) {
-      if (error instanceof WorkerSessionValidationError) {
-        throw new ServiceError(error.statusCode, error.message);
-      }
-      throw error;
-    }
+    await validateGatewaySession(c.req.raw, auth, env);
 
     const connectionString = env.HYPERDRIVE?.connectionString || env.DATABASE_URL;
     if (!connectionString)
@@ -454,8 +463,12 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     if (route.targetPath) upstreamUrl.pathname = route.targetPath;
     const forwardedRequest = new Request(upstreamUrl, new Request(c.req.raw, { headers }));
 
-    if (route.prefix === "/audit" || route.targetPath?.startsWith("/audit/"))
+    if (route.binding === "AUDIT_SERVICE") {
+      // O audit-service confia na identidade repassada; a busca de plataforma lê todas as
+      // organizações, então a sessão do super admin é revalidada antes (logout vale na hora).
+      if (route.targetPath && auth) await validateGatewaySession(c.req.raw, auth, env);
       return withRequestId(await binding.fetch(forwardedRequest), requestId);
+    }
 
     const audit = auditAvailability(env);
     if (!audit) {
