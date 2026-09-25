@@ -5,6 +5,7 @@ import { toast } from "@shared/services/toast";
 import { ConfirmationDialog, Dialog } from "@shared/components";
 import { useAuth } from "@/context/AuthContext";
 import { isOrganizationOwner } from "@modules/auth";
+import { useModuleAccessMap } from "@modules/auth/hooks/useModuleAccess";
 
 import {
   useCopySharedReportModelMutation,
@@ -104,12 +105,13 @@ function ModelCard({ model, shared, canManageShared, onEdit, onOpen, opening }: 
 
 export function ReportModelsPanel({ canManageShared, onOpenModel }: { canManageShared: boolean; onOpenModel: (model: ReportModel | SharedReportModel) => void }) {
   const { user } = useAuth();
+  const { departmentModule } = useModuleAccessMap();
   const personalQuery = useReportModels();
-  const sharedQuery = useSharedReportModels();
+  const sharedQuery = useSharedReportModels(Boolean(departmentModule));
   const [editing, setEditing] = useState<SharedReportModel | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const updateMutation = useUpdateSharedReportModelMutation();
-  const isAdmin = canManageShared || isOrganizationOwner(user);
+  const isAdmin = Boolean(departmentModule) && (canManageShared || isOrganizationOwner(user));
 
   async function openModel(model: ReportModel | SharedReportModel) {
     setOpeningId(model.id);
@@ -145,18 +147,55 @@ export function ReportModelsPanel({ canManageShared, onOpenModel }: { canManageS
         <h2 id="reports-models-title" className="text-lg font-semibold text-gray-900 dark:text-white">Modelos</h2>
         <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">Modelos compartilhados são somente leitura para membros; copie um modelo para personalizá-lo.</p>
       </div>
-      {personalQuery.isPending || sharedQuery.isPending ? <p className="text-sm text-gray-600 dark:text-slate-400" role="status">Carregando modelos...</p> : null}
-      {personalQuery.isError || sharedQuery.isError ? <p role="alert" className="text-sm text-red-600 dark:text-red-400">Não foi possível carregar os modelos.</p> : null}
-      {!personalQuery.isPending && !sharedQuery.isPending && !personalQuery.isError && !sharedQuery.isError ? (
+      {personalQuery.isPending || (Boolean(departmentModule) && sharedQuery.isPending) ? <p className="text-sm text-gray-600 dark:text-slate-400" role="status">Carregando modelos...</p> : null}
+      {personalQuery.isError ? <p role="alert" className="text-sm text-red-600 dark:text-red-400">Não foi possível carregar seus modelos pessoais.</p> : null}
+      {departmentModule && sharedQuery.isError ? <p role="alert" className="text-sm text-red-600 dark:text-red-400">Não foi possível carregar o acervo compartilhado.</p> : null}
+      {!personalQuery.isPending && !personalQuery.isError ? (
         <div className="space-y-6">
           <div>
             <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-200">Meus modelos</h3>
             {personalQuery.data?.length ? <ul className="grid gap-3 lg:grid-cols-2">{personalQuery.data.map((model) => <ModelCard key={model.id} model={model} onOpen={() => void openModel(model)} opening={openingId === model.id} />)}</ul> : <p className="text-sm text-gray-500 dark:text-slate-500">Você ainda não possui modelos pessoais.</p>}
           </div>
-          <div>
-            <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Modelos compartilhados</h3>{isAdmin ? <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-slate-800 dark:text-slate-300">Administração habilitada</span> : null}</div>
-            {sharedQuery.data?.length ? <ul className="grid gap-3 lg:grid-cols-2">{sharedQuery.data.map((model) => <ModelCard key={model.id} model={model} shared canManageShared={isAdmin} onEdit={() => setEditing(model)} onOpen={() => void openModel(model)} opening={openingId === model.id} />)}</ul> : <p className="text-sm text-gray-500 dark:text-slate-500">Nenhum modelo compartilhado disponível.</p>}
-          </div>
+          {departmentModule ? (
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  Modelos compartilhados
+                </h3>
+                {isAdmin ? (
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-slate-800 dark:text-slate-300">
+                    Administração habilitada
+                  </span>
+                ) : null}
+              </div>
+              {sharedQuery.isPending ? (
+                <p className="text-sm text-gray-600 dark:text-slate-400" role="status">
+                  Carregando acervo compartilhado...
+                </p>
+              ) : null}
+              {!sharedQuery.isPending &&
+                !sharedQuery.isError &&
+                (sharedQuery.data?.length ? (
+                  <ul className="grid gap-3 lg:grid-cols-2">
+                    {sharedQuery.data.map((model) => (
+                      <ModelCard
+                        key={model.id}
+                        model={model}
+                        shared
+                        canManageShared={isAdmin}
+                        onEdit={() => setEditing(model)}
+                        onOpen={() => void openModel(model)}
+                        opening={openingId === model.id}
+                      />
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-slate-500">
+                    Nenhum modelo compartilhado disponível.
+                  </p>
+                ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
       <Dialog open={Boolean(editing)} onOpenChange={(open) => !open && setEditing(null)} title="Versionar modelo compartilhado" description="Publicar uma nova versão do modelo" footer={null}>

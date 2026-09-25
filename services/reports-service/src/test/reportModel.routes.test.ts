@@ -3,6 +3,7 @@ import {
   FORWARDED_AUTH_USER_ID_HEADER,
   ServiceError,
 } from "@workspace/shared";
+import "express-async-errors";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
@@ -77,6 +78,20 @@ function createApp(options?: {
         ...options?.authorizationService,
       } as never,
     }),
+  );
+  app.use(
+    (
+      error: unknown,
+      _request: express.Request,
+      response: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      if (error instanceof ServiceError) {
+        response.status(error.statusCode).json({ success: false, code: error.code });
+        return;
+      }
+      response.status(500).json({ success: false, code: "INTERNAL_SERVER_ERROR" });
+    },
   );
   return app;
 }
@@ -187,6 +202,26 @@ describe("report model routes", () => {
       organizationId,
       departmentId: "department-1",
     });
+  });
+
+  it("preserva 403 ao listar acervo sem departamento atual", async () => {
+    const authorizationService = {
+      getSharedDepartment: vi
+        .fn()
+        .mockRejectedValue(
+          new ServiceError(
+            403,
+            "O acervo compartilhado não está disponível para o departamento atual.",
+          ),
+        ),
+    };
+    const modelService = { listShared: vi.fn() };
+    const app = createApp({ modelService, authorizationService });
+
+    const response = await authenticated(request(app).get("/models/shared/list")).expect(403);
+
+    expect(response.body).toMatchObject({ success: false, code: "FORBIDDEN" });
+    expect(modelService.listShared).not.toHaveBeenCalled();
   });
 
   it("cria modelo compartilhado com departamento vindo do contexto autoritativo", async () => {
