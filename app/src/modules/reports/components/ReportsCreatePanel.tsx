@@ -16,7 +16,13 @@ import { buildReportComposition, buildReportCompositionV3, operatorLabels, summa
 import { ReportRelationshipSettings } from "./ReportRelationshipSettings";
 import type { ReportArea, ReportLetterheadSelection } from "../types/report.types";
 import { ReportSourceStep } from "./ReportSourceStep";
-import { getErrorStatus, getReportForbiddenMessage, isReportCsrfError } from "./reportUi";
+import {
+  getErrorStatus,
+  getReportForbiddenMessage,
+  isReportCsrfError,
+  reportCheckboxClassName,
+  reportInputClassName,
+} from "./reportUi";
 import {
   useCancelReportJobMutation,
   useCreateReportJobMutation,
@@ -534,7 +540,7 @@ export function ReportsCreatePanel({
                 Definir critérios
               </h2>
               <label className="flex items-start gap-2 rounded-lg border border-gray-200 p-3 text-sm text-gray-800 dark:border-slate-700 dark:text-slate-200">
-                <input type="checkbox" className="mt-1" disabled={busy} checked={relationshipMode} onChange={(event) => {
+                <input type="checkbox" className={`mt-1 ${reportCheckboxClassName}`} disabled={busy} checked={relationshipMode} onChange={(event) => {
                   setRelationshipMode(event.target.checked);
                   clearLoadedModel();
                   clearGeneratedResult();
@@ -572,7 +578,7 @@ export function ReportsCreatePanel({
                 <label className="block text-sm font-medium text-gray-800 dark:text-slate-200">
                   Timbrado do PDF
                   <select
-                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900"
+                    className={reportInputClassName}
                     disabled={busy}
                     value={selectedLetterhead?.id ?? ""}
                     onChange={(event) => {

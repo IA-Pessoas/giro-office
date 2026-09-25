@@ -118,7 +118,7 @@ export function ReportChartPanel({
   const title = `${labelFor(measure, columns, "Medida")} por ${labelFor(dimension, columns, "Dimensão")}`;
 
   return (
-    <section className="space-y-3 rounded-lg bg-gray-50 p-3 dark:bg-slate-800/50" aria-label="Visualização gráfica">
+    <section className="space-y-4 border-t border-gray-200 pt-4 dark:border-slate-700" aria-label="Visualização gráfica">
       <label className="block text-sm font-medium text-gray-800 dark:text-slate-200">
         Visualização
         <select className={reportInputClassName} value={type} onChange={(event) => setType(event.target.value as ChartType)}>
@@ -130,7 +130,7 @@ export function ReportChartPanel({
       </label>
       {type !== "table" ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm text-gray-800 dark:text-slate-200">Dimensão
               <select className={reportInputClassName} value={dimension} onChange={(event) => setDimension(event.target.value)}>
                 {dimensionOptions.map((key, index) => <option key={key} value={key}>{labelFor(key, columns, `Dimensão ${index + 1}`)}</option>)}
