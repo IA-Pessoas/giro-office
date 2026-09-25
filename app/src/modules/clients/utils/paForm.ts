@@ -1,4 +1,4 @@
-import { formatBrlInput, normalizeDigits } from "../../../shared/utils/inputFormatting.ts";
+import { formatBrlAmount, formatBrlInput, normalizeDigits } from "../../../shared/utils/inputFormatting.ts";
 
 export const PA_MONEY_FIELD_NAMES = new Set<string>(["tax_billing", "management_billing", "system_value"]);
 
@@ -23,7 +23,7 @@ export function parsePaMoneyCents(value: string | null | undefined): number | nu
 export function formatPaMoneyFromApi(value: string | null | undefined): string {
   const cents = parsePaMoneyCents(value);
 
-  return cents === null ? (value ?? "") : formatBrlInput(String(cents));
+  return cents === null ? (value ?? "") : formatBrlAmount(cents / 100);
 }
 
 // Campo de valor aceita só dígitos, formatados como moeda; texto livre vira vazio.

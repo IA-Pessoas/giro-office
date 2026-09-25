@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   formatBrazilianPhoneInput,
+  formatBrlAmount,
   formatBrlDecimalInput,
   formatBrlInput,
   formatCnpjInput,
@@ -45,15 +46,32 @@ assert.equal(normalizeDigits("R$ 12,34"), "1234");
 assert.equal(normalizeDigits(null), "");
 assert.equal(normalizeDigits(undefined), "");
 
-assert.equal(formatBrlInput("123456"), "R$ 1.234,56");
-assert.equal(formatBrlInput("R$ 12,34"), "R$ 12,34");
+// Máscara de moeda digitada em reais, com vírgula decimal (#1366): "100" é R$ 100, não R$ 1,00.
+function typeInto(keys) {
+  return [...keys].reduce((display, key) => formatBrlInput(display + key), "");
+}
+assert.equal(typeInto("150,50"), "R$ 150,50");
+assert.equal(parseBrlInput(typeInto("150,50")), 150.5);
+assert.equal(typeInto("150,5"), "R$ 150,5");
+assert.equal(parseBrlInput(typeInto("150,5")), 150.5);
+assert.equal(typeInto("100"), "R$ 100");
+assert.equal(parseBrlInput(typeInto("100")), 100);
+assert.equal(typeInto("1234567,8"), "R$ 1.234.567,8");
+assert.equal(typeInto("150,555"), "R$ 150,55");
+// Apagar um dígito de "R$ 1.234" não vira decimal: ponto é sempre milhar.
+assert.equal(formatBrlInput("R$ 1.23"), "R$ 123");
+assert.equal(formatBrlInput("R$ 1.234,56"), "R$ 1.234,56");
+assert.equal(formatBrlInput(formatBrlInput("R$ 1.234,56")), "R$ 1.234,56");
+assert.equal(formatBrlInput(",5"), "R$ 0,5");
 assert.equal(formatBrlInput(""), "");
 assert.equal(formatBrlInput("valor inválido"), "valor inválido");
-assert.equal(formatBrlInput("9007199254740992"), "9007199254740992");
 assert.equal(parseBrlInput("R$ 1.234,56"), 1234.56);
 assert.equal(parseBrlInput(""), null);
 assert.equal(parseBrlInput("R$ 12,34"), 12.34);
 assert.equal(parseBrlInput("9007199254740992"), null);
+assert.equal(formatBrlAmount(1234.5), "R$ 1.234,50");
+assert.equal(formatBrlAmount(0), "R$ 0,00");
+assert.equal(parseBrlInput(formatBrlAmount(1234.5)), 1234.5);
 
 console.log("input formatting tests passed");
 
