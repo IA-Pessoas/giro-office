@@ -14,6 +14,7 @@ import type {
   CertificateFileMetadata,
   CertificateListPage,
   CertificateNotification,
+  CertificateNotificationSummary,
   CertificateNotificationListParams,
   CertificatePj,
   CertificatePjListParams,
@@ -73,8 +74,8 @@ export function useCertificatePfList(
 
 export function useCertificateNotificationsList(
   params: CertificateNotificationListParams,
-  options: CertificateQueryOptions<CertificateListPage<CertificateNotification>> = {},
-): UseQueryResult<CertificateListPage<CertificateNotification>, Error> {
+  options: CertificateQueryOptions<CertificateListPage<CertificateNotification, CertificateNotificationSummary>> = {},
+): UseQueryResult<CertificateListPage<CertificateNotification, CertificateNotificationSummary>, Error> {
   return useFetch(certificateNotificationsQueryKey(params), () => certificateService.listNotifications(params), {
     enabled: options.enabled ?? true,
     placeholderData: (previousData) => previousData,

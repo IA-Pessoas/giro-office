@@ -7,6 +7,7 @@ import type {
   CertificateFileMetadata,
   CertificateListPage,
   CertificateNotification,
+  CertificateNotificationSummary,
   CertificateNotificationListParams,
   CertificatePj,
   CertificatePjListParams,
@@ -200,7 +201,7 @@ export const certificateService = {
 
   async listNotifications(
     params: CertificateNotificationListParams = {},
-  ): Promise<CertificateListPage<CertificateNotification>> {
+  ): Promise<CertificateListPage<CertificateNotification, CertificateNotificationSummary>> {
     const api = setupAPIClient();
     const response = await api.get(CERTIFICATE_ENDPOINTS.notifications, {
       params: buildCertificateListParams(params),

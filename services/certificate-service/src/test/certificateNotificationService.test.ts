@@ -6,7 +6,8 @@ import { CertificateNotificationService } from "../services/certificateNotificat
 import { certificateOrganizationId } from "./testUtils.js";
 
 const now = new Date("2026-05-25T12:00:00.000Z");
-const windowEnd = new Date("2026-06-24T23:59:59.999Z");
+// 12:00Z de 25/05 é 25/05 em São Paulo; entra quem vence até 24/06 (hoje + 30).
+const windowEnd = new Date("2026-06-25T00:00:00.000Z");
 
 function createNotificationRecord(overrides: Record<string, unknown> = {}) {
   return {
@@ -47,6 +48,7 @@ describe("CertificateNotificationService", () => {
       page: 2,
       page_size: 10,
       has_more: true,
+      summary: { pj: 21, pf: 21 },
     });
   });
 
@@ -87,7 +89,7 @@ describe("CertificateNotificationService", () => {
 
     expect(prisma.certificatePJ.findMany).toHaveBeenCalledWith({
       where: {
-        expiration_date: { lte: windowEnd },
+        expiration_date: { lt: windowEnd },
       },
       select: {
         id: true,
@@ -98,7 +100,7 @@ describe("CertificateNotificationService", () => {
     });
     expect(prisma.certificatePF.findMany).toHaveBeenCalledWith({
       where: {
-        expiration_date: { lte: windowEnd },
+        expiration_date: { lt: windowEnd },
       },
       select: {
         id: true,
