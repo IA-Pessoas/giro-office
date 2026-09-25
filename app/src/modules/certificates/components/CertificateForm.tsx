@@ -9,6 +9,7 @@ import {
   CERTIFICATE_INPUT_CLASSNAME,
 } from "./certificateWorkspaceUi";
 import { CertificateNativeSelect } from "./CertificateNativeSelect";
+import { FormField } from "@shared/components/FormField";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
 import {
@@ -410,17 +411,19 @@ export function CertificateForm({
               />
             </label>
 
-            <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-              <span className="inline-flex items-center gap-1">
-                <RequiredFieldLabel className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME} required={isCreate}>
-                  Natureza jurídica
-                </RequiredFieldLabel>
+            <FormField
+              className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+              labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+              label="Natureza jurídica"
+              required={isCreate}
+              help={
                 <FieldHelp
                   label="Natureza jurídica"
                   description="Classificação jurídica da empresa conforme o cadastro oficial."
                   container={tooltipContainer}
                 />
-              </span>
+              }
+            >
               <input
                 type="text"
                 value={formState.legalNature}
@@ -434,7 +437,7 @@ export function CertificateForm({
                 disabled={isSubmitting}
                 aria-required={isCreate}
               />
-            </label>
+            </FormField>
           </>
         ) : (
           <>
@@ -508,15 +511,18 @@ export function CertificateForm({
           />
         </label>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className="inline-flex items-center gap-1">
-            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Castelo</span>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Situação Castelo"
+          help={
             <FieldHelp
               label="Situação Castelo"
               description="Indica se este certificado está regularizado no sistema Castelo."
               container={tooltipContainer}
             />
-          </span>
+          }
+        >
           <CertificateNativeSelect
             value={certificateStatusValue(formState.clientCasteloStatus)}
             onChange={(event) => setBoolField("clientCasteloStatus", event.target.value === "true")}
@@ -528,17 +534,20 @@ export function CertificateForm({
               </option>
             ))}
           </CertificateNativeSelect>
-        </label>
+        </FormField>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className="inline-flex items-center gap-1">
-            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Situação Focus</span>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Situação Focus"
+          help={
             <FieldHelp
               label="Situação Focus"
               description="Indica se este certificado está regularizado no sistema Focus."
               container={tooltipContainer}
             />
-          </span>
+          }
+        >
           <CertificateNativeSelect
             value={certificateStatusValue(formState.clientFocusStatus)}
             onChange={(event) => setBoolField("clientFocusStatus", event.target.value === "true")}
@@ -550,7 +559,7 @@ export function CertificateForm({
               </option>
             ))}
           </CertificateNativeSelect>
-        </label>
+        </FormField>
 
         <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
           <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Pago</span>
@@ -575,15 +584,18 @@ export function CertificateForm({
           />
         </label>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className="inline-flex items-center gap-1">
-            <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Valor pago</span>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Valor pago"
+          help={
             <FieldHelp
               label="Valor pago"
               description="Informe o valor pago em reais, usando o formato R$ 0,00."
               container={tooltipContainer}
             />
-          </span>
+          }
+        >
           <input
             type="text"
             value={formState.paymentAmount}
@@ -592,7 +604,7 @@ export function CertificateForm({
             disabled={isSubmitting || !formState.wasPaid}
             placeholder="R$ 0,00"
           />
-        </label>
+        </FormField>
 
         <label className="col-span-full space-y-2">
           <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Observações</span>
