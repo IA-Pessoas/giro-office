@@ -497,6 +497,30 @@ describe("certificate PF routes", () => {
     });
   });
 
+  it("POST /certificate/pf/:id/file rejects a renamed text file with a clear message", async () => {
+    const prisma = createCertificatePrismaMock();
+    const fileStorage = {
+      putObject: vi.fn(async () => undefined),
+      getObject: vi.fn(),
+      deleteObject: vi.fn(),
+    };
+    const app = createCertificateTestApp(prisma, { fileStorage });
+
+    const response = await request(app)
+      .post(`/certificate/pf/${certificateId}/file`)
+      .set(certificateGatewayHeaders(2))
+      .attach("file", Buffer.from("isto nao e um certificado"), {
+        filename: "falso.p12",
+        contentType: "application/x-pkcs12",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe(
+      "O arquivo enviado não é um certificado digital PKCS#12 (.pfx/.p12) válido.",
+    );
+    expect(fileStorage.putObject).not.toHaveBeenCalled();
+  });
+
   it("POST /certificate/pf/:id/file stores encrypted metadata and returns metadata only", async () => {
     const prisma = createCertificatePrismaMock();
     const fileStorage = {

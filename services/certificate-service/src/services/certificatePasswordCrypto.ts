@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
-import { ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError } from "@workspace/shared";
 
 export interface CertificatePasswordCryptoOptions {
   keyBase64: string;
@@ -145,7 +145,8 @@ export function readStoredCertificatePassword(
   if (!stored.trim().startsWith("{")) return stored;
   try {
     return crypto?.decrypt(stored);
-  } catch {
+  } catch (err: unknown) {
+    logError("Senha de certificado ilegível; arquivo validado só pela estrutura", { err });
     return undefined;
   }
 }

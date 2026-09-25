@@ -164,6 +164,15 @@ function boolToLabel(value: boolean) {
   return value ? "Sim" : "Não";
 }
 
+function getPaymentFieldError(
+  state: Pick<CertificateFormState, "paymentAmount" | "paymentDate" | "wasPaid">,
+): { field: string; message: string } | null {
+  const amountMessage = getPaymentAmountValidationError(state.paymentAmount, state.wasPaid);
+  if (amountMessage) return { field: "paymentAmount", message: amountMessage };
+  const dateMessage = getPaymentDateValidationError(state.paymentDate, state.wasPaid);
+  return dateMessage ? { field: "paymentDate", message: dateMessage } : null;
+}
+
 function certificateStatusValue(value: boolean): string {
   return value ? "true" : "false";
 }
@@ -209,22 +218,9 @@ export function CertificateForm({
 
     if (isPj) {
       const state = formState as PjFormState;
-      const invalidAmountMessage = getPaymentAmountValidationError(
-        state.paymentAmount,
-        state.wasPaid,
-      );
-
-      if (invalidAmountMessage) {
-        setFieldError({ field: "paymentAmount", message: invalidAmountMessage });
-        return;
-      }
-
-      const missingPaymentDateMessage = getPaymentDateValidationError(
-        state.paymentDate,
-        state.wasPaid,
-      );
-      if (missingPaymentDateMessage) {
-        setFieldError({ field: "paymentDate", message: missingPaymentDateMessage });
+      const paymentError = getPaymentFieldError(state);
+      if (paymentError) {
+        setFieldError(paymentError);
         return;
       }
 
@@ -287,22 +283,9 @@ export function CertificateForm({
     }
 
     const state = formState as PfFormState;
-    const invalidAmountMessage = getPaymentAmountValidationError(
-      state.paymentAmount,
-      state.wasPaid,
-    );
-
-    if (invalidAmountMessage) {
-      setFieldError({ field: "paymentAmount", message: invalidAmountMessage });
-      return;
-    }
-
-    const missingPaymentDateMessage = getPaymentDateValidationError(
-      state.paymentDate,
-      state.wasPaid,
-    );
-    if (missingPaymentDateMessage) {
-      setFieldError({ field: "paymentDate", message: missingPaymentDateMessage });
+    const paymentError = getPaymentFieldError(state);
+    if (paymentError) {
+      setFieldError(paymentError);
       return;
     }
 
