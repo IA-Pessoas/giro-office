@@ -271,6 +271,45 @@ describe("gateway Worker: superfície /platform", () => {
     expect(forwarded.headers.get("x-auth-impersonator-id")).toBeNull();
   });
 
+  it("auditoria da plataforma vai ao audit-service em /audit/requests (#1530)", async () => {
+    const { app, bindings } = setup();
+
+    const response = await call(
+      app,
+      "GET",
+      "/platform/audit/requests?page=2&method=POST",
+      superAdmin(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(bindings.AUDIT_SERVICE.fetch).toHaveBeenCalledOnce();
+    const forwarded = bindings.AUDIT_SERVICE.fetch.mock.calls[0]?.[0] as Request;
+    const url = new URL(forwarded.url);
+    expect(url.pathname).toBe("/audit/requests");
+    expect(url.search).toBe("?page=2&method=POST");
+    expect(forwarded.headers.get("x-auth-kind")).toBe("platform");
+  });
+
+  it("auditoria da plataforma barra organização e sessão personificada", async () => {
+    const { app, bindings } = setup();
+
+    const member403 = await call(app, "GET", "/platform/audit/requests", member(), "bearer");
+    const impersonated403 = await call(app, "GET", "/platform/audit/requests", impersonated());
+
+    expect([member403.status, impersonated403.status]).toEqual([403, 403]);
+    expect(bindings.AUDIT_SERVICE.fetch).not.toHaveBeenCalled();
+  });
+
+  it("auditoria da plataforma revalida a sessão do super admin", async () => {
+    const { app, bindings } = setup();
+    bindings.USER_SERVICE.fetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+
+    const response = await call(app, "GET", "/platform/audit/requests", superAdmin());
+
+    expect(response.status).toBe(401);
+    expect(bindings.AUDIT_SERVICE.fetch).not.toHaveBeenCalled();
+  });
+
   it("path de plataforma não mapeado não é roteado", async () => {
     const { app, bindings } = setup();
     const response = await call(app, "GET", "/platform/inexistente", superAdmin());
