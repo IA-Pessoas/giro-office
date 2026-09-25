@@ -516,7 +516,7 @@ describe("UserService", () => {
         permission: 1,
         organization_id: "org-1",
       }),
-    ).rejects.toMatchObject({ statusCode: 409, message: "Login ja cadastrado." });
+    ).rejects.toMatchObject({ statusCode: 409, message: "Login já cadastrado." });
 
     expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { login: { equals: "ana", mode: "insensitive" } } }),

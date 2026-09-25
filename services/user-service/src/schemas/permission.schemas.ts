@@ -10,7 +10,7 @@ function containsInvalidPermissionModule(value: Record<string, unknown>): boolea
 }
 
 export const permissionUserIdParamsSchema = z.object({
-  userId: z.string().trim().min(1, "userId e obrigatorio."),
+  userId: z.string().trim().min(1, "userId é obrigatório."),
 });
 
 export const permissionQuerySchema = z
@@ -29,7 +29,7 @@ export const permissionQuerySchema = z
 export const updatePermissionBodySchema = z
   .record(permissionModuleValueSchema)
   .refine((value) => Object.keys(value).length > 0, {
-    message: "Body deve conter ao menos um modulo para atualizar.",
+    message: "Body deve conter ao menos um módulo para atualizar.",
   })
   .refine((value) => !containsInvalidPermissionModule(value), {
     message: "Módulo de permissão inválido ou aposentado.",

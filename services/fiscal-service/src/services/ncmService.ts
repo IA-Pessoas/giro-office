@@ -202,7 +202,7 @@ export class NcmService {
       });
 
       if (!exists) {
-        throw new ServiceError(404, "NCM nao existe.");
+        throw new ServiceError(404, "NCM não existe.");
       }
 
       const deleted = await this.prisma.ncm.delete({

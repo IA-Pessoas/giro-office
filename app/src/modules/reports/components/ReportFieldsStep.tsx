@@ -2,6 +2,7 @@ import { Button } from "@shared/ui/newLayout/button";
 import type { ReportsCatalogSource } from "../types/report.types";
 import { getSelectableReportFields } from "../utils/reportBuilder";
 import { reportCheckboxClassName } from "./reportUi";
+import { formatCount } from "@shared/utils/formatters";
 
 export function ReportFieldsStep({
   source,
@@ -36,7 +37,7 @@ export function ReportFieldsStep({
           Limpar todos
         </Button>
         <span className="text-xs text-gray-600 dark:text-slate-400">
-          {fieldKeys.length} de {fields.length} campos
+          {fieldKeys.length} de {formatCount(fields.length, "campo", "campos")}
         </span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

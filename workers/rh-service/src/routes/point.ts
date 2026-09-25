@@ -254,7 +254,7 @@ export function registerPointRoutes(app: RhApp, deps: RhRouteDeps): void {
     });
     const { requestId } = parseWithZod(uploadAdjustmentAttachmentParamsSchema, c.req.param());
     if (!file) {
-      throw new ServiceError(400, "Comprovante e obrigatorio.");
+      throw new ServiceError(400, "Comprovante é obrigatório.");
     }
     validateUploadFileSignature(file);
     const result = await deps.withDb(c, (db) =>

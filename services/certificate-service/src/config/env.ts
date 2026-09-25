@@ -40,11 +40,11 @@ const certificateServiceEnvSchema = z
   .object({
     nodeEnv: z.string().optional().default("development"),
     port: z.coerce.number().int().positive().default(3041),
-    databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o certificate-service."),
-    jwtSecret: z.string().min(1, "JWT_SECRET nao definido."),
-    auditServiceUrl: z.string().url("AUDIT_SERVICE_URL invalida."),
-    auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN nao definido."),
-    internalServiceToken: z.string().min(1, "CERTIFICATE_SERVICE_INTERNAL_TOKEN nao definido."),
+    databaseUrl: z.string().min(1, "DATABASE_URL não definido para o certificate-service."),
+    jwtSecret: z.string().min(1, "JWT_SECRET não definido."),
+    auditServiceUrl: z.string().url("AUDIT_SERVICE_URL inválida."),
+    auditServiceToken: z.string().min(1, "AUDIT_SERVICE_TOKEN não definido."),
+    internalServiceToken: z.string().min(1, "CERTIFICATE_SERVICE_INTERNAL_TOKEN não definido."),
     certificateReportingToken: z.string().optional().default(""),
     certificateReportingGrantSecret: z.string().optional().default(""),
     reportsInternalToken: z.string().optional().default("reports-service-token"),
@@ -71,11 +71,11 @@ const certificateServiceEnvSchema = z
       .transform((value) => parsePositiveInteger(value, 5 * 1024 * 1024)),
     certificateFileEncryptionKey: z
       .string()
-      .min(1, "CERTIFICATE_FILE_ENCRYPTION_KEY nao definida."),
+      .min(1, "CERTIFICATE_FILE_ENCRYPTION_KEY não definida."),
     certificateFileEncryptionKeyVersion: z.string().optional().default("v1"),
     certificatePasswordEncryptionKey: z
       .string()
-      .min(1, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY nao definida.")
+      .min(1, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY não definida.")
       .refine(
         (value) => isCanonicalBase64(value) && Buffer.from(value, "base64").length === 32,
         "CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64.",
@@ -105,7 +105,7 @@ const certificateServiceEnvSchema = z
     if (env.nodeEnv === "production" && env.storageMode === "local") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "CERTIFICATE_STORAGE_MODE=local nao e permitido em producao.",
+        message: "CERTIFICATE_STORAGE_MODE=local não é permitido em produção.",
         path: ["storageMode"],
       });
     }
@@ -114,7 +114,7 @@ const certificateServiceEnvSchema = z
       if (!env.supabaseUrl || !z.string().url().safeParse(env.supabaseUrl).success) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "SUPABASE_URL invalida para certificate-service.",
+          message: "SUPABASE_URL inválida para certificate-service.",
           path: ["supabaseUrl"],
         });
       }
@@ -122,7 +122,7 @@ const certificateServiceEnvSchema = z
       if (!env.supabaseServiceRoleKey) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "SUPABASE_SERVICE_ROLE_KEY nao definida para certificate-service.",
+          message: "SUPABASE_SERVICE_ROLE_KEY não definida para certificate-service.",
           path: ["supabaseServiceRoleKey"],
         });
       }

@@ -8,6 +8,7 @@ import type {
   ParcelamentoInstallment,
   PatchParcelamentoInstallmentPayload,
 } from "../types";
+import { formatBrlAmount, formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
 import {
   parcelamentoCheckboxCardClassName,
@@ -87,8 +88,8 @@ function buildFormState(
     legal_nature: installment.legal_nature,
     jurisdiction: installment.jurisdiction,
     is_automatic_debit: installment.is_automatic_debit,
-    first_installment_amount: String(installment.first_installment_amount),
-    current_month_installment_amount: String(installment.current_month_installment_amount),
+    first_installment_amount: formatBrlAmount(installment.first_installment_amount),
+    current_month_installment_amount: formatBrlAmount(installment.current_month_installment_amount),
     agreed_installments_count: String(installment.agreed_installments_count),
     enrollment_date: toDateInputValue(installment.enrollment_date),
     status: installment.status,
@@ -148,8 +149,8 @@ export function ParcelamentoInstallmentForm({
       return null;
     }
 
-    const firstAmount = readRequiredNumber(formState.first_installment_amount);
-    const currentAmount = readRequiredNumber(formState.current_month_installment_amount);
+    const firstAmount = parseBrlInput(formState.first_installment_amount) ?? 0;
+    const currentAmount = parseBrlInput(formState.current_month_installment_amount) ?? 0;
     const installmentsCount = Math.trunc(readRequiredNumber(formState.agreed_installments_count));
 
     if (!formState.type.trim() || !formState.legal_nature.trim() || !formState.jurisdiction.trim()) {
@@ -329,21 +330,19 @@ export function ParcelamentoInstallmentForm({
         />
         <TextField
           label="Primeira parcela"
-          type="number"
-          min="0"
-          step="0.01"
+          inputMode="decimal"
+          placeholder="R$ 0,00"
           value={formState.first_installment_amount}
-          onChange={(value) => handleFieldChange("first_installment_amount", value)}
+          onChange={(value) => handleFieldChange("first_installment_amount", formatBrlInput(value))}
           disabled={isDisabled}
           required
         />
         <TextField
           label="Parcela atual"
-          type="number"
-          min="0"
-          step="0.01"
+          inputMode="decimal"
+          placeholder="R$ 0,00"
           value={formState.current_month_installment_amount}
-          onChange={(value) => handleFieldChange("current_month_installment_amount", value)}
+          onChange={(value) => handleFieldChange("current_month_installment_amount", formatBrlInput(value))}
           disabled={isDisabled}
           required
         />
@@ -442,18 +441,22 @@ export function ParcelamentoInstallmentForm({
 
 function TextField({
   disabled,
+  inputMode,
   label,
   min,
   onChange,
+  placeholder,
   required = false,
   step,
   type = "text",
   value,
 }: {
   disabled: boolean;
+  inputMode?: "decimal";
   label: string;
   min?: string;
   onChange: (value: string) => void;
+  placeholder?: string;
   required?: boolean;
   step?: string;
   type?: string;
@@ -464,6 +467,8 @@ function TextField({
       {label}
       <input
         type={type}
+        inputMode={inputMode}
+        placeholder={placeholder}
         min={min}
         step={step}
         required={required}

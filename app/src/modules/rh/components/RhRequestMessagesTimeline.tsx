@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, Paperclip } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import {
   useCreateRhMessageMutation,

@@ -39,8 +39,8 @@ const rawClientServiceEnvSchema = z
         return Number.isNaN(parsed) ? 3035 : parsed;
       }),
     nodeEnv: z.string().optional().default("development"),
-    databaseUrl: z.string().min(1, "DATABASE_URL nao definido para o client-service."),
-    jwtSecret: z.string().min(1, "JWT_SECRET nao definido para o client-service."),
+    databaseUrl: z.string().min(1, "DATABASE_URL não definido para o client-service."),
+    jwtSecret: z.string().min(1, "JWT_SECRET não definido para o client-service."),
     logLevel: loggerLevelSchema.optional().default("info"),
     logPretty: z
       .string()
@@ -77,13 +77,13 @@ const rawClientServiceEnvSchema = z
       if (!env.supabaseUrl) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "SUPABASE_URL nao definida.",
+          message: "SUPABASE_URL não definida.",
           path: ["supabaseUrl"],
         });
       } else if (!z.string().url().safeParse(env.supabaseUrl).success) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "SUPABASE_URL nao definida.",
+          message: "SUPABASE_URL não definida.",
           path: ["supabaseUrl"],
         });
       }
@@ -91,7 +91,7 @@ const rawClientServiceEnvSchema = z
       if (!env.supabaseServiceRoleKey) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "SUPABASE_SERVICE_ROLE_KEY nao definida.",
+          message: "SUPABASE_SERVICE_ROLE_KEY não definida.",
           path: ["supabaseServiceRoleKey"],
         });
       }

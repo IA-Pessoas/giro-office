@@ -10,8 +10,8 @@ import { guidanceWriteStatusSchema } from "./status.schemas.js";
 export const guidanceEconomicActivitySchema = z
   .object({
     id: z.string().uuid().optional(),
-    code: z.string().min(1, "code obrigatorio."),
-    description: z.string().min(1, "description obrigatoria."),
+    code: z.string().min(1, "code obrigatório."),
+    description: z.string().min(1, "description obrigatória."),
     type: z.enum(["Principal", "Secundária", "Secundaria"]),
   })
   .strict();
@@ -19,8 +19,8 @@ export const guidanceEconomicActivitySchema = z
 export const guidancePartnerSchema = z
   .object({
     id: z.string().uuid().optional(),
-    name: z.string().min(1, "name obrigatorio."),
-    cpf: z.string().min(1, "cpf obrigatorio."),
+    name: z.string().min(1, "name obrigatório."),
+    cpf: z.string().min(1, "cpf obrigatório."),
     percentage: z.coerce.number().min(0).max(100).optional(),
     role: z.string().optional(),
     profession: z.string().optional(),
@@ -59,7 +59,7 @@ const guidanceTargetSnapshotSchema = z
   .object({
     version: z.literal(1),
     source: z.literal("manual"),
-    name: z.string().trim().min(1, "name obrigatorio."),
+    name: z.string().trim().min(1, "name obrigatório."),
     document: z.string().optional(),
     address: z.string().optional(),
     city: z.string().optional(),
@@ -85,11 +85,11 @@ const guidanceTargetSnapshotSchema = z
 
 const guidanceBranchDataSchema = z
   .object({
-    name: z.string().trim().min(1, "name obrigatorio."),
+    name: z.string().trim().min(1, "name obrigatório."),
     document: z.string().trim().min(1).optional(),
-    address: z.string().trim().min(1, "address obrigatorio."),
-    city: z.string().trim().min(1, "city obrigatoria."),
-    state: z.string().trim().min(1, "state obrigatorio."),
+    address: z.string().trim().min(1, "address obrigatório."),
+    city: z.string().trim().min(1, "city obrigatória."),
+    state: z.string().trim().min(1, "state obrigatório."),
   })
   .strict();
 
@@ -125,7 +125,7 @@ function validateGuidanceTarget(
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["target_snapshot"],
-      message: "SEM_CLIENTE exige snapshot manual válido e não aceita cadastro.",
+      message: "Sem cliente cadastrado, informe os dados manualmente e não vincule um cadastro.",
     });
   }
 }
@@ -166,10 +166,10 @@ function validateBranchData(
 
 export const createGuidanceBodySchema = z
   .object({
-    process_id: z.string().uuid("process_id invalido.").nullable().optional(),
+    process_id: z.string().uuid("process_id inválido.").nullable().optional(),
     target_type: z.enum(REGULARIZE_GUIDANCE_TARGET_TYPES),
-    client_pj_id: z.string().uuid("client_pj_id invalido.").nullable().optional(),
-    client_pf_id: z.string().uuid("client_pf_id invalido.").nullable().optional(),
+    client_pj_id: z.string().uuid("client_pj_id inválido.").nullable().optional(),
+    client_pf_id: z.string().uuid("client_pf_id inválido.").nullable().optional(),
     target_snapshot: guidanceTargetSnapshotSchema.optional(),
     checklist: guidanceChecklistSchema,
     branch_data: guidanceBranchDataSchema.nullable().optional(),
@@ -197,11 +197,11 @@ export const createGuidanceBodySchema = z
 
 export const updateGuidanceBodySchema = z
   .object({
-    id: z.string().uuid("id invalido."),
-    process_id: z.string().uuid("process_id invalido.").nullable().optional(),
+    id: z.string().uuid("id inválido."),
+    process_id: z.string().uuid("process_id inválido.").nullable().optional(),
     target_type: z.enum(REGULARIZE_GUIDANCE_TARGET_TYPES).optional(),
-    client_pj_id: z.string().uuid("client_pj_id invalido.").nullable().optional(),
-    client_pf_id: z.string().uuid("client_pf_id invalido.").nullable().optional(),
+    client_pj_id: z.string().uuid("client_pj_id inválido.").nullable().optional(),
+    client_pf_id: z.string().uuid("client_pf_id inválido.").nullable().optional(),
     target_snapshot: guidanceTargetSnapshotSchema.optional(),
     checklist: guidanceChecklistSchema.optional(),
     branch_data: guidanceBranchDataSchema.nullable().optional(),
@@ -226,46 +226,46 @@ export const updateGuidanceBodySchema = z
   .superRefine(validateGuidanceTarget)
   .superRefine(validateBranchData);
 
-export const guidanceDetailQuerySchema = z.object({ id: z.string().uuid("id invalido.") }).strict();
+export const guidanceDetailQuerySchema = z.object({ id: z.string().uuid("id inválido.") }).strict();
 
 export const listGuidanceByProcessQuerySchema = z
   .object({
-    process_id: z.string().uuid("process_id invalido.").nullable().optional(),
+    process_id: z.string().uuid("process_id inválido.").nullable().optional(),
     target_type: z.enum(REGULARIZE_GUIDANCE_TARGET_TYPES).optional(),
   })
   .strict();
 
 export const addGuidanceActivityBodySchema = z
   .object({
-    guidance_id: z.string().uuid("guidance_id invalido."),
+    guidance_id: z.string().uuid("guidance_id inválido."),
     activity: guidanceEconomicActivitySchema.omit({ id: true }),
   })
   .strict();
 
 export const updateGuidanceActivityBodySchema = z
   .object({
-    guidance_id: z.string().uuid("guidance_id invalido."),
+    guidance_id: z.string().uuid("guidance_id inválido."),
     activity: guidanceEconomicActivitySchema,
   })
   .strict();
 
 export const removeGuidanceActivityBodySchema = z
   .object({
-    guidance_id: z.string().uuid("guidance_id invalido."),
-    item_id: z.string().uuid("item_id invalido."),
+    guidance_id: z.string().uuid("guidance_id inválido."),
+    item_id: z.string().uuid("item_id inválido."),
   })
   .strict();
 
 export const addGuidancePartnerBodySchema = z
   .object({
-    guidance_id: z.string().uuid("guidance_id invalido."),
+    guidance_id: z.string().uuid("guidance_id inválido."),
     partner: guidancePartnerSchema.omit({ id: true }),
   })
   .strict();
 
 export const updateGuidancePartnerBodySchema = z
   .object({
-    guidance_id: z.string().uuid("guidance_id invalido."),
+    guidance_id: z.string().uuid("guidance_id inválido."),
     partner: guidancePartnerSchema,
   })
   .strict();

@@ -52,6 +52,15 @@ const nextConfig = {
       },
     ];
   },
+  // #1370: rotas legadas vão para as telas atuais (sem 308 permanente, para poder mudar depois).
+  async redirects() {
+    return [
+      { source: "/home", destination: "/dashboard", permanent: false },
+      { source: "/users", destination: "/administracao", permanent: false },
+      { source: "/me", destination: "/configuracoes", permanent: false },
+      { source: "/clients/:id/commercial", destination: "/clients/:id", permanent: false },
+    ];
+  },
   async rewrites() {
     return [
       {

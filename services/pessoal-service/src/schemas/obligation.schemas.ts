@@ -2,11 +2,11 @@ import { z } from "zod";
 
 export const competenceSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}$/, "competencia deve estar no formato YYYY-MM.");
+  .regex(/^\d{4}-\d{2}$/, "competência deve estar no formato YYYY-MM.");
 
 export const obligationIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
@@ -18,14 +18,14 @@ export const generateObligationsParamsSchema = z
 
 export const createObligationBodySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
     competence: competenceSchema,
   })
   .strict();
 
 export const detailObligationQuerySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
     competence: competenceSchema,
   })
   .strict();
@@ -36,7 +36,7 @@ export const updateObligationFieldBodySchema = z
     payroll: z.boolean().nullable().optional(),
     charges: z.boolean().nullable().optional(),
     assistance_fee: z.boolean().nullable().optional(),
-    responsavel_id: z.string().uuid({ message: "responsavel_id invalido." }).nullable().optional(),
+    responsavel_id: z.string().uuid({ message: "responsavel_id inválido." }).nullable().optional(),
     bem_mais: z.boolean().nullable().optional(),
     bsf: z.boolean().nullable().optional(),
     va: z.boolean().nullable().optional(),

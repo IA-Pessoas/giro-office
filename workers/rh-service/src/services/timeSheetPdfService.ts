@@ -184,7 +184,7 @@ export async function renderTimeSheetPdf(input: TimeSheetPdfRenderInput): Promis
       }
       drawText(
         document,
-        "Documento gerado a partir do snapshot da folha.",
+        "Documento gerado a partir da versão registrada da folha.",
         MARGIN,
         PAGE_HEIGHT - 48,
         CONTENT_WIDTH,

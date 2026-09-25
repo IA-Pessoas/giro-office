@@ -88,7 +88,7 @@ describe("regularize dashboard route", () => {
     expect(response.status).toBe(500);
     expect(response.body).toEqual({
       success: false,
-      error: "Erro interno no regularize-service.",
+      error: "Não foi possível concluir a operação. Tente de novo daqui a pouco.",
       code: "INTERNAL_ERROR",
       requestId: "request-dashboard-1",
     });
