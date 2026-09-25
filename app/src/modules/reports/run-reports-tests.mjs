@@ -155,6 +155,47 @@ runTest("keeps authorized letterhead options in the catalog contract", () => {
   assert.deepEqual(parsed.letterheads?.personal, [option]);
 });
 
+runTest("omits summary aggregations for fields that are not selected", () => {
+  const source = {
+    key: "integracao.clients",
+    label: "Clientes",
+    module: "integracao",
+    fields: [
+      {
+        key: "name",
+        label: "Nome",
+        type: "string",
+        selectable: true,
+        aggregatable: true,
+        aggregationFunctions: ["count"],
+      },
+      {
+        key: "state",
+        label: "Estado",
+        type: "string",
+        selectable: true,
+        aggregatable: true,
+        aggregationFunctions: ["count"],
+      },
+    ],
+  };
+  const definition = buildReportComposition(
+    [
+      {
+        source: source.key,
+        fields: ["name"],
+        aggregations: [
+          { field: "name", function: "count" },
+          { field: "state", function: "count" },
+        ],
+      },
+    ],
+    [source],
+  );
+
+  assert.deepEqual(definition.areas[0].aggregations, [{ field: "name", function: "count" }]);
+});
+
 runTest("distinguishes a CSRF failure from a report authorization denial", () => {
   const csrfError = {
     response: {
