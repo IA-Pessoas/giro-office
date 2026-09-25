@@ -46,6 +46,7 @@
     "test:certificate-info-modal": "node src/modules/certificates/run-certificate-info-modal-browser-smoke.mjs",
     "test:overlay-first-click": "node src/shared/components/run-overlay-first-click-browser-smoke.mjs",
     "test:form-a11y": "node src/shared/components/run-form-a11y-browser-smoke.mjs",
+    "test:shell-requests": "node src/shared/components/run-shell-requests-browser-smoke.mjs",
     "test:toast": "node --experimental-strip-types src/shared/services/run-toast-tests.mjs",
     "test:date-format": "node --experimental-strip-types src/shared/run-date-format-tests.mjs",
     "test:native-dialogs": "node src/shared/run-native-dialog-guard-tests.mjs",
