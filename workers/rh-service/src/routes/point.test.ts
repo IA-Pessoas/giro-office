@@ -154,6 +154,23 @@ describe("rh Worker /rh/point", () => {
     expect((await call(testApp(db()), "GET", "/rh/point/summary?month=09-2026")).status).toBe(400);
   });
 
+  it("GET /rh/point/summary returns zeros for a user without point config", async () => {
+    const fake = db();
+    fake.pointsConfig.findUnique.mockResolvedValue(null);
+    const response = await call(testApp(fake), "GET", "/rh/point/summary?month=2026-09");
+    expect(response.status).toBe(200);
+    expect((await json(response)).data).toEqual({
+      month: "2026-09",
+      user_id: TEST_USER_ID,
+      total_worked_minutes: 0,
+      expected_minutes: 0,
+      balance_minutes: 0,
+      overtime_minutes: 0,
+      absence_days: 0,
+      pending_adjustments: 0,
+    });
+  });
+
   it("POST /rh/point/register opens the day and blocks signed sheets", async () => {
     const fake = db();
     const response = await call(testApp(fake), "POST", "/rh/point/register", { permission: 1 });

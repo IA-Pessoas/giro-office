@@ -95,12 +95,7 @@ export function formatRhCategoryLabel(value: string | null | undefined) {
     return "-";
   }
 
-  return value
-    .trim()
-    .toLocaleLowerCase("pt-BR")
-    .split(/\s+/)
-    .map((part) => part.charAt(0).toLocaleUpperCase("pt-BR") + part.slice(1))
-    .join(" ");
+  return value.trim() || "-";
 }
 
 /** O rh-service recusa o solicitante como responsável; o select não deve oferecê-lo. */
