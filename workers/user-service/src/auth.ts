@@ -15,6 +15,7 @@ import {
   CSRF_COOKIE_NAME,
   CSRF_HEADER_NAME,
   FORWARDED_AUTH_CSRF_HASH_HEADER,
+  FORWARDED_AUTH_IMPERSONATOR_ID_HEADER,
   FORWARDED_AUTH_KIND_HEADER,
   FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
@@ -96,6 +97,7 @@ function forwardedAuth(request: Request, env: UserWorkerEnv): UserAuthContext | 
   const permission = permissionHeader === undefined ? undefined : Number(permissionHeader);
   const type = header(request, FORWARDED_AUTH_TYPE_HEADER);
   const platformRole = header(request, FORWARDED_AUTH_PLATFORM_ROLE_HEADER);
+  const impersonator = header(request, FORWARDED_AUTH_IMPERSONATOR_ID_HEADER);
   const claims: WorkerAuthClaims = {
     user_id: userId,
     ...(organizationId ? { organization_id: organizationId } : {}),
@@ -108,6 +110,9 @@ function forwardedAuth(request: Request, env: UserWorkerEnv): UserAuthContext | 
     session_version: sessionVersion,
     session_id: sessionId,
     csrf_hash: csrfHash,
+    ...(kind === "organization" && impersonator
+      ? { impersonator_platform_user_id: impersonator }
+      : {}),
   };
 
   return {
@@ -226,6 +231,15 @@ function hasActiveOrganization(user: Row, organizationId: string): boolean {
   return activeOrganizationId(user) === organizationId;
 }
 
+/** Super admin ativo e com permissão de personificar. */
+export function hasImpersonationPermission(operator: Row | null | undefined): boolean {
+  return (
+    operator?.platform_role === "super_admin" &&
+    operator.status === "active" &&
+    operator.can_impersonate === true
+  );
+}
+
 export async function validateUserSession(
   auth: UserAuthContext,
   prisma: UserPrismaClient,
@@ -240,6 +254,10 @@ export async function validateUserSession(
     },
     select: {
       csrf_hash: true,
+      impersonator_platform_user_id: true,
+      impersonatorPlatformUser: {
+        select: { platform_role: true, status: true, can_impersonate: true },
+      },
       user: {
         select: {
           organization_id: true,
@@ -257,17 +275,23 @@ export async function validateUserSession(
     },
   });
   const user = (session?.user ?? null) as Row | null;
+  const impersonator = auth.claims.impersonator_platform_user_id;
   const reason = !session
     ? "session_not_found"
     : session.csrf_hash !== csrfHash
       ? "csrf_mismatch"
-      : user?.status !== "active"
-        ? "inactive_user"
-        : !hasActiveOrganization(user, auth.organizationId)
-          ? "inactive_organization"
-          : user.session_version !== sessionVersion
-            ? "session_version_mismatch"
-            : undefined;
+      : (session.impersonator_platform_user_id ?? undefined) !== impersonator
+        ? "impersonation_mismatch"
+        : impersonator &&
+            !hasImpersonationPermission(session.impersonatorPlatformUser as Row | null)
+          ? "impersonator_without_permission"
+          : user?.status !== "active"
+            ? "inactive_user"
+            : !hasActiveOrganization(user, auth.organizationId)
+              ? "inactive_organization"
+              : user.session_version !== sessionVersion
+                ? "session_version_mismatch"
+                : undefined;
   if (reason) {
     // Paridade com o auth.session.rejected do Node: o motivo fica no log, a resposta segue generica.
     console.warn("Sessao recusada", {

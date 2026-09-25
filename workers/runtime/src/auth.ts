@@ -37,6 +37,8 @@ export interface WorkerAuthClaims {
   type?: WorkerAuthUserType;
   name?: string;
   login?: string;
+  /** Presente só em sessão de personificação aberta por um super admin. */
+  impersonator_platform_user_id?: string;
 }
 
 export interface WorkerAuthContext {
@@ -120,6 +122,9 @@ function normalizeClaims(payload: Record<string, unknown>): WorkerAuthClaims {
   }
   if (isNonEmptyString(payload.name)) claims.name = payload.name;
   if (isNonEmptyString(payload.login)) claims.login = payload.login;
+  if (isNonEmptyString(payload.impersonator_platform_user_id)) {
+    claims.impersonator_platform_user_id = payload.impersonator_platform_user_id;
+  }
 
   return claims;
 }

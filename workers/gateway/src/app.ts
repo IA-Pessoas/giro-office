@@ -153,6 +153,13 @@ const platformMatchers: RouteMatcher[] = [
     path: /^\/platform\/organizations\/[^/]+\/ownership-transfer\/?$/u,
     binding: "USER_SERVICE",
   },
+  {
+    methods: ["POST"],
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate\/?$/u,
+    binding: "USER_SERVICE",
+  },
+  // Chamado pela sessão personificada (identidade de organização); a policy é impersonationOnly.
+  { methods: ["POST"], path: /^\/platform\/impersonation\/exit\/?$/u, binding: "USER_SERVICE" },
   // Precisa vir depois dos matchers mais específicos acima, senão engoliria
   // `/platform/organizations/:id/users` e `/platform/organizations/:id/status`.
   {
@@ -281,6 +288,10 @@ function auditPayload(
     metadata: {
       actorKind: auth?.actorKind ?? "public",
       ...(auth?.actorKind === "platform" ? { platformUserId: auth.userId } : {}),
+      // Sessão personificada: a requisição é do usuário, mas quem age é o super admin.
+      ...(auth?.claims.impersonator_platform_user_id
+        ? { actorPlatformUserId: auth.claims.impersonator_platform_user_id }
+        : {}),
       routeTarget: route.binding,
       routePrefix: route.prefix,
     },

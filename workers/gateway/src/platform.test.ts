@@ -91,6 +91,20 @@ function member(): Promise<string> {
   });
 }
 
+/** Sessão de organização aberta por um super admin (personificação). */
+async function impersonated(): Promise<string> {
+  return signJwt({
+    user_id: "user-1",
+    organization_id: "org-1",
+    auth_kind: "organization",
+    type: "user",
+    permission: 1,
+    modules: {},
+    csrf_hash: await hashCsrfToken(CSRF),
+    impersonator_platform_user_id: "platform-1",
+  });
+}
+
 /**
  * Ator de plataforma só autentica por cookie de sessão: `auth.ts:159` recusa
  * `auth_kind: "platform"` quando o transporte é Bearer. Ator de organização
@@ -216,6 +230,45 @@ describe("gateway Worker: superfície /platform", () => {
 
     expect([list.status, patch.status]).toEqual([200, 200]);
     expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("iniciar personificação vai ao user-service só para super admin (#1529)", async () => {
+    const { app, bindings } = setup();
+    const path = "/platform/organizations/org-1/users/user-1/impersonate";
+
+    expect((await call(app, "POST", path, superAdmin())).status).toBe(200);
+    expect((await call(app, "POST", path, member(), "bearer")).status).toBe(403);
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledOnce();
+  });
+
+  it("sair da personificação aceita só a sessão personificada e repassa o operador (#1529)", async () => {
+    const { app, bindings } = setup();
+
+    const exit = await call(app, "POST", "/platform/impersonation/exit", impersonated());
+    expect(exit.status).toBe(200);
+    const forwarded = bindings.USER_SERVICE.fetch.mock.calls[0]?.[0] as Request;
+    expect(forwarded.headers.get("x-auth-impersonator-id")).toBe("platform-1");
+
+    expect(
+      (await call(app, "POST", "/platform/impersonation/exit", member(), "bearer")).status,
+    ).toBe(403);
+    expect((await call(app, "POST", "/platform/impersonation/exit", superAdmin())).status).toBe(
+      403,
+    );
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledOnce();
+  });
+
+  it("o cliente não forja o header do personificador", async () => {
+    const { app, bindings } = setup();
+    const token = await member();
+
+    await app.request("https://gateway.test/user/me", {
+      headers: { authorization: `Bearer ${token}`, "x-auth-impersonator-id": "platform-9" },
+    });
+
+    expect(bindings.USER_SERVICE.fetch).toHaveBeenCalledOnce();
+    const forwarded = bindings.USER_SERVICE.fetch.mock.calls[0]?.[0] as Request;
+    expect(forwarded.headers.get("x-auth-impersonator-id")).toBeNull();
   });
 
   it("path de plataforma não mapeado não é roteado", async () => {
