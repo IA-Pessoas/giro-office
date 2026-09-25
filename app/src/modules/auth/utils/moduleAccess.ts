@@ -1,3 +1,5 @@
+import { resolveDepartmentModuleKey as resolveCanonicalDepartmentModuleKey } from "@workspace/shared/auth/modules";
+
 export const GLOBAL_ADMIN_PERMISSION = 2;
 export const MODULE_VIEW_PERMISSION = 1;
 export const MODULE_EDIT_PERMISSION = 2;
@@ -139,32 +141,6 @@ export function isIntegrationTasksOnlyRouteBlocked(
   return routeModule === "integracao" && !canViewTasksOnlyIntegrationRoute(routePath, subject);
 }
 
-const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleKey> = {
-  certificado: "certificado",
-  comercial: "comercial",
-  contabil: "contabil",
-  "contabil fiscal": "contabil",
-  "contabil societario": "contabil",
-  "contabil societário": "contabil",
-  "contabil tributario": "contabil",
-  contábil: "contabil",
-  financeiro: "financeiro",
-  fiscal: "fiscal",
-  integracao: "integracao",
-  "integracao de sistemas": "integracao",
-  integração: "integracao",
-  marketing: "marketing",
-  parcelamento: "parcelamento",
-  pessoal: "pessoal",
-  "departamento pessoal": "pessoal",
-  regularize: "regularize",
-  rh: "rh",
-  "recursos humanos": "rh",
-  tecnologia: "ti",
-  ti: "ti",
-  triagem: "triagem",
-};
-
 function createModuleAccess(level: AccessLevel, source: AccessSource): ModuleAccess {
   return {
     level,
@@ -183,18 +159,6 @@ export function hasAnyModuleAccess(
   accessMap: Partial<Record<ModuleKey, Pick<ModuleAccess, "canView">>> | null | undefined,
 ): boolean {
   return Object.values(accessMap ?? {}).some((access) => access?.canView === true);
-}
-
-function normalizeDepartmentName(value?: string | null): string {
-  if (!value) {
-    return "";
-  }
-
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
 }
 
 export function resolveAccessLevelFromAdditionalPermission(
@@ -216,13 +180,7 @@ export function resolveAccessLevelFromAdditionalPermission(
 }
 
 export function resolveDepartmentModuleKey(departmentName?: string | null): ModuleKey | null {
-  const normalizedDepartmentName = normalizeDepartmentName(departmentName);
-
-  if (!normalizedDepartmentName) {
-    return null;
-  }
-
-  return DEPARTMENT_MODULE_ALIASES[normalizedDepartmentName] ?? null;
+  return resolveCanonicalDepartmentModuleKey(departmentName);
 }
 
 export function resolveModuleAccess({

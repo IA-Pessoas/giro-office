@@ -21,6 +21,47 @@ export const RETIRED_MODULE_KEYS = ["atendimento", "pec", "wiki"] as const;
 export type ModulePermissionKey = (typeof ACTIVE_MODULE_KEYS)[number];
 export type ModulePermissions = Record<ModulePermissionKey, number>;
 
+const DEPARTMENT_MODULE_ALIASES: Record<string, ModulePermissionKey> = {
+  certificado: "certificado",
+  comercial: "comercial",
+  contabil: "contabil",
+  contabilidade: "contabil",
+  contabil_fiscal: "contabil",
+  contabil_societario: "contabil",
+  contabil_tributario: "contabil",
+  financeiro: "financeiro",
+  fiscal: "fiscal",
+  integracao: "integracao",
+  integracao_de_clientes: "integracao",
+  integracao_de_sistemas: "integracao",
+  marketing: "marketing",
+  parcelamento: "parcelamento",
+  pessoal: "pessoal",
+  departamento_pessoal: "pessoal",
+  regularize: "regularize",
+  rh: "rh",
+  recursos_humanos: "rh",
+  tecnologia: "ti",
+  ti: "ti",
+  triagem: "triagem",
+};
+
+function normalizeDepartmentName(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+export function resolveDepartmentModuleKey(
+  departmentName: string | null | undefined,
+): ModulePermissionKey | null {
+  return DEPARTMENT_MODULE_ALIASES[normalizeDepartmentName(departmentName)] ?? null;
+}
+
 export function isModulePermission(value: unknown): value is 0 | 1 | 2 | 3 {
   return value === 0 || value === 1 || value === 2 || value === 3;
 }
