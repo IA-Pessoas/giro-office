@@ -431,6 +431,17 @@ describe("certificate PJ routes", () => {
     });
   });
 
+  it("GET /certificate/pj/list explains the page_size limit", async () => {
+    const app = createCertificateTestApp(createCertificatePrismaMock());
+
+    const response = await request(app)
+      .get("/certificate/pj/list?page_size=101")
+      .set(certificateGatewayHeaders(1));
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Tamanho de página deve ser no máximo 100.");
+  });
+
   it("POST /certificate/pj/:id/file rejects a renamed text file with a clear message", async () => {
     const prisma = createCertificatePrismaMock();
     const fileStorage = {

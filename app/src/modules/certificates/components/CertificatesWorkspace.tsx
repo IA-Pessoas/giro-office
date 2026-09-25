@@ -95,6 +95,7 @@ import {
   CERTIFICATE_SUMMARY_BAR_CLASSNAME,
   CERTIFICATE_SUMMARY_ITEM_CLASSNAME,
   type CertificateSortDirection,
+  formatCertificateDocument,
   formatDateBR,
   getExpirationTone,
   resolveCertificateWorkspaceCapabilities,
@@ -1524,7 +1525,9 @@ export function CertificatesWorkspace() {
                       >
                         <td className={CERTIFICATE_TABLE_NAME_CELL_CLASSNAME}>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.cnpj}</p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {formatCertificateDocument(item.cnpj)}
+                          </p>
                           <DocumentIssueBadge value={item.cnpj} />
                         </td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>
@@ -1663,12 +1666,16 @@ export function CertificatesWorkspace() {
                       >
                         <td className={CERTIFICATE_TABLE_NAME_CELL_CLASSNAME}>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.cpf}</p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {formatCertificateDocument(item.cpf)}
+                          </p>
                           <DocumentIssueBadge value={item.cpf} />
                         </td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>
                           <p>{item.enterprise || "-"}</p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.cnpj || "-"}</p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {formatCertificateDocument(item.cnpj)}
+                          </p>
                           <DocumentIssueBadge value={item.cnpj} />
                         </td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>{item.model}</td>
@@ -1997,7 +2004,7 @@ export function CertificatesWorkspace() {
                 </div>
                 <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
                   <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>CNPJ</p>
-                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{pjDetail?.cnpj ?? "-"}</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{formatCertificateDocument(pjDetail?.cnpj)}</p>
                 </div>
                 <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
                   <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Modelo</p>
@@ -2093,7 +2100,7 @@ export function CertificatesWorkspace() {
                 </div>
                 <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
                   <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>CPF</p>
-                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{pfDetail?.cpf ?? "-"}</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{formatCertificateDocument(pfDetail?.cpf)}</p>
                 </div>
                 <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
                   <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Modelo</p>
@@ -2170,7 +2177,7 @@ export function CertificatesWorkspace() {
                 <span
                   className="inline-flex w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
                 >
-                  CNPJ da empresa: {pfDetail?.cnpj ?? "-"}
+                  CNPJ da empresa: {formatCertificateDocument(pfDetail?.cnpj)}
                 </span>
               </div>
             </div>

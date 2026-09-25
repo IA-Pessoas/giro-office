@@ -1,3 +1,4 @@
+import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -21,7 +22,9 @@ import {
 import {
   getCreatePfPayload,
   getCreatePjPayload,
+  certificateModelOptions,
   getPaymentAmountValidationError,
+  getPaymentDateValidationError,
   getUpdatePfPayload,
   getUpdatePjPayload,
   type CertificateFormState,
@@ -185,6 +188,7 @@ export function CertificateForm({
   // Erro de validação de um campo: aparece abaixo dele, ligado por aria-describedby (#1367).
   const [fieldError, setFieldError] = useState<{ field: string; message: string } | null>(null);
   const fieldErrorFor = (field: string) => (fieldError?.field === field ? fieldError.message : null);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     setFormState(initialState);
@@ -212,6 +216,15 @@ export function CertificateForm({
 
       if (invalidAmountMessage) {
         setFieldError({ field: "paymentAmount", message: invalidAmountMessage });
+        return;
+      }
+
+      const missingPaymentDateMessage = getPaymentDateValidationError(
+        state.paymentDate,
+        state.wasPaid,
+      );
+      if (missingPaymentDateMessage) {
+        setFieldError({ field: "paymentDate", message: missingPaymentDateMessage });
         return;
       }
 
@@ -281,6 +294,15 @@ export function CertificateForm({
 
     if (invalidAmountMessage) {
       setFieldError({ field: "paymentAmount", message: invalidAmountMessage });
+      return;
+    }
+
+    const missingPaymentDateMessage = getPaymentDateValidationError(
+      state.paymentDate,
+      state.wasPaid,
+    );
+    if (missingPaymentDateMessage) {
+      setFieldError({ field: "paymentDate", message: missingPaymentDateMessage });
       return;
     }
 
@@ -395,14 +417,21 @@ export function CertificateForm({
           required={isCreate}
           error={fieldErrorFor("model")}
         >
-          <input
-            type="text"
+          <CertificateNativeSelect
             value={formState.model}
             onChange={(event) => updateField("model", event.target.value)}
-            className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting}
             aria-required={isCreate}
-          />
+          >
+            <option value="" disabled>
+              Selecione
+            </option>
+            {certificateModelOptions(formState.model).map((model) => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))}
+          </CertificateNativeSelect>
         </FormField>
 
         {isPj ? (
@@ -492,15 +521,28 @@ export function CertificateForm({
           required={isCreate}
           error={fieldErrorFor("password")}
         >
-          <input
-            type="text"
-            value={formState.password}
-            onChange={(event) => updateField("password", event.target.value)}
-            className={CERTIFICATE_INPUT_CLASSNAME}
-            disabled={isSubmitting}
-            placeholder={isCreate ? "Senha nova" : "Nova senha (opcional)"}
-            aria-required={isCreate}
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              value={formState.password}
+              onChange={(event) => updateField("password", event.target.value)}
+              className={`${CERTIFICATE_INPUT_CLASSNAME} pr-10`}
+              disabled={isSubmitting}
+              placeholder={isCreate ? "Senha nova" : "Nova senha (opcional)"}
+              aria-required={isCreate}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              aria-pressed={showPassword}
+              disabled={isSubmitting}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </FormField>
 
         <FormField
@@ -595,16 +637,22 @@ export function CertificateForm({
           </CertificateNativeSelect>
         </label>
 
-        <label className={CERTIFICATE_FILTER_LABEL_CLASSNAME}>
-          <span className={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}>Data de pagamento</span>
+        <FormField
+          className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
+          labelClassName={CERTIFICATE_FILTER_LABEL_TEXT_CLASSNAME}
+          label="Data de pagamento"
+          required={formState.wasPaid}
+          error={fieldErrorFor("paymentDate")}
+        >
           <input
             type="date"
             value={formState.paymentDate}
             onChange={(event) => updateField("paymentDate", event.target.value)}
             className={CERTIFICATE_INPUT_CLASSNAME}
             disabled={isSubmitting || !formState.wasPaid}
+            aria-required={formState.wasPaid}
           />
-        </label>
+        </FormField>
 
         <FormField
           className={CERTIFICATE_FILTER_LABEL_CLASSNAME}
