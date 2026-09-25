@@ -96,9 +96,10 @@ async function createResolver(source) {
   await writeFile(path.join(directory, ".git", "info", "exclude"), patterns);
 
   function resolveAll(relativePaths) {
-    const result = spawnSync("git", ["check-ignore", "--no-index", "--verbose", ...relativePaths], {
+    const result = spawnSync("git", ["check-ignore", "--no-index", "--verbose", "--stdin"], {
       cwd: directory,
       encoding: "utf8",
+      input: `${relativePaths.join("\n")}\n`,
       maxBuffer: 10 * 1024 * 1024,
     });
     if (result.error) throw result.error;
