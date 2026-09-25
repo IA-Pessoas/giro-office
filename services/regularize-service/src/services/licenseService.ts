@@ -37,6 +37,21 @@ const licenseSelect = {
   protocol_file_uploaded_at: true,
 } as const;
 
+// Lista mostra o cliente (#1347). O nome só sai quando o cliente é da mesma organização.
+export const licenseListClientSelect = { select: { name: true, organization_id: true } } as const;
+
+export function withLicenseClientName(
+  record: Record<string, unknown>,
+  organizationId: string,
+): Record<string, unknown> {
+  const { client, ...license } = record;
+  const owner = client as { name?: string; organization_id?: string } | null | undefined;
+  return {
+    ...license,
+    client_name: owner?.organization_id === organizationId ? (owner.name ?? null) : null,
+  };
+}
+
 function toPublicLicense(record: Record<string, unknown>): Record<string, unknown> {
   const {
     protocol_file_path: protocolFilePath,
@@ -327,12 +342,17 @@ export class LicenseService {
       ...(params.paginationRequested
         ? { skip: (params.page - 1) * params.limit, take: params.limit }
         : {}),
-      select: licenseSelect,
+      select: { ...licenseSelect, client: licenseListClientSelect },
     } as const;
+    const toListItem = (license: unknown) =>
+      withLicenseClientName(
+        toPublicLicense(license as Record<string, unknown>),
+        params.organizationId,
+      );
 
     if (!params.paginationRequested) {
       const list = await this.prisma.license.findMany(findManyArgs);
-      return list.map((license) => toPublicLicense(license as unknown as Record<string, unknown>));
+      return list.map(toListItem);
     }
 
     const [list, total] = await Promise.all([
@@ -341,7 +361,7 @@ export class LicenseService {
     ]);
 
     return {
-      data: list.map((license) => toPublicLicense(license as unknown as Record<string, unknown>)),
+      data: list.map(toListItem),
       total,
       page: params.page,
       limit: params.limit,
