@@ -75,6 +75,7 @@ describe("CertificateNotificationService", () => {
       certificateNotification: {
         findMany: vi.fn(async () => []),
         upsert: vi.fn(async ({ create }) => ({ id: crypto.randomUUID(), ...create })),
+        deleteMany: vi.fn(async () => ({ count: 0 })),
       },
     };
     const service = new CertificateNotificationService(prisma as never);
@@ -86,7 +87,6 @@ describe("CertificateNotificationService", () => {
 
     expect(prisma.certificatePJ.findMany).toHaveBeenCalledWith({
       where: {
-        has_certificate: true,
         expiration_date: { lte: windowEnd },
       },
       select: {
@@ -98,7 +98,6 @@ describe("CertificateNotificationService", () => {
     });
     expect(prisma.certificatePF.findMany).toHaveBeenCalledWith({
       where: {
-        has_certificate: true,
         expiration_date: { lte: windowEnd },
       },
       select: {
@@ -153,6 +152,7 @@ describe("CertificateNotificationService", () => {
       evaluated: 2,
       created: 2,
       updated: 0,
+      removed: 0,
     });
   });
 
@@ -181,6 +181,7 @@ describe("CertificateNotificationService", () => {
           ...existingNotification,
           ...update,
         })),
+        deleteMany: vi.fn(async () => ({ count: 0 })),
       },
     };
     const service = new CertificateNotificationService(prisma as never);
@@ -226,6 +227,7 @@ describe("CertificateNotificationService", () => {
       evaluated: 1,
       created: 0,
       updated: 1,
+      removed: 0,
     });
   });
 
@@ -246,6 +248,7 @@ describe("CertificateNotificationService", () => {
       certificateNotification: {
         findMany: vi.fn(async () => []),
         upsert: vi.fn(async ({ create }) => ({ id: crypto.randomUUID(), ...create })),
+        deleteMany: vi.fn(async () => ({ count: 0 })),
       },
     };
     const service = new CertificateNotificationService(prisma as never);
@@ -289,6 +292,41 @@ describe("CertificateNotificationService", () => {
       evaluated: 26,
       created: 26,
       updated: 0,
+      removed: 0,
     });
+  });
+
+  it("removes notifications of certificates renewed out of the window", async () => {
+    const prisma = {
+      certificatePJ: {
+        findMany: vi.fn(async () => [
+          {
+            id: "20000000-0000-4000-8000-000000000001",
+            name: "Empresa Vencida",
+            expiration_date: new Date("2026-05-20T00:00:00.000Z"),
+            organization_id: certificateOrganizationId,
+          },
+        ]),
+      },
+      certificatePF: { findMany: vi.fn(async () => []) },
+      certificateNotification: {
+        findMany: vi.fn(async () => []),
+        upsert: vi.fn(async () => ({})),
+        deleteMany: vi.fn(async ({ where }: { where: { type: string } }) => ({
+          count: where.type === "PF" ? 2 : 1,
+        })),
+      },
+    };
+    const service = new CertificateNotificationService(prisma as never);
+
+    const result = await service.runCertificateNotificationReconciliation({ now, windowDays: 30 });
+
+    expect(prisma.certificateNotification.deleteMany).toHaveBeenCalledWith({
+      where: { type: "PJ", certificate_id: { notIn: ["20000000-0000-4000-8000-000000000001"] } },
+    });
+    expect(prisma.certificateNotification.deleteMany).toHaveBeenCalledWith({
+      where: { type: "PF", certificate_id: { notIn: [] } },
+    });
+    expect(result.removed).toBe(3);
   });
 });

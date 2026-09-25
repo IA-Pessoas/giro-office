@@ -21,7 +21,10 @@ import {
   type CertificateUploadFile,
   validateCertificateUploadFile,
 } from "@workspace/certificate-service/src/services/certificateFileValidation.js";
-import { CertificateNotificationService } from "@workspace/certificate-service/src/services/certificateNotificationService.js";
+import {
+  type CertificateNotificationRunResult,
+  CertificateNotificationService,
+} from "@workspace/certificate-service/src/services/certificateNotificationService.js";
 import { createCertificatePasswordCrypto } from "@workspace/certificate-service/src/services/certificatePasswordCrypto.js";
 import { CertificatePfService } from "@workspace/certificate-service/src/services/certificatePfService.js";
 import type { CertificatePjFileDeps } from "@workspace/certificate-service/src/services/certificatePjService.js";
@@ -31,7 +34,7 @@ import {
   type WorkerAuthContext,
   withWorkerPrisma,
 } from "@workspace/runtime";
-import { parseWithZod } from "@workspace/shared";
+import { error as logError, info as logInfo, parseWithZod } from "@workspace/shared";
 import {
   createSuccessResponse,
   INTERNAL_SERVICE_TOKEN_HEADER,
@@ -244,6 +247,28 @@ async function withCertificateReportingService<T>(
   );
 }
 
+function notificationWindowDays(env: CertificateWorkerEnv): number {
+  return Number(env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30);
+}
+
+/** Execução do cron diário (`triggers.crons`): materializa os alertas de vencimento. */
+export async function runScheduledCertificateNotifications(
+  options: Pick<CertificateWorkerOptions, "env" | "notificationService">,
+): Promise<CertificateNotificationRunResult> {
+  try {
+    const result = await withCertificateNotificationService(options, (service) =>
+      service.runCertificateNotificationReconciliation({
+        windowDays: notificationWindowDays(options.env),
+      }),
+    );
+    logInfo("Notificacoes de certificados reconciliadas", { ...result });
+    return result;
+  } catch (err: unknown) {
+    logError("Falha no cron de notificacoes de certificados", { err });
+    throw err;
+  }
+}
+
 export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
   const app = new Hono<CertificateHonoEnv>();
 
@@ -293,7 +318,7 @@ export function createCertificateWorkerApp(options: CertificateWorkerOptions) {
       createSuccessResponse(
         await withCertificateNotificationService(options, (service) =>
           service.runCertificateNotificationReconciliation({
-            windowDays: options.env.CERTIFICATE_NOTIFICATION_WINDOW_DAYS ?? 30,
+            windowDays: notificationWindowDays(options.env),
           }),
         ),
       ),

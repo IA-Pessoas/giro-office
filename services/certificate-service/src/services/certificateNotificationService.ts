@@ -33,6 +33,8 @@ export interface CertificateNotificationRunResult {
   evaluated: number;
   created: number;
   updated: number;
+  /** Notificações de certificados que saíram da janela (renovados). */
+  removed: number;
 }
 
 interface CertificateCandidate {
@@ -110,14 +112,12 @@ export class CertificateNotificationService {
       const [certificatePj, certificatePf] = await Promise.all([
         this.prisma.certificatePJ.findMany({
           where: {
-            has_certificate: true,
             expiration_date: { lte: windowEnd },
           },
           select: certificateNotificationCandidateSelect,
         }),
         this.prisma.certificatePF.findMany({
           where: {
-            has_certificate: true,
             expiration_date: { lte: windowEnd },
           },
           select: certificateNotificationCandidateSelect,
@@ -128,10 +128,13 @@ export class CertificateNotificationService {
         evaluated: 0,
         created: 0,
         updated: 0,
+        removed: 0,
       };
 
       await this.upsertCertificateNotifications(certificatePj, "PJ", result);
       await this.upsertCertificateNotifications(certificatePf, "PF", result);
+      await this.removeStaleNotifications(certificatePj, "PJ", result);
+      await this.removeStaleNotifications(certificatePf, "PF", result);
 
       return result;
     } catch (err: unknown) {
@@ -139,6 +142,17 @@ export class CertificateNotificationService {
       if (err instanceof ServiceError) throw err;
       throw new ServiceError(500, "Erro ao reconciliar notificações de certificados.", err);
     }
+  }
+
+  private async removeStaleNotifications(
+    candidates: CertificateCandidate[],
+    type: CertificateNotificationType,
+    result: CertificateNotificationRunResult,
+  ): Promise<void> {
+    const { count } = await this.prisma.certificateNotification.deleteMany({
+      where: { type, certificate_id: { notIn: candidates.map((candidate) => candidate.id) } },
+    });
+    result.removed += count;
   }
 
   private async upsertCertificateNotifications(
