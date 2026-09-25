@@ -54,7 +54,7 @@ describe("TiInventoryLocationService", () => {
 
     await expect(service.create(context, { name: "Almoxarifado TI" })).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe um local de inventario de TI ativo com este nome.",
+      message: "Já existe um local de inventário de TI ativo com este nome.",
     });
   });
 });

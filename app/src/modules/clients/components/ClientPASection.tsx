@@ -1,6 +1,7 @@
+import { formatCivilDate } from "@shared/utils/dateFormat";
 import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { BriefcaseBusiness, CircleAlert, Database, Landmark, Plus, Save } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { isAxiosError } from "axios";
 
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
@@ -225,11 +226,7 @@ function buildUpdatePayload(
 }
 
 function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Não informado";
-  }
-
-  return new Date(value).toLocaleDateString("pt-BR");
+  return formatCivilDate(value, "Não informado");
 }
 
 export function ClientPASection({ clientId }: { clientId: string }) {

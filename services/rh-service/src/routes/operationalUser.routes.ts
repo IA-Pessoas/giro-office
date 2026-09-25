@@ -57,7 +57,7 @@ function requireOperationalUserCatalogPermission(
   );
 
   if (!canReadCatalog) {
-    next(new ServiceError(403, "Permissao insuficiente para listar colaboradores operacionais."));
+    next(new ServiceError(403, "Permissão insuficiente para listar colaboradores operacionais."));
     return;
   }
 

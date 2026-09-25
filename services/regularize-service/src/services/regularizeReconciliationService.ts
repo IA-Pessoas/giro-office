@@ -302,7 +302,7 @@ export class RegularizeReconciliationService {
 
       const title = `ALVARA A VENCER: ${license.type_license}`;
       const dateStr = license.due_date.toLocaleDateString("pt-BR", { timeZone: "UTC" });
-      const message = `O alvara do cliente ${license.client.name} vence em ${dateStr}.`;
+      const message = `O alvará do cliente ${license.client.name} vence em ${dateStr}.`;
 
       for (const userId of managers) {
         const inserted = await this.createNotificationIfMissing({

@@ -1,4 +1,3 @@
-import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { ClientIntegrationReportingService } from "../services/clientIntegrationReportingService.js";
@@ -29,20 +28,21 @@ describe("ClientIntegrationReportingService", () => {
     });
   });
 
-  it("recusa documento normalizado como campo publicável", async () => {
-    const findMany = vi.fn();
+  // #1361: CPF/CNPJ passou a ser publicado por decisão de produto.
+  it("publica CPF/CNPJ como campo do relatório de clientes", async () => {
+    const findMany = vi.fn().mockResolvedValue([{ cpf_cnpj: "11144477735" }]);
     const service = new ClientIntegrationReportingService({ client: { findMany } } as never);
 
-    await expect(
-      service.extract({
-        organizationId,
-        source: "integracao.clients",
-        fields: ["cpf_cnpj"],
-        limit: 10,
-      }),
-    ).rejects.toBeInstanceOf(ServiceError);
+    await service.extract({
+      organizationId,
+      source: "integracao.clients",
+      fields: ["cpf_cnpj"],
+      limit: 10,
+    });
 
-    expect(findMany).not.toHaveBeenCalled();
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ select: expect.objectContaining({ cpf_cnpj: true }) }),
+    );
   });
 
   it("processa query pelo callback e preserva reachedLimit do resultado", async () => {

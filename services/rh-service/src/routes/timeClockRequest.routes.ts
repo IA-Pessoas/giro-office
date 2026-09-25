@@ -223,7 +223,7 @@ export function createTimeClockRequestRoutes(
         });
         const { requestId } = parseWithZod(uploadAdjustmentAttachmentParamsSchema, req.params);
         if (!req.file) {
-          throw new ServiceError(400, "Comprovante e obrigatorio.");
+          throw new ServiceError(400, "Comprovante é obrigatório.");
         }
         validateUploadFileSignature(req.file);
         const result = await timeClockRequestService.uploadAttachment({

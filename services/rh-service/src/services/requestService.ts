@@ -126,7 +126,7 @@ class RequestService {
         candidateUserId ? 400 : 404,
         candidateUserId
           ? "O responsável informado não está ativo, no escopo da organização ou autorizado no módulo RH."
-          : "Nenhum responsavel de RH elegivel encontrado para atribuir a solicitacao.",
+          : "Nenhum responsável de RH elegível encontrado para atribuir a solicitação.",
       );
     }
 

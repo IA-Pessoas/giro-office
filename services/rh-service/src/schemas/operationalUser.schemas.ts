@@ -3,10 +3,10 @@ import { z } from "zod";
 
 export const operationalUserListQuerySchema = z
   .object({
-    department_id: z.string().uuid("department_id invalido.").optional(),
-    department_name: z.string().trim().min(1, "department_name obrigatorio.").optional(),
+    department_id: z.string().uuid("department_id inválido.").optional(),
+    department_name: z.string().trim().min(1, "department_name obrigatório.").optional(),
     module: z
-      .enum(ACTIVE_MODULE_KEYS, { errorMap: () => ({ message: "module invalido." }) })
+      .enum(ACTIVE_MODULE_KEYS, { errorMap: () => ({ message: "module inválido." }) })
       .optional(),
   })
   .strict();

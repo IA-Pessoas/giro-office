@@ -1,6 +1,7 @@
 import { assertNonEmptyString, error as logError, ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { RH_RESOLVE_WITHOUT_ASSIGNEE_MESSAGE } from "./requestService.js";
 import { RhNotificationService } from "./rhNotificationService.js";
 import { isRhRequestMessageObjectPath } from "./rhRequestMessageStorage.js";
 
@@ -107,7 +108,7 @@ function assertMessageCanBeCreated(
   }
 
   if (type === "Solution" && !request.assigned_to) {
-    throw new ServiceError(409, "Atribua um responsável antes de resolver a solicitação.");
+    throw new ServiceError(409, RH_RESOLVE_WITHOUT_ASSIGNEE_MESSAGE);
   }
 }
 

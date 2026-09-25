@@ -50,11 +50,11 @@ function requireContext(context: Pick<ParcelamentoRequestContext, "organizationI
   userId: string;
 } {
   if (!context.organizationId) {
-    throw new ServiceError(400, "Contexto de organizacao ausente.");
+    throw new ServiceError(400, "Contexto de organização ausente.");
   }
 
   if (!context.userId) {
-    throw new ServiceError(400, "Contexto de usuario ausente.");
+    throw new ServiceError(400, "Contexto de usuário ausente.");
   }
 
   return { organizationId: context.organizationId, userId: context.userId };
@@ -123,7 +123,7 @@ export class InstallmentCompetencyService {
     } catch (err: unknown) {
       logError("Erro ao listar competencias de parcelamento", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao listar competencias de parcelamento.", err);
+      throw new ServiceError(500, "Erro ao listar competências de parcelamento.", err);
     }
   }
 
@@ -168,9 +168,9 @@ export class InstallmentCompetencyService {
       logError("Erro ao criar competencia de parcelamento", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueError(err)) {
-        throw new ServiceError(409, "Ja existe competencia para este parcelamento.", err);
+        throw new ServiceError(409, "Já existe competência para este parcelamento.", err);
       }
-      throw new ServiceError(500, "Erro ao criar competencia de parcelamento.", err);
+      throw new ServiceError(500, "Erro ao criar competência de parcelamento.", err);
     }
   }
 
@@ -215,7 +215,7 @@ export class InstallmentCompetencyService {
     } catch (err: unknown) {
       logError("Erro ao atualizar competencia de parcelamento", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao atualizar competencia de parcelamento.", err);
+      throw new ServiceError(500, "Erro ao atualizar competência de parcelamento.", err);
     }
   }
 
@@ -228,7 +228,7 @@ export class InstallmentCompetencyService {
     });
 
     if (!installment) {
-      throw new ServiceError(404, "Parcelamento nao encontrado.");
+      throw new ServiceError(404, "Parcelamento não encontrado.");
     }
   }
 
@@ -246,7 +246,7 @@ export class InstallmentCompetencyService {
     });
 
     if (existing) {
-      throw new ServiceError(409, "Ja existe competencia para este parcelamento.");
+      throw new ServiceError(409, "Já existe competência para este parcelamento.");
     }
   }
 
@@ -257,7 +257,7 @@ export class InstallmentCompetencyService {
     });
 
     if (!competency) {
-      throw new ServiceError(404, "Competencia de parcelamento nao encontrada.");
+      throw new ServiceError(404, "Competência de parcelamento não encontrada.");
     }
 
     return competency;

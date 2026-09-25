@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 
+import { FormField } from "@shared/components/FormField";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
 
@@ -197,19 +198,15 @@ export function RegularizeFormField({
   required?: boolean;
 }) {
   return (
-    <label className={cn("flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300", className)}>
-      <span className="inline-flex items-center gap-1">
-        <span>{label}</span>
-        {required ? <span className="text-red-500">*</span> : null}
-        {help ? <FieldHelp label={label} description={help} /> : null}
-      </span>
+    <FormField
+      className={cn("text-sm text-gray-700 dark:text-gray-300", className)}
+      label={label}
+      required={required}
+      error={error}
+      help={help ? <FieldHelp label={label} description={help} /> : null}
+    >
       {children}
-      {error ? (
-        <span role="alert" className="text-xs text-red-700 dark:text-red-300">
-          {error}
-        </span>
-      ) : null}
-    </label>
+    </FormField>
   );
 }
 

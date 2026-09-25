@@ -1,12 +1,12 @@
 import { useRef, useState, type FormEvent, type MouseEvent } from "react";
-import { Archive, CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { Archive, Briefcase, CircleAlert, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, getClientDisplayName, type ClientPickerOption } from "@modules/clients";
 import { ConfirmationDialog, Dialog } from "@shared/components";
-import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
+import { formatBrlAmount, formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCommercialProspecting,
@@ -39,7 +39,7 @@ function formatContractValue(value: number): string {
 }
 
 function formatContractValueForInput(value: number): string {
-  return formatBrlInput(String(Math.round(value * 100)));
+  return formatBrlAmount(value);
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -248,7 +248,7 @@ export function CommercialCatalog() {
                 contractValueEditedRef.current = true;
                 setDraft((current) => ({
                   ...current,
-                  contract_value: formatBrlInput(normalizeDigits(event.target.value)),
+                  contract_value: formatBrlInput(event.target.value),
                 }));
               }}
               className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base tabular-nums text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
@@ -466,12 +466,16 @@ export function CommercialCatalog() {
 
   return (
     <>
-      <div className="commercial-catalog mx-auto max-w-[1600px] space-y-8">
+      <div className="commercial-catalog mx-auto max-w-[1600px] space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-blue-600 dark:text-blue-300">Comercial</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Catálogo de propostas</h1>
-          <p className="mt-2 max-w-[65ch] text-base leading-7 text-slate-700 dark:text-slate-300">
+          <h1 className="mb-1 flex items-center gap-3 text-3xl font-bold text-gray-900 dark:text-white">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
+              <Briefcase className="h-5 w-5 text-white" aria-hidden="true" />
+            </span>
+            Catálogo de propostas
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
             Defina o nome e o valor base usados nas propostas comerciais da sua organização.
           </p>
         </div>

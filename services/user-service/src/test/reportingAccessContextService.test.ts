@@ -85,7 +85,7 @@ describe("UserService.getReportingAccessContext", () => {
 
     await expect(
       new UserService().getReportingAccessContext(userId, organizationId),
-    ).rejects.toEqual(expect.objectContaining(new ServiceError(404, "Usuario nao encontrado.")));
+    ).rejects.toEqual(expect.objectContaining(new ServiceError(404, "Usuário não encontrado.")));
     expect(permissionServiceMock.getByUserId).not.toHaveBeenCalled();
   });
 });

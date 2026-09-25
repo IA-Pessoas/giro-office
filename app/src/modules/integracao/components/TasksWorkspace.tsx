@@ -12,7 +12,7 @@ import {
   Settings2,
   Trash2,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { ClientPickerModal, type ClientPickerOption, useClient } from "@modules/clients";

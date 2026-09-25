@@ -76,7 +76,7 @@ describe("installment competency routes", () => {
     expect(response.status).toBe(409);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Ja existe competencia para este parcelamento.",
+      error: "Já existe competência para este parcelamento.",
     });
   });
 

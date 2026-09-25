@@ -180,13 +180,13 @@ export function RegularizeProcessForm({
   }));
 
   if (formState.task_id && !taskOptions.some((task) => task.id === formState.task_id)) {
-    taskOptions.push({ id: formState.task_id, label: "Task vinculada (fora da lista)" });
+    taskOptions.push({ id: formState.task_id, label: "Tarefa vinculada (fora da lista)" });
   }
 
   const taskQueryMessage = tasksQuery.isLoading
-    ? "Carregando tasks..."
+    ? "Carregando tarefas..."
     : tasksQuery.error
-      ? `Erro ao carregar tasks: ${tasksQuery.error.message}`
+      ? `Erro ao carregar tarefas: ${tasksQuery.error.message}`
       : null;
 
   useEffect(() => {
@@ -472,23 +472,23 @@ export function RegularizeProcessForm({
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="Buscar task">
+            <RegularizeFormField label="Buscar tarefa">
               <input
                 type="search"
                 value={taskSearch}
                 onChange={(event) => setTaskSearch(event.target.value)}
-                placeholder="Buscar task por nome ou identificador"
+                placeholder="Buscar tarefa por nome ou identificador"
                 className={regularizeTextFieldClassName}
               />
             </RegularizeFormField>
 
-            <RegularizeFormField label="Task ID">
+            <RegularizeFormField label="Tarefa vinculada">
               <RegularizeNativeSelect
                 value={formState.task_id}
                 onChange={(event) => handleChange("task_id", event.target.value)}
                 disabled={tasksQuery.isLoading || Boolean(tasksQuery.error)}
               >
-                <option value="">Sem task vinculada</option>
+                <option value="">Sem tarefa vinculada</option>
                 {taskOptions.map((task) => (
                   <option key={task.id} value={task.id}>
                     {task.label}

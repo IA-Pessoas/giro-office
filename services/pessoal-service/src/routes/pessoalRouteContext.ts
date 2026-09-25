@@ -5,7 +5,7 @@ import type { PessoalAuthContext } from "../services/pessoalServiceTypes.js";
 
 export function getPessoalRouteContext(request: Request): PessoalAuthContext {
   if (!request.organization_id || !request.user_id) {
-    throw new ServiceError(401, "Autenticacao obrigatoria.");
+    throw new ServiceError(401, "Autenticação obrigatória.");
   }
 
   return {
@@ -18,7 +18,7 @@ export function getPessoalRouteContext(request: Request): PessoalAuthContext {
 
 export function getPessoalOrganizationContext(request: Request): { organizationId: string } {
   if (!request.organization_id) {
-    throw new ServiceError(401, "Autenticacao obrigatoria.");
+    throw new ServiceError(401, "Autenticação obrigatória.");
   }
 
   return { organizationId: request.organization_id };

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/router";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useAssignableUsers } from "../hooks/useAssignableUsers";
 import {

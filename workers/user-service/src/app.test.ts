@@ -565,7 +565,7 @@ describe("user Worker", () => {
     });
 
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toEqual({ message: "Usuario desativado com sucesso." });
+    expect((await response.json()).data).toEqual({ message: "Usuário desativado com sucesso." });
     expect(db.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "inactive", session_version: { increment: 1 } }),

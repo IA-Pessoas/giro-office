@@ -1095,7 +1095,7 @@ describe("TaskCrudService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 400,
-      message: "Projeto nao pertence ao cliente informado.",
+      message: "Projeto não pertence ao cliente informado.",
     });
     expect(prismaMock.task.create).not.toHaveBeenCalled();
   });
@@ -1119,7 +1119,7 @@ describe("TaskCrudService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Projeto nao encontrado.",
+      message: "Projeto não encontrado.",
     });
     expect(prismaMock.task.create).not.toHaveBeenCalled();
   });

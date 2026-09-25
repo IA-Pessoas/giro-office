@@ -12,8 +12,16 @@ export interface SerializedErrorResult {
 
 interface SerializeErrorOptions {
   requestId?: string;
+  /** Identifica o serviço no log do 5xx; nunca vai para a resposta. */
   fallbackMessage: string;
 }
+
+/**
+ * Texto de toda resposta 5xx. O motivo real (nome de serviço, variável de ambiente,
+ * tabela) fica só no log, ligado ao requestId que o usuário repassa ao suporte (#1365).
+ */
+export const INTERNAL_ERROR_MESSAGE =
+  "Não foi possível concluir a operação. Tente de novo daqui a pouco.";
 
 const STATUS_METADATA = new Map<number, { code: string; message: string }>([
   [400, { code: "BAD_REQUEST", message: "Bad Request" }],
@@ -73,11 +81,26 @@ function getDefaultMessageForStatusCode(statusCode: number): string {
   return STATUS_METADATA.get(statusCode)?.message ?? `HTTP ${statusCode} Error`;
 }
 
+export interface ServiceErrorOptions {
+  /**
+   * 5xx só mostra a própria mensagem com `expose: true`: use apenas em texto de negócio
+   * escrito para o usuário, sem nome de serviço, variável de ambiente ou tabela (#1365).
+   */
+  expose?: boolean;
+}
+
 export class ServiceError extends Error {
   readonly statusCode: number;
   readonly code: string;
+  readonly expose: boolean;
 
-  constructor(statusCode: number, message?: string, cause?: unknown, code?: string) {
+  constructor(
+    statusCode: number,
+    message?: string,
+    cause?: unknown,
+    code?: string,
+    options: ServiceErrorOptions = {},
+  ) {
     if (!Number.isInteger(statusCode) || statusCode < 400 || statusCode > 599) {
       throw new RangeError("ServiceError statusCode must be an integer between 400 and 599.");
     }
@@ -88,6 +111,7 @@ export class ServiceError extends Error {
     this.name = "ServiceError";
     this.statusCode = statusCode;
     this.code = code?.trim() || getErrorCodeForStatusCode(statusCode);
+    this.expose = options.expose ?? statusCode < 500;
 
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -101,24 +125,29 @@ export function serializeError(
   error: unknown,
   { requestId, fallbackMessage }: SerializeErrorOptions,
 ): SerializedErrorResult {
-  if (isServiceError(error)) {
+  if (!isServiceError(error) || !error.expose) {
+    const statusCode = isServiceError(error) ? error.statusCode : 500;
+    console.error(`[${fallbackMessage}] erro ${statusCode}`, {
+      requestId,
+      error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+    });
     return {
-      statusCode: error.statusCode,
+      statusCode,
       body: {
         success: false,
-        error: error.message,
-        code: error.code,
+        error: INTERNAL_ERROR_MESSAGE,
+        code: isServiceError(error) ? error.code : "INTERNAL_ERROR",
         ...(requestId ? { requestId } : {}),
       },
     };
   }
 
   return {
-    statusCode: 500,
+    statusCode: error.statusCode,
     body: {
       success: false,
-      error: fallbackMessage,
-      code: "INTERNAL_ERROR",
+      error: error.message,
+      code: error.code,
       ...(requestId ? { requestId } : {}),
     },
   };

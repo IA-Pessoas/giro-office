@@ -107,7 +107,7 @@ export class LddService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "LDD nao encontrado.");
+        throw new ServiceError(404, "LDD não encontrado.");
       }
 
       const data = omitUndefined({
@@ -155,7 +155,7 @@ export class LddService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "LDD nao encontrado.");
+        throw new ServiceError(404, "LDD não encontrado.");
       }
 
       await this.prisma.lddPessoal.delete({ where: { id } });
@@ -187,7 +187,7 @@ export class LddService {
     });
 
     if (!client) {
-      throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      throw new ServiceError(404, "Cliente não encontrado para a organização.");
     }
   }
 }

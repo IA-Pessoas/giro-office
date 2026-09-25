@@ -51,7 +51,7 @@ describe("FiscalIcmsAdapter", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 422,
-      message: expect.stringContaining("limite global do snapshot"),
+      message: expect.stringContaining("limite global (50.000 linhas"),
     });
     expect(responseJson).toHaveBeenCalledOnce();
   });

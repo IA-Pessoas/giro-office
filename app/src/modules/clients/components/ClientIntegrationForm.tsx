@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from "react";
 
+import { FormField } from "@shared/components/FormField";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
 import {
@@ -15,7 +16,11 @@ import type {
   CreateClientIntegrationFormValues,
   UpdateClientIntegrationFormValues,
 } from "../types";
-import { getIntegrationEmailError, getPhoneInputHint } from "../utils/integrationForm";
+import {
+  getIntegrationEmailError,
+  getPhoneInputHint,
+  type IntegrationFieldErrors,
+} from "../utils/integrationForm";
 
 type IntegrationFormMode = "create" | "edit";
 
@@ -38,6 +43,8 @@ interface ClientIntegrationFormProps {
   cnpjLookupError?: unknown;
   /** Liga os erros de campo depois de uma tentativa de salvar, mesmo sem blur. */
   showFieldErrors?: boolean;
+  /** Erros do envio, mostrados abaixo de cada campo (#1367). */
+  fieldErrors?: IntegrationFieldErrors;
 }
 
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-white";
@@ -60,6 +67,7 @@ export function ClientIntegrationForm({
   cnpjLookupStatus = "idle",
   cnpjLookupError,
   showFieldErrors = false,
+  fieldErrors = {},
 }: ClientIntegrationFormProps) {
   const cnpjLookupReason = (cnpjLookupError as { response?: { data?: { error?: unknown } } })
     ?.response?.data?.error;
@@ -77,7 +85,8 @@ export function ClientIntegrationForm({
   const [phoneHint, setPhoneHint] = useState<string | null>(null);
   const [emailTouched, setEmailTouched] = useState(false);
   const emailError =
-    emailTouched || showFieldErrors ? getIntegrationEmailError(values.email) : null;
+    fieldErrors.email ??
+    (emailTouched || showFieldErrors ? getIntegrationEmailError(values.email) : null);
   const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
     setPhoneHint(getPhoneInputHint(event.target.value));
     forwardFormattedInputChange(event, formatBrazilianPhoneInput, onChange);
@@ -115,18 +124,23 @@ export function ClientIntegrationForm({
           </ClientNativeSelect>
         </label>
 
-        <label className="space-y-1.5">
-          <RequiredFieldLabel className={labelClassName} required>
-            {values.type === "PJ" ? "CNPJ" : "CPF"}
-          </RequiredFieldLabel>
-          <input
-            name="cpf_cnpj"
-            value={values.cpf_cnpj}
-            onChange={handleCpfCnpjChange}
-            disabled={disabled}
-            placeholder="Somente números"
-            className={clientTextFieldClassName}
-          />
+        <div className="space-y-1.5">
+          <FormField
+            className="gap-1.5"
+            labelClassName={labelClassName}
+            label={values.type === "PJ" ? "CNPJ" : "CPF"}
+            required
+            error={fieldErrors.cpf_cnpj}
+          >
+            <input
+              name="cpf_cnpj"
+              value={values.cpf_cnpj}
+              onChange={handleCpfCnpjChange}
+              disabled={disabled}
+              placeholder="Somente números"
+              className={clientTextFieldClassName}
+            />
+          </FormField>
           {/* Espaço reservado: o aviso da consulta chega depois e não pode empurrar os campos. */}
           <span className="block min-h-12 text-xs" aria-live="polite">
             {cnpjLookupStatus === "loading" ? (
@@ -141,13 +155,16 @@ export function ClientIntegrationForm({
               </span>
             ) : null}
           </span>
-        </label>
+        </div>
 
         {values.type === "PF" ? (
-          <label className="space-y-1.5">
-            <RequiredFieldLabel className={labelClassName} required>
-              Nome / Apelido
-            </RequiredFieldLabel>
+          <FormField
+            className="gap-1.5"
+            labelClassName={labelClassName}
+            label="Nome / Apelido"
+            required
+            error={fieldErrors.name}
+          >
             <input
               name="name"
               value={values.name}
@@ -155,11 +172,15 @@ export function ClientIntegrationForm({
               disabled={disabled}
               className={clientTextFieldClassName}
             />
-          </label>
+          </FormField>
         ) : null}
 
-        <label className="space-y-1.5">
-          <span className={labelClassName}>Razão Social</span>
+        <FormField
+          className="gap-1.5"
+          labelClassName={labelClassName}
+          label="Razão Social"
+          error={values.type === "PF" ? null : fieldErrors.name}
+        >
           <input
             name="company_name"
             value={values.company_name}
@@ -167,7 +188,7 @@ export function ClientIntegrationForm({
             disabled={disabled}
             className={clientTextFieldClassName}
           />
-        </label>
+        </FormField>
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Nome Fantasia</span>
@@ -211,8 +232,12 @@ export function ClientIntegrationForm({
           ) : null}
         </label>
 
-        <label className="space-y-1.5 md:col-span-2 xl:col-span-2">
-          <span className={labelClassName}>E-mail</span>
+        <FormField
+          className="gap-1.5 md:col-span-2 xl:col-span-2"
+          labelClassName={labelClassName}
+          label="E-mail"
+          error={emailError}
+        >
           <input
             type="email"
             name="email"
@@ -220,15 +245,9 @@ export function ClientIntegrationForm({
             onChange={onChange}
             onBlur={() => setEmailTouched(true)}
             disabled={disabled}
-            aria-invalid={Boolean(emailError)}
             className={clientTextFieldClassName}
           />
-          {emailError ? (
-            <span className="block text-xs text-red-700 dark:text-red-300" role="alert">
-              {emailError}
-            </span>
-          ) : null}
-        </label>
+        </FormField>
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Responsável Legal</span>
@@ -241,8 +260,12 @@ export function ClientIntegrationForm({
           />
         </label>
 
-        <label className="space-y-1.5">
-          <span className={labelClassName}>CPF Responsável</span>
+        <FormField
+          className="gap-1.5"
+          labelClassName={labelClassName}
+          label="CPF Responsável"
+          error={fieldErrors.cpf_responsible}
+        >
           <input
             name="cpf_responsible"
             value={values.cpf_responsible}
@@ -251,7 +274,7 @@ export function ClientIntegrationForm({
             placeholder="Somente números"
             className={clientTextFieldClassName}
           />
-        </label>
+        </FormField>
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Preposto</span>
@@ -264,8 +287,12 @@ export function ClientIntegrationForm({
           />
         </label>
 
-        <label className="space-y-1.5">
-          <span className={labelClassName}>CPF Preposto</span>
+        <FormField
+          className="gap-1.5"
+          labelClassName={labelClassName}
+          label="CPF Preposto"
+          error={fieldErrors.cpf_agent}
+        >
           <input
             name="cpf_agent"
             value={values.cpf_agent}
@@ -274,7 +301,7 @@ export function ClientIntegrationForm({
             placeholder="Somente números"
             className={clientTextFieldClassName}
           />
-        </label>
+        </FormField>
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Instagram</span>

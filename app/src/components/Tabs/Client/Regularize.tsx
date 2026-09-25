@@ -220,7 +220,7 @@ export const regularizeTab = ({ client, perms }: ClientTabProps) => {
                             />
                         </FormControl>
                         <FormControl>
-                            <FormLabel>Inicio Paralisação</FormLabel>
+                            <FormLabel>Início Paralisação</FormLabel>
                             <Input name="start_strike" type="date" value={formData.start_strike} onChange={handleInputChange} color={'bodyText'} />
                         </FormControl>
                         <FormControl>

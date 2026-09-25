@@ -46,7 +46,7 @@ export function ReportSnapshotTable({
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 id="report-snapshot-title" className="font-semibold text-gray-900 dark:text-white">
-            Snapshot: {job.model_name ?? "Relatório"}
+            Resultado: {job.model_name ?? "Relatório"}
           </h3>
           <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
             Somente leitura · criado em {formatReportDate(snapshotQuery.data?.snapshot.created_at)}
@@ -61,10 +61,10 @@ export function ReportSnapshotTable({
       </div>
       {snapshotQuery.isPending ? (
         <div className="flex items-center gap-3 py-8 text-sm text-gray-600 dark:text-slate-400" role="status">
-          <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> Carregando snapshot...
+          <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> Carregando resultado...
         </div>
       ) : snapshotQuery.isError ? (
-        <p role="alert" className="py-5 text-sm text-red-600 dark:text-red-400">Não foi possível carregar o snapshot.</p>
+        <p role="alert" className="py-5 text-sm text-red-600 dark:text-red-400">Não foi possível carregar o resultado.</p>
       ) : blocks ? (
         <>
           <ReportResultBlocks blocks={blocks} snapshot />
@@ -91,12 +91,12 @@ export function ReportSnapshotTable({
           />
         </>
       ) : rows.length === 0 ? (
-        <p className="py-5 text-sm text-gray-600 dark:text-slate-400" role="status">O snapshot não possui linhas.</p>
+        <p className="py-5 text-sm text-gray-600 dark:text-slate-400" role="status">O resultado não possui linhas.</p>
       ) : (
         <>
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
             <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-gray-700">
-              <caption className="sr-only">Tabela paginada do snapshot do relatório</caption>
+              <caption className="sr-only">Tabela paginada do resultado do relatório</caption>
               <thead className="bg-gray-50 dark:bg-gray-800/70">
                 <tr><th scope="col" className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-200">#</th>{headers.map((header) => <th key={header} scope="col" className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-200">{header}</th>)}</tr>
               </thead>
@@ -130,7 +130,7 @@ export function ReportSnapshotTable({
       )}
       <div className="mt-4 flex items-center gap-2 text-xs text-gray-500 dark:text-slate-500">
         <StatusBadge config={getReportStatusConfig(job.status)} size="sm" />
-        Estado do job preservado junto ao snapshot.
+        Situação do relatório no momento da geração.
       </div>
     </section>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { Dialog } from "@shared/components";
 import { Button } from "@shared/ui/newLayout/button";
 import { useReportBuilder } from "../hooks/useReportBuilder";
@@ -697,7 +697,7 @@ export function ReportsCreatePanel({
                           <p className="text-sm text-gray-700 dark:text-slate-300">
                             {snapshot.data.blocks
                               ? "Resultado concluído. Escolha um formato para baixar as áreas separadamente."
-                              : "Resultado concluído. Escolha um formato para baixar o snapshot."}
+                              : "Resultado concluído. Escolha um formato para baixar o relatório."}
                           </p>
                           <ReportDownloadActions id={snapshot.data.snapshot.id} />
                         </div>

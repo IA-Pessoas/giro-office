@@ -8,7 +8,7 @@
   },
   "highRisk": [
     "app/src/pages/_app.tsx",
-    "app/src/pages/_documents.tsx",
+    "app/src/pages/_document.tsx",
     "app/src/styles/theme.ts",
     "app/src/modules/chat/components/ChatOverlay.tsx"
   ],

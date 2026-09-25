@@ -4,7 +4,7 @@ import { AlertCircle, ChevronDown, Loader2, RefreshCw, Save, WalletCards } from 
 import { useAssignableUsers } from "@modules/rh";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
-import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
+import { formatBrlAmount, formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 
 import {
   useCreatePessoalPayrollMutation,
@@ -130,14 +130,14 @@ function buildPayrollFormValues(
     advance_amount:
       payroll.advance_amount === null
         ? ""
-        : formatBrlInput(String(Math.round(payroll.advance_amount * 100))),
+        : formatBrlAmount(payroll.advance_amount),
     info: payroll.info,
     previous: payroll.previous,
     onvio: payroll.onvio,
     group_id: payroll.group_id,
     vt: payroll.vt,
     vt_value:
-      payroll.vt_value === null ? "" : formatBrlInput(String(Math.round(payroll.vt_value * 100))),
+      payroll.vt_value === null ? "" : formatBrlAmount(payroll.vt_value),
     vt_type: payroll.vt_type ?? "",
     va: payroll.va,
     assistance_fee: payroll.assistance_fee,
@@ -433,7 +433,7 @@ export function PessoalPayrollSection({
                       handleFieldChange(
                         field.name,
                         isMoney
-                          ? formatBrlInput(normalizeDigits(event.target.value))
+                          ? formatBrlInput(event.target.value)
                           : event.target.value,
                       )
                     }

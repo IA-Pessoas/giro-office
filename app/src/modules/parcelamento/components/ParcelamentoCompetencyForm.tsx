@@ -6,6 +6,7 @@ import type {
   ParcelamentoInstallmentCompetency,
   PatchParcelamentoInstallmentCompetencyPayload,
 } from "../types";
+import { formatBrlAmount, formatBrlInput, parseBrlInput } from "@shared/utils/inputFormatting";
 import { getParcelamentoErrorMessage } from "../utils/parcelamentoError";
 import { getCurrentParcelamentoMonth } from "../utils/parcelamentoMonth";
 import { ParcelamentoNativeSelect } from "./ParcelamentoNativeSelect";
@@ -90,7 +91,7 @@ function getInitialState(
     is_sent: fromNullableBoolean(initialValue?.is_sent ?? null),
     submission_type: initialValue?.submission_type ?? "",
     notes: initialValue?.notes ?? "",
-    installment_amount: String(initialValue?.installment_amount ?? 0),
+    installment_amount: formatBrlAmount(initialValue?.installment_amount ?? 0),
   };
 }
 
@@ -168,7 +169,10 @@ export function ParcelamentoCompetencyForm({
         is_sent: toNullableBoolean(formState.is_sent),
         submission_type: formState.submission_type,
         notes: formState.notes,
-        installment_amount: toNonNegativeNumber(formState.installment_amount, "Valor"),
+        installment_amount: toNonNegativeNumber(
+          String(parseBrlInput(formState.installment_amount) ?? ""),
+          "Valor",
+        ),
       };
 
       if (isEditing) {
@@ -235,11 +239,11 @@ export function ParcelamentoCompetencyForm({
         </Field>
         <Field label="Valor" required>
           <input
-            type="number"
-            min={0}
-            step="0.01"
+            type="text"
+            inputMode="decimal"
+            placeholder="R$ 0,00"
             value={formState.installment_amount}
-            onChange={(event) => updateField("installment_amount", event.target.value)}
+            onChange={(event) => updateField("installment_amount", formatBrlInput(event.target.value))}
             disabled={isDisabled}
             className={parcelamentoTextFieldClassName}
           />

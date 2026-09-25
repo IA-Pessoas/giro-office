@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { Dialog } from "@shared/components";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import {

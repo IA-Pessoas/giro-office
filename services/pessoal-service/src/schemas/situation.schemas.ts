@@ -2,24 +2,24 @@ import { zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
 export const situationStatusSchema = z.enum(["Em andamento", "Finalizado"], {
-  message: "status invalido.",
+  message: "status inválido.",
 });
 
 export const situationIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
 export const listSituationQuerySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
   })
   .strict();
 
 export const createSituationBodySchema = z
   .object({
-    client_id: z.string().uuid({ message: "client_id invalido." }),
+    client_id: z.string().uuid({ message: "client_id inválido." }),
     title: zNonEmptyText("title"),
     description: zNonEmptyText("description"),
   })

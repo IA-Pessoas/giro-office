@@ -137,7 +137,7 @@ describe("TiTermService", () => {
       service.getById({ ...context, permission: TiPermissionLevel.Viewer }, termId),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Termo de TI nao encontrado.",
+      message: "Termo de TI não encontrado.",
     });
   });
 
@@ -367,7 +367,7 @@ describe("TiTermService", () => {
 
     await expect(service.sign({ ...context, permission: 1 }, termId, {})).rejects.toMatchObject({
       statusCode: 404,
-      message: "Termo de TI nao encontrado.",
+      message: "Termo de TI não encontrado.",
     });
     expect(prisma.termTecnologia.update).not.toHaveBeenCalled();
   });

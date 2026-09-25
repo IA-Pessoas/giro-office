@@ -1,6 +1,6 @@
 import { Download, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import {
   useDownloadRhTimeSheetPdfMutation,
@@ -150,7 +150,7 @@ export function RhTimesheetDetailView({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-            Snapshot autorizado
+            Folha de ponto autorizada
           </p>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
             O PDF contém os registros, totais, banco de horas e assinatura da folha.

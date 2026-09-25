@@ -465,7 +465,7 @@ export function RegularizeGuidanceForm({
               <legend>
                 {formState.target_type === "SEM_CLIENTE"
                   ? "Dados do não cliente"
-                  : "Snapshot cadastral"}
+                  : "Dados cadastrais registrados"}
               </legend>
               {(
                 [

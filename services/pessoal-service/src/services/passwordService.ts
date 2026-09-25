@@ -272,7 +272,7 @@ export class PasswordService {
     });
 
     if (!password) {
-      throw new ServiceError(404, "Senha de pessoal nao encontrada.");
+      throw new ServiceError(404, "Senha de pessoal não encontrada.");
     }
 
     return password;
@@ -285,7 +285,7 @@ export class PasswordService {
     });
 
     if (!client) {
-      throw new ServiceError(404, "Cliente nao encontrado para a organizacao.");
+      throw new ServiceError(404, "Cliente não encontrado para a organização.");
     }
   }
 

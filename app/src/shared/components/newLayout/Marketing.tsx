@@ -48,6 +48,7 @@ import {
   YAxis,
 } from "recharts";
 import { getSummaryItems } from "../../utils/summaryItems";
+import { formatCount } from "@shared/utils/formatters";
 
 interface Budget {
   id: string;
@@ -955,7 +956,7 @@ export function Marketing() {
                       >
                         <td className="px-6 py-4">
                           <p className="font-medium text-gray-900 dark:text-white">{budget.name}</p>
-                          <p className="text-xs text-gray-600 dark:text-slate-400">{budget.items.length} itens</p>
+                          <p className="text-xs text-gray-600 dark:text-slate-400">{formatCount(budget.items.length, "item", "itens")}</p>
                         </td>
                         <td className="px-6 py-4">
                           <p className="text-sm text-gray-900 dark:text-white">{budget.campaign}</p>

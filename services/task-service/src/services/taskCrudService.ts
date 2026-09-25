@@ -433,11 +433,11 @@ export class TaskCrudService {
     });
 
     if (!project) {
-      throw new ServiceError(404, "Projeto nao encontrado.");
+      throw new ServiceError(404, "Projeto não encontrado.");
     }
 
     if (project.client_id !== data.client_id) {
-      throw new ServiceError(400, "Projeto nao pertence ao cliente informado.");
+      throw new ServiceError(400, "Projeto não pertence ao cliente informado.");
     }
     if (!options.allowPendingCommercialProject) {
       assertProjectCommercialValidationReleased(project);

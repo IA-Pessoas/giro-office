@@ -30,7 +30,7 @@ const upload = createPhotoUploadMiddleware();
 
 function getContext(request: Request): TiAuthContext {
   if (!request.user_id || !request.organization_id) {
-    throw new ServiceError(401, "Autenticacao obrigatoria.");
+    throw new ServiceError(401, "Autenticação obrigatória.");
   }
 
   return {
@@ -248,7 +248,7 @@ export function createTiRequestRoutes(
           });
 
           if (!isTiRequestImageObjectPath(objectPath, context.organizationId, params.id)) {
-            throw new ServiceError(500, "Armazenamento da imagem retornou uma chave invalida.");
+            throw new ServiceError(500, "Armazenamento da imagem retornou uma chave inválida.");
           }
 
           attachment = objectPath;

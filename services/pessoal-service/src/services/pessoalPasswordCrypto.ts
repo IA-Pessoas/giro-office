@@ -34,7 +34,7 @@ export function createPessoalPasswordCrypto(options: {
   const key = decodeKey(options.keyBase64);
   const keyVersion = options.keyVersion.trim();
   if (!keyVersion) {
-    throw new ServiceError(500, "Versao da chave de criptografia de pessoal invalida.");
+    throw new ServiceError(500, "Versão da chave de criptografia de pessoal inválida.");
   }
 
   return {
@@ -81,7 +81,7 @@ export function createPessoalPasswordCrypto(options: {
 function decodeKey(keyBase64: string): Buffer {
   const key = Buffer.from(keyBase64, "base64");
   if (key.length !== KEY_BYTES) {
-    throw new ServiceError(500, "Chave de criptografia de pessoal invalida.");
+    throw new ServiceError(500, "Chave de criptografia de pessoal inválida.");
   }
 
   return key;

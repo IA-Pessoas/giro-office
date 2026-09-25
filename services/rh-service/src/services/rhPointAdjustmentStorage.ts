@@ -136,10 +136,10 @@ export class UnavailableRhPointAdjustmentStorage implements RhPointAdjustmentAtt
   async upload(
     _input: Parameters<RhPointAdjustmentAttachmentStorage["upload"]>[0],
   ): Promise<string> {
-    throw new ServiceError(503, "Armazenamento de comprovantes nao configurado.");
+    throw new ServiceError(503, "Armazenamento de comprovantes não configurado.");
   }
 
   async createSignedAccessUrl(): Promise<string> {
-    throw new ServiceError(503, "Armazenamento de comprovantes nao configurado.");
+    throw new ServiceError(503, "Armazenamento de comprovantes não configurado.");
   }
 }

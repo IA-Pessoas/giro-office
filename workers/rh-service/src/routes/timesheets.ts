@@ -19,7 +19,7 @@ import {
   type RhRouteDeps,
 } from "./shared.js";
 
-const THIRD_PARTY_MESSAGE = "Permissao insuficiente para acessar folha de ponto de terceiro.";
+const THIRD_PARTY_MESSAGE = "Permissão insuficiente para acessar folha de ponto de terceiro.";
 
 /** Porta de `timeSheet.routes.ts` do Node (`/rh/timesheets`). */
 export function registerTimeSheetRoutes(app: RhApp, deps: RhRouteDeps): void {

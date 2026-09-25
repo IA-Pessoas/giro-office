@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { AlertTriangle, Plus } from "lucide-react";
-import { toast } from "react-toastify";
+import { Plus } from "lucide-react";
+import { ConfirmationDialog } from "@shared/components";
+import { toast } from "@shared/services/toast";
 
 import {
   useDeleteRhHolidayMutation,
@@ -17,6 +17,7 @@ export function RhHolidaysSection() {
   const [holidayPendingDelete, setHolidayPendingDelete] = useState<RhHoliday | null>(
     null,
   );
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const holidaysQuery = useRhHolidays();
   const deleteHolidayMutation = useDeleteRhHolidayMutation();
   const holidays = holidaysQuery.data ?? [];
@@ -32,6 +33,7 @@ export function RhHolidaysSection() {
     }
 
     setHolidayPendingDelete(null);
+    setDeleteError(null);
   }
 
   async function handleConfirmDelete() {
@@ -39,6 +41,7 @@ export function RhHolidaysSection() {
       return;
     }
 
+    setDeleteError(null);
     try {
       await deleteHolidayMutation.mutateAsync({ id: holidayPendingDelete.id });
       if (editingHoliday?.id === holidayPendingDelete.id) {
@@ -50,7 +53,9 @@ export function RhHolidaysSection() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Não foi possível excluir o feriado.";
-      toast.error(message);
+      setDeleteError(message);
+      // Relança para o diálogo permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -124,62 +129,21 @@ export function RhHolidaysSection() {
         />
       ) : null}
 
-      <DialogPrimitive.Root
+      <ConfirmationDialog
         open={Boolean(holidayPendingDelete)}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
             handleCloseDeleteDialog();
           }
         }}
-      >
-        <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="fixed inset-0 z-[1600] bg-black/60 backdrop-blur-sm" />
-          <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-[1700] w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-lg focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-            <DialogPrimitive.Title className="sr-only">
-              Excluir feriado
-            </DialogPrimitive.Title>
-            <DialogPrimitive.Description className="sr-only">
-              Confirmação de exclusão de feriado
-            </DialogPrimitive.Description>
-
-            <div className="flex flex-col gap-5">
-              <div className="flex items-start gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-300">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Excluir feriado
-                  </h3>
-                  <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
-                    Deseja realmente excluir este feriado? Essa ação não poderá ser
-                    desfeita.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCloseDeleteDialog}
-                  disabled={deleteHolidayMutation.isPending}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmDelete}
-                  disabled={deleteHolidayMutation.isPending}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {deleteHolidayMutation.isPending ? "Excluindo..." : "Excluir"}
-                </button>
-              </div>
-            </div>
-          </DialogPrimitive.Content>
-        </DialogPrimitive.Portal>
-      </DialogPrimitive.Root>
+        title="Excluir feriado"
+        description={`Excluir o feriado "${holidayPendingDelete?.name ?? ""}"? Essa ação não poderá ser desfeita.`}
+        onConfirm={handleConfirmDelete}
+        isConfirming={deleteHolidayMutation.isPending}
+        errorMessage={deleteError}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+      />
     </div>
   );
 }

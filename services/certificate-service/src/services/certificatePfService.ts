@@ -246,7 +246,7 @@ export class CertificatePfService {
     });
 
     if (!record) {
-      throw new ServiceError(404, "Certificado PF nao encontrado.");
+      throw new ServiceError(404, "Certificado PF não encontrado.");
     }
 
     if (!input.canViewPassword) {
@@ -289,7 +289,7 @@ export class CertificatePfService {
       });
 
       if (existing) {
-        throw new ServiceError(409, "Ja existe um certificado PF com estes dados.");
+        throw new ServiceError(409, "Já existe um certificado PF com estes dados.");
       }
 
       const record = await this.prisma.certificatePF.create({
@@ -308,7 +308,7 @@ export class CertificatePfService {
       logError("Erro ao criar certificado PF", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um certificado PF com estes dados.", err);
+        throw new ServiceError(409, "Já existe um certificado PF com estes dados.", err);
       }
       throw new ServiceError(500, "Erro ao criar certificado PF.", err);
     }
@@ -321,7 +321,7 @@ export class CertificatePfService {
       });
 
       if (!existing) {
-        throw new ServiceError(404, "Certificado PF nao encontrado.");
+        throw new ServiceError(404, "Certificado PF não encontrado.");
       }
 
       const name = input.data.name ?? existing.name;
@@ -344,7 +344,7 @@ export class CertificatePfService {
         });
 
         if (duplicate) {
-          throw new ServiceError(409, "Ja existe um certificado PF com estes dados.");
+          throw new ServiceError(409, "Já existe um certificado PF com estes dados.");
         }
       }
 
@@ -363,7 +363,7 @@ export class CertificatePfService {
       logError("Erro ao atualizar certificado PF", { err });
       if (err instanceof ServiceError) throw err;
       if (isPrismaUniqueConstraintError(err)) {
-        throw new ServiceError(409, "Ja existe um certificado PF com estes dados.", err);
+        throw new ServiceError(409, "Já existe um certificado PF com estes dados.", err);
       }
       throw new ServiceError(500, "Erro ao atualizar certificado PF.", err);
     }
@@ -375,7 +375,7 @@ export class CertificatePfService {
     });
 
     if (!record) {
-      throw new ServiceError(404, "Certificado PF nao encontrado.");
+      throw new ServiceError(404, "Certificado PF não encontrado.");
     }
 
     if (record.file_path) {
@@ -522,7 +522,7 @@ export class CertificatePfService {
 
   private requireFileDeps(): CertificatePfFileDeps {
     if (!this.fileDeps) {
-      throw new ServiceError(500, "Storage de arquivo de certificado nao configurado.");
+      throw new ServiceError(500, "Storage de arquivo de certificado não configurado.");
     }
 
     return this.fileDeps;
@@ -530,7 +530,7 @@ export class CertificatePfService {
 
   private requirePasswordCrypto(): CertificatePasswordCrypto {
     if (!this.passwordCrypto) {
-      throw new ServiceError(500, "Criptografia de senha de certificado nao configurada.");
+      throw new ServiceError(500, "Criptografia de senha de certificado não configurada.");
     }
 
     return this.passwordCrypto;
@@ -544,7 +544,7 @@ export class CertificatePfService {
     });
 
     if (!record) {
-      throw new ServiceError(404, "Certificado PF nao encontrado.");
+      throw new ServiceError(404, "Certificado PF não encontrado.");
     }
 
     return record;
@@ -564,7 +564,7 @@ export class CertificatePfService {
       !record.file_encryption_iv ||
       !record.file_encryption_tag
     ) {
-      throw new ServiceError(404, "Arquivo do certificado PF nao encontrado.");
+      throw new ServiceError(404, "Arquivo do certificado PF não encontrado.");
     }
 
     return {
