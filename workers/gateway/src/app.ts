@@ -117,6 +117,12 @@ const platformMatchers: RouteMatcher[] = [
   { methods: ["POST", "DELETE"], path: /^\/platform\/session\/?$/u, binding: "USER_SERVICE" },
   { methods: ["POST"], path: /^\/platform\/session\/refresh\/?$/u, binding: "USER_SERVICE" },
   { methods: ["GET"], path: /^\/platform\/me\/?$/u, binding: "USER_SERVICE" },
+  { methods: ["GET"], path: /^\/platform\/super-admins\/?$/u, binding: "USER_SERVICE" },
+  {
+    methods: ["PATCH"],
+    path: /^\/platform\/super-admins\/[^/]+\/impersonation-permission\/?$/u,
+    binding: "USER_SERVICE",
+  },
   {
     methods: ["GET", "POST"],
     path: /^\/platform\/organizations\/[^/]+\/users\/?$/u,

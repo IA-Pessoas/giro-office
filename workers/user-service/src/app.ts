@@ -31,7 +31,9 @@ import {
   listPlatformUsersQuerySchema,
   platformOrganizationUserParamsSchema,
   platformOrganizationUsersParamsSchema,
+  platformSuperAdminParamsSchema,
   transferPlatformOwnershipBodySchema,
+  updatePlatformSuperAdminImpersonationPermissionSchema,
   updatePlatformUserBodySchema,
 } from "../../../services/user-service/src/schemas/platformUsers.schemas.js";
 import {
@@ -1063,6 +1065,85 @@ async function authFor(
   return authenticateUserRequest(c.req.raw, envOf(c, options));
 }
 
+const PLATFORM_SUPER_ADMIN_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  status: true,
+  can_impersonate: true,
+} as const;
+
+/**
+ * Concede ou revoga a personificação de outro super admin. Revogar derruba as sessões de
+ * plataforma do alvo (session_version) e as personificações ativas que ele abriu.
+ */
+async function updateSuperAdminImpersonationPermission(
+  db: UserPrismaClient,
+  actorId: string,
+  superAdminId: string,
+  canImpersonate: boolean,
+): Promise<{ superAdmin: Row; changed: boolean; revokedSessions: number }> {
+  if (actorId === superAdminId) {
+    throw new ServiceError(409, "Não é permitido alterar a própria permissão.");
+  }
+  if (!db.$transaction) throw new ServiceError(503, "Atualização não configurada com transação.");
+
+  return db.$transaction(
+    async (transaction) => {
+      const target = await transaction.platformUser.findFirst({
+        where: { id: superAdminId, platform_role: "super_admin" },
+        select: PLATFORM_SUPER_ADMIN_SELECT,
+      });
+      if (!target) throw new ServiceError(404, "Super admin não encontrado.");
+      if (target.can_impersonate === canImpersonate) {
+        return { superAdmin: target, changed: false, revokedSessions: 0 };
+      }
+      if (!transaction.platformUser.updateMany) {
+        throw new ServiceError(503, "Atualização não configurada.");
+      }
+
+      const updated = await transaction.platformUser.updateMany({
+        where: {
+          id: superAdminId,
+          platform_role: "super_admin",
+          can_impersonate: target.can_impersonate,
+        },
+        data: {
+          can_impersonate: canImpersonate,
+          ...(canImpersonate ? {} : { session_version: { increment: 1 } }),
+        },
+      });
+      if (updated.count !== 1) {
+        throw new ServiceError(
+          409,
+          "A permissão mudou durante a operação. Atualize e tente novamente.",
+        );
+      }
+
+      let revokedSessions = 0;
+      if (!canImpersonate && transaction.authSession.updateMany) {
+        const now = new Date();
+        const revoked = await transaction.authSession.updateMany({
+          where: {
+            impersonator_platform_user_id: superAdminId,
+            revoked_at: null,
+            expires_at: { gt: now },
+          },
+          data: { revoked_at: now },
+        });
+        revokedSessions = revoked.count;
+      }
+
+      return {
+        superAdmin: { ...target, can_impersonate: canImpersonate },
+        changed: true,
+        revokedSessions,
+      };
+    },
+    { isolationLevel: "Serializable" },
+  );
+}
+
 async function platformContext(
   c: { req: { raw: Request; header(name: string): string | undefined }; env: UserWorkerEnv },
   options: UserWorkerOptions,
@@ -2038,6 +2119,54 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
         },
       });
       return c.json(createSuccessResponse(result));
+    }),
+  );
+
+  app.get("/platform/super-admins", async (c) =>
+    withDb(c, options, async (db) => {
+      await platformContext(c, options, db);
+      if (!db.platformUser.findMany) throw new ServiceError(503, "Listagem não configurada.");
+      const superAdmins = await db.platformUser.findMany({
+        where: { platform_role: "super_admin" },
+        select: PLATFORM_SUPER_ADMIN_SELECT,
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+      });
+      return c.json(createSuccessResponse(superAdmins));
+    }),
+  );
+
+  app.patch("/platform/super-admins/:superAdminId/impersonation-permission", async (c) =>
+    withDb(c, options, async (db) => {
+      const { auth, identity } = await platformContext(c, options, db);
+      await requireCsrf(c.req.raw, auth);
+      if (!identity.can_impersonate) {
+        throw new ServiceError(403, "Você não tem permissão para alterar essa permissão.");
+      }
+      const { superAdminId } = parse(platformSuperAdminParamsSchema, c.req.param());
+      const { can_impersonate: canImpersonate } = parse(
+        updatePlatformSuperAdminImpersonationPermissionSchema,
+        await jsonBody(c),
+      );
+      const result = await updateSuperAdminImpersonationPermission(
+        db,
+        identity.id,
+        superAdminId,
+        canImpersonate,
+      );
+      if (result.changed) {
+        await options.audit?.({
+          platformActorUserId: identity.id,
+          organizationId: null,
+          action: "platform.super_admin.impersonation_permission.updated",
+          referring: "platform_user",
+          referringId: superAdminId,
+          changes: {
+            can_impersonate: { from: !canImpersonate, to: canImpersonate },
+            ...(canImpersonate ? {} : { revoked_impersonation_sessions: result.revokedSessions }),
+          },
+        });
+      }
+      return c.json(createSuccessResponse(result.superAdmin));
     }),
   );
 
