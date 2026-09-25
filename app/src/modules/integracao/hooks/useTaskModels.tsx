@@ -25,7 +25,8 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
     }
   ).response;
 
-  if (response?.status === 409) {
+  // 4xx traz a mensagem de negócio; 5xx já ganhou o toast neutro com requestId (#1365).
+  if (response?.status && response.status < 500) {
     return response.data?.error ?? response.data?.message ?? fallback;
   }
 
