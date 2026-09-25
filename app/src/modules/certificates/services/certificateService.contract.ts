@@ -1,6 +1,7 @@
 import type {
   CertificateFileMetadata,
   CertificateListPage,
+  CertificateListSummary,
   CertificateNotificationListParams,
   CertificatePj,
   CertificatePjListParams,
@@ -11,6 +12,7 @@ import type {
   UpdateCertificatePjBody,
   UpdateCertificatePfBody,
   CertificateNotification,
+  CertificateNotificationSummary,
   CertificatePaginationParams,
   CertificateDownloadResult,
 } from "../types";
@@ -58,11 +60,11 @@ export function buildCertificateListParams<
   ) as T);
 }
 
-export function buildCertificateListPage<T>(
+export function buildCertificateListPage<T, S = CertificateListSummary>(
   data: T[],
   params: CertificatePaginationParams = {},
   metadata: { total?: number; has_more?: boolean } = {},
-): CertificateListPage<T> {
+): CertificateListPage<T, S> {
   const page = params.page ?? DEFAULT_CERTIFICATE_PAGE;
   const pageSize = params.page_size ?? DEFAULT_CERTIFICATE_PAGE_SIZE;
 
@@ -134,10 +136,10 @@ export function unwrapCertificateDetail(
   return unwrapCertificateEnvelope(body);
 }
 
-export function unwrapCertificateList<T>(
+export function unwrapCertificateList<T, S = CertificateListSummary>(
   body: unknown,
   params: CertificatePaginationParams,
-): CertificateListPage<T> {
+): CertificateListPage<T, S> {
   const payload = unwrapCertificateEnvelope<unknown>(body);
 
   if (
@@ -152,13 +154,17 @@ export function unwrapCertificateList<T>(
       page?: number;
       page_size?: number;
       has_more?: boolean;
+      summary?: S;
     };
 
-    return buildCertificateListPage(
-      page.items,
-      { page: page.page, page_size: page.page_size },
-      { total: page.total, has_more: page.has_more },
-    );
+    return {
+      ...buildCertificateListPage(
+        page.items,
+        { page: page.page, page_size: page.page_size },
+        { total: page.total, has_more: page.has_more },
+      ),
+      ...(page.summary ? { summary: page.summary } : {}),
+    };
   }
 
   return buildCertificateListPage(unwrapCertificateEnvelope<T[]>(payload), params);
@@ -167,8 +173,8 @@ export function unwrapCertificateList<T>(
 export function unwrapCertificateNotifications(
   body: unknown,
   params: CertificateNotificationListParams,
-): CertificateListPage<CertificateNotification> {
-  return unwrapCertificateList<CertificateNotification>(body, params);
+): CertificateListPage<CertificateNotification, CertificateNotificationSummary> {
+  return unwrapCertificateList<CertificateNotification, CertificateNotificationSummary>(body, params);
 }
 
 export function unwrapCertificateUploadResult(

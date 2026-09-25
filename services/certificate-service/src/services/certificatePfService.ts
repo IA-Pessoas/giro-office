@@ -17,7 +17,16 @@ import {
   type CertificateFileStorage,
 } from "./certificateFileStorage.js";
 import type { CertificateUploadFile } from "./certificateFileValidation.js";
-import type { CertificatePasswordCrypto } from "./certificatePasswordCrypto.js";
+import {
+  type CertificateListSummary,
+  countCertificateListSummary,
+} from "./certificateListSummary.js";
+import {
+  type CertificatePasswordCrypto,
+  isEncryptedPasswordPayload,
+  readStoredCertificatePassword,
+} from "./certificatePasswordCrypto.js";
+import { assertValidPkcs12 } from "./certificatePkcs12.js";
 import { isPrismaUniqueConstraintError } from "./prismaErrors.js";
 
 export interface CertificatePfContext {
@@ -26,6 +35,7 @@ export interface CertificatePfContext {
 
 export interface CertificatePfListInput extends CertificatePfContext {
   query: CertificatePfListQuery;
+  now?: Date;
 }
 
 export interface CertificatePfGetInput extends CertificatePfContext {
@@ -76,9 +86,13 @@ export interface CertificatePfPublicResult {
 
 export interface CertificatePfDetailResult extends CertificatePfPublicResult {
   password?: string;
+  /** A senha existe, mas não pôde ser descriptografada com as chaves configuradas. */
+  password_unavailable?: true;
 }
 
-export type CertificatePfListResult = PaginatedResult<CertificatePfPublicResult>;
+export type CertificatePfListResult = PaginatedResult<CertificatePfPublicResult> & {
+  summary: CertificateListSummary;
+};
 
 export interface CertificatePfFileMetadataResult {
   file_original_name: string;
@@ -170,15 +184,6 @@ function removeFilePrivateMetadata(record: CertificatePfPrivateRecord): Certific
   return safeRecord;
 }
 
-function isJsonValue(value: string): boolean {
-  try {
-    JSON.parse(value.trim());
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function buildListWhere(organizationId: string, query: CertificatePfListQuery) {
   return {
     organization_id: organizationId,
@@ -220,8 +225,16 @@ export class CertificatePfService {
   async listCertificatePf(input: CertificatePfListInput): Promise<CertificatePfListResult> {
     const pagination = getPaginationParams(input.query);
     const where = buildListWhere(input.organizationId, input.query);
-    const [total, records] = await Promise.all([
+    const [total, summary, records] = await Promise.all([
       this.prisma.certificatePF.count({ where }),
+      countCertificateListSummary(
+        (args) =>
+          this.prisma.certificatePF.count(
+            args as Parameters<typeof this.prisma.certificatePF.count>[0],
+          ),
+        where,
+        input.now,
+      ),
       this.prisma.certificatePF.findMany({
         where,
         orderBy: [{ expiration_date: "asc" }, { name: "asc" }],
@@ -230,11 +243,14 @@ export class CertificatePfService {
       }),
     ]);
 
-    return buildPaginatedResult(
-      records.map((record) => removePassword(removeFilePrivateMetadata(record))),
-      total,
-      input.query,
-    );
+    return {
+      ...buildPaginatedResult(
+        records.map((record) => removePassword(removeFilePrivateMetadata(record))),
+        total,
+        input.query,
+      ),
+      summary,
+    };
   }
 
   async getCertificatePf(input: CertificatePfGetInput): Promise<CertificatePfDetailResult> {
@@ -258,11 +274,21 @@ export class CertificatePfService {
     }
 
     const passwordCrypto = this.requirePasswordCrypto();
-    if (isJsonValue(record.password)) {
-      return removeFilePrivateMetadata({
-        ...record,
-        password: passwordCrypto.decrypt(record.password),
-      });
+    if (isEncryptedPasswordPayload(record.password)) {
+      let password: string;
+      try {
+        password = passwordCrypto.decrypt(record.password);
+      } catch (err: unknown) {
+        logError("Senha do certificado PF indisponível para descriptografia", {
+          certificateId: record.id,
+          err,
+        });
+        return {
+          ...removePassword(removeFilePrivateMetadata(record)),
+          password_unavailable: true,
+        };
+      }
+      return removeFilePrivateMetadata({ ...record, password });
     }
 
     await this.prisma.certificatePF.updateMany({
@@ -404,6 +430,10 @@ export class CertificatePfService {
     const deps = this.requireFileDeps();
 
     const existing = await this.findCertificatePfForFile(input);
+    assertValidPkcs12(
+      input.file.buffer,
+      readStoredCertificatePassword(existing.password, this.passwordCrypto),
+    );
     const encrypted = deps.fileCrypto.encrypt(input.file.buffer);
     const objectPath = buildCertificateObjectPath({
       organizationId: input.organizationId,

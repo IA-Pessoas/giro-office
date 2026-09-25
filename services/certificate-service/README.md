@@ -85,8 +85,11 @@ a versao atual da chave. Nunca registre a chave, senhas ou payloads reais em doc
 artefatos versionados.
 
 As senhas persistidas usam AES-256-GCM no envelope JSON `{ v, iv, tag, data }`. JSON invalido ou
-que nao represente esse envelope falha fechado. Texto legado nao-JSON e recriptografado na primeira
-leitura autorizada.
+que nao represente esse envelope nao derruba o detalhe: o Worker responde 200 sem `password` e com
+`password_unavailable: true`. Texto legado nao-JSON e recriptografado na primeira leitura autorizada.
+
+No Worker, `CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY` (opcional) recebe a chave usada nos envelopes
+migrados. Ela so e usada para leitura, em qualquer versao de envelope, depois que a chave atual falha.
 
 ## Rotas internas
 
@@ -108,11 +111,16 @@ interno e grants HMAC curtos compartilhados com o `reports-service`, usando
 
 ## Notificacoes
 
-O service nao agenda execucoes por conta propria. A reconciliacao de notificacoes deve ser chamada
-por um agendador externo usando `POST /internal/notifications/run`.
+Em producao, o Worker `giro-certificate-service` roda a reconciliacao todo dia as 09:00 UTC
+(`triggers.crons` em `workers/certificate-service/wrangler.jsonc`) e registra no log
+"Notificacoes de certificados reconciliadas" com `evaluated`, `created`, `updated` e `removed`. O service Node
+nao agenda nada; nele, a reconciliacao e chamada por `POST /internal/notifications/run`.
 
-`CERTIFICATE_NOTIFICATION_WINDOW_DAYS` define a janela de vencimento usada para materializar
-notificacoes de certificados PJ/PF com `has_certificate = true`.
+Regra: todo certificado PJ/PF ja vencido ou que vence em ate `CERTIFICATE_NOTIFICATION_WINDOW_DAYS`
+dias (padrao 30) tem uma notificacao, com ou sem arquivo (`has_certificate`). A notificacao e unica
+por organizacao, certificado e tipo (PJ/PF): cada execucao regrava nome e data em vez de duplicar, e
+apaga a notificacao de quem saiu da janela (ex.: certificado renovado). Nao ha marcos separados
+(30/15/7 dias): a data da notificacao e o proprio vencimento.
 
 ## Desenvolvimento
 

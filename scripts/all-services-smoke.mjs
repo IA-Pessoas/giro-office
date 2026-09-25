@@ -163,6 +163,11 @@ const env = {
   fixturePath:
     process.env.SMOKE_UPLOAD_FIXTURE?.trim() ||
     path.join(rootDir, "scripts", "fixtures", "smoke-upload.png"),
+  // PKCS#12 real (senha "secret-password"): o upload de certificado valida o arquivo.
+  certificateFixturePath: path.join(
+    rootDir,
+    "services/certificate-service/src/test/fixtures/certificado-teste-sha256.p12",
+  ),
 };
 
 env.gatewayUrl =
@@ -1972,7 +1977,7 @@ const handlers = {
         responsible: uniqueText("Smoke Certificate Responsible"),
         model: "A1",
         legal_nature: "LTDA",
-        password: "smoke-secret",
+        password: "secret-password",
         expiration_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         notes: "Smoke certificate PJ.",
         was_paid: true,
@@ -2011,7 +2016,7 @@ const handlers = {
       form: {
         file: {
           fieldName: "file",
-          path: env.fixturePath,
+          path: env.certificateFixturePath,
           filename: "smoke-certificate.pfx",
           contentType: "application/octet-stream",
         },
@@ -2057,7 +2062,7 @@ const handlers = {
         name: uniqueText("Smoke Certificate PF"),
         cpf: uniqueDigits(11),
         model: "A1",
-        password: "smoke-secret",
+        password: "secret-password",
         expiration_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         notes: "Smoke certificate PF.",
         enterprise: uniqueText("Smoke Enterprise"),
@@ -2098,7 +2103,7 @@ const handlers = {
       form: {
         file: {
           fieldName: "file",
-          path: env.fixturePath,
+          path: env.certificateFixturePath,
           filename: "smoke-certificate.pfx",
           contentType: "application/octet-stream",
         },
