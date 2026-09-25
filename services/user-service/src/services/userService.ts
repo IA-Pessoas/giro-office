@@ -5,6 +5,7 @@ import {
   type ModulePermissionKey,
   type ModulePermissions,
   normalizeModulePermissions,
+  resolveDepartmentModuleKey,
   ServiceError,
 } from "@workspace/shared";
 
@@ -66,27 +67,6 @@ const EMPTY_MODULES = Object.fromEntries(MODULE_FIELDS.map((field) => [field, 0]
   ModuleField,
   0
 >;
-const DEPARTMENT_MODULE_ALIASES: Record<string, ModuleField> = {
-  certificado: "certificado",
-  comercial: "comercial",
-  contabil: "contabil",
-  contabilidade: "contabil",
-  financeiro: "financeiro",
-  fiscal: "fiscal",
-  integracao: "integracao",
-  integracao_de_clientes: "integracao",
-  marketing: "marketing",
-  parcelamento: "parcelamento",
-  pessoal: "pessoal",
-  departamento_pessoal: "pessoal",
-  regularize: "regularize",
-  rh: "rh",
-  recursos_humanos: "rh",
-  tecnologia: "ti",
-  ti: "ti",
-  triagem: "triagem",
-};
-
 export interface CreateUserInput {
   name: string;
   login: string;
@@ -177,21 +157,6 @@ function normalizeUserOrganization<T extends { organization_id: string | null }>
     ...user,
     organization_id: user.organization_id ?? organizationId,
   };
-}
-
-function normalizeDepartmentName(value: string | null | undefined): string {
-  return (value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-function resolveDepartmentModuleKey(departmentName: string | null | undefined): ModuleField | null {
-  const normalizedName = normalizeDepartmentName(departmentName);
-  return DEPARTMENT_MODULE_ALIASES[normalizedName] ?? null;
 }
 
 function normalizeUserType(value: unknown): AuthUserType | null {
