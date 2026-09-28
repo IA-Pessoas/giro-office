@@ -271,19 +271,19 @@ describe("ClientService.listByOrganization", () => {
 });
 
 describe("ClientService.listInstagramProfiles", () => {
-  it("filtra Instagram ausente dentro da organização e mantém paginação", async () => {
-    const findMany = vi.fn().mockResolvedValue([
-      {
-        id: TEST_CLIENT_ID,
-        name: "Acme",
-        status: "Ativo",
-        instagram: null,
-      },
-    ]);
-    const count = vi.fn().mockResolvedValue(13);
-    const prisma = {
-      client: { findMany, count },
-    } as unknown as PrismaClient;
+  it("filtra perfis ausentes, incluindo valores antigos só com espaços, e mantém paginação", async () => {
+    const queryRaw = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: TEST_CLIENT_ID,
+          name: "Acme",
+          status: "Ativo",
+          instagram: null,
+        },
+      ])
+      .mockResolvedValueOnce([{ total: 13n }]);
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
     const service = new ClientService(prisma);
 
     const result = await service.listInstagramProfiles(TEST_ORG_ID, {
@@ -300,32 +300,23 @@ describe("ClientService.listInstagramProfiles", () => {
       pageSize: 10,
       hasMore: false,
     });
-    expect(findMany).toHaveBeenCalledWith({
-      where: {
-        AND: [
-          { organization_id: TEST_ORG_ID },
-          { OR: [{ instagram: null }, { instagram: "" }] },
-          {
-            OR: [
-              { name: { contains: "Acme", mode: "insensitive" } },
-              { company_name: { contains: "Acme", mode: "insensitive" } },
-              { fantasy_name: { contains: "Acme", mode: "insensitive" } },
-            ],
-          },
-        ],
-      },
-      orderBy: [{ name: "asc" }, { id: "asc" }],
-      skip: 10,
-      take: 10,
-      select: { id: true, name: true, status: true, instagram: true },
-    });
-    expect(count).toHaveBeenCalledWith({ where: expect.any(Object) });
+    expect(queryRaw).toHaveBeenCalledTimes(2);
+    const pageQuery = queryRaw.mock.calls[0]?.[0] as { sql: string; values: unknown[] };
+    const countQuery = queryRaw.mock.calls[1]?.[0] as { sql: string; values: unknown[] };
+    expect(pageQuery.sql).toContain("c.instagram ~ '^[[:space:]]*$'");
+    expect(pageQuery.sql).toContain("ILIKE");
+    expect(pageQuery.values).toContain(TEST_ORG_ID);
+    expect(pageQuery.values).toContain("%Acme%");
+    expect(pageQuery.values).toContain(10);
+    expect(countQuery.sql).toContain("COUNT(*)");
   });
 
   it("filtra perfis preenchidos sem expor organization_id de outras organizações", async () => {
-    const findMany = vi.fn().mockResolvedValue([]);
-    const count = vi.fn().mockResolvedValue(0);
-    const service = new ClientService({ client: { findMany, count } } as unknown as PrismaClient);
+    const queryRaw = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ total: 0n }]);
+    const service = new ClientService({ $queryRaw: queryRaw } as unknown as PrismaClient);
 
     await service.listInstagramProfiles(TEST_ORG_ID, {
       page: 1,
@@ -333,12 +324,9 @@ describe("ClientService.listInstagramProfiles", () => {
       profile: "with",
     });
 
-    expect(findMany.mock.calls[0]?.[0].where).toEqual({
-      AND: [
-        { organization_id: TEST_ORG_ID },
-        { AND: [{ instagram: { not: null } }, { instagram: { not: "" } }] },
-      ],
-    });
+    const pageQuery = queryRaw.mock.calls[0]?.[0] as { sql: string; values: unknown[] };
+    expect(pageQuery.sql).toContain("c.instagram ~ '[^[:space:]]'");
+    expect(pageQuery.values).toContain(TEST_ORG_ID);
   });
 });
 

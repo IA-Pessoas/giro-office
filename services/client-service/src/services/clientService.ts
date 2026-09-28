@@ -4,7 +4,7 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
-import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 import {
   type ClientListStatus,
   type CreateClientBody,
@@ -398,35 +398,38 @@ export class ClientService implements IClientService {
     organizationId: string,
     filters: ListInstagramProfilesFilters,
   ): Promise<ClientInstagramProfilePage> {
-    const conditions: Prisma.ClientWhereInput[] = [{ organization_id: organizationId }];
-    if (filters.profile === "with") {
-      conditions.push({ AND: [{ instagram: { not: null } }, { instagram: { not: "" } }] });
-    } else if (filters.profile === "without") {
-      conditions.push({ OR: [{ instagram: null }, { instagram: "" }] });
-    }
-
     const search = filters.search?.trim();
-    if (search) {
-      conditions.push({
-        OR: [
-          { name: { contains: search, mode: "insensitive" } },
-          { company_name: { contains: search, mode: "insensitive" } },
-          { fantasy_name: { contains: search, mode: "insensitive" } },
-        ],
-      });
-    }
-    const where: Prisma.ClientWhereInput =
-      conditions.length === 1 ? (conditions[0] ?? {}) : { AND: conditions };
+    const profileCondition =
+      filters.profile === "with"
+        ? Prisma.sql`AND c.instagram ~ '[^[:space:]]'`
+        : filters.profile === "without"
+          ? Prisma.sql`AND (c.instagram IS NULL OR c.instagram ~ '^[[:space:]]*$')`
+          : Prisma.empty;
+    const searchCondition = search
+      ? Prisma.sql`AND (
+          c.name ILIKE ${`%${search}%`}
+          OR c.company_name ILIKE ${`%${search}%`}
+          OR c.fantasy_name ILIKE ${`%${search}%`}
+        )`
+      : Prisma.empty;
+    const where = Prisma.sql`WHERE c.organization_id = ${organizationId} ${profileCondition} ${searchCondition}`;
     const skip = (filters.page - 1) * filters.pageSize;
-    const select = { id: true, name: true, status: true, instagram: true } as const;
-    const rows = await this.prisma.client.findMany({
-      where,
-      orderBy: [{ name: "asc" }, { id: "asc" }],
-      skip,
-      take: filters.pageSize,
-      select,
-    });
-    const total = await this.prisma.client.count({ where });
+    const [rows, totals] = await Promise.all([
+      this.prisma.$queryRaw<ClientInstagramProfile[]>(Prisma.sql`
+        SELECT c.id, c.name, c.status, c.instagram
+        FROM clients c
+        ${where}
+        ORDER BY c.name ASC, c.id ASC
+        LIMIT ${filters.pageSize}
+        OFFSET ${skip}
+      `),
+      this.prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS total
+        FROM clients c
+        ${where}
+      `),
+    ]);
+    const total = Number(totals[0]?.total ?? 0);
 
     return {
       items: rows,
