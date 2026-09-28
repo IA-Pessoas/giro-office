@@ -129,7 +129,8 @@ export function MarketingDashboard() {
     summary.requests.active.total === 0 &&
     summary.birthdays.clients.total === 0 &&
     summary.birthdays.employees.total === 0 &&
-    summary.birthdays.companies.total === 0;
+    summary.birthdays.companies.total === 0 &&
+    summary.aiUsage.pendingKnowledge === 0;
 
   if (noData) {
     return (
@@ -142,6 +143,18 @@ export function MarketingDashboard() {
 
   return (
     <div className="space-y-6">
+      {summary.aiUsage.pendingKnowledge > 0 ? (
+        <div
+          className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          role="status"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>
+            <strong>{formatNumber(summary.aiUsage.pendingKnowledge)}</strong> {summary.aiUsage.pendingKnowledge === 1 ? "resposta" : "respostas"} sobre
+            conhecimento de IA estão pendentes nesta competência.
+          </p>
+        </div>
+      ) : null}
       <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-2 flex items-center gap-2">
           <Megaphone className="h-4 w-4 text-blue-600 dark:text-blue-300" aria-hidden="true" />
@@ -166,11 +179,13 @@ export function MarketingDashboard() {
           detail={`RH ${formatNumber(summary.requests.urgent.rh)} · TI ${formatNumber(summary.requests.urgent.ti)}`}
         />
         <ul className="mt-3 space-y-1" aria-label="Avisos">
-          {summary.alerts.map((alert) => (
+          {summary.alerts
+            .filter((alert) => alert.code !== "pending-ai-knowledge")
+            .map((alert) => (
             <li key={alert.code} className="text-sm text-amber-700 dark:text-amber-300">
               {alert.label}: {formatNumber(alert.count)}
             </li>
-          ))}
+            ))}
         </ul>
       </section>
 

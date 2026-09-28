@@ -9,6 +9,7 @@ export interface MarketingDashboardSummary {
     employees: BirthdayAggregate;
     companies: BirthdayAggregate;
   };
+  aiUsage: { competence: string; pendingKnowledge: number };
   alerts: Array<{ code: string; count: number; label: string }>;
 }
 

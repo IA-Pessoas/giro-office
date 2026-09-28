@@ -1,12 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { MarketingDashboardService } from "../services/marketingDashboardService.js";
+import {
+  getCurrentMarketingCompetence,
+  MarketingDashboardService,
+} from "../services/marketingDashboardService.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 
 describe("MarketingDashboardService", () => {
+  it("calcula a competência atual no fuso da organização", () => {
+    expect(
+      getCurrentMarketingCompetence(new Date("2026-03-01T00:30:00.000Z"), "America/Los_Angeles"),
+    ).toEqual(new Date("2026-02-01T00:00:00.000Z"));
+  });
+
   it("returns organization-scoped request counts and canonical monthly birthdays", async () => {
     const prisma = {
+      organization: { findUnique: vi.fn().mockResolvedValue({ timezone: "America/Sao_Paulo" }) },
+      marketingAiUsageControl: { count: vi.fn().mockResolvedValue(2) },
       rhRequest: {
         count: vi.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(1).mockResolvedValueOnce(1),
       },
@@ -42,11 +53,28 @@ describe("MarketingDashboardService", () => {
     expect(dashboard.alerts).toEqual([
       { code: "new-requests", count: 2, label: "Solicitações novas" },
       { code: "urgent-requests", count: 2, label: "Solicitações urgentes em aberto" },
+      { code: "pending-ai-knowledge", count: 2, label: "Conhecimento de IA pendente" },
     ]);
+    expect(dashboard.aiUsage.pendingKnowledge).toBe(2);
+    expect(dashboard.aiUsage.competence).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
+    expect(dashboard.alerts).toContainEqual({
+      code: "pending-ai-knowledge",
+      count: 2,
+      label: "Conhecimento de IA pendente",
+    });
+    expect(prisma.marketingAiUsageControl.count).toHaveBeenCalledWith({
+      where: {
+        organization_id: organizationId,
+        competence: expect.any(Date),
+        knowledge: null,
+      },
+    });
   });
 
   it("scopes request counts to the authenticated organization and excludes resolved requests", async () => {
     const prisma = {
+      organization: { findUnique: vi.fn().mockResolvedValue({ timezone: "UTC" }) },
+      marketingAiUsageControl: { count: vi.fn().mockResolvedValue(0) },
       rhRequest: { count: vi.fn().mockResolvedValue(0) },
       tIRequest: { count: vi.fn().mockResolvedValue(0) },
       $queryRaw: vi.fn().mockResolvedValue([{ total: 0, items: [] }]),

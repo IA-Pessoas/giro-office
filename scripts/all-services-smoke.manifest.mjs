@@ -405,16 +405,6 @@ async function loadGeneratedSmokeDefinitions() {
 
 const baseManifest = [
   op({
-    service: "marketing-service",
-    method: "GET",
-    path: "/marketing/dashboard",
-    action: "marketingDashboardDisabled",
-    target: "gateway",
-    auth: "bearer",
-    expectedStatus: [404],
-    expectedLabel: "disabled until Marketing reconciliation",
-  }),
-  op({
     service: "gateway",
     method: "GET",
     path: "/health",

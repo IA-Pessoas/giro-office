@@ -12,7 +12,7 @@ assert.match(dashboard, /if \(noData\)/);
 assert.match(dashboard, /query\.refetch\(\)/);
 assert.match(service, /"\/marketing\/dashboard"/);
 assert.doesNotMatch(dashboard, /campaigns|mockData|fakeData/i);
-assert.match(page, /notFound:\s*true/);
-assert.doesNotMatch(page, /MarketingDashboard/);
+assert.doesNotMatch(page, /notFound:\s*true/);
+assert.match(page, /MarketingDashboard/);
 
 console.log("Marketing UI states, canonical API path, and activation gate verified.");

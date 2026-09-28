@@ -16,15 +16,21 @@ import { createIsAuthenticatedMiddleware } from "./middlewares/isAuthenticated.j
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildMarketingServiceOpenApiSpec } from "./openapi/spec.js";
 import {
+  createMarketingAiUsageControlRoutes,
+  type MarketingAiUsageControlProvider,
+} from "./routes/marketingAiUsageControl.routes.js";
+import {
   createMarketingDashboardRoutes,
   type MarketingDashboardProvider,
 } from "./routes/marketingDashboard.routes.js";
+import { MarketingAiUsageControlService } from "./services/marketingAiUsageControlService.js";
 import { MarketingDashboardService } from "./services/marketingDashboardService.js";
 
 interface CreateMarketingAppOptions {
   env: MarketingServiceEnv;
   logger: Logger;
   dashboardService?: MarketingDashboardProvider;
+  controlService?: MarketingAiUsageControlProvider;
   prisma?: PrismaClient;
 }
 
@@ -42,11 +48,13 @@ export function createMarketingApp({
   env,
   logger,
   dashboardService,
+  controlService,
   prisma,
 }: CreateMarketingAppOptions): Express {
   const app = express();
   const auth = createIsAuthenticatedMiddleware(env);
   const service = dashboardService ?? (prisma ? new MarketingDashboardService(prisma) : null);
+  const controls = controlService ?? (prisma ? new MarketingAiUsageControlService(prisma) : null);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "marketing-service")));
@@ -68,6 +76,9 @@ export function createMarketingApp({
 
   if (service) {
     app.use("/marketing", createMarketingDashboardRoutes(service, auth));
+  }
+  if (controls) {
+    app.use("/marketing", createMarketingAiUsageControlRoutes(controls, auth));
   }
 
   app.use(

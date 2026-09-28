@@ -557,7 +557,7 @@ await (async () => {
   );
 
   await runTest("disabled modules are blocked even for global admins", () => {
-    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing"]);
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), []);
 
     for (const moduleKey of DISABLED_MODULE_KEYS) {
       assert.equal(isModuleDisabled(moduleKey), true);
@@ -645,27 +645,23 @@ await (async () => {
     assert.match(authContextSource, /\/super-admin\/login/);
   });
 
-  await runTest("retired modules are not registered in navigation or quick actions", () => {
-    for (const blockedPath of ["/marketing"]) {
-      assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
-      assert.equal(quickActionsSource.includes(`href: "${blockedPath}"`), false);
-    }
+  await runTest("enabled Marketing module is available from the app navigation", () => {
+    assert.equal(appShellSource.includes('path: "/marketing"'), true);
+    assert.equal(quickActionsSource.includes('href: "/marketing"'), false);
     assert.equal(appShellSource.includes('path: "/comercial"'), true);
   });
 
   await runTest(
-    "disabled module pages return not found without importing module implementations",
+    "enabled Marketing page mounts its dashboard and research interface",
     () => {
-    for (const source of [marketingPageSource]) {
-        assert.match(source, /notFound:\s*true/);
-      }
-
       assert.equal(commercialPageSource.includes("CommercialCatalog"), true);
       assert.equal(commercialPageSource.includes("notFound: true"), false);
       assert.match(clientCommercialPageSource, /redirect:.*destination: id \? `\/clients\/\$\{id\}`/);
       assert.equal(clientCommercialPageSource.includes("ClientCommercialForm"), false);
       assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
-      assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);
+      assert.equal(marketingPageSource.includes("MarketingDashboard"), true);
+      assert.equal(marketingPageSource.includes("MarketingAiUsageControls"), true);
+      assert.equal(marketingPageSource.includes("notFound: true"), false);
       assert.equal(triagemPageSource.includes("TriageDocumentsSection"), true);
       assert.match(parcelamentoPageSource, /ParcelamentoShell/);
     },

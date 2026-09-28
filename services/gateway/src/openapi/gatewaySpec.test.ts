@@ -55,7 +55,7 @@ it("agrega o catálogo público do reports-service", () => {
   expect(spec.paths["/commercial/prospecting"]?.post?.["x-origin-service"]).toBe(
     "commercial-service",
   );
-  expect(spec.paths["/marketing/dashboard"]).toBeUndefined();
+  expect(spec.paths["/marketing/dashboard"]?.get?.["x-origin-service"]).toBe("marketing-service");
   expect(spec.paths["/triagem/catalogs"]?.get?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/triagem/external-links"]?.post?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/triagem/overview"]?.get?.["x-origin-service"]).toBe("triagem-service");

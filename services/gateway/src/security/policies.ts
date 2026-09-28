@@ -43,6 +43,8 @@ const certificateModulePolicy = createModulePolicy("certificado", moduleAccessPe
 const certificateEditPolicy = createModulePolicy("certificado", moduleEditPermission);
 const commercialModulePolicy = createModulePolicy("comercial", moduleAccessPermission);
 const commercialEditPolicy = createModulePolicy("comercial", moduleEditPermission);
+const marketingModulePolicy = createModulePolicy("marketing", moduleAccessPermission);
+const marketingEditPolicy = createModulePolicy("marketing", moduleEditPermission);
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
@@ -187,6 +189,8 @@ const routePolicyMatchers: Array<{
   { method: "ANY", path: /^\/reports(?:\/|$)/, policy: authenticatedPolicy },
   { method: "GET", path: /^\/commercial(?:\/|$)/, policy: commercialModulePolicy },
   { method: "ANY", path: /^\/commercial(?:\/|$)/, policy: commercialEditPolicy },
+  { method: "GET", path: /^\/marketing(?:\/|$)/, policy: marketingModulePolicy },
+  { method: "ANY", path: /^\/marketing(?:\/|$)/, policy: marketingEditPolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
   { method: "ANY", path: /^\/rh\/profile(?:\/|$)/, policy: rhModulePolicy },

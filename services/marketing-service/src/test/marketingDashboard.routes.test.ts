@@ -30,6 +30,7 @@ const dashboard: MarketingDashboardResponse = {
     employees: { total: 1, items: [{ id: "employee-1", name: "Colaboradora", day: 30 }] },
     companies: { total: 0, items: [] },
   },
+  aiUsage: { competence: "2026-09", pendingKnowledge: 0 },
   alerts: [
     { code: "new-requests", count: 2, label: "Solicitações novas" },
     { code: "urgent-requests", count: 1, label: "Solicitações urgentes em aberto" },

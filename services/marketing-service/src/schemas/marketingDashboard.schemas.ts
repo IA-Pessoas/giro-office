@@ -38,9 +38,13 @@ export const marketingDashboardResponseSchema = z.object({
       ),
     }),
   }),
+  aiUsage: z.object({
+    competence: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    pendingKnowledge: z.number().int().nonnegative(),
+  }),
   alerts: z.array(
     z.object({
-      code: z.enum(["new-requests", "urgent-requests"]),
+      code: z.enum(["new-requests", "urgent-requests", "pending-ai-knowledge"]),
       count: z.number().int().positive(),
       label: z.string(),
     }),
