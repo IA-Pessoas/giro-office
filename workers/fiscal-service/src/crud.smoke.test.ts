@@ -375,7 +375,7 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     const archive = Buffer.from(zipped.data.zip_base64, "base64");
     expect(archive.readUInt32LE(0)).toBe(0x04034b50);
     expect(archive.toString("latin1")).toContain(
-      `aliquota-ISS-anexo-III-2026-09-${eligible.id}.pdf`,
+      `aliquota-ISS-anexo-III-2026-09-smoke-lote-${suffix}-ltda-${document}.pdf`,
     );
     expect(zipped.data.skipped).toHaveLength(1);
     expect(exported.data.skipped).toEqual([

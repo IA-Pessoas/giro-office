@@ -26,10 +26,7 @@ function dosDateTime(date = new Date()): { date: number; time: number } {
   };
 }
 
-/**
- * Cria um ZIP UTF-8 (deflate) em memória, sem dependência externa. Usado pela exportação de
- * relatórios e pelos PDFs em lote do Fiscal; roda em Node e nos Workers (nodejs_compat).
- */
+/** Cria um ZIP UTF-8 (deflate) em memória, sem dependência externa; roda em Node e nos Workers (nodejs_compat). */
 export function createZip(entries: readonly ZipEntry[]): Buffer {
   const dateTime = dosDateTime();
   const localFiles: Buffer[] = [];

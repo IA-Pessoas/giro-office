@@ -1,11 +1,11 @@
 import { csvLine } from "@workspace/shared";
 
-import type { SimplesRateBatch } from "./simplesRateService.js";
+import { type SimplesRateBatch, simplesRateBatchFileName } from "./simplesRateService.js";
 
 const DELIMITER = ";";
 
 export function simplesRateCsvFileName(batch: SimplesRateBatch): string {
-  return `aliquotas-${batch.tax}-anexo-${batch.annex}-${batch.applies_to}.csv`;
+  return simplesRateBatchFileName(batch, "csv");
 }
 
 /** Resposta do lote: dados, nome do arquivo e conteúdo do CSV. */

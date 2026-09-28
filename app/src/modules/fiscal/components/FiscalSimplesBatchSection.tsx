@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import {
   type FiscalSimplesAnnexRate,
   type FiscalSimplesBatchPayload,
+  type FiscalSimplesExport,
   type FiscalSimplesBatchResult,
   fiscalRevenueService,
 } from "../services/fiscalRevenueService";
@@ -28,19 +29,28 @@ const ANNEX_OPTIONS: Array<{ value: FiscalSimplesAnnexRate["annex"]; label: stri
 
 type ExportKind = "csv" | "zip";
 
-/** Exporta o lote e devolve o arquivo a baixar (null quando nenhum cliente entrou). */
-async function runExport({ kind, payload }: { kind: ExportKind; payload: FiscalSimplesBatchPayload }) {
-  if (kind === "csv") {
-    const batch = await fiscalRevenueService.exportSimplesCsv(payload);
-    const file = batch.included.length ? new Blob([batch.csv], { type: "text/csv;charset=utf-8" }) : null;
-    return { batch, file };
+const EXPORTS: Record<
+  ExportKind,
+  {
+    run: (payload: FiscalSimplesBatchPayload) => Promise<FiscalSimplesExport>;
+    label: string;
+    pending: string;
+    done: string;
   }
-  const batch = await fiscalRevenueService.exportSimplesZip(payload);
-  const file = batch.zip_base64
-    ? new Blob([Uint8Array.from(atob(batch.zip_base64), (char) => char.charCodeAt(0))], { type: "application/zip" })
-    : null;
-  return { batch, file };
-}
+> = {
+  csv: {
+    run: fiscalRevenueService.exportSimplesCsv,
+    label: "Exportar CSV",
+    pending: "Exportando...",
+    done: "CSV exportado",
+  },
+  zip: {
+    run: fiscalRevenueService.exportSimplesZip,
+    label: "Exportar PDFs (ZIP)",
+    pending: "Gerando PDFs...",
+    done: "ZIP com os PDFs exportado",
+  },
+};
 
 export function FiscalSimplesBatchSection() {
   const [competence, setCompetence] = useState(() => competenceFromToday(-1));
@@ -48,9 +58,12 @@ export function FiscalSimplesBatchSection() {
   const [documentsText, setDocumentsText] = useState("");
   const [documentsError, setDocumentsError] = useState<string | null>(null);
   const [result, setResult] = useState<FiscalSimplesBatchResult | null>(null);
-  const exportBatch = useMutation({ mutationFn: runExport });
+  const exportBatch = useMutation({
+    mutationFn: ({ kind, payload }: { kind: ExportKind; payload: FiscalSimplesBatchPayload }) =>
+      EXPORTS[kind].run(payload),
+  });
 
-  async function run(kind: ExportKind) {
+  async function submitExport(kind: ExportKind) {
     const documents = parseBatchDocuments(documentsText);
     if (documents.length === 0) {
       setDocumentsError("Informe ao menos um CPF/CNPJ, um por linha.");
@@ -65,9 +78,7 @@ export function FiscalSimplesBatchSection() {
       setResult(batch);
       if (file) {
         downloadFile(file, batch.file_name);
-        toast.success(
-          `${kind === "csv" ? "CSV" : "ZIP com os PDFs"} exportado com ${batch.included.length} cliente(s).`,
-        );
+        toast.success(`${EXPORTS[kind].done} com ${batch.included.length} cliente(s).`);
       } else {
         toast.error("Nenhum cliente do lote tem alíquota para emitir; nenhum arquivo gerado.");
       }
@@ -87,7 +98,7 @@ export function FiscalSimplesBatchSection() {
       </div>
       <form noValidate onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        void run("csv");
+        void submitExport("csv");
       }} className="grid gap-4 rounded-xl border border-gray-200 p-4 md:grid-cols-[1fr_1fr_2fr] dark:border-slate-700">
         <label className="grid content-start gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
           Competência de apuração
@@ -117,10 +128,10 @@ export function FiscalSimplesBatchSection() {
         <div className="md:col-span-3">
           <div className="flex flex-wrap gap-3">
             <button type="submit" disabled={exportBatch.isPending} className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
-              {exportBatch.isPending && exportBatch.variables?.kind === "csv" ? "Exportando..." : "Exportar CSV"}
+              {exportBatch.isPending && exportBatch.variables?.kind === "csv" ? EXPORTS.csv.pending : EXPORTS.csv.label}
             </button>
-            <button type="button" disabled={exportBatch.isPending} onClick={() => void run("zip")} className="h-10 rounded-lg border border-blue-600 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-900/20">
-              {exportBatch.isPending && exportBatch.variables?.kind === "zip" ? "Gerando PDFs..." : "Exportar PDFs (ZIP)"}
+            <button type="button" disabled={exportBatch.isPending} onClick={() => void submitExport("zip")} className="h-10 rounded-lg border border-blue-600 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-900/20">
+              {exportBatch.isPending && exportBatch.variables?.kind === "zip" ? EXPORTS.zip.pending : EXPORTS.zip.label}
             </button>
           </div>
         </div>

@@ -68,13 +68,18 @@ export interface FiscalSimplesBatchResult {
   file_name: string;
 }
 
-export interface FiscalSimplesBatch extends FiscalSimplesBatchResult {
+export interface FiscalSimplesCsv extends FiscalSimplesBatchResult {
   csv: string;
 }
 
 export interface FiscalSimplesZip extends FiscalSimplesBatchResult {
   /** ZIP em base64; null quando nenhum cliente entrou no lote. */
   zip_base64: string | null;
+}
+
+export interface FiscalSimplesExport {
+  batch: FiscalSimplesBatchResult;
+  file: Blob | null;
 }
 
 export interface FiscalSimplesBatchPayload {
@@ -106,16 +111,28 @@ export const fiscalRevenueService = {
     return unwrapFiscalEnvelope<FiscalSimplesPreview>(response.data);
   },
 
-  async exportSimplesCsv(payload: FiscalSimplesBatchPayload): Promise<FiscalSimplesBatch> {
+  /** Lote em CSV; file é null quando nenhum cliente entrou. */
+  async exportSimplesCsv(payload: FiscalSimplesBatchPayload): Promise<FiscalSimplesExport> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     const response = await api.post("/fiscal/simples/csv", payload);
-    return unwrapFiscalEnvelope<FiscalSimplesBatch>(response.data);
+    const batch = unwrapFiscalEnvelope<FiscalSimplesCsv>(response.data);
+    const file = batch.included.length
+      ? new Blob([batch.csv], { type: "text/csv;charset=utf-8" })
+      : null;
+    return { batch, file };
   },
 
-  async exportSimplesZip(payload: FiscalSimplesBatchPayload): Promise<FiscalSimplesZip> {
+  /** Lote em PDFs dentro de um ZIP (base64 na resposta); file é null quando ninguém entrou. */
+  async exportSimplesZip(payload: FiscalSimplesBatchPayload): Promise<FiscalSimplesExport> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     const response = await api.post("/fiscal/simples/zip", payload);
-    return unwrapFiscalEnvelope<FiscalSimplesZip>(response.data);
+    const batch = unwrapFiscalEnvelope<FiscalSimplesZip>(response.data);
+    const file = batch.zip_base64
+      ? new Blob([Uint8Array.from(atob(batch.zip_base64), (char) => char.charCodeAt(0))], {
+          type: "application/zip",
+        })
+      : null;
+    return { batch, file };
   },
 
   async downloadSimplesPdf(

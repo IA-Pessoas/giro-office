@@ -5,11 +5,16 @@ import * as pdfService from "../services/simplesRatePdfService.js";
 import type { SimplesRateBatch, SimplesRateEmission } from "../services/simplesRateService.js";
 import { simplesRateZipExport } from "../services/simplesRateZipService.js";
 
-function emission(client_id: string, client_name: string, rate: string): SimplesRateEmission {
+function emission(
+  client_id: string,
+  client_name: string,
+  rate: string,
+  client_document = "12.345.678/0001-90",
+): SimplesRateEmission {
   return {
     client_id,
     client_name,
-    client_document: "12.345.678/0001-90",
+    client_document,
     competence: "2026-08",
     applies_to: "2026-09",
     annex: "III",
@@ -47,7 +52,7 @@ describe("simplesRateZipExport", () => {
     const result = await simplesRateZipExport(
       batch([
         emission("c1", "Salão Bela Vista Ltda", "2.01"),
-        emission("c2", "Clínica Vida Ltda", "5.00"),
+        emission("c2", "Clínica Vida Ltda", "5.00", "23.456.789/0001-01"),
       ]),
     );
 
@@ -55,15 +60,24 @@ describe("simplesRateZipExport", () => {
     expect(result.skipped).toHaveLength(1);
     const entries = readZipEntries(Buffer.from(result.zip_base64 ?? "", "base64"));
     expect([...entries.keys()]).toEqual([
-      "aliquota-ISS-anexo-III-2026-09-c1.pdf",
-      "aliquota-ISS-anexo-III-2026-09-c2.pdf",
+      "aliquota-ISS-anexo-III-2026-09-salao-bela-vista-ltda-12345678000190.pdf",
+      "aliquota-ISS-anexo-III-2026-09-clinica-vida-ltda-23456789000101.pdf",
     ]);
-    const first = pdfText(entries.get("aliquota-ISS-anexo-III-2026-09-c1.pdf") ?? Buffer.alloc(0));
+    // O ignorado do lote não vira PDF.
+    expect(entries.size).toBe(2);
+    expect([...entries.keys()].some((name) => name.includes("99999999000199"))).toBe(false);
+    const first = pdfText(
+      entries.get("aliquota-ISS-anexo-III-2026-09-salao-bela-vista-ltda-12345678000190.pdf") ??
+        Buffer.alloc(0),
+    );
     expect(first).toContain("Salão Bela Vista Ltda - 12.345.678/0001-90");
     expect(first).toContain("(Simples Nacional, Anexo III) referente ao mês de 09/2026 é de");
     expect(first).toContain("2,01%");
     expect(
-      pdfText(entries.get("aliquota-ISS-anexo-III-2026-09-c2.pdf") ?? Buffer.alloc(0)),
+      pdfText(
+        entries.get("aliquota-ISS-anexo-III-2026-09-clinica-vida-ltda-23456789000101.pdf") ??
+          Buffer.alloc(0),
+      ),
     ).toContain("5,00%");
   });
 
@@ -82,7 +96,11 @@ describe("simplesRateZipExport", () => {
 
     await expect(
       simplesRateZipExport(batch([emission("c1", "A", "2.01"), emission("c2", "B", "3.00")])),
-    ).rejects.toMatchObject({ statusCode: 500, message: expect.stringMatching(/nenhum arquivo/) });
+    ).rejects.toMatchObject({
+      statusCode: 500,
+      expose: true,
+      message: expect.stringMatching(/nenhum arquivo/),
+    });
     spy.mockRestore();
   });
 });
