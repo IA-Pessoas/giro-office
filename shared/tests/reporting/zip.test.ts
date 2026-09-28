@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createZip } from "../src/reporting/zip.js";
-import { readZipEntries } from "../src/testUtils/zip.js";
+import { createZip } from "../../src/reporting/zip.js";
+import { readZipEntries } from "../../src/testUtils/zip.js";
 
 test("zip guarda cada arquivo com nome UTF-8 e conteúdo íntegro", () => {
   const pdf = Buffer.from("%PDF-1.3 conteúdo binário \u0000\u00ff");

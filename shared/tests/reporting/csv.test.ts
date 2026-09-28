@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { csvCell, csvLine } from "../src/reporting/csv.js";
+import { csvCell, csvLine } from "../../src/reporting/csv.js";
 
 test("csv neutraliza texto que a planilha executaria como fórmula", () => {
   for (const formula of ["=SUM(A1)", "+1", "-2", "@cmd", "  =HYPERLINK()", "\t=1", "\r=1"]) {
