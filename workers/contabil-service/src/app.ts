@@ -52,6 +52,7 @@ import {
   documentItemSchema,
   documentsBulkSchema,
   editabilitySchema,
+  fiscalPortfolioSchema,
   monthlyIdSchema,
   monthlySchema,
   statementArchiveSchema,
@@ -523,6 +524,13 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       ),
     );
   };
+  app.get("/triagem/fiscal-portfolio", async (c) => {
+    const query = parseWithZod(fiscalPortfolioSchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.listFiscalPortfolio(query.competence, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
   app.get("/triagem/editability", async (c) => {
     const query = parseWithZod(editabilitySchema, c.req.query());
     const data = await withDocuments(c, (service) =>

@@ -46,6 +46,7 @@ export type ContabilPrisma = {
   triageCompetence: Delegate;
   triageCatalogItem: Delegate;
   triageCompetenceCatalogSnapshot: Delegate;
+  user: Delegate;
 };
 
 export type AuthContext = {
@@ -104,6 +105,7 @@ export type OverviewClient = {
 };
 
 export type DocumentsService = {
+  listFiscalPortfolio(competence: string, auth: AuthContext): Promise<JsonRecord>;
   getEditability(
     clientId: string,
     auth: AuthContext,
@@ -852,6 +854,31 @@ function initialItems(value: unknown): JsonRecord {
   );
 }
 
+function jsonObject(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+// Itens fiscais obrigatórios do snapshot da competência (`fiscalSnapshotItems` do Node).
+function fiscalRequiredItems(snapshot: unknown): Set<string> {
+  const configs = jsonObject(snapshot).configs;
+  const config = Array.isArray(configs)
+    ? configs.map(jsonObject).find((item) => item.type === "FISCAL")
+    : undefined;
+  const activeItems = Array.isArray(config?.active_items) ? config.active_items : [];
+  const fields = new Set<string>(triageFiscalFields);
+  return new Set(
+    activeItems.flatMap((item) => {
+      if (typeof item === "string") return fields.has(item) ? [item] : [];
+      const record = jsonObject(item);
+      return typeof record.field === "string" &&
+        fields.has(record.field) &&
+        record.required !== false
+        ? [record.field]
+        : [];
+    }),
+  );
+}
+
 const TRIAGE_CATALOG_CODE_MAX_LENGTH = 100;
 
 function normalizeOptionalNote(value: unknown, label: string): string | null | undefined {
@@ -1010,6 +1037,113 @@ export function createDocumentsService(
   overviewClient?: OverviewClient,
 ): DocumentsService {
   return {
+    async listFiscalPortfolio(competence, auth) {
+      if (Number(auth.modules?.fiscal ?? auth.permission ?? 0) < 1) {
+        throw new ServiceError(403, "Permissão insuficiente para consultar a Triagem Fiscal.");
+      }
+      const { start, end } = competenceInterval(competence);
+      const scope = { organization_id: auth.organizationId, competence, archived_at: null };
+      const monthlyScope = { ...scope, type: "FISCAL" };
+      // ponytail: a carteira inteira cabe em centenas de empresas; paginar no servidor se chegar a milhares.
+      const clients = await prisma.client.findMany({
+        where: {
+          organization_id: auth.organizationId,
+          OR: [
+            {
+              fiscal: true,
+              AND: [
+                { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
+                { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
+              ],
+            },
+            { triageMonthlys: { some: monthlyScope } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          company_name: true,
+          cpf_cnpj: true,
+          regime: true,
+          triageMonthlys: {
+            where: monthlyScope,
+            select: { id: true, checklist: true, item_notes: true },
+            take: 1,
+          },
+          triageCompetences: {
+            where: scope,
+            select: { id: true, responsible_snapshot: true, configuration_snapshot: true },
+            take: 1,
+          },
+          responsiblesTriage: {
+            where: { organization_id: auth.organizationId, type: "FISCAL" },
+            select: { user_id: true },
+            take: 1,
+          },
+        },
+        orderBy: [{ company_name: "asc" }, { name: "asc" }, { id: "asc" }],
+      });
+
+      const first = (value: unknown) =>
+        Array.isArray(value) && value.length ? jsonObject(value[0]) : undefined;
+      const assignedId = (client: JsonRecord) => first(client.responsiblesTriage)?.user_id;
+      const responsibleIds = clients.map((client) => {
+        const snapshot = first(client.triageCompetences);
+        // Com competência aberta vale o responsável congelado no snapshot, não o atual.
+        const responsibles = jsonObject(snapshot?.responsible_snapshot).responsibles;
+        const id = !snapshot
+          ? assignedId(client)
+          : Array.isArray(responsibles)
+            ? responsibles.map(jsonObject).find((entry) => entry.type === "FISCAL")?.user_id
+            : undefined;
+        return typeof id === "string" ? id : null;
+      });
+      const userIds = responsibleIds.filter((id): id is string => id !== null);
+      const users = userIds.length
+        ? await prisma.user.findMany({
+            where: { organization_id: auth.organizationId, id: { in: userIds } },
+            select: { id: true, name: true },
+          })
+        : [];
+      const userNames = new Map(users.map((user) => [user.id, user.name]));
+      const fiscalFields = triageFiscalFields.slice(0, -1);
+
+      return {
+        competence,
+        items: clients.map((client, index) => {
+          const monthly = first(client.triageMonthlys);
+          const snapshot = first(client.triageCompetences);
+          const required = snapshot ? fiscalRequiredItems(snapshot.configuration_snapshot) : null;
+          const responsibleId = responsibleIds[index];
+          const companyName = typeof client.company_name === "string" ? client.company_name : "";
+          return {
+            client_id: client.id,
+            legal_name: companyName.trim() || client.name,
+            cpf_cnpj: client.cpf_cnpj,
+            regime: client.regime,
+            responsible_id: responsibleId,
+            responsible_name: responsibleId ? (userNames.get(responsibleId) ?? null) : null,
+            can_edit: Number(auth.modules?.fiscal ?? 0) >= 2 || assignedId(client) === auth.userId,
+            has_competence: Boolean(snapshot),
+            planned_checklist: required
+              ? Object.fromEntries(
+                  fiscalFields.map((field) => [
+                    field,
+                    required.has(field) ? "PENDING" : "NOT_APPLICABLE",
+                  ]),
+                )
+              : null,
+            monthly: monthly
+              ? {
+                  id: monthly.id,
+                  checklist: checklist(monthly.checklist, fiscalFields),
+                  item_notes: itemNotes(monthly.item_notes, fiscalFields),
+                }
+              : null,
+          };
+        }),
+      };
+    },
     async getEditability(clientId, auth, type = "CONTABIL") {
       try {
         await canEdit(prisma, clientId, auth, type);

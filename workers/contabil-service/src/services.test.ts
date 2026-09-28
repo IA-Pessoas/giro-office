@@ -207,6 +207,84 @@ describe("contabil services tenant and catalog seams", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
+  it("lista carteira fiscal com responsável do snapshot e checklist planejado", async () => {
+    const database = {
+      client: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: CLIENT,
+            name: "Art",
+            company_name: " ",
+            cpf_cnpj: "49791761000380",
+            regime: "Simples",
+            triageMonthlys: [],
+            triageCompetences: [
+              {
+                id: "competence-1",
+                responsible_snapshot: { responsibles: [{ type: "FISCAL", user_id: "u-snap" }] },
+                configuration_snapshot: {
+                  configs: [
+                    {
+                      type: "FISCAL",
+                      active_items: ["sped_fiscal", { field: "nfse_received", required: false }],
+                    },
+                  ],
+                },
+              },
+            ],
+            responsiblesTriage: [{ user_id: USER }],
+          },
+          {
+            id: MONTHLY,
+            name: "Sem competência",
+            company_name: "SEM COMP",
+            cpf_cnpj: "1",
+            regime: null,
+            triageMonthlys: [
+              { id: "m-1", checklist: { sped_fiscal: "COMPLETED" }, item_notes: {} },
+            ],
+            triageCompetences: [],
+            responsiblesTriage: [],
+          },
+        ]),
+      },
+      user: { findMany: vi.fn().mockResolvedValue([{ id: "u-snap", name: "Snap" }]) },
+    };
+    const service = createDocumentsService(database as never, audit());
+
+    const result = (await service.listFiscalPortfolio("2026-09", {
+      userId: USER,
+      organizationId: ORG,
+      modules: { fiscal: 1 },
+    })) as { items: Record<string, unknown>[] };
+
+    expect(database.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, id: { in: ["u-snap"] } } }),
+    );
+    expect(result.items[0]).toMatchObject({
+      legal_name: "Art",
+      responsible_id: "u-snap",
+      responsible_name: "Snap",
+      can_edit: true,
+      has_competence: true,
+      planned_checklist: expect.objectContaining({
+        sped_fiscal: "PENDING",
+        nfse_received: "NOT_APPLICABLE",
+      }),
+      monthly: null,
+    });
+    expect(result.items[1]).toMatchObject({
+      responsible_id: null,
+      can_edit: false,
+      has_competence: false,
+      planned_checklist: null,
+      monthly: { id: "m-1", checklist: expect.objectContaining({ sped_fiscal: "COMPLETED" }) },
+    });
+    await expect(
+      service.listFiscalPortfolio("2026-09", { userId: USER, organizationId: ORG, modules: {} }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
   it("GET mensal sem registro devolve null em vez de 404 (#1322)", async () => {
     const database = prisma();
     database.triageMonthly.findFirst.mockResolvedValue(null);
