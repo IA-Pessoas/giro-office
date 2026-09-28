@@ -30,6 +30,7 @@
     "test:rh-dossier-point-isolation-browser": "node src/modules/rh/run-rh-dossier-point-isolation-browser-smoke.mjs",
     "test:departments": "node --experimental-strip-types src/modules/departments/run-departments-tests.mjs",
     "test:contabil": "node --experimental-strip-types src/modules/contabil/run-contabil-tests.mjs",
+    "test:contabil-portfolio-browser": "node src/modules/contabil/run-contabil-portfolio-browser-smoke.mjs",
     "test:triagem-fiscal-browser": "node src/modules/contabil/run-triagem-fiscal-browser-smoke.mjs",
     "test:triagem-bank-statements-browser": "node src/modules/contabil/run-triagem-bank-statements-browser-smoke.mjs",
     "test:triagem-external-links-browser": "node src/modules/contabil/run-triagem-external-links-browser-smoke.mjs",
