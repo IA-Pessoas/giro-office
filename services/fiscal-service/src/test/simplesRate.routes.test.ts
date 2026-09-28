@@ -49,7 +49,6 @@ function deps() {
       applies_to: "2026-09",
       annex: "I" as const,
       tax: "ICMS" as const,
-      preview_rate: "5.8000",
       rate: "5.00",
     })),
   };
@@ -75,7 +74,7 @@ describe("fiscal Simples rate routes", () => {
     expect(pdf.status).toBe(200);
     expect(pdf.headers["content-type"]).toMatch(/application\/pdf/);
     expect(pdf.headers["cache-control"]).toBe("no-store");
-    expect(pdf.headers["content-disposition"]).toContain("aliquota-ICMS-2026-09-");
+    expect(pdf.headers["content-disposition"]).toContain("aliquota-ICMS-anexo-I-2026-09-");
     expect(pdf.body.subarray(0, 4).toString()).toBe("%PDF");
     expect(service.emission).toHaveBeenCalledWith(
       { client_id: clientId, competence: "2026-08", annex: "I" },

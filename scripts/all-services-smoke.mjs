@@ -4511,6 +4511,13 @@ const handlers = {
     });
   },
 
+  async fiscalSimplesPdfInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02", annex: "VI" },
+    });
+  },
+
   async fiscalRevenueUpdate(op) {
     await httpRequest(op, {
       path: `/fiscal/revenues/${requireState("fiscalRevenueId")}`,

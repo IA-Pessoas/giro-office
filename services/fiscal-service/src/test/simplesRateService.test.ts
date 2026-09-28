@@ -74,7 +74,6 @@ describe("SimplesRateService", () => {
       applies_to: "2026-10",
       annex: "IV",
       tax: "ISS",
-      preview_rate: "2.0025",
       rate: "2.01",
     });
   });

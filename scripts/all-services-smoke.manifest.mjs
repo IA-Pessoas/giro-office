@@ -2203,6 +2203,17 @@ const baseManifest = [
   }),
   op({
     service: "fiscal-service",
+    method: "GET",
+    path: "/fiscal/simples/pdf",
+    action: "fiscalSimplesPdfInvalid",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectedStatus: [400],
+    expectedLabel: "invalid annex",
+  }),
+  op({
+    service: "fiscal-service",
     method: "PUT",
     path: "/fiscal/revenues/{id}",
     action: "fiscalRevenueUpdate",

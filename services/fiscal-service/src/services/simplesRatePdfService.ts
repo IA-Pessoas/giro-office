@@ -18,7 +18,7 @@ function monthLabel(competence: string): string {
 }
 
 export function simplesRatePdfFileName(emission: SimplesRateEmission): string {
-  return `aliquota-${emission.tax}-${emission.applies_to}-${emission.client_id}.pdf`;
+  return `aliquota-${emission.tax}-anexo-${emission.annex}-${emission.applies_to}-${emission.client_id}.pdf`;
 }
 
 export function simplesRatePdfHeaders(emission: SimplesRateEmission): Record<string, string> {
@@ -59,7 +59,11 @@ export function renderSimplesRatePdf(emission: SimplesRateEmission): Promise<Buf
     doc.moveDown(1.5);
     doc.text("Gostaríamos de informar que a ", { continued: true });
     doc.font("Helvetica-Bold").text(`Alíquota de ${emission.tax}`, { continued: true });
-    doc.font("Helvetica").text(` referente ao mês de ${month} é de `, { continued: true });
+    doc
+      .font("Helvetica")
+      .text(` (Simples Nacional, Anexo ${emission.annex}) referente ao mês de ${month} é de `, {
+        continued: true,
+      });
     doc.font("Helvetica-Bold").text(rate, { continued: true });
     doc.font("Helvetica").text(".");
     doc.moveDown(1.5);

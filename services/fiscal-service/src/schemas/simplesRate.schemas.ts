@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { SIMPLES_ANNEX_NAMES } from "../services/simplesNationalService.js";
 import { competenceSchema } from "./competence.schemas.js";
 
 export const simplesPreviewQuerySchema = z
@@ -12,6 +13,6 @@ export const simplesPreviewQuerySchema = z
 export const simplesPdfQuerySchema = z
   .object({
     ...simplesPreviewQuerySchema.shape,
-    annex: z.enum(["I", "II", "III", "IV", "V"], { message: "Anexo inválido." }),
+    annex: z.enum(SIMPLES_ANNEX_NAMES, { message: "Anexo inválido." }),
   })
   .strict();

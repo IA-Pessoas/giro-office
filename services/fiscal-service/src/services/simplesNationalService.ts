@@ -5,7 +5,8 @@
 // Exceção: no Anexo II o legado repetia as parcelas a deduzir do Anexo III (9.360, 17.640...);
 // aqui valem as da LC 123 (5.940, 13.860, 22.500, 85.500, 720.000).
 
-export type SimplesAnnex = "I" | "II" | "III" | "IV" | "V";
+export const SIMPLES_ANNEX_NAMES = ["I", "II", "III", "IV", "V"] as const;
+export type SimplesAnnex = (typeof SIMPLES_ANNEX_NAMES)[number];
 export type SimplesTax = "ICMS" | "ISS";
 
 interface AnnexTable {
@@ -179,7 +180,7 @@ export function calculateSimplesPreview(
     rbt12: fixed(rbt12, 2),
     annexes:
       status === "ok" && bracket !== null
-        ? (Object.keys(SIMPLES_ANNEXES) as SimplesAnnex[]).map((annex) => {
+        ? SIMPLES_ANNEX_NAMES.map((annex) => {
             const { tax, brackets } = SIMPLES_ANNEXES[annex];
             const [nominal, deduction, share] = brackets[bracket - 1];
             const effective = ((rbt12 * nominal) / 100 - deduction) / rbt12;

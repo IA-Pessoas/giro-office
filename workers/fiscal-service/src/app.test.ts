@@ -66,7 +66,6 @@ describe("fiscal Worker", () => {
       applies_to: "2026-09",
       annex: "III" as const,
       tax: "ISS" as const,
-      preview_rate: "1.9800",
       rate: "2.01",
     };
     const simples = {
@@ -102,7 +101,7 @@ describe("fiscal Worker", () => {
     );
     expect(pdf.status).toBe(200);
     expect(pdf.headers.get("content-type")).toBe("application/pdf");
-    expect(pdf.headers.get("content-disposition")).toContain("aliquota-ISS-2026-09-");
+    expect(pdf.headers.get("content-disposition")).toContain("aliquota-ISS-anexo-III-2026-09-");
     expect((await pdf.arrayBuffer()).byteLength).toBeGreaterThan(500);
     expect(simples.emission).toHaveBeenCalledWith(
       { client_id: clientId, competence: "2026-08", annex: "III" },

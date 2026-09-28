@@ -2,6 +2,7 @@ import { ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
+import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
 import { getPaginationParams, type PaginationQuery } from "../schemas/pagination.schemas.js";
 
 export type MonthlyRevenuePrisma = Pick<PrismaClient, "client" | "fiscalMonthlyRevenue">;
@@ -42,14 +43,6 @@ export interface MonthlyRevenueDto {
   updated_by: string;
   createdAt: string;
   updatedAt: string;
-}
-
-function competenceDate(competence: string): Date {
-  return new Date(`${competence}-01T00:00:00.000Z`);
-}
-
-function competenceKey(date: Date): string {
-  return date.toISOString().slice(0, 7);
 }
 
 function serialize(value: {

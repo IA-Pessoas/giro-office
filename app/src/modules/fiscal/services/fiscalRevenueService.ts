@@ -74,14 +74,16 @@ export const fiscalRevenueService = {
     clientId: string,
     competence: string,
     annex: FiscalSimplesAnnexRate["annex"],
-  ): Promise<Blob> {
+  ): Promise<{ blob: Blob; fileName: string }> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     try {
       const response = await api.get("/fiscal/simples/pdf", {
         params: { client_id: clientId, competence, annex },
         responseType: "blob",
       });
-      return response.data as Blob;
+      const disposition = String(response.headers["content-disposition"] ?? "");
+      const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `aliquota-anexo-${annex}.pdf`;
+      return { blob: response.data as Blob, fileName };
     } catch (error) {
       // Com responseType blob o erro também chega como Blob; devolve o JSON para a mensagem.
       if (isAxiosError(error) && error.response?.data instanceof Blob) {

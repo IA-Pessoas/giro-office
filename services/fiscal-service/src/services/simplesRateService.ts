@@ -1,6 +1,7 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
 import {
   calculateSimplesPreview,
   previousCompetences,
@@ -21,14 +22,8 @@ export interface SimplesRateEmission {
   applies_to: string;
   annex: SimplesAnnex;
   tax: SimplesTax;
-  /** Percentual bruto da prévia. */
-  preview_rate: string;
   /** Percentual emitido, com os limites de ISS/ICMS. */
   rate: string;
-}
-
-function competenceDate(competence: string): Date {
-  return new Date(`${competence}-01T00:00:00.000Z`);
 }
 
 /** Prévia e emissão da alíquota de ISS/ICMS do Simples a partir das receitas mensais. */
@@ -60,7 +55,7 @@ export class SimplesRateService {
     return calculateSimplesPreview(
       competence,
       records.map((record) => ({
-        competence: record.competence.toISOString().slice(0, 7),
+        competence: competenceKey(record.competence),
         amount: record.amount.toString(),
       })),
     );
@@ -87,10 +82,11 @@ export class SimplesRateService {
     const preview = await this.calculate(client.id, input.competence, organizationId);
     if (preview.status !== "ok") throw new ServiceError(422, preview.message ?? "Sem base.");
     const item = preview.annexes.find((annex) => annex.annex === input.annex);
-    if (!item?.emission_rate) {
+    if (!item) throw new ServiceError(422, `Anexo ${input.annex} sem cálculo.`);
+    if (!item.emission_rate) {
       throw new ServiceError(
         422,
-        `Sem alíquota de ${item?.tax ?? "ISS/ICMS"} para emitir no Anexo ${input.annex}: na ${item?.bracket ?? 6}ª faixa o tributo é recolhido fora do Simples.`,
+        `Sem alíquota de ${item.tax} para emitir no Anexo ${item.annex}: na ${item.bracket}ª faixa o tributo é recolhido fora do Simples.`,
       );
     }
     return {
@@ -101,7 +97,6 @@ export class SimplesRateService {
       applies_to: preview.applies_to,
       annex: item.annex,
       tax: item.tax,
-      preview_rate: item.rate,
       rate: item.emission_rate,
     };
   }

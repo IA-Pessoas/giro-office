@@ -25,14 +25,18 @@ export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) 
   );
   const data = preview.data;
 
-  async function emitPdf(item: FiscalSimplesAnnexRate, appliesTo: string) {
+  async function emitPdf(item: FiscalSimplesAnnexRate) {
     setEmitting(item.annex);
     try {
-      const blob = await fiscalRevenueService.downloadSimplesPdf(clientId, competence, item.annex);
+      const { blob, fileName } = await fiscalRevenueService.downloadSimplesPdf(
+        clientId,
+        competence,
+        item.annex,
+      );
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `aliquota-${item.tax}-${appliesTo}-${clientId}.pdf`;
+      anchor.download = fileName;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -97,7 +101,7 @@ export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) 
                     <dt>Repartição {item.tax}</dt><dd className="text-right">{formatRatePercent(item.tax_share)}</dd>
                   </dl>
                   {item.emission_rate ? (
-                    <button type="button" onClick={() => void emitPdf(item, data.applies_to)} disabled={emitting !== null} aria-label={`Emitir PDF do Anexo ${item.annex} (${item.tax})`} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-600 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-900/20">
+                    <button type="button" onClick={() => void emitPdf(item)} disabled={emitting !== null} aria-label={`Emitir PDF do Anexo ${item.annex} (${item.tax})`} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-600 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-900/20">
                       {emitting === item.annex ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                       Emitir PDF · {formatRatePercent(item.emission_rate)}
                     </button>
