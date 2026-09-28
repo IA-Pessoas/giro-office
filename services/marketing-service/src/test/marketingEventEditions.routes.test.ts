@@ -54,11 +54,13 @@ function headers(permission = 1): Record<string, string> {
   };
 }
 
-function service() {
+function service(updateResult: unknown | null = null) {
   return {
-    listEditions: vi.fn(async () => []),
-    createEdition: vi.fn(async () => ({ id: editionId })),
-    updateEdition: vi.fn(async () => null),
+    listEditions: vi.fn<MarketingEventEditionsProvider["listEditions"]>(async () => []),
+    createEdition: vi.fn<MarketingEventEditionsProvider["createEdition"]>(async () => ({
+      id: editionId,
+    })),
+    updateEdition: vi.fn<MarketingEventEditionsProvider["updateEdition"]>(async () => updateResult),
   };
 }
 
@@ -89,6 +91,19 @@ describe("Marketing event editions routes", () => {
       .send({ ...body, date: "2026-02-31" });
     expect(invalid.status).toBe(400);
     expect(provider.createEdition).toHaveBeenCalledTimes(1);
+  });
+
+  it("updates an edition and returns the saved edition", async () => {
+    const savedEdition = { id: editionId, name: "Edição anual" };
+    const provider = service(savedEdition);
+    const response = await request(createTestApp(provider))
+      .put(`/marketing/events/${eventId}/editions/${editionId}`)
+      .set(headers(2))
+      .send(body);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: savedEdition });
+    expect(provider.updateEdition).toHaveBeenCalledWith(organizationId, eventId, editionId, body);
   });
 
   it("requires edit permission and hides editions not in the organization or event", async () => {

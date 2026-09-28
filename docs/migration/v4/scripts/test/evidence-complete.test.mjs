@@ -146,9 +146,9 @@ test("toda decisão restante possui referência auditável e pending preserva co
   const pending = REMAINING_EVIDENCE.filter(({ finalStatus }) => finalStatus === "pending");
   assert.equal(
     REMAINING_EVIDENCE.filter(({ finalStatus }) => finalStatus === "confirmed").length,
-    15,
+    16,
   );
-  assert.equal(pending.length, 72);
+  assert.equal(pending.length, 71);
   assert.deepEqual(
     Object.keys(REMAINING_PENDING_COLUMN_DECISIONS).sort(),
     pending.map(({ sourceTable }) => sourceTable),

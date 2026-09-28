@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import type { MarketingEventEditionInput } from "../schemas/marketingEventEdition.schemas.js";
 
@@ -7,6 +7,7 @@ const editionInclude: Prisma.MarketingEventEditionInclude = {
 };
 
 type EditionRecord = Prisma.MarketingEventEditionGetPayload<{ include: typeof editionInclude }>;
+type MarketingEventEdition = ReturnType<typeof mapEdition>;
 
 function toCents(amount: string): bigint {
   const [whole, fraction = ""] = amount.split(".");
@@ -69,7 +70,7 @@ function budgetCreateData(items: MarketingEventEditionInput["budgetItems"]) {
 export class MarketingEventEditionsService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async listEditions(organizationId: string, eventId: string) {
+  async listEditions(organizationId: string, eventId: string): Promise<MarketingEventEdition[]> {
     const records = await this.prisma.marketingEventEdition.findMany({
       where: { organization_id: organizationId, event_id: eventId },
       orderBy: [{ date: "asc" }, { id: "asc" }],
@@ -78,7 +79,11 @@ export class MarketingEventEditionsService {
     return records.map(mapEdition);
   }
 
-  async createEdition(organizationId: string, eventId: string, input: MarketingEventEditionInput) {
+  async createEdition(
+    organizationId: string,
+    eventId: string,
+    input: MarketingEventEditionInput,
+  ): Promise<MarketingEventEdition> {
     try {
       const record = await this.prisma.marketingEventEdition.create({
         data: {
@@ -92,6 +97,7 @@ export class MarketingEventEditionsService {
       });
       return mapEdition(record);
     } catch (error) {
+      logError("Falha ao criar edição do evento.", { err: error });
       if (
         typeof error === "object" &&
         error !== null &&
@@ -109,7 +115,7 @@ export class MarketingEventEditionsService {
     eventId: string,
     editionId: string,
     input: MarketingEventEditionInput,
-  ) {
+  ): Promise<MarketingEventEdition | null> {
     return this.prisma.$transaction(async (tx) => {
       const current = await tx.marketingEventEdition.findFirst({
         where: { id: editionId, organization_id: organizationId, event_id: eventId },

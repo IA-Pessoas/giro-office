@@ -12,6 +12,19 @@ const CONFIRMED = new Map(
       ],
     ],
     [
+      "tb_mkt.eventos_edicoes",
+      [
+        "infra/prisma/schema.prisma:1776",
+        "services/marketing-service/src/services/marketingEventEditionsService.ts:57",
+      ],
+      "Edições são importadas como filhas de mtk.events e o orçamento JSON legado é expandido em linhas relacionais. evento_id é resolvido exclusivamente pelo id legado do evento; vínculos ambíguos, pais em quarentena, data_local não separável sem inferência e campos inválidos ficam na quarentena de migração para reconciliação.",
+      [
+        "evento_id referencia tb_mkt.eventos.id; o id do evento de destino deriva da identidade v5 do registro pai tb_mkt.eventos.",
+        "orcamentos, parcerias, organizacao, logistica, mkt_comunicacao, durante_evento, pos_evento e obs são coleções/objetos JSON legado preservados nos campos equivalentes atuais.",
+        "data_local é texto livre sem separadores contratuais; somente valores em data ISO ou DD/MM/AAAA seguidos de ' | ' ou ' - ' e local são importados automaticamente.",
+      ],
+    ],
+    [
       "tb_cbc.emails",
       ["infra/prisma/schema.prisma:910", "services/src/src/services/EmailService.ts:50"],
       "A lista de destinatários e os dois gatilhos de envio possuem contrato atual equivalente.",
