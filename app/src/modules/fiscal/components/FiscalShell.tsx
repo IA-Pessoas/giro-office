@@ -51,7 +51,7 @@ const fiscalTabs: Array<{
   },
   {
     id: "revenues",
-    label: "Receitas mensais",
+    label: "Simples Nacional",
     icon: Banknote,
   },
 ];

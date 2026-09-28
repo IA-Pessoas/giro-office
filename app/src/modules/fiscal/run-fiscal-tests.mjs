@@ -272,3 +272,28 @@ await runTest("fiscal revenues tab keeps loading, error, empty and validation st
   assert.match(section, /\{client && canEdit \? \(\s*<form/);
   assert.match(section, /\{canEdit \? \(\s*<td/);
 });
+
+await runTest("fiscal Simples preview formats rates and shows base, states and taxes", async () => {
+  const { formatRatePercent } = await import("./utils/fiscalRevenue.ts");
+  assert.equal(formatRatePercent("1.3600"), "1,36%");
+  assert.equal(formatRatePercent("2.0025"), "2,0025%");
+  assert.equal(formatRatePercent("2.40865"), "2,4087%");
+
+  const preview = await readSource("./components/FiscalSimplesPreviewSection.tsx");
+  const revenues = await readSource("./components/FiscalRevenuesSection.tsx");
+  assert.match(revenues, /<FiscalSimplesPreviewSection clientId=\{client\.id\} \/>/);
+  // Corrigir receita invalida a prévia pelo mesmo prefixo de query.
+  const queryKeys = await readSource("./hooks/queryKeys.ts");
+  assert.match(preview, /fiscalSimplesPreviewQueryKey\(clientId, competence\)/);
+  assert.match(queryKeys, /\[\.\.\.fiscalRevenuesQueryKey\(clientId\), "simples-preview", competence\]/);
+  assert.match(revenues, /invalidateQueries\(\{ queryKey: fiscalRevenuesQueryKey\(/);
+  assert.match(preview, /role="status"[^>]*>Calculando prévia/);
+  assert.match(preview, /preview\.error \? <p role="alert"/);
+  assert.match(preview, /\(média estimada\)/);
+  assert.match(preview, /\(sem registro\)/);
+  assert.match(preview, /RBT12/);
+  assert.match(preview, /Anexo \{item\.annex\} · \{item\.tax\}/);
+  // Sem base (RBT12 zero) ou acima do teto: mensagem, nenhum anexo.
+  assert.match(preview, /data\.status === "ok" \? \(/);
+  assert.match(preview, /\{data\.message\}/);
+});

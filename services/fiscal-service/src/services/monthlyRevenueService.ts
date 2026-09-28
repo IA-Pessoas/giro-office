@@ -3,6 +3,11 @@ import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
 import { getPaginationParams, type PaginationQuery } from "../schemas/pagination.schemas.js";
+import {
+  calculateSimplesPreview,
+  previousCompetences,
+  type SimplesPreview,
+} from "./simplesNationalService.js";
 
 export type MonthlyRevenuePrisma = Pick<PrismaClient, "client" | "fiscalMonthlyRevenue">;
 
@@ -48,6 +53,10 @@ function competenceDate(competence: string): Date {
   return new Date(`${competence}-01T00:00:00.000Z`);
 }
 
+function competenceKey(date: Date): string {
+  return date.toISOString().slice(0, 7);
+}
+
 function serialize(value: {
   id: string;
   client_id: string;
@@ -61,7 +70,7 @@ function serialize(value: {
   return {
     id: value.id,
     client_id: value.client_id,
-    competence: value.competence.toISOString().slice(0, 7),
+    competence: competenceKey(value.competence),
     amount: value.amount.toString(),
     created_by: value.created_by,
     updated_by: value.updated_by,
@@ -148,6 +157,36 @@ export class MonthlyRevenueService {
       changes: { amount: { from: current.amount.toString(), to: input.amount } },
     });
     return serialize(updated);
+  }
+
+  /** Prévia do Simples: RBT12 dos 11 meses anteriores à competência e alíquota por anexo. */
+  async simplesPreview(
+    input: { client_id: string; competence: string },
+    organizationId: string,
+  ): Promise<SimplesPreview & { client_id: string }> {
+    await this.requireClient(input.client_id, organizationId);
+    const months = previousCompetences(input.competence);
+    const records = await this.prisma.fiscalMonthlyRevenue.findMany({
+      where: {
+        organization_id: organizationId,
+        client_id: input.client_id,
+        competence: {
+          gte: competenceDate(months[months.length - 1]),
+          lte: competenceDate(months[0]),
+        },
+      },
+      select: { competence: true, amount: true },
+    });
+    return {
+      client_id: input.client_id,
+      ...calculateSimplesPreview(
+        input.competence,
+        records.map((record) => ({
+          competence: competenceKey(record.competence),
+          amount: record.amount.toString(),
+        })),
+      ),
+    };
   }
 
   async list(

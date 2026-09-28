@@ -86,6 +86,7 @@ describe("activityCatalog", () => {
     ["GET", "/fiscal/rates/list", "consultou", "a lista de registros de alíquotas fiscais"],
     ["GET", "/triagem/fiscal-portfolio", "consultou", "a carteira fiscal mensal da Triagem"],
     ["POST", "/fiscal/revenues", "cadastrou", "uma nova receita mensal"],
+    ["GET", "/fiscal/simples/preview", "consultou", "a prévia de alíquotas do Simples"],
     ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
     [
       "PUT",

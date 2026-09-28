@@ -23,6 +23,7 @@ import {
   createMonthlyRevenueBodySchema,
   listMonthlyRevenuesQuerySchema,
   monthlyRevenueIdParamsSchema,
+  simplesPreviewQuerySchema,
   updateMonthlyRevenueBodySchema,
 } from "@workspace/fiscal-service/src/schemas/monthlyRevenue.schemas.js";
 import {
@@ -77,7 +78,10 @@ type CrudService = {
 type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
-type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
+type RevenueServiceLike = Pick<
+  MonthlyRevenueService,
+  "create" | "update" | "list" | "simplesPreview"
+>;
 
 interface FiscalWorkerOptions {
   env: FiscalWorkerEnv;
@@ -299,6 +303,17 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     });
     const data = await withService("revenueService", (service) =>
       service.list(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/simples/preview", async (c) => {
+    const query = parseWithZod(simplesPreviewQuerySchema, {
+      client_id: c.req.query("client_id"),
+      competence: c.req.query("competence"),
+    });
+    const data = await withService("revenueService", (service) =>
+      service.simplesPreview(query, c.get("auth").organizationId),
     );
     return c.json(createSuccessResponse(data));
   });

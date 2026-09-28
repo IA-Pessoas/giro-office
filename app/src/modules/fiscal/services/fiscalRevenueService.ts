@@ -20,6 +20,30 @@ export interface CreateFiscalMonthlyRevenuePayload {
   amount: string;
 }
 
+export interface FiscalSimplesAnnexRate {
+  annex: "I" | "II" | "III" | "IV" | "V";
+  tax: "ICMS" | "ISS";
+  bracket: number;
+  nominal_rate: string;
+  deduction: string;
+  effective_rate: string;
+  tax_share: string;
+  rate: string;
+}
+
+export type FiscalSimplesPreviewStatus = "ok" | "no_base" | "above_limit";
+
+export interface FiscalSimplesPreview {
+  client_id: string;
+  competence: string;
+  status: FiscalSimplesPreviewStatus;
+  message: string | null;
+  months: Array<{ competence: string; amount: string; registered: boolean }>;
+  estimated_month: { competence: string; amount: string };
+  rbt12: string;
+  annexes: FiscalSimplesAnnexRate[];
+}
+
 export const REVENUE_PAGE_SIZE = 24;
 
 export const fiscalRevenueService = {
@@ -33,6 +57,14 @@ export const fiscalRevenueService = {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     const response = await api.put(`/fiscal/revenues/${id}`, { amount });
     return unwrapFiscalEnvelope<FiscalMonthlyRevenue>(response.data);
+  },
+
+  async simplesPreview(clientId: string, competence: string): Promise<FiscalSimplesPreview> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.get("/fiscal/simples/preview", {
+      params: { client_id: clientId, competence },
+    });
+    return unwrapFiscalEnvelope<FiscalSimplesPreview>(response.data);
   },
 
   async list(clientId: string, page: number): Promise<PaginatedResult<FiscalMonthlyRevenue>> {

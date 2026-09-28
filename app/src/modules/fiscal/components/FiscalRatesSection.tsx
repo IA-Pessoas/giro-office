@@ -7,19 +7,14 @@ import { Download, Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { fiscalRateService, type FiscalRate, type FiscalTaxType } from "../services/fiscalRateService";
-import { getFiscalErrorMessage } from "../utils";
+import { competenceFromToday, getFiscalErrorMessage } from "../utils";
 import { FISCAL_FIELD_CONTROL_CLASSNAME } from "./fiscalFieldStyles";
 
 const pageSize = 20;
 
-function currentCompetence(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export function FiscalRatesSection({ canEdit }: { canEdit: boolean }) {
   const [client, setClient] = useState<ClientPickerOption | null>(null);
-  const [competence, setCompetence] = useState(currentCompetence);
+  const [competence, setCompetence] = useState(() => competenceFromToday());
   const [taxType, setTaxType] = useState<FiscalTaxType>("ISS");
   const [rate, setRate] = useState("");
   const [page, setPage] = useState(1);

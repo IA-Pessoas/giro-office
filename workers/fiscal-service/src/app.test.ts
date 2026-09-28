@@ -71,6 +71,16 @@ describe("fiscal Worker", () => {
       create: vi.fn(async () => revenue),
       update: vi.fn(async () => ({ ...revenue, amount: "10.00" })),
       list: vi.fn(async () => ({ data: [revenue], total: 1, page: 1, limit: 24, hasMore: false })),
+      simplesPreview: vi.fn(async () => ({
+        client_id: revenue.client_id,
+        competence: "2026-09",
+        status: "no_base" as const,
+        message: "Não há base para calcular.",
+        months: [],
+        estimated_month: { competence: "2026-09", amount: "0.00" },
+        rbt12: "0.00",
+        annexes: [],
+      })),
     };
     const app = createFiscalWorkerApp({ env: env(), revenueService: revenues });
 
@@ -118,6 +128,16 @@ describe("fiscal Worker", () => {
     });
     expect(viewerWrite.status).toBe(403);
     expect(revenues.update).toHaveBeenCalledOnce();
+
+    const preview = await app.request(
+      `https://fiscal.test/fiscal/simples/preview?client_id=${revenue.client_id}&competence=2026-09`,
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) }) },
+    );
+    expect(preview.status).toBe(200);
+    expect(revenues.simplesPreview).toHaveBeenCalledWith(
+      { client_id: revenue.client_id, competence: "2026-09" },
+      ORGANIZATION_ID,
+    );
 
     const withoutFiscal = await app.request(
       `https://fiscal.test/fiscal/revenues/list?client_id=${revenue.client_id}`,
