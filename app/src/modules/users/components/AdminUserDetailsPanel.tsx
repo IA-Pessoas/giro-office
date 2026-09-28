@@ -314,7 +314,7 @@ export function AdminUserDetailsPanel({
             <div className="space-y-2">
               <p className={LABEL_CLASSNAME}>Senha</p>
               <PasswordResetButton
-                onSend={() => dataSource.sendPasswordReset(userId)}
+                onSubmit={(password) => dataSource.resetPassword(userId, password)}
                 className={SECONDARY_ACTION_CLASSNAME}
                 disabled={isSaving}
               />

@@ -75,16 +75,21 @@ export function ownPasswordPolicyError(
   return null;
 }
 
+const newPasswordSchema = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`)
+  .max(255);
+
 /** Link de redefinição (#1342): o token vem do e-mail. */
 export const confirmPasswordResetBodySchema = z
   .object({
     token: z.string().trim().min(1, "token é obrigatório.").max(256),
-    password: z
-      .string()
-      .min(MIN_PASSWORD_LENGTH, `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`)
-      .max(255),
+    password: newPasswordSchema,
   })
   .strict();
+
+/** O TI define a nova senha de outro usuário, sem link por e-mail. */
+export const adminSetPasswordBodySchema = z.object({ password: newPasswordSchema }).strict();
 
 export const updateUserBodySchema = z
   .object({
