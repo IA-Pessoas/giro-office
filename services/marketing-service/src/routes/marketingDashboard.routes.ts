@@ -1,5 +1,6 @@
 import {
   createSuccessResponse,
+  error as logError,
   requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
@@ -33,6 +34,7 @@ export function createMarketingDashboardRoutes(
         const dashboard = await dashboardService.getDashboard(organizationId);
         response.json(createSuccessResponse(dashboard));
       } catch (error: unknown) {
+        logError("Falha ao carregar dashboard do Marketing.", { err: error });
         next(
           error instanceof Error ? error : new ServiceError(500, "Falha ao carregar o dashboard."),
         );
