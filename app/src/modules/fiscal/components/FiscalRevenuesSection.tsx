@@ -18,6 +18,7 @@ import {
   toRevenueAmount,
 } from "../utils";
 import { FISCAL_FIELD_CONTROL_CLASSNAME } from "./fiscalFieldStyles";
+import { FiscalSimplesPreviewSection } from "./FiscalSimplesPreviewSection";
 
 const INVALID_AMOUNT_MESSAGE = "Informe a receita em reais, sem valor negativo. Para receita zero, digite 0.";
 
@@ -167,6 +168,7 @@ export function FiscalRevenuesSection({ canEdit }: { canEdit: boolean }) {
               <PaginationControls page={page} limit={REVENUE_PAGE_SIZE} total={list.data.total} count={list.data.data.length} hasMore={list.data.hasMore} isFetching={list.isFetching} onPrevious={() => setPage((value) => Math.max(1, value - 1))} onNext={() => setPage((value) => value + 1)} />
             </div>
           ) : null}
+          <FiscalSimplesPreviewSection clientId={client.id} />
         </div>
       ) : <p className="text-sm text-gray-600 dark:text-gray-400">Selecione um cliente para consultar ou registrar receitas.</p>}
     </section>

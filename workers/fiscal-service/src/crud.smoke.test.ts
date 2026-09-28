@@ -272,6 +272,17 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     );
     expect(updated.data.amount).toBe("999.1");
 
+    const preview = expectOk(
+      await call("GET", `/fiscal/simples/preview?client_id=${clientId}&competence=2026-09`),
+      "GET /fiscal/simples/preview",
+    );
+    // 999,10 (07/2026) + 0 (08/2026) nos 11 meses; RBT12 = 999,10 × 12 ÷ 11.
+    expect(preview.data).toMatchObject({ status: "ok", rbt12: "1089.93" });
+    expect(preview.data.months.slice(0, 2)).toEqual([
+      { competence: "2026-08", amount: "0.00", registered: true },
+      { competence: "2026-07", amount: "999.10", registered: true },
+    ]);
+
     const otherOrganization = {
       ...(await smokeHeaders()),
       "x-auth-organization-id": randomUUID(),

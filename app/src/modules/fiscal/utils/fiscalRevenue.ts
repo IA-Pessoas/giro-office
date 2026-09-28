@@ -16,6 +16,16 @@ export function formatRevenueAmount(amount: string): string {
   return formatBrlAmount(Number(amount));
 }
 
+const percentFormatter = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
+/** Percentual da API ("2.0025") em pt-BR ("2,0025%"), com ao menos duas casas. */
+export function formatRatePercent(value: string): string {
+  return `${percentFormatter.format(Number(value))}%`;
+}
+
 export function formatCompetenceLabel(competence: string): string {
   return `${competence.slice(5, 7)}/${competence.slice(0, 4)}`;
 }

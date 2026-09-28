@@ -4495,6 +4495,15 @@ const handlers = {
     });
   },
 
+  async fiscalSimplesPreview(op) {
+    const response = await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02" },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.status !== "ok") {
+      throw new Error(`prévia do Simples sem base: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
   async fiscalRevenueUpdate(op) {
     await httpRequest(op, {
       path: `/fiscal/revenues/${requireState("fiscalRevenueId")}`,

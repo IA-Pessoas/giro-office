@@ -243,6 +243,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/fiscal\/simples\/preview$/,
+    description: { action: "consultou", item: "a prévia de alíquotas do Simples" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
     description: { action: "consultou", item: "um job de relatório" },
   },

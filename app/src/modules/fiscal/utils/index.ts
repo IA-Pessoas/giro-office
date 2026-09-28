@@ -5,4 +5,9 @@ export {
   parseCommaSeparatedValues,
 } from "./parseCommaSeparatedCodes";
 export { FISCAL_TAX_REGIME_OPTIONS, formatFiscalTaxRegime } from "./fiscalTaxRegime";
-export { formatCompetenceLabel, formatRevenueAmount, toRevenueAmount } from "./fiscalRevenue";
+export {
+  formatCompetenceLabel,
+  formatRatePercent,
+  formatRevenueAmount,
+  toRevenueAmount,
+} from "./fiscalRevenue";
