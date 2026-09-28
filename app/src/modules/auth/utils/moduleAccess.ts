@@ -23,7 +23,6 @@ export const MODULE_KEYS = [
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 export const DISABLED_MODULE_KEYS = [
-  "marketing",
 ] as const satisfies readonly ModuleKey[];
 const DISABLED_MODULE_KEY_SET = new Set<ModuleKey>(DISABLED_MODULE_KEYS);
 export type AccessLevel = "none" | "view" | "edit" | "admin";
@@ -70,6 +69,7 @@ export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/tecnologia": "ti",
   "/comercial": "comercial",
   "/triagem": "triagem",
+  "/marketing": "marketing",
 };
 
 function isWithinRoute(routePath: string, basePath: string): boolean {

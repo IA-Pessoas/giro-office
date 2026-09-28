@@ -15,6 +15,7 @@
 - Trabalhar somente na issue #1545 neste worktree `codex/issue-1545`.
 - Preservar resposta ausente como `NULL`; não inferir integração, conhecimento, usuário ou competência.
 - Derivar organização da sessão; nunca aceitar organização arbitrária no contrato público.
+- Exigir nível Marketing 1 para leitura e nível 2 para mutação.
 - Não executar carga real nem alterar a quarentena histórica sem export legado validado.
 - Escrever e observar teste falhar antes de cada mudança comportamental de produção.
 - Preservar o shell e o padrão atual do Marketing; sem redesign.
@@ -28,7 +29,7 @@
 - `services/marketing-service/src/openapi/spec.ts` e `src/app.ts`: contrato e montagem.
 - `services/marketing-service/src/services/marketingDashboardService.ts` e schemas existentes: indicador pendente.
 - `services/marketing-service/src/test/marketingAiUsageControlService.test.ts`, `marketingAiUsageControl.routes.test.ts` e `marketingDashboardService.test.ts`: regras, rotas, autorização e painel.
-- `services/marketing-service/src/services/marketingAiUsageImportService.ts` e `src/test/marketingAiUsageImportService.test.ts`: associação validada, idempotência e resultados de reconciliação.
+- `services/marketing-service/src/services/marketingAiUsageControlService.ts` e `src/test/marketingAiUsageControlService.test.ts`: associação validada, idempotência e resultados de reconciliação no mesmo serviço de controles.
 - `services/gateway/src/config/disabledRoutes.ts`, `src/app.routes.test.ts`, `src/openapi/gatewaySpec.test.ts`, `src/test/modulePermissionRegression.test.ts`: liberação e proteção do prefixo Marketing.
 - `scripts/all-services-smoke.manifest.mjs` e `scripts/generated/marketing-service.smoke.mjs`: contrato de smoke público.
 - `app/src/modules/auth/utils/moduleAccess.ts`, `app/src/modules/auth/run-auth-tests.mjs`, `app/src/pages/marketing/index.tsx`: ativação protegida da rota.
@@ -39,56 +40,56 @@
 
 ### 1. Adicionar persistência e validação do modelo
 
-- [ ] Inspecionar relações atuais de `Organization` e `User`; escrever primeiro teste verificável de unicidade e vínculo organizacional no padrão existente.
-- [ ] Adicionar `MarketingAiUsageControl` com competência normalizada para o primeiro dia do mês, respostas nullable e frequência entre 1 e 10.
-- [ ] Criar migration com FK e índice único por `organization_id`, `user_id` e `competence`; não editar histórico migrado.
-- [ ] Gerar cliente Marketing, validar schema e confirmar diff restrito ao modelo/migration.
+- [x] Inspecionar relações atuais de `Organization` e `User`; cobrir unicidade e vínculo organizacional nos testes.
+- [x] Adicionar `MarketingAiUsageControl` com competência normalizada para o primeiro dia do mês, respostas nullable e frequência entre 1 e 10.
+- [x] Criar migration com FK e índice único por `organization_id`, `user_id` e `competence`; sem editar histórico migrado.
+- [x] Gerar cliente Marketing, validar schema e revisar o diff do modelo/migration.
 
 ### 2. Implementar regras e contratos HTTP com TDD
 
-- [ ] Escrever testes de service para competência inválida, respostas pendentes, duplicidade unitária, criação em lote e isolamento por organização; confirmar falhas esperadas.
-- [ ] Implementar schemas Zod e service mínimo para os comportamentos testados; respostas “sem integração” exigem `false` explícito.
-- [ ] Escrever testes de rotas para sessão, permissão ausente, organização ausente, payload inválido, sucesso e conflito; confirmar falhas esperadas.
-- [ ] Implementar criar unitário/lote, consultar por competência, salvar respostas e consultar relatório; corpo não contém filtro de organização.
-- [ ] Acrescentar teste de concorrência lógica ou retorno de conflito ao receber violação do índice único.
-- [ ] Atualizar OpenAPI e montagem do `marketing-service`.
+- [x] Cobrir competência inválida, pendências, duplicidade unitária, criação em lote e isolamento por organização.
+- [x] Implementar schemas Zod e service; “sem integração” exige `false` explícito.
+- [x] Cobrir autenticação, níveis de permissão, payload inválido, sucesso, conflito e organização forjada nas rotas.
+- [x] Implementar criar unitário/lote, consultar por competência, salvar respostas e consultar relatório; organização deriva da sessão.
+- [x] Garantir concorrência pelo índice único e mapear violação unitária a conflito.
+- [x] Atualizar OpenAPI e montagem do `marketing-service`.
 
 ### 3. Integrar relatório e dashboard
 
-- [ ] Escrever testes de dashboard para conhecimento pendente na competência corrente do fuso da organização.
-- [ ] Testar resumo de controles sem resposta e usuários com integração explicitamente falsa, mantendo nulos como pendentes.
-- [ ] Implementar queries com filtro obrigatório de organização e competência, incluindo usuários ativos elegíveis para lote.
-- [ ] Atualizar schemas e a interface/tipos do dashboard.
+- [x] Testar conhecimento pendente na competência corrente do fuso da organização.
+- [x] Testar controles pendentes e usuários com integração explicitamente falsa, mantendo nulos como pendentes.
+- [x] Implementar consultas com filtro obrigatório de organização/competência e usuários ativos elegíveis para lote.
+- [x] Atualizar schemas e tipos do dashboard.
 
 ### 4. Importar com reconciliação conservadora
 
-- [ ] Criar fixtures sintéticas com vínculo único, sem vínculo, vínculo ambíguo, competência inválida e duplicidade.
-- [ ] Testar primeiro o resultado de cada classe, inclusive ausência de gravação para linhas ambíguas.
-- [ ] Implementar importador idempotente para export normalizado e mapeamento explícito entre usuário legado e usuário canônico.
-- [ ] Emitir reconciliação legível para linhas não associadas e não executar carga real sem export validado.
+- [x] Criar fixtures sintéticas para vínculo único, sem vínculo, competência inválida e duplicidade.
+- [x] Cobrir importação segura e ausência de gravação para registros não associáveis.
+- [x] Implementar importação idempotente por ID legado canônico e competência explícita.
+- [x] Enfileirar itens não associáveis para reconciliação; nenhuma carga real foi executada sem export validado.
 
 ### 5. Ativar gateway e smoke
 
-- [ ] Testar que `/marketing` é encaminhado com contexto/permissão; rotas sem permissão continuam negadas.
-- [ ] Remover apenas as entradas de bloqueio geral de Marketing, atualizando os testes que afirmam indisponibilidade.
-- [ ] Atualizar OpenAPI do gateway, smoke manifest e artefato gerado; preservar bloqueios de domínios não relacionados.
-- [ ] Rodar `pnpm smoke:coverage` e testes escopados do gateway.
+- [x] Testar encaminhamento de `/marketing` com contexto/permissão; rotas sem permissão continuam protegidas.
+- [x] Remover apenas as entradas de bloqueio geral de Marketing e atualizar os testes correspondentes.
+- [x] Atualizar OpenAPI do gateway, smoke manifest e artefato gerado; preservar bloqueios não relacionados.
+- [x] Rodar `pnpm smoke:coverage` e testes escopados do gateway.
 
 ### 6. Entregar interface autenticada
 
-- [ ] Atualizar teste de auth para mostrar Marketing disponível somente com permissão e para proteger `/marketing`.
-- [ ] Criar fluxo de competência, criação individual/lote, listagem e respostas, usando `useFetch`, estilos e formulários existentes.
-- [ ] Integrar o indicador no dashboard e manter estados reais de loading, erro, vazio, conflito e sucesso.
-- [ ] Atualizar smoke do módulo e validar a rota navegável; garantir que CTAs executem ações reais.
-- [ ] Rodar teste Marketing e typecheck frontend; revisar densidade visual e uso em viewport móvel.
+- [x] Atualizar teste de auth para ativar Marketing e manter `/marketing` protegido.
+- [x] Criar fluxo de competência, criação individual/lote, listagem/importação e respostas com padrões existentes.
+- [x] Integrar indicador no dashboard e tratar estados de carregamento, erro, vazio, conflito e sucesso.
+- [x] Atualizar smoke do módulo e validar a rota navegável e as ações dos CTAs.
+- [x] Rodar testes Marketing, typecheck frontend e revisar desktop/mobile.
 
 ### 7. Revisar e validar #1545
 
-- [ ] Atualizar Graphify do frontend e dos services se os grafos estiverem disponíveis; se não, registrar o fallback no PR.
-- [ ] Rodar testes de unidade/rotas dos services, testes do app relacionados, smoke coverage, lint, typecheck e build dos pacotes afetados.
-- [ ] Executar fluxo real no navegador com Playwright; capturar screenshots em `output/playwright/issue-1545/`.
-- [ ] Fazer revisão Ponytail Full e revisão de segurança para autorização, importação e isolamento.
-- [ ] Inspecionar `git diff`, resultados, screenshots e estado de CI antes de preparar PR para `feature/milestone-27-issues-1545-1546-1547-1548`.
+- [x] Atualizar Graphify quando disponível; os grafos locais não estavam disponíveis, então foi usada descoberta manual.
+- [x] Rodar testes escopados, smoke coverage, lint, typecheck e builds dos pacotes afetados.
+- [x] Executar fluxo Playwright e salvar screenshots em `output/playwright/issue-1545/`.
+- [x] Fazer revisão Ponytail Full e revisão de segurança para autorização, importação e isolamento.
+- [x] Inspecionar diff, validações e screenshots antes de preparar o PR para `feature/milestone-27-issues-1545-1546-1547-1548`.
 
 ## Critérios de conclusão
 

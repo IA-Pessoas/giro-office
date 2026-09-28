@@ -187,6 +187,8 @@ model Organization {
   taskPostponements             TaskPostponement[]
   logs                          Logs[]
   passwordsMkt                  PasswordMkt[]
+  marketingAiUsageControls      MarketingAiUsageControl[]
+  marketingAiUsageImportReconciliations MarketingAiUsageImportReconciliation[]
   notes                         Note[]
   certificateNotifications      CertificateNotification[]
   pessoalNotifications          PessoalNotification[]
@@ -369,6 +371,7 @@ model User {
   permissionsSpecifics        PermissionSpecific?
   obrigationsPessoal          ObrigationsPessoal[]
   passPessoal                 PasswordPessoal[]
+  marketingAiUsageControls    MarketingAiUsageControl[]
   pessoalGroupMigrationMappings PessoalGroupMigrationMapping[] @relation("PessoalGroupMigrationMappedBy")
   payroll                     Payroll[]
   completedSituationsPessoal  SituationsPessoal[]    @relation("completed_by")
@@ -1743,6 +1746,42 @@ model PasswordMkt {
   organization    Organization @relation(fields: [organization_id], references: [id])
 
   @@map("mtk.passwords")
+}
+
+model MarketingAiUsageControl {
+  id              String       @id @default(uuid())
+  organization_id String
+  user_id         String
+  competence      DateTime     @db.Date
+  knowledge       Boolean?
+  integration     Boolean?
+  frequency       Int?
+  purpose         String?
+  perceived_gain  String?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, user_id, competence], map: "uq_marketing_ai_usage_controls_org_user_competence")
+  @@index([organization_id, competence], map: "idx_marketing_ai_usage_controls_org_competence")
+  @@index([user_id], map: "idx_marketing_ai_usage_controls_user")
+  @@map("marketing.ai_usage_controls")
+}
+
+model MarketingAiUsageImportReconciliation {
+  id                 String       @id @default(uuid())
+  organization_id    String
+  legacy_user_id     String
+  legacy_competence  String
+  payload            Json
+  reason             String
+  status             String       @default("pending")
+  created_at         DateTime     @default(now())
+  organization       Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@index([organization_id, status, created_at], map: "idx_marketing_ai_usage_reconciliation_org_status")
+  @@map("marketing.ai_usage_import_reconciliation")
 }
 
 model Installment {

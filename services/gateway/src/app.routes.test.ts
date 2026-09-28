@@ -4512,7 +4512,7 @@ it("blocks disabled commercial routes before proxying even for global admins", a
   }
 });
 
-it("keeps Marketing routes unavailable until module reconciliation", async () => {
+it("proxies authorized Marketing routes to the Marketing service", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
@@ -4535,8 +4535,8 @@ it("keeps Marketing routes unavailable until module reconciliation", async () =>
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    expect(response.status).toBe(404);
-    expect(seenUrls).toEqual([]);
+    expect(response.status).toBe(200);
+    expect(seenUrls).toEqual(["/marketing/dashboard"]);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

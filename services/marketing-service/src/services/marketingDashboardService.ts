@@ -12,10 +12,26 @@ interface BirthdayAggregate {
 const EMPTY_BIRTHDAYS: BirthdayAggregate = { total: 0, items: [] };
 const CLOSED_REQUEST_STATUSES = ["Resolved", "Closed"] as const;
 
+export function getCurrentMarketingCompetence(now: Date, timeZone: string): Date {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  return new Date(Date.UTC(year, month - 1, 1));
+}
+
 export class MarketingDashboardService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async getDashboard(organizationId: string): Promise<MarketingDashboardResponse> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { timezone: true },
+    });
+    const competence = getCurrentMarketingCompetence(new Date(), organization?.timezone ?? "UTC");
     const [
       rhActive,
       tiActive,
@@ -26,6 +42,7 @@ export class MarketingDashboardService {
       clientBirthdays,
       employeeBirthdays,
       companyAnniversaries,
+      pendingKnowledge,
     ] = await this.prisma.$transaction([
       this.prisma.rhRequest.count({
         where: {
@@ -161,6 +178,9 @@ export class MarketingDashboardService {
           ) AS items
         FROM ranked
       `,
+      this.prisma.marketingAiUsageControl.count({
+        where: { organization_id: organizationId, competence, knowledge: null },
+      }),
     ]);
 
     const clientBirthdaySummary = clientBirthdays[0] ?? EMPTY_BIRTHDAYS;
@@ -180,6 +200,13 @@ export class MarketingDashboardService {
         label: "Solicitações urgentes em aberto",
       });
     }
+    if (pendingKnowledge > 0) {
+      alerts.push({
+        code: "pending-ai-knowledge",
+        count: pendingKnowledge,
+        label: "Conhecimento de IA pendente",
+      });
+    }
 
     return marketingDashboardResponseSchema.parse({
       requests: {
@@ -191,6 +218,10 @@ export class MarketingDashboardService {
         clients: clientBirthdaySummary,
         employees: employeeBirthdaySummary,
         companies: companyAnniversarySummary,
+      },
+      aiUsage: {
+        competence: `${competence.getUTCFullYear()}-${String(competence.getUTCMonth() + 1).padStart(2, "0")}`,
+        pendingKnowledge,
       },
       alerts,
     });

@@ -20,6 +20,8 @@ Não inclui as demais entregas das issues #1546–#1548, nem importação de out
 
 ## Modelo e regras
 
+Alvos unitários também precisam estar ativos e vinculados à organização diretamente ou por departamento.
+
 Adicionar `MarketingAiUsageControl` no schema Prisma usado pelo `marketing-service`, com organização, usuário, competência (primeiro dia do mês) e as cinco respostas opcionais. A frequência aceita inteiros de 1 a 10. Índice único em organização, usuário e competência será a garantia final de não duplicidade. Usuário e competência devem pertencer à organização do registro.
 
 Campos sem resposta ficam `NULL`; não converter ausência em `false`, zero ou texto vazio. Um controle está pendente enquanto qualquer resposta estiver ausente. “Sem integração” conta apenas resposta explícita `false`; resposta ausente permanece pendente e não é inferida.
@@ -30,7 +32,7 @@ O dashboard conta conhecimento sem resposta na competência corrente calculada p
 
 ## API e interface
 
-Adicionar rotas no `marketing-service` para criar um controle, criar em lote, consultar controles por competência, atualizar respostas e consultar resumo de pendências. Validar body e parâmetros com Zod; derivar organização e permissão da sessão encaminhada, nunca de `organization_id` fornecido pelo cliente. Usar as respostas de sucesso/erro já padronizadas no serviço.
+Adicionar rotas no `marketing-service` para listar usuários elegíveis, criar um controle, criar em lote, consultar controles por competência, atualizar respostas e consultar resumo de pendências. Leitura exige permissão de visualização Marketing (nível 1); mutações exigem permissão de edição (nível 2). Validar body e parâmetros com Zod; derivar organização e permissão da sessão encaminhada, nunca de `organization_id` fornecido pelo cliente. Usar as respostas de sucesso/erro já padronizadas no serviço.
 
 Estender o dashboard Marketing com o indicador de conhecimento pendente e acrescentar a tela de pesquisas dentro do módulo Marketing existente. A interface terá competência, criação unitária/lote, lista, edição de respostas e estados reais de carregamento, erro, vazio e duplicidade. Preservar os padrões visuais e componentes do dashboard existente.
 
