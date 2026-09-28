@@ -48,7 +48,12 @@ test("imports an edition and relational budget only through one prepared legacy 
     },
     marketing_communication: { abertura: [], divulgacao: ["Rede social"], acessoria: [], site: [] },
     during_event: { recepcao: [], staff: [], programacao: ["Palestra"], feedback: [] },
-    after_event: { avaliacao: [], agradecimento: ["Enviar agradecimento"], relatorio: [], followup: [] },
+    after_event: {
+      avaliacao: [],
+      agradecimento: ["Enviar agradecimento"],
+      relatorio: [],
+      followup: [],
+    },
     notes: "Confirmar horário",
   });
   assert.deepEqual(
@@ -63,9 +68,14 @@ test("imports an edition and relational budget only through one prepared legacy 
       { legacy_id: "budget-a2", name: "Som", amount: "348.00", position: 1 },
     ],
   );
-  assert.ok(result.budgetItems.every(({ id, edition_id, organization_id }) =>
-    /^[0-9a-f-]{36}$/u.test(id) && edition_id === result.edition.id && organization_id === result.edition.organization_id,
-  ));
+  assert.ok(
+    result.budgetItems.every(
+      ({ id, edition_id, organization_id }) =>
+        /^[0-9a-f-]{36}$/u.test(id) &&
+        edition_id === result.edition.id &&
+        organization_id === result.edition.organization_id,
+    ),
+  );
 });
 
 test("quarantines ambiguous, missing, or unprepared event links for reconciliation", () => {

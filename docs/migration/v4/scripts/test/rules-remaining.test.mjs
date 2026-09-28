@@ -2103,7 +2103,8 @@ test("cada regra declara os campos efetivamente emitidos pelo contrato atual", (
   for (const mappingRule of REMAINING_RULES) {
     const actual = [
       ...new Set(
-        mappingRule.destinations.flatMap(({ columns }) => columns)
+        mappingRule.destinations
+          .flatMap(({ columns }) => columns)
           .filter(({ status }) => status === "mapped")
           .map(({ destinationColumn }) => destinationColumn),
       ),
