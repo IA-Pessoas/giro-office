@@ -26,12 +26,16 @@ model Icms {
 }
 
 model Client {
-  id              String @id
-  name            String
-  company_name    String?
-  cpf_cnpj        String
-  organization_id String
-  type            String
+  id                String    @id
+  name              String
+  company_name      String?
+  cpf_cnpj          String
+  organization_id   String
+  type              String
+  status            String
+  competence_output DateTime?
+  regime            String?
+  fiscal            Boolean?
 
   @@map("clients")
 }

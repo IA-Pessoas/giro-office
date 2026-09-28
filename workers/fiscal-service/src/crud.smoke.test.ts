@@ -315,6 +315,69 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     expect(after.data.data[0].amount).toBe("999.1");
   });
 
+  it("lote do Simples: CSV com elegíveis e motivo dos ignorados", async () => {
+    const document = `91${suffix}0001`;
+    const eligible = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Lote ${suffix}`,
+      company_name: `Smoke Lote ${suffix} Ltda`,
+      cpf_cnpj: document,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+    });
+    const presumido = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Presumido ${suffix}`,
+      cpf_cnpj: `92${suffix}0001`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Lucro Presumido",
+    });
+    // Mesmo documento, elegível, em outra organização: não pode entrar no lote.
+    const otherOrganization = await smokeInsert("organizations", { id: randomUUID() });
+    await smokeInsert("clients", {
+      id: randomUUID(),
+      organization_id: String(otherOrganization.id),
+      name: `Smoke Outra Org ${suffix}`,
+      cpf_cnpj: `93${suffix}0001`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+    });
+    expectOk(
+      await call("POST", "/fiscal/revenues", {
+        client_id: String(eligible.id),
+        competence: "2026-07",
+        amount: "11000.00",
+      }),
+      "POST receita do lote",
+    );
+
+    const exported = expectOk(
+      await call("POST", "/fiscal/simples/csv", {
+        competence: "2026-08",
+        annex: "III",
+        documents: [document, String(presumido.cpf_cnpj), `93${suffix}0001`],
+      }),
+      "POST /fiscal/simples/csv",
+    );
+    // RBT12 = 11.000 + 1.000 = 12.000 (1ª faixa): ISS 2,01%.
+    expect(exported.data.csv).toContain(`Smoke Lote ${suffix} Ltda;${document};2,01`);
+    expect(exported.data.skipped).toEqual([
+      {
+        document: String(presumido.cpf_cnpj),
+        client_name: `Smoke Presumido ${suffix}`,
+        reason: "Cliente fora do Simples Nacional.",
+      },
+      {
+        document: `93${suffix}0001`,
+        client_name: null,
+        reason: "Cliente não encontrado nesta organização.",
+      },
+    ]);
+  });
+
   it("reporting interno: catálogo e extract de cada fonte com todos os campos", async () => {
     expectOk(
       await call(

@@ -315,3 +315,24 @@ await runTest("fiscal Simples preview emits one PDF per annex with the limited r
   assert.match(client, /error\.response\?\.data instanceof Blob/);
   assert.match(client, /error\.response\.data = JSON\.parse\(await error\.response\.data\.text\(\)\)/);
 });
+
+await runTest("fiscal Simples batch parses pasted documents and exports CSV for editors", async () => {
+  const { nextCompetence, parseBatchDocuments } = await import("./utils/fiscalRevenue.ts");
+  assert.deepEqual(parseBatchDocuments(" 12.345.678/0001-90\r\n\n44444444444; 99999999000199,\n"), [
+    "12.345.678/0001-90",
+    "44444444444",
+    "99999999000199",
+  ]);
+  assert.equal(nextCompetence("2026-12"), "2027-01");
+
+  const batch = await readSource("./components/FiscalSimplesBatchSection.tsx");
+  const client = await readSource("./services/fiscalRevenueService.ts");
+  assert.match(fiscalSources.shell, /\{canEdit \? <FiscalSimplesBatchSection \/> : null\}/);
+  assert.match(client, /api\.post\("\/fiscal\/simples\/csv", payload\)/);
+  // Validação local, ignorados com motivo e nenhum arquivo quando ninguém entra.
+  assert.match(batch, /Informe ao menos um CPF\/CNPJ, um por linha\./);
+  assert.match(batch, /\{item\.reason\}/);
+  assert.match(batch, /if \(batch\.included\.length > 0\) \{\s*downloadFile\(new Blob\(\[batch\.csv\]/);
+  assert.match(batch, /nenhum arquivo gerado/);
+  assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
+});

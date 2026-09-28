@@ -252,6 +252,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "baixou", item: "um PDF de alíquota do Simples" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/simples\/csv$/,
+    description: { action: "exportou", item: "um CSV de alíquotas do Simples em lote" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
     description: { action: "consultou", item: "um job de relatório" },

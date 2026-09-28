@@ -935,6 +935,47 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/simples/csv": {
+        post: {
+          tags: ["Receitas"],
+          summary: "Exportar CSV de alíquotas do Simples em lote",
+          description:
+            "Para cada CPF/CNPJ informado, inclui o cliente da organização com Fiscal habilitado, ativo no mês da alíquota (status Ativo ou saída nesse mês ou depois) e no Simples Nacional, desde que haja alíquota válida no anexo. O CSV usa ponto e vírgula, colunas Razão Social;CPF/CNPJ;% (vírgula decimal, limites de emissão) e protege textos contra fórmulas. Os demais vêm em skipped com o motivo.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["competence", "annex", "documents"],
+                  additionalProperties: false,
+                  properties: {
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    annex: { type: "string", enum: ["I", "II", "III", "IV", "V"] },
+                    documents: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 500,
+                      items: { type: "string", maxLength: 20 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "CSV do lote (campo csv), nome do arquivo, incluídos e ignorados",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
       "/fiscal/revenues/{id}": {
         put: {
           tags: ["Receitas"],
