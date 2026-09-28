@@ -146,7 +146,7 @@ function FiscalActiveTabPanel({
   }
 
   if (activeTab === "revenues") {
-    return <div role="tabpanel" id="fiscal-panel-revenues" aria-labelledby="fiscal-tab-revenues"><FiscalRevenuesSection canEdit={canEdit} />{canEdit ? <FiscalSimplesBatchSection /> : null}</div>;
+    return <div role="tabpanel" id="fiscal-panel-revenues" aria-labelledby="fiscal-tab-revenues">{canEdit ? <FiscalSimplesBatchSection /> : null}<FiscalRevenuesSection canEdit={canEdit} /></div>;
   }
 
   return <FiscalIpiTab canEdit={canEdit} canDelete={canDelete} />;

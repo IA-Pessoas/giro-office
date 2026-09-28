@@ -17,7 +17,15 @@ import {
   nextCompetence,
   parseBatchDocuments,
 } from "../utils";
-import { FISCAL_FIELD_CONTROL_CLASSNAME, FISCAL_TEXTAREA_CLASSNAME } from "./fiscalFieldStyles";
+import {
+  FISCAL_FIELD_CONTROL_CLASSNAME,
+  FISCAL_FIELD_ERROR_CLASSNAME,
+  FISCAL_PRIMARY_BUTTON_CLASSNAME,
+  FISCAL_SECONDARY_BUTTON_CLASSNAME,
+  FISCAL_TEXTAREA_CLASSNAME,
+  INVALID_COMPETENCE_MESSAGE,
+  isCompetence,
+} from "./fiscalFieldStyles";
 
 const ANNEX_OPTIONS: Array<{ value: FiscalSimplesAnnexRate["annex"]; label: string }> = [
   { value: "I", label: "Anexo I · ICMS" },
@@ -64,6 +72,7 @@ export function FiscalSimplesBatchSection() {
   });
 
   async function submitExport(kind: ExportKind) {
+    if (!isCompetence(competence)) return;
     const documents = parseBatchDocuments(documentsText);
     if (documents.length === 0) {
       setDocumentsError("Informe ao menos um CPF/CNPJ, um por linha.");
@@ -89,27 +98,34 @@ export function FiscalSimplesBatchSection() {
   }
 
   return (
-    <section className="mt-8 space-y-4 border-t border-gray-200 pt-6 dark:border-slate-700">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Emissão em lote</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Entram os clientes com Fiscal habilitado, ativos no mês da alíquota e no Simples Nacional. Os demais aparecem abaixo com o motivo.
-        </p>
-      </div>
+    // Operação da organização inteira: recolhível no topo da aba, fora do fluxo de um cliente.
+    <details className="group mb-6 rounded-xl border border-gray-200 p-4 dark:border-slate-700">
+      <summary className="cursor-pointer list-none">
+        <h2 className="inline text-lg font-semibold text-gray-900 dark:text-white">Emissão em lote</h2>
+        <span className="ml-2 text-sm text-blue-700 group-open:hidden dark:text-blue-300">Abrir</span>
+        <span className="block text-sm text-gray-600 dark:text-gray-400">
+          CSV ou PDFs (ZIP) para uma lista de CPF/CNPJ. Entram os clientes com Fiscal habilitado, ativos no mês da alíquota e no Simples Nacional; os demais aparecem com o motivo.
+        </span>
+      </summary>
+      <div className="mt-4 space-y-4">
       <form noValidate onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         void submitExport("csv");
       }} className="grid gap-4 rounded-xl border border-gray-200 p-4 md:grid-cols-[1fr_1fr_2fr] dark:border-slate-700">
         <label className="grid content-start gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
           Competência de apuração
-          <input type="month" required value={competence} onChange={(event) => setCompetence(event.target.value)} className={FISCAL_FIELD_CONTROL_CLASSNAME} />
-          <span className="text-xs font-normal text-gray-600 dark:text-gray-400">
-            Alíquota para {/^\d{4}-\d{2}$/.test(competence) ? formatCompetenceLabel(nextCompetence(competence)) : "—"}
-          </span>
+          <input type="month" required value={competence} onChange={(event) => { setCompetence(event.target.value); setResult(null); }} aria-invalid={isCompetence(competence) ? undefined : true} aria-describedby="fiscal-simples-batch-competence-hint" className={FISCAL_FIELD_CONTROL_CLASSNAME} />
+          {isCompetence(competence) ? (
+            <span id="fiscal-simples-batch-competence-hint" className="text-xs font-normal text-gray-600 dark:text-gray-400">
+              Alíquota para {formatCompetenceLabel(nextCompetence(competence))}
+            </span>
+          ) : (
+            <span id="fiscal-simples-batch-competence-hint" role="alert" className={FISCAL_FIELD_ERROR_CLASSNAME}>{INVALID_COMPETENCE_MESSAGE}</span>
+          )}
         </label>
         <label className="grid content-start gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
           Anexo
-          <select value={annex} onChange={(event) => setAnnex(event.target.value as FiscalSimplesAnnexRate["annex"])} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
+          <select value={annex} onChange={(event) => { setAnnex(event.target.value as FiscalSimplesAnnexRate["annex"]); setResult(null); }} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
             {ANNEX_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
@@ -123,14 +139,14 @@ export function FiscalSimplesBatchSection() {
             aria-describedby={documentsError ? "fiscal-simples-batch-documents-error" : undefined}
             className={FISCAL_TEXTAREA_CLASSNAME}
           />
-          {documentsError ? <span id="fiscal-simples-batch-documents-error" role="alert" className="text-xs font-normal text-red-600">{documentsError}</span> : null}
+          {documentsError ? <span id="fiscal-simples-batch-documents-error" role="alert" className={FISCAL_FIELD_ERROR_CLASSNAME}>{documentsError}</span> : null}
         </label>
         <div className="md:col-span-3">
           <div className="flex flex-wrap gap-3">
-            <button type="submit" disabled={exportBatch.isPending} className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={exportBatch.isPending} className={FISCAL_PRIMARY_BUTTON_CLASSNAME}>
               {exportBatch.isPending && exportBatch.variables?.kind === "csv" ? EXPORTS.csv.pending : EXPORTS.csv.label}
             </button>
-            <button type="button" disabled={exportBatch.isPending} onClick={() => void submitExport("zip")} className="h-10 rounded-lg border border-blue-600 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-900/20">
+            <button type="button" disabled={exportBatch.isPending} onClick={() => void submitExport("zip")} className={FISCAL_SECONDARY_BUTTON_CLASSNAME}>
               {exportBatch.isPending && exportBatch.variables?.kind === "zip" ? EXPORTS.zip.pending : EXPORTS.zip.label}
             </button>
           </div>
@@ -138,8 +154,8 @@ export function FiscalSimplesBatchSection() {
       </form>
 
       {result ? (
-        <div className="space-y-3" role="status">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+        <div className="space-y-3">
+          <p role="status" className="text-sm text-gray-700 dark:text-gray-300">
             {result.included.length} cliente(s) no arquivo · {result.skipped.length} ignorado(s)
           </p>
           {result.skipped.length ? (
@@ -161,6 +177,7 @@ export function FiscalSimplesBatchSection() {
           ) : null}
         </div>
       ) : null}
-    </section>
+      </div>
+    </details>
   );
 }

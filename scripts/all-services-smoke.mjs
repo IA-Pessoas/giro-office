@@ -4022,6 +4022,9 @@ const handlers = {
         type: "PJ",
         type_registration: "Novo",
         service_unique: false,
+        // Elegível para as alíquotas do Simples (fiscalSimplesPdf).
+        fiscal: true,
+        regime: "Simples Nacional",
       },
     });
     if (isBadExpectation(op)) {

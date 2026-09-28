@@ -55,6 +55,8 @@ export function createSimplesRateRoutes(service: SimplesRateRouteDeps): ReturnTy
     },
   );
 
+  // Prévia e PDF de um cliente são consulta (leitura Fiscal); exportar o lote da organização
+  // em CSV/ZIP é operação de emissão e exige edição, como no Worker (método POST).
   router.post(
     "/simples/csv",
     isAuthenticated,
