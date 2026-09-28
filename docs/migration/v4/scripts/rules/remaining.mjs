@@ -95,6 +95,8 @@ const TRIAGE_ACTIVE_COLUMNS = Object.freeze([
   "cte_emitente",
   "prestadas_mei",
 ]);
+const MARKETING_EVENT_STATUSES = new Set(["Novo", "Em andamento", "Concluído", "Descontinuado"]);
+const MARKETING_EVENT_PRIORITIES = new Set(["Baixa", "Média", "Alta"]);
 
 // As projeções deste domínio são centralizadas em projectRemainingRow para preservar
 // as decisões auditadas de contexto, quarentena e payload.
@@ -305,6 +307,19 @@ export function buildMarketingPasswordContexts({ rows, encryptionConfigured }) {
   });
 }
 
+export function buildMarketingEventContexts({ rows }) {
+  const sourceTable = "tb_mkt.eventos";
+  const nameCounts = new Map();
+  for (const row of rows) {
+    const key = marketingEventNameKey(row?.nome);
+    if (key) nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+  }
+  return issueContexts("mkt-event", sourceTable, rows, (row) => {
+    const key = marketingEventNameKey(row?.nome);
+    return { duplicateName: Boolean(key && nameCounts.get(key) > 1) };
+  });
+}
+
 export function buildMarketingSocialContexts({ rows, clientResolver }) {
   assertAuditedCorpus("tb_mkt.redes_sociais", rows);
   const entries = authoritativeClientEntries(rows, clientResolver);
@@ -437,6 +452,25 @@ export function mapWorkspaceMessageType(value, attachmentState = {}) {
 
 export const REMAINING_RULES = Object.freeze(
   [
+    createRule({
+      sourceTable: "tb_mkt.eventos",
+      domain: "marketing",
+      stepId: "mkt-event-insert",
+      destinationTable: "mtk.events",
+      columns: [
+        mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
+        mapped("id", "legacy_id", "preserve_legacy_numeric_identity"),
+        mapped("nome", "name", "trim_required_text"),
+        mapped("nome", "name_key", "normalize_mysql_general_ci_unique_key"),
+        mapped("logo", "logo", "preserve_optional_logo_or_empty_default"),
+        mapped("status", "status", "preserve_legacy_status_enum"),
+        mapped("prioridade", "priority", "preserve_legacy_priority_enum"),
+        mapped("objetivo", "objective", "preserve_text_or_empty_default"),
+        mapped("publico", "audience", "preserve_text_or_empty_default"),
+      ],
+      defaults: { logo: "", status: "Novo", objective: "", audience: "" },
+      classify: classifyMarketingEvent,
+    }),
     createRule({
       sourceTable: "tb_cbc.emails",
       domain: "shared-email",
@@ -979,6 +1013,37 @@ function classifyStockEntry(row, context) {
   ]);
 }
 
+function classifyMarketingEvent(row, context) {
+  const bound = authenticContext("tb_mkt.eventos", row, context);
+  if (bound.status !== "prepared") return bound;
+  const name = normalizeRequiredScalarText(row?.nome);
+  const status = normalizeText(row?.status) ?? "Novo";
+  const priority = normalizeRequiredScalarText(row?.prioridade);
+  return firstFailure([
+    validId(row?.id, "id", "MKT_EVENT_ID_INVALID"),
+    typeof name === "string" && name.length > 0 && name.length <= 50
+      ? prepared()
+      : quarantine("nome", "MKT_EVENT_NAME_INVALID"),
+    typeof row?.logo === "string" && row.logo.length <= 100
+      ? prepared()
+      : row?.logo == null
+        ? prepared()
+        : quarantine("logo", "MKT_EVENT_LOGO_INVALID"),
+    MARKETING_EVENT_STATUSES.has(status)
+      ? prepared()
+      : quarantine("status", "MKT_EVENT_STATUS_INVALID"),
+    MARKETING_EVENT_PRIORITIES.has(priority)
+      ? prepared()
+      : quarantine("prioridade", "MKT_EVENT_PRIORITY_INVALID"),
+    [row?.objetivo, row?.publico].every((value) => value == null || typeof value === "string")
+      ? prepared()
+      : quarantine("objetivo", "MKT_EVENT_TEXT_INVALID"),
+    context.resolutions.duplicateName === true
+      ? quarantine("nome", "MKT_EVENT_NAME_AMBIGUOUS")
+      : prepared(),
+  ]);
+}
+
 function classifyStockLocation(row, context) {
   const bound = authenticContext("tb_cbs.estoque_localizacoes", row, context);
   if (bound.status !== "prepared") return bound;
@@ -1390,6 +1455,21 @@ function projectPreparedPayload(sourceTable, row, context) {
         id: resolvedIdentityId(context, "client"),
         instagram: normalizeNullableText(row?.instagram),
       });
+    case "tb_mkt.eventos": {
+      const name = normalizeRequiredScalarText(row?.nome);
+      return Object.freeze({
+        id,
+        organization_id: ORGANIZATION_ID,
+        legacy_id: Number(row.id),
+        name,
+        name_key: marketingEventNameKey(name),
+        logo: normalizeNullableText(row?.logo) ?? "",
+        status: normalizeText(row?.status) ?? "Novo",
+        priority: normalizeRequiredScalarText(row?.prioridade),
+        objective: normalizeNullableText(row?.objetivo) ?? "",
+        audience: normalizeNullableText(row?.publico) ?? "",
+      });
+    }
     case "tb_mkt.senhas":
       return Object.freeze({
         id,
@@ -2062,6 +2142,14 @@ function normalizeLegacyFloor(value) {
 
 function normalizeText(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function marketingEventNameKey(value) {
+  return String(value ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
 }
 
 function normalizeNullableText(value) {

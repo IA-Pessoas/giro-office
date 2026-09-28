@@ -1,6 +1,6 @@
 # marketing-service
 
-Serviço somente de leitura para o dashboard inicial de Marketing.
+Serviço do dashboard inicial e cadastro de eventos de Marketing.
 
 ## Porta local
 

@@ -3,6 +3,7 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 export enum MarketingPermissionLevel {
   Viewer = 1,
+  Editor = 2,
 }
 
 export function requireMarketingPermission(minimum: MarketingPermissionLevel): RequestHandler {

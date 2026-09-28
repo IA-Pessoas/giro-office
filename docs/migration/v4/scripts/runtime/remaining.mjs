@@ -7,6 +7,7 @@ import {
   buildCbsStockEntryContexts,
   buildCbsStockExitContexts,
   buildCbsStockLocationContexts,
+  buildMarketingEventContexts,
   buildMarketingPasswordContexts,
   buildMarketingSocialContexts,
   buildPecNoteContexts,
@@ -267,6 +268,9 @@ function buildContextIndexes(rowsBySource, options) {
       "tb_mkt.redes_sociais",
       buildMarketingSocialContexts({ rows: rows("tb_mkt.redes_sociais"), clientResolver }),
     );
+  }
+  if (has("tb_mkt.eventos")) {
+    register("tb_mkt.eventos", buildMarketingEventContexts({ rows: rows("tb_mkt.eventos") }));
   }
   if (has("tb_mkt.senhas")) {
     register(

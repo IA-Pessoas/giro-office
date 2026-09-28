@@ -1,6 +1,17 @@
 const CONFIRMED = new Map(
   [
     [
+      "tb_mkt.eventos",
+      [
+        "infra/prisma/schema.prisma:1749",
+        "services/marketing-service/src/services/marketingEventsService.ts:24",
+      ],
+      "O cadastro legado de eventos possui destino atual equivalente em mtk.events; os campos de cadastro são preservados e a prioridade segue obrigatória como no formulário legado.",
+      [
+        "O backup V4 tem escopo do tenant Castelo definido pelo contrato de migração; nomes repetidos sob a collation legado são enviados à quarentena com sourceTable, id legado e motivo.",
+      ],
+    ],
+    [
       "tb_cbc.emails",
       ["infra/prisma/schema.prisma:910", "services/src/src/services/EmailService.ts:50"],
       "A lista de destinatários e os dois gatilhos de envio possuem contrato atual equivalente.",
