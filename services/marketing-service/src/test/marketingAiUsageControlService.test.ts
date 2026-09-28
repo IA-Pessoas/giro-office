@@ -243,4 +243,30 @@ describe("MarketingAiUsageControlService", () => {
       skipDuplicates: true,
     });
   });
+
+  it("deduplica registros de reconciliação repetidos no mesmo lote", async () => {
+    const unmatchedRecord = {
+      legacyUserId: "legacy-ambiguous",
+      competence: "2026-04",
+      knowledge: null,
+      integration: null,
+      frequency: null,
+      purpose: null,
+      perceived_gain: null,
+    };
+
+    await service.importLegacyRecords(organizationId, [unmatchedRecord, unmatchedRecord]);
+
+    expect(prisma.marketingAiUsageImportReconciliation.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          organization_id: organizationId,
+          legacy_user_id: "legacy-ambiguous",
+          legacy_competence: "2026-04",
+          status: "pending",
+        }),
+      ],
+      skipDuplicates: true,
+    });
+  });
 });

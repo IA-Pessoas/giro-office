@@ -190,13 +190,22 @@ export class MarketingAiUsageControlService {
       });
     }
 
+    const uniqueReconciliation = [
+      ...new Map(
+        reconciliation.map((record) => [
+          JSON.stringify([record.organization_id, record.legacy_user_id, record.legacy_competence]),
+          record,
+        ]),
+      ).values(),
+    ];
+
     const [created, staged] = await Promise.all([
       importable.length
         ? this.prisma.marketingAiUsageControl.createMany({ data: importable, skipDuplicates: true })
         : Promise.resolve({ count: 0 }),
-      reconciliation.length
+      uniqueReconciliation.length
         ? this.prisma.marketingAiUsageImportReconciliation.createMany({
-            data: reconciliation,
+            data: uniqueReconciliation,
             skipDuplicates: true,
           })
         : Promise.resolve({ count: 0 }),
