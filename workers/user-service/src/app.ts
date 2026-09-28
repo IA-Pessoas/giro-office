@@ -16,7 +16,7 @@ import {
   serializeError,
 } from "@workspace/shared/http";
 import { zodIssueMessage } from "@workspace/shared/schemas";
-import { Hono, type MiddlewareHandler } from "hono";
+import { type Context, Hono, type MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError } from "zod";
 import { loginBodySchema } from "../../../services/user-service/src/schemas/auth.schemas.js";
@@ -37,6 +37,7 @@ import {
   updatePlatformUserBodySchema,
 } from "../../../services/user-service/src/schemas/platformUsers.schemas.js";
 import {
+  adminSetPasswordBodySchema,
   confirmPasswordResetBodySchema,
   createUserBodySchema,
   listUsersQuerySchema,
@@ -73,9 +74,8 @@ import {
 } from "./passwordHash.js";
 import {
   confirmPasswordReset,
-  httpPasswordResetEmailSender,
-  issuePasswordReset,
   type PasswordResetEmailSender,
+  setUserPassword,
 } from "./passwordReset.js";
 import type { Row, UserPrismaClient } from "./types.js";
 
@@ -2189,7 +2189,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       if (body.password !== undefined && auth.userId !== id) {
         throw new ServiceError(
           403,
-          "Administradores não definem a senha de outro usuário. Envie um link de redefinição.",
+          "Use a redefinição de senha do usuário para definir a senha de outra pessoa.",
         );
       }
       const ownPasswordChange = body.password !== undefined;
@@ -2237,35 +2237,27 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
     }),
   );
 
-  /** Pedido de link (#1342): o alvo já passou pela checagem de tenant e de hierarquia. */
-  async function sendPasswordResetLink(
-    c: { env: UserWorkerEnv; json: (body: unknown) => Response },
+  /** O TI define a nova senha; o alvo já passou pela checagem de tenant e de hierarquia. */
+  async function setPasswordByAdmin(
+    c: Context<HonoEnv>,
     db: UserPrismaClient,
     targetWhere: Record<string, unknown>,
     actor: Pick<UserAuditParams, "actorUserId" | "platformActorUserId" | "organizationId">,
     assertTarget: (target: Row) => void = () => {},
   ): Promise<Response> {
-    const target = await db.user.findFirst({
-      where: targetWhere,
-      select: { ...userSelect(), email: true },
-    });
+    const { password } = parse(adminSetPasswordBodySchema, await jsonBody(c));
+    const target = await db.user.findFirst({ where: targetWhere, select: userSelect() });
     if (!target) throw new ServiceError(404, "Usuário não encontrado.");
     assertTarget(target);
-    const { expiresAt, deliver } = await issuePasswordReset(
-      db,
-      target,
-      envOf(c, options),
-      options.sendPasswordResetEmail ?? httpPasswordResetEmailSender(envOf(c, options)),
-    );
+    await setUserPassword(db, target, password, options.hashPassword ?? defaultHashPassword);
     await options.audit?.({
       ...actor,
-      action: "PASSWORD_RESET_REQUESTED",
+      action: "PASSWORD_SET_BY_ADMIN",
       referring: "user",
       referringId: String(target.id),
-      changes: { expires_at: expiresAt.toISOString() },
+      changes: {},
     });
-    await deliver();
-    return c.json(createSuccessResponse({ sent: true, expires_at: expiresAt.toISOString() }));
+    return c.json(createSuccessResponse({ reset: true }));
   }
 
   app.post("/user/password-reset/confirm", async (c) =>
@@ -2294,7 +2286,9 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       requireManageUsers(auth);
       await requireCsrf(c.req.raw, auth);
       const { id } = parse(userIdParamsSchema, c.req.param());
-      return sendPasswordResetLink(
+      // A própria senha passa pelo perfil, que exige a senha atual.
+      if (id === auth.userId) throw new ServiceError(403, "Altere a sua senha pelo perfil.");
+      return setPasswordByAdmin(
         c,
         db,
         organizationUserWhere(id, auth.organizationId),
@@ -2309,7 +2303,7 @@ export function createUserWorkerApp(options: UserWorkerOptions = {}) {
       const { auth } = await platformContext(c, options, db);
       await requireCsrf(c.req.raw, auth);
       const { organizationId, userId } = parse(platformOrganizationUserParamsSchema, c.req.param());
-      return sendPasswordResetLink(c, db, organizationUserWhere(userId, organizationId), {
+      return setPasswordByAdmin(c, db, organizationUserWhere(userId, organizationId), {
         platformActorUserId: auth.userId,
         organizationId,
       });

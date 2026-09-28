@@ -150,9 +150,9 @@ export const userService = {
     return extractUser(response.data);
   },
 
-  sendPasswordReset: async (id: string): Promise<void> => {
+  resetPassword: async (id: string, password: string): Promise<void> => {
     const api = setupAPIClient();
-    await api.post(`/user/${id}/password-reset`);
+    await api.post(`/user/${id}/password-reset`, { password });
   },
 };
 
