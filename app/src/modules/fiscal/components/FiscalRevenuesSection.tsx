@@ -126,11 +126,11 @@ export function FiscalRevenuesSection({ canEdit }: { canEdit: boolean }) {
             />
             {amountError ? <span id="fiscal-revenue-amount-error" role="alert" className="text-xs font-normal text-red-600">{amountError}</span> : null}
           </label>
-          <button type="submit" disabled={save.isPending} className="h-10 self-end rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:mt-6">
+          <button type="submit" disabled={save.isPending} className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:mt-6">
             {save.isPending ? "Salvando..." : editing ? "Salvar correção" : "Registrar receita"}
           </button>
           {editing ? (
-            <button type="button" onClick={resetForm} className="h-10 self-end rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 md:mt-6 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-800">
+            <button type="button" onClick={resetForm} className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 md:mt-6 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-800">
               Cancelar
             </button>
           ) : null}
