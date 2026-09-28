@@ -1,6 +1,6 @@
 import { useFetch } from "@shared/hooks";
 import { toast } from "@shared/services/toast";
-import { Download, Loader2 } from "lucide-react";
+import { AlertCircle, Download, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import { fiscalSimplesPreviewQueryKey } from "../hooks/queryKeys";
@@ -13,7 +13,14 @@ import {
   formatRevenueAmount,
   getFiscalErrorMessage,
 } from "../utils";
-import { FISCAL_FIELD_CONTROL_CLASSNAME } from "./fiscalFieldStyles";
+import {
+  FISCAL_FIELD_CONTROL_CLASSNAME,
+  FISCAL_FIELD_ERROR_CLASSNAME,
+  FISCAL_SECONDARY_BUTTON_CLASSNAME,
+  INVALID_COMPETENCE_MESSAGE,
+  isCompetence,
+} from "./fiscalFieldStyles";
+import { FiscalStateBox } from "./FiscalStateBox";
 
 export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) {
   // Apuração do mês anterior: a alíquota emitida vale para o mês atual.
@@ -22,9 +29,10 @@ export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) 
   const preview = useFetch(
     [...fiscalSimplesPreviewQueryKey(clientId, competence)],
     () => fiscalRevenueService.simplesPreview(clientId, competence),
-    { enabled: /^\d{4}-\d{2}$/.test(competence) },
+    { enabled: isCompetence(competence) },
   );
-  const data = preview.data;
+  const data = isCompetence(competence) ? preview.data : undefined;
+  const missingMonths = data?.months.filter((month) => !month.registered).length ?? 0;
 
   async function emitPdf(item: FiscalSimplesAnnexRate) {
     setEmitting(item.annex);
@@ -52,12 +60,33 @@ export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) 
       </div>
       <label className="grid max-w-xs gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
         Competência de apuração
-        <input type="month" required value={competence} onChange={(event) => setCompetence(event.target.value)} aria-describedby="fiscal-simples-applies-to" className={FISCAL_FIELD_CONTROL_CLASSNAME} />
-        {data ? <span id="fiscal-simples-applies-to" className="text-xs font-normal text-gray-600 dark:text-gray-400">Alíquota emitida para {formatCompetenceLabel(data.applies_to)}</span> : null}
+        <input type="month" required value={competence} onChange={(event) => setCompetence(event.target.value)} aria-invalid={isCompetence(competence) ? undefined : true} aria-describedby="fiscal-simples-applies-to" className={FISCAL_FIELD_CONTROL_CLASSNAME} />
+        {isCompetence(competence) ? (
+          data ? <span id="fiscal-simples-applies-to" className="text-xs font-normal text-gray-600 dark:text-gray-400">Alíquota emitida para {formatCompetenceLabel(data.applies_to)}</span> : null
+        ) : (
+          <span id="fiscal-simples-applies-to" role="alert" className={FISCAL_FIELD_ERROR_CLASSNAME}>{INVALID_COMPETENCE_MESSAGE}</span>
+        )}
       </label>
 
-      {preview.isLoading ? <p role="status" className="text-sm text-gray-600">Calculando prévia...</p> : null}
-      {preview.error ? <p role="alert" className="text-sm text-red-600">{getFiscalErrorMessage(preview.error)}</p> : null}
+      {preview.isLoading ? (
+        <div role="status">
+          <FiscalStateBox icon={Loader2} tone="loading" title="Calculando prévia" compact>
+            Estamos somando as receitas dos 11 meses anteriores.
+          </FiscalStateBox>
+        </div>
+      ) : null}
+      {preview.error ? (
+        <div role="alert">
+          <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível calcular a prévia" compact>
+            {getFiscalErrorMessage(preview.error)}
+          </FiscalStateBox>
+        </div>
+      ) : null}
+      {data?.status === "ok" && missingMonths > 0 ? (
+        <p role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200">
+          {missingMonths === 1 ? "1 mês sem receita registrada entra" : `${missingMonths} meses sem receita registrada entram`} como zero no RBT12 e podem baixar a alíquota. Confira as receitas antes de emitir.
+        </p>
+      ) : null}
 
       {data ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
@@ -67,7 +96,7 @@ export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) 
               <thead className="bg-gray-50 text-gray-600 dark:bg-slate-800 dark:text-gray-300"><tr><th className="px-4 py-2">Competência</th><th className="px-4 py-2 text-right">Receita</th></tr></thead>
               <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
                 <tr className="text-gray-800 dark:text-gray-200">
-                  <td className="px-4 py-2">{formatCompetenceLabel(data.estimated_month.competence)} <span className="text-xs text-gray-500">(média estimada)</span></td>
+                  <td className="px-4 py-2">{formatCompetenceLabel(data.estimated_month.competence)} <span className="text-xs text-gray-500 dark:text-gray-400">(média estimada)</span></td>
                   <td className="px-4 py-2 text-right">{formatRevenueAmount(data.estimated_month.amount)}</td>
                 </tr>
                 {data.months.map((month) => (
@@ -84,7 +113,7 @@ export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) 
           </div>
 
           {data.status === "ok" ? (
-            <ul className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="grid content-start gap-3 sm:grid-cols-2">
               {data.annexes.map((item) => (
                 <li key={item.annex} className="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">Anexo {item.annex} · {item.tax}</p>
@@ -97,7 +126,7 @@ export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) 
                     <dt>Repartição {item.tax}</dt><dd className="text-right">{formatRatePercent(item.tax_share)}</dd>
                   </dl>
                   {item.emission_rate ? (
-                    <button type="button" onClick={() => void emitPdf(item)} disabled={emitting !== null} aria-label={`Emitir PDF do Anexo ${item.annex} (${item.tax})`} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-600 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-900/20">
+                    <button type="button" onClick={() => void emitPdf(item)} disabled={emitting !== null} aria-label={`Emitir PDF do Anexo ${item.annex} (${item.tax})`} className={`${FISCAL_SECONDARY_BUTTON_CLASSNAME} mt-3 w-full`}>
                       {emitting === item.annex ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                       Emitir PDF · {formatRatePercent(item.emission_rate)}
                     </button>

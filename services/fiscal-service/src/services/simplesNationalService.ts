@@ -16,7 +16,6 @@ interface AnnexTable {
 }
 
 const BRACKET_CEILINGS = [180_000, 360_000, 720_000, 1_800_000, 3_600_000, 4_800_000] as const;
-export const SIMPLES_RBT12_LIMIT = BRACKET_CEILINGS[BRACKET_CEILINGS.length - 1];
 
 export const SIMPLES_ANNEXES: Readonly<Record<SimplesAnnex, AnnexTable>> = {
   I: {

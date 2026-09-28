@@ -263,8 +263,8 @@ await runTest("fiscal revenue amount distinguishes informed zero from invalid in
 await runTest("fiscal revenues tab keeps loading, error, empty and validation states", async () => {
   const section = await readSource("./components/FiscalRevenuesSection.tsx");
   assert.match(fiscalSources.shell, /<FiscalRevenuesSection canEdit=\{canEdit\} \/>/);
-  assert.match(section, /role="status"[^>]*>Carregando receitas/);
-  assert.match(section, /list\.error \? <p role="alert"/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando receitas"/);
+  assert.match(section, /list\.error \? \(\s*<div role="alert">/);
   assert.match(section, /Nenhuma receita registrada para este cliente/);
   assert.match(section, /id="fiscal-revenue-amount-error" role="alert"/);
   assert.match(section, /if \(value === null\) \{\s*setAmountError/);
@@ -287,8 +287,11 @@ await runTest("fiscal Simples preview formats rates and shows base, states and t
   assert.match(preview, /fiscalSimplesPreviewQueryKey\(clientId, competence\)/);
   assert.match(queryKeys, /\[\.\.\.fiscalRevenuesQueryKey\(clientId\), "simples-preview", competence\]/);
   assert.match(revenues, /invalidateQueries\(\{ queryKey: fiscalRevenuesQueryKey\(/);
-  assert.match(preview, /role="status"[^>]*>Calculando prévia/);
-  assert.match(preview, /preview\.error \? <p role="alert"/);
+  assert.match(preview, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Calculando prévia"/);
+  assert.match(preview, /preview\.error \? \(\s*<div role="alert">/);
+  // Meses sem receita entram como zero: a prévia avisa antes da emissão.
+  assert.match(preview, /meses sem receita registrada entram/);
+  assert.match(preview, /aria-invalid=\{isCompetence\(competence\) \? undefined : true\}/);
   assert.match(preview, /\(média estimada\)/);
   assert.match(preview, /\(sem registro\)/);
   assert.match(preview, /RBT12/);

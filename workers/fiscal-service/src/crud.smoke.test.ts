@@ -232,6 +232,8 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       id: randomUUID(),
       name: `Smoke Receita ${suffix}`,
       status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
     });
     const clientId = String(client.id);
     const created = expectOk(

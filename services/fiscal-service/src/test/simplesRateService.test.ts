@@ -21,9 +21,15 @@ function dependencies(monthly = 15_000) {
         name: "Padaria",
         company_name: "Padaria Exemplo Ltda",
         cpf_cnpj: "12.345.678/0001-90",
+        fiscal: true as boolean | null,
+        status: "Ativo",
+        competence_output: null as Date | null,
+        regime: "Simples Nacional" as string | null,
       })),
     },
-    fiscalMonthlyRevenue: { findMany: vi.fn(async () => records) },
+    fiscalMonthlyRevenue: {
+      findMany: vi.fn(async () => records.map((record) => ({ ...record, client_id: clientId }))),
+    },
   };
 }
 
@@ -39,18 +45,18 @@ describe("SimplesRateService", () => {
 
     expect(prisma.client.findFirst).toHaveBeenCalledWith({
       where: { id: clientId, organization_id: organizationId },
-      select: { id: true, name: true, company_name: true, cpf_cnpj: true },
+      select: expect.objectContaining({ id: true, fiscal: true, regime: true }),
     });
     expect(prisma.fiscalMonthlyRevenue.findMany).toHaveBeenCalledWith({
       where: {
         organization_id: organizationId,
-        client_id: clientId,
+        client_id: { in: [clientId] },
         competence: {
           gte: new Date("2025-10-01T00:00:00.000Z"),
           lte: new Date("2026-08-01T00:00:00.000Z"),
         },
       },
-      select: { competence: true, amount: true },
+      select: { client_id: true, competence: true, amount: true },
     });
     expect(result).toMatchObject({
       client_id: clientId,
@@ -76,6 +82,29 @@ describe("SimplesRateService", () => {
       tax: "ISS",
       rate: "2.01",
     });
+  });
+
+  it("não emite carta do Simples para cliente fora do Simples ou sem Fiscal", async () => {
+    for (const [override, reason] of [
+      [{ regime: "Lucro Presumido" }, "Cliente fora do Simples Nacional."],
+      [{ fiscal: false }, "Fiscal não habilitado para o cliente."],
+      [{ status: "Inativo" }, "Cliente inativo em 10/2026."],
+    ] as const) {
+      const prisma = dependencies();
+      prisma.client.findFirst.mockResolvedValueOnce({
+        ...(await prisma.client.findFirst()),
+        ...override,
+      });
+      const service = new SimplesRateService(prisma as never);
+
+      await expect(
+        service.emission(
+          { client_id: clientId, competence: "2026-09", annex: "III" },
+          organizationId,
+        ),
+      ).rejects.toMatchObject({ statusCode: 422, message: reason });
+      expect(prisma.fiscalMonthlyRevenue.findMany).not.toHaveBeenCalled();
+    }
   });
 
   it("não emite sem base de receita", async () => {
