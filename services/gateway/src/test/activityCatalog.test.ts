@@ -84,6 +84,15 @@ describe("activityCatalog", () => {
     ["GET", "/reports/jobs/list", "consultou", "o histórico de relatórios"],
     ["POST", "/fiscal/rates", "cadastrou", "um novo registro de alíquota fiscal"],
     ["GET", "/fiscal/rates/list", "consultou", "a lista de registros de alíquotas fiscais"],
+    ["GET", "/triagem/fiscal-portfolio", "consultou", "a carteira fiscal mensal da Triagem"],
+    ["POST", "/fiscal/revenues", "cadastrou", "uma nova receita mensal"],
+    ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
+    [
+      "PUT",
+      "/fiscal/revenues/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "atualizou",
+      "uma receita mensal",
+    ],
     [
       "GET",
       "/fiscal/rates/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/pdf",

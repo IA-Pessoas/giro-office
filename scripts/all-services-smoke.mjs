@@ -4467,6 +4467,41 @@ const handlers = {
     });
   },
 
+  async fiscalRevenueCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-01",
+        amount: "12345.67",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalRevenueId =
+        pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    }
+  },
+
+  async fiscalRevenueCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { client_id: requireState("primaryClientId"), competence: "2026-02", amount: "-1" },
+    });
+  },
+
+  async fiscalRevenueList(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), from: "2025-02", to: "2026-01" },
+    });
+  },
+
+  async fiscalRevenueUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/revenues/${requireState("fiscalRevenueId")}`,
+      json: { amount: "12000.00" },
+    });
+  },
+
   async fiscalRatePdf(op) {
     await httpRequest(op, {
       path: `/fiscal/rates/${requireState("fiscalRateId")}/pdf`,
