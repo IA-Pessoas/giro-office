@@ -7,6 +7,7 @@ import {
   ArrowUpDown,
   CalendarDays,
   Check,
+  Loader2,
   MessageSquareText,
   RotateCcw,
   Search,
@@ -18,7 +19,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useAssignableUsers } from "@modules/rh";
 import { formatCpfCnpjInput } from "@shared/utils/inputFormatting";
 
-import { useContabilControlPortfolio } from "../hooks";
+import {
+  useContabilControlBootstrapMutation,
+  useContabilControlPortfolio,
+  usePatchContabilControlFieldMutation,
+} from "../hooks";
 import { getContabilErrorMessage } from "../services";
 import type {
   ContabilCompetence,
@@ -64,7 +69,7 @@ function uniqueSorted(values: string[]) {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right, "pt-BR"));
 }
 
-export function ContabilPortfolioSection() {
+export function ContabilPortfolioSection({ canEdit }: { canEdit: boolean }) {
   const [competence, setCompetence] = useState<ContabilCompetence>(getCurrentContabilCompetence());
   const [step, setStep] = useState<"companies" | "checklist" | "dashboard">("companies");
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
@@ -79,6 +84,10 @@ export function ContabilPortfolioSection() {
   const [onlyMine, setOnlyMine] = useState(false);
   const [progressSort, setProgressSort] = useState<ProgressSort>("none");
   const { user } = useAuth();
+  const patchMutation = usePatchContabilControlFieldMutation();
+  const bootstrapMutation = useContabilControlBootstrapMutation();
+  const [savingCells, setSavingCells] = useState<Set<string>>(() => new Set());
+  const [editError, setEditError] = useState<string | null>(null);
   const assignableUsersQuery = useAssignableUsers({
     enabled: step === "dashboard" && selectedItems.length > 0,
     module: "contabil",
@@ -142,6 +151,44 @@ export function ContabilPortfolioSection() {
   const SortIcon = { none: ArrowUpDown, asc: ArrowUp, desc: ArrowDown }[progressSort];
   const setFilter = (key: string, value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
+
+  // As mutations invalidam a carteira; a célula volta a ficar livre depois do refetch.
+  async function runCellEdit(cellKey: string, action: () => Promise<unknown>) {
+    setEditError(null);
+    setSavingCells((current) => new Set(current).add(cellKey));
+    try {
+      await action();
+    } catch (error) {
+      setEditError(getContabilErrorMessage(error));
+    } finally {
+      setSavingCells((current) => {
+        const next = new Set(current);
+        next.delete(cellKey);
+        return next;
+      });
+    }
+  }
+
+  function toggleChecklistField(
+    clientId: string,
+    control: ContabilControl,
+    field: ContabilControlChecklistField,
+  ) {
+    return runCellEdit(`${clientId}:${field}`, () =>
+      patchMutation.mutateAsync({
+        clientId,
+        competence,
+        controlId: control.id,
+        payload: { field, value: !control[field] },
+      }),
+    );
+  }
+
+  function startControl(clientId: string) {
+    return runCellEdit(`${clientId}:control`, () =>
+      bootstrapMutation.mutateAsync({ client_id: clientId, competence }),
+    );
+  }
 
   return (
     <section className="space-y-4" aria-labelledby="contabil-portfolio-title">
@@ -378,6 +425,11 @@ export function ContabilPortfolioSection() {
             </label>
             </div>
           </div>
+          {editError ? (
+            <ContabilStateBox icon={AlertCircle} tone="danger" title="Não foi possível salvar" compact>
+              {editError}
+            </ContabilStateBox>
+          ) : null}
           <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700">
             <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-slate-700">
               <thead className="bg-gray-50 align-bottom text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-800/70 dark:text-slate-400">
@@ -478,19 +530,63 @@ export function ContabilPortfolioSection() {
                         }[item.closing.status]}
                       </td>
                       <td className="px-3 py-3 text-gray-700 dark:text-slate-300">
-                        {item.control ? "Iniciado" : "—"}
+                        {item.control ? (
+                          "Iniciado"
+                        ) : canEdit ? (
+                          <button
+                            type="button"
+                            onClick={() => void startControl(item.client_id)}
+                            disabled={savingCells.has(`${item.client_id}:control`)}
+                            className="inline-flex items-center gap-1 font-semibold text-blue-700 hover:underline disabled:opacity-60 dark:text-blue-300"
+                          >
+                            {savingCells.has(`${item.client_id}:control`) ? (
+                              <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+                            ) : null}
+                            Iniciar
+                          </button>
+                        ) : (
+                          "—"
+                        )}
                       </td>
-                      {visibleChecklistFields.map((field) => (
-                        <td key={field.field} className="px-2 py-3">
-                          {!item.control ? (
-                            <span className="text-gray-400">—</span>
-                          ) : item.control[field.field] ? (
-                            <Check aria-label="Feito" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                          ) : (
-                            <X aria-label="Pendente" className="h-4 w-4 text-rose-500 dark:text-rose-400" />
-                          )}
-                        </td>
-                      ))}
+                      {visibleChecklistFields.map((field) => {
+                        const control = item.control;
+                        if (!control) {
+                          return (
+                            <td key={field.field} className="px-2 py-3">
+                              <span className="text-gray-400">—</span>
+                            </td>
+                          );
+                        }
+                        const done = control[field.field];
+                        const saving = savingCells.has(`${item.client_id}:${field.field}`);
+                        const icon = saving ? (
+                          <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-gray-400" />
+                        ) : done ? (
+                          <Check aria-hidden="true" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <X aria-hidden="true" className="h-4 w-4 text-rose-500 dark:text-rose-400" />
+                        );
+                        return (
+                          <td key={field.field} className="px-2 py-3">
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                role="checkbox"
+                                aria-checked={done}
+                                aria-label={`${field.label} — ${item.legal_name}`}
+                                title={done ? "Feito · clique para marcar pendente" : "Pendente · clique para marcar feito"}
+                                onClick={() => void toggleChecklistField(item.client_id, control, field.field)}
+                                disabled={saving}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent transition-colors hover:border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-wait dark:hover:border-slate-600 dark:hover:bg-slate-800"
+                              >
+                                {icon}
+                              </button>
+                            ) : (
+                              <span role="img" aria-label={done ? "Feito" : "Pendente"}>{icon}</span>
+                            )}
+                          </td>
+                        );
+                      })}
                       <td className="px-3 py-3 tabular-nums text-gray-700 dark:text-slate-300">
                         {progress < 0 ? (
                           "—"
