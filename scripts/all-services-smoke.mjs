@@ -4022,6 +4022,9 @@ const handlers = {
         type: "PJ",
         type_registration: "Novo",
         service_unique: false,
+        // Elegível para as alíquotas do Simples (fiscalSimplesPdf).
+        fiscal: true,
+        regime: "Simples Nacional",
       },
     });
     if (isBadExpectation(op)) {
@@ -4464,6 +4467,96 @@ const handlers = {
   async fiscalRateList(op) {
     await httpRequest(op, {
       query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async fiscalRevenueCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-01",
+        amount: "12345.67",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalRevenueId =
+        pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    }
+  },
+
+  async fiscalRevenueCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { client_id: requireState("primaryClientId"), competence: "2026-02", amount: "-1" },
+    });
+  },
+
+  async fiscalRevenueList(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), from: "2025-02", to: "2026-01" },
+    });
+  },
+
+  async fiscalSimplesPreview(op) {
+    const response = await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02" },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.status !== "ok") {
+      throw new Error(`prévia do Simples sem base: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSimplesPdf(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02", annex: "III" },
+      expectEnvelope: false,
+    });
+  },
+
+  async fiscalSimplesPdfInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02", annex: "VI" },
+    });
+  },
+
+  async fiscalSimplesCsv(op) {
+    const response = await httpRequest(op, {
+      json: { competence: "2026-02", annex: "III", documents: ["00000000000000"] },
+    });
+    if (!isBadExpectation(op) && typeof response.body?.data?.csv !== "string") {
+      throw new Error(`CSV do Simples sem conteúdo: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSimplesCsvInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { competence: "2026-02", annex: "III", documents: [] },
+    });
+  },
+
+  async fiscalSimplesZip(op) {
+    const response = await httpRequest(op, {
+      json: { competence: "2026-02", annex: "III", documents: ["00000000000000"] },
+    });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data?.skipped)) {
+      throw new Error(`ZIP do Simples sem resultado: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSimplesZipInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { competence: "2026-02", annex: "VI", documents: ["00000000000000"] },
+    });
+  },
+
+  async fiscalRevenueUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/revenues/${requireState("fiscalRevenueId")}`,
+      json: { amount: "12000.00" },
     });
   },
 

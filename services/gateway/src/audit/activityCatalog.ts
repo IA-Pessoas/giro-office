@@ -243,6 +243,26 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/fiscal\/simples\/preview$/,
+    description: { action: "consultou", item: "a prévia de alíquotas do Simples" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/simples\/pdf$/,
+    description: { action: "baixou", item: "um PDF de alíquota do Simples" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/simples\/csv$/,
+    description: { action: "exportou", item: "um CSV de alíquotas do Simples em lote" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/simples\/zip$/,
+    description: { action: "exportou", item: "os PDFs de alíquotas do Simples em lote" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
     description: { action: "consultou", item: "um job de relatório" },
   },
@@ -926,6 +946,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/triagem\/fiscal-portfolio\/?$/,
+    description: { action: "consultou", item: "a carteira fiscal mensal da Triagem" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/triagem\/external-links\/?$/,
     description: { action: "consultou", item: "os links externos da Triagem" },
   },
@@ -1226,6 +1251,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um registro de alíquota fiscal",
     newSingular: "um novo registro de alíquota fiscal",
     plural: "registros de alíquotas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/revenues(?:\/|$)/,
+    singular: "uma receita mensal",
+    newSingular: "uma nova receita mensal",
+    plural: "receitas mensais",
   },
   {
     pattern: /^\/contabil\/controls(?:\/|$)/,

@@ -26,12 +26,16 @@ model Icms {
 }
 
 model Client {
-  id              String @id
-  name            String
-  company_name    String?
-  cpf_cnpj        String
-  organization_id String
-  type            String
+  id                String    @id
+  name              String
+  company_name      String?
+  cpf_cnpj          String
+  organization_id   String
+  type              String
+  status            String
+  competence_output DateTime?
+  regime            String?
+  fiscal            Boolean?
 
   @@map("clients")
 }
@@ -50,6 +54,21 @@ model FiscalRate {
 
   @@index([organization_id, client_id, competence, createdAt])
   @@map("fiscal.rate_statements")
+}
+
+model FiscalMonthlyRevenue {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime @db.Date
+  amount          Decimal  @db.Decimal(15, 2)
+  created_by      String
+  updated_by      String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_revenues_org_client_competence")
+  @@map("fiscal.monthly_revenues")
 }
 
 model Ncm {

@@ -1,0 +1,224 @@
+import "./envBootstrap.js";
+
+import {
+  createLogger,
+  FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_PERMISSION_HEADER,
+  FORWARDED_AUTH_USER_ID_HEADER,
+  INTERNAL_SERVICE_TOKEN_HEADER,
+  ServiceError,
+} from "@workspace/shared";
+import { readZipEntries } from "@workspace/shared/testUtils";
+import request from "supertest";
+import { describe, expect, it, vi } from "vitest";
+
+import { createFiscalApp } from "../app.js";
+import { getFiscalServiceEnv } from "../config/env.js";
+import * as pdfService from "../services/simplesRatePdfService.js";
+
+const env = getFiscalServiceEnv();
+const logger = createLogger({ service: "fiscal-service", env: env.nodeEnv, level: env.logLevel });
+const organizationId = "a0000000-0000-4000-8000-000000000001";
+const clientId = "d0000000-0000-4000-8000-000000000001";
+
+function headers(permission = 1) {
+  return {
+    [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
+    [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: organizationId,
+    [FORWARDED_AUTH_USER_ID_HEADER]: "c0000000-0000-4000-8000-000000000001",
+    [FORWARDED_AUTH_PERMISSION_HEADER]: String(permission),
+  };
+}
+
+function deps() {
+  return {
+    preview: vi.fn(async () => ({
+      client_id: clientId,
+      competence: "2026-08",
+      applies_to: "2026-09",
+      status: "ok" as const,
+      message: null,
+      months: [],
+      estimated_month: { competence: "2026-08", amount: "0.00" },
+      rbt12: "0.00",
+      annexes: [],
+    })),
+    emission: vi.fn(async () => ({
+      client_id: clientId,
+      client_name: "Padaria Exemplo Ltda",
+      client_document: "12.345.678/0001-90",
+      competence: "2026-08",
+      applies_to: "2026-09",
+      annex: "I" as const,
+      tax: "ICMS" as const,
+      rate: "5.00",
+    })),
+    batch: vi.fn(async () => ({
+      competence: "2026-08",
+      applies_to: "2026-09",
+      annex: "III" as const,
+      tax: "ISS" as const,
+      included: [
+        {
+          client_id: clientId,
+          client_name: "Padaria Exemplo Ltda",
+          client_document: "12.345.678/0001-90",
+          competence: "2026-08",
+          applies_to: "2026-09",
+          annex: "III" as const,
+          tax: "ISS" as const,
+          rate: "2.01",
+        },
+      ],
+      skipped: [
+        {
+          document: "99999999000199",
+          client_name: null,
+          reason: "Cliente não encontrado nesta organização.",
+        },
+      ],
+    })),
+  };
+}
+
+describe("fiscal Simples rate routes", () => {
+  it("entrega prévia e PDF para leitura no tenant autenticado", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+
+    const preview = await request(app)
+      .get(`/fiscal/simples/preview?client_id=${clientId}&competence=2026-08`)
+      .set(headers());
+    expect(preview.status).toBe(200);
+    expect(service.preview).toHaveBeenCalledWith(
+      { client_id: clientId, competence: "2026-08" },
+      organizationId,
+    );
+
+    const pdf = await request(app)
+      .get(`/fiscal/simples/pdf?client_id=${clientId}&competence=2026-08&annex=I`)
+      .set(headers());
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers["content-type"]).toMatch(/application\/pdf/);
+    expect(pdf.headers["cache-control"]).toBe("no-store");
+    expect(pdf.headers["content-disposition"]).toContain("aliquota-ICMS-anexo-I-2026-09-");
+    expect(pdf.body.subarray(0, 4).toString()).toBe("%PDF");
+    expect(service.emission).toHaveBeenCalledWith(
+      { client_id: clientId, competence: "2026-08", annex: "I" },
+      organizationId,
+    );
+  });
+
+  it("devolve o erro de emissão sem entregar documento", async () => {
+    const service = deps();
+    service.emission.mockRejectedValueOnce(new ServiceError(422, "Não há base para calcular."));
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+
+    const response = await request(app)
+      .get(`/fiscal/simples/pdf?client_id=${clientId}&competence=2026-08&annex=III`)
+      .set(headers());
+    expect(response.status).toBe(422);
+    expect(response.headers["content-type"]).toMatch(/application\/json/);
+    expect(response.body).toMatchObject({ success: false, error: "Não há base para calcular." });
+  });
+
+  it("exporta o CSV do lote com os ignorados, exigindo edição Fiscal", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+    const body = {
+      competence: "2026-08",
+      annex: "III",
+      documents: ["12345678000190", "99999999000199"],
+    };
+
+    const exported = await request(app).post("/fiscal/simples/csv").set(headers(2)).send(body);
+    expect(exported.status).toBe(200);
+    expect(exported.body.data).toMatchObject({
+      file_name: "aliquotas-ISS-anexo-III-2026-09.csv",
+      skipped: [
+        { document: "99999999000199", reason: "Cliente não encontrado nesta organização." },
+      ],
+    });
+    expect(exported.body.data.csv).toBe(
+      "\uFEFFRazão Social;CPF/CNPJ;%\r\nPadaria Exemplo Ltda;12.345.678/0001-90;2,01\r\n",
+    );
+    expect(service.batch).toHaveBeenCalledWith(body, organizationId);
+
+    const viewer = await request(app).post("/fiscal/simples/csv").set(headers(1)).send(body);
+    expect(viewer.status).toBe(403);
+    for (const invalid of [
+      { ...body, documents: [] },
+      { ...body, annex: "VI" },
+      { competence: "2026-08", annex: "III" },
+      { ...body, extra: true },
+    ]) {
+      const response = await request(app).post("/fiscal/simples/csv").set(headers(2)).send(invalid);
+      expect(response.status).toBe(400);
+    }
+    expect(service.batch).toHaveBeenCalledOnce();
+  });
+
+  it("exporta o ZIP de PDFs do lote, exigindo edição Fiscal", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+    const body = { competence: "2026-08", annex: "III", documents: ["12345678000190"] };
+
+    const exported = await request(app).post("/fiscal/simples/zip").set(headers(2)).send(body);
+    expect(exported.status).toBe(200);
+    expect(exported.body.data).toMatchObject({
+      file_name: "aliquotas-ISS-anexo-III-2026-09.zip",
+      skipped: [{ document: "99999999000199" }],
+    });
+    const zip = Buffer.from(exported.body.data.zip_base64, "base64");
+    expect([...readZipEntries(zip).keys()]).toEqual([
+      "aliquota-ISS-anexo-III-2026-09-padaria-exemplo-ltda-12345678000190.pdf",
+    ]);
+    expect(service.batch).toHaveBeenCalledWith(body, organizationId);
+
+    const viewer = await request(app).post("/fiscal/simples/zip").set(headers(1)).send(body);
+    expect(viewer.status).toBe(403);
+    const invalid = await request(app)
+      .post("/fiscal/simples/zip")
+      .set(headers(2))
+      .send({ ...body, documents: [] });
+    expect(invalid.status).toBe(400);
+    expect(service.batch).toHaveBeenCalledOnce();
+  });
+
+  it("informa a falha de geração dos PDFs sem entregar ZIP", async () => {
+    const service = deps();
+    const spy = vi
+      .spyOn(pdfService, "renderSimplesRatePdf")
+      .mockRejectedValueOnce(new Error("pdfkit falhou"));
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+
+    const response = await request(app)
+      .post("/fiscal/simples/zip")
+      .set(headers(2))
+      .send({ competence: "2026-08", annex: "III", documents: ["12345678000190"] });
+    spy.mockRestore();
+    expect(response.status).toBe(500);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Falha ao gerar os PDFs do lote; nenhum arquivo foi gerado.",
+    });
+    expect(response.body.data).toBeUndefined();
+  });
+
+  it("valida anexo e competência e exige autenticação", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+
+    for (const query of ["competence=2026-08&annex=VI", "competence=2026-13&annex=I", "annex=I"]) {
+      const response = await request(app)
+        .get(`/fiscal/simples/pdf?client_id=${clientId}&${query}`)
+        .set(headers());
+      expect(response.status).toBe(400);
+    }
+    const unauthenticated = await request(app).get(
+      `/fiscal/simples/pdf?client_id=${clientId}&competence=2026-08&annex=I`,
+    );
+    expect(unauthenticated.status).toBe(401);
+    expect(service.emission).not.toHaveBeenCalled();
+  });
+});

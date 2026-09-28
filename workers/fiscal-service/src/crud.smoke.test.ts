@@ -14,6 +14,8 @@ import {
   requireSmokeState,
   smokeCall,
   smokeEnv,
+  smokeHeaders,
+  smokeInsert,
   smokeState,
 } from "../../runtime/src/crudSmoke.js";
 import { createFiscalWorkerApp, type FiscalWorkerEnv } from "./app.js";
@@ -223,6 +225,173 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     });
     expectOk(await call("DELETE", `/fiscal/ipi?ipi_id=${id}`), "DELETE /fiscal/ipi");
     expectOk(await call("GET", `/fiscal/ipi?ipi_id=${id}`), "GET após DELETE", [404]);
+  });
+
+  it("receitas mensais: cria, recusa duplicada, lista por período e corrige", async () => {
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Receita ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+    });
+    const clientId = String(client.id);
+    const created = expectOk(
+      await call("POST", "/fiscal/revenues", {
+        client_id: clientId,
+        competence: "2026-07",
+        amount: "12345.67",
+      }),
+      "POST /fiscal/revenues",
+    );
+    const id = created.data.id as string;
+    expect(created.data).toMatchObject({ competence: "2026-07", amount: "12345.67" });
+    expectOk(
+      await call("POST", "/fiscal/revenues", {
+        client_id: clientId,
+        competence: "2026-07",
+        amount: "1",
+      }),
+      "POST duplicado",
+      [409],
+    );
+    expectOk(
+      await call("POST", "/fiscal/revenues", {
+        client_id: clientId,
+        competence: "2026-08",
+        amount: "0",
+      }),
+      "POST receita zero",
+    );
+    const list = expectOk(
+      await call("GET", `/fiscal/revenues/list?client_id=${clientId}&from=2026-07&to=2026-07`),
+      "GET /fiscal/revenues/list",
+    );
+    expect(list.data.data.map((row: { id: string }) => row.id)).toEqual([id]);
+    const updated = expectOk(
+      await call("PUT", `/fiscal/revenues/${id}`, { amount: "999.10" }),
+      "PUT /fiscal/revenues/:id",
+    );
+    expect(updated.data.amount).toBe("999.1");
+
+    const preview = expectOk(
+      await call("GET", `/fiscal/simples/preview?client_id=${clientId}&competence=2026-09`),
+      "GET /fiscal/simples/preview",
+    );
+    // 999,10 (07/2026) + 0 (08/2026) nos 11 meses; RBT12 = 999,10 × 12 ÷ 11.
+    expect(preview.data).toMatchObject({ status: "ok", rbt12: "1089.93" });
+    const pdf = await call(
+      "GET",
+      `/fiscal/simples/pdf?client_id=${clientId}&competence=2026-09&annex=III`,
+    );
+    expect(pdf.status).toBe(200);
+    expect(pdf.text.startsWith("%PDF")).toBe(true);
+    expect(preview.data.months.slice(0, 2)).toEqual([
+      { competence: "2026-08", amount: "0.00", registered: true },
+      { competence: "2026-07", amount: "999.10", registered: true },
+    ]);
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    const foreignList = await call(
+      "GET",
+      `/fiscal/revenues/list?client_id=${clientId}`,
+      undefined,
+      otherOrganization,
+    );
+    expect(foreignList.status).not.toBe(200);
+    expect(foreignList.text).not.toContain(id);
+    const foreignUpdate = await call(
+      "PUT",
+      `/fiscal/revenues/${id}`,
+      { amount: "1.00" },
+      otherOrganization,
+    );
+    expect(foreignUpdate.status).not.toBe(200);
+    const after = expectOk(
+      await call("GET", `/fiscal/revenues/list?client_id=${clientId}&from=2026-07&to=2026-07`),
+      "GET após tentativa de outra organização",
+    );
+    expect(after.data.data[0].amount).toBe("999.1");
+  });
+
+  it("lote do Simples: CSV com elegíveis e motivo dos ignorados", async () => {
+    const document = `91${suffix}0001`;
+    const eligible = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Lote ${suffix}`,
+      company_name: `Smoke Lote ${suffix} Ltda`,
+      cpf_cnpj: document,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+    });
+    const presumido = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Presumido ${suffix}`,
+      cpf_cnpj: `92${suffix}0001`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Lucro Presumido",
+    });
+    // Mesmo documento, elegível, em outra organização: não pode entrar no lote.
+    const otherOrganization = await smokeInsert("organizations", { id: randomUUID() });
+    await smokeInsert("clients", {
+      id: randomUUID(),
+      organization_id: String(otherOrganization.id),
+      name: `Smoke Outra Org ${suffix}`,
+      cpf_cnpj: `93${suffix}0001`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+    });
+    expectOk(
+      await call("POST", "/fiscal/revenues", {
+        client_id: String(eligible.id),
+        competence: "2026-07",
+        amount: "11000.00",
+      }),
+      "POST receita do lote",
+    );
+
+    const exported = expectOk(
+      await call("POST", "/fiscal/simples/csv", {
+        competence: "2026-08",
+        annex: "III",
+        documents: [document, String(presumido.cpf_cnpj), `93${suffix}0001`],
+      }),
+      "POST /fiscal/simples/csv",
+    );
+    // RBT12 = 11.000 + 1.000 = 12.000 (1ª faixa): ISS 2,01%.
+    expect(exported.data.csv).toContain(`Smoke Lote ${suffix} Ltda;${document};2,01`);
+    const zipped = expectOk(
+      await call("POST", "/fiscal/simples/zip", {
+        competence: "2026-08",
+        annex: "III",
+        documents: [document, String(presumido.cpf_cnpj)],
+      }),
+      "POST /fiscal/simples/zip",
+    );
+    const archive = Buffer.from(zipped.data.zip_base64, "base64");
+    expect(archive.readUInt32LE(0)).toBe(0x04034b50);
+    expect(archive.toString("latin1")).toContain(
+      `aliquota-ISS-anexo-III-2026-09-smoke-lote-${suffix}-ltda-${document}.pdf`,
+    );
+    expect(zipped.data.skipped).toHaveLength(1);
+    expect(exported.data.skipped).toEqual([
+      {
+        document: String(presumido.cpf_cnpj),
+        client_name: `Smoke Presumido ${suffix}`,
+        reason: "Cliente fora do Simples Nacional.",
+      },
+      {
+        document: `93${suffix}0001`,
+        client_name: null,
+        reason: "Cliente não encontrado nesta organização.",
+      },
+    ]);
   });
 
   it("reporting interno: catálogo e extract de cada fonte com todos os campos", async () => {
