@@ -1087,12 +1087,20 @@ function createMarketingEventEditionRule() {
     classifySourceRow: classifyMarketingEventEdition,
     emitRows(row, context) {
       const classification = classifyMarketingEventEdition(row, context);
-      const editionEmission = toEmission(editionStep, rowIdentity(sourceTable, row?.id), classification);
+      const editionEmission = toEmission(
+        editionStep,
+        rowIdentity(sourceTable, row?.id),
+        classification,
+      );
       const importPlan = context?.resolutions?.event?.importPlan;
       if (classification.status !== "prepared") {
         return [
           editionEmission,
-          toEmission(budgetStep, `${rowIdentity(sourceTable, row?.id)}:budget:unresolved`, classification),
+          toEmission(
+            budgetStep,
+            `${rowIdentity(sourceTable, row?.id)}:budget:unresolved`,
+            classification,
+          ),
         ];
       }
       if (importPlan.budgetItems.length === 0) {

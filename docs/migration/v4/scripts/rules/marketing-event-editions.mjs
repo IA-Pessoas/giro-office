@@ -70,7 +70,8 @@ export function planMarketingEventEditionImport({ editionRow, eventCandidates })
 
 function resolveEventLink(legacyId, candidates) {
   if (!positiveInteger(legacyId)) return quarantine("evento_id", "MKT_EDITION_EVENT_LINK_INVALID");
-  if (!Array.isArray(candidates)) return quarantine("evento_id", "MKT_EDITION_EVENT_LOOKUP_MISSING");
+  if (!Array.isArray(candidates))
+    return quarantine("evento_id", "MKT_EDITION_EVENT_LOOKUP_MISSING");
   const matches = candidates.filter((event) => String(event?.legacyId) === String(legacyId));
   if (matches.length === 0) return quarantine("evento_id", "MKT_EDITION_EVENT_NOT_FOUND");
   if (matches.length > 1) return quarantine("evento_id", "MKT_EDITION_EVENT_AMBIGUOUS");

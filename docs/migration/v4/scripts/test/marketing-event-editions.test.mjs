@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { CASTELO_ORGANIZATION_ID, validateMappingRule } from "../lib/mapping-contract.mjs";
 import {
   getFieldByDatabaseName,
   getModelByDatabaseName,
   loadPrismaCatalog,
 } from "../lib/prisma-catalog.mjs";
-import { CASTELO_ORGANIZATION_ID, validateMappingRule } from "../lib/mapping-contract.mjs";
 import { buildMarketingEventEditionContexts, REMAINING_RULES } from "../rules/remaining.mjs";
 import { buildRemainingRuntimeState, REMAINING_EXECUTION_ENTRIES } from "../runtime/remaining.mjs";
 
@@ -83,17 +83,19 @@ test("legacy editions and budget rows run through the migration runtime", async 
       [sourceTable]: [editionRow],
     },
   });
-  const projected = REMAINING_EXECUTION_ENTRIES.filter((entry) => entry.sourceTable === sourceTable)
-    .flatMap((entry) =>
-      entry
-        .emitRows(editionRow, runtime)
-        .filter((emission) => emission.stepId === entry.stepId)
-        .map((emission) => entry.projector(emission, editionRow, runtime)),
-    );
+  const projected = REMAINING_EXECUTION_ENTRIES.filter(
+    (entry) => entry.sourceTable === sourceTable,
+  ).flatMap((entry) =>
+    entry
+      .emitRows(editionRow, runtime)
+      .filter((emission) => emission.stepId === entry.stepId)
+      .map((emission) => entry.projector(emission, editionRow, runtime)),
+  );
   const edition = projected.find(({ event_id }) => event_id !== undefined);
   const [budget] = projected.filter(({ edition_id }) => edition_id !== undefined);
   const iterated = [];
-  for await (const emission of runtime.iterateRows(sourceTable, [editionRow])) iterated.push(emission);
+  for await (const emission of runtime.iterateRows(sourceTable, [editionRow]))
+    iterated.push(emission);
 
   assert.ok(edition);
   assert.ok(budget);
@@ -122,9 +124,7 @@ test("ambiguous or unprepared event links produce migration quarantine emissions
     data_local: "2026-11-12 | Castelo Branco",
   };
   const contexts = buildMarketingEventEditionContexts({ rows: [editionRow], eventRows });
-  const editionRule = REMAINING_RULES.find(
-    (rule) => rule.sourceTable === "tb_mkt.eventos_edicoes",
-  );
+  const editionRule = REMAINING_RULES.find((rule) => rule.sourceTable === "tb_mkt.eventos_edicoes");
   const emissions = editionRule.emitRows(editionRow, contexts[0]);
 
   assert.equal(emissions[0].status, "quarantine");
