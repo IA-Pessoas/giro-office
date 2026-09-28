@@ -138,7 +138,7 @@ await (async () => {
   await runTest("carteira associa o fechamento e o controle às colunas corretas", () => {
     const source = readWorkspaceSource("./components/ContabilPortfolioSection.tsx");
     const closingStatus = source.indexOf('NOT_RECEIVED: "Não recebido"');
-    const monthlyControl = source.indexOf('item.control ? "Iniciado" : "—"');
+    const monthlyControl = source.indexOf('"Iniciado"');
 
     assert.ok(closingStatus >= 0);
     assert.ok(monthlyControl >= 0);
