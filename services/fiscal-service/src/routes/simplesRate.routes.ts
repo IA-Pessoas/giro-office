@@ -16,6 +16,7 @@ import {
 import { simplesRateCsvExport } from "../services/simplesRateCsvService.js";
 import { renderSimplesRatePdf, simplesRatePdfHeaders } from "../services/simplesRatePdfService.js";
 import type { SimplesRateService } from "../services/simplesRateService.js";
+import { simplesRateZipExport } from "../services/simplesRateZipService.js";
 
 export type SimplesRateRouteDeps = Pick<SimplesRateService, "preview" | "emission" | "batch">;
 
@@ -66,6 +67,23 @@ export function createSimplesRateRoutes(service: SimplesRateRouteDeps): ReturnTy
         res.json(createSuccessResponse(simplesRateCsvExport(batch)));
       } catch (err) {
         logError("Erro ao exportar CSV de alíquotas do Simples", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/simples/zip",
+    isAuthenticated,
+    requireFiscalWritePermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(simplesBatchBodySchema, req.body);
+        const auth = requireAuthenticatedRequestContext(req);
+        const batch = await service.batch(body, auth.organization_id);
+        res.json(createSuccessResponse(await simplesRateZipExport(batch)));
+      } catch (err) {
+        logError("Erro ao exportar ZIP de PDFs de alíquotas do Simples", { err });
         next(err);
       }
     },

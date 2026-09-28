@@ -976,6 +976,48 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/simples/zip": {
+        post: {
+          tags: ["Receitas"],
+          summary: "Exportar PDFs de alíquotas do Simples em lote (ZIP)",
+          description:
+            "Mesmos critérios e cálculo do CSV em lote: gera um PDF por cliente incluído e devolve o ZIP em base64 (zip_base64; null quando ninguém entra) com os ignorados e o motivo. Se algum PDF falhar, responde erro sem arquivo parcial.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["competence", "annex", "documents"],
+                  additionalProperties: false,
+                  properties: {
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    annex: { type: "string", enum: ["I", "II", "III", "IV", "V"] },
+                    documents: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 500,
+                      items: { type: "string", maxLength: 20 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "ZIP (base64), nome do arquivo, incluídos e ignorados",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "500": { description: "Falha ao gerar os PDFs; nenhum arquivo entregue" },
+          },
+        },
+      },
       "/fiscal/revenues/{id}": {
         put: {
           tags: ["Receitas"],

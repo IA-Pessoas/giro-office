@@ -8,6 +8,7 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
 } from "@workspace/shared";
+import { readZipEntries } from "@workspace/shared/testUtils";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
@@ -153,6 +154,33 @@ describe("fiscal Simples rate routes", () => {
       const response = await request(app).post("/fiscal/simples/csv").set(headers(2)).send(invalid);
       expect(response.status).toBe(400);
     }
+    expect(service.batch).toHaveBeenCalledOnce();
+  });
+
+  it("exporta o ZIP de PDFs do lote, exigindo edição Fiscal", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+    const body = { competence: "2026-08", annex: "III", documents: ["12345678000190"] };
+
+    const exported = await request(app).post("/fiscal/simples/zip").set(headers(2)).send(body);
+    expect(exported.status).toBe(200);
+    expect(exported.body.data).toMatchObject({
+      file_name: "aliquotas-ISS-anexo-III-2026-09.zip",
+      skipped: [{ document: "99999999000199" }],
+    });
+    const zip = Buffer.from(exported.body.data.zip_base64, "base64");
+    expect([...readZipEntries(zip).keys()]).toEqual([
+      `aliquota-ISS-anexo-III-2026-09-${clientId}.pdf`,
+    ]);
+    expect(service.batch).toHaveBeenCalledWith(body, organizationId);
+
+    const viewer = await request(app).post("/fiscal/simples/zip").set(headers(1)).send(body);
+    expect(viewer.status).toBe(403);
+    const invalid = await request(app)
+      .post("/fiscal/simples/zip")
+      .set(headers(2))
+      .send({ ...body, documents: [] });
+    expect(invalid.status).toBe(400);
     expect(service.batch).toHaveBeenCalledOnce();
   });
 

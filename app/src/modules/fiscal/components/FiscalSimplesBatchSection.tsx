@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 
 import {
   type FiscalSimplesAnnexRate,
-  type FiscalSimplesBatch,
+  type FiscalSimplesBatchPayload,
+  type FiscalSimplesBatchResult,
   fiscalRevenueService,
 } from "../services/fiscalRevenueService";
 import {
@@ -25,16 +26,31 @@ const ANNEX_OPTIONS: Array<{ value: FiscalSimplesAnnexRate["annex"]; label: stri
   { value: "V", label: "Anexo V · ISS" },
 ];
 
+type ExportKind = "csv" | "zip";
+
+/** Exporta o lote e devolve o arquivo a baixar (null quando nenhum cliente entrou). */
+async function runExport({ kind, payload }: { kind: ExportKind; payload: FiscalSimplesBatchPayload }) {
+  if (kind === "csv") {
+    const batch = await fiscalRevenueService.exportSimplesCsv(payload);
+    const file = batch.included.length ? new Blob([batch.csv], { type: "text/csv;charset=utf-8" }) : null;
+    return { batch, file };
+  }
+  const batch = await fiscalRevenueService.exportSimplesZip(payload);
+  const file = batch.zip_base64
+    ? new Blob([Uint8Array.from(atob(batch.zip_base64), (char) => char.charCodeAt(0))], { type: "application/zip" })
+    : null;
+  return { batch, file };
+}
+
 export function FiscalSimplesBatchSection() {
   const [competence, setCompetence] = useState(() => competenceFromToday(-1));
   const [annex, setAnnex] = useState<FiscalSimplesAnnexRate["annex"]>("III");
   const [documentsText, setDocumentsText] = useState("");
   const [documentsError, setDocumentsError] = useState<string | null>(null);
-  const [result, setResult] = useState<FiscalSimplesBatch | null>(null);
-  const exportCsv = useMutation({ mutationFn: fiscalRevenueService.exportSimplesCsv });
+  const [result, setResult] = useState<FiscalSimplesBatchResult | null>(null);
+  const exportBatch = useMutation({ mutationFn: runExport });
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function run(kind: ExportKind) {
     const documents = parseBatchDocuments(documentsText);
     if (documents.length === 0) {
       setDocumentsError("Informe ao menos um CPF/CNPJ, um por linha.");
@@ -42,11 +58,16 @@ export function FiscalSimplesBatchSection() {
     }
     setDocumentsError(null);
     try {
-      const batch = await exportCsv.mutateAsync({ competence, annex, documents });
+      const { batch, file } = await exportBatch.mutateAsync({
+        kind,
+        payload: { competence, annex, documents },
+      });
       setResult(batch);
-      if (batch.included.length > 0) {
-        downloadFile(new Blob([batch.csv], { type: "text/csv;charset=utf-8" }), batch.file_name);
-        toast.success(`CSV exportado com ${batch.included.length} cliente(s).`);
+      if (file) {
+        downloadFile(file, batch.file_name);
+        toast.success(
+          `${kind === "csv" ? "CSV" : "ZIP com os PDFs"} exportado com ${batch.included.length} cliente(s).`,
+        );
       } else {
         toast.error("Nenhum cliente do lote tem alíquota para emitir; nenhum arquivo gerado.");
       }
@@ -64,7 +85,10 @@ export function FiscalSimplesBatchSection() {
           Entram os clientes com Fiscal habilitado, ativos no mês da alíquota e no Simples Nacional. Os demais aparecem abaixo com o motivo.
         </p>
       </div>
-      <form noValidate onSubmit={(event) => void submit(event)} className="grid gap-4 rounded-xl border border-gray-200 p-4 md:grid-cols-[1fr_1fr_2fr] dark:border-slate-700">
+      <form noValidate onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        void run("csv");
+      }} className="grid gap-4 rounded-xl border border-gray-200 p-4 md:grid-cols-[1fr_1fr_2fr] dark:border-slate-700">
         <label className="grid content-start gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
           Competência de apuração
           <input type="month" required value={competence} onChange={(event) => setCompetence(event.target.value)} className={FISCAL_FIELD_CONTROL_CLASSNAME} />
@@ -91,9 +115,14 @@ export function FiscalSimplesBatchSection() {
           {documentsError ? <span id="fiscal-simples-batch-documents-error" role="alert" className="text-xs font-normal text-red-600">{documentsError}</span> : null}
         </label>
         <div className="md:col-span-3">
-          <button type="submit" disabled={exportCsv.isPending} className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
-            {exportCsv.isPending ? "Exportando..." : "Exportar CSV"}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button type="submit" disabled={exportBatch.isPending} className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+              {exportBatch.isPending && exportBatch.variables?.kind === "csv" ? "Exportando..." : "Exportar CSV"}
+            </button>
+            <button type="button" disabled={exportBatch.isPending} onClick={() => void run("zip")} className="h-10 rounded-lg border border-blue-600 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-900/20">
+              {exportBatch.isPending && exportBatch.variables?.kind === "zip" ? "Gerando PDFs..." : "Exportar PDFs (ZIP)"}
+            </button>
+          </div>
         </div>
       </form>
 

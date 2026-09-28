@@ -1,6 +1,6 @@
 import { deflateRawSync } from "node:zlib";
 
-export type ReportZipEntry = { fileName: string; body: Buffer };
+export type ZipEntry = { fileName: string; body: Buffer };
 
 const LOCAL_FILE_SIGNATURE = 0x04034b50;
 const CENTRAL_FILE_SIGNATURE = 0x02014b50;
@@ -26,8 +26,11 @@ function dosDateTime(date = new Date()): { date: number; time: number } {
   };
 }
 
-/** Cria um ZIP UTF-8 em memória sem adicionar dependência ao serviço. */
-export function createReportZip(entries: readonly ReportZipEntry[]): Buffer {
+/**
+ * Cria um ZIP UTF-8 (deflate) em memória, sem dependência externa. Usado pela exportação de
+ * relatórios e pelos PDFs em lote do Fiscal; roda em Node e nos Workers (nodejs_compat).
+ */
+export function createZip(entries: readonly ZipEntry[]): Buffer {
   const dateTime = dosDateTime();
   const localFiles: Buffer[] = [];
   const centralFiles: Buffer[] = [];

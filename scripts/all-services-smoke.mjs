@@ -4534,6 +4534,22 @@ const handlers = {
     });
   },
 
+  async fiscalSimplesZip(op) {
+    const response = await httpRequest(op, {
+      json: { competence: "2026-02", annex: "III", documents: ["00000000000000"] },
+    });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data?.skipped)) {
+      throw new Error(`ZIP do Simples sem resultado: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSimplesZipInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { competence: "2026-02", annex: "VI", documents: ["00000000000000"] },
+    });
+  },
+
   async fiscalRevenueUpdate(op) {
     await httpRequest(op, {
       path: `/fiscal/revenues/${requireState("fiscalRevenueId")}`,
