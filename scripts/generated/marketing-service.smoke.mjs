@@ -13,7 +13,7 @@ export const operations = [
     target: "gateway",
     auth: "bearer",
     expectedStatus: [200],
-    expectedLabel: "Marketing dashboard available with permission"
+    expectedLabel: "Marketing dashboard available with permission",
   },
   {
     service: "marketing-service",
@@ -23,7 +23,7 @@ export const operations = [
     target: "gateway",
     auth: "bearer",
     expectedStatus: [200],
-    expectedLabel: "eligible users listed"
+    expectedLabel: "eligible users listed",
   },
   {
     service: "marketing-service",
@@ -35,7 +35,7 @@ export const operations = [
     expectationKind: "bad",
     expectedStatus: [400],
     expectedLabel: "invalid request",
-    pairCoverageExempt: true
+    pairCoverageExempt: true,
   },
   {
     service: "marketing-service",
@@ -47,7 +47,7 @@ export const operations = [
     expectationKind: "bad",
     expectedStatus: [400],
     expectedLabel: "invalid request",
-    pairCoverageExempt: true
+    pairCoverageExempt: true,
   },
   {
     service: "marketing-service",
@@ -59,7 +59,7 @@ export const operations = [
     expectationKind: "bad",
     expectedStatus: [400],
     expectedLabel: "invalid request",
-    pairCoverageExempt: true
+    pairCoverageExempt: true,
   },
   {
     service: "marketing-service",
@@ -71,7 +71,7 @@ export const operations = [
     expectationKind: "bad",
     expectedStatus: [400],
     expectedLabel: "invalid request",
-    pairCoverageExempt: true
+    pairCoverageExempt: true,
   },
   {
     service: "marketing-service",
@@ -83,7 +83,7 @@ export const operations = [
     expectationKind: "bad",
     expectedStatus: [400],
     expectedLabel: "invalid request",
-    pairCoverageExempt: true
+    pairCoverageExempt: true,
   },
   {
     service: "marketing-service",
@@ -95,7 +95,7 @@ export const operations = [
     expectationKind: "bad",
     expectedStatus: [400],
     expectedLabel: "invalid request",
-    pairCoverageExempt: true
+    pairCoverageExempt: true,
   },
   {
     service: "marketing-service",
@@ -105,8 +105,8 @@ export const operations = [
     target: "gateway",
     auth: "bearer",
     expectedStatus: [200],
-    expectedLabel: "reconciliation queue listed"
-  }
+    expectedLabel: "reconciliation queue listed",
+  },
 ];
 
 export const routePlaceholders = [];
