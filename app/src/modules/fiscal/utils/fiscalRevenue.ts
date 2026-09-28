@@ -33,6 +33,21 @@ export function competenceFromToday(offsetMonths = 0): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Competência seguinte (AAAA-MM), à qual a alíquota emitida se refere. */
+export function nextCompetence(competence: string): string {
+  const [year, month] = competence.split("-").map(Number);
+  const date = new Date(year, month, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** CPF/CNPJ colados em lote: um por linha (aceita também vírgula ou ponto e vírgula). */
+export function parseBatchDocuments(text: string): string[] {
+  return text
+    .split(/[\r\n,;]+/u)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 export function formatCompetenceLabel(competence: string): string {
   return `${competence.slice(5, 7)}/${competence.slice(0, 4)}`;
 }

@@ -47,6 +47,28 @@ export interface FiscalSimplesPreview {
   annexes: FiscalSimplesAnnexRate[];
 }
 
+export interface FiscalSimplesEmission {
+  client_id: string;
+  client_name: string;
+  client_document: string;
+  competence: string;
+  applies_to: string;
+  annex: FiscalSimplesAnnexRate["annex"];
+  tax: FiscalSimplesAnnexRate["tax"];
+  rate: string;
+}
+
+export interface FiscalSimplesBatch {
+  competence: string;
+  applies_to: string;
+  annex: FiscalSimplesAnnexRate["annex"];
+  tax: FiscalSimplesAnnexRate["tax"];
+  included: FiscalSimplesEmission[];
+  skipped: Array<{ document: string; client_name: string | null; reason: string }>;
+  file_name: string;
+  csv: string;
+}
+
 export const REVENUE_PAGE_SIZE = 24;
 
 export const fiscalRevenueService = {
@@ -68,6 +90,16 @@ export const fiscalRevenueService = {
       params: { client_id: clientId, competence },
     });
     return unwrapFiscalEnvelope<FiscalSimplesPreview>(response.data);
+  },
+
+  async exportSimplesCsv(payload: {
+    competence: string;
+    annex: FiscalSimplesAnnexRate["annex"];
+    documents: string[];
+  }): Promise<FiscalSimplesBatch> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.post("/fiscal/simples/csv", payload);
+    return unwrapFiscalEnvelope<FiscalSimplesBatch>(response.data);
   },
 
   async downloadSimplesPdf(

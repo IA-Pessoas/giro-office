@@ -81,6 +81,31 @@ describe("fiscal Worker", () => {
         annexes: [],
       })),
       emission: vi.fn(async () => emission),
+      batch: vi.fn(async () => ({
+        competence: "2026-08",
+        applies_to: "2026-09",
+        annex: "III" as const,
+        tax: "ISS" as const,
+        included: [
+          {
+            client_id: clientId,
+            client_name: "Padaria Exemplo Ltda",
+            client_document: "12.345.678/0001-90",
+            competence: "2026-08",
+            applies_to: "2026-09",
+            annex: "III" as const,
+            tax: "ISS" as const,
+            rate: "2.01",
+          },
+        ],
+        skipped: [
+          {
+            document: "99999999000199",
+            client_name: null,
+            reason: "Cliente não encontrado nesta organização.",
+          },
+        ],
+      })),
     };
     const app = createFiscalWorkerApp({ env: env(), simplesService: simples });
     const reader = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
@@ -119,6 +144,26 @@ describe("fiscal Worker", () => {
     );
     expect(withoutFiscal.status).toBe(403);
     expect(simples.emission).toHaveBeenCalledOnce();
+
+    const body = { competence: "2026-08", annex: "III", documents: ["12345678000190"] };
+    const csv = await app.request("https://fiscal.test/fiscal/simples/csv", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(csv.status).toBe(200);
+    const payload = (await csv.json()) as { data: { csv: string; file_name: string } };
+    expect(payload.data.file_name).toBe("aliquotas-ISS-anexo-III-2026-09.csv");
+    expect(payload.data.csv).toContain("Padaria Exemplo Ltda;12.345.678/0001-90;2,01");
+    expect(simples.batch).toHaveBeenCalledWith(body, ORGANIZATION_ID);
+
+    const readerCsv = await app.request("https://fiscal.test/fiscal/simples/csv", {
+      method: "POST",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(readerCsv.status).toBe(403);
+    expect(simples.batch).toHaveBeenCalledOnce();
   });
 
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {

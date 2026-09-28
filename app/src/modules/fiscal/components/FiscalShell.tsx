@@ -17,6 +17,7 @@ import { FiscalIpiSection } from "./FiscalIpiSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
 import { FiscalRatesSection } from "./FiscalRatesSection";
 import { FiscalRevenuesSection } from "./FiscalRevenuesSection";
+import { FiscalSimplesBatchSection } from "./FiscalSimplesBatchSection";
 import { FiscalSearchSection } from "./FiscalSearchSection";
 
 const fiscalTabs: Array<{
@@ -145,7 +146,7 @@ function FiscalActiveTabPanel({
   }
 
   if (activeTab === "revenues") {
-    return <div role="tabpanel" id="fiscal-panel-revenues" aria-labelledby="fiscal-tab-revenues"><FiscalRevenuesSection canEdit={canEdit} /></div>;
+    return <div role="tabpanel" id="fiscal-panel-revenues" aria-labelledby="fiscal-tab-revenues"><FiscalRevenuesSection canEdit={canEdit} />{canEdit ? <FiscalSimplesBatchSection /> : null}</div>;
   }
 
   return <FiscalIpiTab canEdit={canEdit} canDelete={canDelete} />;

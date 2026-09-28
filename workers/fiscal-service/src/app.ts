@@ -32,6 +32,7 @@ import {
   updateNcmBodySchema,
 } from "@workspace/fiscal-service/src/schemas/ncm.schemas.js";
 import {
+  simplesBatchBodySchema,
   simplesPdfQuerySchema,
   simplesPreviewQuerySchema,
 } from "@workspace/fiscal-service/src/schemas/simplesRate.schemas.js";
@@ -42,6 +43,10 @@ import {
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
 import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
+import {
+  renderSimplesRateCsv,
+  simplesRateCsvFileName,
+} from "@workspace/fiscal-service/src/services/simplesRateCsvService.js";
 import {
   renderSimplesRatePdf,
   simplesRatePdfHeaders,
@@ -87,7 +92,7 @@ type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
 type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
-type SimplesServiceLike = Pick<SimplesRateService, "preview" | "emission">;
+type SimplesServiceLike = Pick<SimplesRateService, "preview" | "emission" | "batch">;
 
 interface FiscalWorkerOptions {
   env: FiscalWorkerEnv;
@@ -339,6 +344,20 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     );
     const pdf = await renderSimplesRatePdf(emission);
     return new Response(new Uint8Array(pdf), { headers: simplesRatePdfHeaders(emission) });
+  });
+
+  app.post("/fiscal/simples/csv", async (c) => {
+    const body = parseWithZod(simplesBatchBodySchema, await readJson(c));
+    const batch = await withService("simplesService", (service) =>
+      service.batch(body, c.get("auth").organizationId),
+    );
+    return c.json(
+      createSuccessResponse({
+        ...batch,
+        file_name: simplesRateCsvFileName(batch),
+        csv: renderSimplesRateCsv(batch),
+      }),
+    );
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {

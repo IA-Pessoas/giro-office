@@ -7,15 +7,17 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
-import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/isAuthenticated.js";
 import {
+  simplesBatchBodySchema,
   simplesPdfQuerySchema,
   simplesPreviewQuerySchema,
 } from "../schemas/simplesRate.schemas.js";
+import { renderSimplesRateCsv, simplesRateCsvFileName } from "../services/simplesRateCsvService.js";
 import { renderSimplesRatePdf, simplesRatePdfHeaders } from "../services/simplesRatePdfService.js";
 import type { SimplesRateService } from "../services/simplesRateService.js";
 
-export type SimplesRateRouteDeps = Pick<SimplesRateService, "preview" | "emission">;
+export type SimplesRateRouteDeps = Pick<SimplesRateService, "preview" | "emission" | "batch">;
 
 export function createSimplesRateRoutes(service: SimplesRateRouteDeps): ReturnType<typeof Router> {
   const router = Router();
@@ -47,6 +49,29 @@ export function createSimplesRateRoutes(service: SimplesRateRouteDeps): ReturnTy
         res.set(simplesRatePdfHeaders(emission)).status(200).send(pdf);
       } catch (err) {
         logError("Erro ao emitir PDF de alíquota do Simples", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/simples/csv",
+    isAuthenticated,
+    requireFiscalWritePermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(simplesBatchBodySchema, req.body);
+        const auth = requireAuthenticatedRequestContext(req);
+        const batch = await service.batch(body, auth.organization_id);
+        res.json(
+          createSuccessResponse({
+            ...batch,
+            file_name: simplesRateCsvFileName(batch),
+            csv: renderSimplesRateCsv(batch),
+          }),
+        );
+      } catch (err) {
+        logError("Erro ao exportar CSV de alíquotas do Simples", { err });
         next(err);
       }
     },

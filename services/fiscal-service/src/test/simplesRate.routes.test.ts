@@ -51,6 +51,31 @@ function deps() {
       tax: "ICMS" as const,
       rate: "5.00",
     })),
+    batch: vi.fn(async () => ({
+      competence: "2026-08",
+      applies_to: "2026-09",
+      annex: "III" as const,
+      tax: "ISS" as const,
+      included: [
+        {
+          client_id: clientId,
+          client_name: "Padaria Exemplo Ltda",
+          client_document: "12.345.678/0001-90",
+          competence: "2026-08",
+          applies_to: "2026-09",
+          annex: "III" as const,
+          tax: "ISS" as const,
+          rate: "2.01",
+        },
+      ],
+      skipped: [
+        {
+          document: "99999999000199",
+          client_name: null,
+          reason: "Cliente não encontrado nesta organização.",
+        },
+      ],
+    })),
   };
 }
 
@@ -93,6 +118,42 @@ describe("fiscal Simples rate routes", () => {
     expect(response.status).toBe(422);
     expect(response.headers["content-type"]).toMatch(/application\/json/);
     expect(response.body).toMatchObject({ success: false, error: "Não há base para calcular." });
+  });
+
+  it("exporta o CSV do lote com os ignorados, exigindo edição Fiscal", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+    const body = {
+      competence: "2026-08",
+      annex: "III",
+      documents: ["12345678000190", "99999999000199"],
+    };
+
+    const exported = await request(app).post("/fiscal/simples/csv").set(headers(2)).send(body);
+    expect(exported.status).toBe(200);
+    expect(exported.body.data).toMatchObject({
+      file_name: "aliquotas-ISS-anexo-III-2026-09.csv",
+      skipped: [
+        { document: "99999999000199", reason: "Cliente não encontrado nesta organização." },
+      ],
+    });
+    expect(exported.body.data.csv).toBe(
+      "\uFEFFRazão Social;CPF/CNPJ;%\r\nPadaria Exemplo Ltda;12.345.678/0001-90;2,01\r\n",
+    );
+    expect(service.batch).toHaveBeenCalledWith(body, organizationId);
+
+    const viewer = await request(app).post("/fiscal/simples/csv").set(headers(1)).send(body);
+    expect(viewer.status).toBe(403);
+    for (const invalid of [
+      { ...body, documents: [] },
+      { ...body, annex: "VI" },
+      { competence: "2026-08", annex: "III" },
+      { ...body, extra: true },
+    ]) {
+      const response = await request(app).post("/fiscal/simples/csv").set(headers(2)).send(invalid);
+      expect(response.status).toBe(400);
+    }
+    expect(service.batch).toHaveBeenCalledOnce();
   });
 
   it("valida anexo e competência e exige autenticação", async () => {

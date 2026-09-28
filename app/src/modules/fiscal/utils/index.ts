@@ -10,5 +10,7 @@ export {
   formatCompetenceLabel,
   formatRatePercent,
   formatRevenueAmount,
+  nextCompetence,
+  parseBatchDocuments,
   toRevenueAmount,
 } from "./fiscalRevenue";
