@@ -7,6 +7,7 @@ import { fiscalSimplesPreviewQueryKey } from "../hooks/queryKeys";
 import { type FiscalSimplesAnnexRate, fiscalRevenueService } from "../services/fiscalRevenueService";
 import {
   competenceFromToday,
+  downloadFile,
   formatCompetenceLabel,
   formatRatePercent,
   formatRevenueAmount,
@@ -33,12 +34,7 @@ export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) 
         competence,
         item.annex,
       );
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = fileName;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      downloadFile(blob, fileName);
     } catch (error) {
       toast.error(getFiscalErrorMessage(error));
     } finally {

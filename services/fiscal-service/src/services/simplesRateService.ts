@@ -38,7 +38,8 @@ export interface SimplesRateBatch {
 }
 
 // Mesma regra do lote legado (listar-arquivos.php): Fiscal habilitado, ativo e no Simples.
-const SIMPLES_REGIME = "Simples Nacional";
+const ACTIVE_CLIENT_STATUS = "Ativo";
+const SIMPLES_REGIME = "simples nacional";
 
 type BatchClient = {
   id: string;
@@ -51,8 +52,18 @@ type BatchClient = {
   regime: string | null;
 };
 
+/** Só dígitos; CNPJ/CPF colado de planilha sem o zero à esquerda (13 ou 10 dígitos) é completado. */
 function digits(document: string): string {
-  return document.replace(/\D/g, "");
+  const value = document.replace(/\D/g, "");
+  return value.length === 13 || value.length === 10 ? `0${value}` : value;
+}
+
+function normalizedRegime(regime: string | null): string {
+  return (regime ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .trim()
+    .toLowerCase();
 }
 
 function maskDocument(value: string): string {
@@ -69,26 +80,34 @@ function clientName(client: { name: string; company_name: string | null }): stri
 function ineligibility(client: BatchClient, appliesTo: string): string | null {
   if (client.fiscal !== true) return "Fiscal não habilitado para o cliente.";
   const active =
-    client.status === "Ativo" ||
+    client.status === ACTIVE_CLIENT_STATUS ||
     (client.competence_output !== null && client.competence_output >= competenceDate(appliesTo));
   if (!active) return `Cliente inativo em ${appliesTo.slice(5, 7)}/${appliesTo.slice(0, 4)}.`;
-  if (client.regime?.trim() !== SIMPLES_REGIME) return "Cliente fora do Simples Nacional.";
+  if (normalizedRegime(client.regime) !== SIMPLES_REGIME)
+    return "Cliente fora do Simples Nacional.";
   return null;
 }
 
 /** Emissão do anexo a partir da prévia, ou o motivo de não emitir. */
+type EmissionResult = { ok: true; emission: SimplesRateEmission } | { ok: false; reason: string };
+
 function resolveEmission(
-  client: { id: string; name: string; company_name: string | null; cpf_cnpj: string },
+  client: Pick<BatchClient, "id" | "name" | "company_name" | "cpf_cnpj">,
   preview: SimplesPreview,
   annex: SimplesAnnex,
-): SimplesRateEmission | string {
-  if (preview.status !== "ok") return preview.message ?? "Sem base para calcular.";
-  const item = preview.annexes.find((candidate) => candidate.annex === annex);
-  if (!item) return `Anexo ${annex} sem cálculo.`;
-  if (!item.emission_rate) {
-    return `Sem alíquota de ${item.tax} para emitir no Anexo ${item.annex}: na ${item.bracket}ª faixa o tributo é recolhido fora do Simples.`;
+): EmissionResult {
+  if (preview.status !== "ok") {
+    return { ok: false, reason: preview.message ?? "Sem base para calcular." };
   }
-  return {
+  const item = preview.annexes.find((candidate) => candidate.annex === annex);
+  if (!item) return { ok: false, reason: `Anexo ${annex} sem cálculo.` };
+  if (!item.emission_rate) {
+    return {
+      ok: false,
+      reason: `Sem alíquota de ${item.tax} para emitir no Anexo ${item.annex}: na ${item.bracket}ª faixa o tributo é recolhido fora do Simples.`,
+    };
+  }
+  const emission: SimplesRateEmission = {
     client_id: client.id,
     client_name: clientName(client),
     client_document: client.cpf_cnpj,
@@ -98,6 +117,7 @@ function resolveEmission(
     tax: item.tax,
     rate: item.emission_rate,
   };
+  return { ok: true, emission };
 }
 
 /** Prévia e emissão da alíquota de ISS/ICMS do Simples a partir das receitas mensais. */
@@ -155,8 +175,8 @@ export class SimplesRateService {
     const client = await this.requireClient(input.client_id, organizationId);
     const preview = await this.calculate(client.id, input.competence, organizationId);
     const emission = resolveEmission(client, preview, input.annex);
-    if (typeof emission === "string") throw new ServiceError(422, emission);
-    return emission;
+    if (!emission.ok) throw new ServiceError(422, emission.reason);
+    return emission.emission;
   }
 
   /** Lote de emissão para os documentos informados, com o motivo de cada cliente ignorado. */
@@ -240,8 +260,8 @@ export class SimplesRateService {
           })),
       );
       const emission = resolveEmission(client, preview, input.annex);
-      if (typeof emission === "string") skip(emission);
-      else result.included.push(emission);
+      if (emission.ok) result.included.push(emission.emission);
+      else skip(emission.reason);
     }
     return result;
   }

@@ -13,7 +13,7 @@ import {
   simplesPdfQuerySchema,
   simplesPreviewQuerySchema,
 } from "../schemas/simplesRate.schemas.js";
-import { renderSimplesRateCsv, simplesRateCsvFileName } from "../services/simplesRateCsvService.js";
+import { simplesRateCsvExport } from "../services/simplesRateCsvService.js";
 import { renderSimplesRatePdf, simplesRatePdfHeaders } from "../services/simplesRatePdfService.js";
 import type { SimplesRateService } from "../services/simplesRateService.js";
 
@@ -63,13 +63,7 @@ export function createSimplesRateRoutes(service: SimplesRateRouteDeps): ReturnTy
         const body = parseWithZod(simplesBatchBodySchema, req.body);
         const auth = requireAuthenticatedRequestContext(req);
         const batch = await service.batch(body, auth.organization_id);
-        res.json(
-          createSuccessResponse({
-            ...batch,
-            file_name: simplesRateCsvFileName(batch),
-            csv: renderSimplesRateCsv(batch),
-          }),
-        );
+        res.json(createSuccessResponse(simplesRateCsvExport(batch)));
       } catch (err) {
         logError("Erro ao exportar CSV de alíquotas do Simples", { err });
         next(err);

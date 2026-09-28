@@ -7,7 +7,7 @@ import { Download, Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { fiscalRateService, type FiscalRate, type FiscalTaxType } from "../services/fiscalRateService";
-import { competenceFromToday, getFiscalErrorMessage } from "../utils";
+import { competenceFromToday, downloadFile, getFiscalErrorMessage } from "../utils";
 import { FISCAL_FIELD_CONTROL_CLASSNAME } from "./fiscalFieldStyles";
 
 const pageSize = 20;
@@ -48,12 +48,7 @@ export function FiscalRatesSection({ canEdit }: { canEdit: boolean }) {
     setDownloadingId(item.id);
     try {
       const blob = await fiscalRateService.download(item.id);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `aliquota-${item.tax_type}-${item.competence}-${item.id}.pdf`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      downloadFile(blob, `aliquota-${item.tax_type}-${item.competence}-${item.id}.pdf`);
     } catch (error) {
       toast.error(getFiscalErrorMessage(error));
     } finally {

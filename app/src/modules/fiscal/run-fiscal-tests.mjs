@@ -332,7 +332,7 @@ await runTest("fiscal Simples batch parses pasted documents and exports CSV for 
   // Validação local, ignorados com motivo e nenhum arquivo quando ninguém entra.
   assert.match(batch, /Informe ao menos um CPF\/CNPJ, um por linha\./);
   assert.match(batch, /\{item\.reason\}/);
-  assert.match(batch, /if \(batch\.included\.length > 0\) \{\s*download\(batch\.csv, batch\.file_name\);/);
+  assert.match(batch, /if \(batch\.included\.length > 0\) \{\s*downloadFile\(new Blob\(\[batch\.csv\]/);
   assert.match(batch, /nenhum arquivo gerado/);
   assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });

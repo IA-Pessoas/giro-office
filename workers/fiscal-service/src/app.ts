@@ -43,10 +43,7 @@ import {
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
 import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
-import {
-  renderSimplesRateCsv,
-  simplesRateCsvFileName,
-} from "@workspace/fiscal-service/src/services/simplesRateCsvService.js";
+import { simplesRateCsvExport } from "@workspace/fiscal-service/src/services/simplesRateCsvService.js";
 import {
   renderSimplesRatePdf,
   simplesRatePdfHeaders,
@@ -351,13 +348,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const batch = await withService("simplesService", (service) =>
       service.batch(body, c.get("auth").organizationId),
     );
-    return c.json(
-      createSuccessResponse({
-        ...batch,
-        file_name: simplesRateCsvFileName(batch),
-        csv: renderSimplesRateCsv(batch),
-      }),
-    );
+    return c.json(createSuccessResponse(simplesRateCsvExport(batch)));
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {

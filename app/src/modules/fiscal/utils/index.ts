@@ -1,3 +1,4 @@
+export { downloadFile } from "./downloadFile";
 export { getFiscalErrorMessage } from "./fiscalError";
 export { formatFiscalDateLabel, toFiscalInputDate, toFiscalIsoDate } from "./fiscalDate";
 export {

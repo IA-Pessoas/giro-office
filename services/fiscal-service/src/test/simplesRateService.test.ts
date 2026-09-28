@@ -153,6 +153,15 @@ describe("SimplesRateService.batch", () => {
       ...eligible,
       regime: "Lucro Presumido",
     },
+    // Regime gravado sem acento/caixa e documento com zero à esquerda perdido na planilha.
+    {
+      id: "c9",
+      name: "Caixa",
+      company_name: "Caixa Alta Ltda",
+      cpf_cnpj: "01.234.567/0001-89",
+      ...eligible,
+      regime: " SIMPLES NACIONAL ",
+    },
     {
       id: "c5",
       name: "Sem receita",
@@ -187,7 +196,13 @@ describe("SimplesRateService.batch", () => {
       competence_output: new Date("2026-08-31T23:59:59.000Z"),
     },
   ];
-  const monthly: Record<string, number> = { c1: 15_000, c6: 350_000, c7: 50_000, c8: 15_000 };
+  const monthly: Record<string, number> = {
+    c1: 15_000,
+    c6: 350_000,
+    c7: 50_000,
+    c8: 15_000,
+    c9: 15_000,
+  };
 
   function batchPrisma() {
     return {
@@ -226,6 +241,7 @@ describe("SimplesRateService.batch", () => {
           "55555555000155",
           "66666666000166",
           "77777777000177",
+          "1234567000189",
           "99.999.999/0001-99",
           "12.345.678/0001-90",
         ],
@@ -248,7 +264,20 @@ describe("SimplesRateService.batch", () => {
     expect(result.included.map((item) => [item.client_id, item.rate])).toEqual([
       ["c1", "2.01"], // 1ª faixa: 2,01% bruto, no mínimo do ISS
       ["c7", "3.43"], // 3ª faixa (RBT12 600.000): 3,432%
+      ["c9", "2.01"],
     ]);
+    // Receitas só do tenant e dos elegíveis, nos 11 meses anteriores.
+    expect(prisma.fiscalMonthlyRevenue.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: organizationId,
+        client_id: { in: ["c1", "c9", "c5", "c6", "c7"] },
+        competence: {
+          gte: new Date("2025-09-01T00:00:00.000Z"),
+          lte: new Date("2026-07-01T00:00:00.000Z"),
+        },
+      },
+      select: { client_id: true, competence: true, amount: true },
+    });
     expect(result.skipped).toEqual([
       {
         document: "11.111.111/0001-11",

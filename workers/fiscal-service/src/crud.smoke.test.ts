@@ -334,6 +334,17 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       fiscal: true,
       regime: "Lucro Presumido",
     });
+    // Mesmo documento, elegível, em outra organização: não pode entrar no lote.
+    const otherOrganization = await smokeInsert("organizations", { id: randomUUID() });
+    await smokeInsert("clients", {
+      id: randomUUID(),
+      organization_id: String(otherOrganization.id),
+      name: `Smoke Outra Org ${suffix}`,
+      cpf_cnpj: `93${suffix}0001`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+    });
     expectOk(
       await call("POST", "/fiscal/revenues", {
         client_id: String(eligible.id),
@@ -347,7 +358,7 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       await call("POST", "/fiscal/simples/csv", {
         competence: "2026-08",
         annex: "III",
-        documents: [document, String(presumido.cpf_cnpj)],
+        documents: [document, String(presumido.cpf_cnpj), `93${suffix}0001`],
       }),
       "POST /fiscal/simples/csv",
     );
@@ -358,6 +369,11 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
         document: String(presumido.cpf_cnpj),
         client_name: `Smoke Presumido ${suffix}`,
         reason: "Cliente fora do Simples Nacional.",
+      },
+      {
+        document: `93${suffix}0001`,
+        client_name: null,
+        reason: "Cliente não encontrado nesta organização.",
       },
     ]);
   });

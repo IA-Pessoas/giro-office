@@ -9,12 +9,13 @@ import {
 } from "../services/fiscalRevenueService";
 import {
   competenceFromToday,
+  downloadFile,
   formatCompetenceLabel,
   getFiscalErrorMessage,
   nextCompetence,
   parseBatchDocuments,
 } from "../utils";
-import { FISCAL_FIELD_CONTROL_CLASSNAME } from "./fiscalFieldStyles";
+import { FISCAL_FIELD_CONTROL_CLASSNAME, FISCAL_TEXTAREA_CLASSNAME } from "./fiscalFieldStyles";
 
 const ANNEX_OPTIONS: Array<{ value: FiscalSimplesAnnexRate["annex"]; label: string }> = [
   { value: "I", label: "Anexo I · ICMS" },
@@ -23,15 +24,6 @@ const ANNEX_OPTIONS: Array<{ value: FiscalSimplesAnnexRate["annex"]; label: stri
   { value: "IV", label: "Anexo IV · ISS" },
   { value: "V", label: "Anexo V · ISS" },
 ];
-
-function download(content: string, fileName: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8" }));
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
 
 export function FiscalSimplesBatchSection() {
   const [competence, setCompetence] = useState(() => competenceFromToday(-1));
@@ -53,7 +45,7 @@ export function FiscalSimplesBatchSection() {
       const batch = await exportCsv.mutateAsync({ competence, annex, documents });
       setResult(batch);
       if (batch.included.length > 0) {
-        download(batch.csv, batch.file_name);
+        downloadFile(new Blob([batch.csv], { type: "text/csv;charset=utf-8" }), batch.file_name);
         toast.success(`CSV exportado com ${batch.included.length} cliente(s).`);
       } else {
         toast.error("Nenhum cliente do lote tem alíquota para emitir; nenhum arquivo gerado.");
@@ -94,7 +86,7 @@ export function FiscalSimplesBatchSection() {
             onChange={(event) => setDocumentsText(event.target.value)}
             aria-invalid={documentsError ? true : undefined}
             aria-describedby={documentsError ? "fiscal-simples-batch-documents-error" : undefined}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+            className={FISCAL_TEXTAREA_CLASSNAME}
           />
           {documentsError ? <span id="fiscal-simples-batch-documents-error" role="alert" className="text-xs font-normal text-red-600">{documentsError}</span> : null}
         </label>
