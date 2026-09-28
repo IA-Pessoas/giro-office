@@ -6,12 +6,14 @@ import { formatBrlInput } from "@shared/utils/inputFormatting";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
+import { fiscalRevenuesQueryKey } from "../hooks/queryKeys";
 import {
   fiscalRevenueService,
   REVENUE_PAGE_SIZE,
   type FiscalMonthlyRevenue,
 } from "../services/fiscalRevenueService";
 import {
+  competenceFromToday,
   formatCompetenceLabel,
   formatRevenueAmount,
   getFiscalErrorMessage,
@@ -22,22 +24,16 @@ import { FiscalSimplesPreviewSection } from "./FiscalSimplesPreviewSection";
 
 const INVALID_AMOUNT_MESSAGE = "Informe a receita em reais, sem valor negativo. Para receita zero, digite 0.";
 
-function previousCompetence(): string {
-  const now = new Date();
-  const previous = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export function FiscalRevenuesSection({ canEdit }: { canEdit: boolean }) {
   const [client, setClient] = useState<ClientPickerOption | null>(null);
-  const [competence, setCompetence] = useState(previousCompetence);
+  const [competence, setCompetence] = useState(() => competenceFromToday(-1));
   const [amount, setAmount] = useState("");
   const [editing, setEditing] = useState<FiscalMonthlyRevenue | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const list = useFetch(
-    ["fiscal", "revenues", client?.id ?? "", page],
+    [...fiscalRevenuesQueryKey(client?.id ?? ""), page],
     () => fiscalRevenueService.list(client?.id ?? "", page),
     { enabled: Boolean(client) },
   );
@@ -49,12 +45,12 @@ export function FiscalRevenuesSection({ canEdit }: { canEdit: boolean }) {
     onSuccess: async () => {
       toast.success(editing ? "Receita corrigida." : "Receita registrada.");
       resetForm();
-      await queryClient.invalidateQueries({ queryKey: ["fiscal", "revenues", client?.id ?? ""] });
+      await queryClient.invalidateQueries({ queryKey: fiscalRevenuesQueryKey(client?.id ?? "") });
     },
   });
 
   function resetForm() {
-    if (editing) setCompetence(previousCompetence());
+    if (editing) setCompetence(competenceFromToday(-1));
     setEditing(null);
     setAmount("");
     setAmountError(null);

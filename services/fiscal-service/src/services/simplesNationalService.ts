@@ -87,9 +87,12 @@ export interface SimplesAnnexRate {
   rate: string;
 }
 
+/** ok: calculado; no_base: RBT12 zero; above_limit: RBT12 acima do teto do Simples. */
+export type SimplesPreviewStatus = "ok" | "no_base" | "above_limit";
+
 export interface SimplesPreview {
   competence: string;
-  status: "ok" | "no_base" | "above_limit";
+  status: SimplesPreviewStatus;
   message: string | null;
   months: Array<{ competence: string; amount: string; registered: boolean }>;
   estimated_month: { competence: string; amount: string };
@@ -133,7 +136,8 @@ export function calculateSimplesPreview(
   const average = sum / months.length;
   const rbt12 = sum + average;
   const bracket = simplesBracket(rbt12);
-  const status = rbt12 <= 0 ? "no_base" : bracket === null ? "above_limit" : "ok";
+  const status: SimplesPreviewStatus =
+    rbt12 <= 0 ? "no_base" : bracket === null ? "above_limit" : "ok";
 
   return {
     competence,

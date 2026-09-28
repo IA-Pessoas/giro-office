@@ -26,6 +26,13 @@ export function formatRatePercent(value: string): string {
   return `${percentFormatter.format(Number(value))}%`;
 }
 
+/** Competência no formato AAAA-MM, deslocada em meses a partir do mês atual. */
+export function competenceFromToday(offsetMonths = 0): string {
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth() + offsetMonths, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function formatCompetenceLabel(competence: string): string {
   return `${competence.slice(5, 7)}/${competence.slice(0, 4)}`;
 }

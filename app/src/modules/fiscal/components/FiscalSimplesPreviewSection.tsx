@@ -1,8 +1,10 @@
 import { useFetch } from "@shared/hooks";
 import { useState } from "react";
 
+import { fiscalSimplesPreviewQueryKey } from "../hooks/queryKeys";
 import { fiscalRevenueService } from "../services/fiscalRevenueService";
 import {
+  competenceFromToday,
   formatCompetenceLabel,
   formatRatePercent,
   formatRevenueAmount,
@@ -10,16 +12,10 @@ import {
 } from "../utils";
 import { FISCAL_FIELD_CONTROL_CLASSNAME } from "./fiscalFieldStyles";
 
-function currentCompetence(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export function FiscalSimplesPreviewSection({ clientId }: { clientId: string }) {
-  const [competence, setCompetence] = useState(currentCompetence);
-  // Mesmo prefixo das receitas: corrigir uma receita invalida a prévia.
+  const [competence, setCompetence] = useState(() => competenceFromToday());
   const preview = useFetch(
-    ["fiscal", "revenues", clientId, "simples-preview", competence],
+    [...fiscalSimplesPreviewQueryKey(clientId, competence)],
     () => fiscalRevenueService.simplesPreview(clientId, competence),
     { enabled: /^\d{4}-\d{2}$/.test(competence) },
   );

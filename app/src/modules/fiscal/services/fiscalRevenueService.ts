@@ -31,10 +31,12 @@ export interface FiscalSimplesAnnexRate {
   rate: string;
 }
 
+export type FiscalSimplesPreviewStatus = "ok" | "no_base" | "above_limit";
+
 export interface FiscalSimplesPreview {
   client_id: string;
   competence: string;
-  status: "ok" | "no_base" | "above_limit";
+  status: FiscalSimplesPreviewStatus;
   message: string | null;
   months: Array<{ competence: string; amount: string; registered: boolean }>;
   estimated_month: { competence: string; amount: string };

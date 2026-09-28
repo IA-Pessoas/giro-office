@@ -4,7 +4,7 @@ import {
   calculateSimplesPreview,
   previousCompetences,
   simplesBracket,
-} from "../services/simplesNational.js";
+} from "../services/simplesNationalService.js";
 
 // Onze meses anteriores a 2026-09, do mais recente para o mais antigo.
 const MONTHS = previousCompetences("2026-09");
@@ -100,6 +100,74 @@ describe("calculateSimplesPreview (tabelas do Fiscal.php legado)", () => {
       ),
     ).toEqual([1, 1, 2, 2, 3, 4, 5, 6]);
     expect(simplesBracket(4_800_000.01)).toBeNull();
+  });
+
+  // Tabela de referência (Fiscal.php legado = LC 123 com LC 155; Anexo II com as parcelas da lei).
+  // [alíquota nominal, parcela a deduzir, repartição ICMS/ISS] por faixa.
+  const REFERENCE: Record<string, [string, string, string][]> = {
+    I: [
+      ["4.00", "0.00", "34.00"],
+      ["7.30", "5940.00", "34.00"],
+      ["9.50", "13860.00", "33.50"],
+      ["10.70", "22500.00", "33.50"],
+      ["14.30", "87300.00", "33.50"],
+      ["19.00", "378000.00", "0.00"],
+    ],
+    II: [
+      ["4.50", "0.00", "32.00"],
+      ["7.80", "5940.00", "32.00"],
+      ["10.00", "13860.00", "32.00"],
+      ["11.20", "22500.00", "32.00"],
+      ["14.70", "85500.00", "32.00"],
+      ["30.00", "720000.00", "0.00"],
+    ],
+    III: [
+      ["6.00", "0.00", "33.50"],
+      ["11.20", "9360.00", "32.00"],
+      ["13.50", "17640.00", "32.50"],
+      ["16.00", "35640.00", "32.50"],
+      ["21.00", "125640.00", "33.50"],
+      ["33.00", "648000.00", "0.00"],
+    ],
+    IV: [
+      ["4.50", "0.00", "44.50"],
+      ["9.00", "8100.00", "40.00"],
+      ["10.20", "12420.00", "40.00"],
+      ["14.00", "39780.00", "40.00"],
+      ["22.00", "183780.00", "40.00"],
+      ["33.00", "828000.00", "0.00"],
+    ],
+    V: [
+      ["15.50", "0.00", "14.00"],
+      ["18.00", "4500.00", "17.00"],
+      ["19.50", "9900.00", "19.00"],
+      ["20.50", "17100.00", "21.00"],
+      ["23.00", "62100.00", "23.50"],
+      ["30.50", "540000.00", "0.00"],
+    ],
+  };
+
+  it("usa, em cada faixa de cada anexo, a linha da tabela de referência", () => {
+    const ceilings = [180_000, 360_000, 720_000, 1_800_000, 3_600_000, 4_800_000];
+    ceilings.forEach((ceiling, index) => {
+      // 11 meses de ceiling/12 dão RBT12 exatamente no teto da faixa.
+      const result = calculateSimplesPreview("2026-09", revenues(Array(11).fill(ceiling / 12)));
+      expect(result.rbt12).toBe(ceiling.toFixed(2));
+      for (const [name, rows] of Object.entries(REFERENCE)) {
+        const [nominal_rate, deduction, tax_share] = rows[index];
+        const item = annex(result, name);
+        expect({ name, ...item }).toMatchObject({
+          name,
+          bracket: index + 1,
+          nominal_rate,
+          deduction,
+          tax_share,
+        });
+        const effective = (ceiling * Number(nominal_rate)) / 100 - Number(deduction);
+        expect(Number(item.effective_rate)).toBeCloseTo((effective / ceiling) * 100, 4);
+        expect(Number(item.rate)).toBeCloseTo((effective / ceiling) * Number(tax_share), 4);
+      }
+    });
   });
 
   it("zera ISS/ICMS na 6ª faixa, recolhidos fora do Simples", () => {

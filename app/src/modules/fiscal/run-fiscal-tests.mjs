@@ -283,7 +283,10 @@ await runTest("fiscal Simples preview formats rates and shows base, states and t
   const revenues = await readSource("./components/FiscalRevenuesSection.tsx");
   assert.match(revenues, /<FiscalSimplesPreviewSection clientId=\{client\.id\} \/>/);
   // Corrigir receita invalida a prévia pelo mesmo prefixo de query.
-  assert.match(preview, /\["fiscal", "revenues", clientId, "simples-preview", competence\]/);
+  const queryKeys = await readSource("./hooks/queryKeys.ts");
+  assert.match(preview, /fiscalSimplesPreviewQueryKey\(clientId, competence\)/);
+  assert.match(queryKeys, /\[\.\.\.fiscalRevenuesQueryKey\(clientId\), "simples-preview", competence\]/);
+  assert.match(revenues, /invalidateQueries\(\{ queryKey: fiscalRevenuesQueryKey\(/);
   assert.match(preview, /role="status"[^>]*>Calculando prévia/);
   assert.match(preview, /preview\.error \? <p role="alert"/);
   assert.match(preview, /\(média estimada\)/);

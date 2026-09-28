@@ -7,7 +7,7 @@ import {
   calculateSimplesPreview,
   previousCompetences,
   type SimplesPreview,
-} from "./simplesNational.js";
+} from "./simplesNationalService.js";
 
 export type MonthlyRevenuePrisma = Pick<PrismaClient, "client" | "fiscalMonthlyRevenue">;
 
@@ -53,6 +53,10 @@ function competenceDate(competence: string): Date {
   return new Date(`${competence}-01T00:00:00.000Z`);
 }
 
+function competenceKey(date: Date): string {
+  return date.toISOString().slice(0, 7);
+}
+
 function serialize(value: {
   id: string;
   client_id: string;
@@ -66,7 +70,7 @@ function serialize(value: {
   return {
     id: value.id,
     client_id: value.client_id,
-    competence: value.competence.toISOString().slice(0, 7),
+    competence: competenceKey(value.competence),
     amount: value.amount.toString(),
     created_by: value.created_by,
     updated_by: value.updated_by,
@@ -178,7 +182,7 @@ export class MonthlyRevenueService {
       ...calculateSimplesPreview(
         input.competence,
         records.map((record) => ({
-          competence: record.competence.toISOString().slice(0, 7),
+          competence: competenceKey(record.competence),
           amount: record.amount.toString(),
         })),
       ),
