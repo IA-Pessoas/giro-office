@@ -20,10 +20,15 @@ import {
   type MarketingDashboardProvider,
 } from "./routes/marketingDashboard.routes.js";
 import {
+  createMarketingEventEditionsRoutes,
+  type MarketingEventEditionsProvider,
+} from "./routes/marketingEventEditions.routes.js";
+import {
   createMarketingEventsRoutes,
   type MarketingEventsProvider,
 } from "./routes/marketingEvents.routes.js";
 import { MarketingDashboardService } from "./services/marketingDashboardService.js";
+import { MarketingEventEditionsService } from "./services/marketingEventEditionsService.js";
 import { MarketingEventsService } from "./services/marketingEventsService.js";
 
 interface CreateMarketingAppOptions {
@@ -31,6 +36,7 @@ interface CreateMarketingAppOptions {
   logger: Logger;
   dashboardService?: MarketingDashboardProvider;
   eventsService?: MarketingEventsProvider;
+  editionsService?: MarketingEventEditionsProvider;
   prisma?: PrismaClient;
 }
 
@@ -49,12 +55,15 @@ export function createMarketingApp({
   logger,
   dashboardService,
   eventsService,
+  editionsService,
   prisma,
 }: CreateMarketingAppOptions): Express {
   const app = express();
   const auth = createIsAuthenticatedMiddleware(env);
   const service = dashboardService ?? (prisma ? new MarketingDashboardService(prisma) : null);
   const marketingEvents = eventsService ?? (prisma ? new MarketingEventsService(prisma) : null);
+  const marketingEventEditions =
+    editionsService ?? (prisma ? new MarketingEventEditionsService(prisma) : null);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "marketing-service")));
@@ -79,6 +88,9 @@ export function createMarketingApp({
   }
   if (marketingEvents) {
     app.use("/marketing", createMarketingEventsRoutes(marketingEvents, auth));
+  }
+  if (marketingEventEditions) {
+    app.use("/marketing", createMarketingEventEditionsRoutes(marketingEventEditions, auth));
   }
 
   app.use(
