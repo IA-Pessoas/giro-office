@@ -1,6 +1,6 @@
 # marketing-service
 
-Serviço somente de leitura para o dashboard inicial de Marketing.
+Serviço do dashboard inicial e gestão de eventos de Marketing por organização.
 
 ## Porta local
 
@@ -14,9 +14,11 @@ Serviço somente de leitura para o dashboard inicial de Marketing.
 
 ## Gateway
 
-O serviço prepara `GET /marketing/dashboard`, que exige permissão Marketing de nível 1. O gateway
-mantém `/marketing` bloqueado com 404 até a reconciliação do módulo. Todas as consultas usam a
-organização do contexto autenticado. O serviço não altera solicitações, clientes ou colaboradores.
+O gateway expõe o prefixo público `/marketing`. Exemplos: `GET /marketing/dashboard`,
+`GET /marketing/events/list`, `POST /marketing/events` e `PUT /marketing/events/{id}`.
+As rotas exigem autenticação e permissão do módulo Marketing; criação e edição requerem nível de
+edição. Eventos são limitados à organização do contexto autenticado. Na criação, o status inicial
+é `Novo`; ele pode ser alterado na edição.
 
 ## Desenvolvimento
 
@@ -24,3 +26,6 @@ organização do contexto autenticado. O serviço não altera solicitações, cl
 pnpm --filter @workspace/marketing-service dev
 pnpm --filter @workspace/marketing-service test
 ```
+
+O smoke de integração do workspace é opt-in com `MARKETING_EVENTS_SMOKE_ENABLED=1`; ele cria um
+evento com nome único na organização autenticada para testar criação e edição.

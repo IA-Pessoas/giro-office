@@ -18,6 +18,7 @@ import {
   FileCheck,
   LayoutDashboard,
   Loader2,
+  Megaphone,
   Menu,
   Receipt,
   Search,
@@ -157,6 +158,7 @@ const moduleCategories: NavigationCategory[] = [
       },
       { path: "/tecnologia", name: "Tecnologia", icon: Code, moduleKey: "ti" as ModuleKey },
       { path: "/comercial", name: "Comercial", icon: BadgeDollarSign, moduleKey: "comercial" as ModuleKey },
+      { path: "/marketing", name: "Marketing", icon: Megaphone, moduleKey: "marketing" as ModuleKey },
     ],
   },
   {

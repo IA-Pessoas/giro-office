@@ -22,9 +22,7 @@ export const MODULE_KEYS = [
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
-export const DISABLED_MODULE_KEYS = [
-  "marketing",
-] as const satisfies readonly ModuleKey[];
+export const DISABLED_MODULE_KEYS = [] as const satisfies readonly ModuleKey[];
 const DISABLED_MODULE_KEY_SET = new Set<ModuleKey>(DISABLED_MODULE_KEYS);
 export type AccessLevel = "none" | "view" | "edit" | "admin";
 export type AccessSource = "admin" | "department" | "additional-module" | "none";
@@ -69,6 +67,7 @@ export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/departamento-pessoal": "pessoal",
   "/tecnologia": "ti",
   "/comercial": "comercial",
+  "/marketing": "marketing",
   "/triagem": "triagem",
 };
 

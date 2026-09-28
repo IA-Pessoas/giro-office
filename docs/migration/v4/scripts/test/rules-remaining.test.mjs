@@ -779,7 +779,7 @@ async function workspaceContexts() {
   };
 }
 
-test("registry final contém cento e três regras; ramais reclassificados não possuem emissor", () => {
+test("registry final contém cento e quatro regras; ramais reclassificados não possuem emissor", () => {
   const previous = [
     V2_RULES,
     RH_PESSOAL_RULES,
@@ -793,10 +793,10 @@ test("registry final contém cento e três regras; ramais reclassificados não p
   const confirmed = REMAINING_EVIDENCE.filter(({ finalStatus }) => finalStatus === "confirmed");
   const pending = REMAINING_EVIDENCE.filter(({ finalStatus }) => finalStatus === "pending");
 
-  assert.equal(REMAINING_RULES.length, 14);
-  assert.equal(confirmed.length, 14);
-  assert.equal(pending.length, 73);
-  assert.equal(registry.size, 103);
+  assert.equal(REMAINING_RULES.length, 15);
+  assert.equal(confirmed.length, 15);
+  assert.equal(pending.length, 72);
+  assert.equal(registry.size, 104);
   assert.equal(registry.has("tb_cbs.ramais"), false);
   assert.deepEqual(
     REMAINING_RULES.map(({ sourceTable }) => sourceTable),

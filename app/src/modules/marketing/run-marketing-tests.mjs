@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const dashboard = await readFile(new URL("./components/MarketingDashboard.tsx", import.meta.url), "utf8");
+const events = await readFile(new URL("./components/MarketingEvents.tsx", import.meta.url), "utf8");
+const eventsService = await readFile(new URL("./services/marketingEventsService.ts", import.meta.url), "utf8");
+const eventsHooks = await readFile(new URL("./hooks/useMarketingEvents.ts", import.meta.url), "utf8");
 const service = await readFile(new URL("./services/marketingDashboardService.ts", import.meta.url), "utf8");
 const page = await readFile(new URL("../../pages/marketing/index.tsx", import.meta.url), "utf8");
 
@@ -12,7 +15,20 @@ assert.match(dashboard, /if \(noData\)/);
 assert.match(dashboard, /query\.refetch\(\)/);
 assert.match(service, /"\/marketing\/dashboard"/);
 assert.doesNotMatch(dashboard, /campaigns|mockData|fakeData/i);
-assert.match(page, /notFound:\s*true/);
-assert.doesNotMatch(page, /MarketingDashboard/);
+assert.match(events, /query\.isLoading/);
+assert.match(events, /query\.isError/);
+assert.match(events, /query\.data\?\.length\s*===\s*0/);
+assert.match(events, /createMutation\.mutateAsync|useCreateMarketingEvent/);
+assert.match(events, /updateMutation\.mutateAsync|useUpdateMarketingEvent/);
+assert.match(events, /name="logo"/);
+assert.match(events, /name="priority"/);
+assert.match(events, /name="objective"/);
+assert.match(events, /name="audience"/);
+assert.match(eventsService, /"\/marketing\/events\/list"/);
+assert.match(eventsService, /"\/marketing\/events"/);
+assert.match(eventsHooks, /invalidateQueries/);
+assert.doesNotMatch(page, /notFound:\s*true/);
+assert.match(page, /MarketingDashboard/);
+assert.match(page, /MarketingEvents/);
 
-console.log("Marketing UI states, canonical API path, and activation gate verified.");
+console.log("Marketing UI states, canonical API path, and module activation verified.");

@@ -187,6 +187,7 @@ model Organization {
   taskPostponements             TaskPostponement[]
   logs                          Logs[]
   passwordsMkt                  PasswordMkt[]
+  marketingEvents               MarketingEvent[]
   notes                         Note[]
   certificateNotifications      CertificateNotification[]
   pessoalNotifications          PessoalNotification[]
@@ -1743,6 +1744,27 @@ model PasswordMkt {
   organization    Organization @relation(fields: [organization_id], references: [id])
 
   @@map("mtk.passwords")
+}
+
+model MarketingEvent {
+  id              String       @id @default(uuid())
+  organization_id String
+  name            String       @db.VarChar(50)
+  name_key        String       @db.VarChar(50)
+  legacy_id       Int?
+  logo            String       @default("") @db.VarChar(100)
+  status          String       @default("Novo") @db.VarChar(25)
+  priority        String       @db.VarChar(15)
+  objective       String       @default("")
+  audience        String       @default("")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, name_key], map: "mtk.events_organization_name_key_unique")
+  @@unique([organization_id, legacy_id], map: "mtk.events_organization_legacy_id_unique")
+  @@index([organization_id, status], map: "mtk.events_organization_status_idx")
+  @@map("mtk.events")
 }
 
 model Installment {
