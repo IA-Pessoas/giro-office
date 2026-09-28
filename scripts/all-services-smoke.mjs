@@ -4504,6 +4504,20 @@ const handlers = {
     }
   },
 
+  async fiscalSimplesPdf(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02", annex: "III" },
+      expectEnvelope: false,
+    });
+  },
+
+  async fiscalSimplesPdfInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02", annex: "VI" },
+    });
+  },
+
   async fiscalRevenueUpdate(op) {
     await httpRequest(op, {
       path: `/fiscal/revenues/${requireState("fiscalRevenueId")}`,

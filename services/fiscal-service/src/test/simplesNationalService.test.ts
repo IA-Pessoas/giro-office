@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateSimplesPreview,
+  nextCompetence,
   previousCompetences,
   simplesBracket,
 } from "../services/simplesNationalService.js";
@@ -34,6 +35,45 @@ describe("previousCompetences", () => {
       "2025-05",
       "2025-04",
     ]);
+  });
+});
+
+describe("nextCompetence", () => {
+  it("avança um mês, atravessando o ano", () => {
+    expect(nextCompetence("2026-08")).toBe("2026-09");
+    expect(nextCompetence("2026-12")).toBe("2027-01");
+  });
+});
+
+describe("emissão (Pdf::iss legado)", () => {
+  it("vale para a competência seguinte e limita ICMS a 1,36–5% e ISS a 2,01–5%", () => {
+    // RBT12 180.000 (1ª faixa): I 1,36; II 1,44; III 2,01; IV 2,0025; V 2,17.
+    const low = calculateSimplesPreview("2026-09", revenues(Array(11).fill(15_000)));
+    expect(low.applies_to).toBe("2026-10");
+    expect(low.annexes.map((item) => [item.annex, item.rate, item.emission_rate])).toEqual([
+      ["I", "1.3600", "1.36"], // no mínimo exato do ICMS
+      ["II", "1.4400", "1.44"],
+      ["III", "2.0100", "2.01"], // no mínimo exato do ISS
+      ["IV", "2.0025", "2.01"], // abaixo do mínimo do ISS: sobe para 2,01
+      ["V", "2.1700", "2.17"],
+    ]);
+
+    // RBT12 3.600.000 (5ª faixa, teto): V = (3.6M × 23% − 62.100) ÷ 3.6M × 23,5% = 4,9996%
+    // (dentro do limite; 2 casas na emissão, como o legado);
+    // IV = (3.6M × 22% − 183.780) ÷ 3.6M × 40% = 6,758% (acima do máximo).
+    const high = calculateSimplesPreview("2026-09", revenues(Array(11).fill(300_000)));
+    const byAnnex = Object.fromEntries(high.annexes.map((item) => [item.annex, item]));
+    expect(byAnnex.IV).toMatchObject({ rate: "6.7580", emission_rate: "5.00" });
+    expect(byAnnex.V).toMatchObject({ rate: "4.9996", emission_rate: "5.00" });
+    // III = (3.6M × 21% − 125.640) ÷ 3.6M × 33,5% = 5,86585% → 5,00.
+    expect(byAnnex.III).toMatchObject({ rate: "5.8659", emission_rate: "5.00" });
+    // A prévia mantém o valor bruto.
+    expect(Number(byAnnex.IV.rate)).toBeGreaterThan(5);
+  });
+
+  it("na 6ª faixa não há alíquota válida para emitir", () => {
+    const result = calculateSimplesPreview("2026-09", revenues(Array(11).fill(350_000)));
+    expect(result.annexes.every((item) => item.emission_rate === null)).toBe(true);
   });
 });
 

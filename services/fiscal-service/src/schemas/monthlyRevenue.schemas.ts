@@ -23,13 +23,6 @@ export const monthlyRevenueIdParamsSchema = z
   .object({ id: z.string().uuid("Registro inválido.") })
   .strict();
 
-export const simplesPreviewQuerySchema = z
-  .object({
-    client_id: z.string().uuid("Cliente inválido."),
-    competence: competenceSchema,
-  })
-  .strict();
-
 export const listMonthlyRevenuesQuerySchema = z
   .object({
     ...paginationQuerySchema.shape,

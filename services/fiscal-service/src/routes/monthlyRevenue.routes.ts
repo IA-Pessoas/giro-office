@@ -12,15 +12,11 @@ import {
   createMonthlyRevenueBodySchema,
   listMonthlyRevenuesQuerySchema,
   monthlyRevenueIdParamsSchema,
-  simplesPreviewQuerySchema,
   updateMonthlyRevenueBodySchema,
 } from "../schemas/monthlyRevenue.schemas.js";
 import type { MonthlyRevenueService } from "../services/monthlyRevenueService.js";
 
-export type MonthlyRevenueRouteDeps = Pick<
-  MonthlyRevenueService,
-  "create" | "update" | "list" | "simplesPreview"
->;
+export type MonthlyRevenueRouteDeps = Pick<MonthlyRevenueService, "create" | "update" | "list">;
 
 export function createMonthlyRevenueRoutes(
   service: MonthlyRevenueRouteDeps,
@@ -59,21 +55,6 @@ export function createMonthlyRevenueRoutes(
         res.json(createSuccessResponse(await service.list(query, auth.organization_id)));
       } catch (err) {
         logError("Erro ao listar receitas mensais", { err });
-        next(err);
-      }
-    },
-  );
-
-  router.get(
-    "/simples/preview",
-    isAuthenticated,
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const query = parseWithZod(simplesPreviewQuerySchema, req.query);
-        const auth = requireAuthenticatedRequestContext(req);
-        res.json(createSuccessResponse(await service.simplesPreview(query, auth.organization_id)));
-      } catch (err) {
-        logError("Erro ao calcular prévia do Simples", { err });
         next(err);
       }
     },

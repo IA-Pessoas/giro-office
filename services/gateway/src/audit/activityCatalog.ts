@@ -248,6 +248,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/fiscal\/simples\/pdf$/,
+    description: { action: "baixou", item: "um PDF de alíquota do Simples" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
     description: { action: "consultou", item: "um job de relatório" },
   },
