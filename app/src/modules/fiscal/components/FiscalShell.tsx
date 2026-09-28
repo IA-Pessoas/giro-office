@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Banknote,
   Percent,
   Landmark,
   Receipt,
@@ -15,6 +16,7 @@ import { FiscalIcmsSection } from "./FiscalIcmsSection";
 import { FiscalIpiSection } from "./FiscalIpiSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
 import { FiscalRatesSection } from "./FiscalRatesSection";
+import { FiscalRevenuesSection } from "./FiscalRevenuesSection";
 import { FiscalSearchSection } from "./FiscalSearchSection";
 
 const fiscalTabs: Array<{
@@ -47,6 +49,11 @@ const fiscalTabs: Array<{
     label: "Alíquotas ISS/ICMS",
     icon: Percent,
   },
+  {
+    id: "revenues",
+    label: "Receitas mensais",
+    icon: Banknote,
+  },
 ];
 
 export function FiscalShell() {
@@ -64,7 +71,7 @@ export function FiscalShell() {
             Fiscal
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Consulta e cadastro de NCM, ICMS, IPI e alíquotas por empresa
+            Consulta e cadastro de NCM, ICMS, IPI, alíquotas e receitas por empresa
           </p>
         </div>
       </div>
@@ -135,6 +142,10 @@ function FiscalActiveTabPanel({
 
   if (activeTab === "rates") {
     return <div role="tabpanel" id="fiscal-panel-rates" aria-labelledby="fiscal-tab-rates"><FiscalRatesSection canEdit={canEdit} /></div>;
+  }
+
+  if (activeTab === "revenues") {
+    return <div role="tabpanel" id="fiscal-panel-revenues" aria-labelledby="fiscal-tab-revenues"><FiscalRevenuesSection canEdit={canEdit} /></div>;
   }
 
   return <FiscalIpiTab canEdit={canEdit} canDelete={canDelete} />;

@@ -20,6 +20,12 @@ import {
   updateIpiBodySchema,
 } from "@workspace/fiscal-service/src/schemas/ipi.schemas.js";
 import {
+  createMonthlyRevenueBodySchema,
+  listMonthlyRevenuesQuerySchema,
+  monthlyRevenueIdParamsSchema,
+  updateMonthlyRevenueBodySchema,
+} from "@workspace/fiscal-service/src/schemas/monthlyRevenue.schemas.js";
+import {
   createNcmBodySchema,
   detailNcmQuerySchema,
   listNcmQuerySchema,
@@ -31,6 +37,7 @@ import {
 } from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
+import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   fiscalIcmsReportingCatalog,
@@ -70,6 +77,7 @@ type CrudService = {
 type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
+type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
 
 interface FiscalWorkerOptions {
   env: FiscalWorkerEnv;
@@ -79,6 +87,7 @@ interface FiscalWorkerOptions {
   searchService?: SearchServiceLike;
   reportingService?: ReportingServiceLike;
   rateService?: RateServiceLike;
+  revenueService?: RevenueServiceLike;
 }
 
 type FiscalContext = {
@@ -93,6 +102,7 @@ type WorkerServices = {
   searchService: SearchServiceLike;
   reportingService: ReportingServiceLike;
   rateService: RateServiceLike;
+  revenueService: RevenueServiceLike;
 };
 
 const SECURITY_HEADERS = {
@@ -214,6 +224,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
       const prisma = client as unknown as ConstructorParameters<typeof IcmsService>[0] &
         ConstructorParameters<typeof FiscalSearchService>[0] &
         ConstructorParameters<typeof FiscalRateService>[0] &
+        ConstructorParameters<typeof MonthlyRevenueService>[0] &
         ConstructorParameters<typeof InternalReportingService>[0];
       const factories: { [S in keyof WorkerServices]: () => WorkerServices[S] } = {
         icmsService: () => new IcmsService(prisma, createFiscalAudit(env)),
@@ -222,6 +233,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         searchService: () => new FiscalSearchService(prisma),
         reportingService: () => new InternalReportingService(prisma),
         rateService: () => new FiscalRateService(prisma, createFiscalAudit(env)),
+        revenueService: () => new MonthlyRevenueService(prisma, createFiscalAudit(env)),
       };
       return callback(factories[key]());
     });
@@ -267,6 +279,37 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     return new Response(new Uint8Array(pdf), {
       headers: fiscalRatePdfHeaders(rate),
     });
+  });
+
+  app.post("/fiscal/revenues", async (c) => {
+    const body = parseWithZod(createMonthlyRevenueBodySchema, await readJson(c));
+    const data = await withService("revenueService", (service) =>
+      service.create({ ...actor(c), ...body }),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.get("/fiscal/revenues/list", async (c) => {
+    const query = parseWithZod(listMonthlyRevenuesQuerySchema, {
+      client_id: c.req.query("client_id"),
+      from: c.req.query("from"),
+      to: c.req.query("to"),
+      page: c.req.query("page"),
+      page_size: c.req.query("page_size"),
+    });
+    const data = await withService("revenueService", (service) =>
+      service.list(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.put("/fiscal/revenues/:id", async (c) => {
+    const { id } = parseWithZod(monthlyRevenueIdParamsSchema, { id: c.req.param("id") });
+    const { amount } = parseWithZod(updateMonthlyRevenueBodySchema, await readJson(c));
+    const data = await withService("revenueService", (service) =>
+      service.update({ ...actor(c), id, amount }),
+    );
+    return c.json(createSuccessResponse(data));
   });
 
   const crudRoutes: {

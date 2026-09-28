@@ -117,6 +117,10 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       { name: "IPI", description: "CRUD de IPI" },
       { name: "NCM", description: "CRUD de NCM" },
       { name: "Alíquotas", description: "Registro manual e PDF de ISS/ICMS por empresa" },
+      {
+        name: "Receitas",
+        description: "Receita bruta mensal por cliente, base do Simples Nacional",
+      },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
@@ -791,6 +795,106 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
               content: { "application/json": { schema: paginatedListEnvelopeSchema } },
             },
             "400": { description: "Filtro inválido" },
+          },
+        },
+      },
+      "/fiscal/revenues": {
+        post: {
+          tags: ["Receitas"],
+          summary: "Registrar receita bruta do cliente na competência",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "amount"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    amount: {
+                      type: "string",
+                      pattern: "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+                      description: "Valor em reais, não negativo, com ponto decimal",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Receita registrada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+            "409": { description: "Já existe receita para o cliente nesta competência" },
+          },
+        },
+      },
+      "/fiscal/revenues/list": {
+        get: {
+          tags: ["Receitas"],
+          summary: "Listar receitas mensais do cliente",
+          description: "Competência sem registro é tratada como receita zero pelo cálculo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            { name: "from", in: "query", required: false, schema: { type: "string" } },
+            { name: "to", in: "query", required: false, schema: { type: "string" } },
+            ...paginationParameters,
+          ],
+          responses: {
+            "200": {
+              description: "Receitas paginadas, da competência mais recente para a mais antiga",
+              content: { "application/json": { schema: paginatedListEnvelopeSchema } },
+            },
+            "400": { description: "Filtro inválido" },
+          },
+        },
+      },
+      "/fiscal/revenues/{id}": {
+        put: {
+          tags: ["Receitas"],
+          summary: "Corrigir o valor de uma receita mensal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["amount"],
+                  additionalProperties: false,
+                  properties: { amount: { type: "string" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Receita corrigida",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Receita não encontrada nesta organização" },
           },
         },
       },

@@ -56,6 +56,70 @@ function gatewayHeaders(overrides: Record<string, string> = {}): HeadersInit {
 }
 
 describe("fiscal Worker", () => {
+  it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
+    const revenue = {
+      id: ICMS_ID,
+      client_id: "d0000000-0000-4000-8000-000000000001",
+      competence: "2026-08",
+      amount: "12345.67",
+      created_by: USER_ID,
+      updated_by: USER_ID,
+      createdAt: "2026-09-28T12:00:00.000Z",
+      updatedAt: "2026-09-28T12:00:00.000Z",
+    };
+    const revenues = {
+      create: vi.fn(async () => revenue),
+      update: vi.fn(async () => ({ ...revenue, amount: "10.00" })),
+      list: vi.fn(async () => ({ data: [revenue], total: 1, page: 1, limit: 24, hasMore: false })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), revenueService: revenues });
+
+    const created = await app.request("https://fiscal.test/fiscal/revenues", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: revenue.client_id,
+        competence: "2026-08",
+        amount: "12345.67",
+      }),
+    });
+    expect(created.status).toBe(201);
+    expect(revenues.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+
+    const listed = await app.request(
+      `https://fiscal.test/fiscal/revenues/list?client_id=${revenue.client_id}&from=2025-09&to=2026-08`,
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) }) },
+    );
+    expect(listed.status).toBe(200);
+    expect(revenues.list).toHaveBeenCalledWith(
+      expect.objectContaining({ client_id: revenue.client_id, from: "2025-09", to: "2026-08" }),
+      ORGANIZATION_ID,
+    );
+
+    const updated = await app.request(`https://fiscal.test/fiscal/revenues/${ICMS_ID}`, {
+      method: "PUT",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ amount: "10.00" }),
+    });
+    expect(updated.status).toBe(200);
+    expect(revenues.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: ICMS_ID, amount: "10.00", organizationId: ORGANIZATION_ID }),
+    );
+
+    const viewerWrite = await app.request(`https://fiscal.test/fiscal/revenues/${ICMS_ID}`, {
+      method: "PUT",
+      headers: {
+        ...gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) }),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ amount: "1" }),
+    });
+    expect(viewerWrite.status).toBe(403);
+    expect(revenues.update).toHaveBeenCalledOnce();
+  });
+
   it("registra alíquota manual e entrega PDF no tenant autenticado", async () => {
     const rate = {
       id: ICMS_ID,

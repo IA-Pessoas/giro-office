@@ -14,6 +14,7 @@ import {
   requireSmokeState,
   smokeCall,
   smokeEnv,
+  smokeInsert,
   smokeState,
 } from "../../runtime/src/crudSmoke.js";
 import { createFiscalWorkerApp, type FiscalWorkerEnv } from "./app.js";
@@ -223,6 +224,52 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     });
     expectOk(await call("DELETE", `/fiscal/ipi?ipi_id=${id}`), "DELETE /fiscal/ipi");
     expectOk(await call("GET", `/fiscal/ipi?ipi_id=${id}`), "GET após DELETE", [404]);
+  });
+
+  it("receitas mensais: cria, recusa duplicada, lista por período e corrige", async () => {
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Receita ${suffix}`,
+      status: "Ativo",
+    });
+    const clientId = String(client.id);
+    const created = expectOk(
+      await call("POST", "/fiscal/revenues", {
+        client_id: clientId,
+        competence: "2026-07",
+        amount: "12345.67",
+      }),
+      "POST /fiscal/revenues",
+    );
+    const id = created.data.id as string;
+    expect(created.data).toMatchObject({ competence: "2026-07", amount: "12345.67" });
+    expectOk(
+      await call("POST", "/fiscal/revenues", {
+        client_id: clientId,
+        competence: "2026-07",
+        amount: "1",
+      }),
+      "POST duplicado",
+      [409],
+    );
+    expectOk(
+      await call("POST", "/fiscal/revenues", {
+        client_id: clientId,
+        competence: "2026-08",
+        amount: "0",
+      }),
+      "POST receita zero",
+    );
+    const list = expectOk(
+      await call("GET", `/fiscal/revenues/list?client_id=${clientId}&from=2026-07&to=2026-07`),
+      "GET /fiscal/revenues/list",
+    );
+    expect(list.data.data.map((row: { id: string }) => row.id)).toEqual([id]);
+    const updated = expectOk(
+      await call("PUT", `/fiscal/revenues/${id}`, { amount: "999.10" }),
+      "PUT /fiscal/revenues/:id",
+    );
+    expect(updated.data.amount).toBe("999.1");
   });
 
   it("reporting interno: catálogo e extract de cada fonte com todos os campos", async () => {

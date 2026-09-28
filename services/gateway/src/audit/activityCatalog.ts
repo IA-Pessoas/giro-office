@@ -926,6 +926,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/triagem\/fiscal-portfolio\/?$/,
+    description: { action: "consultou", item: "a carteira fiscal mensal da Triagem" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/triagem\/external-links\/?$/,
     description: { action: "consultou", item: "os links externos da Triagem" },
   },
@@ -1226,6 +1231,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um registro de alíquota fiscal",
     newSingular: "um novo registro de alíquota fiscal",
     plural: "registros de alíquotas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/revenues(?:\/|$)/,
+    singular: "uma receita mensal",
+    newSingular: "uma nova receita mensal",
+    plural: "receitas mensais",
   },
   {
     pattern: /^\/contabil\/controls(?:\/|$)/,

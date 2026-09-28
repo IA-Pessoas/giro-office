@@ -246,3 +246,29 @@ await runTest("fiscal NCM shows tax regime name instead of legacy code", async (
   assert.equal(formatFiscalTaxRegime("Simples Nacional"), "Simples Nacional");
   assert.match(fiscalSources.ncmSection, /formatFiscalTaxRegime\(item\.tax_regime\)/);
 });
+
+await runTest("fiscal revenue amount distinguishes informed zero from invalid input", async () => {
+  const { formatCompetenceLabel, formatRevenueAmount, toRevenueAmount } = await import(
+    "./utils/fiscalRevenue.ts"
+  );
+  assert.equal(toRevenueAmount("R$ 1.234,5"), "1234.50");
+  assert.equal(toRevenueAmount("R$ 0"), "0.00");
+  assert.equal(toRevenueAmount(""), null);
+  assert.equal(toRevenueAmount("R$ "), null);
+  assert.equal(toRevenueAmount("-5"), null);
+  assert.equal(formatRevenueAmount("1234.5"), "R$ 1.234,50");
+  assert.equal(formatCompetenceLabel("2026-08"), "08/2026");
+});
+
+await runTest("fiscal revenues tab keeps loading, error, empty and validation states", async () => {
+  const section = await readSource("./components/FiscalRevenuesSection.tsx");
+  assert.match(fiscalSources.shell, /<FiscalRevenuesSection canEdit=\{canEdit\} \/>/);
+  assert.match(section, /role="status"[^>]*>Carregando receitas/);
+  assert.match(section, /list\.error \? <p role="alert"/);
+  assert.match(section, /Nenhuma receita registrada para este cliente/);
+  assert.match(section, /id="fiscal-revenue-amount-error" role="alert"/);
+  assert.match(section, /if \(value === null\) \{\s*setAmountError/);
+  // Visualizador só consulta: sem formulário nem ação de correção.
+  assert.match(section, /\{client && canEdit \? \(\s*<form/);
+  assert.match(section, /\{canEdit \? \(\s*<td/);
+});

@@ -52,6 +52,21 @@ model FiscalRate {
   @@map("fiscal.rate_statements")
 }
 
+model FiscalMonthlyRevenue {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime @db.Date
+  amount          Decimal  @db.Decimal(15, 2)
+  created_by      String
+  updated_by      String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_revenues_org_client_competence")
+  @@map("fiscal.monthly_revenues")
+}
+
 model Ncm {
   id                    String    @id @default(uuid())
   tax_regime            String
