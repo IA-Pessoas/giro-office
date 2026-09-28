@@ -297,3 +297,21 @@ await runTest("fiscal Simples preview formats rates and shows base, states and t
   assert.match(preview, /data\.status === "ok" \? \(/);
   assert.match(preview, /\{data\.message\}/);
 });
+
+await runTest("fiscal Simples preview emits one PDF per annex with the limited rate", async () => {
+  const preview = await readSource("./components/FiscalSimplesPreviewSection.tsx");
+  const client = await readSource("./services/fiscalRevenueService.ts");
+  // Apuração do mês anterior; o PDF vale para o mês seguinte à apuração.
+  assert.match(preview, /Competência de apuração/);
+  assert.match(preview, /useState\(\(\) => competenceFromToday\(-1\)\)/);
+  assert.match(preview, /Alíquota emitida para \{formatCompetenceLabel\(data\.applies_to\)\}/);
+  // Botão só com alíquota válida; 6ª faixa explica por que não emite.
+  assert.match(preview, /\{item\.emission_rate \? \(\s*<button/);
+  assert.match(preview, /Emitir PDF · \{formatRatePercent\(item\.emission_rate\)\}/);
+  assert.match(preview, /na 6ª faixa o \{item\.tax\} é recolhido fora do Simples/);
+  // Erro de emissão vira toast com a mensagem do servidor, sem baixar arquivo.
+  assert.match(preview, /catch \(error\) \{\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
+  assert.match(client, /"\/fiscal\/simples\/pdf"/);
+  assert.match(client, /error\.response\?\.data instanceof Blob/);
+  assert.match(client, /error\.response\.data = JSON\.parse\(await error\.response\.data\.text\(\)\)/);
+});

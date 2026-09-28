@@ -83,8 +83,10 @@ export interface SimplesAnnexRate {
   deduction: string;
   effective_rate: string;
   tax_share: string;
-  /** Percentual do ISS/ICMS sem os limites de emissão (#1562). */
+  /** Percentual do ISS/ICMS sem os limites de emissão. */
   rate: string;
+  /** Percentual emitido no PDF/CSV, com os limites; null sem alíquota válida (6ª faixa). */
+  emission_rate: string | null;
 }
 
 /** ok: calculado; no_base: RBT12 zero; above_limit: RBT12 acima do teto do Simples. */
@@ -92,6 +94,8 @@ export type SimplesPreviewStatus = "ok" | "no_base" | "above_limit";
 
 export interface SimplesPreview {
   competence: string;
+  /** Competência seguinte, à qual a alíquota emitida se refere (Pdf::iss legado). */
+  applies_to: string;
   status: SimplesPreviewStatus;
   message: string | null;
   months: Array<{ competence: string; amount: string; registered: boolean }>;
@@ -105,6 +109,23 @@ export interface SimplesPreview {
 function fixed(value: number, digits: number): string {
   const scale = 10 ** digits;
   return (Math.round(value * scale + 1e-6) / scale).toFixed(digits);
+}
+
+// Limites do Pdf::iss legado aplicados só na emissão; a prévia mostra o valor bruto.
+export const SIMPLES_EMISSION_LIMITS: Readonly<Record<SimplesTax, readonly [number, number]>> = {
+  ICMS: [1.36, 5],
+  ISS: [2.01, 5],
+};
+
+function emissionRate(tax: SimplesTax, rate: number): string | null {
+  if (rate <= 0) return null;
+  const [minimum, maximum] = SIMPLES_EMISSION_LIMITS[tax];
+  return fixed(Math.min(Math.max(rate, minimum), maximum), 2);
+}
+
+export function nextCompetence(competence: string): string {
+  const [year, month] = competence.split("-").map(Number);
+  return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
 }
 
 /** Os 11 meses imediatamente anteriores à competência, do mais recente ao mais antigo. */
@@ -141,6 +162,7 @@ export function calculateSimplesPreview(
 
   return {
     competence,
+    applies_to: nextCompetence(competence),
     status,
     message:
       status === "no_base"
@@ -161,6 +183,7 @@ export function calculateSimplesPreview(
             const { tax, brackets } = SIMPLES_ANNEXES[annex];
             const [nominal, deduction, share] = brackets[bracket - 1];
             const effective = ((rbt12 * nominal) / 100 - deduction) / rbt12;
+            const rate = Number(fixed(effective * share, 4));
             return {
               annex,
               tax,
@@ -169,7 +192,8 @@ export function calculateSimplesPreview(
               deduction: fixed(deduction, 2),
               effective_rate: fixed(effective * 100, 4),
               tax_share: fixed(share, 2),
-              rate: fixed(effective * share, 4),
+              rate: fixed(rate, 4),
+              emission_rate: emissionRate(tax, rate),
             };
           })
         : [],

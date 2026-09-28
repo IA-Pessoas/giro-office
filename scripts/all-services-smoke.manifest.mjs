@@ -2194,6 +2194,15 @@ const baseManifest = [
   }),
   op({
     service: "fiscal-service",
+    method: "GET",
+    path: "/fiscal/simples/pdf",
+    action: "fiscalSimplesPdf",
+    target: "gateway",
+    auth: "bearer",
+    expectEnvelope: false,
+  }),
+  op({
+    service: "fiscal-service",
     method: "PUT",
     path: "/fiscal/revenues/{id}",
     action: "fiscalRevenueUpdate",

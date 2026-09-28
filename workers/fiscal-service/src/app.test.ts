@@ -56,6 +56,72 @@ function gatewayHeaders(overrides: Record<string, string> = {}): HeadersInit {
 }
 
 describe("fiscal Worker", () => {
+  it("entrega prévia e PDF de alíquota do Simples para leitura, recusando anexo inválido", async () => {
+    const clientId = "d0000000-0000-4000-8000-000000000001";
+    const emission = {
+      client_id: clientId,
+      client_name: "Padaria Exemplo Ltda",
+      client_document: "12.345.678/0001-90",
+      competence: "2026-08",
+      applies_to: "2026-09",
+      annex: "III" as const,
+      tax: "ISS" as const,
+      preview_rate: "1.9800",
+      rate: "2.01",
+    };
+    const simples = {
+      preview: vi.fn(async () => ({
+        client_id: clientId,
+        competence: "2026-08",
+        applies_to: "2026-09",
+        status: "no_base" as const,
+        message: "Não há base para calcular.",
+        months: [],
+        estimated_month: { competence: "2026-08", amount: "0.00" },
+        rbt12: "0.00",
+        annexes: [],
+      })),
+      emission: vi.fn(async () => emission),
+    };
+    const app = createFiscalWorkerApp({ env: env(), simplesService: simples });
+    const reader = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
+
+    const preview = await app.request(
+      `https://fiscal.test/fiscal/simples/preview?client_id=${clientId}&competence=2026-08`,
+      { headers: reader },
+    );
+    expect(preview.status).toBe(200);
+    expect(simples.preview).toHaveBeenCalledWith(
+      { client_id: clientId, competence: "2026-08" },
+      ORGANIZATION_ID,
+    );
+
+    const pdf = await app.request(
+      `https://fiscal.test/fiscal/simples/pdf?client_id=${clientId}&competence=2026-08&annex=III`,
+      { headers: reader },
+    );
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    expect(pdf.headers.get("content-disposition")).toContain("aliquota-ISS-2026-09-");
+    expect((await pdf.arrayBuffer()).byteLength).toBeGreaterThan(500);
+    expect(simples.emission).toHaveBeenCalledWith(
+      { client_id: clientId, competence: "2026-08", annex: "III" },
+      ORGANIZATION_ID,
+    );
+
+    const invalid = await app.request(
+      `https://fiscal.test/fiscal/simples/pdf?client_id=${clientId}&competence=2026-08&annex=VI`,
+      { headers: reader },
+    );
+    expect(invalid.status).toBe(400);
+    const withoutFiscal = await app.request(
+      `https://fiscal.test/fiscal/simples/pdf?client_id=${clientId}&competence=2026-08&annex=III`,
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 0 }) }) },
+    );
+    expect(withoutFiscal.status).toBe(403);
+    expect(simples.emission).toHaveBeenCalledOnce();
+  });
+
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
     const revenue = {
       id: ICMS_ID,
@@ -71,16 +137,6 @@ describe("fiscal Worker", () => {
       create: vi.fn(async () => revenue),
       update: vi.fn(async () => ({ ...revenue, amount: "10.00" })),
       list: vi.fn(async () => ({ data: [revenue], total: 1, page: 1, limit: 24, hasMore: false })),
-      simplesPreview: vi.fn(async () => ({
-        client_id: revenue.client_id,
-        competence: "2026-09",
-        status: "no_base" as const,
-        message: "Não há base para calcular.",
-        months: [],
-        estimated_month: { competence: "2026-09", amount: "0.00" },
-        rbt12: "0.00",
-        annexes: [],
-      })),
     };
     const app = createFiscalWorkerApp({ env: env(), revenueService: revenues });
 
@@ -128,16 +184,6 @@ describe("fiscal Worker", () => {
     });
     expect(viewerWrite.status).toBe(403);
     expect(revenues.update).toHaveBeenCalledOnce();
-
-    const preview = await app.request(
-      `https://fiscal.test/fiscal/simples/preview?client_id=${revenue.client_id}&competence=2026-09`,
-      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) }) },
-    );
-    expect(preview.status).toBe(200);
-    expect(revenues.simplesPreview).toHaveBeenCalledWith(
-      { client_id: revenue.client_id, competence: "2026-09" },
-      ORGANIZATION_ID,
-    );
 
     const withoutFiscal = await app.request(
       `https://fiscal.test/fiscal/revenues/list?client_id=${revenue.client_id}`,

@@ -218,47 +218,6 @@ describe("MonthlyRevenueService", () => {
     expect(result.data[0]).toMatchObject({ competence: "2026-08", amount: "12345.67" });
   });
 
-  it("calcula a prévia do Simples com as receitas dos 11 meses anteriores no tenant", async () => {
-    const { prisma, audit } = dependencies();
-    prisma.fiscalMonthlyRevenue.findMany.mockResolvedValueOnce([
-      stored({
-        competence: new Date("2026-08-01T00:00:00.000Z"),
-        amount: { toString: () => "110000" },
-      }),
-    ]);
-    const service = new MonthlyRevenueService(prisma as never, audit);
-
-    const result = await service.simplesPreview(
-      { client_id: clientId, competence: "2026-09" },
-      organizationId,
-    );
-
-    expect(prisma.fiscalMonthlyRevenue.findMany).toHaveBeenCalledWith({
-      where: {
-        organization_id: organizationId,
-        client_id: clientId,
-        competence: {
-          gte: new Date("2025-10-01T00:00:00.000Z"),
-          lte: new Date("2026-08-01T00:00:00.000Z"),
-        },
-      },
-      select: { competence: true, amount: true },
-    });
-    expect(result).toMatchObject({ client_id: clientId, status: "ok", rbt12: "120000.00" });
-    expect(result.months[0]).toMatchObject({ competence: "2026-08", registered: true });
-  });
-
-  it("não calcula prévia para cliente de outra organização", async () => {
-    const { prisma, audit } = dependencies();
-    prisma.client.findFirst.mockResolvedValueOnce(null as never);
-    const service = new MonthlyRevenueService(prisma as never, audit);
-
-    await expect(
-      service.simplesPreview({ client_id: clientId, competence: "2026-09" }, organizationId),
-    ).rejects.toMatchObject({ statusCode: 404 });
-    expect(prisma.fiscalMonthlyRevenue.findMany).not.toHaveBeenCalled();
-  });
-
   it("não lista receitas de cliente de outra organização", async () => {
     const { prisma, audit } = dependencies();
     prisma.client.findFirst.mockResolvedValueOnce(null as never);

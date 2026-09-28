@@ -869,7 +869,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Receitas"],
           summary: "Prévia das alíquotas de ISS/ICMS do Simples Nacional",
           description:
-            "RBT12 = soma das receitas dos 11 meses anteriores à competência (mês sem registro vale zero) mais a média desses 11 meses, que estima o 12º. Para cada anexo (I e II: ICMS; III a V: ISS) devolve faixa, alíquota nominal, parcela a deduzir, alíquota efetiva, repartição e percentual do tributo, sem os limites da emissão. status no_base (RBT12 zero) e above_limit (acima de R$ 4.800.000,00) não trazem anexos.",
+            "RBT12 = soma das receitas dos 11 meses anteriores à competência (mês sem registro vale zero) mais a média desses 11 meses, que estima o 12º. Para cada anexo (I e II: ICMS; III a V: ISS) devolve faixa, alíquota nominal, parcela a deduzir, alíquota efetiva, repartição, percentual bruto do tributo (rate) e percentual de emissão com os limites (emission_rate: ICMS 1,36–5%, ISS 2,01–5%; null na 6ª faixa). applies_to é a competência seguinte, à qual a alíquota emitida se refere. status no_base (RBT12 zero) e above_limit (acima de R$ 4.800.000,00) não trazem anexos.",
           security: [{ bearerAuth: [] }],
           parameters: [
             {
@@ -894,6 +894,44 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
             },
             "400": { description: "Filtro inválido" },
             "404": { description: "Cliente não encontrado nesta organização" },
+          },
+        },
+      },
+      "/fiscal/simples/pdf": {
+        get: {
+          tags: ["Receitas"],
+          summary: "Emitir PDF da alíquota do Simples para um anexo",
+          description:
+            "Carta ao cliente com a alíquota de ISS (Anexos III a V) ou ICMS (I e II) referente à competência seguinte, com os limites de emissão aplicados. 422 quando não há base (RBT12 zero ou acima do teto) ou alíquota válida (6ª faixa).",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+            {
+              name: "annex",
+              in: "query",
+              required: true,
+              schema: { type: "string", enum: ["I", "II", "III", "IV", "V"] },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "PDF para envio ao cliente",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+            "400": { description: "Filtro inválido" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+            "422": { description: "Sem base ou sem alíquota válida para o anexo" },
           },
         },
       },

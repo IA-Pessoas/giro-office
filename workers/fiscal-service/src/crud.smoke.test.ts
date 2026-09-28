@@ -278,6 +278,12 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     );
     // 999,10 (07/2026) + 0 (08/2026) nos 11 meses; RBT12 = 999,10 × 12 ÷ 11.
     expect(preview.data).toMatchObject({ status: "ok", rbt12: "1089.93" });
+    const pdf = await call(
+      "GET",
+      `/fiscal/simples/pdf?client_id=${clientId}&competence=2026-09&annex=III`,
+    );
+    expect(pdf.status).toBe(200);
+    expect(pdf.text.startsWith("%PDF")).toBe(true);
     expect(preview.data.months.slice(0, 2)).toEqual([
       { competence: "2026-08", amount: "0.00", registered: true },
       { competence: "2026-07", amount: "999.10", registered: true },

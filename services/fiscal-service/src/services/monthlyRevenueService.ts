@@ -3,11 +3,6 @@ import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
 import { getPaginationParams, type PaginationQuery } from "../schemas/pagination.schemas.js";
-import {
-  calculateSimplesPreview,
-  previousCompetences,
-  type SimplesPreview,
-} from "./simplesNationalService.js";
 
 export type MonthlyRevenuePrisma = Pick<PrismaClient, "client" | "fiscalMonthlyRevenue">;
 
@@ -157,36 +152,6 @@ export class MonthlyRevenueService {
       changes: { amount: { from: current.amount.toString(), to: input.amount } },
     });
     return serialize(updated);
-  }
-
-  /** Prévia do Simples: RBT12 dos 11 meses anteriores à competência e alíquota por anexo. */
-  async simplesPreview(
-    input: { client_id: string; competence: string },
-    organizationId: string,
-  ): Promise<SimplesPreview & { client_id: string }> {
-    await this.requireClient(input.client_id, organizationId);
-    const months = previousCompetences(input.competence);
-    const records = await this.prisma.fiscalMonthlyRevenue.findMany({
-      where: {
-        organization_id: organizationId,
-        client_id: input.client_id,
-        competence: {
-          gte: competenceDate(months[months.length - 1]),
-          lte: competenceDate(months[0]),
-        },
-      },
-      select: { competence: true, amount: true },
-    });
-    return {
-      client_id: input.client_id,
-      ...calculateSimplesPreview(
-        input.competence,
-        records.map((record) => ({
-          competence: competenceKey(record.competence),
-          amount: record.amount.toString(),
-        })),
-      ),
-    };
   }
 
   async list(

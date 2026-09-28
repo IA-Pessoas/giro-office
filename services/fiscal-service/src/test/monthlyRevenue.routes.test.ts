@@ -47,16 +47,6 @@ function deps() {
     create: vi.fn(async () => revenue()),
     update: vi.fn(async () => revenue("100.00")),
     list: vi.fn(async () => ({ data: [revenue()], total: 1, page: 1, limit: 24, hasMore: false })),
-    simplesPreview: vi.fn(async () => ({
-      client_id: clientId,
-      competence: "2026-09",
-      status: "ok" as const,
-      message: null,
-      months: [],
-      estimated_month: { competence: "2026-09", amount: "0.00" },
-      rbt12: "0.00",
-      annexes: [],
-    })),
   };
 }
 
@@ -123,30 +113,6 @@ describe("fiscal monthly revenue routes", () => {
     expect(service.create).not.toHaveBeenCalled();
     expect(service.update).not.toHaveBeenCalled();
     expect(service.list).not.toHaveBeenCalled();
-  });
-
-  it("entrega a prévia do Simples para leitura e valida a competência", async () => {
-    const service = deps();
-    const app = createFiscalApp({ env, logger, monthlyRevenueRouteDeps: service });
-
-    const preview = await request(app)
-      .get(`/fiscal/simples/preview?client_id=${clientId}&competence=2026-09`)
-      .set(headers(1));
-    expect(preview.status).toBe(200);
-    expect(service.simplesPreview).toHaveBeenCalledWith(
-      { client_id: clientId, competence: "2026-09" },
-      organizationId,
-    );
-
-    const invalid = await request(app)
-      .get(`/fiscal/simples/preview?client_id=${clientId}&competence=2026-13`)
-      .set(headers(1));
-    expect(invalid.status).toBe(400);
-    const unauthenticated = await request(app).get(
-      `/fiscal/simples/preview?client_id=${clientId}&competence=2026-09`,
-    );
-    expect(unauthenticated.status).toBe(401);
-    expect(service.simplesPreview).toHaveBeenCalledOnce();
   });
 
   it("bloqueia escrita de visualizador e acesso sem autenticação", async () => {

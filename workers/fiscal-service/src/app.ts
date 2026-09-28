@@ -23,7 +23,6 @@ import {
   createMonthlyRevenueBodySchema,
   listMonthlyRevenuesQuerySchema,
   monthlyRevenueIdParamsSchema,
-  simplesPreviewQuerySchema,
   updateMonthlyRevenueBodySchema,
 } from "@workspace/fiscal-service/src/schemas/monthlyRevenue.schemas.js";
 import {
@@ -33,12 +32,21 @@ import {
   updateNcmBodySchema,
 } from "@workspace/fiscal-service/src/schemas/ncm.schemas.js";
 import {
+  simplesPdfQuerySchema,
+  simplesPreviewQuerySchema,
+} from "@workspace/fiscal-service/src/schemas/simplesRate.schemas.js";
+import {
   fiscalRatePdfHeaders,
   renderFiscalRatePdf,
 } from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
 import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
+import {
+  renderSimplesRatePdf,
+  simplesRatePdfHeaders,
+} from "@workspace/fiscal-service/src/services/simplesRatePdfService.js";
+import { SimplesRateService } from "@workspace/fiscal-service/src/services/simplesRateService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   fiscalIcmsReportingCatalog,
@@ -78,10 +86,8 @@ type CrudService = {
 type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
-type RevenueServiceLike = Pick<
-  MonthlyRevenueService,
-  "create" | "update" | "list" | "simplesPreview"
->;
+type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
+type SimplesServiceLike = Pick<SimplesRateService, "preview" | "emission">;
 
 interface FiscalWorkerOptions {
   env: FiscalWorkerEnv;
@@ -92,6 +98,7 @@ interface FiscalWorkerOptions {
   reportingService?: ReportingServiceLike;
   rateService?: RateServiceLike;
   revenueService?: RevenueServiceLike;
+  simplesService?: SimplesServiceLike;
 }
 
 type FiscalContext = {
@@ -107,6 +114,7 @@ type WorkerServices = {
   reportingService: ReportingServiceLike;
   rateService: RateServiceLike;
   revenueService: RevenueServiceLike;
+  simplesService: SimplesServiceLike;
 };
 
 const SECURITY_HEADERS = {
@@ -229,6 +237,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         ConstructorParameters<typeof FiscalSearchService>[0] &
         ConstructorParameters<typeof FiscalRateService>[0] &
         ConstructorParameters<typeof MonthlyRevenueService>[0] &
+        ConstructorParameters<typeof SimplesRateService>[0] &
         ConstructorParameters<typeof InternalReportingService>[0];
       const factories: { [S in keyof WorkerServices]: () => WorkerServices[S] } = {
         icmsService: () => new IcmsService(prisma, createFiscalAudit(env)),
@@ -238,6 +247,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         reportingService: () => new InternalReportingService(prisma),
         rateService: () => new FiscalRateService(prisma, createFiscalAudit(env)),
         revenueService: () => new MonthlyRevenueService(prisma, createFiscalAudit(env)),
+        simplesService: () => new SimplesRateService(prisma),
       };
       return callback(factories[key]());
     });
@@ -312,10 +322,23 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
       client_id: c.req.query("client_id"),
       competence: c.req.query("competence"),
     });
-    const data = await withService("revenueService", (service) =>
-      service.simplesPreview(query, c.get("auth").organizationId),
+    const data = await withService("simplesService", (service) =>
+      service.preview(query, c.get("auth").organizationId),
     );
     return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/simples/pdf", async (c) => {
+    const query = parseWithZod(simplesPdfQuerySchema, {
+      client_id: c.req.query("client_id"),
+      competence: c.req.query("competence"),
+      annex: c.req.query("annex"),
+    });
+    const emission = await withService("simplesService", (service) =>
+      service.emission(query, c.get("auth").organizationId),
+    );
+    const pdf = await renderSimplesRatePdf(emission);
+    return new Response(new Uint8Array(pdf), { headers: simplesRatePdfHeaders(emission) });
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {
