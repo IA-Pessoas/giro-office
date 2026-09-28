@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { Eye, Pencil, Plus, RefreshCw } from "lucide-react";
+import { CalendarDays, Eye, Pencil, Plus, RefreshCw } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
 import { Dialog } from "@shared/components";
 
 import { marketingFormControlClass, marketingFormTextareaClass } from "./marketingFormStyles";
+import { MarketingEventEditions } from "./MarketingEventEditions";
 import {
   useCreateMarketingEvent,
   useMarketingEvents,
@@ -83,6 +84,7 @@ export function MarketingEvents() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<MarketingEvent | null>(null);
   const [viewingEvent, setViewingEvent] = useState<MarketingEvent | null>(null);
+  const [editionsEvent, setEditionsEvent] = useState<MarketingEvent | null>(null);
   const [draft, setDraft] = useState<EventDraft>(emptyDraft);
   const [formError, setFormError] = useState("");
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -210,6 +212,14 @@ export function MarketingEvents() {
                   <td className="max-w-64 truncate px-3 py-3 text-gray-700 dark:text-slate-200">{event.audience}</td>
                   <td className="px-3 py-3 text-right">
                       <button
+                        aria-label={`Ver edições de ${event.name}`}
+                        className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                        onClick={() => setEditionsEvent(event)}
+                        type="button"
+                      >
+                        <CalendarDays aria-hidden="true" className="h-4 w-4" />
+                      </button>
+                      <button
                         aria-label={`Ver evento ${event.name}`}
                         className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                         onClick={() => setViewingEvent(event)}
@@ -325,6 +335,14 @@ export function MarketingEvents() {
           </dl>
         ) : null}
       </Dialog>
+      {editionsEvent ? (
+        <MarketingEventEditions
+          canEdit={access.canEdit}
+          event={editionsEvent}
+          onOpenChange={(open) => { if (!open) setEditionsEvent(null); }}
+          open={editionsEvent !== null}
+        />
+      ) : null}
     </section>
   );
 }

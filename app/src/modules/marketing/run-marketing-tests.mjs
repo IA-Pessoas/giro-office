@@ -5,6 +5,9 @@ const dashboard = await readFile(new URL("./components/MarketingDashboard.tsx", 
 const events = await readFile(new URL("./components/MarketingEvents.tsx", import.meta.url), "utf8");
 const eventsService = await readFile(new URL("./services/marketingEventsService.ts", import.meta.url), "utf8");
 const eventsHooks = await readFile(new URL("./hooks/useMarketingEvents.ts", import.meta.url), "utf8");
+const editions = await readFile(new URL("./components/MarketingEventEditions.tsx", import.meta.url), "utf8");
+const editionsService = await readFile(new URL("./services/marketingEventEditionsService.ts", import.meta.url), "utf8");
+const editionsHooks = await readFile(new URL("./hooks/useMarketingEventEditions.ts", import.meta.url), "utf8");
 const service = await readFile(new URL("./services/marketingDashboardService.ts", import.meta.url), "utf8");
 const page = await readFile(new URL("../../pages/marketing/index.tsx", import.meta.url), "utf8");
 
@@ -27,6 +30,16 @@ assert.match(events, /name="audience"/);
 assert.match(eventsService, /"\/marketing\/events\/list"/);
 assert.match(eventsService, /"\/marketing\/events"/);
 assert.match(eventsHooks, /invalidateQueries/);
+assert.match(events, /MarketingEventEditions/);
+assert.match(editionsService, /\/marketing\/events\/\$\{eventId\}\/editions/);
+assert.match(editionsService, /\$\{editionId\}/);
+assert.match(editionsHooks, /invalidateQueries/);
+assert.match(editions, /budgetTotal/);
+assert.match(editions, /Orçamento/);
+assert.match(editions, /Marketing e comunicação/);
+assert.match(editions, /Durante o evento/);
+assert.match(editions, /Após o evento/);
+assert.match(editions, /editing \? "Salvar edição"/);
 assert.doesNotMatch(page, /notFound:\s*true/);
 assert.match(page, /MarketingDashboard/);
 assert.match(page, /MarketingEvents/);
