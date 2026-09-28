@@ -522,6 +522,25 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     if (delivered.status === 200) {
       expect(read.data.item_notes.inbound_report.delivery_method).toBe(deliveryCode);
     }
+
+    // Carteira: select com relações de Client e lookup em users contra o schema real.
+    const portfolio = expectOk(
+      await call("GET", `/triagem/fiscal-portfolio?competence=${fiscalCompetence}`),
+      "GET fiscal-portfolio",
+    );
+    expect(portfolio.data.competence).toBe(fiscalCompetence);
+    expect(portfolio.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          client_id: clientId,
+          can_edit: true,
+          monthly: expect.objectContaining({
+            id,
+            checklist: expect.objectContaining({ inbound_report: "PENDING" }),
+          }),
+        }),
+      ]),
+    );
   });
 
   it("reporting interno: catálogo e extract de cada fonte com todos os campos", async () => {
