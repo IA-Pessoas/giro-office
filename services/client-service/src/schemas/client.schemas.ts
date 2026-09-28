@@ -116,6 +116,17 @@ export const listClientsQuerySchema = z
     }
   });
 
+export const listInstagramProfilesQuerySchema = z
+  .object({
+    profile: z.enum(["all", "with", "without"]).default("all"),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    search: z.string().max(200).optional(),
+  })
+  .strict();
+
+export type ListInstagramProfilesQuery = z.infer<typeof listInstagramProfilesQuerySchema>;
+
 const optionalDateTime = z.coerce.date().optional();
 // z.coerce.date() transforma null em 1970-01-01; nas colunas DateTime? o null tem que passar.
 const nullableDateTime = z.coerce.date().nullable().optional();
@@ -162,7 +173,12 @@ const extendedClientFields = {
   competence_entry: nullableDateTime,
   competence_output: nullableDateTime,
   opening_date: openingDateSchema,
-  instagram: z.string().nullable().optional(),
+  instagram: z
+    .preprocess(
+      (value) => (typeof value === "string" ? value.trim() || null : value),
+      z.string().nullable(),
+    )
+    .optional(),
   indication: z.string().nullable().optional(),
   regime: z.string().nullable().optional(),
   size: z.string().nullable().optional(),

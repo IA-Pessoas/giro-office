@@ -2,6 +2,7 @@ import type { ClientListFilters } from "../types";
 
 export const CLIENT_ENDPOINTS = {
   list: "/client/list",
+  instagramProfilesReport: "/client/instagram-profiles/report",
   create: "/client",
   createIntegration: "/client/integration",
   lookupCnpj: "/client/integration",

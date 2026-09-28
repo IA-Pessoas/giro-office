@@ -9,6 +9,7 @@ export { ClientPickerModal, type ClientPickerOption } from './components/ClientP
 export { ClientSelectionField } from './components/ClientSelectionField';
 
 export {
+  CLIENTS_QUERY_KEY,
   useActivateClientMutation,
   useClient,
   useClientPa,

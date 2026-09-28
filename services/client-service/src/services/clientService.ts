@@ -53,6 +53,28 @@ export type ClientListPage = {
   hasMore: boolean;
 };
 
+export type ClientInstagramProfile = {
+  id: string;
+  name: string;
+  status: string;
+  instagram: string | null;
+};
+
+export type ClientInstagramProfilePage = {
+  items: ClientInstagramProfile[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
+export type ListInstagramProfilesFilters = {
+  page: number;
+  pageSize: number;
+  profile: "all" | "with" | "without";
+  search?: string;
+};
+
 type ClientAuthorization = IntegracaoServiceAuthorization & {
   userId: string;
   hasClientListAccess?: boolean;
@@ -274,6 +296,10 @@ export interface IClientService {
     filters: ListClientsFilters,
     authorization?: ClientAuthorization,
   ): Promise<ClientListPage>;
+  listInstagramProfiles(
+    organizationId: string,
+    filters: ListInstagramProfilesFilters,
+  ): Promise<ClientInstagramProfilePage>;
   getById(
     id: string,
     organizationId: string,
@@ -365,6 +391,49 @@ export class ClientService implements IClientService {
       page: filters.page,
       pageSize: filters.pageSize,
       hasMore,
+    };
+  }
+
+  async listInstagramProfiles(
+    organizationId: string,
+    filters: ListInstagramProfilesFilters,
+  ): Promise<ClientInstagramProfilePage> {
+    const conditions: Prisma.ClientWhereInput[] = [{ organization_id: organizationId }];
+    if (filters.profile === "with") {
+      conditions.push({ AND: [{ instagram: { not: null } }, { instagram: { not: "" } }] });
+    } else if (filters.profile === "without") {
+      conditions.push({ OR: [{ instagram: null }, { instagram: "" }] });
+    }
+
+    const search = filters.search?.trim();
+    if (search) {
+      conditions.push({
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { company_name: { contains: search, mode: "insensitive" } },
+          { fantasy_name: { contains: search, mode: "insensitive" } },
+        ],
+      });
+    }
+    const where: Prisma.ClientWhereInput =
+      conditions.length === 1 ? (conditions[0] ?? {}) : { AND: conditions };
+    const skip = (filters.page - 1) * filters.pageSize;
+    const select = { id: true, name: true, status: true, instagram: true } as const;
+    const rows = await this.prisma.client.findMany({
+      where,
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      skip,
+      take: filters.pageSize,
+      select,
+    });
+    const total = await this.prisma.client.count({ where });
+
+    return {
+      items: rows,
+      total,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      hasMore: filters.page * filters.pageSize < total,
     };
   }
 

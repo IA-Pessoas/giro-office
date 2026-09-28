@@ -270,6 +270,78 @@ describe("ClientService.listByOrganization", () => {
   });
 });
 
+describe("ClientService.listInstagramProfiles", () => {
+  it("filtra Instagram ausente dentro da organização e mantém paginação", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: TEST_CLIENT_ID,
+        name: "Acme",
+        status: "Ativo",
+        instagram: null,
+      },
+    ]);
+    const count = vi.fn().mockResolvedValue(13);
+    const prisma = {
+      client: { findMany, count },
+    } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+
+    const result = await service.listInstagramProfiles(TEST_ORG_ID, {
+      page: 2,
+      pageSize: 10,
+      search: " Acme ",
+      profile: "without",
+    });
+
+    expect(result).toEqual({
+      items: [{ id: TEST_CLIENT_ID, name: "Acme", status: "Ativo", instagram: null }],
+      total: 13,
+      page: 2,
+      pageSize: 10,
+      hasMore: false,
+    });
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        AND: [
+          { organization_id: TEST_ORG_ID },
+          { OR: [{ instagram: null }, { instagram: "" }] },
+          {
+            OR: [
+              { name: { contains: "Acme", mode: "insensitive" } },
+              { company_name: { contains: "Acme", mode: "insensitive" } },
+              { fantasy_name: { contains: "Acme", mode: "insensitive" } },
+            ],
+          },
+        ],
+      },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      skip: 10,
+      take: 10,
+      select: { id: true, name: true, status: true, instagram: true },
+    });
+    expect(count).toHaveBeenCalledWith({ where: expect.any(Object) });
+  });
+
+  it("filtra perfis preenchidos sem expor organization_id de outras organizações", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const count = vi.fn().mockResolvedValue(0);
+    const service = new ClientService({ client: { findMany, count } } as unknown as PrismaClient);
+
+    await service.listInstagramProfiles(TEST_ORG_ID, {
+      page: 1,
+      pageSize: 20,
+      profile: "with",
+    });
+
+    expect(findMany.mock.calls[0]?.[0].where).toEqual({
+      AND: [
+        { organization_id: TEST_ORG_ID },
+        { AND: [{ instagram: { not: null } }, { instagram: { not: "" } }] },
+      ],
+    });
+  });
+});
+
 describe("ClientService.getById", () => {
   it("returns Regularize detail fields without changing list select", async () => {
     const findUniqueOrg = vi.fn().mockResolvedValue({
