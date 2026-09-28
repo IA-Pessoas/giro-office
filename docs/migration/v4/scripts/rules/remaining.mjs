@@ -460,7 +460,7 @@ export const REMAINING_RULES = Object.freeze(
       columns: [
         mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
         mapped("id", "legacy_id", "preserve_legacy_numeric_identity"),
-        mapped("nome", "name", "trim_required_text"),
+        mapped("nome", "name", "preserve_legacy_name_value"),
         mapped("nome", "name_key", "normalize_mysql_general_ci_unique_key"),
         mapped("logo", "logo", "preserve_optional_logo_or_empty_default"),
         mapped("status", "status", "preserve_legacy_status_enum"),
@@ -1016,12 +1016,12 @@ function classifyStockEntry(row, context) {
 function classifyMarketingEvent(row, context) {
   const bound = authenticContext("tb_mkt.eventos", row, context);
   if (bound.status !== "prepared") return bound;
-  const name = normalizeRequiredScalarText(row?.nome);
+  const name = marketingEventName(row?.nome);
   const status = normalizeText(row?.status) ?? "Novo";
   const priority = normalizeRequiredScalarText(row?.prioridade);
   return firstFailure([
     validId(row?.id, "id", "MKT_EVENT_ID_INVALID"),
-    typeof name === "string" && name.length > 0 && name.length <= 50
+    typeof name === "string" && name.length > 0 && name.trim().length > 0 && name.length <= 50
       ? prepared()
       : quarantine("nome", "MKT_EVENT_NAME_INVALID"),
     typeof row?.logo === "string" && row.logo.length <= 100
@@ -1456,7 +1456,7 @@ function projectPreparedPayload(sourceTable, row, context) {
         instagram: normalizeNullableText(row?.instagram),
       });
     case "tb_mkt.eventos": {
-      const name = normalizeRequiredScalarText(row?.nome);
+      const name = marketingEventName(row?.nome) ?? normalizeRequiredScalarText(row?.nome);
       return Object.freeze({
         id,
         organization_id: ORGANIZATION_ID,
@@ -2144,12 +2144,19 @@ function normalizeText(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+function marketingEventName(value) {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  return value;
+}
+
 function marketingEventNameKey(value) {
   return String(value ?? "")
-    .trim()
+    .replace(/ +$/u, "")
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
+    .replace(/[\u{10000}-\u{10ffff}]/gu, "\uFFFD")
+    .toLowerCase()
+    .replace(/ß/g, "s");
 }
 
 function normalizeNullableText(value) {

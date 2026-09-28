@@ -1,4 +1,8 @@
 import type { MarketingServiceEnv } from "../config/env.js";
+import {
+  MARKETING_EVENT_PRIORITIES,
+  MARKETING_EVENT_STATUSES,
+} from "../schemas/marketingEvent.schemas.js";
 
 const marketingEventSchema = {
   type: "object",
@@ -6,8 +10,8 @@ const marketingEventSchema = {
     id: { type: "string", format: "uuid" },
     name: { type: "string", maxLength: 50 },
     logo: { type: "string", maxLength: 100 },
-    status: { type: "string", enum: ["Novo", "Em andamento", "Concluído", "Descontinuado"] },
-    priority: { type: "string", enum: ["Baixa", "Média", "Alta"] },
+    status: { type: "string", enum: MARKETING_EVENT_STATUSES },
+    priority: { type: "string", enum: MARKETING_EVENT_PRIORITIES },
     objective: { type: "string" },
     audience: { type: "string" },
   },
@@ -19,16 +23,25 @@ const marketingEventInputSchema = {
   properties: {
     name: { type: "string", minLength: 1, maxLength: 50 },
     logo: { type: "string", maxLength: 100, default: "" },
-    status: {
-      type: "string",
-      enum: ["Novo", "Em andamento", "Concluído", "Descontinuado"],
-      default: "Novo",
-    },
-    priority: { type: "string", enum: ["Baixa", "Média", "Alta"] },
+    priority: { type: "string", enum: MARKETING_EVENT_PRIORITIES },
     objective: { type: "string", default: "" },
     audience: { type: "string", default: "" },
   },
   required: ["name", "priority"],
+  additionalProperties: false,
+} as const;
+
+const marketingEventUpdateSchema = {
+  type: "object",
+  properties: {
+    ...marketingEventInputSchema.properties,
+    status: {
+      type: "string",
+      enum: MARKETING_EVENT_STATUSES,
+    },
+  },
+  required: [],
+  minProperties: 1,
   additionalProperties: false,
 } as const;
 
@@ -162,11 +175,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
       schemas: {
         MarketingEvent: marketingEventSchema,
         MarketingEventInput: marketingEventInputSchema,
-        MarketingEventUpdate: {
-          ...marketingEventInputSchema,
-          required: [],
-          minProperties: 1,
-        },
+        MarketingEventUpdate: marketingEventUpdateSchema,
       },
     },
   };

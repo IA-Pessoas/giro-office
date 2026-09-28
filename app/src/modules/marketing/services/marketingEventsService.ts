@@ -3,6 +3,7 @@ import { api } from "@shared/services/apiClient";
 import type {
   MarketingEvent,
   MarketingEventEnvelope,
+  CreateMarketingEventPayload,
   MarketingEventPayload,
 } from "../types/marketingEvent";
 
@@ -21,7 +22,7 @@ export const marketingEventsService = {
     return unwrap(response.data);
   },
 
-  async createEvent(payload: MarketingEventPayload): Promise<MarketingEvent> {
+  async createEvent(payload: CreateMarketingEventPayload): Promise<MarketingEvent> {
     const response = await api.post<MarketingEventEnvelope<MarketingEvent>>(
       "/marketing/events",
       payload,

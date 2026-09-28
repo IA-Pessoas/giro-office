@@ -33,7 +33,7 @@ export function createIsAuthenticatedMiddleware(env: MarketingServiceEnv): Reque
       const claims = verifyJwtToken(extractBearerToken(authorizationHeader), env.jwtSecret);
       request.user_id = claims.user_id;
       request.organization_id = claims.organization_id ?? "";
-      request.permission = claims.modules?.marketing ?? claims.permission;
+      request.permission = claims.modules?.marketing ?? 0;
       next();
     } catch (error: unknown) {
       next(new ServiceError(401, "Não autenticado.", error));

@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createMarketingApp } from "../app.js";
 import { getMarketingServiceEnv } from "../config/env.js";
+import { buildMarketingServiceOpenApiSpec } from "../openapi/spec.js";
 import type { MarketingEventsProvider } from "../routes/marketingEvents.routes.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
@@ -75,6 +76,16 @@ function createJwt(claims: Record<string, unknown>): string {
 }
 
 describe("Marketing events routes", () => {
+  it("documents the fixed creation default and editable update status", () => {
+    const schemas = buildMarketingServiceOpenApiSpec(getMarketingServiceEnv()).components.schemas;
+
+    expect(schemas.MarketingEventInput.properties.status).toBeUndefined();
+    expect(schemas.MarketingEventUpdate.properties.status).toEqual({
+      type: "string",
+      enum: ["Novo", "Em andamento", "Concluído", "Descontinuado"],
+    });
+  });
+
   it("lists events within the authenticated organization", async () => {
     const service = createEventsService();
     const response = await request(createTestApp(service))
@@ -144,11 +155,21 @@ describe("Marketing events routes", () => {
     expect(service.createEvent).toHaveBeenCalledWith(organizationId, {
       name: "Workshop",
       logo: "",
-      status: "Novo",
       priority: "Média",
       objective: "",
       audience: "",
     });
+  });
+
+  it("rejects a client-provided status during creation", async () => {
+    const service = createEventsService();
+    const response = await request(createTestApp(service))
+      .post("/marketing/events")
+      .set(gatewayHeaders(2))
+      .send({ name: "Workshop", priority: "Média", status: "Concluído" });
+
+    expect(response.status).toBe(400);
+    expect(service.createEvent).not.toHaveBeenCalled();
   });
 
   it("accepts only priority values supported by the legacy form", async () => {

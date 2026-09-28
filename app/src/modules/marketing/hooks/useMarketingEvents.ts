@@ -3,7 +3,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useFetch } from "@shared/hooks";
 
 import { marketingEventsService } from "../services/marketingEventsService";
-import type { MarketingEventPayload } from "../types/marketingEvent";
+import type {
+  CreateMarketingEventPayload,
+  MarketingEventPayload,
+} from "../types/marketingEvent";
 
 export const marketingEventsQueryKey = ["marketing", "events"] as const;
 
@@ -14,7 +17,7 @@ export function useMarketingEvents() {
 export function useCreateMarketingEvent() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: MarketingEventPayload) => marketingEventsService.createEvent(payload),
+    mutationFn: (payload: CreateMarketingEventPayload) => marketingEventsService.createEvent(payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: marketingEventsQueryKey }),
   });
 }

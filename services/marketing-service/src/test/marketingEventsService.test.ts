@@ -50,9 +50,8 @@ describe("MarketingEventsService", () => {
     };
 
     await new MarketingEventsService(prisma as never).createEvent(organizationId, {
-      name: " Evento Á ",
+      name: " AÇÃO ÇãO ",
       logo: "",
-      status: "Novo",
       priority: "Média",
       objective: "",
       audience: "",
@@ -61,8 +60,8 @@ describe("MarketingEventsService", () => {
     expect(prisma.marketingEvent.create).toHaveBeenCalledWith({
       data: {
         organization_id: organizationId,
-        name: "Evento Á",
-        name_key: "evento a",
+        name: " AÇÃO ÇãO ",
+        name_key: " acao cao",
         logo: "",
         status: "Novo",
         priority: "Média",
@@ -81,6 +80,68 @@ describe("MarketingEventsService", () => {
     });
   });
 
+  it("matches the legacy general_ci equivalence between sharp s and s", async () => {
+    const prisma = {
+      marketingEvent: {
+        create: vi.fn().mockResolvedValue(event),
+      },
+    };
+
+    await new MarketingEventsService(prisma as never).createEvent(organizationId, {
+      name: "Straße",
+      logo: "",
+      priority: "Média",
+      objective: "",
+      audience: "",
+    });
+
+    expect(prisma.marketingEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ name_key: "strase" }) }),
+    );
+  });
+
+  it("matches the legacy general_ci weight for supplementary Unicode characters", async () => {
+    const prisma = {
+      marketingEvent: {
+        create: vi.fn().mockResolvedValue(event),
+      },
+    };
+
+    await new MarketingEventsService(prisma as never).createEvent(organizationId, {
+      name: "Evento 🚀",
+      logo: "",
+      priority: "Média",
+      objective: "",
+      audience: "",
+    });
+
+    expect(prisma.marketingEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ name_key: "evento �" }) }),
+    );
+  });
+
+  it("preserves leading spaces but ignores trailing spaces like the legacy collation", async () => {
+    const prisma = {
+      marketingEvent: {
+        create: vi.fn().mockResolvedValue(event),
+      },
+    };
+
+    await new MarketingEventsService(prisma as never).createEvent(organizationId, {
+      name: " Evento ",
+      logo: "",
+      priority: "Média",
+      objective: "",
+      audience: "",
+    });
+
+    expect(prisma.marketingEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: " Evento ", name_key: " evento" }),
+      }),
+    );
+  });
+
   it("converts a concurrent duplicate-key violation to the legacy conflict response", async () => {
     const prisma = {
       marketingEvent: {
@@ -92,7 +153,6 @@ describe("MarketingEventsService", () => {
       new MarketingEventsService(prisma as never).createEvent(organizationId, {
         name: "Evento Á",
         logo: "",
-        status: "Novo",
         priority: "Média",
         objective: "",
         audience: "",
