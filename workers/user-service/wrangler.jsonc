@@ -12,7 +12,7 @@
   // USER_EMAIL_ADAPTER_URL, USER_EMAIL_ADAPTER_TOKEN e USER_EMAIL_FROM (#1342).
   "vars": {
     "AUTH_COOKIE_SECURE": true,
-    "APP_PUBLIC_URL": "https://giro-app.potencia-api.workers.dev"
+    "APP_PUBLIC_URL": "https://useoffice.com.br"
   },
   // Encerra e audita personificações vencidas a cada minuto (#1529).
   "triggers": { "crons": ["* * * * *"] },

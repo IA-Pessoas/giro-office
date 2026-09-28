@@ -3,6 +3,9 @@
   "name": "giro-app",
   // worker.ts manda /api/* para o gateway e o resto para o worker gerado pelo OpenNext.
   "main": "worker.ts",
+  // Só o domínio próprio: o workers.dev da conta leva o nome de outro cliente.
+  "workers_dev": false,
+  "routes": [{ "pattern": "useoffice.com.br", "custom_domain": true }],
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
