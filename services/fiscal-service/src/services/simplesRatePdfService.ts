@@ -17,8 +17,21 @@ function monthLabel(competence: string): string {
   return `${competence.slice(5, 7)}/${competence.slice(0, 4)}`;
 }
 
+/** Razão social em ASCII para nome de arquivo ("Salão Bela Vista" → "salao-bela-vista"). */
+function fileSlug(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+/** Nome identificável no ZIP: tributo, anexo, mês, razão social e documento (desempate). */
 export function simplesRatePdfFileName(emission: SimplesRateEmission): string {
-  return `aliquota-${emission.tax}-anexo-${emission.annex}-${emission.applies_to}-${emission.client_id}.pdf`;
+  const document = emission.client_document.replace(/\D/g, "") || emission.client_id;
+  return `aliquota-${emission.tax}-anexo-${emission.annex}-${emission.applies_to}-${fileSlug(emission.client_name)}-${document}.pdf`;
 }
 
 export function simplesRatePdfHeaders(emission: SimplesRateEmission): Record<string, string> {

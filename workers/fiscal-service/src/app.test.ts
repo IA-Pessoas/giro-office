@@ -126,7 +126,9 @@ describe("fiscal Worker", () => {
     );
     expect(pdf.status).toBe(200);
     expect(pdf.headers.get("content-type")).toBe("application/pdf");
-    expect(pdf.headers.get("content-disposition")).toContain("aliquota-ISS-anexo-III-2026-09-");
+    expect(pdf.headers.get("content-disposition")).toContain(
+      "aliquota-ISS-anexo-III-2026-09-padaria-exemplo-ltda-12345678000190.pdf",
+    );
     expect((await pdf.arrayBuffer()).byteLength).toBeGreaterThan(500);
     expect(simples.emission).toHaveBeenCalledWith(
       { client_id: clientId, competence: "2026-08", annex: "III" },
@@ -164,6 +166,27 @@ describe("fiscal Worker", () => {
     });
     expect(readerCsv.status).toBe(403);
     expect(simples.batch).toHaveBeenCalledOnce();
+
+    const zip = await app.request("https://fiscal.test/fiscal/simples/zip", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(zip.status).toBe(200);
+    const zipped = (await zip.json()) as { data: { zip_base64: string; file_name: string } };
+    expect(zipped.data.file_name).toBe("aliquotas-ISS-anexo-III-2026-09.zip");
+    const archive = Buffer.from(zipped.data.zip_base64, "base64");
+    expect(archive.readUInt32LE(0)).toBe(0x04034b50);
+    expect(archive.toString("latin1")).toContain(
+      "aliquota-ISS-anexo-III-2026-09-padaria-exemplo-ltda-12345678000190.pdf",
+    );
+    const readerZip = await app.request("https://fiscal.test/fiscal/simples/zip", {
+      method: "POST",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(readerZip.status).toBe(403);
+    expect(simples.batch).toHaveBeenCalledTimes(2);
   });
 
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {

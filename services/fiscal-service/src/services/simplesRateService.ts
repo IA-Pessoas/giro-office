@@ -37,6 +37,14 @@ export interface SimplesRateBatch {
   skipped: Array<{ document: string; client_name: string | null; reason: string }>;
 }
 
+/** Nome do arquivo do lote (CSV ou ZIP) pelo tributo, anexo e mês da alíquota. */
+export function simplesRateBatchFileName(
+  batch: SimplesRateBatch,
+  extension: "csv" | "zip",
+): string {
+  return `aliquotas-${batch.tax}-anexo-${batch.annex}-${batch.applies_to}.${extension}`;
+}
+
 // Mesma regra do lote legado (listar-arquivos.php): Fiscal habilitado, ativo e no Simples.
 const ACTIVE_CLIENT_STATUS = "Ativo";
 const SIMPLES_REGIME = "simples nacional";

@@ -51,7 +51,7 @@ describe("renderSimplesRatePdf", () => {
   it("baixa sem cache com nome do tributo e do mês de referência", () => {
     expect(simplesRatePdfHeaders(emission)).toEqual({
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="aliquota-ISS-anexo-III-2027-01-${emission.client_id}.pdf"`,
+      "Content-Disposition": `attachment; filename="aliquota-ISS-anexo-III-2027-01-padaria-exemplo-ltda-12345678000190.pdf"`,
       "Cache-Control": "no-store",
     });
   });

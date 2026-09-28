@@ -49,6 +49,7 @@ import {
   simplesRatePdfHeaders,
 } from "@workspace/fiscal-service/src/services/simplesRatePdfService.js";
 import { SimplesRateService } from "@workspace/fiscal-service/src/services/simplesRateService.js";
+import { simplesRateZipExport } from "@workspace/fiscal-service/src/services/simplesRateZipService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   fiscalIcmsReportingCatalog,
@@ -349,6 +350,14 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
       service.batch(body, c.get("auth").organizationId),
     );
     return c.json(createSuccessResponse(simplesRateCsvExport(batch)));
+  });
+
+  app.post("/fiscal/simples/zip", async (c) => {
+    const body = parseWithZod(simplesBatchBodySchema, await readJson(c));
+    const batch = await withService("simplesService", (service) =>
+      service.batch(body, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(await simplesRateZipExport(batch)));
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {

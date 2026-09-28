@@ -58,7 +58,7 @@ export interface FiscalSimplesEmission {
   rate: string;
 }
 
-export interface FiscalSimplesBatch {
+export interface FiscalSimplesBatchResult {
   competence: string;
   applies_to: string;
   annex: FiscalSimplesAnnexRate["annex"];
@@ -66,7 +66,26 @@ export interface FiscalSimplesBatch {
   included: FiscalSimplesEmission[];
   skipped: Array<{ document: string; client_name: string | null; reason: string }>;
   file_name: string;
+}
+
+export interface FiscalSimplesCsv extends FiscalSimplesBatchResult {
   csv: string;
+}
+
+export interface FiscalSimplesZip extends FiscalSimplesBatchResult {
+  /** ZIP em base64; null quando nenhum cliente entrou no lote. */
+  zip_base64: string | null;
+}
+
+export interface FiscalSimplesExport {
+  batch: FiscalSimplesBatchResult;
+  file: Blob | null;
+}
+
+export interface FiscalSimplesBatchPayload {
+  competence: string;
+  annex: FiscalSimplesAnnexRate["annex"];
+  documents: string[];
 }
 
 export const REVENUE_PAGE_SIZE = 24;
@@ -92,14 +111,28 @@ export const fiscalRevenueService = {
     return unwrapFiscalEnvelope<FiscalSimplesPreview>(response.data);
   },
 
-  async exportSimplesCsv(payload: {
-    competence: string;
-    annex: FiscalSimplesAnnexRate["annex"];
-    documents: string[];
-  }): Promise<FiscalSimplesBatch> {
+  /** Lote em CSV; file é null quando nenhum cliente entrou. */
+  async exportSimplesCsv(payload: FiscalSimplesBatchPayload): Promise<FiscalSimplesExport> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     const response = await api.post("/fiscal/simples/csv", payload);
-    return unwrapFiscalEnvelope<FiscalSimplesBatch>(response.data);
+    const batch = unwrapFiscalEnvelope<FiscalSimplesCsv>(response.data);
+    const file = batch.included.length
+      ? new Blob([batch.csv], { type: "text/csv;charset=utf-8" })
+      : null;
+    return { batch, file };
+  },
+
+  /** Lote em PDFs dentro de um ZIP (base64 na resposta); file é null quando ninguém entrou. */
+  async exportSimplesZip(payload: FiscalSimplesBatchPayload): Promise<FiscalSimplesExport> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.post("/fiscal/simples/zip", payload);
+    const batch = unwrapFiscalEnvelope<FiscalSimplesZip>(response.data);
+    const file = batch.zip_base64
+      ? new Blob([Uint8Array.from(atob(batch.zip_base64), (char) => char.charCodeAt(0))], {
+          type: "application/zip",
+        })
+      : null;
+    return { batch, file };
   },
 
   async downloadSimplesPdf(

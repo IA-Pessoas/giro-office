@@ -8,11 +8,13 @@ import {
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
 } from "@workspace/shared";
+import { readZipEntries } from "@workspace/shared/testUtils";
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
 import { createFiscalApp } from "../app.js";
 import { getFiscalServiceEnv } from "../config/env.js";
+import * as pdfService from "../services/simplesRatePdfService.js";
 
 const env = getFiscalServiceEnv();
 const logger = createLogger({ service: "fiscal-service", env: env.nodeEnv, level: env.logLevel });
@@ -154,6 +156,53 @@ describe("fiscal Simples rate routes", () => {
       expect(response.status).toBe(400);
     }
     expect(service.batch).toHaveBeenCalledOnce();
+  });
+
+  it("exporta o ZIP de PDFs do lote, exigindo edição Fiscal", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+    const body = { competence: "2026-08", annex: "III", documents: ["12345678000190"] };
+
+    const exported = await request(app).post("/fiscal/simples/zip").set(headers(2)).send(body);
+    expect(exported.status).toBe(200);
+    expect(exported.body.data).toMatchObject({
+      file_name: "aliquotas-ISS-anexo-III-2026-09.zip",
+      skipped: [{ document: "99999999000199" }],
+    });
+    const zip = Buffer.from(exported.body.data.zip_base64, "base64");
+    expect([...readZipEntries(zip).keys()]).toEqual([
+      "aliquota-ISS-anexo-III-2026-09-padaria-exemplo-ltda-12345678000190.pdf",
+    ]);
+    expect(service.batch).toHaveBeenCalledWith(body, organizationId);
+
+    const viewer = await request(app).post("/fiscal/simples/zip").set(headers(1)).send(body);
+    expect(viewer.status).toBe(403);
+    const invalid = await request(app)
+      .post("/fiscal/simples/zip")
+      .set(headers(2))
+      .send({ ...body, documents: [] });
+    expect(invalid.status).toBe(400);
+    expect(service.batch).toHaveBeenCalledOnce();
+  });
+
+  it("informa a falha de geração dos PDFs sem entregar ZIP", async () => {
+    const service = deps();
+    const spy = vi
+      .spyOn(pdfService, "renderSimplesRatePdf")
+      .mockRejectedValueOnce(new Error("pdfkit falhou"));
+    const app = createFiscalApp({ env, logger, simplesRateRouteDeps: service });
+
+    const response = await request(app)
+      .post("/fiscal/simples/zip")
+      .set(headers(2))
+      .send({ competence: "2026-08", annex: "III", documents: ["12345678000190"] });
+    spy.mockRestore();
+    expect(response.status).toBe(500);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "Falha ao gerar os PDFs do lote; nenhum arquivo foi gerado.",
+    });
+    expect(response.body.data).toBeUndefined();
   });
 
   it("valida anexo e competência e exige autenticação", async () => {

@@ -332,7 +332,12 @@ await runTest("fiscal Simples batch parses pasted documents and exports CSV for 
   // Validação local, ignorados com motivo e nenhum arquivo quando ninguém entra.
   assert.match(batch, /Informe ao menos um CPF\/CNPJ, um por linha\./);
   assert.match(batch, /\{item\.reason\}/);
-  assert.match(batch, /if \(batch\.included\.length > 0\) \{\s*downloadFile\(new Blob\(\[batch\.csv\]/);
+  assert.match(client, /const file = batch\.included\.length\s*\?\s*new Blob\(\[batch\.csv\]/);
+  // ZIP: só baixa quando o servidor devolveu arquivo; falha de geração vira toast, sem download.
+  assert.match(client, /api\.post\("\/fiscal\/simples\/zip", payload\)/);
+  assert.match(client, /const file = batch\.zip_base64\s*\?/);
+  assert.match(batch, /if \(file\) \{\s*downloadFile\(file, batch\.file_name\);/);
+  assert.match(batch, /Exportar PDFs \(ZIP\)/);
   assert.match(batch, /nenhum arquivo gerado/);
   assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });

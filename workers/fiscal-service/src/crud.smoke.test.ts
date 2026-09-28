@@ -364,6 +364,20 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     );
     // RBT12 = 11.000 + 1.000 = 12.000 (1ª faixa): ISS 2,01%.
     expect(exported.data.csv).toContain(`Smoke Lote ${suffix} Ltda;${document};2,01`);
+    const zipped = expectOk(
+      await call("POST", "/fiscal/simples/zip", {
+        competence: "2026-08",
+        annex: "III",
+        documents: [document, String(presumido.cpf_cnpj)],
+      }),
+      "POST /fiscal/simples/zip",
+    );
+    const archive = Buffer.from(zipped.data.zip_base64, "base64");
+    expect(archive.readUInt32LE(0)).toBe(0x04034b50);
+    expect(archive.toString("latin1")).toContain(
+      `aliquota-ISS-anexo-III-2026-09-smoke-lote-${suffix}-ltda-${document}.pdf`,
+    );
+    expect(zipped.data.skipped).toHaveLength(1);
     expect(exported.data.skipped).toEqual([
       {
         document: String(presumido.cpf_cnpj),

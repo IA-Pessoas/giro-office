@@ -1,22 +1,22 @@
 import { csvLine } from "@workspace/shared";
 
-import type { SimplesRateBatch } from "./simplesRateService.js";
+import { type SimplesRateBatch, simplesRateBatchFileName } from "./simplesRateService.js";
 
 const DELIMITER = ";";
 
 export function simplesRateCsvFileName(batch: SimplesRateBatch): string {
-  return `aliquotas-${batch.tax}-anexo-${batch.annex}-${batch.applies_to}.csv`;
+  return simplesRateBatchFileName(batch, "csv");
+}
+
+/** Resposta do lote: dados, nome do arquivo e conteúdo do CSV. */
+export function simplesRateCsvExport(batch: SimplesRateBatch) {
+  return { ...batch, file_name: simplesRateCsvFileName(batch), csv: renderSimplesRateCsv(batch) };
 }
 
 /**
  * CSV do lote legado (listar-arquivos.php): razão social, CPF/CNPJ e percentual emitido com
  * vírgula decimal, separados por ponto e vírgula. O BOM faz o Excel ler os acentos em UTF-8.
  */
-/** Resposta do lote: dados, nome do arquivo e conteúdo do CSV. */
-export function simplesRateCsvExport(batch: SimplesRateBatch) {
-  return { ...batch, file_name: simplesRateCsvFileName(batch), csv: renderSimplesRateCsv(batch) };
-}
-
 export function renderSimplesRateCsv(batch: SimplesRateBatch): string {
   const lines = [
     csvLine(["Razão Social", "CPF/CNPJ", "%"], DELIMITER),

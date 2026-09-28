@@ -89,6 +89,7 @@ describe("activityCatalog", () => {
     ["GET", "/fiscal/simples/preview", "consultou", "a prévia de alíquotas do Simples"],
     ["GET", "/fiscal/simples/pdf", "baixou", "um PDF de alíquota do Simples"],
     ["POST", "/fiscal/simples/csv", "exportou", "um CSV de alíquotas do Simples em lote"],
+    ["POST", "/fiscal/simples/zip", "exportou", "os PDFs de alíquotas do Simples em lote"],
     ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
     [
       "PUT",
