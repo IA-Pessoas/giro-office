@@ -2,6 +2,9 @@
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
   "name": "giro-gateway",
   "main": "src/index.ts",
+  // O app chega por service binding; nada público além do domínio do app.
+  "workers_dev": false,
+  "preview_urls": false,
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat"],
   "services": [
@@ -25,7 +28,7 @@
     { "binding": "REGULARIZE_SERVICE", "service": "giro-regularize-service" }
   ],
   // Só para GET /dashboard/stats, servido pelo próprio gateway como no Node.
-  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
   // Login, login de plataforma e link de redefinição: 10 tentativas por minuto por IP e rota (#1344).
   // namespace_id é escolhido por nós e precisa ser único na conta (ADR 0003).
   "ratelimits": [

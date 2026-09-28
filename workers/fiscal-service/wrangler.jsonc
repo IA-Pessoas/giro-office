@@ -9,6 +9,6 @@
     { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" },
     { "binding": "USER_SERVICE", "service": "giro-user-service" }
   ],
-  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
   "observability": { "enabled": true }
 }
