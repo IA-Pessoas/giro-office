@@ -61,6 +61,17 @@ type BatchClient = {
 };
 
 /** Só dígitos; CNPJ/CPF colado de planilha sem o zero à esquerda (13 ou 10 dígitos) é completado. */
+const CLIENT_SELECT = {
+  id: true,
+  name: true,
+  company_name: true,
+  cpf_cnpj: true,
+  fiscal: true,
+  status: true,
+  competence_output: true,
+  regime: true,
+} as const;
+
 function digits(document: string): string {
   const value = document.replace(/\D/g, "");
   return value.length === 13 || value.length === 10 ? `0${value}` : value;
@@ -132,35 +143,42 @@ function resolveEmission(
 export class SimplesRateService {
   constructor(private readonly prisma: SimplesRatePrisma) {}
 
-  private async requireClient(clientId: string, organizationId: string) {
+  private async requireClient(clientId: string, organizationId: string): Promise<BatchClient> {
     const client = await this.prisma.client.findFirst({
       where: { id: clientId, organization_id: organizationId },
-      select: { id: true, name: true, company_name: true, cpf_cnpj: true },
+      select: CLIENT_SELECT,
     });
     if (!client) throw new ServiceError(404, "Cliente não encontrado.");
     return client;
   }
 
-  private async calculate(clientId: string, competence: string, organizationId: string) {
+  /** Receitas dos 11 meses anteriores à competência, por cliente, no tenant. */
+  private async revenueWindow(clientIds: string[], competence: string, organizationId: string) {
+    const byClient = new Map<string, Array<{ competence: string; amount: string }>>();
+    if (clientIds.length === 0) return byClient;
     const months = previousCompetences(competence);
     const records = await this.prisma.fiscalMonthlyRevenue.findMany({
       where: {
         organization_id: organizationId,
-        client_id: clientId,
+        client_id: { in: clientIds },
         competence: {
           gte: competenceDate(months[months.length - 1]),
           lte: competenceDate(months[0]),
         },
       },
-      select: { competence: true, amount: true },
+      select: { client_id: true, competence: true, amount: true },
     });
-    return calculateSimplesPreview(
-      competence,
-      records.map((record) => ({
-        competence: competenceKey(record.competence),
-        amount: record.amount.toString(),
-      })),
-    );
+    for (const record of records) {
+      const list = byClient.get(record.client_id) ?? [];
+      list.push({ competence: competenceKey(record.competence), amount: record.amount.toString() });
+      byClient.set(record.client_id, list);
+    }
+    return byClient;
+  }
+
+  private async calculate(clientId: string, competence: string, organizationId: string) {
+    const revenues = await this.revenueWindow([clientId], competence, organizationId);
+    return calculateSimplesPreview(competence, revenues.get(clientId) ?? []);
   }
 
   /** RBT12 dos 11 meses anteriores à competência e alíquota bruta por anexo. */
@@ -181,6 +199,9 @@ export class SimplesRateService {
     organizationId: string,
   ): Promise<SimplesRateEmission> {
     const client = await this.requireClient(input.client_id, organizationId);
+    // Mesma elegibilidade do lote: carta "Simples Nacional" só para cliente com Fiscal, ativo e no Simples.
+    const reason = ineligibility(client, nextCompetence(input.competence));
+    if (reason) throw new ServiceError(422, reason);
     const preview = await this.calculate(client.id, input.competence, organizationId);
     const emission = resolveEmission(client, preview, input.annex);
     if (!emission.ok) throw new ServiceError(422, emission.reason);
@@ -200,36 +221,14 @@ export class SimplesRateService {
     ]);
     const clients: BatchClient[] = await this.prisma.client.findMany({
       where: { organization_id: organizationId, cpf_cnpj: { in: variants } },
-      select: {
-        id: true,
-        name: true,
-        company_name: true,
-        cpf_cnpj: true,
-        fiscal: true,
-        status: true,
-        competence_output: true,
-        regime: true,
-      },
+      select: CLIENT_SELECT,
     });
     const byDocument = new Map(clients.map((client) => [digits(client.cpf_cnpj), client]));
 
-    const months = previousCompetences(input.competence);
     const eligibleIds = clients
       .filter((client) => ineligibility(client, appliesTo) === null)
       .map((client) => client.id);
-    const records = eligibleIds.length
-      ? await this.prisma.fiscalMonthlyRevenue.findMany({
-          where: {
-            organization_id: organizationId,
-            client_id: { in: eligibleIds },
-            competence: {
-              gte: competenceDate(months[months.length - 1]),
-              lte: competenceDate(months[0]),
-            },
-          },
-          select: { client_id: true, competence: true, amount: true },
-        })
-      : [];
+    const revenues = await this.revenueWindow(eligibleIds, input.competence, organizationId);
 
     const result: SimplesRateBatch = {
       competence: input.competence,
@@ -258,15 +257,7 @@ export class SimplesRateService {
         skip(reason);
         continue;
       }
-      const preview = calculateSimplesPreview(
-        input.competence,
-        records
-          .filter((record) => record.client_id === client.id)
-          .map((record) => ({
-            competence: competenceKey(record.competence),
-            amount: record.amount.toString(),
-          })),
-      );
+      const preview = calculateSimplesPreview(input.competence, revenues.get(client.id) ?? []);
       const emission = resolveEmission(client, preview, input.annex);
       if (emission.ok) result.included.push(emission.emission);
       else skip(emission.reason);
