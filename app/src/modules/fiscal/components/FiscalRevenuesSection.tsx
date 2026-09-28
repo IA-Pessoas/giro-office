@@ -17,8 +17,8 @@ import {
   getFiscalErrorMessage,
   toRevenueAmount,
 } from "../utils";
+import { FISCAL_FIELD_CONTROL_CLASSNAME } from "./fiscalFieldStyles";
 
-const FIELD_CONTROL_CLASSNAME = "h-10 rounded-lg border border-gray-300 bg-white px-3 text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white";
 const INVALID_AMOUNT_MESSAGE = "Informe a receita em reais, sem valor negativo. Para receita zero, digite 0.";
 
 function previousCompetence(): string {
@@ -53,6 +53,7 @@ export function FiscalRevenuesSection({ canEdit }: { canEdit: boolean }) {
   });
 
   function resetForm() {
+    if (editing) setCompetence(previousCompetence());
     setEditing(null);
     setAmount("");
     setAmountError(null);
@@ -108,7 +109,7 @@ export function FiscalRevenuesSection({ canEdit }: { canEdit: boolean }) {
         <form noValidate onSubmit={(event) => void submit(event)} className="grid gap-4 rounded-xl border border-gray-200 p-4 md:grid-cols-[1fr_1fr_auto_auto] md:items-start dark:border-slate-700">
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             Competência
-            <input type="month" required disabled={Boolean(editing)} value={competence} onChange={(event) => setCompetence(event.target.value)} className={`${FIELD_CONTROL_CLASSNAME} disabled:opacity-60`} />
+            <input type="month" required disabled={Boolean(editing)} value={competence} onChange={(event) => setCompetence(event.target.value)} className={`${FISCAL_FIELD_CONTROL_CLASSNAME} disabled:opacity-60`} />
           </label>
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             Receita bruta
@@ -121,7 +122,7 @@ export function FiscalRevenuesSection({ canEdit }: { canEdit: boolean }) {
               placeholder="R$ 0,00"
               aria-invalid={amountError ? true : undefined}
               aria-describedby={amountError ? "fiscal-revenue-amount-error" : undefined}
-              className={FIELD_CONTROL_CLASSNAME}
+              className={FISCAL_FIELD_CONTROL_CLASSNAME}
             />
             {amountError ? <span id="fiscal-revenue-amount-error" role="alert" className="text-xs font-normal text-red-600">{amountError}</span> : null}
           </label>

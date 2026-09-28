@@ -14,6 +14,7 @@ import {
   requireSmokeState,
   smokeCall,
   smokeEnv,
+  smokeHeaders,
   smokeInsert,
   smokeState,
 } from "../../runtime/src/crudSmoke.js";
@@ -270,6 +271,31 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       "PUT /fiscal/revenues/:id",
     );
     expect(updated.data.amount).toBe("999.1");
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    const foreignList = await call(
+      "GET",
+      `/fiscal/revenues/list?client_id=${clientId}`,
+      undefined,
+      otherOrganization,
+    );
+    expect(foreignList.status).not.toBe(200);
+    expect(foreignList.text).not.toContain(id);
+    const foreignUpdate = await call(
+      "PUT",
+      `/fiscal/revenues/${id}`,
+      { amount: "1.00" },
+      otherOrganization,
+    );
+    expect(foreignUpdate.status).not.toBe(200);
+    const after = expectOk(
+      await call("GET", `/fiscal/revenues/list?client_id=${clientId}&from=2026-07&to=2026-07`),
+      "GET após tentativa de outra organização",
+    );
+    expect(after.data.data[0].amount).toBe("999.1");
   });
 
   it("reporting interno: catálogo e extract de cada fonte com todos os campos", async () => {

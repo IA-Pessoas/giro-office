@@ -217,4 +217,19 @@ describe("MonthlyRevenueService", () => {
     expect(result).toMatchObject({ total: 1, page: 1, limit: 24, hasMore: false });
     expect(result.data[0]).toMatchObject({ competence: "2026-08", amount: "12345.67" });
   });
+
+  it("não lista receitas de cliente de outra organização", async () => {
+    const { prisma, audit } = dependencies();
+    prisma.client.findFirst.mockResolvedValueOnce(null as never);
+    const service = new MonthlyRevenueService(prisma as never, audit);
+
+    await expect(service.list({ client_id: clientId }, organizationId)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(prisma.client.findFirst).toHaveBeenCalledWith({
+      where: { id: clientId, organization_id: organizationId },
+      select: { id: true },
+    });
+    expect(prisma.fiscalMonthlyRevenue.findMany).not.toHaveBeenCalled();
+  });
 });

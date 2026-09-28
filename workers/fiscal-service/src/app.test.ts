@@ -118,6 +118,13 @@ describe("fiscal Worker", () => {
     });
     expect(viewerWrite.status).toBe(403);
     expect(revenues.update).toHaveBeenCalledOnce();
+
+    const withoutFiscal = await app.request(
+      `https://fiscal.test/fiscal/revenues/list?client_id=${revenue.client_id}`,
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 0 }) }) },
+    );
+    expect(withoutFiscal.status).toBe(403);
+    expect(revenues.list).toHaveBeenCalledOnce();
   });
 
   it("registra alíquota manual e entrega PDF no tenant autenticado", async () => {

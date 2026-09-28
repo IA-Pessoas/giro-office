@@ -1,8 +1,8 @@
 import { z } from "zod";
 
+import { competenceSchema } from "./competence.schemas.js";
 import { paginationQuerySchema } from "./pagination.schemas.js";
 
-const competenceSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Competência inválida.");
 // Valor em reais com ponto decimal. Ausência de registro é receita zero no cálculo;
 // um valor malformado ou negativo nunca vira zero silenciosamente.
 const amountSchema = z

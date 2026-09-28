@@ -7,7 +7,8 @@ import { getPaginationParams, type PaginationQuery } from "../schemas/pagination
 export type MonthlyRevenuePrisma = Pick<PrismaClient, "client" | "fiscalMonthlyRevenue">;
 
 const REFERRING = "fiscal.monthly_revenues";
-const DUPLICATE_MESSAGE = "Já existe receita registrada para este cliente nesta competência.";
+const DUPLICATE_MESSAGE =
+  "Já existe receita registrada para este cliente nesta competência. Use Corrigir na lista.";
 
 interface Actor {
   organizationId: string;
@@ -80,12 +81,17 @@ export class MonthlyRevenueService {
     private readonly audit: { createLog(params: CreateLogParams): Promise<void> },
   ) {}
 
-  async create(input: CreateMonthlyRevenueInput): Promise<MonthlyRevenueDto> {
+  private async requireClient(clientId: string, organizationId: string): Promise<{ id: string }> {
     const client = await this.prisma.client.findFirst({
-      where: { id: input.client_id, organization_id: input.organizationId },
+      where: { id: clientId, organization_id: organizationId },
       select: { id: true },
     });
     if (!client) throw new ServiceError(404, "Cliente não encontrado.");
+    return client;
+  }
+
+  async create(input: CreateMonthlyRevenueInput): Promise<MonthlyRevenueDto> {
+    const client = await this.requireClient(input.client_id, input.organizationId);
 
     const competence = competenceDate(input.competence);
     const existing = await this.prisma.fiscalMonthlyRevenue.findFirst({
@@ -154,6 +160,7 @@ export class MonthlyRevenueService {
     limit: number;
     hasMore: boolean;
   }> {
+    await this.requireClient(input.client_id, organizationId);
     const page = input.page ?? 1;
     const { skip, take } = getPaginationParams(input);
     const range = {
