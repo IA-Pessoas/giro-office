@@ -37,6 +37,8 @@ function createCoverageEnv(): GatewayEnv {
     parcelamentoServiceUrl: "http://127.0.0.1:3043",
     reportsServiceUrl: "http://127.0.0.1:3044",
     commercialServiceUrl: "http://127.0.0.1:3045",
+    marketingServiceUrl: "http://127.0.0.1:3047",
+    marketingServiceInternalToken: "marketing-service-token",
     databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
     jwtSecret: "test-secret",
     logLevel: "silent",

@@ -63,6 +63,16 @@ export const serviceRegistry = [
     prismaOutputPath: "services/commercial-service/src/generated/prisma",
   },
   {
+    name: "marketing-service",
+    packagePath: "services/marketing-service",
+    defaultUrl: "http://localhost:3047",
+    urlEnvKey: "MARKETING_SERVICE_URL",
+    openapiSpecPath: "services/marketing-service/src/openapi/spec.ts",
+    authModes: ["public", "bearer", "internal-token"],
+    internalTokenEnvKey: "MARKETING_SERVICE_INTERNAL_TOKEN",
+    prismaOutputPath: "services/marketing-service/src/generated/prisma",
+  },
+  {
     name: "department-service",
     packagePath: "services/department-service",
     defaultUrl: "http://localhost:3036",

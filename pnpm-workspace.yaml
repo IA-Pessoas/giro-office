@@ -22,6 +22,7 @@ packages:
   - "services/parcelamento-service"
   - "services/reports-service"
   - "services/commercial-service"
+  - "services/marketing-service"
   - "services/triagem-service"
   - "services/src"
 

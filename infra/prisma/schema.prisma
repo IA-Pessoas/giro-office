@@ -123,6 +123,13 @@ generator commercialServiceClient {
   previewFeatures = ["fullTextSearchPostgres"]
 }
 
+generator marketingServiceClient {
+  provider        = "prisma-client"
+  runtime         = "workerd"
+  output          = "../../services/marketing-service/src/generated/prisma"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
 datasource db {
   provider = "postgresql"
 }
