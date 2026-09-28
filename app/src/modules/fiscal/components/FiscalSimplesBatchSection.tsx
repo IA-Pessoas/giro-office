@@ -140,7 +140,7 @@ export function FiscalSimplesBatchSection() {
       {result ? (
         <div className="space-y-3" role="status">
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            {result.included.length} cliente(s) no CSV · {result.skipped.length} ignorado(s)
+            {result.included.length} cliente(s) no arquivo · {result.skipped.length} ignorado(s)
           </p>
           {result.skipped.length ? (
             <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700">
