@@ -109,6 +109,8 @@ const gatewayEnvSchema = z
     parcelamentoServiceUrl: z.string().url().default("http://localhost:3043"),
     reportsServiceUrl: z.string().url().default("http://localhost:3044"),
     commercialServiceUrl: z.string().url().default("http://localhost:3045"),
+    marketingServiceUrl: z.string().url().default("http://localhost:3047"),
+    marketingServiceInternalToken: z.string().optional().default("marketing-service-token"),
     websocketUpstreamUrl: z
       .string()
       .optional()
@@ -222,6 +224,20 @@ const gatewayEnvSchema = z
     validateProductionInternalServiceToken({
       nodeEnv: env.nodeEnv,
       serviceName: "gateway",
+      envName: "MARKETING_SERVICE_INTERNAL_TOKEN",
+      token: env.marketingServiceInternalToken,
+    });
+    if (
+      env.nodeEnv === "production" &&
+      env.marketingServiceInternalToken === env.auditServiceToken
+    ) {
+      throw new Error(
+        "MARKETING_SERVICE_INTERNAL_TOKEN deve ser diferente de AUDIT_SERVICE_TOKEN em produção.",
+      );
+    }
+    validateProductionInternalServiceToken({
+      nodeEnv: env.nodeEnv,
+      serviceName: "gateway",
       envName: "CLIENT_SERVICE_INTERNAL_TOKEN",
       token: clientServiceInternalToken,
     });
@@ -276,6 +292,8 @@ export interface GatewayEnv {
   parcelamentoServiceUrl: string;
   reportsServiceUrl: string;
   commercialServiceUrl: string;
+  marketingServiceUrl: string;
+  marketingServiceInternalToken: string;
   websocketUpstreamUrl?: string;
   databaseUrl?: string;
   publicGatewayUrl?: string;
@@ -323,6 +341,8 @@ export function getGatewayEnv(): GatewayEnv {
     parcelamentoServiceUrl: process.env.PARCELAMENTO_SERVICE_URL,
     reportsServiceUrl: process.env.REPORTS_SERVICE_URL,
     commercialServiceUrl: process.env.COMMERCIAL_SERVICE_URL,
+    marketingServiceUrl: process.env.MARKETING_SERVICE_URL,
+    marketingServiceInternalToken: process.env.MARKETING_SERVICE_INTERNAL_TOKEN,
     websocketUpstreamUrl: process.env.WEBSOCKET_UPSTREAM_URL,
     databaseUrl: process.env.DATABASE_URL,
     publicGatewayUrl: process.env.GATEWAY_PUBLIC_URL,

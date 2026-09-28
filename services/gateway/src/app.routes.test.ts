@@ -4512,6 +4512,37 @@ it("blocks disabled commercial routes before proxying even for global admins", a
   }
 });
 
+it("keeps Marketing routes unavailable until module reconciliation", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+    modules: { marketing: 3 },
+  });
+  const seenUrls: string[] = [];
+  const upstream = createServer((request, response) => {
+    seenUrls.push(request.url ?? "");
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: {} }));
+  });
+  const marketingServiceUrl = await startServer(upstream);
+  const gateway = createServer(createApp(createEnv({ marketingServiceUrl }), createTestLogger()));
+  const gatewayUrl = await startServer(gateway);
+
+  try {
+    const response = await fetch(`${gatewayUrl}/marketing/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(404);
+    expect(seenUrls).toEqual([]);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
 it("allows Viewers without client-related module permission to proxy /client/list", async () => {
   const token = createToken({
     user_id: "user-1",

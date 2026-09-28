@@ -1,9 +1,11 @@
 const DISABLED_GATEWAY_ROUTE_PATTERNS = [
+  /^\/marketing(?:\/|$)/,
   /^\/client\/commercial\/overview\/?$/,
   /^\/client\/[^/]+\/commercial\/?$/,
 ] as const;
 
 const DISABLED_GATEWAY_OPENAPI_PATHS = new Set([
+  "/marketing/dashboard",
   "/client/commercial/overview",
   "/client/{id}/commercial",
 ]);

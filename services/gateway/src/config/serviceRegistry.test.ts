@@ -37,6 +37,23 @@ describe("commercial-service gateway registry", () => {
   });
 });
 
+describe("marketing-service gateway registry", () => {
+  it("encaminha Marketing com contexto e permissão do módulo", () => {
+    const env = {
+      marketingServiceUrl: "http://marketing-service:3047",
+      marketingServiceInternalToken: "gateway-marketing-token",
+    } as GatewayEnv;
+
+    expect(resolveGatewayService(env, "/marketing/dashboard", "GET")).toMatchObject({
+      key: "marketing-service",
+      targetUrl: "http://marketing-service:3047",
+      internalServiceToken: "gateway-marketing-token",
+      permissionModule: "marketing",
+      routePrefixes: ["/marketing"],
+    });
+  });
+});
+
 describe("regularize-service gateway registry", () => {
   it("encaminha contexto confiável e a permissão específica do módulo", () => {
     const env = {

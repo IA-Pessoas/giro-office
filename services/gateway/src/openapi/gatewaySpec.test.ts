@@ -34,6 +34,8 @@ it("agrega o catálogo público do reports-service", () => {
     parcelamentoServiceUrl: "http://127.0.0.1:3043",
     reportsServiceUrl: "http://127.0.0.1:3044",
     commercialServiceUrl: "http://127.0.0.1:3045",
+    marketingServiceUrl: "http://127.0.0.1:3047",
+    marketingServiceInternalToken: "marketing-service-token",
     databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
     jwtSecret: "test-secret",
     logLevel: "silent",
@@ -53,6 +55,7 @@ it("agrega o catálogo público do reports-service", () => {
   expect(spec.paths["/commercial/prospecting"]?.post?.["x-origin-service"]).toBe(
     "commercial-service",
   );
+  expect(spec.paths["/marketing/dashboard"]).toBeUndefined();
   expect(spec.paths["/triagem/catalogs"]?.get?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/triagem/external-links"]?.post?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/triagem/overview"]?.get?.["x-origin-service"]).toBe("triagem-service");

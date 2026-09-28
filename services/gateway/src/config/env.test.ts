@@ -29,6 +29,8 @@ function setGatewayEnv(overrides: NodeJS.ProcessEnv) {
   process.env.TI_SERVICE_INTERNAL_TOKEN = "secure-ti-service-token-with-at-least-32-chars";
   process.env.CERTIFICATE_SERVICE_INTERNAL_TOKEN =
     "secure-certificate-service-token-with-at-least-32-chars";
+  process.env.MARKETING_SERVICE_INTERNAL_TOKEN =
+    "secure-marketing-service-token-with-at-least-32-chars";
   process.env.GATEWAY_ALLOWED_ORIGINS = "https://app.example.com";
   delete process.env.GATEWAY_PUBLIC_URL;
   delete process.env.GATEWAY_JSON_BODY_LIMIT;
@@ -174,6 +176,23 @@ describe("gateway env security validation", () => {
     delete process.env.COMMERCIAL_SERVICE_URL;
 
     expect(getGatewayEnv().commercialServiceUrl).toBe("http://localhost:3045");
+  });
+
+  it("uses Marketing service defaults", () => {
+    setGatewayEnv({ NODE_ENV: "test" });
+    delete process.env.MARKETING_SERVICE_URL;
+    delete process.env.MARKETING_SERVICE_INTERNAL_TOKEN;
+
+    const env = getGatewayEnv();
+
+    expect(env.marketingServiceUrl).toBe("http://localhost:3047");
+    expect(env.marketingServiceInternalToken).toBe("marketing-service-token");
+  });
+
+  it("requires a dedicated Marketing internal token in production", () => {
+    setGatewayEnv({ MARKETING_SERVICE_INTERNAL_TOKEN: "marketing-service-token" });
+
+    expect(() => getGatewayEnv()).toThrow(/MARKETING_SERVICE_INTERNAL_TOKEN/);
   });
 
   it("parses optional gateway public URL and JSON body limit overrides", () => {
