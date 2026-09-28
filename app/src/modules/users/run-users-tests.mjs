@@ -509,12 +509,12 @@ runTest("organization owner scope field uses a checkbox toggle", () => {
   assert.equal(createUserModalSource.includes('name="isOrganizationOwner"'), false);
 });
 
-runTest("admin user details sends a reset link instead of setting a password", () => {
+runTest("admin user details resets the password in a modal instead of a form field", () => {
   assert.doesNotMatch(adminUserDetailsPanelSource, /name="password"/);
   assert.doesNotMatch(adminUserDetailsPanelSource, /formData\.password/);
   assert.match(
     adminUserDetailsPanelSource,
-    /<PasswordResetButton[\s\S]*onSend=\{\(\) => dataSource\.sendPasswordReset\(userId\)\}/,
+    /<PasswordResetButton[\s\S]*onSubmit=\{\(password\) => dataSource\.resetPassword\(userId, password\)\}/,
   );
 });
 

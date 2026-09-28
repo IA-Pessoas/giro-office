@@ -1749,7 +1749,7 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
     expect(response.status).toBe(403);
   });
 
-  describe("redefinição de senha pelo administrador (#1342)", () => {
+  describe("redefinição de senha pelo administrador", () => {
     const OTHER_USER_ID = "c0000000-0000-4000-8000-000000000002";
     const resetEnv = () => ({ ...env(), APP_PUBLIC_URL: "https://app.test" });
 
@@ -1767,10 +1767,15 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
       } as never);
     }
 
-    function resetRequest(app: ReturnType<typeof createUserWorkerApp>, headers: HeadersInit) {
+    function resetRequest(
+      app: ReturnType<typeof createUserWorkerApp>,
+      headers: Record<string, string>,
+      password = "senha-definida-pelo-ti",
+    ) {
       return app.request(`https://user.test/user/${OTHER_USER_ID}/password-reset`, {
         method: "POST",
-        headers,
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ password }),
       });
     }
 
@@ -1814,14 +1819,16 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
       expect(db.user.updateMany).not.toHaveBeenCalled();
     });
 
-    it("envia link de uso único e registra auditoria", async () => {
+    it("TI define a senha, derruba as sessões e registra auditoria sem enviar link", async () => {
       const db = prisma();
       withTarget(db);
+      const hashPassword = vi.fn(async () => "ti-argon2id-hash");
       const sendPasswordResetEmail = vi.fn(async () => {});
       const audit = vi.fn(async () => {});
       const app = createUserWorkerApp({
         env: resetEnv(),
         prisma: db,
+        hashPassword,
         sendPasswordResetEmail,
         audit,
       } as never);
@@ -1829,80 +1836,58 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
       const response = await resetRequest(app, forwardedHeaders());
 
       expect(response.status).toBe(200);
-      expect(JSON.stringify(await response.json())).not.toMatch(/token/i);
+      expect(hashPassword).toHaveBeenCalledWith("senha-definida-pelo-ti");
+      expect(db.user.updateMany).toHaveBeenCalledWith({
+        where: { id: OTHER_USER_ID },
+        data: {
+          password: "ti-argon2id-hash",
+          session_version: { increment: 1 },
+          version: { increment: 1 },
+        },
+      });
+      expect(db.authSession.updateMany).toHaveBeenCalledWith({
+        where: { user_id: OTHER_USER_ID, revoked_at: null },
+        data: { revoked_at: expect.any(Date) },
+      });
       expect(db.passwordResetToken.updateMany).toHaveBeenCalledWith({
         where: { user_id: OTHER_USER_ID, used_at: null },
         data: { used_at: expect.any(Date) },
       });
-      const [{ data: created }] = db.passwordResetToken.create.mock.calls[0] as unknown as [
-        { data: { user_id: string; token_hash: string; expires_at: Date } },
-      ];
-      expect(created.user_id).toBe(OTHER_USER_ID);
-      expect(created.expires_at.getTime()).toBeGreaterThan(Date.now());
-      expect(created.expires_at.getTime()).toBeLessThanOrEqual(Date.now() + 60 * 60 * 1000);
-      const [message] = sendPasswordResetEmail.mock.calls[0] as unknown as [
-        { to: string; name: string; link: string },
-      ];
-      expect(message.to).toBe("alvo@example.com");
-      const link = new URL(message.link);
-      expect(link.origin + link.pathname).toBe("https://app.test/redefinir-senha");
-      expect(await hashCsrfToken(String(link.searchParams.get("token")))).toBe(created.token_hash);
+      expect(db.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(sendPasswordResetEmail).not.toHaveBeenCalled();
+      expect(JSON.stringify(audit.mock.calls)).not.toContain("senha-definida-pelo-ti");
       expect(audit).toHaveBeenCalledWith(
         expect.objectContaining({
           actorUserId: USER_ID,
-          action: "PASSWORD_RESET_REQUESTED",
+          action: "PASSWORD_SET_BY_ADMIN",
           referring: "user",
           referringId: OTHER_USER_ID,
         }),
       );
     });
 
-    it("usa o login como destino quando ele é um e-mail", async () => {
-      const db = prisma();
-      withTarget(db, { email: null, login: "alvo.login@example.com" });
-      const sendPasswordResetEmail = vi.fn(async () => {});
-      const app = createUserWorkerApp({
-        env: resetEnv(),
-        prisma: db,
-        sendPasswordResetEmail,
-      } as never);
-
-      expect((await resetRequest(app, forwardedHeaders())).status).toBe(200);
-      expect(sendPasswordResetEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ to: "alvo.login@example.com" }),
-      );
-    });
-
-    it("recusa usuário sem e-mail", async () => {
-      const db = prisma();
-      withTarget(db, { email: null, login: "alvo" });
-      const app = createUserWorkerApp({
-        env: resetEnv(),
-        prisma: db,
-        sendPasswordResetEmail: vi.fn(async () => {}),
-      } as never);
-
-      expect((await resetRequest(app, forwardedHeaders())).status).toBe(422);
-      expect(db.passwordResetToken.create).not.toHaveBeenCalled();
-    });
-
-    it("responde 503 quando o envio de e-mail não está configurado", async () => {
+    it("recusa senha curta definida pelo TI", async () => {
       const db = prisma();
       withTarget(db);
       const app = createUserWorkerApp({ env: env(), prisma: db });
 
-      expect((await resetRequest(app, forwardedHeaders())).status).toBe(503);
-      expect(db.passwordResetToken.create).not.toHaveBeenCalled();
+      expect((await resetRequest(app, forwardedHeaders(), "curta")).status).toBe(400);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
     });
 
-    it("exige gestão de usuários para pedir a redefinição", async () => {
+    it("não redefine a senha de usuário inativo", async () => {
+      const db = prisma();
+      withTarget(db, { status: "inactive" });
+      const app = createUserWorkerApp({ env: env(), prisma: db });
+
+      expect((await resetRequest(app, forwardedHeaders())).status).toBe(409);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("exige gestão de usuários para redefinir a senha", async () => {
       const db = prisma();
       withTarget(db);
-      const app = createUserWorkerApp({
-        env: resetEnv(),
-        prisma: db,
-        sendPasswordResetEmail: vi.fn(async () => {}),
-      } as never);
+      const app = createUserWorkerApp({ env: env(), prisma: db });
 
       const response = await resetRequest(
         app,
@@ -1910,27 +1895,47 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
       );
 
       expect(response.status).toBe(403);
-      expect(db.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(db.user.updateMany).not.toHaveBeenCalled();
     });
 
-    it("super admin envia a redefinição pela plataforma", async () => {
+    it("não redefine a própria senha sem a senha atual", async () => {
+      const db = prisma();
+      const app = createUserWorkerApp({ env: env(), prisma: db });
+
+      const response = await app.request(`https://user.test/user/${USER_ID}/password-reset`, {
+        method: "POST",
+        headers: { ...forwardedHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ password: "senha-definida-pelo-ti" }),
+      });
+
+      expect(response.status).toBe(403);
+      expect(db.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("super admin define a senha pela plataforma", async () => {
       const db = prisma();
       withTarget(db);
-      const sendPasswordResetEmail = vi.fn(async () => {});
       const app = createUserWorkerApp({
-        env: resetEnv(),
+        env: env(),
         prisma: db,
-        sendPasswordResetEmail,
+        hashPassword: async () => "platform-hash",
       } as never);
 
       const response = await app.request(
         `https://user.test/platform/organizations/${ORGANIZATION_ID}/users/${OTHER_USER_ID}/password-reset`,
-        { method: "POST", headers: await platformHeaders(db) },
+        {
+          method: "POST",
+          headers: { ...(await platformHeaders(db)), "content-type": "application/json" },
+          body: JSON.stringify({ password: "senha-definida-pelo-ti" }),
+        },
       );
 
       expect(response.status).toBe(200);
-      expect(sendPasswordResetEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ to: "alvo@example.com" }),
+      expect(db.user.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: OTHER_USER_ID },
+          data: expect.objectContaining({ password: "platform-hash" }),
+        }),
       );
     });
 
@@ -1984,42 +1989,6 @@ describe("admin de TI gerencia usuários com teto de permissão", () => {
       db.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
       expect((await confirmRequest(app, "nova-senha-forte")).status).toBe(400);
       expect(db.user.updateMany).not.toHaveBeenCalled();
-    });
-
-    it("audita o pedido mesmo quando o e-mail falha", async () => {
-      const db = prisma();
-      withTarget(db);
-      const audit = vi.fn(async () => {});
-      const app = createUserWorkerApp({
-        env: resetEnv(),
-        prisma: db,
-        audit,
-        sendPasswordResetEmail: vi.fn(async () => {
-          throw new Error("adapter fora do ar");
-        }),
-      } as never);
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      expect((await resetRequest(app, forwardedHeaders())).status).toBe(502);
-      expect(audit).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "PASSWORD_RESET_REQUESTED" }),
-      );
-      expect(consoleError).toHaveBeenCalled();
-      consoleError.mockRestore();
-    });
-
-    it("limita a um envio por minuto por usuário", async () => {
-      const db = prisma();
-      withTarget(db);
-      db.passwordResetToken.findFirst.mockResolvedValue({ id: "reset-recente" });
-      const app = createUserWorkerApp({
-        env: resetEnv(),
-        prisma: db,
-        sendPasswordResetEmail: vi.fn(async () => {}),
-      } as never);
-
-      expect((await resetRequest(app, forwardedHeaders())).status).toBe(429);
-      expect(db.passwordResetToken.create).not.toHaveBeenCalled();
     });
 
     it("não redefine a senha de usuário desativado depois do envio", async () => {

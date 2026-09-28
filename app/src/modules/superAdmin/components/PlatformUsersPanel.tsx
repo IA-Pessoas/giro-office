@@ -319,7 +319,9 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                       </select>
                     </label>
                     <PasswordResetButton
-                      onSend={() => platformService.sendPasswordReset(organization.id, selectedUser.id)}
+                      onSubmit={(password) =>
+                        platformService.resetPassword(organization.id, selectedUser.id, password)
+                      }
                       className="rounded-lg border px-3 py-2 text-sm font-semibold"
                       disabled={userUpdateMutation.isPending}
                     />
