@@ -7,63 +7,32 @@ import {
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-import { z } from "zod";
 
 import {
   MarketingPermissionLevel,
   requireMarketingPermission,
 } from "../middlewares/requireMarketingPermission.js";
-
-export const MARKETING_EVENT_STATUSES = [
-  "Novo",
-  "Em andamento",
-  "Concluído",
-  "Descontinuado",
-] as const;
-
-export const MARKETING_EVENT_PRIORITIES = ["Baixa", "Média", "Alta"] as const;
-
-const marketingEventIdParamsSchema = z.object({
-  id: z.string().uuid({ message: "Identificador do evento inválido." }),
-});
-
-const createMarketingEventBodySchema = z
-  .object({
-    name: z.string().trim().min(1, "Informe o nome do evento.").max(50),
-    logo: z.string().max(100).optional().default(""),
-    status: z.enum(MARKETING_EVENT_STATUSES).optional().default("Novo"),
-    priority: z.enum(MARKETING_EVENT_PRIORITIES),
-    objective: z.string().optional().default(""),
-    audience: z.string().optional().default(""),
-  })
-  .strict();
-
-const updateMarketingEventBodySchema = z
-  .object({
-    name: z.string().trim().min(1, "Informe o nome do evento.").max(50).optional(),
-    logo: z.string().max(100).optional(),
-    status: z.enum(MARKETING_EVENT_STATUSES).optional(),
-    priority: z.enum(MARKETING_EVENT_PRIORITIES).optional(),
-    objective: z.string().optional(),
-    audience: z.string().optional(),
-  })
-  .strict()
-  .refine((body) => Object.keys(body).length > 0, {
-    message: "Informe ao menos um campo para atualizar.",
-  });
+import type {
+  CreateMarketingEventInput,
+  MarketingEventPriority,
+  MarketingEventStatus,
+  UpdateMarketingEventInput,
+} from "../schemas/marketingEvent.schemas.js";
+import {
+  createMarketingEventBodySchema,
+  marketingEventIdParamsSchema,
+  updateMarketingEventBodySchema,
+} from "../schemas/marketingEvent.schemas.js";
 
 export interface MarketingEvent {
   id: string;
   name: string;
   logo: string;
-  status: string;
-  priority: string;
+  status: MarketingEventStatus;
+  priority: MarketingEventPriority;
   objective: string;
   audience: string;
 }
-
-export type CreateMarketingEventInput = z.infer<typeof createMarketingEventBodySchema>;
-export type UpdateMarketingEventInput = z.infer<typeof updateMarketingEventBodySchema>;
 
 export interface MarketingEventsProvider {
   listEvents(organizationId: string): Promise<MarketingEvent[]>;

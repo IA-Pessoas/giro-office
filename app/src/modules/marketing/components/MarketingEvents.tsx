@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { Pencil, Plus, RefreshCw } from "lucide-react";
+import { Eye, Pencil, Plus, RefreshCw } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
 import { Dialog } from "@shared/components";
 
+import { marketingFormControlClass, marketingFormTextareaClass } from "./marketingFormStyles";
 import {
   useCreateMarketingEvent,
   useMarketingEvents,
@@ -61,7 +62,7 @@ function Field({
       <span>{label}{required ? " *" : ""}</span>
       {children ?? (
         <input
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+          className={marketingFormControlClass}
           id={id}
           maxLength={maxLength}
           name={name}
@@ -81,6 +82,7 @@ export function MarketingEvents() {
   const updateMutation = useUpdateMarketingEvent();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<MarketingEvent | null>(null);
+  const [viewingEvent, setViewingEvent] = useState<MarketingEvent | null>(null);
   const [draft, setDraft] = useState<EventDraft>(emptyDraft);
   const [formError, setFormError] = useState("");
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -114,12 +116,18 @@ export function MarketingEvents() {
       return;
     }
 
-    const payload: MarketingEventPayload = { ...draft, priority: draft.priority };
     try {
       if (editingEvent) {
+        const payload: MarketingEventPayload = { ...draft, priority: draft.priority };
         await updateMutation.mutateAsync({ id: editingEvent.id, payload });
       } else {
-        await createMutation.mutateAsync(payload);
+        await createMutation.mutateAsync({
+          name: draft.name,
+          logo: draft.logo,
+          priority: draft.priority,
+          objective: draft.objective,
+          audience: draft.audience,
+        });
       }
       setDialogOpen(false);
     } catch (error: unknown) {
@@ -190,7 +198,7 @@ export function MarketingEvents() {
                 <th className="px-3 py-2 font-semibold" scope="col">Status</th>
                 <th className="px-3 py-2 font-semibold" scope="col">Prioridade</th>
                 <th className="px-3 py-2 font-semibold" scope="col">Público-alvo</th>
-                {access.canEdit ? <th className="px-3 py-2" scope="col"><span className="sr-only">Ações</span></th> : null}
+                <th className="px-3 py-2" scope="col"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
             <tbody>
@@ -200,8 +208,16 @@ export function MarketingEvents() {
                   <td className="px-3 py-3 text-gray-700 dark:text-slate-200">{event.status}</td>
                   <td className="px-3 py-3 text-gray-700 dark:text-slate-200">{event.priority}</td>
                   <td className="max-w-64 truncate px-3 py-3 text-gray-700 dark:text-slate-200">{event.audience}</td>
-                  {access.canEdit ? (
-                    <td className="px-3 py-3 text-right">
+                  <td className="px-3 py-3 text-right">
+                      <button
+                        aria-label={`Ver evento ${event.name}`}
+                        className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                        onClick={() => setViewingEvent(event)}
+                        type="button"
+                      >
+                        <Eye aria-hidden="true" className="h-4 w-4" />
+                      </button>
+                      {access.canEdit ? (
                       <button
                         aria-label={`Editar evento ${event.name}`}
                         className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
@@ -210,8 +226,8 @@ export function MarketingEvents() {
                       >
                         <Pencil aria-hidden="true" className="h-4 w-4" />
                       </button>
+                      ) : null}
                     </td>
-                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -250,9 +266,9 @@ export function MarketingEvents() {
           <Field label="Nome" maxLength={50} name="name" onChange={(name) => setDraft((current) => ({ ...current, name }))} required value={draft.name} />
           <Field label="Logo (caminho ou URL)" maxLength={100} name="logo" onChange={(logo) => setDraft((current) => ({ ...current, logo }))} value={draft.logo} />
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Status" name="status" onChange={(status) => setDraft((current) => ({ ...current, status: status as MarketingEventPayload["status"] }))} value={draft.status}>
+            {editingEvent ? <Field label="Status" name="status" onChange={(status) => setDraft((current) => ({ ...current, status: status as MarketingEventPayload["status"] }))} value={draft.status}>
               <select
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className={marketingFormControlClass}
                 id="marketing-event-status"
                 name="status"
                 onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as MarketingEventPayload["status"] }))}
@@ -260,10 +276,10 @@ export function MarketingEvents() {
               >
                 {MARKETING_EVENT_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
               </select>
-            </Field>
+            </Field> : <p className="text-sm text-gray-600 dark:text-slate-300">Status inicial: Novo</p>}
             <Field label="Prioridade" name="priority" onChange={(priority) => setDraft((current) => ({ ...current, priority: priority as MarketingEventPriority | "" }))} required value={draft.priority}>
               <select
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                className={marketingFormControlClass}
                 id="marketing-event-priority"
                 name="priority"
                 onChange={(event) => setDraft((current) => ({ ...current, priority: event.target.value as MarketingEventPriority | "" }))}
@@ -277,13 +293,37 @@ export function MarketingEvents() {
           </div>
           <label className="block space-y-1.5 text-sm font-medium text-gray-700 dark:text-slate-200" htmlFor="marketing-event-objective">
             Objetivo
-            <textarea className="min-h-24 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white" id="marketing-event-objective" name="objective" onChange={(event) => setDraft((current) => ({ ...current, objective: event.target.value }))} value={draft.objective} />
+            <textarea className={marketingFormTextareaClass} id="marketing-event-objective" name="objective" onChange={(event) => setDraft((current) => ({ ...current, objective: event.target.value }))} value={draft.objective} />
           </label>
           <label className="block space-y-1.5 text-sm font-medium text-gray-700 dark:text-slate-200" htmlFor="marketing-event-audience">
             Público-alvo
-            <textarea className="min-h-24 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white" id="marketing-event-audience" name="audience" onChange={(event) => setDraft((current) => ({ ...current, audience: event.target.value }))} value={draft.audience} />
+            <textarea className={marketingFormTextareaClass} id="marketing-event-audience" name="audience" onChange={(event) => setDraft((current) => ({ ...current, audience: event.target.value }))} value={draft.audience} />
           </label>
         </form>
+      </Dialog>
+
+      <Dialog
+        description="Dados completos do evento"
+        footer={(
+          <button
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+            onClick={() => setViewingEvent(null)}
+            type="button"
+          >Fechar</button>
+        )}
+        onOpenChange={(open) => { if (!open) setViewingEvent(null); }}
+        open={viewingEvent !== null}
+        title={viewingEvent?.name ?? "Detalhes do evento"}
+      >
+        {viewingEvent ? (
+          <dl className="grid gap-4 text-sm sm:grid-cols-2">
+            <div><dt className="font-semibold text-gray-700 dark:text-slate-200">Logo</dt><dd className="mt-1 break-all text-gray-600 dark:text-slate-300">{viewingEvent.logo ? <><img alt={`Logo de ${viewingEvent.name}`} className="mb-2 max-h-20 max-w-40 object-contain" src={viewingEvent.logo} />{viewingEvent.logo}</> : "—"}</dd></div>
+            <div><dt className="font-semibold text-gray-700 dark:text-slate-200">Status</dt><dd className="mt-1 text-gray-600 dark:text-slate-300">{viewingEvent.status}</dd></div>
+            <div><dt className="font-semibold text-gray-700 dark:text-slate-200">Prioridade</dt><dd className="mt-1 text-gray-600 dark:text-slate-300">{viewingEvent.priority}</dd></div>
+            <div><dt className="font-semibold text-gray-700 dark:text-slate-200">Público-alvo</dt><dd className="mt-1 whitespace-pre-wrap text-gray-600 dark:text-slate-300">{viewingEvent.audience || "—"}</dd></div>
+            <div className="sm:col-span-2"><dt className="font-semibold text-gray-700 dark:text-slate-200">Objetivo</dt><dd className="mt-1 whitespace-pre-wrap text-gray-600 dark:text-slate-300">{viewingEvent.objective || "—"}</dd></div>
+          </dl>
+        ) : null}
       </Dialog>
     </section>
   );

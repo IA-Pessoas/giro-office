@@ -62,6 +62,68 @@ test("nomes ambíguos por capitalização ou acento ficam em quarentena com orig
   assert.ok(results.every(({ decision }) => decision.identityRef.startsWith(`${sourceTable}:`)));
 });
 
+test("nomes equivalentes por utf8mb4_general_ci ficam em quarentena na importação", () => {
+  const rows = [
+    { id: 43, nome: "Straße", logo: "", status: "Novo", prioridade: "Baixa" },
+    { id: 44, nome: "Strase", logo: "", status: "Novo", prioridade: "Baixa" },
+  ];
+  const contexts = buildMarketingEventContexts({ rows });
+  const results = rows.map((row, index) =>
+    projectRemainingRow({ sourceTable, row, context: contexts[index] }),
+  );
+
+  assert.deepEqual(
+    results.map(({ decision }) => decision.reasonCode),
+    ["MKT_EVENT_NAME_AMBIGUOUS", "MKT_EVENT_NAME_AMBIGUOUS"],
+  );
+});
+
+test("caracteres suplementares equivalentes por utf8mb4_general_ci ficam em quarentena", () => {
+  const rows = [
+    { id: 45, nome: "Evento 🚀", logo: "", status: "Novo", prioridade: "Baixa" },
+    { id: 46, nome: "Evento 😀", logo: "", status: "Novo", prioridade: "Baixa" },
+  ];
+  const contexts = buildMarketingEventContexts({ rows });
+  const results = rows.map((row, index) =>
+    projectRemainingRow({ sourceTable, row, context: contexts[index] }),
+  );
+
+  assert.deepEqual(
+    results.map(({ decision }) => decision.reasonCode),
+    ["MKT_EVENT_NAME_AMBIGUOUS", "MKT_EVENT_NAME_AMBIGUOUS"],
+  );
+});
+
+test("preserva espaços iniciais distintos e agrupa espaços finais da collation legada", () => {
+  const distinctNames = [
+    { id: 47, nome: "Evento", status: "Novo", prioridade: "Baixa" },
+    { id: 48, nome: " Evento", status: "Novo", prioridade: "Baixa" },
+  ];
+  const distinctContexts = buildMarketingEventContexts({ rows: distinctNames });
+  const distinctResults = distinctNames.map((row, index) =>
+    projectRemainingRow({ sourceTable, row, context: distinctContexts[index] }),
+  );
+
+  assert.deepEqual(
+    distinctResults.map(({ decision }) => decision.status),
+    ["prepared", "prepared"],
+  );
+  assert.equal(distinctResults[1].payload.name, " Evento");
+
+  const trailingSpaces = [
+    { id: 49, nome: "Evento", status: "Novo", prioridade: "Baixa" },
+    { id: 50, nome: "Evento   ", status: "Novo", prioridade: "Baixa" },
+  ];
+  const trailingContexts = buildMarketingEventContexts({ rows: trailingSpaces });
+  const trailingResults = trailingSpaces.map((row, index) =>
+    projectRemainingRow({ sourceTable, row, context: trailingContexts[index] }),
+  );
+  assert.deepEqual(
+    trailingResults.map(({ decision }) => decision.reasonCode),
+    ["MKT_EVENT_NAME_AMBIGUOUS", "MKT_EVENT_NAME_AMBIGUOUS"],
+  );
+});
+
 test("registros sem identidade ou prioridade legadas válidas ficam em quarentena", () => {
   const rows = [
     { id: 0, nome: "Sem identidade", status: "Novo", prioridade: "Alta" },

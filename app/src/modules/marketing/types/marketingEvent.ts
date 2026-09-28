@@ -29,6 +29,8 @@ export interface MarketingEventPayload {
   audience: string;
 }
 
+export type CreateMarketingEventPayload = Omit<MarketingEventPayload, "status">;
+
 export interface MarketingEventEnvelope<T> {
   success: boolean;
   data: T;

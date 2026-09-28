@@ -104,6 +104,13 @@ try {
   assert.equal(await page.title(), "Marketing", "/marketing: título");
   await page.getByRole("row", { name: /Evento de validação/ }).waitFor();
   await page.screenshot({ path: path.join(outputDirectory, "marketing-eventos.png"), fullPage: true });
+  await page.getByRole("button", { name: "Ver evento Evento de validação" }).click();
+  const detailsDialog = page.getByRole("dialog", { name: "Evento de validação" });
+  await detailsDialog.getByText("Dados completos do evento").waitFor();
+  await detailsDialog.getByText("Fixture para validar o fluxo real do formulário.").waitFor();
+  await detailsDialog.getByText("Equipe interna").waitFor();
+  await page.screenshot({ path: path.join(outputDirectory, "marketing-evento-detalhes.png"), fullPage: true });
+  await detailsDialog.getByRole("button", { name: "Fechar" }).last().click();
   await page.getByRole("button", { name: "Novo evento" }).click();
   await page.getByRole("heading", { name: "Novo evento" }).waitFor();
   await page.screenshot({ path: path.join(outputDirectory, "marketing-evento-novo.png"), fullPage: true });
@@ -112,7 +119,7 @@ try {
   await page.getByRole("button", { name: "Salvar evento" }).click();
   await page.getByRole("row", { name: /Evento criado pelo smoke/ }).waitFor();
   console.log("PASS /marketing: página autenticada e módulo ativo");
-  console.log("PASS /marketing: lista, criação e capturas salvas em output/playwright");
+  console.log("PASS /marketing: lista, detalhes para leitura, criação e capturas em output/playwright");
 
   for (const [from, to] of [
     ["/home", "/dashboard"],
