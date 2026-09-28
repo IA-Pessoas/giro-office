@@ -56,6 +56,8 @@ describe("matriz de regressão das políticas modulares", () => {
       ["certificado", "DELETE", "/certificate/cert-1"],
       ["marketing", "POST", "/marketing/events"],
       ["marketing", "PUT", "/marketing/events/event-1"],
+      ["marketing", "POST", "/marketing/events/event-1/editions"],
+      ["marketing", "PUT", "/marketing/events/event-1/editions/edition-1"],
     ] as const;
 
     for (const [module, method, path] of writeRoutes) {

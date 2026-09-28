@@ -4546,14 +4546,38 @@ it("proxies Marketing reads and writes when module permission allows", async () 
         },
         body: JSON.stringify({ name: "Workshop" }),
       }),
+      fetch(`${gatewayUrl}/marketing/events/event-1/editions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`${gatewayUrl}/marketing/events/event-1/editions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ name: "Edição" }),
+      }),
+      fetch(`${gatewayUrl}/marketing/events/event-1/editions/edition-1`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ name: "Edição atualizada" }),
+      }),
     ]);
 
-    expect(responses.map((response) => response.status)).toEqual([200, 200, 200]);
-    expect(seenUrls).toEqual([
-      "GET /marketing/dashboard",
-      "GET /marketing/events/list",
-      "POST /marketing/events",
-    ]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200, 200, 200, 200, 200]);
+    expect(seenUrls.sort()).toEqual(
+      [
+        "GET /marketing/dashboard",
+        "GET /marketing/events/list",
+        "POST /marketing/events",
+        "GET /marketing/events/event-1/editions",
+        "POST /marketing/events/event-1/editions",
+        "PUT /marketing/events/event-1/editions/edition-1",
+      ].sort(),
+    );
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

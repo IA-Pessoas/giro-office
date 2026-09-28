@@ -1646,6 +1646,80 @@ const handlers = {
     });
   },
 
+  async marketingEventEditionsList(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions`,
+    });
+  },
+
+  async marketingEventEditionCreate(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    const response = await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions`,
+      json: {
+        name: `Smoke edição ${Date.now()}`,
+        date: "2030-11-12",
+        place: "Smoke test",
+        budgetItems: [{ name: "Espaço", amount: "100.00" }],
+        partnerships: [],
+        organizingTeam: [],
+        logistics: {
+          fornecedores: [],
+          cronograma: [],
+          registro: [],
+          transporte: [],
+          acomodacoes: [],
+        },
+        marketingCommunication: { abertura: [], divulgacao: [], acessoria: [], site: [] },
+        duringEvent: { recepcao: [], staff: [], programacao: [], feedback: [] },
+        afterEvent: { avaliacao: [], agradecimento: [], relatorio: [], followup: [] },
+        notes: "Smoke test",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.marketingEventEditionId = response.body?.data?.id ?? "";
+    }
+  },
+
+  async marketingEventEditionUpdate(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    const editionId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventEditionId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions/${editionId}`,
+      json: {
+        name: `Smoke edição ${Date.now()}`,
+        date: "2030-11-12",
+        place: "Smoke test",
+        budgetItems: [{ name: "Espaço", amount: "125.00" }],
+        partnerships: [],
+        organizingTeam: [],
+        logistics: {
+          fornecedores: [],
+          cronograma: [],
+          registro: [],
+          transporte: [],
+          acomodacoes: [],
+        },
+        marketingCommunication: { abertura: [], divulgacao: [], acessoria: [], site: [] },
+        duringEvent: { recepcao: [], staff: [], programacao: [], feedback: [] },
+        afterEvent: { avaliacao: [], agradecimento: [], relatorio: [], followup: [] },
+        notes: "Smoke test atualizado",
+      },
+    });
+  },
+
   async gatewayHealth(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
