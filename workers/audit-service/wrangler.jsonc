@@ -5,7 +5,7 @@
   "workers_dev": false,
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat"],
-  "vars": { "AUDIT_ENABLED": "true" },
+  "vars": { "NODE_ENV": "production", "AUDIT_ENABLED": "true" },
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
   "observability": {
     "enabled": true,

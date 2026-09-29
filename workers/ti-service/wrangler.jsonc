@@ -7,7 +7,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "services": [{ "binding": "USER_SERVICE", "service": "giro-user-service" }],
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
-  "vars": { "TI_REQUEST_IMAGE_BUCKET": "ti-request-attachments-private" },
+  "vars": { "NODE_ENV": "production", "TI_REQUEST_IMAGE_BUCKET": "ti-request-attachments-private" },
   "observability": {
     "enabled": true,
     "logs": { "enabled": true, "invocation_logs": true },
