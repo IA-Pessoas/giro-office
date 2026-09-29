@@ -15,5 +15,9 @@
   // Base das URLs que o cron envia por Service Binding; o binding ignora o host.
   "vars": { "INTERNAL_REQUEST_ORIGIN": "https://commercial.internal" },
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
-  "observability": { "enabled": true }
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": true }
+  }
 }
