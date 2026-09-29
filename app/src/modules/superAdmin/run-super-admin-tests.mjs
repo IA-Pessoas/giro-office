@@ -447,14 +447,25 @@ await runTest("mantém lista e painel de detalhe isolados pela organização sel
 
 await runTest("usa abas acessíveis e controla permissões de personificação por operador", async () => {
   const superAdminsHookSource = await source("./hooks/usePlatformSuperAdmins.ts");
+  const reconciliationTabSource = await source("./components/MarketingMigrationReconciliationTab.tsx");
   assert.match(superAdminPageSource, /role="tablist"/);
-  assert.equal((superAdminPageSource.match(/^\s+role="tab"$/gm) ?? []).length, 4);
+  assert.equal((superAdminPageSource.match(/^\s+role="tab"$/gm) ?? []).length, 5);
   assert.match(superAdminPageSource, /aria-selected=\{activePanel === "superAdmins"\}/);
   assert.match(superAdminPageSource, /aria-labelledby=\{`super-admin-tab-\$\{activePanel\}`\}/);
   assert.match(superAdminPageSource, />\s*Visão geral\s*</);
   assert.match(superAdminPageSource, />\s*Usuários\s*</);
   assert.match(superAdminPageSource, />\s*Super admins\s*</);
   assert.match(superAdminPageSource, />\s*Auditoria\s*</);
+  assert.match(superAdminPageSource, />\s*Reconciliação\s*</);
+  assert.match(superAdminPageSource, /<MarketingMigrationReconciliationTab/);
+  assert.match(reconciliationTabSource, /platformService\.getMarketingMigrationReconciliation\(organization\.id\)/);
+  assert.match(reconciliationTabSource, /platformService\.resolveMarketingMigrationAssociation/);
+  assert.match(reconciliationTabSource, /MKT_EDITION_EVENT_AMBIGUOUS/);
+  assert.match(reconciliationTabSource, /Pendente de tratamento/);
+  assert.match(reconciliationTabSource, /Destino canônico explícito/);
+  assert.match(reconciliationTabSource, /Histórico de decisões/);
+  assert.match(platformServiceSource, /decisions: Array<\{/);
+  assert.doesNotMatch(reconciliationTabSource, /encrypted_payload|password_payload|payload:/i);
   assert.match(superAdminPageSource, /<PlatformSuperAdminsPanel\s*\/>/);
   assert.match(superAdminsPanelSource, /formatImpersonationPermission/);
   assert.match(managementUtilsSource, /formatImpersonationPermission/);

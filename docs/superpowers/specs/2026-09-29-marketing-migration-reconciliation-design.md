@@ -58,6 +58,8 @@ senhas, payloads criptografados e dados pessoais que não sejam necessários par
 retornados à interface.
 
 Cada execução persistirá um resumo por conjunto com totais preparados, importados e em quarentena.
+Para uso de IA, o total importado contará apenas controles com proveniência explícita do importador
+legado; registros existentes anteriores a essa marca permanecerão sem classificação comprovada.
 Cada item pendente identificará a tabela de origem, o ID legado ou outra identidade estável e o
 código de motivo. Referências de origem continuarão disponíveis em modo de consulta depois do corte;
 nenhuma operação da tela escreverá no sistema legado.

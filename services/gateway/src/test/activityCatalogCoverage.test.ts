@@ -71,3 +71,26 @@ it("classifica toda operação pública do gateway", () => {
 
   expect(unknown).toEqual([]);
 });
+
+it("classifica as operações de reconciliação de Marketing com descrições auditáveis", () => {
+  expect(classifyActivity("GET", "/marketing/migration-reconciliation")).toMatchObject({
+    kind: "visible",
+    description: { action: "consultou", item: "o estado da reconciliação de Marketing" },
+  });
+  expect(classifyActivity("GET", "/marketing/migration-reconciliation/targets")).toMatchObject({
+    kind: "visible",
+    description: { action: "consultou", item: "os destinos canônicos elegíveis de Marketing" },
+  });
+  expect(
+    classifyActivity("POST", "/marketing/migration-reconciliation/eventos_edicoes/resolve"),
+  ).toMatchObject({
+    kind: "visible",
+    description: { action: "registrou", item: "uma decisão de reconciliação de Marketing" },
+  });
+  expect(
+    classifyActivity("POST", "/marketing/migration-reconciliation/eventos_edicoes/reconcile"),
+  ).toMatchObject({
+    kind: "visible",
+    description: { action: "executou", item: "uma reconciliação de Marketing" },
+  });
+});

@@ -6,6 +6,7 @@ import {
   getModelByDatabaseName,
   loadPrismaCatalog,
 } from "../lib/prisma-catalog.mjs";
+import { toLegacyIdRef } from "../lib/sensitivity.mjs";
 import { buildMarketingEventEditionContexts, REMAINING_RULES } from "../rules/remaining.mjs";
 import { buildRemainingRuntimeState, REMAINING_EXECUTION_ENTRIES } from "../runtime/remaining.mjs";
 
@@ -130,6 +131,35 @@ test("ambiguous or unprepared event links produce migration quarantine emissions
   assert.equal(emissions[0].status, "quarantine");
   assert.equal(emissions[0].reasonCode, "MKT_EDITION_EVENT_AMBIGUOUS");
   assert.equal(emissions[1].status, "quarantine");
+});
+
+test("an audited item decision resolves only its stable edition identity during re-run", () => {
+  const eventRows = [
+    { id: 7, nome: "Feira", prioridade: "Média", status: "Novo" },
+    { id: 7, nome: "Feira alternativa", prioridade: "Média", status: "Novo" },
+  ];
+  const editionRow = {
+    id: 19,
+    evento_id: 7,
+    nome: "Edição anual",
+    orcamentos: [],
+    data_local: "2026-11-12 | Castelo Branco",
+  };
+  const sourceIdentityDigest = toLegacyIdRef("tb_mkt.eventos_edicoes:19");
+  const runtime = buildRemainingRuntimeState({
+    sourceRows: { "tb_mkt.eventos": eventRows, "tb_mkt.eventos_edicoes": [editionRow] },
+    marketingEventEditionResolutions: new Map([[sourceIdentityDigest, "canonical-event-id"]]),
+  });
+  const editionEntry = REMAINING_EXECUTION_ENTRIES.find(
+    (entry) =>
+      entry.sourceTable === "tb_mkt.eventos_edicoes" &&
+      entry.stepId === "mkt-event-edition-insert",
+  );
+  const [emission] = editionEntry.emitRows(editionRow, runtime);
+  const payload = editionEntry.projector(emission, editionRow, runtime);
+
+  assert.equal(emission.status, "prepared");
+  assert.equal(payload.event_id, "canonical-event-id");
 });
 
 test("feedback period and evaluation are tenant scoped and one-to-one with a valid rating", () => {

@@ -83,6 +83,10 @@ describe("platform default deny", () => {
       ["PATCH", "/platform/organizations/org-1/users/user-1"],
       ["GET", "/platform/organizations/org-1/departments"],
       ["GET", "/platform/audit/requests"],
+      ["GET", "/platform/marketing/migration-reconciliation"],
+      ["GET", "/platform/marketing/migration-reconciliation/targets"],
+      ["POST", "/platform/marketing/migration-reconciliation/eventos_edicoes/resolve"],
+      ["POST", "/platform/marketing/migration-reconciliation/eventos_edicoes/reconcile"],
     ]) {
       expect(getRoutePolicy(method, path), `${method} ${path}`).toEqual({
         special: "platformOnly",

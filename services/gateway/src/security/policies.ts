@@ -329,6 +329,11 @@ const routePolicyMatchers: Array<{
     policy: platformOnlyPolicy,
   },
   {
+    method: "ANY",
+    path: /^\/platform\/marketing\/migration-reconciliation(?:\/|$)/,
+    policy: platformOnlyPolicy,
+  },
+  {
     method: "PUT",
     path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/permissions\/?$/,
     policy: platformOnlyPolicy,

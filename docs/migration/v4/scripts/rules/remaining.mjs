@@ -4,6 +4,7 @@ import { REMAINING_EVIDENCE } from "../evidence/remaining.mjs";
 import { normalizeRequiredScalarText } from "../lib/empty-scalar-policy.mjs";
 import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
 import { uuidV5 } from "../lib/uuid-v5.mjs";
+import { toLegacyIdRef } from "../lib/sensitivity.mjs";
 import {
   isAuthenticLegacyReferenceResolution,
   isAuthoritativeV2ClientIdentityResolution,
@@ -337,7 +338,7 @@ export function buildMarketingEventContexts({ rows }) {
   });
 }
 
-export function buildMarketingEventEditionContexts({ rows, eventRows = [] }) {
+export function buildMarketingEventEditionContexts({ rows, eventRows = [], resolutions = new Map() }) {
   const eventContexts = buildMarketingEventContexts({ rows: eventRows });
   const eventRule = REMAINING_RULES.find(({ sourceTable }) => sourceTable === "tb_mkt.eventos");
   const candidates = eventRows.map((row, index) => ({
@@ -347,15 +348,33 @@ export function buildMarketingEventEditionContexts({ rows, eventRows = [] }) {
   }));
 
   return issueContexts("mkt-event-edition", "tb_mkt.eventos_edicoes", rows, (row) => {
-    const plan = planMarketingEventEditionImport({ editionRow: row, eventCandidates: candidates });
+    const sourceIdentityDigest = toLegacyIdRef(
+      `tb_mkt.eventos_edicoes:${String(row?.id ?? "missing")}`,
+    );
+    const resolvedEventId = resolutions.get(sourceIdentityDigest);
+    const plan = planMarketingEventEditionImport({
+      editionRow: row,
+      eventCandidates: candidates,
+      resolvedEventId,
+    });
     const matches = candidates.filter((event) => String(event.legacyId) === String(row?.evento_id));
-    const event = matches.length === 1 ? matches[0] : null;
+    const event =
+      matches.length === 1
+        ? matches[0]
+        : matches.length > 1 && typeof resolvedEventId === "string"
+          ? { legacyId: row?.evento_id, id: resolvedEventId, status: "prepared" }
+          : null;
     return {
       event: issueResolution({
-        state: matches.length === 0 ? "zero" : matches.length > 1 ? "many" : "one",
+        state: event === null ? (matches.length === 0 ? "zero" : "many") : "one",
         sourceTable: "tb_mkt.eventos",
         sourceKey: validLegacyId(row?.evento_id) ? normalizeKey(row.evento_id) : null,
-        identityRef: event === null ? null : `tb_mkt.eventos:${normalizeKey(event.legacyId)}`,
+        identityRef:
+          event === null
+            ? null
+            : typeof resolvedEventId === "string"
+              ? `mtk.events:${resolvedEventId}`
+              : `tb_mkt.eventos:${normalizeKey(event.legacyId)}`,
         migrationState: event?.status ?? "quarantine",
         importPlan: plan,
       }),
@@ -369,6 +388,7 @@ export function buildMarketingEventEditionFeedbackContexts({
   editionRows = [],
   eventRows = [],
   evaluationRows = [],
+  resolutions = new Map(),
 }) {
   if (
     sourceTable !== "tb_mkt.eventos_feedbacks" &&
@@ -376,7 +396,7 @@ export function buildMarketingEventEditionFeedbackContexts({
   ) {
     throw new TypeError(`origem de feedback de edição inválida: ${String(sourceTable)}`);
   }
-  const editionContexts = buildMarketingEventEditionContexts({ rows: editionRows, eventRows });
+  const editionContexts = buildMarketingEventEditionContexts({ rows: editionRows, eventRows, resolutions });
   const editionRule = REMAINING_RULES.find(
     ({ sourceTable: candidate }) => candidate === "tb_mkt.eventos_edicoes",
   );

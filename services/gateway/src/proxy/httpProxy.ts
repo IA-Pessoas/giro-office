@@ -178,6 +178,12 @@ const SESSION_COOKIE_RULES: SessionCookieRule[] = [
     outbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
   },
   {
+    method: "POST",
+    path: /^\/platform\/marketing\/migration-reconciliation\/[^/]+\/(?:resolve|reconcile)$/u,
+    inbound: [AUTH_SESSION_COOKIE_NAME, CSRF_COOKIE_NAME],
+    outbound: [],
+  },
+  {
     method: "GET",
     path: "/platform/me",
     inbound: [AUTH_SESSION_COOKIE_NAME],

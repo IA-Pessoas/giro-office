@@ -308,6 +308,15 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       routePrefixes: [...MARKETING_SERVICE_PREFIXES],
       internalServiceToken: env.marketingServiceInternalToken,
       permissionModule: "marketing",
+      forwardSessionBinding: true,
+      forwardPlatformSessionCredentials: true,
+      stripPathPrefix: "/platform",
+      routeMatchers: [
+        {
+          methods: ["GET", "POST"],
+          path: /^\/platform\/marketing\/migration-reconciliation(?:\/targets|\/[^/]+\/(?:resolve|reconcile))?\/?$/,
+        },
+      ],
     },
     {
       key: "audit-service",
