@@ -7,5 +7,9 @@
   "compatibility_flags": ["nodejs_compat"],
   "services": [{ "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }],
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
-  "observability": { "enabled": true }
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": true }
+  }
 }

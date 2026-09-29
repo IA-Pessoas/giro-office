@@ -38,5 +38,9 @@
       "simple": { "limit": 10, "period": 60 }
     }
   ],
-  "observability": { "enabled": true }
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": true }
+  }
 }

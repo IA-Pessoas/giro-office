@@ -16,5 +16,9 @@
   // Mesma origem do app, como o rewrite de /api/* em next.config.mjs: cw.session e cw.csrf
   // sao host-only e SameSite=Lax, e o CSP e connect-src 'self'.
   "services": [{ "binding": "GATEWAY", "service": "giro-gateway" }],
-  "observability": { "enabled": true }
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": true }
+  }
 }

@@ -16,5 +16,9 @@
   },
   // Encerra e audita personificações vencidas a cada minuto (#1529).
   "triggers": { "crons": ["* * * * *"] },
-  "observability": { "enabled": true }
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": true }
+  }
 }
