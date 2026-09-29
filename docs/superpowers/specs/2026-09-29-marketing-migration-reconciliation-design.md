@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-29
 
-**Status:** aguardando revisão da especificação
+**Status:** aprovada pelo usuário em 2026-09-29
 
 **Referência:** issue #1549 — Reconciliação final e ativação do Marketing
 
