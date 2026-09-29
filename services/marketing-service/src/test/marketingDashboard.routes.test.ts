@@ -1,6 +1,7 @@
 import "./envBootstrap.js";
 
 import {
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
@@ -92,6 +93,29 @@ describe("GET /marketing/dashboard", () => {
     const response = await request(createTestApp(service))
       .get("/marketing/dashboard")
       .set(gatewayHeaders(0));
+
+    expect(response.status).toBe(403);
+    expect(service.getDashboard).not.toHaveBeenCalled();
+  });
+
+  it("uses the forwarded Marketing module permission", async () => {
+    const service = createDashboardProvider();
+    const headers = gatewayHeaders();
+    delete headers[FORWARDED_AUTH_PERMISSION_HEADER];
+    headers[FORWARDED_AUTH_MODULES_HEADER] = JSON.stringify({ marketing: 1 });
+
+    const response = await request(createTestApp(service)).get("/marketing/dashboard").set(headers);
+
+    expect(response.status).toBe(200);
+    expect(service.getDashboard).toHaveBeenCalledWith(organizationId);
+  });
+
+  it("does not let global permission override disabled Marketing module access", async () => {
+    const service = createDashboardProvider();
+    const headers = gatewayHeaders(1);
+    headers[FORWARDED_AUTH_MODULES_HEADER] = JSON.stringify({ marketing: 0 });
+
+    const response = await request(createTestApp(service)).get("/marketing/dashboard").set(headers);
 
     expect(response.status).toBe(403);
     expect(service.getDashboard).not.toHaveBeenCalled();

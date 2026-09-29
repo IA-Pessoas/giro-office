@@ -13,6 +13,7 @@ import { ContabilResponsiblesAdapter } from "./integrations/contabilResponsibles
 import { FiscalIcmsAdapter } from "./integrations/fiscalIcmsAdapter.js";
 import { FiscalIpiAdapter } from "./integrations/fiscalIpiAdapter.js";
 import { FiscalNcmAdapter } from "./integrations/fiscalNcmAdapter.js";
+import { MarketingBudgetAdapter } from "./integrations/marketingBudgetAdapter.js";
 import { ParcelamentoAdapter } from "./integrations/parcelamentoAdapter.js";
 import { PessoalLddAdapter } from "./integrations/pessoalLddAdapter.js";
 import { PessoalObligationsAdapter } from "./integrations/pessoalObligationsAdapter.js";
@@ -49,6 +50,7 @@ const app = createReportsApp({
     adapters: [
       new ParcelamentoAdapter(env),
       new ClientIntegrationAdapter(env),
+      new MarketingBudgetAdapter(prisma),
       new ContabilControlAdapter(env),
       new ContabilRelationshipAdapter(env),
       new ContabilResponsiblesAdapter(env),

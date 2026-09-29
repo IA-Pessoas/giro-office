@@ -92,18 +92,13 @@ export class MarketingDashboardService {
             AND person.status = 'Ativo'
             AND EXTRACT(MONTH FROM person.date_of_birth) = calendar.month
             AND EXTRACT(DAY FROM person.date_of_birth) >= calendar.day
-        ), ranked AS (
-          SELECT id, name, day, COUNT(*) OVER()::int AS total,
-            ROW_NUMBER() OVER (ORDER BY day, name, id) AS position
-          FROM matches
         )
-        SELECT COALESCE(MAX(total), 0)::int AS total,
+        SELECT COUNT(*)::int AS total,
           COALESCE(
-            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id)
-              FILTER (WHERE position <= 8),
+            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id),
             '[]'::jsonb
           ) AS items
-        FROM ranked
+        FROM matches
       `,
       this.prisma.$queryRaw<BirthdayAggregate[]>`
         WITH calendar AS (
@@ -133,18 +128,13 @@ export class MarketingDashboardService {
             AND employee.birth_date IS NOT NULL
             AND EXTRACT(MONTH FROM employee.birth_date) = calendar.month
             AND EXTRACT(DAY FROM employee.birth_date) >= calendar.day
-        ), ranked AS (
-          SELECT id, name, day, COUNT(*) OVER()::int AS total,
-            ROW_NUMBER() OVER (ORDER BY day, name, id) AS position
-          FROM matches
         )
-        SELECT COALESCE(MAX(total), 0)::int AS total,
+        SELECT COUNT(*)::int AS total,
           COALESCE(
-            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id)
-              FILTER (WHERE position <= 8),
+            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id),
             '[]'::jsonb
           ) AS items
-        FROM ranked
+        FROM matches
       `,
       this.prisma.$queryRaw<BirthdayAggregate[]>`
         WITH calendar AS (
@@ -165,18 +155,13 @@ export class MarketingDashboardService {
             AND company.opening_date IS NOT NULL
             AND EXTRACT(MONTH FROM company.opening_date) = calendar.month
             AND EXTRACT(DAY FROM company.opening_date) >= calendar.day
-        ), ranked AS (
-          SELECT id, name, day, COUNT(*) OVER()::int AS total,
-            ROW_NUMBER() OVER (ORDER BY day, name, id) AS position
-          FROM matches
         )
-        SELECT COALESCE(MAX(total), 0)::int AS total,
+        SELECT COUNT(*)::int AS total,
           COALESCE(
-            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id)
-              FILTER (WHERE position <= 8),
+            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id),
             '[]'::jsonb
           ) AS items
-        FROM ranked
+        FROM matches
       `,
       this.prisma.marketingAiUsageControl.count({
         where: { organization_id: organizationId, competence, knowledge: null },
