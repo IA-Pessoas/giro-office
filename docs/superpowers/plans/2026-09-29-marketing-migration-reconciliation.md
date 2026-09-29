@@ -36,21 +36,29 @@
 - Modificar: `infra/prisma/schema.prisma`
 - Criar: `infra/prisma/migrations/20260929120000_marketing_migration_reconciliation/migration.sql`
 - Criar: `services/marketing-service/src/services/marketingMigrationReconciliationService.ts`
+- Criar: `services/marketing-service/src/services/marketingMigrationReconciliationRunner.ts` para executar o dry-run somente leitura dos conjuntos Marketing e persistir o snapshot do resultado.
 - Criar: `services/marketing-service/src/test/marketingMigrationReconciliationService.test.ts`
+- Modificar: `services/marketing-service/src/config/env.ts` e `services/marketing-service/README.md` para configurar `MIGRATION_SOURCE_DIR` sem valor padrão e documentar seu acesso somente leitura.
+- Modificar: `docs/migration/v4/scripts/dry-run.mjs`, `docs/migration/v4/scripts/lib/execution-engine.mjs` e `docs/migration/v4/scripts/runtime/remaining.mjs` para suportar decisões registradas e relatório sanitizado por item apenas para conjuntos Marketing.
+- Modificar: `docs/migration/v4/scripts/test/dry-run.test.mjs`, `docs/migration/v4/scripts/test/execution-engine.test.mjs` e adicionar testes de runtime para as decisões explícitas.
 - Modificar: `services/marketing-service/package.json` somente se um comando de teste focado for necessário.
 
 **Interfaces:**
-- Serviço recebe `organizationId` validado e não lê nem escreve a origem legada.
-- O resumo identifica conjunto, estado (`not_run` ou execução concluída), totais preparados/importados/em quarentena e data da execução.
-- Uma pendência tem conjunto, tabela/escopo de origem, ID legado estável, código de motivo e metadados sanitizados.
+- Serviço recebe `organizationId` validado; o runner lê a origem por V4 somente em modo read-only e nunca escreve nela.
+- O dry-run V4 disponibiliza somente para estes conjuntos Marketing cada identidade estável já calculada pelo executor, estado e código de motivo; não inclui linhas ou payloads da origem e não limita a lista a uma amostra de identidades.
+- O resumo identifica conjunto, estado (`not_run` ou execução concluída), totais preparados/importados/em quarentena e data da execução. “Importado” vem do estado persistido no destino; “preparado” e “quarentena” vêm da execução read-only do V4.
+- Uma pendência tem conjunto, tabela/escopo de origem, identidade estável, código de motivo e metadados sanitizados.
 - Uma decisão tem organização, identidade de origem, destino canônico, ator verificado e instante de criação; identidade da pendência é única por organização/conjunto/origem.
+- Reexecução aplica decisões sobre o snapshot persistido da última execução, produz uma nova execução e não altera nem relê com escrita a fonte legada; associação por nome continua proibida.
+- O runner só executa quando `MIGRATION_SOURCE_DIR` aponta para uma cópia da origem validada e somente leitura; configuração ausente/inválida retorna estado não executado e nunca habilita Marketing.
 - Conjuntos abrangidos: `eventos`, `eventos_edicoes`, `eventos_feedbacks_periodos`, `eventos_feedbacks`, `redes_sociais`, `senhas` e importações de uso de IA já persistidas.
 
-- [ ] **Passo 1: Escrever testes falhos** para estado `not_run`, totais por conjunto, isolamento por organização, origem sem ID estável, categorias não resolvíveis, decisão com ator/data, destino inválido e repetição idempotente.
-- [ ] **Passo 2: Rodar `pnpm --filter @workspace/marketing-service test -- marketingMigrationReconciliationService.test.ts`** e confirmar falhas pelas funções/modelos ausentes.
-- [ ] **Passo 3: Implementar modelos Prisma e serviço** para ler a reconciliação existente, agregar os totais, listar metadados sanitizados, persistir decisão explícita e gravar novo resumo sem atualizar a fonte legada.
-- [ ] **Passo 4: Gerar cliente Prisma e rodar o teste focado**, confirmando totais, isolamento, política de elegibilidade e auditoria.
-- [ ] **Passo 5: Commitar** schema, migração, serviço e testes.
+- [ ] **Passo 1: Escrever testes falhos** para o relatório V4 por item (identidade estável sem linha/payload, sem truncamento), reaplicação de decisão explícita e rejeição de identidade ausente ou de categoria não resolvível.
+- [ ] **Passo 2: Rodar `node --test docs/migration/v4/scripts/test/dry-run.test.mjs docs/migration/v4/scripts/test/execution-engine.test.mjs`** e confirmar as falhas de relatório/reaplicação.
+- [ ] **Passo 3: Implementar a saída sanitizada por item e o adaptador de decisão V4** limitado às seis origens `tb_mkt` aprovadas; preservar execução read-only e não emitir conteúdo de senha, payload ou linha de origem.
+- [ ] **Passo 4: Escrever e rodar testes falhos do serviço** para estado `not_run`, totais por conjunto, isolamento por organização, importados consultados no destino, decisão com ator/data, destino inválido e repetição idempotente.
+- [ ] **Passo 5: Implementar modelos Prisma e serviço** para persistir resumos e decisões, alimentar o relatório do dry-run com decisões registradas e gravar novo resumo sem atualizar a fonte legada; testar dry-run e serviço focados.
+- [ ] **Passo 6: Commitar** modelos, migração, adaptador, serviço e testes.
 
 ### Tarefa 2: Proteger e publicar os contratos de reconciliação
 
@@ -113,7 +121,7 @@
 
 ## Revisão de cobertura da especificação
 
-- Totais, estado `not_run`, origem e motivo: Tarefas 1 e 3.
+- Totais, estado `not_run`, origem e motivo: Tarefa 1 produz relatório itemizado; Tarefas 2 e 3 servem e exibem esses dados.
 - Resolução explícita auditada, tenant e reexecução: Tarefas 1 e 2.
 - Ausência de associação por aproximação e preservação read-only da origem: Tarefas 1 e 2.
 - Gate centralizado e ativação condicionada ao inventário integrado: Tarefa 4.
@@ -124,5 +132,6 @@
 
 - PR #1581 foi mergeado em `develop`; validar funções e contratos pelo código e testes atuais.
 - Issues #1543 e #1544 ainda aparecem como abertas. Não as implementar; se o inventário revelar uma dependência funcional ausente, manter o gate fechado e deixar explícita a pendência que impede a conclusão.
+- O dry-run atual usa caminho de backup fixo no CLI e só retorna até 20 digests por grupo de quarentena; a implementação precisa aceitar a origem configurada, criar e persistir um snapshot completo e sanitizado dos conjuntos de Marketing e validar a execução com fixtures. Se não houver uma origem/snapshot utilizável em runtime, a reconciliação não pode ser anunciada como pronta nem o gate pode ser aberto.
 - Graphify não tem grafo local no worktree e sua geração de contexto tentou instalar dependências com erro `EPERM`; continuar pelo fallback manual documentado em `AGENTS.md`.
 - Não declarar #1549 concluída, abrir PR ou habilitar Marketing enquanto testes integrados, revisão, CI e critérios de aceite não estiverem aprovados.
