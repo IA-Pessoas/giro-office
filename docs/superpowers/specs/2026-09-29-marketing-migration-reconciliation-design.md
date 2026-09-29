@@ -35,21 +35,32 @@ não tem grafos no worktree; a navegação foi feita manualmente conforme o fall
    comprovado.
 6. Manter Marketing bloqueado no Office até todas as funções inventariadas e seus critérios de
    autorização, organização, relatórios, segredos, rotas, navegação, importações e contratos
-   passarem pelas validações integradas.
+   passarem pelas validações integradas; liberar o módulo quando todas passarem e mantê-lo
+   bloqueado quando qualquer item permanecer incompleto.
 
 ## Desenho
 
 ### Superfície operacional
 
-Adicionar uma área de reconciliação de Marketing acessível somente a administradores de plataforma.
-Ela ficará fora da navegação do módulo Marketing, pois o próprio módulo poderá permanecer
-bloqueado durante a revisão dos dados. A organização será selecionada no contexto operacional e
-validada no servidor; o cliente não poderá escolher outro tenant em cada chamada.
+Adicionar uma aba de reconciliação de Marketing ao `SuperAdminPage` existente, acessível somente a
+administradores de plataforma. A tela reutilizará a organização já selecionada no console e
+permanecerá acessível enquanto o módulo Marketing estiver bloqueado.
+
+As chamadas passarão pelo gateway com a política `platformOnly` e a sessão de plataforma existente.
+As mutações também exigirão CSRF. O gateway encaminhará a identidade verificada; o
+`marketing-service` aceitará essas chamadas somente pelo token interno e pelos cabeçalhos confiáveis
+de plataforma. Cada operação receberá o ID da organização selecionada e restringirá consultas a
+esse tenant no servidor.
 
 A tela mostrará os totais e as pendências agrupadas por conjunto, origem e motivo. Uma pendência
 ambígua mostrará somente os metadados necessários e destinos canônicos elegíveis. Valores brutos,
 senhas, payloads criptografados e dados pessoais que não sejam necessários para a decisão não serão
 retornados à interface.
+
+Cada execução persistirá um resumo por conjunto com totais preparados, importados e em quarentena.
+Cada item pendente identificará a tabela de origem, o ID legado ou outra identidade estável e o
+código de motivo. Referências de origem continuarão disponíveis em modo de consulta depois do corte;
+nenhuma operação da tela escreverá no sistema legado.
 
 ### Resolução e reconciliação
 
@@ -60,25 +71,27 @@ ou segredos sem validação continuarão em quarentena até que exista uma corre
 comprovável.
 
 Cada decisão persistirá o conjunto, a identidade estável do registro de origem, o destino canônico,
-o responsável obtido do contexto autenticado e o instante gerado pelo servidor. A reconciliação
-seguinte reaplicará essas decisões e produzirá novos totais. O registro de auditoria não poderá ser
-alterado pelo cliente e não conterá segredos em claro.
+o responsável obtido da identidade verificada pelo gateway e o instante gerado pelo servidor. A
+reconciliação seguinte reaplicará essas decisões e criará um novo resumo. O registro de auditoria
+não poderá ser alterado pelo cliente e não conterá segredos em claro.
 
-Os adaptadores reaproveitarão os importadores e as regras V4 existentes para uso de IA, senhas,
-eventos, edições e feedback. Resultados ausentes ou ainda não executados serão identificados como
-indisponíveis; não serão apresentados como zero nem como importação concluída.
+Os adaptadores cobrirão os conjuntos legados de Marketing já mapeados (`eventos`, `eventos_edicoes`,
+`eventos_feedbacks_periodos`, `eventos_feedbacks`, `redes_sociais` e `senhas`) e os registros de
+importação de uso de IA já persistidos pelo `marketing-service`. Reaproveitarão os importadores e as
+regras V4. Cada conjunto sem execução registrada mostrará o estado “não executado”; não será
+apresentado como zero nem como importação concluída.
 
 ### Gate do módulo
 
 O bloqueio será centralizado no mecanismo atual de módulos e deverá valer para navegação, acesso
-direto à rota e resolução de permissões, inclusive para administradores globais. A área operacional
+direto à rota e resolução de permissões, inclusive para administradores globais. A aba operacional
 de Super Admin continuará acessível independentemente desse bloqueio.
 
 Marketing só poderá sair da lista de módulos desabilitados quando os testes comprovarem todas as
 funções inventariadas e os critérios integrados de autorização, isolamento por organização,
-relatórios, segredos, rotas, navegação, importações e contratos. Até esse ponto, a implementação
-de reconciliação poderá ser usada por operadores autorizados, mas o módulo ficará indisponível aos
-usuários regulares.
+relatórios, segredos, rotas, navegação, importações e contratos. Se a validação confirmar a
+cobertura, a mesma entrega habilitará Marketing. Se algum critério falhar, a entrega manterá o
+módulo bloqueado e não declarará a issue concluída.
 
 ### Fonte legada e segurança
 
