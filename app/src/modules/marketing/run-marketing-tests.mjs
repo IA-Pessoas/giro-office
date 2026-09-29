@@ -9,7 +9,54 @@ const page = await readFile(new URL("../../pages/marketing/index.tsx", import.me
 const profiles = await readFile(new URL("./components/MarketingInstagramProfiles.tsx", import.meta.url), "utf8");
 const passwords = await readFile(new URL("./components/MarketingPasswords.tsx", import.meta.url), "utf8");
 const passwordService = await readFile(new URL("./services/marketingPasswordService.ts", import.meta.url), "utf8");
+const aiUsage = await readFile(new URL("./components/MarketingAiUsageControls.tsx", import.meta.url), "utf8");
+const dashboardHook = await readFile(new URL("./hooks/useMarketingDashboard.ts", import.meta.url), "utf8");
 const canonicalQueries = await readFile(new URL("./components/MarketingCanonicalQueries.tsx", import.meta.url), "utf8");
+const marketingQueryKeys = await import("./utils/marketingQueryKeys.ts").catch(() => null);
+
+assert.equal(
+  typeof marketingQueryKeys?.marketingQueryKey,
+  "function",
+  "Marketing query keys must include the authenticated user and organization scope.",
+);
+assert.deepEqual(
+  marketingQueryKeys.marketingQueryKey(["marketing", "dashboard"], {
+    organization_id: "org-a",
+    id: "user-a",
+  }),
+  ["marketing", "dashboard", "org-a", "user-a"],
+);
+assert.notDeepEqual(
+  marketingQueryKeys.marketingQueryKey(["marketing", "dashboard"], {
+    organization_id: "org-a",
+    id: "user-a",
+  }),
+  marketingQueryKeys.marketingQueryKey(["marketing", "dashboard"], {
+    organization_id: "org-b",
+    id: "user-b",
+  }),
+);
+assert.match(aiUsage, /marketingQueryKey\(/);
+assert.match(
+  aiUsage,
+  /setLegacyJson\("\[\]"\);[\s\S]*\[user\?\.id, user\?\.organization_id\]/,
+);
+assert.match(passwords, /marketingQueryKey\(/);
+assert.match(
+  passwords,
+  /setRevealed\(null\);\s*setEditingId\(null\);[\s\S]*\[authUser\?\.id, authUser\?\.organization_id\]/,
+);
+assert.match(dashboardHook, /marketingQueryKey\(/);
+assert.notDeepEqual(
+  marketingQueryKeys.marketingQueryKey(["marketing", "dashboard"], {
+    organization_id: "org-a",
+    id: "user-a",
+  }),
+  marketingQueryKeys.marketingQueryKey(["marketing", "dashboard"], {
+    organization_id: "org-a",
+    id: "user-b",
+  }),
+);
 
 assert.match(dashboard, /if \(query\.isLoading\)/);
 assert.match(dashboard, /if \(query\.isError\)/);
@@ -39,7 +86,11 @@ assert.match(passwords, /window\.confirm/);
 assert.match(passwords, /marketingPasswordService\.reveal/);
 assert.match(passwords, /marketingPasswordService\.export/);
 assert.match(passwords, /if \(!access\.canEdit\) setRevealed\(null\)/);
-assert.match(passwords, /access\.canEdit && revealed\?\.id === credential\.id/);
+assert.match(
+  passwords,
+  /revealed\?\.organizationId === \(authUser\?\.organization_id \?\? null\)/,
+);
+assert.match(passwords, /access\.canEdit && currentReveal\?\.id === credential\.id/);
 assert.doesNotMatch(passwords, /useMutation/);
 assert.match(passwordService, /confirmed: true/);
 assert.match(passwordService, /\/marketing\/passwords\/import/);
