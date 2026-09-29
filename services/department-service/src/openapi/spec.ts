@@ -123,12 +123,6 @@ export function buildDepartmentServiceOpenApiSpec(env: DepartmentServiceEnv): Op
             {
               name: "administrative",
               in: "query",
-              description: "Use true para consultar a lista na área administrativa.",
-              schema: { type: "string", enum: ["true"] },
-            },
-            {
-              name: "administrative",
-              in: "query",
               description: "Use true para a consulta administrativa de departamentos.",
               schema: { type: "string", enum: ["true"] },
             },
