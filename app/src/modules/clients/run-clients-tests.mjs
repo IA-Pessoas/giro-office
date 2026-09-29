@@ -284,6 +284,7 @@ runTest("status mapper preserves already-normalized inactive values from mixed e
 
 runTest("client endpoints use only /client contract", () => {
   assert.equal(CLIENT_ENDPOINTS.list, "/client/list");
+  assert.equal(CLIENT_ENDPOINTS.instagramProfilesReport, "/client/instagram-profiles/report");
   assert.equal(CLIENT_ENDPOINTS.create, "/client");
   assert.equal(CLIENT_ENDPOINTS.createIntegration, "/client/integration");
   assert.equal(CLIENT_ENDPOINTS.detail("123"), "/client/123");

@@ -100,6 +100,28 @@ export interface ClientListPage {
   hasMore: boolean;
 }
 
+export interface ClientInstagramProfile {
+  id: string;
+  name: string;
+  status: ClientStatus;
+  instagram: string | null;
+}
+
+export interface ClientInstagramProfilePage {
+  items: ClientInstagramProfile[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export interface ClientInstagramProfileFilters {
+  profile: "all" | "with" | "without";
+  page: number;
+  limit: number;
+  search?: string;
+}
+
 export interface ClientCompanyLookup {
   cnpj: string;
   name: string | null;

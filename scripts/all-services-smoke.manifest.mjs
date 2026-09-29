@@ -1571,6 +1571,14 @@ const baseManifest = [
   }),
   op({
     service: "client-service",
+    method: "GET",
+    path: "/client/instagram-profiles/report",
+    action: "clientInstagramProfilesReport",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
     method: "POST",
     path: "/internal/commercial/prospecting-transition",
     action: "clientCommercialProspectingTransition",

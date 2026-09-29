@@ -10,6 +10,8 @@ import type {
   ClientHistoryPendingItem,
   ClientListFilters,
   ClientListPage,
+  ClientInstagramProfileFilters,
+  ClientInstagramProfilePage,
   CreateClientPayload,
   CreateClientData,
   CreateClientIntegrationPayload,
@@ -41,6 +43,15 @@ export const clientService = {
     });
 
     return unwrapClientEnvelope<ClientListPage>(response.data);
+  },
+
+  async listInstagramProfiles(
+    filters: ClientInstagramProfileFilters,
+  ): Promise<ClientInstagramProfilePage> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_ENDPOINTS.instagramProfilesReport, { params: filters });
+
+    return unwrapClientEnvelope<ClientInstagramProfilePage>(response.data);
   },
 
   async getById(id: string): Promise<Client | null> {

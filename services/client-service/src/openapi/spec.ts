@@ -231,6 +231,38 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/client/instagram-profiles/report": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar clientes com ou sem perfil Instagram",
+          description:
+            "Leitura organizacional protegida pela permissão de Integração nível 1 ou superior. O escopo vem da organização autenticada.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "profile",
+              in: "query",
+              schema: { type: "string", enum: ["all", "with", "without"], default: "all" },
+            },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+            { name: "search", in: "query", schema: { type: "string", maxLength: 200 } },
+          ],
+          responses: {
+            "200": {
+              description: "Relatório paginado de perfis Instagram dos clientes da organização",
+              ...successEnvelopeContent(),
+            },
+            "400": { description: "Filtros inválidos" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+      },
       "/client": {
         post: {
           tags: ["Clients"],

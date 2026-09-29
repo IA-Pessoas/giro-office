@@ -270,6 +270,66 @@ describe("ClientService.listByOrganization", () => {
   });
 });
 
+describe("ClientService.listInstagramProfiles", () => {
+  it("filtra perfis ausentes, incluindo valores antigos só com espaços, e mantém paginação", async () => {
+    const queryRaw = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: TEST_CLIENT_ID,
+          name: "Acme",
+          status: "Ativo",
+          instagram: null,
+        },
+      ])
+      .mockResolvedValueOnce([{ total: 13n }]);
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+
+    const result = await service.listInstagramProfiles(TEST_ORG_ID, {
+      page: 2,
+      pageSize: 10,
+      search: " Acme ",
+      profile: "without",
+    });
+
+    expect(result).toEqual({
+      items: [{ id: TEST_CLIENT_ID, name: "Acme", status: "Ativo", instagram: null }],
+      total: 13,
+      page: 2,
+      pageSize: 10,
+      hasMore: false,
+    });
+    expect(queryRaw).toHaveBeenCalledTimes(2);
+    const pageQuery = queryRaw.mock.calls[0]?.[0] as { sql: string; values: unknown[] };
+    const countQuery = queryRaw.mock.calls[1]?.[0] as { sql: string; values: unknown[] };
+    expect(pageQuery.sql).toContain("c.instagram ~ '^[[:space:]]*$'");
+    expect(pageQuery.sql).toContain("ILIKE");
+    expect(pageQuery.values).toContain(TEST_ORG_ID);
+    expect(pageQuery.values).toContain("%Acme%");
+    expect(pageQuery.values).toContain(10);
+    expect(countQuery.sql).toContain("COUNT(*)");
+  });
+
+  it("filtra perfis preenchidos sem expor organization_id de outras organizações", async () => {
+    const queryRaw = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ total: 0n }]);
+    const service = new ClientService({ $queryRaw: queryRaw } as unknown as PrismaClient);
+
+    await service.listInstagramProfiles(TEST_ORG_ID, {
+      page: 1,
+      pageSize: 20,
+      profile: "with",
+    });
+
+    const pageQuery = queryRaw.mock.calls[0]?.[0] as { sql: string; values: unknown[] };
+    expect(pageQuery.sql).toContain("c.instagram ~ '[^[:space:]]'");
+    expect(pageQuery.values).toContain(TEST_ORG_ID);
+  });
+});
+
 describe("ClientService.getById", () => {
   it("returns Regularize detail fields without changing list select", async () => {
     const findUniqueOrg = vi.fn().mockResolvedValue({

@@ -24,7 +24,12 @@ export const createIntegrationBodySchema = z
     email: clientEmailSchema,
     agent: z.string().nullable().optional(),
     cpf_agent: z.string().nullable().optional(),
-    instagram: z.string().nullable().optional(),
+    instagram: z
+      .preprocess(
+        (value) => (typeof value === "string" ? value.trim() || null : value),
+        z.string().nullable(),
+      )
+      .optional(),
     indication: z.string().nullable().optional(),
     participants_meet: z.string().nullable().optional(),
     meet_type: z.string().nullable().optional(),
@@ -57,7 +62,12 @@ export const updateIntegrationBodySchema = z
     neighborhood: z.string().nullable().optional(),
     state: z.string().nullable().optional(),
     city: z.string().nullable().optional(),
-    instagram: z.string().nullable().optional(),
+    instagram: z
+      .preprocess(
+        (value) => (typeof value === "string" ? value.trim() || null : value),
+        z.string().nullable(),
+      )
+      .optional(),
     indication: z.string().nullable().optional(),
     type_registration: z.string().optional(),
     service_unique: z.boolean().optional(),
