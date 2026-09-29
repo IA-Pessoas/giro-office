@@ -578,6 +578,23 @@ await (async () => {
     }
   });
 
+  await runTest("Marketing uses the standard module permission levels", () => {
+    assert.equal(isModuleDisabled("marketing"), false);
+    assert.equal(APP_ROUTE_MODULE_MAP["/marketing"], "marketing");
+    assert.equal(
+      resolveModuleAccess({ module: "marketing", additionalModulePermissions: { marketing: 1 } }).canView,
+      true,
+    );
+    assert.equal(
+      resolveModuleAccess({ module: "marketing", additionalModulePermissions: { marketing: 1 } }).canEdit,
+      false,
+    );
+    assert.equal(
+      resolveModuleAccess({ module: "marketing", additionalModulePermissions: { marketing: 2 } }).canEdit,
+      true,
+    );
+  });
+
   await runTest("module access helpers normalize aliases and additional permission levels", () => {
     assert.equal(resolveDepartmentModuleKey("Departamento Pessoal"), "pessoal");
     assert.equal(resolveDepartmentModuleKey("Contabilidade"), "contabil");
@@ -645,14 +662,14 @@ await (async () => {
     assert.match(authContextSource, /\/super-admin\/login/);
   });
 
-  await runTest("enabled Marketing module is available from the app navigation", () => {
+  await runTest("Marketing is registered in navigation and not exposed as a quick action", () => {
     assert.equal(appShellSource.includes('path: "/marketing"'), true);
     assert.equal(quickActionsSource.includes('href: "/marketing"'), false);
     assert.equal(appShellSource.includes('path: "/comercial"'), true);
   });
 
   await runTest(
-    "enabled Marketing page mounts its dashboard and research interface",
+    "Marketing page uses the new module implementation",
     () => {
       assert.equal(commercialPageSource.includes("CommercialCatalog"), true);
       assert.equal(commercialPageSource.includes("notFound: true"), false);
@@ -661,7 +678,14 @@ await (async () => {
       assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
       assert.equal(marketingPageSource.includes("MarketingDashboard"), true);
       assert.equal(marketingPageSource.includes("MarketingAiUsageControls"), true);
+      assert.equal(marketingPageSource.includes("MarketingEvents"), true);
+      assert.equal(marketingPageSource.includes("MarketingInstagramProfiles"), true);
+      assert.equal(marketingPageSource.includes("MarketingPasswords"), true);
+      assert.equal(marketingPageSource.includes("MarketingCanonicalQueries"), true);
       assert.equal(marketingPageSource.includes("notFound: true"), false);
+      assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);
+      assert.match(marketingPageSource, /MarketingDashboard/);
+      assert.doesNotMatch(marketingPageSource, /notFound:\s*true/);
       assert.equal(triagemPageSource.includes("TriageDocumentsSection"), true);
       assert.match(parcelamentoPageSource, /ParcelamentoShell/);
     },

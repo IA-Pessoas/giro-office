@@ -1,4 +1,8 @@
-import { requireAuthenticatedRequestContext, ServiceError } from "@workspace/shared";
+import {
+  error as logError,
+  requireAuthenticatedRequestContext,
+  ServiceError,
+} from "@workspace/shared";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 export enum MarketingPermissionLevel {
@@ -17,6 +21,7 @@ export function requireMarketingPermission(minimum: MarketingPermissionLevel): R
 
       next();
     } catch (error: unknown) {
+      logError("Falha ao verificar permissão do módulo Marketing.", { err: error });
       next(error);
     }
   };

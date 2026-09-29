@@ -45,14 +45,14 @@ function countModes(destinations) {
 test("complete registry maps the frozen scope once", () => {
   const registry = createCompleteExecutionRegistry();
 
-  assert.equal(new Set([...registry.values()].map((entry) => entry.sourceTable)).size, 103);
-  assert.equal(registry.size, 133);
-  assert.equal(ALL_MAPPING_RULES.length, 103);
-  assert.equal(ALL_EXECUTION_ENTRIES.length, 133);
+  assert.equal(new Set([...registry.values()].map((entry) => entry.sourceTable)).size, 104);
+  assert.equal(registry.size, 134);
+  assert.equal(ALL_MAPPING_RULES.length, 104);
+  assert.equal(ALL_EXECUTION_ENTRIES.length, 134);
   assert.deepEqual(countModes(ALL_MAPPING_RULES.flatMap(({ destinations }) => destinations)), {
     aggregate: 4,
     derived: 14,
-    insert: 90,
+    insert: 91,
     lookup: 4,
     merge: 21,
   });

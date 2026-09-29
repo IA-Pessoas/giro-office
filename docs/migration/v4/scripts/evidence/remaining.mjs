@@ -1,6 +1,30 @@
 const CONFIRMED = new Map(
   [
     [
+      "tb_mkt.eventos",
+      [
+        "infra/prisma/schema.prisma:1749",
+        "services/marketing-service/src/services/marketingEventsService.ts:24",
+      ],
+      "O cadastro legado de eventos possui destino atual equivalente em mtk.events; os campos de cadastro são preservados e a prioridade segue obrigatória como no formulário legado.",
+      [
+        "O backup V4 tem escopo do tenant Castelo definido pelo contrato de migração; nomes repetidos sob a collation legado são enviados à quarentena com sourceTable, id legado e motivo.",
+      ],
+    ],
+    [
+      "tb_mkt.eventos_edicoes",
+      [
+        "infra/prisma/schema.prisma:1776",
+        "services/marketing-service/src/services/marketingEventEditionsService.ts:57",
+      ],
+      "Edições são importadas como filhas de mtk.events e o orçamento JSON legado é expandido em linhas relacionais. evento_id é resolvido exclusivamente pelo id legado do evento; vínculos ambíguos, pais em quarentena, data_local não separável sem inferência e campos inválidos ficam na quarentena de migração para reconciliação.",
+      [
+        "evento_id referencia tb_mkt.eventos.id; o id do evento de destino deriva da identidade v5 do registro pai tb_mkt.eventos.",
+        "orcamentos, parcerias, organizacao, logistica, mkt_comunicacao, durante_evento, pos_evento e obs são coleções/objetos JSON legado preservados nos campos equivalentes atuais.",
+        "data_local é texto livre sem separadores contratuais; somente valores em data ISO ou DD/MM/AAAA seguidos de ' | ' ou ' - ' e local são importados automaticamente.",
+      ],
+    ],
+    [
       "tb_cbc.emails",
       ["infra/prisma/schema.prisma:910", "services/src/src/services/EmailService.ts:50"],
       "A lista de destinatários e os dois gatilhos de envio possuem contrato atual equivalente.",
@@ -52,6 +76,23 @@ const CONFIRMED = new Map(
       "O contrato atual cobre somente o subset fiel das saídas: as 1.807 linhas com obs funcional vão integralmente para quarentena porque stock.exits não possui essa coluna; portanto não há equivalência plena para as 3.000 linhas.",
       [
         "produto_id referencia tb_cbs.estoque.id; solicitante, autorizador e operador referenciam tb_admin.usuarios.id; qualquer pai não preparado também coloca a saída em quarentena.",
+      ],
+    ],
+    [
+      "tb_mkt.eventos_feedbacks",
+      ["infra/prisma/schema.prisma:1820"],
+      "A avaliação legada possui destino relacional por edição, com nota de 1 a 5, observação, data e unicidade por tenant/edição; linhas sem vínculo inequívoco ou duplicadas para uma edição ficam em quarentena.",
+      [
+        "edicao_id referencia tb_mkt.eventos_edicoes.id; o destino é ligado apenas pela identidade determinística da edição preparada.",
+        "A tabela legada não impõe unicidade por edição; mais de uma avaliação válida para a mesma edição exige reconciliação e nenhuma é escolhida automaticamente.",
+      ],
+    ],
+    [
+      "tb_mkt.eventos_feedbacks_periodos",
+      ["infra/prisma/schema.prisma:1776"],
+      "O período legado pertence a uma edição e é armazenado nos campos de início e fim da edição; datas ausentes, inválidas ou fora de ordem e vínculos não únicos ficam em quarentena.",
+      [
+        "edicao referencia tb_mkt.eventos_edicoes.id; início e fim são importados juntos preservando os componentes de DATETIME legado.",
       ],
     ],
     [

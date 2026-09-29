@@ -279,7 +279,7 @@ export default function Login() {
                       className={`text-xs ${LOGIN_CARD_SECONDARY_TEXT_CLASSNAME}`}
                       hidden={!showPasswordHelp}
                     >
-                      Peça ao administrador da sua empresa um link de redefinição de senha por e-mail.
+                      Peça ao TI da sua empresa para redefinir a sua senha.
                     </p>
 
                     <button

@@ -187,6 +187,8 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoModulePolicy },
   { method: "ANY", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoEditPolicy },
   { method: "ANY", path: /^\/reports(?:\/|$)/, policy: authenticatedPolicy },
+  { method: "GET", path: /^\/marketing(?:\/|$)/, policy: marketingModulePolicy },
+  { method: "ANY", path: /^\/marketing(?:\/|$)/, policy: marketingEditPolicy },
   { method: "GET", path: /^\/commercial(?:\/|$)/, policy: commercialModulePolicy },
   { method: "ANY", path: /^\/commercial(?:\/|$)/, policy: commercialEditPolicy },
   { method: "GET", path: /^\/marketing(?:\/|$)/, policy: marketingModulePolicy },

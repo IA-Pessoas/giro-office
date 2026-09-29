@@ -1,8 +1,8 @@
 import { z } from "zod";
 
+import { competenceSchema } from "./competence.schemas.js";
 import { paginationQuerySchema } from "./pagination.schemas.js";
 
-const competenceSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Competência inválida.");
 const taxTypeSchema = z.enum(["ISS", "ICMS"]);
 const rateSchema = z
   .string()

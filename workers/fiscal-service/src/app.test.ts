@@ -56,6 +56,210 @@ function gatewayHeaders(overrides: Record<string, string> = {}): HeadersInit {
 }
 
 describe("fiscal Worker", () => {
+  it("entrega prévia e PDF de alíquota do Simples para leitura, recusando anexo inválido", async () => {
+    const clientId = "d0000000-0000-4000-8000-000000000001";
+    const emission = {
+      client_id: clientId,
+      client_name: "Padaria Exemplo Ltda",
+      client_document: "12.345.678/0001-90",
+      competence: "2026-08",
+      applies_to: "2026-09",
+      annex: "III" as const,
+      tax: "ISS" as const,
+      rate: "2.01",
+    };
+    const simples = {
+      preview: vi.fn(async () => ({
+        client_id: clientId,
+        competence: "2026-08",
+        applies_to: "2026-09",
+        status: "no_base" as const,
+        message: "Não há base para calcular.",
+        months: [],
+        estimated_month: { competence: "2026-08", amount: "0.00" },
+        rbt12: "0.00",
+        annexes: [],
+      })),
+      emission: vi.fn(async () => emission),
+      batch: vi.fn(async () => ({
+        competence: "2026-08",
+        applies_to: "2026-09",
+        annex: "III" as const,
+        tax: "ISS" as const,
+        included: [
+          {
+            client_id: clientId,
+            client_name: "Padaria Exemplo Ltda",
+            client_document: "12.345.678/0001-90",
+            competence: "2026-08",
+            applies_to: "2026-09",
+            annex: "III" as const,
+            tax: "ISS" as const,
+            rate: "2.01",
+          },
+        ],
+        skipped: [
+          {
+            document: "99999999000199",
+            client_name: null,
+            reason: "Cliente não encontrado nesta organização.",
+          },
+        ],
+      })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), simplesService: simples });
+    const reader = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
+
+    const preview = await app.request(
+      `https://fiscal.test/fiscal/simples/preview?client_id=${clientId}&competence=2026-08`,
+      { headers: reader },
+    );
+    expect(preview.status).toBe(200);
+    expect(simples.preview).toHaveBeenCalledWith(
+      { client_id: clientId, competence: "2026-08" },
+      ORGANIZATION_ID,
+    );
+
+    const pdf = await app.request(
+      `https://fiscal.test/fiscal/simples/pdf?client_id=${clientId}&competence=2026-08&annex=III`,
+      { headers: reader },
+    );
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    expect(pdf.headers.get("content-disposition")).toContain(
+      "aliquota-ISS-anexo-III-2026-09-padaria-exemplo-ltda-12345678000190.pdf",
+    );
+    expect((await pdf.arrayBuffer()).byteLength).toBeGreaterThan(500);
+    expect(simples.emission).toHaveBeenCalledWith(
+      { client_id: clientId, competence: "2026-08", annex: "III" },
+      ORGANIZATION_ID,
+    );
+
+    const invalid = await app.request(
+      `https://fiscal.test/fiscal/simples/pdf?client_id=${clientId}&competence=2026-08&annex=VI`,
+      { headers: reader },
+    );
+    expect(invalid.status).toBe(400);
+    const withoutFiscal = await app.request(
+      `https://fiscal.test/fiscal/simples/pdf?client_id=${clientId}&competence=2026-08&annex=III`,
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 0 }) }) },
+    );
+    expect(withoutFiscal.status).toBe(403);
+    expect(simples.emission).toHaveBeenCalledOnce();
+
+    const body = { competence: "2026-08", annex: "III", documents: ["12345678000190"] };
+    const csv = await app.request("https://fiscal.test/fiscal/simples/csv", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(csv.status).toBe(200);
+    const payload = (await csv.json()) as { data: { csv: string; file_name: string } };
+    expect(payload.data.file_name).toBe("aliquotas-ISS-anexo-III-2026-09.csv");
+    expect(payload.data.csv).toContain("Padaria Exemplo Ltda;12.345.678/0001-90;2,01");
+    expect(simples.batch).toHaveBeenCalledWith(body, ORGANIZATION_ID);
+
+    const readerCsv = await app.request("https://fiscal.test/fiscal/simples/csv", {
+      method: "POST",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(readerCsv.status).toBe(403);
+    expect(simples.batch).toHaveBeenCalledOnce();
+
+    const zip = await app.request("https://fiscal.test/fiscal/simples/zip", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(zip.status).toBe(200);
+    const zipped = (await zip.json()) as { data: { zip_base64: string; file_name: string } };
+    expect(zipped.data.file_name).toBe("aliquotas-ISS-anexo-III-2026-09.zip");
+    const archive = Buffer.from(zipped.data.zip_base64, "base64");
+    expect(archive.readUInt32LE(0)).toBe(0x04034b50);
+    expect(archive.toString("latin1")).toContain(
+      "aliquota-ISS-anexo-III-2026-09-padaria-exemplo-ltda-12345678000190.pdf",
+    );
+    const readerZip = await app.request("https://fiscal.test/fiscal/simples/zip", {
+      method: "POST",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(readerZip.status).toBe(403);
+    expect(simples.batch).toHaveBeenCalledTimes(2);
+  });
+
+  it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
+    const revenue = {
+      id: ICMS_ID,
+      client_id: "d0000000-0000-4000-8000-000000000001",
+      competence: "2026-08",
+      amount: "12345.67",
+      created_by: USER_ID,
+      updated_by: USER_ID,
+      createdAt: "2026-09-28T12:00:00.000Z",
+      updatedAt: "2026-09-28T12:00:00.000Z",
+    };
+    const revenues = {
+      create: vi.fn(async () => revenue),
+      update: vi.fn(async () => ({ ...revenue, amount: "10.00" })),
+      list: vi.fn(async () => ({ data: [revenue], total: 1, page: 1, limit: 24, hasMore: false })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), revenueService: revenues });
+
+    const created = await app.request("https://fiscal.test/fiscal/revenues", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: revenue.client_id,
+        competence: "2026-08",
+        amount: "12345.67",
+      }),
+    });
+    expect(created.status).toBe(201);
+    expect(revenues.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+
+    const listed = await app.request(
+      `https://fiscal.test/fiscal/revenues/list?client_id=${revenue.client_id}&from=2025-09&to=2026-08`,
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) }) },
+    );
+    expect(listed.status).toBe(200);
+    expect(revenues.list).toHaveBeenCalledWith(
+      expect.objectContaining({ client_id: revenue.client_id, from: "2025-09", to: "2026-08" }),
+      ORGANIZATION_ID,
+    );
+
+    const updated = await app.request(`https://fiscal.test/fiscal/revenues/${ICMS_ID}`, {
+      method: "PUT",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ amount: "10.00" }),
+    });
+    expect(updated.status).toBe(200);
+    expect(revenues.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: ICMS_ID, amount: "10.00", organizationId: ORGANIZATION_ID }),
+    );
+
+    const viewerWrite = await app.request(`https://fiscal.test/fiscal/revenues/${ICMS_ID}`, {
+      method: "PUT",
+      headers: {
+        ...gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) }),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ amount: "1" }),
+    });
+    expect(viewerWrite.status).toBe(403);
+    expect(revenues.update).toHaveBeenCalledOnce();
+
+    const withoutFiscal = await app.request(
+      `https://fiscal.test/fiscal/revenues/list?client_id=${revenue.client_id}`,
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 0 }) }) },
+    );
+    expect(withoutFiscal.status).toBe(403);
+    expect(revenues.list).toHaveBeenCalledOnce();
+  });
+
   it("registra alíquota manual e entrega PDF no tenant autenticado", async () => {
     const rate = {
       id: ICMS_ID,

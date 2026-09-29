@@ -8,6 +8,10 @@ import {
   isAuthenticLegacyReferenceResolution,
   isAuthoritativeV2ClientIdentityResolution,
 } from "./admin-business.mjs";
+import {
+  planMarketingEventEditionFeedbackImport,
+  planMarketingEventEditionImport,
+} from "./marketing-event-editions.mjs";
 import { V2_RULES } from "./v2.mjs";
 
 const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
@@ -95,6 +99,8 @@ const TRIAGE_ACTIVE_COLUMNS = Object.freeze([
   "cte_emitente",
   "prestadas_mei",
 ]);
+const MARKETING_EVENT_STATUSES = new Set(["Novo", "Em andamento", "Concluído", "Descontinuado"]);
+const MARKETING_EVENT_PRIORITIES = new Set(["Baixa", "Média", "Alta"]);
 
 // As projeções deste domínio são centralizadas em projectRemainingRow para preservar
 // as decisões auditadas de contexto, quarentena e payload.
@@ -141,6 +147,19 @@ export function projectRemainingRow({ sourceTable, row, context }) {
     payload,
     candidate,
   });
+}
+
+export function projectMarketingEventEditionBudgetItem({ row, context, identityRef }) {
+  const bound = authenticContext("tb_mkt.eventos_edicoes", row, context);
+  if (bound.status !== "prepared") throw new Error("MKT_EDITION_BUDGET_CONTEXT_INVALID");
+  const importPlan = context.resolutions.event?.importPlan;
+  if (importPlan?.status !== "prepared") throw new Error("MKT_EDITION_BUDGET_PLAN_INVALID");
+  const expectedPrefix = `tb_mkt.eventos_edicoes:${generatedIdentityId("tb_mkt.eventos_edicoes", row?.id)}:budget:`;
+  const item = importPlan.budgetItems.find(
+    ({ legacy_id }) => `${expectedPrefix}${legacy_id}` === identityRef,
+  );
+  if (item === undefined) throw new Error("MKT_EDITION_BUDGET_ITEM_NOT_FOUND");
+  return item;
 }
 
 export function buildCbsStockContexts({
@@ -305,6 +324,92 @@ export function buildMarketingPasswordContexts({ rows, encryptionConfigured }) {
   });
 }
 
+export function buildMarketingEventContexts({ rows }) {
+  const sourceTable = "tb_mkt.eventos";
+  const nameCounts = new Map();
+  for (const row of rows) {
+    const key = marketingEventNameKey(row?.nome);
+    if (key) nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+  }
+  return issueContexts("mkt-event", sourceTable, rows, (row) => {
+    const key = marketingEventNameKey(row?.nome);
+    return { duplicateName: Boolean(key && nameCounts.get(key) > 1) };
+  });
+}
+
+export function buildMarketingEventEditionContexts({ rows, eventRows = [] }) {
+  const eventContexts = buildMarketingEventContexts({ rows: eventRows });
+  const eventRule = REMAINING_RULES.find(({ sourceTable }) => sourceTable === "tb_mkt.eventos");
+  const candidates = eventRows.map((row, index) => ({
+    legacyId: row?.id,
+    id: generatedIdentityId("tb_mkt.eventos", row?.id),
+    status: eventRule?.emitRows(row, eventContexts[index])[0]?.status ?? "quarantine",
+  }));
+
+  return issueContexts("mkt-event-edition", "tb_mkt.eventos_edicoes", rows, (row) => {
+    const plan = planMarketingEventEditionImport({ editionRow: row, eventCandidates: candidates });
+    const matches = candidates.filter((event) => String(event.legacyId) === String(row?.evento_id));
+    const event = matches.length === 1 ? matches[0] : null;
+    return {
+      event: issueResolution({
+        state: matches.length === 0 ? "zero" : matches.length > 1 ? "many" : "one",
+        sourceTable: "tb_mkt.eventos",
+        sourceKey: validLegacyId(row?.evento_id) ? normalizeKey(row.evento_id) : null,
+        identityRef: event === null ? null : `tb_mkt.eventos:${normalizeKey(event.legacyId)}`,
+        migrationState: event?.status ?? "quarantine",
+        importPlan: plan,
+      }),
+    };
+  });
+}
+
+export function buildMarketingEventEditionFeedbackContexts({
+  sourceTable,
+  rows,
+  editionRows = [],
+  eventRows = [],
+  evaluationRows = [],
+}) {
+  if (
+    sourceTable !== "tb_mkt.eventos_feedbacks" &&
+    sourceTable !== "tb_mkt.eventos_feedbacks_periodos"
+  ) {
+    throw new TypeError(`origem de feedback de edição inválida: ${String(sourceTable)}`);
+  }
+  const editionContexts = buildMarketingEventEditionContexts({ rows: editionRows, eventRows });
+  const editionRule = REMAINING_RULES.find(
+    ({ sourceTable: candidate }) => candidate === "tb_mkt.eventos_edicoes",
+  );
+  const editionCandidates = editionRows.map((row, index) => ({
+    legacyId: row?.id,
+    id: generatedIdentityId("tb_mkt.eventos_edicoes", row?.id),
+    status: editionRule?.emitRows(row, editionContexts[index])[0]?.status ?? "quarantine",
+  }));
+
+  return issueContexts(`mkt-event-edition-feedback:${sourceTable}`, sourceTable, rows, (row) => {
+    const importPlan = planMarketingEventEditionFeedbackImport({
+      sourceTable,
+      feedbackRow: row,
+      editionCandidates,
+      evaluationRows,
+    });
+    return {
+      feedback: issueResolution({
+        state: importPlan.status === "prepared" ? "one" : "unresolved",
+        sourceTable,
+        sourceKey: validLegacyId(row?.id)
+          ? normalizeKey(row.id)
+          : normalizeKey(row?.edicao ?? row?.edicao_id),
+        identityRef:
+          importPlan.status === "prepared"
+            ? `${sourceTable}:${normalizeKey(row?.id ?? row?.edicao)}`
+            : null,
+        importPlan,
+      }),
+    };
+  });
+}
+
 export function buildMarketingSocialContexts({ rows, clientResolver }) {
   assertAuditedCorpus("tb_mkt.redes_sociais", rows);
   const entries = authoritativeClientEntries(rows, clientResolver);
@@ -437,6 +542,28 @@ export function mapWorkspaceMessageType(value, attachmentState = {}) {
 
 export const REMAINING_RULES = Object.freeze(
   [
+    createRule({
+      sourceTable: "tb_mkt.eventos",
+      domain: "marketing",
+      stepId: "mkt-event-insert",
+      destinationTable: "mtk.events",
+      columns: [
+        mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
+        mapped("id", "legacy_id", "preserve_legacy_numeric_identity"),
+        mapped("nome", "name", "preserve_legacy_name_value"),
+        mapped("nome", "name_key", "normalize_mysql_general_ci_unique_key"),
+        mapped("logo", "logo", "preserve_optional_logo_or_empty_default"),
+        mapped("status", "status", "preserve_legacy_status_enum"),
+        mapped("prioridade", "priority", "preserve_legacy_priority_enum"),
+        mapped("objetivo", "objective", "preserve_text_or_empty_default"),
+        mapped("publico", "audience", "preserve_text_or_empty_default"),
+      ],
+      defaults: { logo: "", status: "Novo", objective: "", audience: "" },
+      classify: classifyMarketingEvent,
+    }),
+    createMarketingEventEditionRule(),
+    createMarketingEventEditionFeedbackPeriodRule(),
+    createMarketingEventEditionFeedbackRule(),
     createRule({
       sourceTable: "tb_cbc.emails",
       domain: "shared-email",
@@ -946,6 +1073,158 @@ function createRule({
   };
 }
 
+function createMarketingEventEditionRule() {
+  const sourceTable = "tb_mkt.eventos_edicoes";
+  const evidence = EVIDENCE_BY_SOURCE.get(sourceTable);
+  const editionStep = {
+    stepId: "mkt-event-edition-insert",
+    destinationTable: "mtk.event_editions",
+    mode: "insert",
+    identity: generateIdentity("id", sourceTable),
+    columns: [
+      mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
+      mapped("id", "legacy_id", "preserve_legacy_numeric_identity"),
+      mapped("evento_id", "event_id", "resolve_marketing_event_by_legacy_id", reference()),
+      mapped("nome", "name", "preserve_legacy_name_value"),
+      mapped("data_local", "date", "parse_legacy_date_local"),
+      mapped(null, "place", "parse_legacy_date_local"),
+      notPreserved(
+        "orcamentos",
+        "Cada item de orçamento é migrado como linha relacional em mtk.event_edition_budget_items.",
+      ),
+      mapped("parcerias", "partnerships", "normalize_legacy_named_list"),
+      mapped("organizacao", "organizing_team", "normalize_legacy_named_list"),
+      mapped("logistica", "logistics", "validate_legacy_planning_section"),
+      mapped("mkt_comunicacao", "marketing_communication", "validate_legacy_planning_section"),
+      mapped("durante_evento", "during_event", "validate_legacy_planning_section"),
+      mapped("pos_evento", "after_event", "validate_legacy_planning_section"),
+      mapped("obs", "notes", "preserve_legacy_notes"),
+    ],
+    constants: { organization_id: ORGANIZATION_ID },
+    defaults: {},
+    precedence: ["legacy_identity"],
+    dependencies: ["tb_mkt.eventos"],
+  };
+  const budgetStep = {
+    stepId: "mkt-event-edition-budget-insert",
+    destinationTable: "mtk.event_edition_budget_items",
+    mode: "insert",
+    identity: generateIdentity("id", sourceTable),
+    columns: [
+      mapped("orcamentos", "id", "uuid_v5_from_legacy_edition_and_budget_identity"),
+      mapped("id", "edition_id", "resolve_legacy_edition_identity"),
+      mapped("orcamentos", "legacy_id", "preserve_nested_legacy_budget_id"),
+      mapped("orcamentos", "name", "preserve_nested_legacy_budget_name"),
+      mapped("orcamentos", "amount", "normalize_legacy_decimal_amount"),
+      mapped("orcamentos", "position", "preserve_legacy_budget_order"),
+    ],
+    constants: { organization_id: ORGANIZATION_ID },
+    defaults: {},
+    precedence: ["legacy_identity"],
+    dependencies: ["tb_mkt.eventos"],
+  };
+
+  return {
+    sourceTable,
+    status: "confirmed",
+    domain: "marketing",
+    ruleOrigin: evidence.ruleId,
+    evidence: {
+      legacy: [...evidence.legacyReferences, ...evidence.legacyRelationships],
+      current: [...evidence.currentContractEvidence],
+    },
+    cardinality: "1:N",
+    dependencies: ["tb_mkt.eventos"],
+    destinations: [editionStep, budgetStep],
+    classifySourceRow: classifyMarketingEventEdition,
+    emitRows(row, context) {
+      const classification = classifyMarketingEventEdition(row, context);
+      const editionEmission = toEmission(
+        editionStep,
+        rowIdentity(sourceTable, row?.id),
+        classification,
+      );
+      const importPlan = context?.resolutions?.event?.importPlan;
+      if (classification.status !== "prepared") {
+        return [
+          editionEmission,
+          toEmission(
+            budgetStep,
+            `${rowIdentity(sourceTable, row?.id)}:budget:unresolved`,
+            classification,
+          ),
+        ];
+      }
+      if (importPlan.budgetItems.length === 0) {
+        return [
+          editionEmission,
+          {
+            stepId: budgetStep.stepId,
+            destinationTable: budgetStep.destinationTable,
+            status: "not_emitted",
+            identityRef: `${rowIdentity(sourceTable, row?.id)}:budget:empty`,
+            field: null,
+            reasonCode: "MKT_EDITION_BUDGET_EMPTY",
+          },
+        ];
+      }
+      return [
+        editionEmission,
+        ...importPlan.budgetItems.map((item) =>
+          toEmission(
+            budgetStep,
+            `${sourceTable}:${generatedIdentityId(sourceTable, row?.id)}:budget:${item.legacy_id}`,
+            classification,
+          ),
+        ),
+      ];
+    },
+  };
+}
+
+function createMarketingEventEditionFeedbackPeriodRule() {
+  return createRule({
+    sourceTable: "tb_mkt.eventos_feedbacks_periodos",
+    domain: "marketing",
+    stepId: "mkt-event-edition-feedback-period-update",
+    destinationTable: "mtk.event_editions",
+    mode: "merge",
+    identity: resolveIdentity("tb_mkt.eventos_edicoes", "edicao", "id"),
+    columns: [
+      mapped("inicio", "feedback_period_start", "preserve_legacy_datetime_wall_clock"),
+      mapped("fim", "feedback_period_end", "preserve_legacy_datetime_wall_clock"),
+    ],
+    dependencies: ["tb_mkt.eventos_edicoes"],
+    precedence: ["explicit_legacy_link", "source"],
+    emissionIdentity: (row, context) =>
+      context?.resolutions?.feedback?.importPlan?.editionId ??
+      `${"tb_mkt.eventos_feedbacks_periodos"}:${normalizeKey(row?.edicao) ?? "invalid"}`,
+    classify: (row, context) =>
+      classifyMarketingEventEditionFeedback(row, context, "tb_mkt.eventos_feedbacks_periodos"),
+  });
+}
+
+function createMarketingEventEditionFeedbackRule() {
+  return createRule({
+    sourceTable: "tb_mkt.eventos_feedbacks",
+    domain: "marketing",
+    stepId: "mkt-event-edition-feedback-insert",
+    destinationTable: "mtk.event_edition_feedback",
+    identity: generateIdentity("id", "tb_mkt.eventos_feedbacks"),
+    columns: [
+      mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
+      mapped("edicao_id", "edition_id", "resolve_legacy_edition_identity", reference()),
+      mapped("nota", "rating", "normalize_legacy_rating_1_to_5"),
+      mapped("obs", "observation", "preserve_legacy_observation"),
+      mapped("data", "evaluated_at", "preserve_legacy_datetime_wall_clock"),
+    ],
+    dependencies: ["tb_mkt.eventos_edicoes"],
+    emissionIdentity: (row) => rowIdentity("tb_mkt.eventos_feedbacks", row?.id),
+    classify: (row, context) =>
+      classifyMarketingEventEditionFeedback(row, context, "tb_mkt.eventos_feedbacks"),
+  });
+}
+
 function compareSourceTables(left, right) {
   return left.sourceTable < right.sourceTable ? -1 : left.sourceTable > right.sourceTable ? 1 : 0;
 }
@@ -977,6 +1256,85 @@ function classifyStockEntry(row, context) {
     ),
     preparedParentResolution(context, "user", "repositor", "CBS_STOCK_ENTRY_USER_QUARANTINED"),
   ]);
+}
+
+function classifyMarketingEvent(row, context) {
+  const bound = authenticContext("tb_mkt.eventos", row, context);
+  if (bound.status !== "prepared") return bound;
+  const name = marketingEventName(row?.nome);
+  const status = normalizeText(row?.status) ?? "Novo";
+  const priority = normalizeRequiredScalarText(row?.prioridade);
+  return firstFailure([
+    validId(row?.id, "id", "MKT_EVENT_ID_INVALID"),
+    typeof name === "string" && name.length > 0 && name.trim().length > 0 && name.length <= 50
+      ? prepared()
+      : quarantine("nome", "MKT_EVENT_NAME_INVALID"),
+    typeof row?.logo === "string" && row.logo.length <= 100
+      ? prepared()
+      : row?.logo == null
+        ? prepared()
+        : quarantine("logo", "MKT_EVENT_LOGO_INVALID"),
+    MARKETING_EVENT_STATUSES.has(status)
+      ? prepared()
+      : quarantine("status", "MKT_EVENT_STATUS_INVALID"),
+    MARKETING_EVENT_PRIORITIES.has(priority)
+      ? prepared()
+      : quarantine("prioridade", "MKT_EVENT_PRIORITY_INVALID"),
+    [row?.objetivo, row?.publico].every((value) => value == null || typeof value === "string")
+      ? prepared()
+      : quarantine("objetivo", "MKT_EVENT_TEXT_INVALID"),
+    context.resolutions.duplicateName === true
+      ? quarantine("nome", "MKT_EVENT_NAME_AMBIGUOUS")
+      : prepared(),
+  ]);
+}
+
+function classifyMarketingEventEdition(row, context) {
+  const bound = authenticContext("tb_mkt.eventos_edicoes", row, context);
+  if (bound.status !== "prepared") return bound;
+  const event = requiredResolution(
+    context,
+    "event",
+    row?.evento_id,
+    ["tb_mkt.eventos"],
+    "evento_id",
+    "MKT_EDITION_EVENT",
+  );
+  if (event.status !== "prepared") return event;
+  const parent = preparedParentResolution(
+    context,
+    "event",
+    "evento_id",
+    "MKT_EDITION_EVENT_TARGET_QUARANTINED",
+  );
+  if (parent.status !== "prepared") return parent;
+  const importPlan = context.resolutions.event.importPlan;
+  return importPlan?.status === "prepared"
+    ? prepared()
+    : quarantine(
+        importPlan?.field ?? "evento_id",
+        importPlan?.reasonCode ?? "MKT_EDITION_IMPORT_PLAN_MISSING",
+      );
+}
+
+function classifyMarketingEventEditionFeedback(row, context, sourceTable) {
+  const bound = authenticContext(sourceTable, row, context);
+  if (bound.status !== "prepared") return bound;
+  const resolution = context.resolutions.feedback;
+  if (!isAuthenticRemainingResolution(resolution) || resolution.sourceTable !== sourceTable) {
+    return quarantine(
+      sourceTable.endsWith("_periodos") ? "edicao" : "edicao_id",
+      "MKT_EDITION_FEEDBACK_CONTEXT_INVALID",
+    );
+  }
+  const plan = resolution.importPlan;
+  if (plan?.status !== "prepared") {
+    return quarantine(
+      plan?.field ?? (sourceTable.endsWith("_periodos") ? "edicao" : "edicao_id"),
+      plan?.reasonCode ?? "MKT_EDITION_FEEDBACK_IMPORT_PLAN_MISSING",
+    );
+  }
+  return prepared();
 }
 
 function classifyStockLocation(row, context) {
@@ -1390,6 +1748,23 @@ function projectPreparedPayload(sourceTable, row, context) {
         id: resolvedIdentityId(context, "client"),
         instagram: normalizeNullableText(row?.instagram),
       });
+    case "tb_mkt.eventos": {
+      const name = marketingEventName(row?.nome) ?? normalizeRequiredScalarText(row?.nome);
+      return Object.freeze({
+        id,
+        organization_id: ORGANIZATION_ID,
+        legacy_id: Number(row.id),
+        name,
+        name_key: marketingEventNameKey(name),
+        logo: normalizeNullableText(row?.logo) ?? "",
+        status: normalizeText(row?.status) ?? "Novo",
+        priority: normalizeRequiredScalarText(row?.prioridade),
+        objective: normalizeNullableText(row?.objetivo) ?? "",
+        audience: normalizeNullableText(row?.publico) ?? "",
+      });
+    }
+    case "tb_mkt.eventos_edicoes":
+      return context.resolutions.event.importPlan.edition;
     case "tb_mkt.senhas":
       return Object.freeze({
         id,
@@ -2062,6 +2437,21 @@ function normalizeLegacyFloor(value) {
 
 function normalizeText(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function marketingEventName(value) {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  return value;
+}
+
+function marketingEventNameKey(value) {
+  return String(value ?? "")
+    .replace(/ +$/u, "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[\u{10000}-\u{10ffff}]/gu, "\uFFFD")
+    .toLowerCase()
+    .replace(/ß/g, "s");
 }
 
 function normalizeNullableText(value) {

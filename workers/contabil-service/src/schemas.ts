@@ -59,6 +59,7 @@ export const monthlySchema = z
     type: z.enum(["CONTABIL", "FISCAL"] as const).optional(),
   })
   .strict();
+export const fiscalPortfolioSchema = z.object({ competence }).strict();
 export const editabilitySchema = z
   .object({ client_id: uuid("client_id"), type: monthlySchema.shape.type })
   .strict();

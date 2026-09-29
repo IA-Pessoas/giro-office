@@ -360,7 +360,8 @@ describe.skipIf(!smokeState)("task-service CRUD smoke (banco real)", () => {
           status: "Em Andamento",
           department_id: state.departmentId,
           observations: "",
-          billing: "Realizar",
+          // "Realizar" sem contratação trava a tarefa até a validação do Comercial (#1244).
+          billing: "Não Realizar",
           urgency: "Normal",
           responsible_id: state.ownerId,
           // Vencida: só tarefa vencida em andamento pode ser prorrogada.

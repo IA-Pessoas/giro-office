@@ -24,8 +24,8 @@ function countModes(entries) {
 
 test("runtime remaining cobre todas as origens e passos", async () => {
   assert.equal(assertExecutionGroupCoverage(REMAINING_RULES, REMAINING_EXECUTION_ENTRIES), true);
-  assert.equal(new Set(REMAINING_EXECUTION_ENTRIES.map((entry) => entry.sourceTable)).size, 14);
-  assert.equal(REMAINING_EXECUTION_ENTRIES.length, 14);
+  assert.equal(new Set(REMAINING_EXECUTION_ENTRIES.map((entry) => entry.sourceTable)).size, 16);
+  assert.equal(REMAINING_EXECUTION_ENTRIES.length, 17);
   assert.equal(
     assertTransformationCoverage(
       REMAINING_RULES,
@@ -35,7 +35,7 @@ test("runtime remaining cobre todas as origens e passos", async () => {
     true,
   );
   assert.deepEqual(countModes(REMAINING_RULES.flatMap(({ destinations }) => destinations)), {
-    insert: 13,
+    insert: 16,
     merge: 1,
   });
 

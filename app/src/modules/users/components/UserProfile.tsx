@@ -148,7 +148,7 @@ function UserFormContent({ user, me, departments }) {
               <div className="u-stack u-gap-2">
                 <p className="users-section-title">Senha</p>
                 <PasswordResetButton
-                  onSend={() => userService.sendPasswordReset(user.id)}
+                  onSubmit={(password) => userService.resetPassword(user.id, password)}
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
                 />
               </div>

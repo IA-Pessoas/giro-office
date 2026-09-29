@@ -105,9 +105,9 @@ test("CLI aceita somente as cinco origens declaradas e gera pacote dry-run compl
       ),
       true,
     );
-    assert.equal(preflight.blockedSources, 103);
-    assert.equal(preflight.blockedSteps, 133);
-    assert.equal(preflight.totalBlockedRows, 133);
+    assert.equal(preflight.blockedSources, 104);
+    assert.equal(preflight.blockedSteps, 134);
+    assert.equal(preflight.totalBlockedRows, 134);
     assert.equal(quarantine.total, 0);
   });
 });

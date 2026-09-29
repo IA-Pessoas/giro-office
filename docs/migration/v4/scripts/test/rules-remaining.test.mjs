@@ -779,7 +779,7 @@ async function workspaceContexts() {
   };
 }
 
-test("registry final contém cento e três regras; ramais reclassificados não possuem emissor", () => {
+test("registry final contém cento e quatro regras; ramais reclassificados não possuem emissor", () => {
   const previous = [
     V2_RULES,
     RH_PESSOAL_RULES,
@@ -793,10 +793,10 @@ test("registry final contém cento e três regras; ramais reclassificados não p
   const confirmed = REMAINING_EVIDENCE.filter(({ finalStatus }) => finalStatus === "confirmed");
   const pending = REMAINING_EVIDENCE.filter(({ finalStatus }) => finalStatus === "pending");
 
-  assert.equal(REMAINING_RULES.length, 14);
-  assert.equal(confirmed.length, 14);
-  assert.equal(pending.length, 73);
-  assert.equal(registry.size, 103);
+  assert.equal(REMAINING_RULES.length, 16);
+  assert.equal(confirmed.length, 16);
+  assert.equal(pending.length, 71);
+  assert.equal(registry.size, 105);
   assert.equal(registry.has("tb_cbs.ramais"), false);
   assert.deepEqual(
     REMAINING_RULES.map(({ sourceTable }) => sourceTable),
@@ -2004,6 +2004,35 @@ test("comportamento real cobre as quinze origens originalmente confirmadas após
 test("cada regra declara os campos efetivamente emitidos pelo contrato atual", () => {
   const expectedFields = {
     "tb_cbc.emails": ["id", "email", "responsible", "new_client_sending", "task_stalled_sending"],
+    "tb_mkt.eventos": [
+      "id",
+      "legacy_id",
+      "name",
+      "name_key",
+      "logo",
+      "status",
+      "priority",
+      "objective",
+      "audience",
+    ],
+    "tb_mkt.eventos_edicoes": [
+      "id",
+      "legacy_id",
+      "event_id",
+      "name",
+      "date",
+      "place",
+      "partnerships",
+      "organizing_team",
+      "logistics",
+      "marketing_communication",
+      "during_event",
+      "after_event",
+      "notes",
+      "edition_id",
+      "amount",
+      "position",
+    ],
     "tb_cbs.estoque": [
       "id",
       "department_id",
@@ -2074,7 +2103,8 @@ test("cada regra declara os campos efetivamente emitidos pelo contrato atual", (
   for (const mappingRule of REMAINING_RULES) {
     const actual = [
       ...new Set(
-        mappingRule.destinations[0].columns
+        mappingRule.destinations
+          .flatMap(({ columns }) => columns)
           .filter(({ status }) => status === "mapped")
           .map(({ destinationColumn }) => destinationColumn),
       ),

@@ -1,0 +1,267 @@
+import { ServiceError } from "@workspace/shared";
+
+import type { PrismaClient } from "../generated/prisma/client.js";
+import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
+import {
+  calculateSimplesPreview,
+  nextCompetence,
+  previousCompetences,
+  SIMPLES_ANNEXES,
+  type SimplesAnnex,
+  type SimplesPreview,
+  type SimplesTax,
+} from "./simplesNationalService.js";
+
+export type SimplesRatePrisma = Pick<PrismaClient, "client" | "fiscalMonthlyRevenue">;
+
+export interface SimplesRateEmission {
+  client_id: string;
+  client_name: string;
+  client_document: string;
+  /** Competência de apuração (base do RBT12). */
+  competence: string;
+  /** Competência seguinte, à qual a alíquota emitida se refere. */
+  applies_to: string;
+  annex: SimplesAnnex;
+  tax: SimplesTax;
+  /** Percentual emitido, com os limites de ISS/ICMS. */
+  rate: string;
+}
+
+export interface SimplesRateBatch {
+  competence: string;
+  applies_to: string;
+  annex: SimplesAnnex;
+  tax: SimplesTax;
+  included: SimplesRateEmission[];
+  skipped: Array<{ document: string; client_name: string | null; reason: string }>;
+}
+
+/** Nome do arquivo do lote (CSV ou ZIP) pelo tributo, anexo e mês da alíquota. */
+export function simplesRateBatchFileName(
+  batch: SimplesRateBatch,
+  extension: "csv" | "zip",
+): string {
+  return `aliquotas-${batch.tax}-anexo-${batch.annex}-${batch.applies_to}.${extension}`;
+}
+
+// Mesma regra do lote legado (listar-arquivos.php): Fiscal habilitado, ativo e no Simples.
+const ACTIVE_CLIENT_STATUS = "Ativo";
+const SIMPLES_REGIME = "simples nacional";
+
+type BatchClient = {
+  id: string;
+  name: string;
+  company_name: string | null;
+  cpf_cnpj: string;
+  fiscal: boolean | null;
+  status: string;
+  competence_output: Date | null;
+  regime: string | null;
+};
+
+/** Só dígitos; CNPJ/CPF colado de planilha sem o zero à esquerda (13 ou 10 dígitos) é completado. */
+const CLIENT_SELECT = {
+  id: true,
+  name: true,
+  company_name: true,
+  cpf_cnpj: true,
+  fiscal: true,
+  status: true,
+  competence_output: true,
+  regime: true,
+} as const;
+
+function digits(document: string): string {
+  const value = document.replace(/\D/g, "");
+  return value.length === 13 || value.length === 10 ? `0${value}` : value;
+}
+
+function normalizedRegime(regime: string | null): string {
+  return (regime ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .trim()
+    .toLowerCase();
+}
+
+function maskDocument(value: string): string {
+  return value.length === 14
+    ? value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
+    : value.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+}
+
+function clientName(client: { name: string; company_name: string | null }): string {
+  return client.company_name?.trim() || client.name;
+}
+
+/** Motivo de inelegibilidade, ou null; ativo = status Ativo ou saída no mês da alíquota ou depois. */
+function ineligibility(client: BatchClient, appliesTo: string): string | null {
+  if (client.fiscal !== true) return "Fiscal não habilitado para o cliente.";
+  const active =
+    client.status === ACTIVE_CLIENT_STATUS ||
+    (client.competence_output !== null && client.competence_output >= competenceDate(appliesTo));
+  if (!active) return `Cliente inativo em ${appliesTo.slice(5, 7)}/${appliesTo.slice(0, 4)}.`;
+  if (normalizedRegime(client.regime) !== SIMPLES_REGIME)
+    return "Cliente fora do Simples Nacional.";
+  return null;
+}
+
+/** Emissão do anexo a partir da prévia, ou o motivo de não emitir. */
+type EmissionResult = { ok: true; emission: SimplesRateEmission } | { ok: false; reason: string };
+
+function resolveEmission(
+  client: Pick<BatchClient, "id" | "name" | "company_name" | "cpf_cnpj">,
+  preview: SimplesPreview,
+  annex: SimplesAnnex,
+): EmissionResult {
+  if (preview.status !== "ok") {
+    return { ok: false, reason: preview.message ?? "Sem base para calcular." };
+  }
+  const item = preview.annexes.find((candidate) => candidate.annex === annex);
+  if (!item) return { ok: false, reason: `Anexo ${annex} sem cálculo.` };
+  if (!item.emission_rate) {
+    return {
+      ok: false,
+      reason: `Sem alíquota de ${item.tax} para emitir no Anexo ${item.annex}: na ${item.bracket}ª faixa o tributo é recolhido fora do Simples.`,
+    };
+  }
+  const emission: SimplesRateEmission = {
+    client_id: client.id,
+    client_name: clientName(client),
+    client_document: client.cpf_cnpj,
+    competence: preview.competence,
+    applies_to: preview.applies_to,
+    annex: item.annex,
+    tax: item.tax,
+    rate: item.emission_rate,
+  };
+  return { ok: true, emission };
+}
+
+/** Prévia e emissão da alíquota de ISS/ICMS do Simples a partir das receitas mensais. */
+export class SimplesRateService {
+  constructor(private readonly prisma: SimplesRatePrisma) {}
+
+  private async requireClient(clientId: string, organizationId: string): Promise<BatchClient> {
+    const client = await this.prisma.client.findFirst({
+      where: { id: clientId, organization_id: organizationId },
+      select: CLIENT_SELECT,
+    });
+    if (!client) throw new ServiceError(404, "Cliente não encontrado.");
+    return client;
+  }
+
+  /** Receitas dos 11 meses anteriores à competência, por cliente, no tenant. */
+  private async revenueWindow(clientIds: string[], competence: string, organizationId: string) {
+    const byClient = new Map<string, Array<{ competence: string; amount: string }>>();
+    if (clientIds.length === 0) return byClient;
+    const months = previousCompetences(competence);
+    const records = await this.prisma.fiscalMonthlyRevenue.findMany({
+      where: {
+        organization_id: organizationId,
+        client_id: { in: clientIds },
+        competence: {
+          gte: competenceDate(months[months.length - 1]),
+          lte: competenceDate(months[0]),
+        },
+      },
+      select: { client_id: true, competence: true, amount: true },
+    });
+    for (const record of records) {
+      const list = byClient.get(record.client_id) ?? [];
+      list.push({ competence: competenceKey(record.competence), amount: record.amount.toString() });
+      byClient.set(record.client_id, list);
+    }
+    return byClient;
+  }
+
+  private async calculate(clientId: string, competence: string, organizationId: string) {
+    const revenues = await this.revenueWindow([clientId], competence, organizationId);
+    return calculateSimplesPreview(competence, revenues.get(clientId) ?? []);
+  }
+
+  /** RBT12 dos 11 meses anteriores à competência e alíquota bruta por anexo. */
+  async preview(
+    input: { client_id: string; competence: string },
+    organizationId: string,
+  ): Promise<SimplesPreview & { client_id: string }> {
+    await this.requireClient(input.client_id, organizationId);
+    return {
+      client_id: input.client_id,
+      ...(await this.calculate(input.client_id, input.competence, organizationId)),
+    };
+  }
+
+  /** Alíquota a emitir para um anexo, com os limites; 422 sem base ou sem alíquota válida. */
+  async emission(
+    input: { client_id: string; competence: string; annex: SimplesAnnex },
+    organizationId: string,
+  ): Promise<SimplesRateEmission> {
+    const client = await this.requireClient(input.client_id, organizationId);
+    // Mesma elegibilidade do lote: carta "Simples Nacional" só para cliente com Fiscal, ativo e no Simples.
+    const reason = ineligibility(client, nextCompetence(input.competence));
+    if (reason) throw new ServiceError(422, reason);
+    const preview = await this.calculate(client.id, input.competence, organizationId);
+    const emission = resolveEmission(client, preview, input.annex);
+    if (!emission.ok) throw new ServiceError(422, emission.reason);
+    return emission.emission;
+  }
+
+  /** Lote de emissão para os documentos informados, com o motivo de cada cliente ignorado. */
+  async batch(
+    input: { competence: string; annex: SimplesAnnex; documents: string[] },
+    organizationId: string,
+  ): Promise<SimplesRateBatch> {
+    const appliesTo = nextCompetence(input.competence);
+    const wanted = input.documents.map((document) => document.trim()).filter(Boolean);
+    const variants = [...new Set(wanted.map(digits))].flatMap((value) => [
+      value,
+      maskDocument(value),
+    ]);
+    const clients: BatchClient[] = await this.prisma.client.findMany({
+      where: { organization_id: organizationId, cpf_cnpj: { in: variants } },
+      select: CLIENT_SELECT,
+    });
+    const byDocument = new Map(clients.map((client) => [digits(client.cpf_cnpj), client]));
+
+    const eligibleIds = clients
+      .filter((client) => ineligibility(client, appliesTo) === null)
+      .map((client) => client.id);
+    const revenues = await this.revenueWindow(eligibleIds, input.competence, organizationId);
+
+    const result: SimplesRateBatch = {
+      competence: input.competence,
+      applies_to: appliesTo,
+      annex: input.annex,
+      tax: SIMPLES_ANNEXES[input.annex].tax,
+      included: [],
+      skipped: [],
+    };
+    const seen = new Set<string>();
+    for (const document of wanted) {
+      const client = byDocument.get(digits(document));
+      const skip = (reason: string) =>
+        result.skipped.push({ document, client_name: client ? clientName(client) : null, reason });
+      if (seen.has(digits(document))) {
+        skip("Documento repetido no lote.");
+        continue;
+      }
+      seen.add(digits(document));
+      if (!client) {
+        skip("Cliente não encontrado nesta organização.");
+        continue;
+      }
+      const reason = ineligibility(client, appliesTo);
+      if (reason) {
+        skip(reason);
+        continue;
+      }
+      const preview = calculateSimplesPreview(input.competence, revenues.get(client.id) ?? []);
+      const emission = resolveEmission(client, preview, input.annex);
+      if (emission.ok) result.included.push(emission.emission);
+      else skip(emission.reason);
+    }
+    return result;
+  }
+}

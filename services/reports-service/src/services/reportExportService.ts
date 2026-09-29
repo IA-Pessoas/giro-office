@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { createZip, ServiceError } from "@workspace/shared";
 import { reportLetterheadReferenceSchema } from "../schemas/reportLetterhead.schemas.js";
 import type { ReportAuditService } from "./reportAuditService.js";
 import type { ReportAuthorizationService } from "./reportAuthorizationService.js";
@@ -13,7 +13,6 @@ import {
 } from "./reportPdfService.js";
 import type { ReportSnapshotService } from "./reportSnapshotService.js";
 import { ReportXlsxService } from "./reportXlsxService.js";
-import { createReportZip } from "./reportZipService.js";
 
 const REPORT_TIME_ZONE = "UTC";
 const reportFileTimestampFormatter = new Intl.DateTimeFormat("en-US", {
@@ -143,7 +142,7 @@ export class ReportExportService {
                 : {}),
             })
           : tables.length > 1
-            ? createReportZip(
+            ? createZip(
                 await renderZipEntries(
                   tables,
                   stems,

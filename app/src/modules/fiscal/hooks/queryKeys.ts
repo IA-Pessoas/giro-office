@@ -7,6 +7,15 @@ import type {
 export const FISCAL_QUERY_KEY = ["fiscal"] as const;
 export const FISCAL_LIST_PAGE_SIZE = 20;
 
+/** Prefixo das receitas do cliente; invalidá-lo também atualiza a prévia do Simples. */
+export function fiscalRevenuesQueryKey(clientId: string) {
+  return [...FISCAL_QUERY_KEY, "revenues", clientId] as const;
+}
+
+export function fiscalSimplesPreviewQueryKey(clientId: string, competence: string) {
+  return [...fiscalRevenuesQueryKey(clientId), "simples-preview", competence] as const;
+}
+
 export function fiscalNcmSearchQueryKey(ncmCode: string) {
   return [...FISCAL_QUERY_KEY, "search", ncmCode] as const;
 }

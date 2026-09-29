@@ -902,8 +902,84 @@ html.dark .ui-input,
 }
 
 @media print {
+    @page {
+        size: A4 portrait;
+        margin: 14mm;
+    }
+
+    body * {
+        visibility: hidden !important;
+    }
+
+    #__next {
+        display: none !important;
+    }
+
+    body {
+        margin: 0 !important;
+    }
+
+    #marketing-event-edition-report,
+    #marketing-event-edition-report * {
+        visibility: visible !important;
+    }
+
+    #marketing-event-edition-report {
+        position: relative;
+        inset: auto;
+        width: 100%;
+        color: #111827 !important;
+        background: #fff !important;
+        font-size: 10pt;
+    }
+
+    body [role="dialog"] {
+        display: block !important;
+        position: static !important;
+        inset: auto !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        transform: none !important;
+        translate: none !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
+
+    body [role="dialog"] > header,
+    body [role="dialog"] > footer {
+        display: none !important;
+    }
+
+    body [role="dialog"] > div {
+        display: block !important;
+        width: 100% !important;
+        flex: none !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
+    #marketing-event-edition-report * {
+        color: #111827 !important;
+        background: transparent !important;
+        border-color: #d1d5db !important;
+        box-shadow: none !important;
+    }
+
     .hide-on-print {
         display: none !important;
+    }
+
+    #marketing-event-edition-report section,
+    #marketing-event-edition-report tr {
+        break-inside: avoid;
     }
 }
   

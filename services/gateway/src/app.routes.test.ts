@@ -4512,16 +4512,16 @@ it("blocks disabled commercial routes before proxying even for global admins", a
   }
 });
 
-it("proxies authorized Marketing routes to the Marketing service", async () => {
+it("proxies Marketing reads and writes when module permission allows", async () => {
   const token = createToken({
     user_id: "user-1",
     organization_id: "org-1",
     permission: 2,
-    modules: { marketing: 3 },
+    modules: { marketing: 2 },
   });
   const seenUrls: string[] = [];
   const upstream = createServer((request, response) => {
-    seenUrls.push(request.url ?? "");
+    seenUrls.push(`${request.method} ${request.url ?? ""}`);
     response.statusCode = 200;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify({ success: true, data: {} }));
@@ -4531,12 +4531,53 @@ it("proxies authorized Marketing routes to the Marketing service", async () => {
   const gatewayUrl = await startServer(gateway);
 
   try {
-    const response = await fetch(`${gatewayUrl}/marketing/dashboard`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const responses = await Promise.all([
+      fetch(`${gatewayUrl}/marketing/dashboard`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`${gatewayUrl}/marketing/events/list`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`${gatewayUrl}/marketing/events`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ name: "Workshop" }),
+      }),
+      fetch(`${gatewayUrl}/marketing/events/event-1/editions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`${gatewayUrl}/marketing/events/event-1/editions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ name: "Edição" }),
+      }),
+      fetch(`${gatewayUrl}/marketing/events/event-1/editions/edition-1`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ name: "Edição atualizada" }),
+      }),
+    ]);
 
-    expect(response.status).toBe(200);
-    expect(seenUrls).toEqual(["/marketing/dashboard"]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200, 200, 200, 200, 200]);
+    expect(seenUrls.sort()).toEqual(
+      [
+        "GET /marketing/dashboard",
+        "GET /marketing/events/list",
+        "POST /marketing/events",
+        "GET /marketing/events/event-1/editions",
+        "POST /marketing/events/event-1/editions",
+        "PUT /marketing/events/event-1/editions/edition-1",
+      ].sort(),
+    );
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);
