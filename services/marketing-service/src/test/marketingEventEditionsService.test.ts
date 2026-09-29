@@ -1,5 +1,6 @@
 import "./envBootstrap.js";
 
+import { INTERNAL_ERROR_MESSAGE } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { MarketingEventEditionsService } from "../services/marketingEventEditionsService.js";
@@ -124,6 +125,23 @@ describe("MarketingEventEditionsService", () => {
     );
   });
 
+  it("normalizes unexpected edition persistence failures to the internal error", async () => {
+    const prisma = {
+      marketingEventEdition: { create: vi.fn().mockRejectedValue(new Error("database detail")) },
+    };
+
+    await expect(
+      new MarketingEventEditionsService(prisma as never).createEdition(
+        organizationId,
+        eventId,
+        input,
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 500,
+      message: INTERNAL_ERROR_MESSAGE,
+    });
+  });
+
   it("creates one rating and observation for an edition", async () => {
     const evaluatedAt = new Date("2026-11-01T12:30:00.000Z");
     const prisma = {
@@ -181,6 +199,27 @@ describe("MarketingEventEditionsService", () => {
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
+  it("normalizes unexpected feedback persistence failures to the internal error", async () => {
+    const prisma = {
+      marketingEventEdition: { findFirst: vi.fn().mockResolvedValue({ id: editionId }) },
+      marketingEventEditionFeedback: {
+        create: vi.fn().mockRejectedValue(new Error("database detail")),
+      },
+    };
+
+    await expect(
+      new MarketingEventEditionsService(prisma as never).createEditionFeedback(
+        organizationId,
+        eventId,
+        editionId,
+        { rating: 4 },
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 500,
+      message: INTERNAL_ERROR_MESSAGE,
+    });
+  });
+
   it("composes report with edition sections, budget, period, and available feedback", async () => {
     const record = {
       ...storedEdition(),
@@ -231,9 +270,18 @@ describe("MarketingEventEditionsService", () => {
   it("omits absent optional feedback from the report", async () => {
     const prisma = {
       marketingEventEdition: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ ...storedEdition(), event: { id: eventId, name: "Feira" } }),
+        findFirst: vi.fn().mockResolvedValue({
+          ...storedEdition(),
+          event: {
+            id: eventId,
+            name: "Feira",
+            logo: null,
+            status: "Novo",
+            priority: "Média",
+            objective: null,
+            audience: null,
+          },
+        }),
       },
     };
     const result = await new MarketingEventEditionsService(prisma as never).getEditionReport(

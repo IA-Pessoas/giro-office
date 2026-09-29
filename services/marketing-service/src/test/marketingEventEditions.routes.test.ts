@@ -15,6 +15,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createMarketingApp } from "../app.js";
 import { getMarketingServiceEnv } from "../config/env.js";
 import type { MarketingEventEditionsProvider } from "../routes/marketingEventEditions.routes.js";
+import type {
+  MarketingEventEdition,
+  MarketingEventEditionReport,
+} from "../services/marketingEventEditionsService.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const eventId = "20000000-0000-4000-8000-000000000001";
@@ -31,6 +35,39 @@ const body = {
   duringEvent: { recepcao: [], staff: [], programacao: [], feedback: [] },
   afterEvent: { avaliacao: [], agradecimento: [], relatorio: [], followup: [] },
   notes: "",
+};
+
+const editionResponse: MarketingEventEdition = {
+  id: editionId,
+  eventId,
+  name: "Edição anual",
+  date: "2026-11-12",
+  place: "Castelo Branco",
+  budgetItems: [],
+  budgetTotal: "0.00",
+  partnerships: [],
+  organizingTeam: [],
+  logistics: { fornecedores: [], cronograma: [], registro: [], transporte: [], acomodacoes: [] },
+  marketingCommunication: { abertura: [], divulgacao: [], acessoria: [], site: [] },
+  duringEvent: { recepcao: [], staff: [], programacao: [], feedback: [] },
+  afterEvent: { avaliacao: [], agradecimento: [], relatorio: [], followup: [] },
+  notes: "",
+  feedbackPeriodStart: null,
+  feedbackPeriodEnd: null,
+  feedback: null,
+};
+
+const reportResponse: MarketingEventEditionReport = {
+  event: {
+    id: eventId,
+    name: "Feira anual",
+    logo: "",
+    status: "Novo",
+    priority: "Média",
+    objective: "Apresentar serviços",
+    audience: "Comunidade",
+  },
+  edition: editionResponse,
 };
 
 function createTestApp(editionsService: MarketingEventEditionsProvider) {
@@ -55,12 +92,12 @@ function headers(permission = 1): Record<string, string> {
   };
 }
 
-function service(updateResult: unknown | null = null) {
+function service(updateResult: MarketingEventEdition | null = null) {
   return {
     listEditions: vi.fn<MarketingEventEditionsProvider["listEditions"]>(async () => []),
-    createEdition: vi.fn<MarketingEventEditionsProvider["createEdition"]>(async () => ({
-      id: editionId,
-    })),
+    createEdition: vi.fn<MarketingEventEditionsProvider["createEdition"]>(
+      async () => editionResponse,
+    ),
     updateEdition: vi.fn<MarketingEventEditionsProvider["updateEdition"]>(async () => updateResult),
     createEditionFeedback: vi.fn<MarketingEventEditionsProvider["createEditionFeedback"]>(
       async () => ({
@@ -69,10 +106,9 @@ function service(updateResult: unknown | null = null) {
         evaluatedAt: "2026-11-01T12:30:00.000Z",
       }),
     ),
-    getEditionReport: vi.fn<MarketingEventEditionsProvider["getEditionReport"]>(async () => ({
-      event: { id: eventId, name: "Feira anual" },
-      edition: { id: editionId },
-    })),
+    getEditionReport: vi.fn<MarketingEventEditionsProvider["getEditionReport"]>(
+      async () => reportResponse,
+    ),
   };
 }
 
@@ -85,6 +121,21 @@ describe("Marketing event editions routes", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true, data: [] });
     expect(provider.listEditions).toHaveBeenCalledWith(organizationId, eventId);
+  });
+
+  it("returns field-specific validation messages for invalid event and edition IDs", async () => {
+    const app = createTestApp(service());
+    const invalidEventId = await request(app)
+      .get("/marketing/events/not-a-uuid/editions")
+      .set(headers());
+    const invalidEditionId = await request(app)
+      .get(`/marketing/events/${eventId}/editions/not-a-uuid/report`)
+      .set(headers());
+
+    expect(invalidEventId.status).toBe(400);
+    expect(invalidEventId.body.error).toBe("Identificador do evento inválido.");
+    expect(invalidEditionId.status).toBe(400);
+    expect(invalidEditionId.body.error).toBe("Identificador da edição inválido.");
   });
 
   it("creates an edition with edit permission and rejects invalid dates before writing", async () => {
@@ -106,15 +157,14 @@ describe("Marketing event editions routes", () => {
   });
 
   it("updates an edition and returns the saved edition", async () => {
-    const savedEdition = { id: editionId, name: "Edição anual" };
-    const provider = service(savedEdition);
+    const provider = service(editionResponse);
     const response = await request(createTestApp(provider))
       .put(`/marketing/events/${eventId}/editions/${editionId}`)
       .set(headers(2))
       .send(body);
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ success: true, data: savedEdition });
+    expect(response.body).toEqual({ success: true, data: editionResponse });
     expect(provider.updateEdition).toHaveBeenCalledWith(organizationId, eventId, editionId, body);
   });
 
