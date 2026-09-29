@@ -103,7 +103,7 @@ export class MarketingPasswordService {
 
   async create(organizationId: string, input: MarketingPasswordInput): Promise<PasswordMetadata> {
     this.assertNotesDoNotContainSecret(input.notes, input.password);
-    await this.assertIdentityAvailable(organizationId, input.local, input.user);
+    await this.assertIdentityAvailable(input.local, input.user);
     try {
       const record = await this.prisma.passwordMkt.create({
         data: {
@@ -137,7 +137,7 @@ export class MarketingPasswordService {
 
     const local = input.local?.trim() || existing.local;
     const user = input.user?.trim() || existing.user;
-    await this.assertIdentityAvailable(organizationId, local, user, id);
+    await this.assertIdentityAvailable(local, user, id);
     if (input.notes !== undefined) {
       let currentSecret: string;
       try {
@@ -261,7 +261,6 @@ export class MarketingPasswordService {
       }
       const existing = await this.prisma.passwordMkt.findFirst({
         where: {
-          organization_id: organizationId,
           local: candidate.local,
           user: candidate.user,
         },
@@ -314,14 +313,12 @@ export class MarketingPasswordService {
   }
 
   private async assertIdentityAvailable(
-    organizationId: string,
     local: string,
     user: string,
     exceptId?: string,
   ): Promise<void> {
     const duplicate = await this.prisma.passwordMkt.findFirst({
       where: {
-        organization_id: organizationId,
         local: local.trim(),
         user: user.trim(),
         ...(exceptId ? { id: { not: exceptId } } : {}),

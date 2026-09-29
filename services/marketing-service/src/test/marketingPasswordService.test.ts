@@ -1,5 +1,5 @@
+import { EncryptionService } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
-import { EncryptionService } from "../../../../shared/src/security/encryption.js";
 
 import { MarketingPasswordService } from "../services/marketingPasswordService.js";
 
@@ -87,9 +87,12 @@ describe("MarketingPasswordService", () => {
     });
   });
 
-  it("rejects duplicate local and user identities within the organization", async () => {
+  it("rejects duplicate local and user identities across organizations", async () => {
     const prisma = createPrisma();
-    prisma.passwordMkt.findFirst.mockResolvedValueOnce({ id: "credential-existing" } as never);
+    prisma.passwordMkt.findFirst.mockResolvedValueOnce({
+      id: "credential-existing",
+      organization_id: "another-organization",
+    } as never);
     const service = new MarketingPasswordService(
       prisma as never,
       new EncryptionService(encryptionKey),
@@ -105,7 +108,6 @@ describe("MarketingPasswordService", () => {
     expect(prisma.passwordMkt.create).not.toHaveBeenCalled();
     expect(prisma.passwordMkt.findFirst).toHaveBeenCalledWith({
       where: {
-        organization_id: organizationId,
         local: "Instagram",
         user: "acme@example.com",
       },
