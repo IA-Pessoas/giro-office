@@ -152,8 +152,7 @@ test("an audited item decision resolves only its stable edition identity during 
   });
   const editionEntry = REMAINING_EXECUTION_ENTRIES.find(
     (entry) =>
-      entry.sourceTable === "tb_mkt.eventos_edicoes" &&
-      entry.stepId === "mkt-event-edition-insert",
+      entry.sourceTable === "tb_mkt.eventos_edicoes" && entry.stepId === "mkt-event-edition-insert",
   );
   const [emission] = editionEntry.emitRows(editionRow, runtime);
   const payload = editionEntry.projector(emission, editionRow, runtime);
