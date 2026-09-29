@@ -10,6 +10,7 @@
     { "binding": "USER_SERVICE", "service": "giro-user-service" }
   ],
   "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
+  "vars": { "NODE_ENV": "production" },
   "observability": {
     "enabled": true,
     "logs": { "enabled": true, "invocation_logs": true },

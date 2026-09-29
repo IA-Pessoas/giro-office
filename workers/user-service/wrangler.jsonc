@@ -11,6 +11,7 @@
   // APP_PUBLIC_URL monta o link de redefinição de senha. O envio usa os secrets
   // USER_EMAIL_ADAPTER_URL, USER_EMAIL_ADAPTER_TOKEN e USER_EMAIL_FROM (#1342).
   "vars": {
+    "NODE_ENV": "production",
     "AUTH_COOKIE_SECURE": true,
     "APP_PUBLIC_URL": "https://useoffice.com.br"
   },
