@@ -4,6 +4,7 @@ import { canSSRAuth } from "@modules/auth";
 import { MarketingDashboard } from "@modules/marketing/components/MarketingDashboard";
 import { MarketingAiUsageControls } from "@modules/marketing/components/MarketingAiUsageControls";
 import { MarketingInstagramProfiles } from "@modules/marketing/components/MarketingInstagramProfiles";
+import { MarketingPasswords } from "@modules/marketing/components/MarketingPasswords";
 
 export default function MarketingPage() {
   return (
@@ -15,6 +16,7 @@ export default function MarketingPage() {
         <MarketingDashboard />
         <MarketingAiUsageControls />
         <MarketingInstagramProfiles />
+        <MarketingPasswords />
       </main>
     </>
   );
