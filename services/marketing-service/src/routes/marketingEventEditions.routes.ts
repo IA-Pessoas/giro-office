@@ -13,8 +13,10 @@ import {
   requireMarketingPermission,
 } from "../middlewares/requireMarketingPermission.js";
 import {
+  type MarketingEventEditionFeedbackInput,
   type MarketingEventEditionInput,
   marketingEventEditionBodySchema,
+  marketingEventEditionFeedbackBodySchema,
   marketingEventEditionIdParamsSchema,
   marketingEventEditionParamsSchema,
 } from "../schemas/marketingEventEdition.schemas.js";
@@ -31,6 +33,17 @@ export interface MarketingEventEditionsProvider {
     eventId: string,
     editionId: string,
     input: MarketingEventEditionInput,
+  ): Promise<unknown | null>;
+  createEditionFeedback(
+    organizationId: string,
+    eventId: string,
+    editionId: string,
+    input: MarketingEventEditionFeedbackInput,
+  ): Promise<unknown>;
+  getEditionReport(
+    organizationId: string,
+    eventId: string,
+    editionId: string,
   ): Promise<unknown | null>;
 }
 
@@ -97,6 +110,53 @@ export function createMarketingEventEditionsRoutes(
         response.json(createSuccessResponse(edition));
       } catch (error: unknown) {
         logError("Falha ao atualizar edição do evento.", { err: error });
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    "/events/:eventId/editions/:editionId/feedback",
+    authenticate,
+    requireMarketingPermission(MarketingPermissionLevel.Editor),
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { eventId, editionId } = parseWithZod(
+          marketingEventEditionIdParamsSchema,
+          request.params,
+        );
+        const body = parseWithZod(marketingEventEditionFeedbackBodySchema, request.body);
+        const feedback = await editionsService.createEditionFeedback(
+          organizationId,
+          eventId,
+          editionId,
+          body,
+        );
+        response.status(201).json(createSuccessResponse(feedback));
+      } catch (error: unknown) {
+        logError("Falha ao registrar avaliação da edição.", { err: error });
+        next(error);
+      }
+    },
+  );
+
+  router.get(
+    "/events/:eventId/editions/:editionId/report",
+    authenticate,
+    requireMarketingPermission(MarketingPermissionLevel.Viewer),
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request);
+        const { eventId, editionId } = parseWithZod(
+          marketingEventEditionIdParamsSchema,
+          request.params,
+        );
+        const report = await editionsService.getEditionReport(organizationId, eventId, editionId);
+        if (!report) throw new ServiceError(404, "Edição não encontrada.");
+        response.json(createSuccessResponse(report));
+      } catch (error: unknown) {
+        logError("Falha ao consultar relatório da edição.", { err: error });
         next(error);
       }
     },

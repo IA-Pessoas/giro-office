@@ -1720,6 +1720,27 @@ const handlers = {
     });
   },
 
+  async marketingEventEditionFeedbackCreate(op) {
+    const eventId = requireState("marketingEventId");
+    const editionId = requireState("marketingEventEditionId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions/${editionId}/feedback`,
+      json: isBadExpectation(op) ? { rating: 6 } : { rating: 5, observation: "Smoke test" },
+    });
+  },
+
+  async marketingEventEditionReport(op) {
+    const eventId = requireState("marketingEventId");
+    const editionId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventEditionId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions/${editionId}/report`,
+    });
+  },
+
   async gatewayHealth(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
