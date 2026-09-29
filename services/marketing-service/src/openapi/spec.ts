@@ -62,6 +62,32 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
       "/marketing/ai-usage-controls/reconciliation": {
         get: protectedOperation("Listar registros legados pendentes de reconciliação."),
       },
+      "/marketing/passwords/list": {
+        get: protectedOperation("Listar metadados de credenciais sem revelar os segredos."),
+      },
+      "/marketing/passwords": {
+        post: protectedOperation("Criar credencial criptografada para a organização autenticada."),
+      },
+      "/marketing/passwords/{id}": {
+        get: protectedOperation("Consultar metadados de uma credencial."),
+        patch: protectedOperation("Editar metadados e, opcionalmente, substituir o segredo."),
+      },
+      "/marketing/passwords/{id}/reveal": {
+        post: protectedOperation("Revelar uma credencial após confirmação explícita."),
+      },
+      "/marketing/passwords/{id}/export": {
+        post: protectedOperation("Exportar uma credencial após confirmação explícita."),
+      },
+      "/marketing/passwords/import": {
+        post: protectedOperation(
+          "Importar segredos legados verificáveis e colocar casos inseguros em quarentena.",
+        ),
+      },
+      "/marketing/passwords/import/reconciliation": {
+        get: protectedOperation(
+          "Listar metadados de registros em quarentena, sem o conteúdo secreto.",
+        ),
+      },
     },
     components: {
       securitySchemes: {

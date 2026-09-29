@@ -107,6 +107,28 @@ export const operations = [
     expectedStatus: [200],
     expectedLabel: "reconciliation queue listed",
   },
+  ...[
+    ["GET", "/marketing/passwords/list"],
+    ["POST", "/marketing/passwords"],
+    ["GET", "/marketing/passwords/{id}"],
+    ["PATCH", "/marketing/passwords/{id}"],
+    ["POST", "/marketing/passwords/{id}/reveal"],
+    ["POST", "/marketing/passwords/{id}/export"],
+    ["POST", "/marketing/passwords/import"],
+    ["GET", "/marketing/passwords/import/reconciliation"],
+  ].map(([method, path]) => ({
+    service: "marketing-service",
+    method,
+    path,
+    action: `marketingPasswordUnauthorized${method}${path.replace(/[^a-z0-9]/giu, "")}`,
+    handlerAction: "marketingPasswordUnauthorized",
+    target: "gateway",
+    auth: "public",
+    expectationKind: "bad",
+    expectedStatus: [401],
+    expectedLabel: "unauthorized",
+    pairCoverageExempt: true,
+  })),
 ];
 
 export const routePlaceholders = [];
