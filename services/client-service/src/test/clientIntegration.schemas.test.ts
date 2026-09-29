@@ -23,4 +23,12 @@ describe("integration email contract", () => {
       expect(updateIntegrationBodySchema.safeParse({ email }).success).toBe(true);
     }
   });
+
+  it("normalizes empty and padded Instagram values on canonical client inputs", () => {
+    expect(updateIntegrationBodySchema.parse({ instagram: "  @acme  " }).instagram).toBe("@acme");
+    expect(updateIntegrationBodySchema.parse({ instagram: "   " }).instagram).toBeNull();
+    expect(
+      createIntegrationBodySchema.parse({ ...createBody, instagram: " " }).instagram,
+    ).toBeNull();
+  });
 });

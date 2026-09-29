@@ -10,11 +10,16 @@ import cors from "cors";
 import express, { type Express, type Request } from "express";
 import "express-async-errors";
 
+import { EncryptionService } from "@workspace/shared";
 import type { MarketingServiceEnv } from "./config/env.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { createIsAuthenticatedMiddleware } from "./middlewares/isAuthenticated.js";
 import { requestContext } from "./middlewares/requestContext.js";
 import { buildMarketingServiceOpenApiSpec } from "./openapi/spec.js";
+import {
+  createMarketingAiUsageControlRoutes,
+  type MarketingAiUsageControlProvider,
+} from "./routes/marketingAiUsageControl.routes.js";
 import {
   createMarketingDashboardRoutes,
   type MarketingDashboardProvider,
@@ -27,14 +32,22 @@ import {
   createMarketingEventsRoutes,
   type MarketingEventsProvider,
 } from "./routes/marketingEvents.routes.js";
+import {
+  createMarketingPasswordRoutes,
+  type MarketingPasswordProvider,
+} from "./routes/marketingPassword.routes.js";
+import { MarketingAiUsageControlService } from "./services/marketingAiUsageControlService.js";
 import { MarketingDashboardService } from "./services/marketingDashboardService.js";
 import { MarketingEventEditionsService } from "./services/marketingEventEditionsService.js";
 import { MarketingEventsService } from "./services/marketingEventsService.js";
+import { MarketingPasswordService } from "./services/marketingPasswordService.js";
 
 interface CreateMarketingAppOptions {
   env: MarketingServiceEnv;
   logger: Logger;
   dashboardService?: MarketingDashboardProvider;
+  controlService?: MarketingAiUsageControlProvider;
+  passwordService?: MarketingPasswordProvider;
   eventsService?: MarketingEventsProvider;
   editionsService?: MarketingEventEditionsProvider;
   prisma?: PrismaClient;
@@ -54,6 +67,8 @@ export function createMarketingApp({
   env,
   logger,
   dashboardService,
+  controlService,
+  passwordService,
   eventsService,
   editionsService,
   prisma,
@@ -61,13 +76,19 @@ export function createMarketingApp({
   const app = express();
   const auth = createIsAuthenticatedMiddleware(env);
   const service = dashboardService ?? (prisma ? new MarketingDashboardService(prisma) : null);
+  const controls = controlService ?? (prisma ? new MarketingAiUsageControlService(prisma) : null);
+  const passwords =
+    passwordService ??
+    (prisma
+      ? new MarketingPasswordService(prisma, new EncryptionService(env.mtkEncryptionKey))
+      : null);
   const marketingEvents = eventsService ?? (prisma ? new MarketingEventsService(prisma) : null);
   const marketingEventEditions =
     editionsService ?? (prisma ? new MarketingEventEditionsService(prisma) : null);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "marketing-service")));
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));
   app.use(requestContext);
 
   app.get("/health", (_request, response) => {
@@ -85,6 +106,12 @@ export function createMarketingApp({
 
   if (service) {
     app.use("/marketing", createMarketingDashboardRoutes(service, auth));
+  }
+  if (controls) {
+    app.use("/marketing", createMarketingAiUsageControlRoutes(controls, auth));
+  }
+  if (passwords) {
+    app.use("/marketing", createMarketingPasswordRoutes(passwords, auth));
   }
   if (marketingEvents) {
     app.use("/marketing", createMarketingEventsRoutes(marketingEvents, auth));

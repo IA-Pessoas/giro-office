@@ -7391,6 +7391,14 @@ const handlers = {
   // Error-path handlers: 401 Unauthorized (invalid token → gateway rejects)
   // -------------------------------------------------------------------------
 
+  async marketingPasswordUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+    });
+  },
+
   async userListUnauthorized(op) {
     await httpRequest(op, {
       expectedStatus: [401],

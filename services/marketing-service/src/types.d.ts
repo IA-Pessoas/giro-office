@@ -5,6 +5,7 @@ declare global {
       organization_id: string;
       permission?: number;
       user_type?: "owner" | "admin" | "user";
+      modules?: Record<string, number>;
       requestId?: string;
     }
   }

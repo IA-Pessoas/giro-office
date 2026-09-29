@@ -67,8 +67,8 @@ export const APP_ROUTE_MODULE_MAP: Partial<Record<string, ModuleKey>> = {
   "/departamento-pessoal": "pessoal",
   "/tecnologia": "ti",
   "/comercial": "comercial",
-  "/marketing": "marketing",
   "/triagem": "triagem",
+  "/marketing": "marketing",
 };
 
 function isWithinRoute(routePath: string, basePath: string): boolean {

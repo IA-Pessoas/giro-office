@@ -3,6 +3,7 @@ import {
   error as logError,
   normalizeModulePermission,
   parseWithZod,
+  requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
@@ -15,6 +16,7 @@ import {
   clientIdParamsSchema,
   createClientBodySchema,
   listClientsQuerySchema,
+  listInstagramProfilesQuerySchema,
   updateClientBodySchema,
 } from "../schemas/client.schemas.js";
 import { hasClientListModuleAccess } from "../utils/moduleAuthorization.js";
@@ -46,6 +48,32 @@ function getClientListAuthorization(request: Request) {
 export function createClientCoreRouter(deps: ClientRouterDeps): Router {
   const { clientService } = deps;
   const router: ReturnType<typeof Router> = Router();
+
+  router.get(
+    "/instagram-profiles/report",
+    isAuthenticated,
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(listInstagramProfilesQuerySchema, request.query);
+        const organizationId = resolveOrganizationId(request, undefined);
+        requireIntegracaoRouteAccess("GET", "/client/list", {
+          ...getIntegrationAuthorization(request),
+          organizationId,
+          resourceOrganizationId: organizationId,
+        });
+        const report = await clientService.listInstagramProfiles(organizationId, {
+          page: query.page,
+          pageSize: query.limit,
+          profile: query.profile,
+          search: query.search,
+        });
+        response.json(createSuccessResponse(report));
+      } catch (err) {
+        logError("Erro ao consultar relatório de perfis Instagram", { err });
+        next(err);
+      }
+    },
+  );
 
   router.get(
     "/list",

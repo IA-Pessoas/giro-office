@@ -375,6 +375,43 @@ describe("activityCatalog", () => {
     expect(describeActivity(method, path)).toEqual({ action, item });
   });
 
+  it.each([
+    ["GET", "/client/instagram-profiles/report", "consultou", "o relatório de perfis do Instagram"],
+    ["GET", "/marketing/dashboard", "consultou", "o dashboard do Marketing"],
+    [
+      "GET",
+      "/marketing/ai-usage-controls/users",
+      "consultou",
+      "os usuários elegíveis para a pesquisa de IA",
+    ],
+    [
+      "POST",
+      "/marketing/ai-usage-controls/batch",
+      "criou",
+      "pesquisas mensais de uso de IA em lote",
+    ],
+    [
+      "POST",
+      "/marketing/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/reveal",
+      "revelou",
+      "uma credencial de Marketing",
+    ],
+    [
+      "GET",
+      "/marketing/events/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/editions/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/report",
+      "consultou",
+      "o relatório de uma edição de evento",
+    ],
+    [
+      "POST",
+      "/marketing/events/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/editions/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/feedback",
+      "registrou",
+      "uma avaliação de edição de evento",
+    ],
+  ])("classifica atividade %s %s", (method, path, action, item) => {
+    expect(describeActivity(method, path)).toEqual({ action, item });
+  });
+
   it("classifica POST /task/project-wizard como criação visível de Projeto com Tarefas", () => {
     expect(classifyActivity("POST", "/task/project-wizard")).toEqual({
       kind: "visible",

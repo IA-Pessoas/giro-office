@@ -1,6 +1,7 @@
 # marketing-service
 
-Serviço do dashboard inicial e gestão de eventos de Marketing por organização.
+Serviço de Marketing para dashboard, pesquisas de uso de IA, credenciais criptografadas, eventos e
+edições, com dados isolados por organização.
 
 ## Porta local
 
@@ -10,10 +11,16 @@ Serviço do dashboard inicial e gestão de eventos de Marketing por organizaçã
 
 - `DATABASE_URL` e `JWT_SECRET` para consultas e autenticação.
 - `MARKETING_SERVICE_INTERNAL_TOKEN` para autenticação encaminhada pelo gateway.
+- `MTK_ENCRYPTION_KEY` para compatibilidade criptográfica com as credenciais legadas do Office
+  (chave base64 de 32 bytes; usar a mesma chave configurada no serviço legado).
 - `SERVICE_ALLOWED_ORIGINS` e `ENABLE_API_DOCS` para CORS e documentação.
 
 ## Gateway
 
+O gateway encaminha `/marketing` para este serviço. As credenciais usam `GET /passwords/list` e
+`GET /passwords/:id` para metadados sem segredo. Criar, editar, importar, revelar, exportar e
+consultar a quarentena exigem permissão de edição; revelar e exportar também exigem confirmação
+explícita. Segredos e payloads de quarentena usam o formato Office e nunca são incluídos em logs.
 O gateway expõe o prefixo público `/marketing`. Exemplos: `GET /marketing/dashboard`,
 `GET /marketing/events/list`, `POST /marketing/events`, `PUT /marketing/events/{id}`,
 `GET /marketing/events/{eventId}/editions`, `POST /marketing/events/{eventId}/editions` e
@@ -26,7 +33,8 @@ guardam data, local, itens de orçamento, planejamento estruturado e período op
 As rotas exigem autenticação e permissão do módulo Marketing. Criação e edição de eventos e edições,
 assim como registro de avaliação, requerem nível de edição; leitura do relatório requer acesso de
 leitura ao módulo. Eventos e edições são limitados à organização do contexto autenticado. Na criação,
-o status inicial do evento é `Novo`; ele pode ser alterado na edição.
+o status inicial do evento é `Novo`; ele pode ser alterado na edição. Todas as consultas e gravações
+usam a organização do contexto autenticado.
 
 ## Desenvolvimento
 

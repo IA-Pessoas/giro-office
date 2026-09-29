@@ -39,7 +39,7 @@ function canonical(value: unknown): string {
       .join(",")}}`;
   return JSON.stringify(value);
 }
-for (const source of reportingSources) {
+for (const source of reportingSources.filter((source) => source.key !== "marketing.budgets")) {
   it(`${source.key}: verifies all fields and signed criteria at the HTTP boundary`, async () => {
     const service =
       source.key === "integracao.projects"

@@ -12,10 +12,26 @@ interface BirthdayAggregate {
 const EMPTY_BIRTHDAYS: BirthdayAggregate = { total: 0, items: [] };
 const CLOSED_REQUEST_STATUSES = ["Resolved", "Closed"] as const;
 
+export function getCurrentMarketingCompetence(now: Date, timeZone: string): Date {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  return new Date(Date.UTC(year, month - 1, 1));
+}
+
 export class MarketingDashboardService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async getDashboard(organizationId: string): Promise<MarketingDashboardResponse> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { timezone: true },
+    });
+    const competence = getCurrentMarketingCompetence(new Date(), organization?.timezone ?? "UTC");
     const [
       rhActive,
       tiActive,
@@ -26,6 +42,7 @@ export class MarketingDashboardService {
       clientBirthdays,
       employeeBirthdays,
       companyAnniversaries,
+      pendingKnowledge,
     ] = await this.prisma.$transaction([
       this.prisma.rhRequest.count({
         where: {
@@ -75,18 +92,13 @@ export class MarketingDashboardService {
             AND person.status = 'Ativo'
             AND EXTRACT(MONTH FROM person.date_of_birth) = calendar.month
             AND EXTRACT(DAY FROM person.date_of_birth) >= calendar.day
-        ), ranked AS (
-          SELECT id, name, day, COUNT(*) OVER()::int AS total,
-            ROW_NUMBER() OVER (ORDER BY day, name, id) AS position
-          FROM matches
         )
-        SELECT COALESCE(MAX(total), 0)::int AS total,
+        SELECT COUNT(*)::int AS total,
           COALESCE(
-            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id)
-              FILTER (WHERE position <= 8),
+            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id),
             '[]'::jsonb
           ) AS items
-        FROM ranked
+        FROM matches
       `,
       this.prisma.$queryRaw<BirthdayAggregate[]>`
         WITH calendar AS (
@@ -116,18 +128,13 @@ export class MarketingDashboardService {
             AND employee.birth_date IS NOT NULL
             AND EXTRACT(MONTH FROM employee.birth_date) = calendar.month
             AND EXTRACT(DAY FROM employee.birth_date) >= calendar.day
-        ), ranked AS (
-          SELECT id, name, day, COUNT(*) OVER()::int AS total,
-            ROW_NUMBER() OVER (ORDER BY day, name, id) AS position
-          FROM matches
         )
-        SELECT COALESCE(MAX(total), 0)::int AS total,
+        SELECT COUNT(*)::int AS total,
           COALESCE(
-            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id)
-              FILTER (WHERE position <= 8),
+            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id),
             '[]'::jsonb
           ) AS items
-        FROM ranked
+        FROM matches
       `,
       this.prisma.$queryRaw<BirthdayAggregate[]>`
         WITH calendar AS (
@@ -148,19 +155,17 @@ export class MarketingDashboardService {
             AND company.opening_date IS NOT NULL
             AND EXTRACT(MONTH FROM company.opening_date) = calendar.month
             AND EXTRACT(DAY FROM company.opening_date) >= calendar.day
-        ), ranked AS (
-          SELECT id, name, day, COUNT(*) OVER()::int AS total,
-            ROW_NUMBER() OVER (ORDER BY day, name, id) AS position
-          FROM matches
         )
-        SELECT COALESCE(MAX(total), 0)::int AS total,
+        SELECT COUNT(*)::int AS total,
           COALESCE(
-            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id)
-              FILTER (WHERE position <= 8),
+            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id),
             '[]'::jsonb
           ) AS items
-        FROM ranked
+        FROM matches
       `,
+      this.prisma.marketingAiUsageControl.count({
+        where: { organization_id: organizationId, competence, knowledge: null },
+      }),
     ]);
 
     const clientBirthdaySummary = clientBirthdays[0] ?? EMPTY_BIRTHDAYS;
@@ -180,6 +185,13 @@ export class MarketingDashboardService {
         label: "Solicitações urgentes em aberto",
       });
     }
+    if (pendingKnowledge > 0) {
+      alerts.push({
+        code: "pending-ai-knowledge",
+        count: pendingKnowledge,
+        label: "Conhecimento de IA pendente",
+      });
+    }
 
     return marketingDashboardResponseSchema.parse({
       requests: {
@@ -191,6 +203,10 @@ export class MarketingDashboardService {
         clients: clientBirthdaySummary,
         employees: employeeBirthdaySummary,
         companies: companyAnniversarySummary,
+      },
+      aiUsage: {
+        competence: `${competence.getUTCFullYear()}-${String(competence.getUTCMonth() + 1).padStart(2, "0")}`,
+        pendingKnowledge,
       },
       alerts,
     });

@@ -187,6 +187,9 @@ model Organization {
   taskPostponements             TaskPostponement[]
   logs                          Logs[]
   passwordsMkt                  PasswordMkt[]
+  marketingAiUsageControls      MarketingAiUsageControl[]
+  marketingAiUsageImportReconciliations MarketingAiUsageImportReconciliation[]
+  marketingPasswordImportReconciliations MarketingPasswordImportReconciliation[]
   marketingEvents               MarketingEvent[]
   notes                         Note[]
   certificateNotifications      CertificateNotification[]
@@ -370,6 +373,7 @@ model User {
   permissionsSpecifics        PermissionSpecific?
   obrigationsPessoal          ObrigationsPessoal[]
   passPessoal                 PasswordPessoal[]
+  marketingAiUsageControls    MarketingAiUsageControl[]
   pessoalGroupMigrationMappings PessoalGroupMigrationMapping[] @relation("PessoalGroupMigrationMappedBy")
   payroll                     Payroll[]
   completedSituationsPessoal  SituationsPessoal[]    @relation("completed_by")
@@ -1761,6 +1765,56 @@ model PasswordMkt {
   @@map("mtk.passwords")
 }
 
+model MarketingAiUsageControl {
+  id              String       @id @default(uuid())
+  organization_id String
+  user_id         String
+  competence      DateTime     @db.Date
+  knowledge       Boolean?
+  integration     Boolean?
+  frequency       Int?
+  purpose         String?
+  perceived_gain  String?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, user_id, competence], map: "uq_marketing_ai_usage_controls_org_user_competence")
+  @@index([organization_id, competence], map: "idx_marketing_ai_usage_controls_org_competence")
+  @@index([user_id], map: "idx_marketing_ai_usage_controls_user")
+  @@map("marketing.ai_usage_controls")
+}
+
+model MarketingAiUsageImportReconciliation {
+  id                 String       @id @default(uuid())
+  organization_id    String
+  legacy_user_id     String
+  legacy_competence  String
+  payload            Json
+  reason             String
+  status             String       @default("pending")
+  created_at         DateTime     @default(now())
+  organization       Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, legacy_user_id, legacy_competence], map: "uq_marketing_ai_usage_reconciliation_org_user_competence")
+  @@index([organization_id, status, created_at], map: "idx_marketing_ai_usage_reconciliation_org_status")
+  @@map("marketing.ai_usage_import_reconciliation")
+}
+
+model MarketingPasswordImportReconciliation {
+  id                 String       @id @default(uuid())
+  organization_id    String
+  encrypted_payload  String
+  reason             String
+  status             String       @default("pending")
+  created_at         DateTime     @default(now())
+  organization       Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@index([organization_id, status, created_at], map: "idx_marketing_password_import_reconciliation_org_status")
+  @@map("marketing.password_import_reconciliation")
+}
+
 model MarketingEvent {
   id              String       @id @default(uuid())
   organization_id String
@@ -1832,12 +1886,12 @@ model MarketingEventEditionBudgetItem {
   legacy_id       String?               @db.VarChar(100)
   name            String                @db.VarChar(100)
   amount          Decimal               @db.Decimal(12, 2)
-    position        Int                   @default(0)
+  position        Int                   @default(0)
   edition         MarketingEventEdition @relation(fields: [edition_id, organization_id], references: [id, organization_id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([id, organization_id], map: "mtk.event_edition_budget_items_id_organization_unique")
   @@unique([organization_id, edition_id, legacy_id], map: "mtk.event_edition_budget_items_edition_legacy_unique")
-    @@index([organization_id, edition_id, position], map: "mtk.event_edition_budget_items_edition_idx")
+  @@index([organization_id, edition_id, position], map: "mtk.event_edition_budget_items_edition_idx")
   @@map("mtk.event_edition_budget_items")
 }
 model Installment {

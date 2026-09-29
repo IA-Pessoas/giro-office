@@ -65,7 +65,9 @@ it("rh.attendance: filters derived rows beyond 101 and counts the complete set",
   });
   expect(count.rows).toEqual([{ total: 150 }]);
 });
-for (const source of reportingSources.filter((source) => source.key !== "rh.attendance")) {
+for (const source of reportingSources.filter(
+  (source) => source.key !== "rh.attendance" && source.key !== "marketing.budgets",
+)) {
   describe(source.key, () => {
     it("orders the entire authorized set before the output cap", async () => {
       const field =

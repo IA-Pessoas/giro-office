@@ -65,10 +65,17 @@ function emptyListPage(): ClientListPage {
 
 function mockServiceBase(): Pick<
   IClientService,
-  "listByOrganization" | "getById" | "create" | "update" | "deactivate" | "activate"
+  | "listByOrganization"
+  | "listInstagramProfiles"
+  | "getById"
+  | "create"
+  | "update"
+  | "deactivate"
+  | "activate"
 > {
   return {
     listByOrganization: vi.fn(),
+    listInstagramProfiles: vi.fn(),
     getById: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -311,6 +318,63 @@ describe("client-service", () => {
       },
       { userId: "user-test-1", level: 1, isOwner: false },
     );
+  });
+
+  it("GET /client/instagram-profiles/report uses organization context and Office read permission", async () => {
+    const report = {
+      items: [{ id: TEST_CLIENT_ID, name: "Cliente A", status: "Ativo", instagram: "@cliente" }],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      hasMore: false,
+    };
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      listInstagramProfiles: vi.fn().mockResolvedValue(report),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID, 0, 1);
+
+    const response = await request(app)
+      .get("/client/instagram-profiles/report")
+      .query({ profile: "with", page: "1", limit: "10" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(report);
+    expect(mock.listInstagramProfiles).toHaveBeenCalledWith(TEST_ORG_ID, {
+      page: 1,
+      pageSize: 10,
+      profile: "with",
+      search: undefined,
+    });
+  });
+
+  it("GET /client/instagram-profiles/report rejects client-selected organization scope", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const response = await request(app)
+      .get("/client/instagram-profiles/report")
+      .query({ organization_id: "660e8400-e29b-41d4-a716-446655440001" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(400);
+    expect(mock.listInstagramProfiles).not.toHaveBeenCalled();
+  });
+
+  it("GET /client/instagram-profiles/report blocks Office users without integration read access", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID, 3, 0);
+
+    const response = await request(app)
+      .get("/client/instagram-profiles/report")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(403);
+    expect(mock.listInstagramProfiles).not.toHaveBeenCalled();
   });
 
   it("GET /client/integration consulta CNPJ alfanumérico pelo provider injetado", async () => {

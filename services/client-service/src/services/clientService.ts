@@ -4,7 +4,7 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
-import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 import {
   type ClientListStatus,
   type CreateClientBody,
@@ -51,6 +51,28 @@ export type ClientListPage = {
   page: number;
   pageSize: number;
   hasMore: boolean;
+};
+
+export type ClientInstagramProfile = {
+  id: string;
+  name: string;
+  status: string;
+  instagram: string | null;
+};
+
+export type ClientInstagramProfilePage = {
+  items: ClientInstagramProfile[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
+export type ListInstagramProfilesFilters = {
+  page: number;
+  pageSize: number;
+  profile: "all" | "with" | "without";
+  search?: string;
 };
 
 type ClientAuthorization = IntegracaoServiceAuthorization & {
@@ -274,6 +296,10 @@ export interface IClientService {
     filters: ListClientsFilters,
     authorization?: ClientAuthorization,
   ): Promise<ClientListPage>;
+  listInstagramProfiles(
+    organizationId: string,
+    filters: ListInstagramProfilesFilters,
+  ): Promise<ClientInstagramProfilePage>;
   getById(
     id: string,
     organizationId: string,
@@ -365,6 +391,52 @@ export class ClientService implements IClientService {
       page: filters.page,
       pageSize: filters.pageSize,
       hasMore,
+    };
+  }
+
+  async listInstagramProfiles(
+    organizationId: string,
+    filters: ListInstagramProfilesFilters,
+  ): Promise<ClientInstagramProfilePage> {
+    const search = filters.search?.trim();
+    const profileCondition =
+      filters.profile === "with"
+        ? Prisma.sql`AND c.instagram ~ '[^[:space:]]'`
+        : filters.profile === "without"
+          ? Prisma.sql`AND (c.instagram IS NULL OR c.instagram ~ '^[[:space:]]*$')`
+          : Prisma.empty;
+    const searchCondition = search
+      ? Prisma.sql`AND (
+          c.name ILIKE ${`%${search}%`}
+          OR c.company_name ILIKE ${`%${search}%`}
+          OR c.fantasy_name ILIKE ${`%${search}%`}
+        )`
+      : Prisma.empty;
+    const where = Prisma.sql`WHERE c.organization_id = ${organizationId} ${profileCondition} ${searchCondition}`;
+    const skip = (filters.page - 1) * filters.pageSize;
+    const [rows, totals] = await Promise.all([
+      this.prisma.$queryRaw<ClientInstagramProfile[]>(Prisma.sql`
+        SELECT c.id, c.name, c.status, c.instagram
+        FROM clients c
+        ${where}
+        ORDER BY c.name ASC, c.id ASC
+        LIMIT ${filters.pageSize}
+        OFFSET ${skip}
+      `),
+      this.prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS total
+        FROM clients c
+        ${where}
+      `),
+    ]);
+    const total = Number(totals[0]?.total ?? 0);
+
+    return {
+      items: rows,
+      total,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      hasMore: filters.page * filters.pageSize < total,
     };
   }
 

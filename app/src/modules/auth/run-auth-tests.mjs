@@ -556,6 +556,28 @@ await (async () => {
     },
   );
 
+  await runTest("disabled modules are blocked even for global admins", () => {
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), []);
+
+    for (const moduleKey of DISABLED_MODULE_KEYS) {
+      assert.equal(isModuleDisabled(moduleKey), true);
+      assert.deepEqual(
+        resolveModuleAccess({
+          module: moduleKey,
+          isGlobalAdmin: true,
+          additionalModulePermissions: { [moduleKey]: 2 },
+        }),
+        {
+          level: "none",
+          canView: false,
+          canEdit: false,
+          isAdmin: false,
+          source: "none",
+        },
+      );
+    }
+  });
+
   await runTest("Marketing uses the standard module permission levels", () => {
     assert.equal(isModuleDisabled("marketing"), false);
     assert.equal(APP_ROUTE_MODULE_MAP["/marketing"], "marketing");
@@ -654,6 +676,13 @@ await (async () => {
       assert.match(clientCommercialPageSource, /redirect:.*destination: id \? `\/clients\/\$\{id\}`/);
       assert.equal(clientCommercialPageSource.includes("ClientCommercialForm"), false);
       assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
+      assert.equal(marketingPageSource.includes("MarketingDashboard"), true);
+      assert.equal(marketingPageSource.includes("MarketingAiUsageControls"), true);
+      assert.equal(marketingPageSource.includes("MarketingEvents"), true);
+      assert.equal(marketingPageSource.includes("MarketingInstagramProfiles"), true);
+      assert.equal(marketingPageSource.includes("MarketingPasswords"), true);
+      assert.equal(marketingPageSource.includes("MarketingCanonicalQueries"), true);
+      assert.equal(marketingPageSource.includes("notFound: true"), false);
       assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);
       assert.match(marketingPageSource, /MarketingDashboard/);
       assert.doesNotMatch(marketingPageSource, /notFound:\s*true/);

@@ -55,7 +55,7 @@ export function Departments() {
 
   const departmentsQuery = useFetch<DepItem[]>(
     ["departments", status],
-    () => departmentService.list(getStatusFilterValue(status)),
+    () => departmentService.listForAdministration(getStatusFilterValue(status)),
     {
       retry: false,
     },
