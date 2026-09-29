@@ -1,7 +1,12 @@
 import { api } from "@shared/services/apiClient";
 
 import type { MarketingEventEnvelope } from "../types/marketingEvent";
-import type { MarketingEventEdition, MarketingEventEditionPayload } from "../types/marketingEventEdition";
+import type {
+  MarketingEventEdition,
+  MarketingEventEditionFeedback,
+  MarketingEventEditionPayload,
+  MarketingEventEditionReport,
+} from "../types/marketingEventEdition";
 
 function unwrap<T>(envelope: MarketingEventEnvelope<T>): T {
   if (!envelope.success || envelope.data === undefined) {
@@ -28,6 +33,25 @@ export const marketingEventEditionsService = {
   async update(eventId: string, editionId: string, payload: MarketingEventEditionPayload): Promise<MarketingEventEdition> {
     const response = await api.put<MarketingEventEnvelope<MarketingEventEdition>>(
       `/marketing/events/${eventId}/editions/${editionId}`, payload,
+    );
+    return unwrap(response.data);
+  },
+
+  async createFeedback(
+    eventId: string,
+    editionId: string,
+    payload: { rating: number; observation?: string },
+  ): Promise<MarketingEventEditionFeedback> {
+    const response = await api.post<MarketingEventEnvelope<MarketingEventEditionFeedback>>(
+      `/marketing/events/${eventId}/editions/${editionId}/feedback`,
+      payload,
+    );
+    return unwrap(response.data);
+  },
+
+  async getReport(eventId: string, editionId: string): Promise<MarketingEventEditionReport> {
+    const response = await api.get<MarketingEventEnvelope<MarketingEventEditionReport>>(
+      `/marketing/events/${eventId}/editions/${editionId}/report`,
     );
     return unwrap(response.data);
   },

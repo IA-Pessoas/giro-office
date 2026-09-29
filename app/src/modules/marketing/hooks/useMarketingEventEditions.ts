@@ -21,3 +21,27 @@ export function useSaveMarketingEventEdition(eventId: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: marketingEventEditionsQueryKey(eventId) }),
   });
 }
+
+export function useCreateMarketingEventEditionFeedback(eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ editionId, rating, observation }: { editionId: string; rating: number; observation?: string }) =>
+      marketingEventEditionsService.createFeedback(eventId, editionId, { rating, observation }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: marketingEventEditionsQueryKey(eventId) }),
+  });
+}
+
+export function useMarketingEventEditionReport(
+  eventId: string,
+  editionId: string | null,
+  enabled: boolean,
+) {
+  return useFetch(
+    ["marketing", "events", eventId, "editions", editionId, "report"],
+    () => {
+      if (!editionId) throw new Error("Edição não selecionada.");
+      return marketingEventEditionsService.getReport(eventId, editionId);
+    },
+    { enabled: enabled && Boolean(editionId) },
+  );
+}
