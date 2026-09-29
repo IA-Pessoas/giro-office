@@ -61,18 +61,19 @@
 - Modificar: `services/marketing-service/src/app.ts`
 - Modificar: `services/marketing-service/src/openapi/spec.ts`
 - Modificar: `services/marketing-service/src/middlewares/isAuthenticated.ts` somente para aceitar identidade confiável de plataforma já validada pelo gateway.
-- Modificar: `services/gateway/src/security/policies.ts` e testes correspondentes para políticas `platformOnly` das rotas novas.
+- Modificar: `services/gateway/src/security/policies.ts`, `services/gateway/src/config/serviceRegistry.ts`, `services/gateway/src/proxy/httpProxy.ts` e testes correspondentes para encaminhar `/platform/marketing/...` ao `marketing-service`, removendo o prefixo `/platform` antes de chegar ao serviço e aplicando política `platformOnly`.
 - Modificar: `scripts/all-services-smoke.manifest.mjs` e testes do gateway/smoke para cobrir contratos públicos.
+- Modificar: `app/src/modules/superAdmin/services/platformService.ts` para chamar as rotas com `platformApi`.
 
 **Interfaces:**
-- `GET /marketing/migration-reconciliation?organizationId=...` retorna estado, totais e pendências sanitizadas.
-- `POST /marketing/migration-reconciliation/:dataset/:sourceId/resolve` recebe apenas `organizationId` e `canonicalTargetId`; ator vem dos cabeçalhos confiáveis verificados e CSRF da sessão.
-- `POST /marketing/migration-reconciliation/:dataset/reconcile` recebe `organizationId`, reaplica decisões registradas e grava novo resumo.
+- `GET /platform/marketing/migration-reconciliation?organizationId=...` retorna estado, totais e pendências sanitizadas; o gateway encaminha para `/marketing/migration-reconciliation` no serviço.
+- `POST /platform/marketing/migration-reconciliation/:dataset/:sourceId/resolve` recebe apenas `organizationId` e `canonicalTargetId`; ator vem dos cabeçalhos confiáveis verificados e CSRF da sessão.
+- `POST /platform/marketing/migration-reconciliation/:dataset/reconcile` recebe `organizationId`, reaplica decisões registradas e grava novo resumo.
 - Todas as rotas são independentes da permissão normal do módulo Marketing para que continuem acessíveis com o gate fechado.
 
 - [ ] **Passo 1: Escrever testes falhos** de sessão/CSRF ausentes, identidade interna ausente, leitura autorizada, mutação protegida, tenant divergente, destino inválido e respostas sem segredos.
 - [ ] **Passo 2: Rodar os testes de rota e gateway focados** e confirmar rejeições por rota/política ausentes.
-- [ ] **Passo 3: Implementar schemas, rotas, política gateway, OpenAPI e manifesto smoke**, delegando validação e persistência à Tarefa 1.
+- [ ] **Passo 3: Implementar schemas, rotas, política, registro de upstream, encaminhamento de sessão/CSRF, OpenAPI e manifesto smoke**, delegando validação e persistência à Tarefa 1.
 - [ ] **Passo 4: Rodar testes de rota/gateway e `pnpm smoke:coverage`**, confirmando autorização, CSRF, isolamento e cobertura good/bad dos contratos.
 - [ ] **Passo 5: Commitar** schemas, rotas, políticas, OpenAPI, smoke e testes.
 
