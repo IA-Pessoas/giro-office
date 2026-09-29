@@ -59,7 +59,7 @@
 - [x] **Passo 3: Implementar a saída sanitizada por item e o adaptador de decisão V4** limitado às seis origens `tb_mkt` aprovadas; preservar execução read-only e não emitir conteúdo de senha, payload ou linha de origem.
 - [x] **Passo 4: Escrever e rodar testes falhos do serviço** para estado `not_run`, totais por conjunto, isolamento por organização, importados consultados no destino, decisão com ator/data, destino inválido e repetição idempotente.
 - [x] **Passo 5: Implementar modelos Prisma e serviço** para persistir resumos e decisões, alimentar o relatório do dry-run com decisões registradas e gravar novo resumo sem atualizar a fonte legada; testar dry-run e serviço focados.
-- [ ] **Passo 6: Commitar** modelos, migração, adaptador, serviço e testes.
+- [x] **Passo 6: Commitar** modelos, migração, adaptador, serviço e testes. Commit de checkpoint: `0cb47a5e`.
 
 ### Tarefa 2: Proteger e publicar os contratos de reconciliação
 
@@ -84,7 +84,7 @@
 - [x] **Passo 2: Rodar os testes de rota e gateway focados** e confirmar rejeições por rota/política ausentes.
 - [x] **Passo 3: Implementar schemas, rotas, política, registro de upstream, encaminhamento de sessão/CSRF, OpenAPI e manifesto smoke**, delegando validação e persistência à Tarefa 1.
 - [x] **Passo 4: Rodar testes de rota/gateway e `pnpm smoke:coverage`**, confirmando autorização, CSRF, isolamento e cobertura good/bad dos contratos.
-- [ ] **Passo 5: Commitar** schemas, rotas, políticas, OpenAPI, smoke e testes.
+- [x] **Passo 5: Commitar** schemas, rotas, políticas, OpenAPI, smoke e testes. Commit de checkpoint: `0cb47a5e`.
 
 ### Tarefa 3: Operar reconciliação no Super Admin
 
@@ -104,7 +104,7 @@
 - [x] **Passo 2: Rodar `pnpm --filter @workspace/app test:super-admin`** e confirmar as falhas específicas do fluxo novo.
 - [x] **Passo 3: Implementar cliente de API e aba** seguindo os componentes e estilos atuais do Super Admin.
 - [x] **Passo 4: Rodar testes e smoke real com Playwright**, validar leitura, resolução, atualização, dados sanitizados e acesso enquanto Marketing está bloqueado; salvar screenshots em `output/playwright/`.
-- [ ] **Passo 5: Commitar** componente, cliente e evidências relevantes.
+- [x] **Passo 5: Commitar** componente, cliente e evidências relevantes. Commit de checkpoint: `0cb47a5e`.
 
 ### Tarefa 4: Validar inventário e aplicar o gate final de Marketing
 
@@ -118,7 +118,7 @@
 - [x] **Passo 2: Rodar testes de inventário/auth** e registrar a lista objetiva de critérios aprovados e pendentes.
 - [x] **Passo 3: Aplicar a decisão do gate**: remover Marketing de `DISABLED_MODULE_KEYS` somente se todos os critérios integrados da especificação passarem; se algum falhar, manter Marketing desabilitado e registrar o bloqueio sem declarar a issue concluída.
 - [x] **Passo 4: Validar testes Marketing, auth, Super Admin e contratos; executar lint, typecheck, build e smoke escopados**, além dos testes V4 relevantes, sem executar importação de produção.
-- [ ] **Passo 5: Fazer revisão de segurança e simplificação**, corrigir problemas encontrados, atualizar evidências do PR e commitar o gate e testes.
+- [x] **Passo 5: Fazer revisão de segurança e simplificação**, corrigir problemas encontrados, atualizar evidências do PR e commitar o gate e testes. Commit de checkpoint: `0cb47a5e`; Marketing permanece bloqueado.
 
 ## Revisão de cobertura da especificação
 
