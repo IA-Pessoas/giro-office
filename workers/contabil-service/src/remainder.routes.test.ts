@@ -118,6 +118,7 @@ function services() {
       archive: vi.fn(async () => ({ id: ID, archived_at: "2026-09-22" })),
     },
     triageDocumentsService: {
+      listFiscalPortfolio: vi.fn(async () => ({ competence: "2026-09", items: [] })),
       getEditability: vi.fn(async () => ({ can_edit: true })),
       getMonthly: vi.fn(async () => ({ id: ID })),
       getOrCreateMonthly: vi.fn(async () => ({ id: ID })),
@@ -199,9 +200,24 @@ describe("contabil Worker remainder routes", () => {
     const invalid = await app.request("https://contabil.test/triagem/statements", {
       headers: headers("2"),
     });
+    const portfolio = await app.request(
+      "https://contabil.test/triagem/fiscal-portfolio?competence=2026-09",
+      { headers: headers("2") },
+    );
+    const invalidPortfolio = await app.request(
+      "https://contabil.test/triagem/fiscal-portfolio?competence=2026-13",
+      { headers: headers("2") },
+    );
 
     expect(monthly.status).toBe(200);
     expect(invalid.status).toBe(400);
+    expect(portfolio.status).toBe(200);
+    expect(invalidPortfolio.status).toBe(400);
+    expect(deps.triageDocumentsService.listFiscalPortfolio).toHaveBeenCalledOnce();
+    expect(deps.triageDocumentsService.listFiscalPortfolio).toHaveBeenCalledWith(
+      "2026-09",
+      expect.objectContaining({ organizationId: ORG }),
+    );
     expect(deps.triageDocumentsService.getMonthly).toHaveBeenCalledWith(
       expect.objectContaining({ client_id: CLIENT, competence: "2026-09" }),
       expect.objectContaining({ organizationId: ORG }),

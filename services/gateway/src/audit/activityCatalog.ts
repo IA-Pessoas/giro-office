@@ -54,6 +54,74 @@ const TECHNICAL_RULES = [
 
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
+    methods: ["GET"],
+    pattern: /^\/client\/instagram-profiles\/report$/,
+    description: { action: "consultou", item: "o relatório de perfis do Instagram" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/dashboard$/,
+    description: { action: "consultou", item: "o dashboard do Marketing" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/ai-usage-controls\/users$/,
+    description: { action: "consultou", item: "os usuários elegíveis para a pesquisa de IA" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/ai-usage-controls\/batch$/,
+    description: { action: "criou", item: "pesquisas mensais de uso de IA em lote" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/ai-usage-controls\/report$/,
+    description: { action: "consultou", item: "o relatório de pesquisas de uso de IA" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/ai-usage-controls\/import$/,
+    description: { action: "importou", item: "registros legados de uso de IA" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/ai-usage-controls\/reconciliation$/,
+    description: { action: "consultou", item: "a fila de reconciliação de pesquisas de IA" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/passwords\/[^/]+\/reveal$/,
+    description: { action: "revelou", item: "uma credencial de Marketing" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/passwords\/[^/]+\/export$/,
+    description: { action: "exportou", item: "uma credencial de Marketing" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/passwords\/import$/,
+    description: { action: "importou", item: "credenciais legadas de Marketing" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/passwords\/import\/reconciliation$/,
+    description: {
+      action: "consultou",
+      item: "a fila de reconciliação de credenciais de Marketing",
+    },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/events\/[^/]+\/editions\/[^/]+\/report$/,
+    description: { action: "consultou", item: "o relatório de uma edição de evento" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/events\/[^/]+\/editions\/[^/]+\/feedback$/,
+    description: { action: "registrou", item: "uma avaliação de edição de evento" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/task\/project-wizard$/,
     description: { action: "criou", item: "um projeto com tarefas" },
@@ -240,6 +308,26 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/fiscal\/rates\/[^/]+\/pdf$/,
     description: { action: "baixou", item: "um PDF de alíquota fiscal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/simples\/preview$/,
+    description: { action: "consultou", item: "a prévia de alíquotas do Simples" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/simples\/pdf$/,
+    description: { action: "baixou", item: "um PDF de alíquota do Simples" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/simples\/csv$/,
+    description: { action: "exportou", item: "um CSV de alíquotas do Simples em lote" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/simples\/zip$/,
+    description: { action: "exportou", item: "os PDFs de alíquotas do Simples em lote" },
   },
   {
     methods: ["GET"],
@@ -926,6 +1014,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/triagem\/fiscal-portfolio\/?$/,
+    description: { action: "consultou", item: "a carteira fiscal mensal da Triagem" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/triagem\/external-links\/?$/,
     description: { action: "consultou", item: "os links externos da Triagem" },
   },
@@ -1065,6 +1158,30 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 ];
 
 const RESOURCE_RULES: ResourceRule[] = [
+  {
+    pattern: /^\/marketing\/events\/[^/]+\/editions(?:\/|$)/,
+    singular: "uma edição de evento",
+    newSingular: "uma nova edição de evento",
+    plural: "edições de evento",
+  },
+  {
+    pattern: /^\/marketing\/events(?:\/|$)/,
+    singular: "um evento de Marketing",
+    newSingular: "um novo evento de Marketing",
+    plural: "eventos de Marketing",
+  },
+  {
+    pattern: /^\/marketing\/ai-usage-controls(?:\/|$)/,
+    singular: "uma pesquisa mensal de uso de IA",
+    newSingular: "uma nova pesquisa mensal de uso de IA",
+    plural: "pesquisas mensais de uso de IA",
+  },
+  {
+    pattern: /^\/marketing\/passwords(?:\/|$)/,
+    singular: "uma credencial de Marketing",
+    newSingular: "uma nova credencial de Marketing",
+    plural: "credenciais de Marketing",
+  },
   {
     pattern: /^\/pessoal\/groups(?:\/|$)/,
     singular: "um grupo de pessoal",
@@ -1226,6 +1343,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um registro de alíquota fiscal",
     newSingular: "um novo registro de alíquota fiscal",
     plural: "registros de alíquotas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/revenues(?:\/|$)/,
+    singular: "uma receita mensal",
+    newSingular: "uma nova receita mensal",
+    plural: "receitas mensais",
   },
   {
     pattern: /^\/contabil\/controls(?:\/|$)/,

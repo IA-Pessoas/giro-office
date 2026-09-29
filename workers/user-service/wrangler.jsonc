@@ -6,15 +6,19 @@
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat"],
   "services": [{ "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }],
-  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "da08299aa9604daaa985fc2ba12fce04" }],
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
   // O app so e servido por HTTPS: cw.session e cw.csrf precisam da flag Secure.
   // APP_PUBLIC_URL monta o link de redefinição de senha. O envio usa os secrets
   // USER_EMAIL_ADAPTER_URL, USER_EMAIL_ADAPTER_TOKEN e USER_EMAIL_FROM (#1342).
   "vars": {
     "AUTH_COOKIE_SECURE": true,
-    "APP_PUBLIC_URL": "https://giro-app.eed-jrr.workers.dev"
+    "APP_PUBLIC_URL": "https://useoffice.com.br"
   },
   // Encerra e audita personificações vencidas a cada minuto (#1529).
   "triggers": { "crons": ["* * * * *"] },
-  "observability": { "enabled": true }
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": true }
+  }
 }

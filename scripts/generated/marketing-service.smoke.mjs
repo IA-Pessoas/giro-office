@@ -8,16 +8,6 @@ export const operations = [
   {
     service: "marketing-service",
     method: "GET",
-    path: "/marketing/dashboard",
-    action: "marketingDashboard",
-    target: "gateway",
-    auth: "bearer",
-    expectedStatus: [200],
-    expectedLabel: "Marketing dashboard available with permission",
-  },
-  {
-    service: "marketing-service",
-    method: "GET",
     path: "/marketing/ai-usage-controls/users",
     action: "marketingAiUsageEligibleUsers",
     target: "gateway",

@@ -460,7 +460,11 @@ const upstream = createServer(async (request, response) => {
       if (forceUserVersionConflict) {
         forceUserVersionConflict = false;
         managedUser.version += 1;
-        return reply(response, 409, "Conflito de edição.");
+        return reply(
+          response,
+          409,
+          "Usuário foi alterado por outra edição. Recarregue e tente novamente.",
+        );
       }
       const previousName = managedUser.name;
       const previousLogin = managedUser.login;
@@ -488,7 +492,8 @@ const upstream = createServer(async (request, response) => {
     if (request.method === "POST" && userMatch[3] === "password-reset") {
       assert.equal(request.headers["x-csrf-token"], csrf);
       assert.equal(request.headers.authorization, undefined);
-      return reply(response, 200, { sent: true });
+      assert.deepEqual(body, { password: "senha-definida-pelo-ti" });
+      return reply(response, 200, { reset: true });
     }
     if (request.method === "POST" && userMatch[3] === "reactivate") {
       assert.equal(request.headers["x-csrf-token"], csrf);
@@ -993,24 +998,23 @@ try {
     forceUserVersionConflict = true;
     await userDetails.getByRole("button", { name: "Salvar alterações", exact: true }).click();
     await userDetails
-      .getByText(
-        "Este usuário foi alterado por outra pessoa. Recarregue o estado atual antes de salvar.",
-      )
+      .getByText("Usuário foi alterado por outra edição. Recarregue e tente novamente.")
       .waitFor();
     await userDetails.getByRole("button", { name: "Recarregar", exact: true }).click();
     await page.getByRole("button", { name: "Editar dados", exact: true }).waitFor();
     await page.getByRole("button", { name: "Editar dados", exact: true }).click();
     await userDetails.getByLabel("Nome", { exact: true }).fill("Usuário homologado editado");
     assert.equal(await userDetails.getByLabel("Nova senha", { exact: true }).count(), 0);
-    await userDetails
-      .getByRole("button", { name: "Enviar link de redefinição de senha", exact: true })
-      .click();
-    const resetDialog = page.getByRole("dialog", {
-      name: "Enviar link de redefinição de senha",
-      exact: true,
-    });
-    await resetDialog.getByRole("button", { name: "Enviar link", exact: true }).click();
-    await page.getByText("Link de redefinição enviado por e-mail.", { exact: true }).waitFor();
+    await userDetails.getByRole("button", { name: "Redefinir senha", exact: true }).click();
+    const resetDialog = page.getByRole("dialog", { name: "Redefinir senha", exact: true });
+    await resetDialog.getByLabel("Nova senha", { exact: true }).fill("senha-definida-pelo-ti");
+    await resetDialog
+      .getByLabel("Confirmar nova senha", { exact: true })
+      .fill("senha-definida-pelo-ti");
+    await resetDialog.getByRole("button", { name: "Redefinir senha", exact: true }).click();
+    await page
+      .getByText("Senha redefinida. O usuário foi desconectado.", { exact: true })
+      .waitFor();
     assert.ok(
       requests.some(
         (request) =>

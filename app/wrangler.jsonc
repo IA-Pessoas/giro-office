@@ -3,6 +3,10 @@
   "name": "giro-app",
   // worker.ts manda /api/* para o gateway e o resto para o worker gerado pelo OpenNext.
   "main": "worker.ts",
+  // Só o domínio próprio: o workers.dev da conta leva o nome de outro cliente.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "useoffice.com.br", "custom_domain": true }],
   "compatibility_date": "2026-09-22",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -12,5 +16,9 @@
   // Mesma origem do app, como o rewrite de /api/* em next.config.mjs: cw.session e cw.csrf
   // sao host-only e SameSite=Lax, e o CSP e connect-src 'self'.
   "services": [{ "binding": "GATEWAY", "service": "giro-gateway" }],
-  "observability": { "enabled": true }
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": true }
+  }
 }

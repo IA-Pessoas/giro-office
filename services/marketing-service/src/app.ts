@@ -25,11 +25,21 @@ import {
   type MarketingDashboardProvider,
 } from "./routes/marketingDashboard.routes.js";
 import {
+  createMarketingEventEditionsRoutes,
+  type MarketingEventEditionsProvider,
+} from "./routes/marketingEventEditions.routes.js";
+import {
+  createMarketingEventsRoutes,
+  type MarketingEventsProvider,
+} from "./routes/marketingEvents.routes.js";
+import {
   createMarketingPasswordRoutes,
   type MarketingPasswordProvider,
 } from "./routes/marketingPassword.routes.js";
 import { MarketingAiUsageControlService } from "./services/marketingAiUsageControlService.js";
 import { MarketingDashboardService } from "./services/marketingDashboardService.js";
+import { MarketingEventEditionsService } from "./services/marketingEventEditionsService.js";
+import { MarketingEventsService } from "./services/marketingEventsService.js";
 import { MarketingPasswordService } from "./services/marketingPasswordService.js";
 
 interface CreateMarketingAppOptions {
@@ -38,6 +48,8 @@ interface CreateMarketingAppOptions {
   dashboardService?: MarketingDashboardProvider;
   controlService?: MarketingAiUsageControlProvider;
   passwordService?: MarketingPasswordProvider;
+  eventsService?: MarketingEventsProvider;
+  editionsService?: MarketingEventEditionsProvider;
   prisma?: PrismaClient;
 }
 
@@ -57,6 +69,8 @@ export function createMarketingApp({
   dashboardService,
   controlService,
   passwordService,
+  eventsService,
+  editionsService,
   prisma,
 }: CreateMarketingAppOptions): Express {
   const app = express();
@@ -68,6 +82,9 @@ export function createMarketingApp({
     (prisma
       ? new MarketingPasswordService(prisma, new EncryptionService(env.mtkEncryptionKey))
       : null);
+  const marketingEvents = eventsService ?? (prisma ? new MarketingEventsService(prisma) : null);
+  const marketingEventEditions =
+    editionsService ?? (prisma ? new MarketingEventEditionsService(prisma) : null);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "marketing-service")));
@@ -95,6 +112,12 @@ export function createMarketingApp({
   }
   if (passwords) {
     app.use("/marketing", createMarketingPasswordRoutes(passwords, auth));
+  }
+  if (marketingEvents) {
+    app.use("/marketing", createMarketingEventsRoutes(marketingEvents, auth));
+  }
+  if (marketingEventEditions) {
+    app.use("/marketing", createMarketingEventEditionsRoutes(marketingEventEditions, auth));
   }
 
   app.use(

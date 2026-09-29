@@ -518,9 +518,9 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       "/platform/organizations/{organizationId}/users/{userId}/password-reset": {
         post: {
           tags: ["Platform auth"],
-          summary: "Enviar link de redefinição de senha",
+          summary: "Definir a senha de outro usuário",
           description:
-            "Implementado no Worker. Gera um token de uso único válido por 1 hora, invalida os anteriores e envia o link por e-mail. O administrador nunca vê o token.",
+            "Implementado no Worker. O TI define a nova senha (mínimo de 10 caracteres), sem link por e-mail; todas as sessões do usuário e os links pendentes são revogados.",
           security: platformBrowserSession,
           parameters: [
             {
@@ -537,15 +537,29 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             },
             csrfHeader,
           ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["password"],
+                  additionalProperties: false,
+                  properties: { password: { type: "string", writeOnly: true, minLength: 10 } },
+                },
+              },
+            },
+          },
           responses: {
-            "200": { description: "E-mail com link de uso único enviado", ...successJson },
+            "200": { description: "Senha redefinida", ...successJson },
+            "400": { description: "Senha fora da política" },
             "401": { description: "Sessão ausente" },
-            "403": { description: "Sem permissão sobre o usuário ou CSRF inválido" },
+            "403": {
+              description:
+                "Sem permissão sobre o usuário, alvo é o próprio usuário ou CSRF inválido",
+            },
             "404": { description: "Usuário fora do tenant" },
             "409": { description: "Usuário inativo" },
-            "422": { description: "Usuário sem e-mail cadastrado" },
-            "502": { description: "Falha no envio do e-mail" },
-            "503": { description: "Envio de e-mail não configurado" },
           },
         },
       },
@@ -930,20 +944,34 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
       "/user/{id}/password-reset": {
         post: {
           tags: ["Users"],
-          summary: "Enviar link de redefinição de senha",
+          summary: "Definir a senha de outro usuário",
           description:
-            "Implementado no Worker. Gera um token de uso único válido por 1 hora, invalida os anteriores e envia o link por e-mail. O administrador nunca vê o token.",
+            "Implementado no Worker. O TI define a nova senha (mínimo de 10 caracteres), sem link por e-mail; todas as sessões do usuário e os links pendentes são revogados.",
           security: bearer,
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["password"],
+                  additionalProperties: false,
+                  properties: { password: { type: "string", writeOnly: true, minLength: 10 } },
+                },
+              },
+            },
+          },
           responses: {
-            "200": { description: "E-mail com link de uso único enviado", ...successJson },
+            "200": { description: "Senha redefinida", ...successJson },
+            "400": { description: "Senha fora da política" },
             "401": { description: "Sessão ausente" },
-            "403": { description: "Sem permissão sobre o usuário ou CSRF inválido" },
+            "403": {
+              description:
+                "Sem permissão sobre o usuário, alvo é o próprio usuário ou CSRF inválido",
+            },
             "404": { description: "Usuário fora do tenant" },
             "409": { description: "Usuário inativo" },
-            "422": { description: "Usuário sem e-mail cadastrado" },
-            "502": { description: "Falha no envio do e-mail" },
-            "503": { description: "Envio de e-mail não configurado" },
           },
         },
       },
