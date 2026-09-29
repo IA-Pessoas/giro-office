@@ -302,6 +302,8 @@ describe("gateway Worker: superfície /platform", () => {
     expect(url.pathname).toBe("/audit/requests");
     expect(url.search).toBe("?page=2&method=POST");
     expect(forwarded.headers.get("x-auth-kind")).toBe("platform");
+    // O audit-service valida o INTERNAL_SERVICE_TOKEN dele, que é o AUDIT_SERVICE_TOKEN do gateway.
+    expect(forwarded.headers.get(INTERNAL_SERVICE_TOKEN_HEADER)).toBe("gateway-audit-token");
   });
 
   it("auditoria da plataforma barra organização e sessão personificada", async () => {

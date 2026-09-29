@@ -471,6 +471,10 @@ export function createGatewayWorkerApp(options: GatewayOptions = {}) {
     const forwardedRequest = new Request(upstreamUrl, new Request(c.req.raw, { headers }));
 
     if (route.binding === "AUDIT_SERVICE") {
+      // O INTERNAL_SERVICE_TOKEN do audit-service é o AUDIT_SERVICE_TOKEN do gateway.
+      if (env.AUDIT_SERVICE_TOKEN?.trim()) {
+        forwardedRequest.headers.set(INTERNAL_SERVICE_TOKEN_HEADER, env.AUDIT_SERVICE_TOKEN);
+      }
       return withRequestId(await binding.fetch(forwardedRequest), requestId);
     }
 
