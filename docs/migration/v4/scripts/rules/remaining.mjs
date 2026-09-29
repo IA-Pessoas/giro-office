@@ -397,8 +397,13 @@ export function buildMarketingEventEditionFeedbackContexts({
       feedback: issueResolution({
         state: importPlan.status === "prepared" ? "one" : "unresolved",
         sourceTable,
-        sourceKey: validLegacyId(row?.id) ? normalizeKey(row.id) : normalizeKey(row?.edicao ?? row?.edicao_id),
-        identityRef: importPlan.status === "prepared" ? `${sourceTable}:${normalizeKey(row?.id ?? row?.edicao)}` : null,
+        sourceKey: validLegacyId(row?.id)
+          ? normalizeKey(row.id)
+          : normalizeKey(row?.edicao ?? row?.edicao_id),
+        identityRef:
+          importPlan.status === "prepared"
+            ? `${sourceTable}:${normalizeKey(row?.id ?? row?.edicao)}`
+            : null,
         importPlan,
       }),
     };
@@ -1317,7 +1322,10 @@ function classifyMarketingEventEditionFeedback(row, context, sourceTable) {
   if (bound.status !== "prepared") return bound;
   const resolution = context.resolutions.feedback;
   if (!isAuthenticRemainingResolution(resolution) || resolution.sourceTable !== sourceTable) {
-    return quarantine(sourceTable.endsWith("_periodos") ? "edicao" : "edicao_id", "MKT_EDITION_FEEDBACK_CONTEXT_INVALID");
+    return quarantine(
+      sourceTable.endsWith("_periodos") ? "edicao" : "edicao_id",
+      "MKT_EDITION_FEEDBACK_CONTEXT_INVALID",
+    );
   }
   const plan = resolution.importPlan;
   if (plan?.status !== "prepared") {

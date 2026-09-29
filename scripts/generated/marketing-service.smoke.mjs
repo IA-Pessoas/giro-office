@@ -8,11 +8,11 @@ export const operations = [];
 
 export const routePlaceholders = [
   {
-    "service": "marketing-service",
-    "method": "GET",
-    "path": "/marketing/dashboard",
-    "target": "gateway",
-    "auth": "bearer",
-    "suggestedAction": "marketingServiceGetMarketingDashboard"
-  }
+    service: "marketing-service",
+    method: "GET",
+    path: "/marketing/dashboard",
+    target: "gateway",
+    auth: "bearer",
+    suggestedAction: "marketingServiceGetMarketingDashboard",
+  },
 ];

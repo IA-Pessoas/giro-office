@@ -56,6 +56,7 @@ assert.match(editionReport, /window\.print\(\)/);
 assert.match(editionReport, /budgetItems/);
 assert.match(editionReport, /logistics/);
 assert.match(editionReport, /marketingCommunication/);
+assert.match(editionReport, /Antes do evento · marketing e comunicação/);
 assert.match(editionReport, /duringEvent/);
 assert.match(editionReport, /afterEvent/);
 assert.match(editionReport, /feedback/);

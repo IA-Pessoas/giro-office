@@ -150,7 +150,7 @@ export function MarketingEventEditionReport({
 
       <div className="space-y-6">
         <PlanningSection title="Logística" values={edition.logistics} />
-        <PlanningSection title="Marketing e comunicação" values={edition.marketingCommunication} />
+        <PlanningSection title="Antes do evento · marketing e comunicação" values={edition.marketingCommunication} />
         <PlanningSection title="Durante o evento" values={edition.duringEvent} />
         <PlanningSection title="Após o evento" values={edition.afterEvent} />
       </div>

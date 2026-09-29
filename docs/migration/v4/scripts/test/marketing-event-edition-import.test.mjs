@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-
-import { planMarketingEventEditionImport } from "../rules/marketing-event-editions.mjs";
 import * as editionImports from "../rules/marketing-event-editions.mjs";
+import { planMarketingEventEditionImport } from "../rules/marketing-event-editions.mjs";
 
 function planMarketingEventEditionFeedbackImport(input) {
   assert.equal(
@@ -190,7 +189,11 @@ test("quarantines feedback rows with no edition match", () => {
 test("quarantines feedback rows with ambiguous edition matches", () => {
   const result = planMarketingEventEditionFeedbackImport({
     sourceTable: "tb_mkt.eventos_feedbacks_periodos",
-    feedbackRow: { edicao: 19, inicio: "2026-10-01T09:00:00.000Z", fim: "2026-10-30T18:00:00.000Z" },
+    feedbackRow: {
+      edicao: 19,
+      inicio: "2026-10-01T09:00:00.000Z",
+      fim: "2026-10-30T18:00:00.000Z",
+    },
     editionCandidates: [
       { legacyId: 19, id: "edition-19a", status: "prepared" },
       { legacyId: 19, id: "edition-19b", status: "prepared" },
