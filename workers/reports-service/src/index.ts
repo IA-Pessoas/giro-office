@@ -30,7 +30,7 @@ function positiveInteger(value: string | undefined, fallback: number) {
 }
 
 /** Substitui o processo `worker.ts` do Node, que fazia polling da fila de jobs. */
-async function processReportJobs(env: ReportsWorkerEnv) {
+async function processReportJobs(env: ReportsWorkerEnv, deadlineMs = 50_000) {
   await withWorkerPrisma(env, PrismaClient, async (prisma) => {
     const leaseSeconds = positiveInteger(env.REPORTS_WORKER_LEASE_SECONDS, 120);
     const audit = createAudit(prisma as never, env);
@@ -45,15 +45,39 @@ async function processReportJobs(env: ReportsWorkerEnv) {
     );
     await drainReportJobs(worker, {
       concurrency: positiveInteger(env.REPORTS_WORKER_CONCURRENCY, 2),
-      deadlineMs: 50_000,
+      deadlineMs,
     });
   });
 }
 
+const JOB_PATH = /^\/reports\/jobs(\/[^/]+)?$/;
+let lastRequestDrain = 0;
+
+/**
+ * Os crons desta conta não disparam (2026-09-29): criar o job e o polling do status
+ * também drenam a fila. O lease do job evita processamento em dobro entre isolates.
+ * ponytail: waitUntil dura ~30 s após a resposta; job mais longo que isso fica para
+ * o próximo lease. Remover quando o cron voltar a disparar.
+ */
+function drainOnJobRequest(request: Request, env: ReportsWorkerEnv, context?: ScheduledContext) {
+  const { pathname } = new URL(request.url);
+  if (!context || !JOB_PATH.test(pathname) || pathname.endsWith("/list")) return;
+  if (!env.HYPERDRIVE?.connectionString && !env.DATABASE_URL) return;
+  if (Date.now() - lastRequestDrain < 5_000) return;
+  lastRequestDrain = Date.now();
+  context.waitUntil(
+    processReportJobs(env, 20_000).catch((error) =>
+      console.error("[reports-service] drenagem da fila pela request falhou", error),
+    ),
+  );
+}
+
 export default {
-  fetch(request: Request, env: ReportsWorkerEnv, context?: ScheduledContext) {
+  async fetch(request: Request, env: ReportsWorkerEnv, context?: ScheduledContext) {
     useSourceBindings(env);
-    return app.fetch(request, env, context as never);
+    const response = await app.fetch(request, env, context as never);
+    if (response.ok) drainOnJobRequest(request, env, context);
+    return response;
   },
   scheduled(_event: unknown, env: ReportsWorkerEnv, context: ScheduledContext) {
     if (!env.HYPERDRIVE?.connectionString && !env.DATABASE_URL) {
