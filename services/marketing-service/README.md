@@ -13,6 +13,9 @@ edições, com dados isolados por organização.
 - `MARKETING_SERVICE_INTERNAL_TOKEN` para autenticação encaminhada pelo gateway.
 - `MTK_ENCRYPTION_KEY` para compatibilidade criptográfica com as credenciais legadas do Office
   (chave base64 de 32 bytes; usar a mesma chave configurada no serviço legado).
+- `MIGRATION_SOURCE_DIR` é opcional e não tem valor padrão. Quando definido, deve apontar para uma
+  cópia validada da origem legada montada somente para leitura; sem ela, a reconciliação permanece
+  como não executada. O serviço não grava na origem.
 - `SERVICE_ALLOWED_ORIGINS` e `ENABLE_API_DOCS` para CORS e documentação.
 
 ## Gateway

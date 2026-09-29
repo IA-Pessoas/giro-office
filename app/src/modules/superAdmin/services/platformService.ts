@@ -22,7 +22,91 @@ function unwrapData<T>(response: { data?: { data?: T } }): T {
   return response.data?.data as T;
 }
 
+export type MarketingReconciliationDataset =
+  | "eventos"
+  | "eventos_edicoes"
+  | "eventos_feedbacks_periodos"
+  | "eventos_feedbacks"
+  | "redes_sociais"
+  | "senhas"
+  | "ai_usage";
+
+export interface MarketingMigrationReconciliation {
+  organizationId: string;
+  lastRunAt: string | null;
+  datasets: Array<{
+    dataset: MarketingReconciliationDataset;
+    status: string;
+    totals: { prepared: number; imported: number; quarantined: number } | null;
+    items: Array<{
+      sourceTable: string;
+      sourceIdentityDigest: string;
+      stepId: string;
+      field: string | null;
+      reasonCode: string;
+      resolution: { canonicalTargetId: string; actorId: string; createdAt: string } | null;
+    }>;
+    decisions: Array<{
+      sourceTable: string;
+      sourceIdentityDigest: string;
+      stepId: string;
+      canonicalTargetId: string;
+      actorId: string;
+      createdAt: string;
+    }>;
+  }>;
+}
+
+export interface MarketingCanonicalEvent {
+  id: string;
+  name: string;
+}
+
 export const platformService = {
+  async getMarketingMigrationReconciliation(
+    organizationId: string,
+  ): Promise<MarketingMigrationReconciliation> {
+    const response = await api.get("/platform/marketing/migration-reconciliation", {
+      params: { organizationId },
+    });
+    return unwrapData<MarketingMigrationReconciliation>(response);
+  },
+
+  async listMarketingCanonicalEvents(organizationId: string): Promise<MarketingCanonicalEvent[]> {
+    const response = await api.get("/platform/marketing/migration-reconciliation/targets", {
+      params: { organizationId },
+    });
+    return unwrapData<{ events: MarketingCanonicalEvent[] }>(response).events;
+  },
+
+  async resolveMarketingMigrationAssociation(
+    dataset: "eventos_edicoes",
+    payload: {
+      organizationId: string;
+      sourceTable: "tb_mkt.eventos_edicoes";
+      sourceIdentityDigest: string;
+      stepId: string;
+      canonicalTargetId: string;
+    },
+  ): Promise<{ id: string; createdAt: string }> {
+    const response = await api.post(
+      `/platform/marketing/migration-reconciliation/${dataset}/resolve`,
+      payload,
+    );
+    return unwrapData<{ id: string; createdAt: string }>(response);
+  },
+
+  async reconcileMarketingMigration(
+    dataset: MarketingReconciliationDataset,
+    organizationId: string,
+  ): Promise<{ dataset: string; data: { runId: string; complete: boolean } }> {
+    const response = await api.post(
+      `/platform/marketing/migration-reconciliation/${dataset}/reconcile`,
+      { organizationId },
+    );
+    return unwrapData<{ dataset: string; data: { runId: string; complete: boolean } }>(response);
+  },
+
   async listOrganizations(params: {
     page: number;
     pageSize: number;

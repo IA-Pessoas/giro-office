@@ -1,4 +1,4 @@
-import { Activity, Building2, LayoutDashboard, ShieldCheck, Users } from "lucide-react";
+import { Activity, Building2, ClipboardCheck, LayoutDashboard, ShieldCheck, Users } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
@@ -15,9 +15,10 @@ import { OrganizationOverviewPanel } from "./OrganizationOverviewPanel";
 import { PlatformAuditPanel } from "./PlatformAuditPanel";
 import { PlatformSuperAdminsPanel } from "./PlatformSuperAdminsPanel";
 import { PlatformUsersPanel } from "./PlatformUsersPanel";
+import { MarketingMigrationReconciliationTab } from "./MarketingMigrationReconciliationTab";
 
 const PAGE_SIZE = 20;
-const PANEL_TABS = ["overview", "users", "superAdmins", "audit"] as const;
+const PANEL_TABS = ["migration", "overview", "users", "superAdmins", "audit"] as const;
 type ActivePanel = (typeof PANEL_TABS)[number];
 
 export function SuperAdminPage() {
@@ -163,6 +164,18 @@ export function SuperAdminPage() {
             >
               <button
                 aria-controls="super-admin-panel"
+                aria-selected={activePanel === "migration"}
+                className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 ${activePanel === "migration" ? "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+                id="super-admin-tab-migration"
+                onClick={() => setActivePanel("migration")}
+                role="tab"
+                tabIndex={activePanel === "migration" ? 0 : -1}
+                type="button"
+              >
+                <ClipboardCheck aria-hidden="true" className="h-4 w-4" /> Reconciliação
+              </button>
+              <button
+                aria-controls="super-admin-panel"
                 aria-selected={activePanel === "overview"}
                 className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600 ${activePanel === "overview" ? "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
                 id="super-admin-tab-overview"
@@ -257,6 +270,11 @@ export function SuperAdminPage() {
                   O detalhe e os usuários aparecem após uma seleção no diretório.
                 </p>
               </div>
+            ) : activePanel === "migration" ? (
+              <MarketingMigrationReconciliationTab
+                key={selectedOrganization.id}
+                organization={selectedOrganization}
+              />
             ) : (
               <>
                 <header className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">

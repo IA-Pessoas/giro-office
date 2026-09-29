@@ -111,6 +111,16 @@ const env = {
   marketingEventsSmokeEnabled:
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "true" ||
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "1",
+  marketingReconciliationSmokeEnabled:
+    process.env.MARKETING_RECONCILIATION_SMOKE_ENABLED === "true" ||
+    process.env.MARKETING_RECONCILIATION_SMOKE_ENABLED === "1",
+  marketingReconciliationOrganizationId:
+    process.env.MARKETING_RECONCILIATION_ORGANIZATION_ID?.trim() || "",
+  marketingReconciliationSourceIdentityDigest:
+    process.env.MARKETING_RECONCILIATION_SOURCE_IDENTITY_DIGEST?.trim() || "",
+  marketingReconciliationStepId: process.env.MARKETING_RECONCILIATION_STEP_ID?.trim() || "",
+  marketingReconciliationCanonicalTargetId:
+    process.env.MARKETING_RECONCILIATION_CANONICAL_TARGET_ID?.trim() || "",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -1611,6 +1621,48 @@ async function platformHttpRequest(op, options = {}) {
 }
 
 const handlers = {
+  async marketingMigrationReconciliationGet(op) {
+    await platformHttpRequest(op, {
+      path: `/platform${op.path}`,
+      query: { organizationId: requireMarketingReconciliationSmokeOrganizationId() },
+      expectedStatus: [200],
+    });
+  },
+
+  async marketingMigrationReconciliationTargets(op) {
+    await platformHttpRequest(op, {
+      path: `/platform${op.path}`,
+      query: { organizationId: requireMarketingReconciliationSmokeOrganizationId() },
+      expectedStatus: [200],
+    });
+  },
+
+  async marketingMigrationReconciliationResolve(op) {
+    await platformHttpRequest(op, {
+      path: "/platform/marketing/migration-reconciliation/eventos_edicoes/resolve",
+      json: {
+        organizationId: requireMarketingReconciliationSmokeOrganizationId(),
+        sourceTable: "tb_mkt.eventos_edicoes",
+        sourceIdentityDigest: requireMarketingReconciliationSmokeValue(
+          "marketingReconciliationSourceIdentityDigest",
+        ),
+        stepId: requireMarketingReconciliationSmokeValue("marketingReconciliationStepId"),
+        canonicalTargetId: requireMarketingReconciliationSmokeValue(
+          "marketingReconciliationCanonicalTargetId",
+        ),
+      },
+      expectedStatus: [201],
+    });
+  },
+
+  async marketingMigrationReconciliationRun(op) {
+    await platformHttpRequest(op, {
+      path: "/platform/marketing/migration-reconciliation/eventos_edicoes/reconcile",
+      json: { organizationId: requireMarketingReconciliationSmokeOrganizationId() },
+      expectedStatus: [201],
+    });
+  },
+
   async marketingDashboard(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -7691,6 +7743,20 @@ function matchesFilter(op) {
 }
 
 function disabledConditionReason(condition) {
+  if (condition === "marketingReconciliationSmokeEnabled") {
+    if (!env.marketingReconciliationSmokeEnabled) {
+      return "MARKETING_RECONCILIATION_SMOKE_ENABLED is false";
+    }
+    const requiredFixture = [
+      env.marketingReconciliationOrganizationId,
+      env.marketingReconciliationSourceIdentityDigest,
+      env.marketingReconciliationStepId,
+      env.marketingReconciliationCanonicalTargetId,
+    ];
+    if (requiredFixture.some((value) => !value)) {
+      return "Marketing reconciliation smoke fixture is incomplete";
+    }
+  }
   if (condition === "marketingEventsSmokeEnabled" && !env.marketingEventsSmokeEnabled) {
     return "MARKETING_EVENTS_SMOKE_ENABLED is false";
   }
@@ -7768,6 +7834,22 @@ function disabledConditionReason(condition) {
   }
 
   return "";
+}
+
+function requireMarketingReconciliationSmokeOrganizationId() {
+  const organizationId = requireMarketingReconciliationSmokeValue(
+    "marketingReconciliationOrganizationId",
+  );
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) {
+    throw new Error("MARKETING_RECONCILIATION_ORGANIZATION_ID must be a UUID.");
+  }
+  return organizationId;
+}
+
+function requireMarketingReconciliationSmokeValue(key) {
+  const value = env[key];
+  if (!value) throw new Error(`${key} is required for the Marketing reconciliation smoke.`);
+  return value;
 }
 
 async function run() {

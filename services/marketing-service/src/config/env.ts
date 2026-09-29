@@ -14,6 +14,7 @@ const marketingServiceEnvSchema = z
     jwtSecret: z.string().min(1, "JWT_SECRET não definido."),
     internalServiceToken: z.string().min(1, "MARKETING_SERVICE_INTERNAL_TOKEN não definido."),
     mtkEncryptionKey: z.string().min(1, "MTK_ENCRYPTION_KEY não definido."),
+    migrationSourceDir: z.string().trim().min(1).optional(),
     allowedOrigins: z
       .string()
       .optional()
@@ -53,6 +54,7 @@ const marketingServiceEnvSchema = z
       jwtSecret: env.jwtSecret,
       internalServiceToken: env.internalServiceToken,
       mtkEncryptionKey: env.mtkEncryptionKey,
+      migrationSourceDir: env.migrationSourceDir,
       allowedOrigins: env.allowedOrigins,
       enableApiDocs,
       logLevel: env.logLevel,
@@ -70,6 +72,7 @@ export function getMarketingServiceEnv(): MarketingServiceEnv {
     jwtSecret: process.env.JWT_SECRET,
     internalServiceToken: process.env.MARKETING_SERVICE_INTERNAL_TOKEN,
     mtkEncryptionKey: process.env.MTK_ENCRYPTION_KEY,
+    migrationSourceDir: process.env.MIGRATION_SOURCE_DIR,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
     logLevel: process.env.LOG_LEVEL,

@@ -227,6 +227,7 @@ describe("MarketingAiUsageControlService", () => {
           frequency: 5,
           purpose: "Pesquisa",
           perceived_gain: null,
+          imported_from_legacy: true,
         },
       ],
       skipDuplicates: true,

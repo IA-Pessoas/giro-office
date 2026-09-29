@@ -52,6 +52,28 @@ describe("marketing-service gateway registry", () => {
       routePrefixes: ["/marketing"],
     });
   });
+
+  it("encaminha a reconciliação pela sessão de plataforma e remove o prefixo público", () => {
+    const env = {
+      marketingServiceUrl: "http://marketing-service:3047",
+      marketingServiceInternalToken: "gateway-marketing-token",
+    } as GatewayEnv;
+
+    expect(
+      resolveGatewayService(
+        env,
+        "/platform/marketing/migration-reconciliation/eventos_edicoes/resolve",
+        "POST",
+      ),
+    ).toMatchObject({
+      key: "marketing-service",
+      internalServiceToken: "gateway-marketing-token",
+      permissionModule: "marketing",
+      forwardSessionBinding: true,
+      forwardPlatformSessionCredentials: true,
+      stripPathPrefix: "/platform",
+    });
+  });
 });
 
 describe("regularize-service gateway registry", () => {
@@ -146,7 +168,9 @@ describe("user-service gateway registry", () => {
       forwardSessionBinding: true,
     });
     expect(
-      getGatewayServiceDefinitions(env).filter((service) => service.forwardSessionBinding),
+      getGatewayServiceDefinitions(env).filter(
+        (service) => service.key === "user-service" && service.forwardSessionBinding,
+      ),
     ).toHaveLength(1);
   });
 

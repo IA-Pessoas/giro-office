@@ -247,6 +247,18 @@ function buildContextIndexes(rowsBySource, options) {
     regularizeRows: rows("tb_regularize.clientes"),
     integrationRows: rows("tb_integracao.clientes"),
   });
+  const marketingEventEditionResolutions = options.marketingEventEditionResolutions ?? new Map();
+  if (
+    !(marketingEventEditionResolutions instanceof Map) ||
+    [...marketingEventEditionResolutions].some(
+      ([digest, targetId]) =>
+        !/^sha256:[a-f0-9]{64}$/.test(digest) ||
+        typeof targetId !== "string" ||
+        targetId.length === 0,
+    )
+  ) {
+    throw new Error("MKT_EDITION_RESOLUTIONS_INVALID");
+  }
 
   if (has("tb_cbs.estoque_categorias")) {
     register(
@@ -317,6 +329,7 @@ function buildContextIndexes(rowsBySource, options) {
       buildMarketingEventEditionContexts({
         rows: rows("tb_mkt.eventos_edicoes"),
         eventRows: rows("tb_mkt.eventos"),
+        resolutions: marketingEventEditionResolutions,
       }),
     );
   }
@@ -329,6 +342,7 @@ function buildContextIndexes(rowsBySource, options) {
         editionRows: rows("tb_mkt.eventos_edicoes"),
         eventRows: rows("tb_mkt.eventos"),
         evaluationRows: rows("tb_mkt.eventos_feedbacks"),
+        resolutions: marketingEventEditionResolutions,
       }),
     );
   }
@@ -341,6 +355,7 @@ function buildContextIndexes(rowsBySource, options) {
         editionRows: rows("tb_mkt.eventos_edicoes"),
         eventRows: rows("tb_mkt.eventos"),
         evaluationRows: rows("tb_mkt.eventos_feedbacks"),
+        resolutions: marketingEventEditionResolutions,
       }),
     );
   }

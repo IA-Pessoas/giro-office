@@ -59,6 +59,39 @@ const secondOrganization = {
   subscription_plan: "pro",
 };
 const organizations = [organization, secondOrganization];
+const marketingEvent = {
+  id: "a0000000-0000-4000-8000-000000000001",
+  name: "Encontro de integração",
+};
+const marketingReconciliation = {
+  organizationId: organization.id,
+  lastRunAt: "2026-09-28T12:00:00.000Z",
+  datasets: [
+    {
+      dataset: "eventos_edicoes",
+      status: "completed",
+      totals: { prepared: 12, imported: 10, quarantined: 2 },
+      items: [
+        {
+          sourceTable: "tb_mkt.eventos_edicoes",
+          sourceIdentityDigest: `sha256:${"a".repeat(64)}`,
+          stepId: "mkt-event-edition-insert",
+          field: "evento_id",
+          reasonCode: "MKT_EDITION_EVENT_AMBIGUOUS",
+          resolution: null,
+        },
+      ],
+      decisions: [],
+    },
+    ...["eventos", "eventos_feedbacks_periodos", "eventos_feedbacks", "redes_sociais", "senhas", "ai_usage"].map((dataset) => ({
+      dataset,
+      status: "not_run",
+      totals: null,
+      items: [],
+      decisions: [],
+    })),
+  ],
+};
 const platformUser = {
   id: "user-safe-1",
   name: "Pessoa de teste",
@@ -180,6 +213,50 @@ const upstream = createServer(async (request, response) => {
     assert.equal(request.headers.authorization, undefined);
     platformSuperAdmins[0].can_impersonate = identity.can_impersonate;
     return reply(response, 200, platformSuperAdmins);
+  }
+  if (url.pathname === "/platform/marketing/migration-reconciliation" && request.method === "GET") {
+    assert.equal(url.searchParams.get("organizationId"), organization.id);
+    return reply(response, 200, marketingReconciliation);
+  }
+  if (url.pathname === "/platform/marketing/migration-reconciliation/targets" && request.method === "GET") {
+    assert.equal(url.searchParams.get("organizationId"), organization.id);
+    return reply(response, 200, { events: [marketingEvent] });
+  }
+  const marketingResolveMatch = url.pathname.match(
+    /^\/platform\/marketing\/migration-reconciliation\/eventos_edicoes\/resolve$/,
+  );
+  if (marketingResolveMatch && request.method === "POST") {
+    assert.equal(request.headers["x-csrf-token"], csrf);
+    assert.equal(body?.organizationId, organization.id);
+    assert.equal(body?.sourceTable, "tb_mkt.eventos_edicoes");
+    assert.equal(body?.canonicalTargetId, marketingEvent.id);
+    assert.equal("actorId" in body, false);
+    const item = marketingReconciliation.datasets[0].items[0];
+    item.resolution = {
+      canonicalTargetId: marketingEvent.id,
+      actorId: identity.id,
+      createdAt: "2026-09-29T14:00:00.000Z",
+    };
+    marketingReconciliation.datasets[0].decisions.push({
+      sourceTable: item.sourceTable,
+      sourceIdentityDigest: item.sourceIdentityDigest,
+      stepId: item.stepId,
+      canonicalTargetId: marketingEvent.id,
+      actorId: identity.id,
+      createdAt: item.resolution.createdAt,
+    });
+    return reply(response, 201, { id: "decision-safe-1", createdAt: item.resolution.createdAt });
+  }
+  const marketingReconcileMatch = url.pathname.match(
+    /^\/platform\/marketing\/migration-reconciliation\/eventos_edicoes\/reconcile$/,
+  );
+  if (marketingReconcileMatch && request.method === "POST") {
+    assert.equal(request.headers["x-csrf-token"], csrf);
+    assert.equal(body?.organizationId, organization.id);
+    marketingReconciliation.lastRunAt = "2026-09-29T14:05:00.000Z";
+    marketingReconciliation.datasets[0].totals = { prepared: 12, imported: 11, quarantined: 1 };
+    marketingReconciliation.datasets[0].items = [];
+    return reply(response, 201, { dataset: "eventos_edicoes", data: { runId: "run-safe-2", complete: false } });
   }
   const superAdminPermissionMatch = url.pathname.match(
     /^\/platform\/super-admins\/([^/]+)\/impersonation-permission$/,
@@ -1368,6 +1445,68 @@ try {
         .query.get("organizationId"),
       organization.id,
     );
+    await page.getByRole("button", { name: /Organização Aurora/ }).click();
+    await page.getByRole("tab", { name: "Reconciliação", exact: true }).click();
+    await page.getByText("Edições de eventos", { exact: true }).waitFor();
+    if (viewport.width > 1000) {
+      const targetSelect = page.getByLabel("Destino canônico explícito", { exact: true });
+      await targetSelect.waitFor();
+      await targetSelect.selectOption(marketingEvent.id);
+      await page.getByRole("button", { name: "Registrar resolução auditada", exact: true }).click();
+      await page
+        .getByLabel("Histórico de decisões")
+        .getByText(new RegExp(`operador ${identity.id}`))
+        .waitFor();
+      assert.equal(
+        await page
+          .getByLabel("Histórico de decisões")
+          .getByText(/Destino Encontro de integração/)
+          .count(),
+        1,
+      );
+      if (screenshotDirectory) {
+        await mkdir(screenshotDirectory, { recursive: true });
+        await settleLayout();
+        await page.screenshot({
+          path: join(screenshotDirectory, "issue-1549-marketing-reconciliation-resolution-desktop.png"),
+          fullPage: true,
+        });
+      }
+      await page.getByRole("button", { name: "Reexecutar reconciliação", exact: true }).click();
+      await page.getByText("Nova execução registrada.", { exact: false }).waitFor();
+      await page.getByText("11", { exact: true }).waitFor();
+      await page
+        .getByText(/Destino Encontro de integração; operador/)
+        .waitFor();
+      assert.ok(
+        requests.some(
+          (request) =>
+            request.method === "POST" &&
+            request.path === "/platform/marketing/migration-reconciliation/eventos_edicoes/resolve" &&
+            request.csrfHeader === csrf &&
+            request.body.actorId === undefined,
+        ),
+        "a UI deve enviar destino explícito sem alegar identidade do operador",
+      );
+      assert.ok(
+        requests.some(
+          (request) =>
+            request.method === "POST" &&
+            request.path === "/platform/marketing/migration-reconciliation/eventos_edicoes/reconcile" &&
+            request.csrfHeader === csrf,
+        ),
+      );
+    }
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await settleLayout();
+      await page.screenshot({
+        path: join(screenshotDirectory, `issue-1549-marketing-reconciliation-${viewport.width}.png`),
+        fullPage: true,
+      });
+    }
+    await page.getByRole("tab", { name: "Auditoria", exact: true }).click();
+    await page.locator('[aria-labelledby="platform-audit-title"]').waitFor();
     await Promise.all([
       page.waitForResponse(
         (response) =>
@@ -1597,9 +1736,7 @@ try {
     await planTrigger.click();
     await planDialog.getByLabel("Plano", { exact: true }).selectOption("enterprise");
     await planDialog.getByRole("button", { name: "Salvar plano", exact: true }).click();
-    await planDialog
-      .getByText("Esta organização foi alterada por outra pessoa.", { exact: false })
-      .waitFor();
+    await planDialog.getByText("Conflito de edição.", { exact: true }).waitFor();
     await page.waitForFunction(() => document.querySelector("#platform-status")?.value === "trial");
     await new Promise((resolve) => setTimeout(resolve, 300));
     assert.equal(

@@ -1,12 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-const PENDING_SOURCE_NAMES = new Set(
-  JSON.parse(
-    readFileSync(new URL("../../pending-mapping/tables.json", import.meta.url), "utf8"),
-  ).map(({ sourceTable }) => sourceTable),
-);
-
 export const CONFIRMED_SCOPE_COUNTS = Object.freeze({
   origins: 103,
   sourceRows: 629349,
@@ -18,15 +12,17 @@ export function buildConfirmedScope({
   tableMappings,
   destinationMappings,
   sourceDigest,
+  pendingMappings = readPendingMappings(),
 }) {
-  validateInputs({ inventory, tableMappings, destinationMappings, sourceDigest });
+  validateInputs({ inventory, tableMappings, destinationMappings, pendingMappings, sourceDigest });
 
   const inventoryBySource = new Map(inventory.tables.map((table) => [table.sourceTable, table]));
+  const pendingSourceNames = new Set(pendingMappings.map(({ sourceTable }) => sourceTable));
   const confirmedSources = new Set();
   const sources = tableMappings
     .map((mapping) => {
       const inventoryTable = inventoryBySource.get(mapping.sourceTable);
-      if (!inventoryTable || PENDING_SOURCE_NAMES.has(mapping.sourceTable)) {
+      if (!inventoryTable || pendingSourceNames.has(mapping.sourceTable)) {
         throw scopeError("CONFIRMED_SCOPE_INVALID");
       }
       if (
@@ -103,6 +99,7 @@ export function validateConfirmedScope(scope, packageData) {
     tableMappings: packageData.tableMappings,
     destinationMappings: packageData.destinationMappings,
     sourceDigest: packageData.inventory.sourceDigest,
+    pendingMappings: packageData.pendingMappings ?? readPendingMappings(),
   });
   if (scope?.scopeDigest !== digestScope(scope) || scope.scopeDigest !== rebuilt.scopeDigest) {
     throw scopeError("CONFIRMED_SCOPE_DRIFT");
@@ -119,11 +116,32 @@ export function validateConfirmedScope(scope, packageData) {
   return true;
 }
 
-function validateInputs({ inventory, tableMappings, destinationMappings, sourceDigest }) {
+function readPendingMappings() {
+  const mappings = JSON.parse(
+    readFileSync(new URL("../../pending-mapping/tables.json", import.meta.url), "utf8"),
+  );
+  if (
+    !Array.isArray(mappings) ||
+    mappings.some((mapping) => typeof mapping?.sourceTable !== "string")
+  ) {
+    throw scopeError("CONFIRMED_SCOPE_INVALID");
+  }
+  return mappings;
+}
+
+function validateInputs({
+  inventory,
+  tableMappings,
+  destinationMappings,
+  pendingMappings,
+  sourceDigest,
+}) {
   if (
     !Array.isArray(inventory?.tables) ||
     !Array.isArray(tableMappings) ||
     !Array.isArray(destinationMappings) ||
+    !Array.isArray(pendingMappings) ||
+    pendingMappings.some((mapping) => typeof mapping?.sourceTable !== "string") ||
     sourceDigest !== inventory.sourceDigest ||
     sourceDigest !== digestSourceInventory(inventory.tables)
   ) {

@@ -65,6 +65,26 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/marketing\/migration-reconciliation$/,
+    description: { action: "consultou", item: "o estado da reconciliação de Marketing" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/migration-reconciliation\/targets$/,
+    description: { action: "consultou", item: "os destinos canônicos elegíveis de Marketing" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/migration-reconciliation\/[^/]+\/resolve$/,
+    description: { action: "registrou", item: "uma decisão de reconciliação de Marketing" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/migration-reconciliation\/[^/]+\/reconcile$/,
+    description: { action: "executou", item: "uma reconciliação de Marketing" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/marketing\/ai-usage-controls\/users$/,
     description: { action: "consultou", item: "os usuários elegíveis para a pesquisa de IA" },
   },

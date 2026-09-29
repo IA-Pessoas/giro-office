@@ -109,6 +109,20 @@ test("quarantines ambiguous, missing, or unprepared event links for reconciliati
   assert.equal(parentQuarantined.reasonCode, "MKT_EDITION_EVENT_TARGET_QUARANTINED");
 });
 
+test("an explicit event decision resolves an ambiguous link to its chosen canonical event", () => {
+  const result = planMarketingEventEditionImport({
+    editionRow,
+    eventCandidates: [
+      { legacyId: 7, id: "event-7a", status: "prepared" },
+      { legacyId: 7, id: "event-7b", status: "prepared" },
+    ],
+    resolvedEventId: "canonical-event-id",
+  });
+
+  assert.equal(result.status, "prepared");
+  assert.equal(result.edition.event_id, "canonical-event-id");
+});
+
 test("quarantines free-text date and place when they cannot be split without guessing", () => {
   const result = planMarketingEventEditionImport({
     editionRow: { ...editionRow, data_local: "12/11/2026 às 19h no Castelo Branco" },

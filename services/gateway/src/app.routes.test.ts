@@ -866,6 +866,87 @@ it("audita somente queries allowlisted nas leituras de organização da platafor
   }
 });
 
+it("encaminha reconciliação Marketing com sessão de plataforma, CSRF e rota interna", async () => {
+  const csrfToken = "R".repeat(43);
+  const platformToken = createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) });
+  const upstreamRequests: Array<{
+    url?: string;
+    cookie?: string;
+    csrf?: string;
+    userId?: string;
+    role?: string;
+    token?: string;
+  }> = [];
+  const marketingService = createServer((request, response) => {
+    upstreamRequests.push({
+      url: request.url,
+      cookie: request.headers.cookie,
+      csrf: request.headers[CSRF_HEADER_NAME] as string | undefined,
+      userId: request.headers[FORWARDED_AUTH_USER_ID_HEADER] as string | undefined,
+      role: request.headers[FORWARDED_AUTH_PLATFORM_ROLE_HEADER] as string | undefined,
+      token: request.headers[INTERNAL_SERVICE_TOKEN_HEADER] as string | undefined,
+    });
+    response.statusCode = 201;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ success: true, data: { id: "decision-1" } }));
+  });
+  const marketingServiceUrl = await startServer(marketingService);
+  const app = createApp(
+    createEnv({ marketingServiceUrl, bearerAuthCompatibility: false }),
+    createTestLogger(),
+    { sessionValidator: vi.fn().mockResolvedValue(undefined) },
+  );
+  const gateway = createServer(app);
+  const gatewayUrl = await startServer(gateway);
+  const path = "/platform/marketing/migration-reconciliation/eventos_edicoes/resolve";
+  const body = {
+    organizationId: "10000000-0000-4000-8000-000000000001",
+    sourceTable: "tb_mkt.eventos_edicoes",
+    sourceIdentityDigest: `sha256:${"a".repeat(64)}`,
+    stepId: "edition-insert",
+    canonicalTargetId: "20000000-0000-4000-8000-000000000001",
+  };
+  const headers = {
+    Cookie: `theme=dark; cw.session=${platformToken}; cw.csrf=${csrfToken}`,
+    Origin: "https://useoffice.com.br",
+    [CSRF_HEADER_NAME]: csrfToken,
+    "content-type": "application/json",
+  };
+
+  try {
+    const rejected = await fetch(`${gatewayUrl}${path}`, {
+      method: "POST",
+      headers: {
+        Cookie: headers.Cookie,
+        Origin: headers.Origin,
+        "content-type": headers["content-type"],
+      },
+      body: JSON.stringify(body),
+    });
+    const accepted = await fetch(`${gatewayUrl}${path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    expect(rejected.status).toBe(403);
+    expect(accepted.status).toBe(201);
+    expect(upstreamRequests).toEqual([
+      {
+        url: "/marketing/migration-reconciliation/eventos_edicoes/resolve",
+        cookie: `cw.session=${platformToken}; cw.csrf=${csrfToken}`,
+        csrf: csrfToken,
+        userId: "platform-user-1",
+        role: "super_admin",
+        token: "marketing-service-internal-token",
+      },
+    ]);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(marketingService);
+  }
+});
+
 it("persiste uma tentativa e audita o resultado de cada mutação de organização da plataforma", async () => {
   const csrfToken = "P".repeat(43);
   const platformToken = createPlatformToken({ csrf_hash: hashCsrfToken(csrfToken) });

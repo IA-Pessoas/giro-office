@@ -9,8 +9,8 @@ const PLANNING_KEYS = Object.freeze({
   after_event: ["avaliacao", "agradecimento", "relatorio", "followup"],
 });
 
-export function planMarketingEventEditionImport({ editionRow, eventCandidates }) {
-  const eventLink = resolveEventLink(editionRow?.evento_id, eventCandidates);
+export function planMarketingEventEditionImport({ editionRow, eventCandidates, resolvedEventId }) {
+  const eventLink = resolveEventLink(editionRow?.evento_id, eventCandidates, resolvedEventId);
   if (eventLink.status !== "prepared") return eventLink;
 
   if (!positiveInteger(editionRow?.id)) return quarantine("id", "MKT_EDITION_ID_INVALID");
@@ -163,13 +163,17 @@ function parseLegacyDateTime(value) {
   const parsed = new Date(withTimezone);
   return Number.isNaN(parsed.valueOf()) ? null : parsed.toISOString();
 }
-function resolveEventLink(legacyId, candidates) {
+function resolveEventLink(legacyId, candidates, resolvedEventId) {
   if (!positiveInteger(legacyId)) return quarantine("evento_id", "MKT_EDITION_EVENT_LINK_INVALID");
   if (!Array.isArray(candidates))
     return quarantine("evento_id", "MKT_EDITION_EVENT_LOOKUP_MISSING");
   const matches = candidates.filter((event) => String(event?.legacyId) === String(legacyId));
   if (matches.length === 0) return quarantine("evento_id", "MKT_EDITION_EVENT_NOT_FOUND");
-  if (matches.length > 1) return quarantine("evento_id", "MKT_EDITION_EVENT_AMBIGUOUS");
+  if (matches.length > 1) {
+    return typeof resolvedEventId === "string" && resolvedEventId.length > 0
+      ? { status: "prepared", id: resolvedEventId }
+      : quarantine("evento_id", "MKT_EDITION_EVENT_AMBIGUOUS");
+  }
   if (matches[0].status !== "prepared" || typeof matches[0].id !== "string") {
     return quarantine("evento_id", "MKT_EDITION_EVENT_TARGET_QUARANTINED");
   }

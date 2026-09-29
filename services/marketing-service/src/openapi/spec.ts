@@ -296,6 +296,74 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
           "Listar metadados de registros em quarentena, sem o conteúdo secreto.",
         ),
       },
+      "/marketing/migration-reconciliation": {
+        get: platformOperation(
+          "Consultar totais e pendências da migração Marketing para a organização selecionada.",
+          {
+            parameters: [organizationIdQuery],
+            successDescription: "Snapshot da última execução e decisões auditadas.",
+          },
+        ),
+      },
+      "/marketing/migration-reconciliation/targets": {
+        get: platformOperation("Listar eventos canônicos disponíveis para uma resolução.", {
+          parameters: [organizationIdQuery],
+          successDescription: "Eventos pertencentes à organização selecionada.",
+        }),
+      },
+      "/marketing/migration-reconciliation/{dataset}/resolve": {
+        post: platformOperation("Registrar uma decisão explícita para uma pendência elegível.", {
+          parameters: [migrationDatasetPath, csrfTokenHeader],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    organizationId: { type: "string", format: "uuid" },
+                    sourceTable: { type: "string", enum: ["tb_mkt.eventos_edicoes"] },
+                    sourceIdentityDigest: {
+                      type: "string",
+                      pattern: "^sha256:[a-f0-9]{64}$",
+                    },
+                    stepId: { type: "string" },
+                    canonicalTargetId: { type: "string", format: "uuid" },
+                  },
+                  required: [
+                    "organizationId",
+                    "sourceTable",
+                    "sourceIdentityDigest",
+                    "stepId",
+                    "canonicalTargetId",
+                  ],
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          successDescription: "Decisão imutável registrada com operador e horário.",
+        }),
+      },
+      "/marketing/migration-reconciliation/{dataset}/reconcile": {
+        post: platformOperation("Executar novamente o dry-run da migração Marketing.", {
+          parameters: [migrationDatasetPath, csrfTokenHeader],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { organizationId: { type: "string", format: "uuid" } },
+                  required: ["organizationId"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          successDescription: "Nova execução registrada sem escrever na origem legada.",
+        }),
+      },
       "/marketing/events/list": {
         get: {
           summary: "Listar eventos da organização",
@@ -559,6 +627,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
     components: {
       securitySchemes: {
         bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+        cookieAuth: { type: "apiKey", in: "cookie", name: "cw.session" },
       },
       schemas: {
         MarketingEvent: marketingEventSchema,
@@ -583,6 +652,55 @@ function protectedOperation(summary: string) {
       "400": { description: "Dados inválidos." },
       "401": { description: "Autenticação obrigatória." },
       "403": { description: "Permissão Marketing insuficiente." },
+    },
+  };
+}
+
+const organizationIdQuery = {
+  name: "organizationId",
+  in: "query",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
+
+const migrationDatasetPath = {
+  name: "dataset",
+  in: "path",
+  required: true,
+  schema: { type: "string", enum: ["eventos_edicoes"] },
+} as const;
+
+const csrfTokenHeader = {
+  name: "x-csrf-token",
+  in: "header",
+  required: true,
+  schema: { type: "string" },
+} as const;
+
+function platformOperation(
+  summary: string,
+  options: {
+    parameters: readonly unknown[];
+    successDescription: string;
+    requestBody?: Record<string, unknown>;
+  },
+) {
+  return {
+    summary,
+    description:
+      "Acesso exclusivo à sessão autenticada de Super Admin, encaminhada pelo gateway com proteção CSRF nas mutações.",
+    security: [{ cookieAuth: [] }],
+    parameters: options.parameters,
+    ...(options.requestBody ? { requestBody: options.requestBody } : {}),
+    responses: {
+      "200": { description: options.successDescription },
+      "201": { description: options.successDescription },
+      "400": { description: "Dados inválidos." },
+      "401": { description: "Sessão ou operador de plataforma inválido." },
+      "403": { description: "Sessão sem perfil de Super Admin." },
+      "404": { description: "Organização ou destino canônico não encontrado." },
+      "409": { description: "Pendência já resolvida ou não elegível." },
+      "503": { description: "Origem V4 indisponível ou runner não configurado." },
     },
   };
 }
