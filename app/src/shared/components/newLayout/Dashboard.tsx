@@ -31,6 +31,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { useAuth } from "@/context/AuthContext";
+import { isOrganizationOwner } from "@modules/auth";
 import { useActivityClock } from "../../../modules/dashboard/hooks/useActivityClock";
 import { useDashboard } from "../../../modules/dashboard/hooks/useDashboard";
 import type { DashboardStats } from "../../../modules/dashboard/types";
@@ -190,8 +192,12 @@ function hasTaskData(department: DashboardStats["departments"][number]): boolean
 }
 
 export function Dashboard() {
+  const { user } = useAuth();
   const { stats, fetchedAt, isLoading, isFetching, error, refetch } = useDashboard();
   const activityNow = useActivityClock();
+  const canViewRecentActivity =
+    isOrganizationOwner(user) ||
+    (user?.auth_kind === "platform" && user.platform_role === "super_admin");
   const [showAllDepartments, setShowAllDepartments] = useState(false);
   // Hora em que estes dados foram buscados. O `updatedAt` do servidor é o último dado alterado
   // na organização e podia ser de dias atrás, parecendo painel desatualizado (#1371).
@@ -664,68 +670,70 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              Atividade Recente
-            </h3>
-            <button className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
-              Ver todas
-            </button>
-          </div>
-          <div className="space-y-4">
-            {activities.length > 0 ? (
-              activities.map((activity, i) => (
-                <div
-                  key={i}
-                  className="flex items-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer"
-                >
+        {canViewRecentActivity ? (
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                Atividade Recente
+              </h3>
+              <button className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
+                Ver todas
+              </button>
+            </div>
+            <div className="space-y-4">
+              {activities.length > 0 ? (
+                activities.map((activity, i) => (
                   <div
-                    className={`w-8 h-8 rounded-full ${activity.bgColor} flex items-center justify-center flex-shrink-0`}
+                    key={i}
+                    className="flex items-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer"
                   >
-                    <span className={`text-xs font-semibold ${activity.textColor}`}>
-                      {activity.avatar}
-                    </span>
+                    <div
+                      className={`w-8 h-8 rounded-full ${activity.bgColor} flex items-center justify-center flex-shrink-0`}
+                    >
+                      <span className={`text-xs font-semibold ${activity.textColor}`}>
+                        {activity.avatar}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        <span className="font-medium">{activity.user}</span> {activity.action}{" "}
+                        <span className="font-medium">{activity.item}</span>
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {activity.elapsedTime}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      <span className="font-medium">{activity.user}</span> {activity.action}{" "}
-                      <span className="font-medium">{activity.item}</span>
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {activity.elapsedTime}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : isLoading ? (
-              <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                Carregando atividades...
-              </p>
-            ) : error && !stats ? (
-              <div
-                role="alert"
-                className="rounded-lg bg-red-50 p-4 text-center dark:bg-red-900/20"
-              >
-                <p className="text-sm text-red-700 dark:text-red-300">
-                  Não foi possível carregar as atividades agora.
+                ))
+              ) : isLoading ? (
+                <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Carregando atividades...
                 </p>
-                <button
-                  type="button"
-                  onClick={() => void refetch()}
-                  className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              ) : error && !stats ? (
+                <div
+                  role="alert"
+                  className="rounded-lg bg-red-50 p-4 text-center dark:bg-red-900/20"
                 >
-                  Tentar novamente
-                </button>
-              </div>
-            ) : (
-              <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                Nenhuma atividade recente.
-              </p>
-            )}
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    Não foi possível carregar as atividades agora.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : (
+                <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Nenhuma atividade recente.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Ações Rápidas</h3>
