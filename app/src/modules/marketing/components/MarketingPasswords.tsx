@@ -10,6 +10,7 @@ import {
   type MarketingPassword,
   type MarketingPasswordInput,
 } from "../services/marketingPasswordService";
+import { marketingQueryKey } from "../utils/marketingQueryKeys";
 
 const PASSWORDS_QUERY_KEY = ["marketing", "passwords"] as const;
 const RECONCILIATION_QUERY_KEY = ["marketing", "passwords", "reconciliation"] as const;
@@ -24,13 +25,15 @@ function triggerDownload(filename: string, content: string): void {
 }
 
 export function MarketingPasswords() {
-  const { access, isLoading: accessLoading } = useModuleAccess("marketing");
+  const { access, isLoading: accessLoading, user: authUser } = useModuleAccess("marketing");
   const queryClient = useQueryClient();
-  const passwordsQuery = useFetch(PASSWORDS_QUERY_KEY, marketingPasswordService.list, {
+  const passwordsQueryKey = marketingQueryKey(PASSWORDS_QUERY_KEY, authUser);
+  const reconciliationQueryKey = marketingQueryKey(RECONCILIATION_QUERY_KEY, authUser);
+  const passwordsQuery = useFetch(passwordsQueryKey, marketingPasswordService.list, {
     enabled: access.canView,
   });
   const reconciliationQuery = useFetch(
-    RECONCILIATION_QUERY_KEY,
+    reconciliationQueryKey,
     marketingPasswordService.reconciliation,
     { enabled: access.canEdit },
   );
@@ -40,7 +43,12 @@ export function MarketingPasswords() {
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
   const [notes, setNotes] = useState("");
-  const [revealed, setRevealed] = useState<{ id: string; value: string } | null>(null);
+  const [revealed, setRevealed] = useState<{
+    id: string;
+    value: string;
+    userId: string | null;
+    organizationId: string | null;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [importJson, setImportJson] = useState("[]");
@@ -52,6 +60,24 @@ export function MarketingPasswords() {
     if (!access.canEdit) setRevealed(null);
   }, [access.canEdit]);
 
+  useEffect(() => {
+    setRevealed(null);
+    setEditingId(null);
+    setLocal("");
+    setUser("");
+    setPassword("");
+    setNotes("");
+    setImportJson("[]");
+    setError("");
+    setStatus("");
+  }, [authUser?.id, authUser?.organization_id]);
+
+  const currentReveal =
+    revealed?.userId === (authUser?.id ?? null) &&
+    revealed?.organizationId === (authUser?.organization_id ?? null)
+      ? revealed
+      : null;
+
   const resetForm = () => {
     setEditingId(null);
     setLocal("");
@@ -62,8 +88,8 @@ export function MarketingPasswords() {
 
   const refresh = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: PASSWORDS_QUERY_KEY }),
-      queryClient.invalidateQueries({ queryKey: RECONCILIATION_QUERY_KEY }),
+      queryClient.invalidateQueries({ queryKey: passwordsQueryKey }),
+      queryClient.invalidateQueries({ queryKey: reconciliationQueryKey }),
     ]);
   };
 
@@ -123,7 +149,12 @@ export function MarketingPasswords() {
     setError("");
     try {
       const result = await marketingPasswordService.reveal(credential.id);
-      setRevealed({ id: credential.id, value: result.password });
+      setRevealed({
+        id: credential.id,
+        value: result.password,
+        userId: authUser?.id ?? null,
+        organizationId: authUser?.organization_id ?? null,
+      });
     } catch {
       setError("Não foi possível revelar esta credencial.");
     }
@@ -270,7 +301,9 @@ export function MarketingPasswords() {
                 <td className="px-4 py-3 text-gray-700 dark:text-slate-200">{credential.user}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{credential.notes || "—"}</td>
                 <td className="px-4 py-3 font-mono text-gray-600 dark:text-slate-300">
-                  {access.canEdit && revealed?.id === credential.id ? revealed.value : "••••••••"}
+                  {access.canEdit && currentReveal?.id === credential.id
+                    ? currentReveal.value
+                    : "••••••••"}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
@@ -279,8 +312,25 @@ export function MarketingPasswords() {
                         <button className="rounded-md border border-gray-300 p-2 text-gray-700 dark:border-slate-600 dark:text-slate-200" onClick={() => beginEdit(credential)} type="button" aria-label={`Editar ${credential.local} de ${credential.user}`}>
                           <Pencil className="h-4 w-4" aria-hidden="true" />
                         </button>
-                        <button className="rounded-md border border-gray-300 p-2 text-gray-700 dark:border-slate-600 dark:text-slate-200" onClick={() => revealed?.id === credential.id ? setRevealed(null) : void revealCredential(credential)} type="button" aria-label={revealed?.id === credential.id ? "Ocultar senha" : `Revelar senha de ${credential.local}`}>
-                          {revealed?.id === credential.id ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                        <button
+                          className="rounded-md border border-gray-300 p-2 text-gray-700 dark:border-slate-600 dark:text-slate-200"
+                          onClick={() =>
+                            currentReveal?.id === credential.id
+                              ? setRevealed(null)
+                              : void revealCredential(credential)
+                          }
+                          type="button"
+                          aria-label={
+                            currentReveal?.id === credential.id
+                              ? "Ocultar senha"
+                              : `Revelar senha de ${credential.local}`
+                          }
+                        >
+                          {currentReveal?.id === credential.id ? (
+                            <EyeOff className="h-4 w-4" aria-hidden="true" />
+                          ) : (
+                            <Eye className="h-4 w-4" aria-hidden="true" />
+                          )}
                         </button>
                         <button className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200" disabled={exportingId === credential.id} onClick={() => void exportCredential(credential)} type="button">
                           {exportingId === credential.id ? "Exportando…" : "Exportar"}

@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useFetch } from "@shared/hooks";
 import { useModuleAccess } from "@modules/auth";
 import { useMarketingDashboard } from "../hooks/useMarketingDashboard";
+import { marketingQueryKey } from "../utils/marketingQueryKeys";
 
 import { marketingAiUsageService, type AiUsageAnswers, type AiUsageControl } from "../services/marketingAiUsageService";
 
@@ -72,7 +73,7 @@ function AnswerForm({ control, onSave, saving, editable }: {
 }
 
 export function MarketingAiUsageControls() {
-  const { access } = useModuleAccess("marketing");
+  const { access, user } = useModuleAccess("marketing");
   const canEdit = access.canEdit;
   const dashboardQuery = useMarketingDashboard();
   const [selectedCompetence, setSelectedCompetence] = useState<string | null>(null);
@@ -81,17 +82,44 @@ export function MarketingAiUsageControls() {
   const [legacyJson, setLegacyJson] = useState("[]");
   const [importError, setImportError] = useState("");
   const queryClient = useQueryClient();
-  const queryKey = ["marketing", "ai-usage", competence];
+  const queryKey = marketingQueryKey(["marketing", "ai-usage", competence], user);
+  const usersQueryKey = marketingQueryKey(["marketing", "ai-usage-users"], user);
+  const reportQueryKey = marketingQueryKey(
+    ["marketing", "ai-usage-report", competence],
+    user,
+  );
+  const reconciliationQueryKey = marketingQueryKey(
+    ["marketing", "ai-usage-reconciliation"],
+    user,
+  );
   const controlsQuery = useFetch(queryKey, () => marketingAiUsageService.getControls(competence));
-  const usersQuery = useFetch(["marketing", "ai-usage-users"], () => marketingAiUsageService.getEligibleUsers());
-  const reportQuery = useFetch(["marketing", "ai-usage-report", competence], () => marketingAiUsageService.getReport(competence));
-  const reconciliationQuery = useFetch(["marketing", "ai-usage-reconciliation"], () => marketingAiUsageService.getReconciliation());
+  const usersQuery = useFetch(
+    usersQueryKey,
+    () => marketingAiUsageService.getEligibleUsers(),
+  );
+  const reportQuery = useFetch(
+    reportQueryKey,
+    () => marketingAiUsageService.getReport(competence),
+  );
+  const reconciliationQuery = useFetch(
+    reconciliationQueryKey,
+    () => marketingAiUsageService.getReconciliation(),
+  );
+
+  useEffect(() => {
+    setUserId("");
+    setLegacyJson("[]");
+    setImportError("");
+  }, [user?.id, user?.organization_id]);
+
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey }),
-      queryClient.invalidateQueries({ queryKey: ["marketing", "ai-usage-report", competence] }),
-      queryClient.invalidateQueries({ queryKey: ["marketing", "dashboard"] }),
-      queryClient.invalidateQueries({ queryKey: ["marketing", "ai-usage-reconciliation"] }),
+      queryClient.invalidateQueries({ queryKey: reportQueryKey }),
+      queryClient.invalidateQueries({
+        queryKey: marketingQueryKey(["marketing", "dashboard"], user),
+      }),
+      queryClient.invalidateQueries({ queryKey: reconciliationQueryKey }),
     ]);
   };
   const createBatch = useMutation({ mutationFn: () => marketingAiUsageService.createBatch(competence), onSuccess: refresh });
