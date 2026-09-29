@@ -3,6 +3,7 @@ import { z } from "zod";
 export const listDepartmentsQuerySchema = z
   .object({
     status: z.enum(["Todos", "Ativo", "Inativo"]).optional(),
+    administrative: z.enum(["true"]).optional(),
   })
   .strict();
 

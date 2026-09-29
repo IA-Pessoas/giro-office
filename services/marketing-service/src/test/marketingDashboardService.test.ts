@@ -96,6 +96,9 @@ describe("MarketingDashboardService", () => {
       },
     });
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+    for (const queryCall of prisma.$queryRaw.mock.calls) {
+      expect(queryCall[0]?.join("?")).not.toContain("position <= 8");
+    }
     const employeeBirthdaysQuery = prisma.$queryRaw.mock.calls[1]?.[0];
     expect(employeeBirthdaysQuery?.join("?")).toContain("employee.status = 'active'");
     expect(employeeBirthdaysQuery?.join("?")).toContain("department.organization_id = ?");

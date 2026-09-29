@@ -1,6 +1,21 @@
-import { AlertCircle, Cake, Loader2, Megaphone } from "lucide-react";
+import { AlertCircle, Cake, Download, Loader2, Megaphone } from "lucide-react";
 
 import { useMarketingDashboard } from "../hooks/useMarketingDashboard";
+import { createBirthdayCsv } from "../utils/birthdayCsv";
+
+function downloadBirthdays(
+  filename: string,
+  items: readonly { name: string; day: number }[],
+): void {
+  const url = URL.createObjectURL(
+    new Blob([`\uFEFF${createBirthdayCsv(items)}`], { type: "text/csv;charset=utf-8" }),
+  );
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 
 function formatNumber(value: number): string {
   return value.toLocaleString("pt-BR");
@@ -59,21 +74,36 @@ function BirthdaySection({
   title,
   items,
   total,
+  onExport,
 }: {
   title: string;
   items: Array<{ id: string; name: string; day: number }>;
   total: number;
+  onExport?: () => void;
 }) {
+  const visibleItems = items.slice(0, 8);
   return (
     <section aria-label={title}>
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
-      {items.length === 0 ? (
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
+        {onExport && items.length > 0 ? (
+          <button
+            type="button"
+            onClick={onExport}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950/40"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            Exportar CSV
+          </button>
+        ) : null}
+      </div>
+      {visibleItems.length === 0 ? (
         <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
           Nenhum registro para os próximos dias deste mês.
         </p>
       ) : (
         <ul className="mt-2 divide-y divide-gray-100 dark:divide-slate-700">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <li key={item.id} className="flex items-center justify-between gap-3 py-2 text-sm">
               <span className="truncate text-gray-700 dark:text-slate-200">{item.name}</span>
               <time className="shrink-0 text-gray-500 dark:text-slate-400" dateTime={`--${String(item.day).padStart(2, "0")}`}>
@@ -83,9 +113,9 @@ function BirthdaySection({
           ))}
         </ul>
       )}
-      {total > items.length ? (
+      {total > visibleItems.length ? (
         <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-          Exibindo {items.length} de {formatNumber(total)} registros.
+          Exibindo {visibleItems.length} de {formatNumber(total)} registros.
         </p>
       ) : null}
     </section>
@@ -198,8 +228,16 @@ export function MarketingDashboard() {
           </div>
         </div>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-          <BirthdaySection title="Aniversários de clientes" {...summary.birthdays.clients} />
-          <BirthdaySection title="Aniversários da equipe" {...summary.birthdays.employees} />
+          <BirthdaySection
+            title="Aniversários de clientes"
+            {...summary.birthdays.clients}
+            onExport={() => downloadBirthdays("aniversarios-clientes.csv", summary.birthdays.clients.items)}
+          />
+          <BirthdaySection
+            title="Aniversários da equipe"
+            {...summary.birthdays.employees}
+            onExport={() => downloadBirthdays("aniversarios-colaboradores.csv", summary.birthdays.employees.items)}
+          />
           <BirthdaySection title="Aniversários das empresas" {...summary.birthdays.companies} />
         </div>
       </section>
