@@ -1,5 +1,12 @@
-import { error as logError, ServiceError } from "@workspace/shared";
+import { INTERNAL_ERROR_MESSAGE, error as logError, ServiceError } from "@workspace/shared";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import type { MarketingEvent } from "../routes/marketingEvents.routes.js";
+import {
+  MARKETING_EVENT_PRIORITIES,
+  MARKETING_EVENT_STATUSES,
+  type MarketingEventPriority,
+  type MarketingEventStatus,
+} from "../schemas/marketingEvent.schemas.js";
 import type {
   MarketingEventEditionFeedbackInput,
   MarketingEventEditionInput,
@@ -12,7 +19,49 @@ const editionInclude: Prisma.MarketingEventEditionInclude = {
 const reportInclude: Prisma.MarketingEventEditionInclude = { ...editionInclude, event: true };
 
 type EditionRecord = Prisma.MarketingEventEditionGetPayload<{ include: typeof editionInclude }>;
-type MarketingEventEdition = ReturnType<typeof mapEdition>;
+type EditionReportRecord = Prisma.MarketingEventEditionGetPayload<{
+  include: typeof reportInclude;
+}>;
+const eventStatuses = new Set<string>(MARKETING_EVENT_STATUSES);
+const eventPriorities = new Set<string>(MARKETING_EVENT_PRIORITIES);
+
+export interface MarketingEventEditionBudgetItem {
+  id: string;
+  name: string;
+  amount: string;
+  position: number;
+}
+
+export interface MarketingEventEditionFeedback {
+  rating: number;
+  observation: string | null;
+  evaluatedAt: string;
+}
+
+export interface MarketingEventEdition {
+  id: string;
+  eventId: string;
+  name: string;
+  date: string;
+  place: string;
+  budgetItems: MarketingEventEditionBudgetItem[];
+  budgetTotal: string;
+  partnerships: string[];
+  organizingTeam: string[];
+  logistics: MarketingEventEditionInput["logistics"];
+  marketingCommunication: MarketingEventEditionInput["marketingCommunication"];
+  duringEvent: MarketingEventEditionInput["duringEvent"];
+  afterEvent: MarketingEventEditionInput["afterEvent"];
+  notes: string;
+  feedbackPeriodStart: string | null;
+  feedbackPeriodEnd: string | null;
+  feedback: MarketingEventEditionFeedback | null;
+}
+
+export interface MarketingEventEditionReport {
+  event: MarketingEvent;
+  edition: MarketingEventEdition;
+}
 
 function toCents(amount: string): bigint {
   const [whole, fraction = ""] = amount.split(".");
@@ -23,7 +72,7 @@ function fromCents(cents: bigint): string {
   return `${cents / 100n}.${(cents % 100n).toString().padStart(2, "0")}`;
 }
 
-function mapEdition(record: EditionRecord) {
+function mapEdition(record: EditionRecord): MarketingEventEdition {
   return {
     id: record.id,
     eventId: record.event_id,
@@ -39,12 +88,13 @@ function mapEdition(record: EditionRecord) {
     budgetTotal: fromCents(
       record.budgetItems.reduce((total, item) => total + toCents(item.amount.toString()), 0n),
     ),
-    partnerships: record.partnerships,
-    organizingTeam: record.organizing_team,
-    logistics: record.logistics,
-    marketingCommunication: record.marketing_communication,
-    duringEvent: record.during_event,
-    afterEvent: record.after_event,
+    partnerships: record.partnerships as string[],
+    organizingTeam: record.organizing_team as string[],
+    logistics: record.logistics as MarketingEventEditionInput["logistics"],
+    marketingCommunication:
+      record.marketing_communication as MarketingEventEditionInput["marketingCommunication"],
+    duringEvent: record.during_event as MarketingEventEditionInput["duringEvent"],
+    afterEvent: record.after_event as MarketingEventEditionInput["afterEvent"],
     notes: record.notes,
     feedbackPeriodStart: record.feedback_period_start?.toISOString() ?? null,
     feedbackPeriodEnd: record.feedback_period_end?.toISOString() ?? null,
@@ -55,6 +105,21 @@ function mapEdition(record: EditionRecord) {
           evaluatedAt: record.feedback.evaluated_at.toISOString(),
         }
       : null,
+  };
+}
+
+function mapReportEvent(event: EditionReportRecord["event"]): MarketingEvent {
+  if (!eventStatuses.has(event.status) || !eventPriorities.has(event.priority)) {
+    throw new ServiceError(500, "O evento salvo contém status ou prioridade inválidos.");
+  }
+  return {
+    id: event.id,
+    name: event.name,
+    logo: event.logo,
+    status: event.status as MarketingEventStatus,
+    priority: event.priority as MarketingEventPriority,
+    objective: event.objective,
+    audience: event.audience,
   };
 }
 
@@ -122,7 +187,8 @@ export class MarketingEventEditionsService {
       ) {
         throw new ServiceError(404, "Evento não encontrado.", error);
       }
-      throw error;
+      if (error instanceof ServiceError) throw error;
+      throw new ServiceError(500, INTERNAL_ERROR_MESSAGE, error);
     }
   }
 
@@ -158,7 +224,7 @@ export class MarketingEventEditionsService {
     eventId: string,
     editionId: string,
     input: MarketingEventEditionFeedbackInput,
-  ): Promise<{ rating: number; observation: string | null; evaluatedAt: string }> {
+  ): Promise<MarketingEventEditionFeedback> {
     try {
       const edition = await this.prisma.marketingEventEdition.findFirst({
         where: { id: editionId, organization_id: organizationId, event_id: eventId },
@@ -191,7 +257,7 @@ export class MarketingEventEditionsService {
       ) {
         throw new ServiceError(409, "Esta edição já possui uma avaliação.", error);
       }
-      throw error;
+      throw new ServiceError(500, INTERNAL_ERROR_MESSAGE, error);
     }
   }
 
@@ -199,22 +265,14 @@ export class MarketingEventEditionsService {
     organizationId: string,
     eventId: string,
     editionId: string,
-  ): Promise<{ event: Record<string, unknown>; edition: MarketingEventEdition } | null> {
+  ): Promise<MarketingEventEditionReport | null> {
     const record = await this.prisma.marketingEventEdition.findFirst({
       where: { id: editionId, organization_id: organizationId, event_id: eventId },
       include: reportInclude,
     });
     if (!record) return null;
     return {
-      event: {
-        id: record.event.id,
-        name: record.event.name,
-        logo: record.event.logo,
-        status: record.event.status,
-        priority: record.event.priority,
-        objective: record.event.objective,
-        audience: record.event.audience,
-      },
+      event: mapReportEvent(record.event),
       edition: mapEdition(record),
     };
   }

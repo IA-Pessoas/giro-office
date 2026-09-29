@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { MarketingEditionLists, MarketingEventEditionReport as EditionReport } from "../types/marketingEventEdition";
+import { marketingPrimaryButtonClass, marketingSecondaryButtonClass } from "./marketingButtonStyles";
 
 function formatAmount(amount: string): string {
   const [whole, fraction = ""] = amount.split(".");
@@ -85,14 +86,14 @@ export function MarketingEventEditionReport({
     >
       <div className="hide-on-print flex flex-wrap justify-between gap-2">
         <button
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          className={marketingSecondaryButtonClass}
           onClick={onBack}
           type="button"
         >
           Voltar às edições
         </button>
         <button
-          className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          className={marketingPrimaryButtonClass}
           onClick={printReport}
           type="button"
         >

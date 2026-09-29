@@ -12,6 +12,11 @@ import {
 import type { MarketingEvent } from "../types/marketingEvent";
 import type { MarketingEditionLists, MarketingEventEdition, MarketingEventEditionPayload } from "../types/marketingEventEdition";
 import { marketingFormControlClass, marketingFormTextareaClass } from "./marketingFormStyles";
+import {
+  marketingIconButtonClass,
+  marketingPrimaryButtonClass,
+  marketingSecondaryButtonClass,
+} from "./marketingButtonStyles";
 import { MarketingEventEditionReport } from "./MarketingEventEditionReport";
 
 const planningGroups = [
@@ -214,8 +219,8 @@ export function MarketingEventEditions({
       description={`Edições e planejamento de ${event.name}`}
       footer={formOpen ? (
         <>
-          <button className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700" disabled={isSaving} onClick={() => { setFormOpen(false); setEditing(null); setFormError(""); }} type="button">Cancelar</button>
-          {canEdit ? <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={isSaving} form="marketing-event-edition-form" type="submit">{isSaving ? "Salvando…" : editing ? "Salvar edição" : "Nova edição"}</button> : null}
+          <button className={marketingSecondaryButtonClass} disabled={isSaving} onClick={() => { setFormOpen(false); setEditing(null); setFormError(""); }} type="button">Cancelar</button>
+          {canEdit ? <button className={marketingPrimaryButtonClass} disabled={isSaving} form="marketing-event-edition-form" type="submit">{isSaving ? "Salvando…" : editing ? "Salvar edição" : "Nova edição"}</button> : null}
         </>
       ) : null}
       onOpenChange={onOpenChange}
@@ -226,7 +231,7 @@ export function MarketingEventEditions({
       {query.isError ? <p className="text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível carregar as edições. Feche e tente novamente.</p> : null}
       {!query.isLoading && !query.isError && !formOpen ? (
         <div className="space-y-4">
-          {!reportEditionId && canEdit ? <div className="flex justify-end"><button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" onClick={startCreate} type="button"><Plus aria-hidden="true" className="h-4 w-4" />Adicionar edição</button></div> : null}
+          {!reportEditionId && canEdit ? <div className="flex justify-end"><button className={marketingPrimaryButtonClass} onClick={startCreate} type="button"><Plus aria-hidden="true" className="h-4 w-4" />Adicionar edição</button></div> : null}
           {feedbackEditionId && !reportEditionId ? (
             <form className="space-y-3 rounded-md border border-gray-200 p-4 dark:border-slate-700" onSubmit={saveFeedback}>
               <h3 className="font-semibold text-gray-900 dark:text-white">Registrar avaliação</h3>
@@ -242,14 +247,14 @@ export function MarketingEventEditions({
                 </label>
               </div>
               <div className="flex justify-end gap-2">
-                <button className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800" disabled={feedbackMutation.isPending} onClick={() => setFeedbackEditionId(null)} type="button">Cancelar</button>
-                <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={feedbackMutation.isPending} type="submit">{feedbackMutation.isPending ? "Salvando…" : "Salvar avaliação"}</button>
+                <button className={marketingSecondaryButtonClass} disabled={feedbackMutation.isPending} onClick={() => setFeedbackEditionId(null)} type="button">Cancelar</button>
+                <button className={marketingPrimaryButtonClass} disabled={feedbackMutation.isPending} type="submit">{feedbackMutation.isPending ? "Salvando…" : "Salvar avaliação"}</button>
               </div>
             </form>
           ) : null}
           {reportEditionId ? (
             reportQuery.isLoading ? <p className="text-sm text-gray-600 dark:text-slate-300" role="status">Carregando relatório…</p> :
-            reportQuery.isError ? <div className="space-y-3" role="alert"><p className="text-sm text-red-700 dark:text-red-300">Não foi possível carregar o relatório.</p><button className="rounded-md border border-gray-300 px-3 py-2 text-sm" onClick={() => void reportQuery.refetch()} type="button">Tentar novamente</button><button className="ml-2 rounded-md px-3 py-2 text-sm" onClick={() => setReportEditionId(null)} type="button">Voltar</button></div> :
+            reportQuery.isError ? <div className="space-y-3" role="alert"><p className="text-sm text-red-700 dark:text-red-300">Não foi possível carregar o relatório.</p><button className={marketingSecondaryButtonClass} onClick={() => void reportQuery.refetch()} type="button">Tentar novamente</button><button className="ml-2 rounded-md px-3 py-2 text-sm" onClick={() => setReportEditionId(null)} type="button">Voltar</button></div> :
             reportQuery.data ? <MarketingEventEditionReport onBack={() => setReportEditionId(null)} report={reportQuery.data} /> : null
           ) : null}
           {!reportEditionId && editions.length === 0 ? <p className="rounded-lg bg-gray-50 px-4 py-6 text-sm text-gray-600 dark:bg-slate-800 dark:text-slate-300">Nenhuma edição cadastrada para este evento.</p> : null}
@@ -280,7 +285,7 @@ export function MarketingEventEditions({
                       </button>
                     ) : null}
                     <button className="rounded-md px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-200 dark:hover:bg-slate-800" onClick={() => { setReportEditionId(edition.id); setFeedbackEditionId(null); }} type="button">Relatório</button>
-                    {canEdit ? <button aria-label={`Editar edição ${edition.name}`} className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white" onClick={() => startEdit(edition)} type="button"><Pencil aria-hidden="true" className="h-4 w-4" /></button> : null}
+                    {canEdit ? <button aria-label={`Editar edição ${edition.name}`} className={marketingIconButtonClass} onClick={() => startEdit(edition)} type="button"><Pencil aria-hidden="true" className="h-4 w-4" /></button> : null}
                   </div></td>
                 </tr>)}</tbody>
               </table>

@@ -7,7 +7,6 @@ import {
 } from "@workspace/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-
 import {
   MarketingPermissionLevel,
   requireMarketingPermission,
@@ -20,31 +19,36 @@ import {
   marketingEventEditionIdParamsSchema,
   marketingEventEditionParamsSchema,
 } from "../schemas/marketingEventEdition.schemas.js";
+import type {
+  MarketingEventEdition,
+  MarketingEventEditionFeedback,
+  MarketingEventEditionReport,
+} from "../services/marketingEventEditionsService.js";
 
 export interface MarketingEventEditionsProvider {
-  listEditions(organizationId: string, eventId: string): Promise<unknown[]>;
+  listEditions(organizationId: string, eventId: string): Promise<MarketingEventEdition[]>;
   createEdition(
     organizationId: string,
     eventId: string,
     input: MarketingEventEditionInput,
-  ): Promise<unknown>;
+  ): Promise<MarketingEventEdition>;
   updateEdition(
     organizationId: string,
     eventId: string,
     editionId: string,
     input: MarketingEventEditionInput,
-  ): Promise<unknown | null>;
+  ): Promise<MarketingEventEdition | null>;
   createEditionFeedback(
     organizationId: string,
     eventId: string,
     editionId: string,
     input: MarketingEventEditionFeedbackInput,
-  ): Promise<unknown>;
+  ): Promise<MarketingEventEditionFeedback>;
   getEditionReport(
     organizationId: string,
     eventId: string,
     editionId: string,
-  ): Promise<unknown | null>;
+  ): Promise<MarketingEventEditionReport | null>;
 }
 
 export function createMarketingEventEditionsRoutes(

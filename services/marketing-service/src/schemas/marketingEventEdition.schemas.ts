@@ -35,10 +35,12 @@ const afterEventSchema = z
   })
   .strict();
 
-export const marketingEventEditionParamsSchema = z.object({ eventId: z.string().uuid() }).strict();
+export const marketingEventEditionParamsSchema = z
+  .object({ eventId: z.string().uuid({ message: "Identificador do evento inválido." }) })
+  .strict();
 export const marketingEventEditionIdParamsSchema = marketingEventEditionParamsSchema
   .extend({
-    editionId: z.string().uuid(),
+    editionId: z.string().uuid({ message: "Identificador da edição inválido." }),
   })
   .strict();
 
