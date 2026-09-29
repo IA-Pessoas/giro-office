@@ -30,6 +30,11 @@ Exemplos de paths publicos:
 - `/fiscal/rates` (POST: alíquota informada manualmente)
 - `/fiscal/rates/list?client_id=<uuid>`
 - `/fiscal/rates/<uuid>/pdf`
+- `/fiscal/revenues` (POST) e `/fiscal/revenues/<uuid>` (PUT): receita bruta mensal por cliente e competência
+- `/fiscal/revenues/list?client_id=<uuid>&from=AAAA-MM&to=AAAA-MM`
+- `/fiscal/simples/preview?client_id=<uuid>&competence=AAAA-MM`: RBT12 e alíquota de ISS/ICMS por anexo do Simples
+- `/fiscal/simples/pdf?client_id=<uuid>&competence=AAAA-MM&annex=III`: carta com a alíquota do mês seguinte
+- `/fiscal/simples/csv` e `/fiscal/simples/zip` (POST, edição Fiscal): lote por lista de CPF/CNPJ em CSV ou ZIP de PDFs
 - `/health`
 
 As rotas `/internal/reporting/catalog` e `/internal/reporting/extract` são internas, não passam

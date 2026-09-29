@@ -132,9 +132,7 @@ export async function confirmPasswordReset(
   });
   if (!owner) throw invalid;
   const passwordHash = await hashPassword(input.password);
-  if (!db.$transaction || !db.user.updateMany || !db.authSession.updateMany) {
-    throw new ServiceError(503, "Redefinição de senha não configurada.");
-  }
+  if (!db.$transaction) throw new ServiceError(503, "Redefinição de senha não configurada.");
   await db.$transaction(
     async (transaction) => {
       const claimed = await transaction.passwordResetToken.updateMany({
@@ -142,20 +140,55 @@ export async function confirmPasswordReset(
         data: { used_at: new Date() },
       });
       if (claimed.count !== 1) throw invalid;
-      await transaction.user.updateMany?.({
-        where: { id: userId },
-        data: {
-          password: passwordHash,
-          session_version: { increment: 1 },
-          version: { increment: 1 },
-        },
-      });
-      await transaction.authSession.updateMany?.({
-        where: { user_id: userId, revoked_at: null },
-        data: { revoked_at: new Date() },
-      });
+      await replacePassword(transaction, userId, passwordHash);
     },
     { isolationLevel: "Serializable" },
   );
   return { userId };
+}
+
+/** Grava a nova senha e derruba todas as sessões do usuário. */
+async function replacePassword(
+  transaction: UserPrismaClient,
+  userId: string,
+  passwordHash: string,
+): Promise<void> {
+  if (!transaction.user.updateMany || !transaction.authSession.updateMany) {
+    throw new ServiceError(503, "Redefinição de senha não configurada.");
+  }
+  await transaction.user.updateMany({
+    where: { id: userId },
+    data: {
+      password: passwordHash,
+      session_version: { increment: 1 },
+      version: { increment: 1 },
+    },
+  });
+  await transaction.authSession.updateMany({
+    where: { user_id: userId, revoked_at: null },
+    data: { revoked_at: new Date() },
+  });
+}
+
+/**
+ * O TI define a senha de outro usuário (sem link). O alvo já passou pela checagem de
+ * tenant e hierarquia; links pendentes deixam de valer.
+ */
+export async function setUserPassword(
+  db: UserPrismaClient,
+  target: Row,
+  password: string,
+  hashPassword: (password: string) => Promise<string>,
+): Promise<void> {
+  if (target.status !== "active") throw new ServiceError(409, "O usuário está inativo.");
+  if (!db.$transaction) throw new ServiceError(503, "Redefinição de senha não configurada.");
+  const userId = String(target.id);
+  const passwordHash = await hashPassword(password);
+  await db.$transaction(async (transaction) => {
+    await replacePassword(transaction, userId, passwordHash);
+    await transaction.passwordResetToken.updateMany({
+      where: { user_id: userId, used_at: null },
+      data: { used_at: new Date() },
+    });
+  });
 }

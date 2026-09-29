@@ -117,6 +117,10 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       { name: "IPI", description: "CRUD de IPI" },
       { name: "NCM", description: "CRUD de NCM" },
       { name: "Alíquotas", description: "Registro manual e PDF de ISS/ICMS por empresa" },
+      {
+        name: "Receitas",
+        description: "Receita bruta mensal por cliente, base do Simples Nacional",
+      },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
@@ -791,6 +795,260 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
               content: { "application/json": { schema: paginatedListEnvelopeSchema } },
             },
             "400": { description: "Filtro inválido" },
+          },
+        },
+      },
+      "/fiscal/revenues": {
+        post: {
+          tags: ["Receitas"],
+          summary: "Registrar receita bruta do cliente na competência",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "amount"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    amount: {
+                      type: "string",
+                      pattern: "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+                      description: "Valor em reais, não negativo, com ponto decimal",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Receita registrada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+            "409": { description: "Já existe receita para o cliente nesta competência" },
+          },
+        },
+      },
+      "/fiscal/revenues/list": {
+        get: {
+          tags: ["Receitas"],
+          summary: "Listar receitas mensais do cliente",
+          description: "Competência sem registro é tratada como receita zero pelo cálculo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            { name: "from", in: "query", required: false, schema: { type: "string" } },
+            { name: "to", in: "query", required: false, schema: { type: "string" } },
+            ...paginationParameters,
+          ],
+          responses: {
+            "200": {
+              description: "Receitas paginadas, da competência mais recente para a mais antiga",
+              content: { "application/json": { schema: paginatedListEnvelopeSchema } },
+            },
+            "400": { description: "Filtro inválido" },
+          },
+        },
+      },
+      "/fiscal/simples/preview": {
+        get: {
+          tags: ["Receitas"],
+          summary: "Prévia das alíquotas de ISS/ICMS do Simples Nacional",
+          description:
+            "RBT12 = soma das receitas dos 11 meses anteriores à competência (mês sem registro vale zero) mais a média desses 11 meses, que estima o 12º. Para cada anexo (I e II: ICMS; III a V: ISS) devolve faixa, alíquota nominal, parcela a deduzir, alíquota efetiva, repartição, percentual bruto do tributo (rate) e percentual de emissão com os limites (emission_rate: ICMS 1,36–5%, ISS 2,01–5%; null na 6ª faixa). applies_to é a competência seguinte, à qual a alíquota emitida se refere. status no_base (RBT12 zero) e above_limit (acima de R$ 4.800.000,00) não trazem anexos.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Prévia calculada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Filtro inválido" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+          },
+        },
+      },
+      "/fiscal/simples/pdf": {
+        get: {
+          tags: ["Receitas"],
+          summary: "Emitir PDF da alíquota do Simples para um anexo",
+          description:
+            "Carta ao cliente com a alíquota de ISS (Anexos III a V) ou ICMS (I e II) referente à competência seguinte, com os limites de emissão aplicados. 422 quando não há base (RBT12 zero ou acima do teto) ou alíquota válida (6ª faixa).",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+            {
+              name: "annex",
+              in: "query",
+              required: true,
+              schema: { type: "string", enum: ["I", "II", "III", "IV", "V"] },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "PDF para envio ao cliente",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+            "400": { description: "Filtro inválido" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+            "422": { description: "Sem base ou sem alíquota válida para o anexo" },
+          },
+        },
+      },
+      "/fiscal/simples/csv": {
+        post: {
+          tags: ["Receitas"],
+          summary: "Exportar CSV de alíquotas do Simples em lote",
+          description:
+            "Para cada CPF/CNPJ informado, inclui o cliente da organização com Fiscal habilitado, ativo no mês da alíquota (status Ativo ou saída nesse mês ou depois) e no Simples Nacional, desde que haja alíquota válida no anexo. O CSV usa ponto e vírgula, colunas Razão Social;CPF/CNPJ;% (vírgula decimal, limites de emissão) e protege textos contra fórmulas. Os demais vêm em skipped com o motivo.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["competence", "annex", "documents"],
+                  additionalProperties: false,
+                  properties: {
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    annex: { type: "string", enum: ["I", "II", "III", "IV", "V"] },
+                    documents: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 500,
+                      items: { type: "string", maxLength: 20 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "CSV do lote (campo csv), nome do arquivo, incluídos e ignorados",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
+      "/fiscal/simples/zip": {
+        post: {
+          tags: ["Receitas"],
+          summary: "Exportar PDFs de alíquotas do Simples em lote (ZIP)",
+          description:
+            "Mesmos critérios e cálculo do CSV em lote: gera um PDF por cliente incluído e devolve o ZIP em base64 (zip_base64; null quando ninguém entra) com os ignorados e o motivo. Se algum PDF falhar, responde erro sem arquivo parcial.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["competence", "annex", "documents"],
+                  additionalProperties: false,
+                  properties: {
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    annex: { type: "string", enum: ["I", "II", "III", "IV", "V"] },
+                    documents: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 500,
+                      items: { type: "string", maxLength: 20 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "ZIP (base64), nome do arquivo, incluídos e ignorados",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "500": { description: "Falha ao gerar os PDFs; nenhum arquivo entregue" },
+          },
+        },
+      },
+      "/fiscal/revenues/{id}": {
+        put: {
+          tags: ["Receitas"],
+          summary: "Corrigir o valor de uma receita mensal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["amount"],
+                  additionalProperties: false,
+                  properties: { amount: { type: "string" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Receita corrigida",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Receita não encontrada nesta organização" },
           },
         },
       },

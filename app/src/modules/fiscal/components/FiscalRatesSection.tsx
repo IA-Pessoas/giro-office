@@ -7,19 +7,14 @@ import { Download, Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { fiscalRateService, type FiscalRate, type FiscalTaxType } from "../services/fiscalRateService";
-import { getFiscalErrorMessage } from "../utils";
+import { competenceFromToday, downloadFile, getFiscalErrorMessage } from "../utils";
+import { FISCAL_FIELD_CONTROL_CLASSNAME } from "./fiscalFieldStyles";
 
 const pageSize = 20;
-const FIELD_CONTROL_CLASSNAME = "h-10 rounded-lg border border-gray-300 bg-white px-3 text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white";
-
-function currentCompetence(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
 
 export function FiscalRatesSection({ canEdit }: { canEdit: boolean }) {
   const [client, setClient] = useState<ClientPickerOption | null>(null);
-  const [competence, setCompetence] = useState(currentCompetence);
+  const [competence, setCompetence] = useState(() => competenceFromToday());
   const [taxType, setTaxType] = useState<FiscalTaxType>("ISS");
   const [rate, setRate] = useState("");
   const [page, setPage] = useState(1);
@@ -53,12 +48,7 @@ export function FiscalRatesSection({ canEdit }: { canEdit: boolean }) {
     setDownloadingId(item.id);
     try {
       const blob = await fiscalRateService.download(item.id);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `aliquota-${item.tax_type}-${item.competence}-${item.id}.pdf`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      downloadFile(blob, `aliquota-${item.tax_type}-${item.competence}-${item.id}.pdf`);
     } catch (error) {
       toast.error(getFiscalErrorMessage(error));
     } finally {
@@ -97,18 +87,18 @@ export function FiscalRatesSection({ canEdit }: { canEdit: boolean }) {
         <form onSubmit={(event) => void submit(event)} className="grid gap-4 rounded-xl border border-gray-200 p-4 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end dark:border-slate-700">
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             Competência
-            <input type="month" required value={competence} onChange={(event) => setCompetence(event.target.value)} className={FIELD_CONTROL_CLASSNAME} />
+            <input type="month" required value={competence} onChange={(event) => setCompetence(event.target.value)} className={FISCAL_FIELD_CONTROL_CLASSNAME} />
           </label>
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             Tributo
-            <select value={taxType} onChange={(event) => setTaxType(event.target.value as FiscalTaxType)} className={FIELD_CONTROL_CLASSNAME}>
+            <select value={taxType} onChange={(event) => setTaxType(event.target.value as FiscalTaxType)} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
               <option value="ISS">ISS</option>
               <option value="ICMS">ICMS</option>
             </select>
           </label>
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             Alíquota informada (%)
-            <input type="text" inputMode="decimal" required maxLength={8} value={rate} onChange={(event) => setRate(event.target.value)} placeholder="Ex.: 5,1250" className={FIELD_CONTROL_CLASSNAME} />
+            <input type="text" inputMode="decimal" required maxLength={8} value={rate} onChange={(event) => setRate(event.target.value)} placeholder="Ex.: 5,1250" className={FISCAL_FIELD_CONTROL_CLASSNAME} />
           </label>
           <button type="submit" disabled={create.isPending} className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
             {create.isPending ? "Registrando..." : "Registrar alíquota"}

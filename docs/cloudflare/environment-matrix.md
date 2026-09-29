@@ -11,6 +11,23 @@ Esta matriz documenta nomes e escopo. Ela não contém valores, tokens ou URLs p
 | `INTERNAL_SERVICE_TOKEN` | Secret | Gateway e Workers de domínio | Header interno; nunca expor em `NEXT_PUBLIC_*`. |
 | `HYPERDRIVE` | Binding | Workers com Prisma | Conexão PostgreSQL por request; substituir a URL direta no runtime. O config `giro-postgres-prod` precisa de **cache de query desligado** (`caching.disabled=true`): com cache, leituras logo após PATCH/POST voltam o valor antigo e a UI parece não persistir (QA 2026-09-22, BUG-003/004/005). |
 
+### Tokens internos com o mesmo valor
+
+Cada chamador envia um token com nome próprio, mas o destino valida contra outro nome. Ao gerar
+ou rotacionar, os pares abaixo precisam do **mesmo valor**; senão o destino responde 401 e o
+gateway devolve 503 (inclusive no login, que audita).
+
+| Chamador envia | Destino valida contra | Valor |
+| --- | --- | --- |
+| `AUDIT_SERVICE_TOKEN` (todos) | `INTERNAL_SERVICE_TOKEN` do audit-service | o do audit é o `AUDIT_SERVICE_TOKEN`; o gateway exige que seja distinto do `INTERNAL_SERVICE_TOKEN` dele |
+| `USER_SERVICE_INTERNAL_TOKEN` | `INTERNAL_SERVICE_TOKEN` do user-service | = `INTERNAL_SERVICE_TOKEN` |
+| `TRIAGEM_INTERNAL_TOKEN` | `INTERNAL_SERVICE_TOKEN` do triagem-service | = `INTERNAL_SERVICE_TOKEN` |
+| `CLIENT_SERVICE_INTERNAL_TOKEN` | `INTERNAL_SERVICE_TOKEN` do client-service | = `INTERNAL_SERVICE_TOKEN` |
+| `TASK_SERVICE_INTERNAL_TOKEN` | `COMMERCIAL_SERVICE_TOKEN` do task-service | = `COMMERCIAL_SERVICE_TOKEN` |
+
+Consequência conhecida: o gateway repassa `/audit/*` com o `INTERNAL_SERVICE_TOKEN`, que o
+audit-service recusa — `GET /api/audit/requests` responde 401.
+
 ## Service Bindings atuais
 
 | Binding no Gateway | Serviço | Estado local |
