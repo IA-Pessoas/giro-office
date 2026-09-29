@@ -279,7 +279,7 @@ test("erro de callback com mutação prioriza drift e fecha o FileHandle", async
   );
 
   await assert.rejects(async () => collect(session.iterateStep(stepKey)), /SOURCE_DUMP_DRIFT/);
-  assert.equal(await countOpenDescriptors(childPath), 0);
+  await assertNoOpenDescriptor(childPath);
 });
 
 test("erro de callback sem mutação é sanitizado e fecha o FileHandle", async (t) => {
@@ -298,7 +298,7 @@ test("erro de callback sem mutação é sanitizado e fecha o FileHandle", async 
     async () => collect(session.iterateStep(stepKey)),
     /EXECUTION_CALLBACK_FAILED/,
   );
-  assert.equal(await countOpenDescriptors(childPath), 0);
+  await assertNoOpenDescriptor(childPath);
 });
 
 test("erro de parser revalida o dump e fecha o FileHandle", async (t) => {
@@ -311,7 +311,7 @@ test("erro de parser revalida o dump e fecha o FileHandle", async (t) => {
   const session = await createExecutionSession(await executionFixture({ sourceDir }));
 
   await assert.rejects(async () => collect(session.iterateStep(stepKey)), /Erro no parser SQL/);
-  assert.equal(await countOpenDescriptors(childPath), 0);
+  await assertNoOpenDescriptor(childPath);
 });
 
 test("iterateStep falha fechado quando emitRows omite a decisão do step", async () => {
@@ -647,6 +647,7 @@ async function executionFixture({
     tableMappings: mappingPackage.tableMappings,
     destinationMappings: mappingPackage.destinationMappings,
     sourceDigest: mappingPackage.inventory.sourceDigest,
+    pendingMappings: mappingPackage.pendingMappings,
   });
   const { ruleRegistry, executionRegistry } = createFixtureRegistries({
     mappingPackage,
@@ -921,7 +922,7 @@ async function createMappingPackage(
   }
   const inventory = { tables: inventoryRows };
   inventory.sourceDigest = digestSourceInventory(inventoryRows);
-  return { inventory, tableMappings, destinationMappings };
+  return { inventory, tableMappings, destinationMappings, pendingMappings: [] };
 }
 
 async function inventoryTable(sourceDir, sourceTable, fileName, rowCount) {
@@ -972,7 +973,14 @@ async function collect(iterable) {
 async function countOpenDescriptors(filePath) {
   const target = await realpath(filePath);
   let count = 0;
-  for (const descriptor of await readdir("/proc/self/fd")) {
+  let descriptors;
+  try {
+    descriptors = await readdir("/proc/self/fd");
+  } catch (error) {
+    if (process.platform === "win32" && error?.code === "ENOENT") return null;
+    throw error;
+  }
+  for (const descriptor of descriptors) {
     try {
       if ((await readlink(`/proc/self/fd/${descriptor}`)).replace(/ \(deleted\)$/, "") === target) {
         count += 1;
@@ -982,6 +990,11 @@ async function countOpenDescriptors(filePath) {
     }
   }
   return count;
+}
+
+async function assertNoOpenDescriptor(filePath) {
+  const count = await countOpenDescriptors(filePath);
+  if (count !== null) assert.equal(count, 0);
 }
 
 function digestSourceInventory(tables) {

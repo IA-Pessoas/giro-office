@@ -288,6 +288,7 @@ export async function runConfiguredDryRun({ sourceDir, organizationId, resolutio
     tableMappings,
     destinationMappings,
     sourceDigest: inventory.sourceDigest,
+    pendingMappings,
   });
   const executionRegistry = createCompleteExecutionRegistry();
   if (
