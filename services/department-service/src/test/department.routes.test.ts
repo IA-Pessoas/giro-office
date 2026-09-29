@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDepartmentApp } from "../app.js";
 import { getDepartmentServiceEnv } from "../config/env.js";
+import { buildDepartmentServiceOpenApiSpec } from "../openapi/spec.js";
 import type { DepartmentRouteDeps } from "../routes/department.routes.js";
 
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
@@ -77,6 +78,17 @@ describe("department routes", () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data?.service).toBe("department-service");
     expect(res.body.data?.status).toBe("ok");
+  });
+
+  it("documenta o filtro administrativo uma única vez no OpenAPI", () => {
+    const spec = buildDepartmentServiceOpenApiSpec(getDepartmentServiceEnv());
+    const route = spec.paths["/department/list"] as {
+      get?: { parameters?: Array<{ name?: string }> };
+    };
+
+    expect(
+      route.get?.parameters?.filter((parameter) => parameter.name === "administrative"),
+    ).toHaveLength(1);
   });
 
   it("GET /department/list sem autenticacao retorna 401", async () => {
