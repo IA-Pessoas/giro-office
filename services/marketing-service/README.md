@@ -1,6 +1,6 @@
 # marketing-service
 
-Serviço somente de leitura para o dashboard inicial de Marketing.
+Serviço do dashboard inicial e gestão de eventos de Marketing por organização.
 
 ## Porta local
 
@@ -14,9 +14,19 @@ Serviço somente de leitura para o dashboard inicial de Marketing.
 
 ## Gateway
 
-O serviço prepara `GET /marketing/dashboard`, que exige permissão Marketing de nível 1. O gateway
-mantém `/marketing` bloqueado com 404 até a reconciliação do módulo. Todas as consultas usam a
-organização do contexto autenticado. O serviço não altera solicitações, clientes ou colaboradores.
+O gateway expõe o prefixo público `/marketing`. Exemplos: `GET /marketing/dashboard`,
+`GET /marketing/events/list`, `POST /marketing/events`, `PUT /marketing/events/{id}`,
+`GET /marketing/events/{eventId}/editions`, `POST /marketing/events/{eventId}/editions` e
+`PUT /marketing/events/{eventId}/editions/{editionId}`. Também disponibiliza
+`POST /marketing/events/{eventId}/editions/{editionId}/feedback` para registrar uma avaliação única
+(nota de 1 a 5 e observação opcional) e
+`GET /marketing/events/{eventId}/editions/{editionId}/report` para consultar os dados da edição
+em formato adequado para impressão. Edições pertencem ao evento da organização autenticada e
+guardam data, local, itens de orçamento, planejamento estruturado e período opcional de avaliação.
+As rotas exigem autenticação e permissão do módulo Marketing. Criação e edição de eventos e edições,
+assim como registro de avaliação, requerem nível de edição; leitura do relatório requer acesso de
+leitura ao módulo. Eventos e edições são limitados à organização do contexto autenticado. Na criação,
+o status inicial do evento é `Novo`; ele pode ser alterado na edição.
 
 ## Desenvolvimento
 
@@ -24,3 +34,7 @@ organização do contexto autenticado. O serviço não altera solicitações, cl
 pnpm --filter @workspace/marketing-service dev
 pnpm --filter @workspace/marketing-service test
 ```
+
+O smoke de integração do workspace é opt-in com `MARKETING_EVENTS_SMOKE_ENABLED=1`; ele cria um
+evento e uma edição com nomes únicos na organização autenticada para testar criação, leitura e
+edição dos respectivos dados.

@@ -54,6 +54,10 @@ describe("matriz de regressão das políticas modulares", () => {
       ["fiscal", "POST", "/fiscal/ncm"],
       ["contabil", "POST", "/contabil/controls"],
       ["certificado", "DELETE", "/certificate/cert-1"],
+      ["marketing", "POST", "/marketing/events"],
+      ["marketing", "PUT", "/marketing/events/event-1"],
+      ["marketing", "POST", "/marketing/events/event-1/editions"],
+      ["marketing", "PUT", "/marketing/events/event-1/editions/edition-1"],
     ] as const;
 
     for (const [module, method, path] of writeRoutes) {
@@ -62,7 +66,7 @@ describe("matriz de regressão das políticas modulares", () => {
       expect(canAccessRoute(owner, policy), `owner: ${method} ${path}`).toBe(true);
     }
 
-    // Exceções do ADR 0002: fluxos operacionais em que o nível 1 executa. Marketing não tem rota.
+    // Exceções do ADR 0002: fluxos operacionais em que o nível 1 executa.
     const covered = new Set<string>([
       ...writeRoutes.map(([module]) => module),
       "triagem",

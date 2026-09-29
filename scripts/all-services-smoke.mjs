@@ -108,6 +108,9 @@ const env = {
   platformImpersonationSmokeEnabled:
     process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "true" ||
     process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "1",
+  marketingEventsSmokeEnabled:
+    process.env.MARKETING_EVENTS_SMOKE_ENABLED === "true" ||
+    process.env.MARKETING_EVENTS_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -291,12 +294,17 @@ const state = {
   reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
   reportsJobId: "",
   commercialProposalConfigId: "",
+  marketingEventId: "",
 };
 
 const cleanupTasks = [];
 const executed = [];
 const skipped = [];
 const actionExecutionRank = {
+  marketingDashboard: 1050,
+  marketingEventsList: 1051,
+  marketingEventsCreate: 1052,
+  marketingEventsUpdate: 1053,
   // Adjustment lifecycle actions need a deterministic order because:
   // - completeRhPointLifecycle fails the min-interval check (runs too fast)
   // - Adjustment approval sets clock_out and runs calculateDailyHours automatically
@@ -1603,6 +1611,136 @@ async function platformHttpRequest(op, options = {}) {
 }
 
 const handlers = {
+  async marketingDashboard(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async marketingEventsList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async marketingEventsCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      json: {
+        name: `Smoke Marketing ${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+        logo: "",
+        priority: "Baixa",
+        objective: "Validação automatizada de integração.",
+        audience: "Smoke test",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.marketingEventId = response.body?.data?.id ?? "";
+    }
+  },
+
+  async marketingEventsUpdate(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}`,
+      json: { objective: "Smoke test atualizado." },
+    });
+  },
+
+  async marketingEventEditionsList(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions`,
+    });
+  },
+
+  async marketingEventEditionCreate(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    const response = await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions`,
+      json: {
+        name: `Smoke edição ${Date.now()}`,
+        date: "2030-11-12",
+        place: "Smoke test",
+        budgetItems: [{ name: "Espaço", amount: "100.00" }],
+        partnerships: [],
+        organizingTeam: [],
+        logistics: {
+          fornecedores: [],
+          cronograma: [],
+          registro: [],
+          transporte: [],
+          acomodacoes: [],
+        },
+        marketingCommunication: { abertura: [], divulgacao: [], acessoria: [], site: [] },
+        duringEvent: { recepcao: [], staff: [], programacao: [], feedback: [] },
+        afterEvent: { avaliacao: [], agradecimento: [], relatorio: [], followup: [] },
+        notes: "Smoke test",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.marketingEventEditionId = response.body?.data?.id ?? "";
+    }
+  },
+
+  async marketingEventEditionUpdate(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    const editionId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventEditionId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions/${editionId}`,
+      json: {
+        name: `Smoke edição ${Date.now()}`,
+        date: "2030-11-12",
+        place: "Smoke test",
+        budgetItems: [{ name: "Espaço", amount: "125.00" }],
+        partnerships: [],
+        organizingTeam: [],
+        logistics: {
+          fornecedores: [],
+          cronograma: [],
+          registro: [],
+          transporte: [],
+          acomodacoes: [],
+        },
+        marketingCommunication: { abertura: [], divulgacao: [], acessoria: [], site: [] },
+        duringEvent: { recepcao: [], staff: [], programacao: [], feedback: [] },
+        afterEvent: { avaliacao: [], agradecimento: [], relatorio: [], followup: [] },
+        notes: "Smoke test atualizado",
+      },
+    });
+  },
+
+  async marketingEventEditionFeedbackCreate(op) {
+    const eventId = requireState("marketingEventId");
+    const editionId = requireState("marketingEventEditionId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions/${editionId}/feedback`,
+      json: isBadExpectation(op) ? { rating: 6 } : { rating: 5, observation: "Smoke test" },
+    });
+  },
+
+  async marketingEventEditionReport(op) {
+    const eventId = requireState("marketingEventId");
+    const editionId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventEditionId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions/${editionId}/report`,
+    });
+  },
+
   async gatewayHealth(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -7545,6 +7683,9 @@ function matchesFilter(op) {
 }
 
 function disabledConditionReason(condition) {
+  if (condition === "marketingEventsSmokeEnabled" && !env.marketingEventsSmokeEnabled) {
+    return "MARKETING_EVENTS_SMOKE_ENABLED is false";
+  }
   if (condition === "platformImpersonationSmokeEnabled") {
     if (!env.platformImpersonationSmokeEnabled) {
       return "PLATFORM_IMPERSONATION_SMOKE_ENABLED is false";
