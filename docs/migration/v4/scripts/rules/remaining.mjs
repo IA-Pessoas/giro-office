@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import { REMAINING_EVIDENCE } from "../evidence/remaining.mjs";
 import { normalizeRequiredScalarText } from "../lib/empty-scalar-policy.mjs";
 import { REQUIRED_IDENTITY_NAMESPACE } from "../lib/mapping-contract.mjs";
-import { uuidV5 } from "../lib/uuid-v5.mjs";
 import { toLegacyIdRef } from "../lib/sensitivity.mjs";
+import { uuidV5 } from "../lib/uuid-v5.mjs";
 import {
   isAuthenticLegacyReferenceResolution,
   isAuthoritativeV2ClientIdentityResolution,
@@ -338,7 +338,11 @@ export function buildMarketingEventContexts({ rows }) {
   });
 }
 
-export function buildMarketingEventEditionContexts({ rows, eventRows = [], resolutions = new Map() }) {
+export function buildMarketingEventEditionContexts({
+  rows,
+  eventRows = [],
+  resolutions = new Map(),
+}) {
   const eventContexts = buildMarketingEventContexts({ rows: eventRows });
   const eventRule = REMAINING_RULES.find(({ sourceTable }) => sourceTable === "tb_mkt.eventos");
   const candidates = eventRows.map((row, index) => ({
@@ -396,7 +400,11 @@ export function buildMarketingEventEditionFeedbackContexts({
   ) {
     throw new TypeError(`origem de feedback de edição inválida: ${String(sourceTable)}`);
   }
-  const editionContexts = buildMarketingEventEditionContexts({ rows: editionRows, eventRows, resolutions });
+  const editionContexts = buildMarketingEventEditionContexts({
+    rows: editionRows,
+    eventRows,
+    resolutions,
+  });
   const editionRule = REMAINING_RULES.find(
     ({ sourceTable: candidate }) => candidate === "tb_mkt.eventos_edicoes",
   );
