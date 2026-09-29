@@ -30,6 +30,8 @@ assert.match(passwords, /••••••••/);
 assert.match(passwords, /window\.confirm/);
 assert.match(passwords, /marketingPasswordService\.reveal/);
 assert.match(passwords, /marketingPasswordService\.export/);
+assert.match(passwords, /if \(!access\.canEdit\) setRevealed\(null\)/);
+assert.match(passwords, /access\.canEdit && revealed\?\.id === credential\.id/);
 assert.doesNotMatch(passwords, /useMutation/);
 assert.match(passwordService, /confirmed: true/);
 assert.match(passwordService, /\/marketing\/passwords\/import/);

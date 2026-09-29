@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, KeyRound, Loader2, Pencil, Plus, Save, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useModuleAccess } from "@modules/auth";
 import { useFetch } from "@shared/hooks";
@@ -47,6 +47,10 @@ export function MarketingPasswords() {
   const [busyImport, setBusyImport] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    if (!access.canEdit) setRevealed(null);
+  }, [access.canEdit]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -266,7 +270,7 @@ export function MarketingPasswords() {
                 <td className="px-4 py-3 text-gray-700 dark:text-slate-200">{credential.user}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-slate-300">{credential.notes || "—"}</td>
                 <td className="px-4 py-3 font-mono text-gray-600 dark:text-slate-300">
-                  {revealed?.id === credential.id ? revealed.value : "••••••••"}
+                  {access.canEdit && revealed?.id === credential.id ? revealed.value : "••••••••"}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
