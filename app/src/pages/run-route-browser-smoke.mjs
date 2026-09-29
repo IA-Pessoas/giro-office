@@ -113,6 +113,11 @@ try {
   await detailsDialog.getByRole("button", { name: "Fechar" }).last().click();
   await page.getByRole("button", { name: "Novo evento" }).click();
   await page.getByRole("heading", { name: "Novo evento" }).waitFor();
+  await page.evaluate(async () => {
+    const openLayers = Array.from(document.querySelectorAll('[data-state="open"]'));
+    const animations = openLayers.flatMap((element) => element.getAnimations());
+    await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+  });
   await page.screenshot({ path: path.join(outputDirectory, "marketing-evento-novo.png"), fullPage: true });
   await page.getByLabel("Nome *").fill("Evento criado pelo smoke");
   await page.getByLabel("Prioridade *").selectOption("Alta");

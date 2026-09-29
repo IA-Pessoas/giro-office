@@ -1,4 +1,4 @@
-import { ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { MarketingEvent, MarketingEventsProvider } from "../routes/marketingEvents.routes.js";
 import type {
@@ -106,6 +106,7 @@ export class MarketingEventsService implements MarketingEventsProvider {
       });
       return mapMarketingEvent(record);
     } catch (error: unknown) {
+      logError("Falha ao criar evento de Marketing.", { err: error });
       return duplicateNameError(error);
     }
   }
@@ -128,6 +129,7 @@ export class MarketingEventsService implements MarketingEventsProvider {
       });
       return mapMarketingEvent(record);
     } catch (error: unknown) {
+      logError("Falha ao atualizar evento de Marketing.", { err: error });
       if (hasPrismaCode(error, "P2025")) return null;
       return duplicateNameError(error);
     }
