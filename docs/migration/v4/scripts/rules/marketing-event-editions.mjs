@@ -68,6 +68,95 @@ export function planMarketingEventEditionImport({ editionRow, eventCandidates })
   });
 }
 
+export function planMarketingEventEditionFeedbackImport({ sourceTable, feedbackRow, editionCandidates, evaluationRows }) {
+  const isPeriod = sourceTable === "tb_mkt.eventos_feedbacks_periodos";
+  const isEvaluation = sourceTable === "tb_mkt.eventos_feedbacks";
+  if (!isPeriod && !isEvaluation) return quarantine("sourceTable", "MKT_EDITION_FEEDBACK_SOURCE_INVALID");
+
+  const editionField = isPeriod ? "edicao" : "edicao_id";
+  const editionLegacyId = feedbackRow?.[editionField];
+  if (!positiveInteger(editionLegacyId)) {
+    return quarantine(editionField, "MKT_EDITION_FEEDBACK_EDITION_LINK_INVALID");
+  }
+  if (!Array.isArray(editionCandidates)) {
+    return quarantine(editionField, "MKT_EDITION_FEEDBACK_EDITION_LOOKUP_MISSING");
+  }
+  const matches = editionCandidates.filter(
+    (edition) => String(edition?.legacyId) === String(editionLegacyId),
+  );
+  if (matches.length === 0) {
+    return quarantine(editionField, "MKT_EDITION_FEEDBACK_EDITION_NOT_FOUND");
+  }
+  if (matches.length > 1) {
+    return quarantine(editionField, "MKT_EDITION_FEEDBACK_EDITION_AMBIGUOUS");
+  }
+  const edition = matches[0];
+  if (isEvaluation) {
+    const evaluations = Array.isArray(evaluationRows) ? evaluationRows : [feedbackRow];
+    const evaluationCount = evaluations.filter(
+      (row) => String(row?.edicao_id) === String(editionLegacyId),
+    ).length;
+    if (evaluationCount > 1) {
+      return quarantine(editionField, "MKT_EDITION_FEEDBACK_EVALUATION_AMBIGUOUS");
+    }
+  }
+  if (edition.status !== "prepared" || typeof edition.id !== "string") {
+    return quarantine(editionField, "MKT_EDITION_FEEDBACK_EDITION_TARGET_QUARANTINED");
+  }
+
+  if (isPeriod) {
+    const start = parseLegacyDateTime(feedbackRow?.inicio);
+    const end = parseLegacyDateTime(feedbackRow?.fim);
+    if (start === null || end === null || new Date(start) > new Date(end)) {
+      return quarantine("inicio", "MKT_EDITION_FEEDBACK_PERIOD_INVALID");
+    }
+    return Object.freeze({
+      status: "prepared",
+      kind: "period",
+      editionId: edition.id,
+      organizationId: CASTELO_ORGANIZATION_ID,
+      feedbackPeriodStart: start,
+      feedbackPeriodEnd: end,
+    });
+  }
+
+  const feedbackId = feedbackRow?.id;
+  const rating = Number(feedbackRow?.nota);
+  const observation = feedbackRow?.obs;
+  const evaluatedAt = parseLegacyDateTime(feedbackRow?.data);
+  if (!positiveInteger(feedbackId)) return quarantine("id", "MKT_EDITION_FEEDBACK_ID_INVALID");
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return quarantine("nota", "MKT_EDITION_FEEDBACK_RATING_INVALID");
+  }
+  if (observation != null && typeof observation !== "string") {
+    return quarantine("obs", "MKT_EDITION_FEEDBACK_OBSERVATION_INVALID");
+  }
+  if (evaluatedAt === null) return quarantine("data", "MKT_EDITION_FEEDBACK_DATE_INVALID");
+  if (feedbackRow?.valido != null && ![1, "1", true].includes(feedbackRow.valido)) {
+    return quarantine("valido", "MKT_EDITION_FEEDBACK_NOT_VALID");
+  }
+
+  return Object.freeze({
+    status: "prepared",
+    kind: "evaluation",
+    evaluation: Object.freeze({
+      id: generatedId(`${sourceTable}:${feedbackId}`),
+      organization_id: CASTELO_ORGANIZATION_ID,
+      edition_id: edition.id,
+      rating,
+      observation: observation ?? null,
+      evaluated_at: evaluatedAt,
+    }),
+  });
+}
+
+function parseLegacyDateTime(value) {
+  if (typeof value !== "string" && !(value instanceof Date)) return null;
+  const raw = value instanceof Date ? value.toISOString() : value.trim().replace(" ", "T");
+  const withTimezone = /(?:Z|[+-]\d{2}:\d{2})$/iu.test(raw) ? raw : `${raw}Z`;
+  const parsed = new Date(withTimezone);
+  return Number.isNaN(parsed.valueOf()) ? null : parsed.toISOString();
+}
 function resolveEventLink(legacyId, candidates) {
   if (!positiveInteger(legacyId)) return quarantine("evento_id", "MKT_EDITION_EVENT_LINK_INVALID");
   if (!Array.isArray(candidates))

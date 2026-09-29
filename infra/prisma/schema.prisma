@@ -1784,10 +1784,13 @@ model MarketingEventEdition {
   during_event             Json                              @default("{}") @db.JsonB
   after_event              Json                              @default("{}") @db.JsonB
   notes                    String                            @default("")
+  feedback_period_start    DateTime?                         @db.Timestamp(3)
+  feedback_period_end      DateTime?                         @db.Timestamp(3)
   createdAt                DateTime                          @default(now())
   updatedAt                DateTime                          @default(now()) @updatedAt
   event                    MarketingEvent                    @relation(fields: [event_id, organization_id], references: [id, organization_id], onDelete: Cascade, onUpdate: Cascade)
   budgetItems              MarketingEventEditionBudgetItem[]
+  feedback                 MarketingEventEditionFeedback?
 
   @@unique([id, organization_id], map: "mtk.event_editions_id_organization_unique")
   @@unique([organization_id, legacy_id], map: "mtk.event_editions_organization_legacy_unique")
@@ -1795,6 +1798,18 @@ model MarketingEventEdition {
   @@map("mtk.event_editions")
 }
 
+model MarketingEventEditionFeedback {
+  id              String                @id @default(uuid())
+  organization_id String
+  edition_id      String
+  rating          Int
+  observation     String?               @db.Text
+  evaluated_at    DateTime              @db.Timestamp(3)
+  edition         MarketingEventEdition @relation(fields: [edition_id, organization_id], references: [id, organization_id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([edition_id, organization_id], map: "mtk.event_edition_feedback_edition_unique")
+  @@map("mtk.event_edition_feedback")
+}
 model MarketingEventEditionBudgetItem {
   id              String                @id @default(uuid())
   organization_id String

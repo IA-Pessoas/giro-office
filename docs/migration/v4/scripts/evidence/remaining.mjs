@@ -79,6 +79,23 @@ const CONFIRMED = new Map(
       ],
     ],
     [
+      "tb_mkt.eventos_feedbacks",
+      ["infra/prisma/schema.prisma:1820"],
+      "A avaliação legada possui destino relacional por edição, com nota de 1 a 5, observação, data e unicidade por tenant/edição; linhas sem vínculo inequívoco ou duplicadas para uma edição ficam em quarentena.",
+      [
+        "edicao_id referencia tb_mkt.eventos_edicoes.id; o destino é ligado apenas pela identidade determinística da edição preparada.",
+        "A tabela legada não impõe unicidade por edição; mais de uma avaliação válida para a mesma edição exige reconciliação e nenhuma é escolhida automaticamente.",
+      ],
+    ],
+    [
+      "tb_mkt.eventos_feedbacks_periodos",
+      ["infra/prisma/schema.prisma:1776"],
+      "O período legado pertence a uma edição e é armazenado nos campos de início e fim da edição; datas ausentes, inválidas ou fora de ordem e vínculos não únicos ficam em quarentena.",
+      [
+        "edicao referencia tb_mkt.eventos_edicoes.id; início e fim são importados juntos preservando os componentes de DATETIME legado.",
+      ],
+    ],
+    [
       "tb_mkt.redes_sociais",
       [
         "infra/prisma/schema.prisma:536",
