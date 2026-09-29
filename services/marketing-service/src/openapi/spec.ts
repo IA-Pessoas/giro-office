@@ -84,6 +84,18 @@ const marketingEventEditionInputSchema = {
     duringEvent: editionPlanningSchema(["recepcao", "staff", "programacao", "feedback"]),
     afterEvent: editionPlanningSchema(["avaliacao", "agradecimento", "relatorio", "followup"]),
     notes: { type: "string", maxLength: 10000 },
+    feedbackPeriodStart: {
+      type: "string",
+      format: "date-time",
+      nullable: true,
+      description: "Use junto com feedbackPeriodEnd; ambos devem estar preenchidos ou nulos.",
+    },
+    feedbackPeriodEnd: {
+      type: "string",
+      format: "date-time",
+      nullable: true,
+      description: "Use junto com feedbackPeriodStart; não pode ser anterior ao início.",
+    },
   },
   required: [
     "name",
@@ -117,6 +129,11 @@ const marketingEventEditionSchema = {
     duringEvent: { type: "object" },
     afterEvent: { type: "object" },
     notes: { type: "string" },
+    feedbackPeriodStart: { type: "string", format: "date-time", nullable: true },
+    feedbackPeriodEnd: { type: "string", format: "date-time", nullable: true },
+    feedback: {
+      oneOf: [{ $ref: "#/components/schemas/MarketingEventEditionFeedback" }, { type: "null" }],
+    },
   },
   required: [
     "id",
@@ -133,7 +150,37 @@ const marketingEventEditionSchema = {
     "duringEvent",
     "afterEvent",
     "notes",
+    "feedbackPeriodStart",
+    "feedbackPeriodEnd",
+    "feedback",
   ],
+} as const;
+
+const marketingEventEditionFeedbackInputSchema = {
+  type: "object",
+  properties: {
+    rating: { type: "integer", minimum: 1, maximum: 5 },
+    observation: { type: "string", maxLength: 10000 },
+  },
+  required: ["rating"],
+  additionalProperties: false,
+} as const;
+const marketingEventEditionFeedbackSchema = {
+  type: "object",
+  properties: {
+    rating: { type: "integer", minimum: 1, maximum: 5 },
+    observation: { type: "string", nullable: true },
+    evaluatedAt: { type: "string", format: "date-time" },
+  },
+  required: ["rating", "observation", "evaluatedAt"],
+} as const;
+const marketingEventEditionReportSchema = {
+  type: "object",
+  properties: {
+    event: { $ref: "#/components/schemas/MarketingEvent" },
+    edition: { $ref: "#/components/schemas/MarketingEventEdition" },
+  },
+  required: ["event", "edition"],
 } as const;
 
 const marketingEventResponse = {
@@ -141,6 +188,22 @@ const marketingEventResponse = {
   properties: {
     success: { type: "boolean", example: true },
     data: { $ref: "#/components/schemas/MarketingEvent" },
+  },
+  required: ["success", "data"],
+} as const;
+const marketingEventEditionResponse = {
+  type: "object",
+  properties: {
+    success: { type: "boolean", example: true },
+    data: { $ref: "#/components/schemas/MarketingEventEdition" },
+  },
+  required: ["success", "data"],
+} as const;
+const marketingEventEditionFeedbackResponse = {
+  type: "object",
+  properties: {
+    success: { type: "boolean", example: true },
+    data: { $ref: "#/components/schemas/MarketingEventEditionFeedback" },
   },
   required: ["success", "data"],
 } as const;
@@ -315,7 +378,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
           responses: {
             "201": {
               description: "Edição criada.",
-              content: { "application/json": { schema: marketingEventResponse } },
+              content: { "application/json": { schema: marketingEventEditionResponse } },
             },
             "400": { description: "Dados inválidos." },
             "401": { description: "Autenticação obrigatória." },
@@ -353,11 +416,90 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
           responses: {
             "200": {
               description: "Edição atualizada.",
-              content: { "application/json": { schema: marketingEventResponse } },
+              content: { "application/json": { schema: marketingEventEditionResponse } },
             },
             "400": { description: "Dados inválidos." },
             "401": { description: "Autenticação obrigatória." },
             "403": { description: "Permissão de edição do Marketing necessária." },
+            "404": { description: "Edição não encontrada na organização." },
+          },
+        },
+      },
+      "/marketing/events/{eventId}/editions/{editionId}/feedback": {
+        post: {
+          summary: "Registrar a avaliação única da edição",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "eventId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "editionId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/MarketingEventEditionFeedbackInput" },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Avaliação registrada.",
+              content: { "application/json": { schema: marketingEventEditionFeedbackResponse } },
+            },
+            "400": { description: "Nota inválida; informe um valor inteiro entre 1 e 5." },
+            "401": { description: "Autenticação obrigatória." },
+            "403": { description: "Permissão de edição do Marketing necessária." },
+            "404": { description: "Edição não encontrada na organização." },
+            "409": { description: "Esta edição já possui uma avaliação." },
+          },
+        },
+      },
+      "/marketing/events/{eventId}/editions/{editionId}/report": {
+        get: {
+          summary: "Consultar relatório da edição",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "eventId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "editionId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Relatório da edição na organização autenticada.",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      success: { type: "boolean" },
+                      data: { $ref: "#/components/schemas/MarketingEventEditionReport" },
+                    },
+                    required: ["success", "data"],
+                  },
+                },
+              },
+            },
+            "401": { description: "Autenticação obrigatória." },
+            "403": { description: "Permissão Marketing insuficiente." },
             "404": { description: "Edição não encontrada na organização." },
           },
         },
@@ -373,6 +515,9 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
         MarketingEventUpdate: marketingEventUpdateSchema,
         MarketingEventEditionInput: marketingEventEditionInputSchema,
         MarketingEventEdition: marketingEventEditionSchema,
+        MarketingEventEditionFeedbackInput: marketingEventEditionFeedbackInputSchema,
+        MarketingEventEditionFeedback: marketingEventEditionFeedbackSchema,
+        MarketingEventEditionReport: marketingEventEditionReportSchema,
       },
     },
   };

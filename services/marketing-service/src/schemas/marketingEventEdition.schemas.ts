@@ -70,7 +70,43 @@ export const marketingEventEditionBodySchema = z
     duringEvent: duringEventSchema,
     afterEvent: afterEventSchema,
     notes: z.string().max(10000),
+    feedbackPeriodStart: z.string().datetime({ offset: true }).nullable().optional(),
+    feedbackPeriodEnd: z.string().datetime({ offset: true }).nullable().optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const start = value.feedbackPeriodStart ?? null;
+    const end = value.feedbackPeriodEnd ?? null;
+    if ((start === null) !== (end === null)) {
+      context.addIssue({
+        code: "custom",
+        path: [start === null ? "feedbackPeriodStart" : "feedbackPeriodEnd"],
+        message: "Informe as datas inicial e final do período de avaliação.",
+      });
+      return;
+    }
+    if (start !== null && end !== null && new Date(start).valueOf() > new Date(end).valueOf()) {
+      context.addIssue({
+        code: "custom",
+        path: ["feedbackPeriodEnd"],
+        message: "A data final do período deve ser igual ou posterior à data inicial.",
+      });
+    }
+  });
+
+export const marketingEventEditionFeedbackBodySchema = z
+  .object({
+    rating: z
+      .number()
+      .int()
+      .min(1, "A avaliação deve ser de 1 a 5.")
+      .max(5, "A avaliação deve ser de 1 a 5."),
+    observation: z.string().trim().max(10000).optional(),
   })
   .strict();
+
+export type MarketingEventEditionFeedbackInput = z.infer<
+  typeof marketingEventEditionFeedbackBodySchema
+>;
 
 export type MarketingEventEditionInput = z.infer<typeof marketingEventEditionBodySchema>;

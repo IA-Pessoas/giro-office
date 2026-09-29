@@ -8,7 +8,10 @@ import {
   isAuthenticLegacyReferenceResolution,
   isAuthoritativeV2ClientIdentityResolution,
 } from "./admin-business.mjs";
-import { planMarketingEventEditionImport } from "./marketing-event-editions.mjs";
+import {
+  planMarketingEventEditionFeedbackImport,
+  planMarketingEventEditionImport,
+} from "./marketing-event-editions.mjs";
 import { V2_RULES } from "./v2.mjs";
 
 const ORGANIZATION_ID = "e8048d1c-0830-45d7-84de-68e20abd685b";
@@ -360,6 +363,53 @@ export function buildMarketingEventEditionContexts({ rows, eventRows = [] }) {
   });
 }
 
+export function buildMarketingEventEditionFeedbackContexts({
+  sourceTable,
+  rows,
+  editionRows = [],
+  eventRows = [],
+  evaluationRows = [],
+}) {
+  if (
+    sourceTable !== "tb_mkt.eventos_feedbacks" &&
+    sourceTable !== "tb_mkt.eventos_feedbacks_periodos"
+  ) {
+    throw new TypeError(`origem de feedback de edição inválida: ${String(sourceTable)}`);
+  }
+  const editionContexts = buildMarketingEventEditionContexts({ rows: editionRows, eventRows });
+  const editionRule = REMAINING_RULES.find(
+    ({ sourceTable: candidate }) => candidate === "tb_mkt.eventos_edicoes",
+  );
+  const editionCandidates = editionRows.map((row, index) => ({
+    legacyId: row?.id,
+    id: generatedIdentityId("tb_mkt.eventos_edicoes", row?.id),
+    status: editionRule?.emitRows(row, editionContexts[index])[0]?.status ?? "quarantine",
+  }));
+
+  return issueContexts(`mkt-event-edition-feedback:${sourceTable}`, sourceTable, rows, (row) => {
+    const importPlan = planMarketingEventEditionFeedbackImport({
+      sourceTable,
+      feedbackRow: row,
+      editionCandidates,
+      evaluationRows,
+    });
+    return {
+      feedback: issueResolution({
+        state: importPlan.status === "prepared" ? "one" : "unresolved",
+        sourceTable,
+        sourceKey: validLegacyId(row?.id)
+          ? normalizeKey(row.id)
+          : normalizeKey(row?.edicao ?? row?.edicao_id),
+        identityRef:
+          importPlan.status === "prepared"
+            ? `${sourceTable}:${normalizeKey(row?.id ?? row?.edicao)}`
+            : null,
+        importPlan,
+      }),
+    };
+  });
+}
+
 export function buildMarketingSocialContexts({ rows, clientResolver }) {
   assertAuditedCorpus("tb_mkt.redes_sociais", rows);
   const entries = authoritativeClientEntries(rows, clientResolver);
@@ -512,6 +562,8 @@ export const REMAINING_RULES = Object.freeze(
       classify: classifyMarketingEvent,
     }),
     createMarketingEventEditionRule(),
+    createMarketingEventEditionFeedbackPeriodRule(),
+    createMarketingEventEditionFeedbackRule(),
     createRule({
       sourceTable: "tb_cbc.emails",
       domain: "shared-email",
@@ -1130,6 +1182,49 @@ function createMarketingEventEditionRule() {
   };
 }
 
+function createMarketingEventEditionFeedbackPeriodRule() {
+  return createRule({
+    sourceTable: "tb_mkt.eventos_feedbacks_periodos",
+    domain: "marketing",
+    stepId: "mkt-event-edition-feedback-period-update",
+    destinationTable: "mtk.event_editions",
+    mode: "merge",
+    identity: resolveIdentity("tb_mkt.eventos_edicoes", "edicao", "id"),
+    columns: [
+      mapped("inicio", "feedback_period_start", "preserve_legacy_datetime_wall_clock"),
+      mapped("fim", "feedback_period_end", "preserve_legacy_datetime_wall_clock"),
+    ],
+    dependencies: ["tb_mkt.eventos_edicoes"],
+    precedence: ["explicit_legacy_link", "source"],
+    emissionIdentity: (row, context) =>
+      context?.resolutions?.feedback?.importPlan?.editionId ??
+      `${"tb_mkt.eventos_feedbacks_periodos"}:${normalizeKey(row?.edicao) ?? "invalid"}`,
+    classify: (row, context) =>
+      classifyMarketingEventEditionFeedback(row, context, "tb_mkt.eventos_feedbacks_periodos"),
+  });
+}
+
+function createMarketingEventEditionFeedbackRule() {
+  return createRule({
+    sourceTable: "tb_mkt.eventos_feedbacks",
+    domain: "marketing",
+    stepId: "mkt-event-edition-feedback-insert",
+    destinationTable: "mtk.event_edition_feedback",
+    identity: generateIdentity("id", "tb_mkt.eventos_feedbacks"),
+    columns: [
+      mapped("id", "id", "uuid_v5_from_full_source_table_and_legacy_id"),
+      mapped("edicao_id", "edition_id", "resolve_legacy_edition_identity", reference()),
+      mapped("nota", "rating", "normalize_legacy_rating_1_to_5"),
+      mapped("obs", "observation", "preserve_legacy_observation"),
+      mapped("data", "evaluated_at", "preserve_legacy_datetime_wall_clock"),
+    ],
+    dependencies: ["tb_mkt.eventos_edicoes"],
+    emissionIdentity: (row) => rowIdentity("tb_mkt.eventos_feedbacks", row?.id),
+    classify: (row, context) =>
+      classifyMarketingEventEditionFeedback(row, context, "tb_mkt.eventos_feedbacks"),
+  });
+}
+
 function compareSourceTables(left, right) {
   return left.sourceTable < right.sourceTable ? -1 : left.sourceTable > right.sourceTable ? 1 : 0;
 }
@@ -1220,6 +1315,26 @@ function classifyMarketingEventEdition(row, context) {
         importPlan?.field ?? "evento_id",
         importPlan?.reasonCode ?? "MKT_EDITION_IMPORT_PLAN_MISSING",
       );
+}
+
+function classifyMarketingEventEditionFeedback(row, context, sourceTable) {
+  const bound = authenticContext(sourceTable, row, context);
+  if (bound.status !== "prepared") return bound;
+  const resolution = context.resolutions.feedback;
+  if (!isAuthenticRemainingResolution(resolution) || resolution.sourceTable !== sourceTable) {
+    return quarantine(
+      sourceTable.endsWith("_periodos") ? "edicao" : "edicao_id",
+      "MKT_EDITION_FEEDBACK_CONTEXT_INVALID",
+    );
+  }
+  const plan = resolution.importPlan;
+  if (plan?.status !== "prepared") {
+    return quarantine(
+      plan?.field ?? (sourceTable.endsWith("_periodos") ? "edicao" : "edicao_id"),
+      plan?.reasonCode ?? "MKT_EDITION_FEEDBACK_IMPORT_PLAN_MISSING",
+    );
+  }
+  return prepared();
 }
 
 function classifyStockLocation(row, context) {

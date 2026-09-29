@@ -24,6 +24,9 @@ function storedEdition() {
     during_event: { recepcao: ["Credenciamento"] },
     after_event: { followup: ["Pesquisa"] },
     notes: "Levar material impresso.",
+    feedback_period_start: null,
+    feedback_period_end: null,
+    feedback: null,
     budgetItems: [
       {
         id: "40000000-0000-4000-8000-000000000001",
@@ -84,6 +87,175 @@ describe("MarketingEventEditionsService", () => {
     ]);
     expect(prisma.marketingEventEdition.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { organization_id: organizationId, event_id: eventId } }),
+    );
+  });
+
+  it("stores an optional valid feedback period", async () => {
+    const periodStart = new Date("2026-10-01T09:00:00.000Z");
+    const periodEnd = new Date("2026-10-30T18:00:00.000Z");
+    const record = {
+      ...storedEdition(),
+      feedback_period_start: periodStart,
+      feedback_period_end: periodEnd,
+    };
+    const prisma = {
+      marketingEventEdition: { create: vi.fn().mockResolvedValue(record) },
+    };
+
+    const result = await new MarketingEventEditionsService(prisma as never).createEdition(
+      organizationId,
+      eventId,
+      {
+        ...input,
+        feedbackPeriodStart: periodStart.toISOString(),
+        feedbackPeriodEnd: periodEnd.toISOString(),
+      } as never,
+    );
+
+    expect(result.feedbackPeriodStart).toBe(periodStart.toISOString());
+    expect(result.feedbackPeriodEnd).toBe(periodEnd.toISOString());
+    expect(prisma.marketingEventEdition.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          feedback_period_start: periodStart,
+          feedback_period_end: periodEnd,
+        }),
+      }),
+    );
+  });
+
+  it("creates one rating and observation for an edition", async () => {
+    const evaluatedAt = new Date("2026-11-01T12:30:00.000Z");
+    const prisma = {
+      marketingEventEdition: { findFirst: vi.fn().mockResolvedValue({ id: editionId }) },
+      marketingEventEditionFeedback: {
+        create: vi.fn().mockResolvedValue({
+          id: "50000000-0000-4000-8000-000000000001",
+          rating: 5,
+          observation: "Ótima organização",
+          evaluated_at: evaluatedAt,
+        }),
+      },
+    };
+
+    const result = await new MarketingEventEditionsService(prisma as never).createEditionFeedback(
+      organizationId,
+      eventId,
+      editionId,
+      { rating: 5, observation: "Ótima organização" },
+    );
+
+    expect(result).toMatchObject({
+      rating: 5,
+      observation: "Ótima organização",
+      evaluatedAt: evaluatedAt.toISOString(),
+    });
+    expect(prisma.marketingEventEdition.findFirst).toHaveBeenCalledWith({
+      where: { id: editionId, organization_id: organizationId, event_id: eventId },
+      select: { id: true },
+    });
+    expect(prisma.marketingEventEditionFeedback.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organization_id: organizationId,
+        edition_id: editionId,
+        rating: 5,
+        observation: "Ótima organização",
+      }),
+    });
+  });
+
+  it("rejects a second evaluation with a domain conflict", async () => {
+    const duplicateError = Object.assign(new Error("unique conflict"), { code: "P2002" });
+    const prisma = {
+      marketingEventEdition: { findFirst: vi.fn().mockResolvedValue({ id: editionId }) },
+      marketingEventEditionFeedback: { create: vi.fn().mockRejectedValue(duplicateError) },
+    };
+
+    await expect(
+      new MarketingEventEditionsService(prisma as never).createEditionFeedback(
+        organizationId,
+        eventId,
+        editionId,
+        { rating: 4 },
+      ),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("composes report with edition sections, budget, period, and available feedback", async () => {
+    const record = {
+      ...storedEdition(),
+      feedback_period_start: new Date("2026-10-01T09:00:00.000Z"),
+      feedback_period_end: new Date("2026-10-30T18:00:00.000Z"),
+      feedback: {
+        rating: 5,
+        observation: "Ótima organização",
+        evaluated_at: new Date("2026-11-01T12:30:00.000Z"),
+      },
+      event: {
+        id: eventId,
+        name: "Feira anual",
+        logo: "",
+        status: "Novo",
+        priority: "Média",
+        objective: "Apresentar serviços",
+        audience: "Comunidade",
+      },
+    };
+    const prisma = { marketingEventEdition: { findFirst: vi.fn().mockResolvedValue(record) } };
+
+    const result = await new MarketingEventEditionsService(prisma as never).getEditionReport(
+      organizationId,
+      eventId,
+      editionId,
+    );
+
+    expect(result).toMatchObject({
+      event: { id: eventId, name: "Feira anual", objective: "Apresentar serviços" },
+      edition: {
+        id: editionId,
+        budgetTotal: "1000000000.10",
+        feedbackPeriodStart: "2026-10-01T09:00:00.000Z",
+        feedbackPeriodEnd: "2026-10-30T18:00:00.000Z",
+        feedback: { rating: 5, observation: "Ótima organização" },
+        logistics: { fornecedores: ["Som"] },
+        afterEvent: { followup: ["Pesquisa"] },
+      },
+    });
+    expect(prisma.marketingEventEdition.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: editionId, organization_id: organizationId, event_id: eventId },
+      }),
+    );
+  });
+
+  it("omits absent optional feedback from the report", async () => {
+    const prisma = {
+      marketingEventEdition: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ ...storedEdition(), event: { id: eventId, name: "Feira" } }),
+      },
+    };
+    const result = await new MarketingEventEditionsService(prisma as never).getEditionReport(
+      organizationId,
+      eventId,
+      editionId,
+    );
+    expect(result?.edition.feedback).toBeNull();
+  });
+
+  it("does not return a report across organizations or event ids", async () => {
+    const prisma = { marketingEventEdition: { findFirst: vi.fn().mockResolvedValue(null) } };
+    const result = await new MarketingEventEditionsService(prisma as never).getEditionReport(
+      organizationId,
+      "foreign-event-id",
+      editionId,
+    );
+    expect(result).toBeNull();
+    expect(prisma.marketingEventEdition.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: editionId, organization_id: organizationId, event_id: "foreign-event-id" },
+      }),
     );
   });
 

@@ -17,11 +17,16 @@ Serviço do dashboard inicial e gestão de eventos de Marketing por organizaçã
 O gateway expõe o prefixo público `/marketing`. Exemplos: `GET /marketing/dashboard`,
 `GET /marketing/events/list`, `POST /marketing/events`, `PUT /marketing/events/{id}`,
 `GET /marketing/events/{eventId}/editions`, `POST /marketing/events/{eventId}/editions` e
-`PUT /marketing/events/{eventId}/editions/{editionId}`. Edições pertencem ao evento da organização
-autenticada e guardam data, local, itens de orçamento e planejamento estruturado.
-As rotas exigem autenticação e permissão do módulo Marketing; criação e edição requerem nível de
-edição. Eventos são limitados à organização do contexto autenticado. Na criação, o status inicial
-é `Novo`; ele pode ser alterado na edição.
+`PUT /marketing/events/{eventId}/editions/{editionId}`. Também disponibiliza
+`POST /marketing/events/{eventId}/editions/{editionId}/feedback` para registrar uma avaliação única
+(nota de 1 a 5 e observação opcional) e
+`GET /marketing/events/{eventId}/editions/{editionId}/report` para consultar os dados da edição
+em formato adequado para impressão. Edições pertencem ao evento da organização autenticada e
+guardam data, local, itens de orçamento, planejamento estruturado e período opcional de avaliação.
+As rotas exigem autenticação e permissão do módulo Marketing. Criação e edição de eventos e edições,
+assim como registro de avaliação, requerem nível de edição; leitura do relatório requer acesso de
+leitura ao módulo. Eventos e edições são limitados à organização do contexto autenticado. Na criação,
+o status inicial do evento é `Novo`; ele pode ser alterado na edição.
 
 ## Desenvolvimento
 

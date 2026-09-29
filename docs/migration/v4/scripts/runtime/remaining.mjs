@@ -9,6 +9,7 @@ import {
   buildCbsStockLocationContexts,
   buildMarketingEventContexts,
   buildMarketingEventEditionContexts,
+  buildMarketingEventEditionFeedbackContexts,
   buildMarketingPasswordContexts,
   buildMarketingSocialContexts,
   buildPecNoteContexts,
@@ -78,6 +79,10 @@ export function buildRemainingRuntimeState(options = {}) {
                 sourceTable,
                 stepId: entry.stepId,
                 status: emission.status,
+                ...(sourceTable === "tb_mkt.eventos_feedbacks" ||
+                sourceTable === "tb_mkt.eventos_feedbacks_periodos"
+                  ? { identityRef: emission.identityRef }
+                  : {}),
                 field: emission.field,
                 reasonCode: emission.reasonCode,
               });
@@ -152,6 +157,23 @@ function runtimeEmission(rule, row, runtimeState) {
 function projectRuntimePayload(rule, step, emission, row, runtimeState) {
   if (emission?.status !== "prepared" || !isRemainingRuntimeState(runtimeState)) {
     throw new Error("REMAINING_PROJECTION_NOT_PREPARED");
+  }
+  if (
+    rule.sourceTable === "tb_mkt.eventos_feedbacks_periodos" ||
+    rule.sourceTable === "tb_mkt.eventos_feedbacks"
+  ) {
+    const plan = runtimeState.contextFor(rule.sourceTable, row)?.resolutions?.feedback?.importPlan;
+    if (plan?.status !== "prepared") throw new Error("MKT_EDITION_FEEDBACK_PLAN_INVALID");
+    if (plan.kind === "period") {
+      return {
+        id: plan.editionId,
+        organization_id: plan.organizationId,
+        feedback_period_start: plan.feedbackPeriodStart,
+        feedback_period_end: plan.feedbackPeriodEnd,
+      };
+    }
+    if (plan.kind === "evaluation") return plan.evaluation;
+    throw new Error("MKT_EDITION_FEEDBACK_KIND_INVALID");
   }
   const audit = projectRemainingRow({
     sourceTable: rule.sourceTable,
@@ -295,6 +317,30 @@ function buildContextIndexes(rowsBySource, options) {
       buildMarketingEventEditionContexts({
         rows: rows("tb_mkt.eventos_edicoes"),
         eventRows: rows("tb_mkt.eventos"),
+      }),
+    );
+  }
+  if (has("tb_mkt.eventos_feedbacks_periodos")) {
+    register(
+      "tb_mkt.eventos_feedbacks_periodos",
+      buildMarketingEventEditionFeedbackContexts({
+        sourceTable: "tb_mkt.eventos_feedbacks_periodos",
+        rows: rows("tb_mkt.eventos_feedbacks_periodos"),
+        editionRows: rows("tb_mkt.eventos_edicoes"),
+        eventRows: rows("tb_mkt.eventos"),
+        evaluationRows: rows("tb_mkt.eventos_feedbacks"),
+      }),
+    );
+  }
+  if (has("tb_mkt.eventos_feedbacks")) {
+    register(
+      "tb_mkt.eventos_feedbacks",
+      buildMarketingEventEditionFeedbackContexts({
+        sourceTable: "tb_mkt.eventos_feedbacks",
+        rows: rows("tb_mkt.eventos_feedbacks"),
+        editionRows: rows("tb_mkt.eventos_edicoes"),
+        eventRows: rows("tb_mkt.eventos"),
+        evaluationRows: rows("tb_mkt.eventos_feedbacks"),
       }),
     );
   }
