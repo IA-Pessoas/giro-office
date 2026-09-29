@@ -140,6 +140,7 @@ export class MarketingAiUsageControlService {
       frequency: number | null;
       purpose: string | null;
       perceived_gain: string | null;
+      imported_from_legacy: true;
     }> = [];
     const reconciliation: Array<{
       organization_id: string;
@@ -187,6 +188,7 @@ export class MarketingAiUsageControlService {
         frequency: record.frequency,
         purpose: record.purpose,
         perceived_gain: record.perceived_gain,
+        imported_from_legacy: true,
       });
     }
 

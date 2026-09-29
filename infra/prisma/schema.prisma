@@ -190,6 +190,8 @@ model Organization {
   marketingAiUsageControls      MarketingAiUsageControl[]
   marketingAiUsageImportReconciliations MarketingAiUsageImportReconciliation[]
   marketingPasswordImportReconciliations MarketingPasswordImportReconciliation[]
+  marketingMigrationReconciliationRuns MarketingMigrationReconciliationRun[]
+  marketingMigrationReconciliationDecisions MarketingMigrationReconciliationDecision[]
   marketingEvents               MarketingEvent[]
   notes                         Note[]
   certificateNotifications      CertificateNotification[]
@@ -1775,6 +1777,7 @@ model MarketingAiUsageControl {
   frequency       Int?
   purpose         String?
   perceived_gain  String?
+  imported_from_legacy Boolean      @default(false)
   created_at      DateTime     @default(now())
   updated_at      DateTime     @updatedAt
   organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
@@ -1813,6 +1816,68 @@ model MarketingPasswordImportReconciliation {
 
   @@index([organization_id, status, created_at], map: "idx_marketing_password_import_reconciliation_org_status")
   @@map("marketing.password_import_reconciliation")
+}
+
+model MarketingMigrationReconciliationRun {
+  id              String                                  @id @default(uuid())
+  organization_id String
+  created_at      DateTime                                @default(now())
+  organization    Organization                            @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  datasets        MarketingMigrationReconciliationDataset[]
+
+  @@index([organization_id, created_at(sort: Desc)], map: "idx_mkt_migration_runs_org_created")
+  @@map("marketing.migration_reconciliation_runs")
+}
+
+model MarketingMigrationReconciliationDataset {
+  id              String                                  @id @default(uuid())
+  run_id          String
+  dataset         String
+  status          String
+  prepared_total  Int?
+  imported_total  Int?
+  quarantined_total Int?
+  created_at      DateTime                                @default(now())
+  run             MarketingMigrationReconciliationRun    @relation(fields: [run_id], references: [id], onDelete: Cascade)
+  items           MarketingMigrationReconciliationItem[]
+
+  @@unique([run_id, dataset], map: "uq_mkt_migration_dataset_run_name")
+  @@map("marketing.migration_reconciliation_datasets")
+}
+
+model MarketingMigrationReconciliationItem {
+  id                     String                                      @id @default(uuid())
+  dataset_id             String
+  source_table           String
+  source_identity_digest String
+  step_id                String
+  field                  String?
+  reason_code            String
+  created_at             DateTime                                    @default(now())
+  dataset                MarketingMigrationReconciliationDataset    @relation(fields: [dataset_id], references: [id], onDelete: Cascade)
+
+  @@unique([dataset_id, source_table, source_identity_digest, step_id], map: "uq_mkt_migration_item_identity")
+  @@index([dataset_id, reason_code], map: "idx_mkt_migration_items_reason")
+  @@map("marketing.migration_reconciliation_items")
+}
+
+model MarketingMigrationReconciliationDecision {
+  id                     String       @id @default(uuid())
+  organization_id        String
+  dataset                String
+  source_table           String
+  source_identity_digest String
+  step_id                String
+  canonical_target_id    String
+  actor_id               String
+  request_id             String
+  created_at             DateTime     @default(now())
+  organization           Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@unique([organization_id, dataset, source_table, source_identity_digest, step_id], map: "uq_mkt_migration_decision_item")
+  @@unique([organization_id, request_id], map: "uq_mkt_migration_decision_request")
+  @@index([organization_id, created_at(sort: Desc)], map: "idx_mkt_migration_decisions_org_created")
+  @@map("marketing.migration_reconciliation_decisions")
 }
 
 model MarketingEvent {

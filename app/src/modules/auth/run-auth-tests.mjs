@@ -557,7 +557,7 @@ await (async () => {
   );
 
   await runTest("disabled modules are blocked even for global admins", () => {
-    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), []);
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing"]);
 
     for (const moduleKey of DISABLED_MODULE_KEYS) {
       assert.equal(isModuleDisabled(moduleKey), true);
@@ -578,12 +578,13 @@ await (async () => {
     }
   });
 
-  await runTest("Marketing uses the standard module permission levels", () => {
-    assert.equal(isModuleDisabled("marketing"), false);
+  await runTest("Marketing stays gated for every permission level until integrated validation passes", () => {
+    assert.equal(isModuleDisabled("marketing"), true);
+    assert.equal(DISABLED_MODULE_KEYS.includes("marketing"), true);
     assert.equal(APP_ROUTE_MODULE_MAP["/marketing"], "marketing");
     assert.equal(
       resolveModuleAccess({ module: "marketing", additionalModulePermissions: { marketing: 1 } }).canView,
-      true,
+      false,
     );
     assert.equal(
       resolveModuleAccess({ module: "marketing", additionalModulePermissions: { marketing: 1 } }).canEdit,
@@ -591,7 +592,15 @@ await (async () => {
     );
     assert.equal(
       resolveModuleAccess({ module: "marketing", additionalModulePermissions: { marketing: 2 } }).canEdit,
-      true,
+      false,
+    );
+    assert.equal(
+      resolveModuleAccess({
+        module: "marketing",
+        additionalModulePermissions: { marketing: 3 },
+        isGlobalAdmin: true,
+      }).canView,
+      false,
     );
   });
 

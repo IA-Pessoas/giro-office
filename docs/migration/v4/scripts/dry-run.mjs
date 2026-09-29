@@ -1,22 +1,26 @@
 #!/usr/bin/env node
 
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { buildConfirmedScope } from "./lib/confirmed-scope.mjs";
-import { createExecutionSession } from "./lib/execution-engine.mjs";
 import { CASTELO_ORGANIZATION_ID } from "./lib/mapping-contract.mjs";
 import { buildSourceInventory } from "./lib/source-inventory.mjs";
-import {
-  ALL_MAPPING_RULES,
-  createCompleteExecutionRegistry,
-  createCompleteRuntimeStateByStep,
-} from "./runtime/index.mjs";
+import { ALL_MAPPING_RULES, createCompleteExecutionRegistry } from "./runtime/index.mjs";
 
-const DEFAULT_SOURCE_DIR = "/home/bruno/Documents/03.08.2026";
 const EXPECTED_SOURCE_TABLES = 312;
 const EXPECTED_SOURCE_ROWS = 1_374_880;
 const SOURCE_STATUS_PRIORITY = Object.freeze({ notEmitted: 1, prepared: 2, quarantine: 3 });
+const ITEMIZABLE_MARKETING_SOURCES = new Set([
+  "tb_mkt.eventos",
+  "tb_mkt.eventos_edicoes",
+  "tb_mkt.eventos_feedbacks_periodos",
+  "tb_mkt.eventos_feedbacks",
+  "tb_mkt.redes_sociais",
+  "tb_mkt.senhas",
+]);
+
+export const MIGRATION_ORGANIZATION_ID = CASTELO_ORGANIZATION_ID;
 
 export async function runDryRun({
   inventory,
@@ -27,6 +31,7 @@ export async function runDryRun({
   reportStep,
   fastMode = false,
   policyExcludedSources = new Map(),
+  itemizedSourceTables = [],
 }) {
   validateDryRunInputs({
     inventory,
@@ -35,9 +40,11 @@ export async function runDryRun({
     pendingMappings,
     createSession,
     fastMode,
+    itemizedSourceTables,
   });
 
   const inventoryBySource = new Map(inventory.tables.map((table) => [table.sourceTable, table]));
+  const itemizedSources = new Set(itemizedSourceTables);
   const executableSources = new Set(
     [...executionRegistry.values()].map(({ sourceTable }) => sourceTable),
   );
@@ -55,10 +62,12 @@ export async function runDryRun({
   }
 
   const sourceCounts = emptyCounts();
+  const sourceCountsByTable = {};
   const statusCounts = emptyCounts();
   const destinationCounts = new Map();
   const tableQuarantine = [];
   const runtimeQuarantineGroups = fastMode === true ? null : new Map();
+  const quarantineItems = [];
   let expectedWrites = 0;
   const expectedWriteCounts = { aggregate: 0, insert: 0, update: 0 };
   let unresolvedRequiredReferences = 0;
@@ -108,6 +117,22 @@ export async function runDryRun({
           if (fastMode !== true) {
             addRuntimeQuarantine(runtimeQuarantineGroups, result, entry, sourceRowCount);
           }
+          if (itemizedSources.has(entry.sourceTable)) {
+            if (
+              sourceRowCount !== 1 ||
+              typeof result?.sourceIdentityDigest !== "string" ||
+              !/^sha256:[a-f0-9]{64}$/.test(result.sourceIdentityDigest)
+            ) {
+              throw dryRunError("DRY_RUN_MARKETING_QUARANTINE_IDENTITY_INVALID");
+            }
+            quarantineItems.push({
+              sourceTable: entry.sourceTable,
+              stepId: entry.stepId,
+              sourceIdentityDigest: result.sourceIdentityDigest,
+              field: typeof result.field === "string" ? result.field : null,
+              reasonCode: normalizeReasonCode(result.reasonCode),
+            });
+          }
           if (isRequiredReferenceReason(result?.reasonCode)) {
             unresolvedRequiredReferences += sourceRowCount;
           }
@@ -122,11 +147,18 @@ export async function runDryRun({
   }
 
   for (const sourceTable of executableSources) {
+    const outcomes = sourceOutcomes.get(sourceTable);
+    sourceCountsByTable[sourceTable] = outcomes.reduce((counts, priority) => {
+      if (priority === SOURCE_STATUS_PRIORITY.prepared) counts.prepared += 1;
+      else if (priority === SOURCE_STATUS_PRIORITY.quarantine) counts.quarantine += 1;
+      else if (priority === SOURCE_STATUS_PRIORITY.notEmitted) counts.notEmitted += 1;
+      return counts;
+    }, emptyCounts());
     accountExecutableSource({
       authenticated: inventoryBySource.get(sourceTable),
       quarantine: tableQuarantine,
       sourceCounts,
-      outcomes: sourceOutcomes.get(sourceTable),
+      outcomes,
     });
   }
 
@@ -205,10 +237,17 @@ export async function runDryRun({
     },
     statusCounts,
     sourceCounts,
+    sourceCountsByTable,
     destinationCounts: Object.fromEntries(
       [...destinationCounts].sort(([left], [right]) => compareText(left, right)),
     ),
     quarantine,
+    quarantineItems: quarantineItems.sort(
+      (left, right) =>
+        compareText(left.sourceTable, right.sourceTable) ||
+        compareText(left.stepId, right.stepId) ||
+        compareText(left.sourceIdentityDigest, right.sourceIdentityDigest),
+    ),
     expectedWrites,
     expectedWriteCounts,
     blockers: {
@@ -220,16 +259,27 @@ export async function runDryRun({
   });
 }
 
-async function runCli(args) {
-  if (args.includes("--apply")) throw dryRunError("DRY_RUN_APPLY_REJECTED");
-  if (args.length > 0) throw dryRunError("DRY_RUN_ARGUMENT_UNKNOWN");
+export async function runConfiguredDryRun({ sourceDir, organizationId, resolutions = [] }) {
+  if (organizationId !== CASTELO_ORGANIZATION_ID) {
+    throw dryRunError("DRY_RUN_TENANT_NOT_SUPPORTED");
+  }
+  if (typeof sourceDir !== "string" || sourceDir.trim().length === 0) {
+    throw dryRunError("DRY_RUN_SOURCE_DIR_REQUIRED");
+  }
+  const resolvedSourceDir = path.resolve(sourceDir);
+  const { buildConfirmedScope } = await import("./lib/confirmed-scope.mjs");
+  const { createExecutionSession } = await import("./lib/execution-engine.mjs");
+  const { createRuntimeOptionsFromRows, loadRuntimeSourceRows } = await import(
+    "./lib/runtime-options.mjs"
+  );
+  const { createCompleteRuntimeStateByStep } = await import("./runtime/index.mjs");
 
   const [tableMappings, destinationMappings, pendingMappings, inventory] = await Promise.all([
     readJson(new URL("../mapping/tables.json", import.meta.url)),
     readJson(new URL("../mapping/destinations.json", import.meta.url)),
     readJson(new URL("../pending-mapping/tables.json", import.meta.url)),
     buildSourceInventory({
-      sourceDir: DEFAULT_SOURCE_DIR,
+      sourceDir: resolvedSourceDir,
       expectedTables: EXPECTED_SOURCE_TABLES,
     }),
   ]);
@@ -238,19 +288,58 @@ async function runCli(args) {
     tableMappings,
     destinationMappings,
     sourceDigest: inventory.sourceDigest,
+    pendingMappings,
   });
   const executionRegistry = createCompleteExecutionRegistry();
-  const runtimeStateByStep = createCompleteRuntimeStateByStep();
+  if (
+    !Array.isArray(resolutions) ||
+    resolutions.some(
+      (resolution) =>
+        !/^sha256:[a-f0-9]{64}$/.test(resolution?.sourceIdentityDigest) ||
+        typeof resolution?.canonicalTargetId !== "string" ||
+        resolution.canonicalTargetId.length === 0,
+    )
+  ) {
+    throw dryRunError("DRY_RUN_MARKETING_RESOLUTIONS_INVALID");
+  }
+  const contextSourceTables = new Set(confirmedScope.sources.map(({ sourceTable }) => sourceTable));
+  const pendingContextSources = confirmedScope.steps.flatMap(({ dependencies }) => dependencies);
+  while (pendingContextSources.length > 0) {
+    const sourceTable = pendingContextSources.pop();
+    if (contextSourceTables.has(sourceTable)) continue;
+    contextSourceTables.add(sourceTable);
+    for (const step of confirmedScope.steps) {
+      if (step.sourceTable === sourceTable) pendingContextSources.push(...step.dependencies);
+    }
+  }
+  const sourceRowsByTable = await loadRuntimeSourceRows({
+    sourceDir: resolvedSourceDir,
+    sourceTables: [...contextSourceTables],
+  });
+  const runtimeOptions = createRuntimeOptionsFromRows({
+    sourceRowsByTable,
+    destinationRowsByTable: new Map(),
+  });
+  const resolutionMap = new Map(
+    resolutions.map(({ sourceIdentityDigest, canonicalTargetId }) => [
+      sourceIdentityDigest,
+      canonicalTargetId,
+    ]),
+  );
+  const runtimeStateByStep = createCompleteRuntimeStateByStep({
+    ...runtimeOptions,
+    remaining: { ...runtimeOptions.remaining, marketingEventEditionResolutions: resolutionMap },
+  });
   const ruleRegistry = new Map(ALL_MAPPING_RULES.map((rule) => [rule.sourceTable, rule]));
   const createSession = () =>
     createExecutionSession({
       scope: confirmedScope,
-      sourceDir: DEFAULT_SOURCE_DIR,
+      sourceDir: resolvedSourceDir,
       mappingPackage: { inventory, tableMappings, destinationMappings },
       ruleRegistry,
       executionRegistry,
       runtimeStateByStep,
-      organizationId: CASTELO_ORGANIZATION_ID,
+      organizationId,
       destinationReader: async function* emptyDestinationReader() {},
     });
   return runDryRun({
@@ -259,6 +348,18 @@ async function runCli(args) {
     executionRegistry,
     pendingMappings,
     createSession,
+    itemizedSourceTables: [...ITEMIZABLE_MARKETING_SOURCES],
+  });
+}
+
+async function runCli(args) {
+  if (args.includes("--apply")) throw dryRunError("DRY_RUN_APPLY_REJECTED");
+  if (args.length !== 2 || args[0] !== "--source-dir") {
+    throw dryRunError("DRY_RUN_SOURCE_DIR_REQUIRED");
+  }
+  return runConfiguredDryRun({
+    sourceDir: args[1],
+    organizationId: CASTELO_ORGANIZATION_ID,
   });
 }
 
@@ -394,6 +495,14 @@ function validateDryRunInputs(options) {
     throw new TypeError("executionRegistry deve ser Map");
   }
   if (!Array.isArray(options.pendingMappings)) throw new TypeError("pendingMappings inválido");
+  const itemizedSourceTables = options.itemizedSourceTables ?? [];
+  if (
+    !Array.isArray(itemizedSourceTables) ||
+    itemizedSourceTables.some((sourceTable) => !ITEMIZABLE_MARKETING_SOURCES.has(sourceTable)) ||
+    new Set(itemizedSourceTables).size !== itemizedSourceTables.length
+  ) {
+    throw dryRunError("DRY_RUN_ITEMIZED_SOURCES_INVALID");
+  }
   if (typeof options.createSession !== "function") throw new TypeError("createSession inválido");
   const inventorySources = new Set();
   for (const table of options.inventory.tables) {
@@ -406,6 +515,9 @@ function validateDryRunInputs(options) {
       throw dryRunError("DRY_RUN_INVENTORY_INVALID");
     }
     inventorySources.add(table.sourceTable);
+  }
+  if (itemizedSourceTables.some((sourceTable) => !inventorySources.has(sourceTable))) {
+    throw dryRunError("DRY_RUN_ITEMIZED_SOURCE_NOT_IN_INVENTORY");
   }
 }
 

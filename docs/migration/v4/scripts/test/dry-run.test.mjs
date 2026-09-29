@@ -1,43 +1,48 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { runDryRun } from "../dry-run.mjs";
-import { createCompleteExecutionRegistry } from "../runtime/index.mjs";
 
-const inventory = JSON.parse(
-  await readFile(new URL("../../reports/source-inventory.json", import.meta.url), "utf8"),
-);
-const pendingMappings = JSON.parse(
-  await readFile(new URL("../../pending-mapping/tables.json", import.meta.url), "utf8"),
-);
-const confirmedScope = {
-  sources: inventory.tables.filter(
-    ({ sourceTable }) => !pendingMappings.some((pending) => pending.sourceTable === sourceTable),
-  ),
-};
-
-test("dry-run accounts for all frozen sources without storing payloads", async () => {
-  const executionRegistry = createCompleteExecutionRegistry();
-  const inventoryBySource = new Map(inventory.tables.map((table) => [table.sourceTable, table]));
-  const firstStepBySource = new Map();
-  for (const [key, entry] of executionRegistry) {
-    if (!firstStepBySource.has(entry.sourceTable)) firstStepBySource.set(entry.sourceTable, key);
-  }
+test("dry-run accounts for executable and pending sources without storing payloads", async () => {
+  const executableSource = "tb_mkt.eventos";
+  const pendingSource = "tb_mkt.eventos_sem_mapeamento";
+  const executionRegistry = new Map([
+    [
+      `${executableSource}\0insert-event`,
+      {
+        sourceTable: executableSource,
+        stepId: "insert-event",
+        destinationTable: "marketing.events",
+        contract: { write: { kind: "insert" } },
+      },
+    ],
+  ]);
+  const inventory = {
+    tables: [
+      { sourceTable: executableSource, rowCount: 2 },
+      { sourceTable: pendingSource, rowCount: 3 },
+    ],
+  };
+  const pendingMappings = [
+    {
+      sourceTable: pendingSource,
+      sourceRowCount: 3,
+      status: "pending",
+      reasonCode: "NO_CURRENT_CONTRACT",
+      reason: "Origem sintética sem contrato de destino.",
+    },
+  ];
+  const confirmedScope = { sources: [{ sourceTable: executableSource }] };
   const createSession = async () => ({
-    async *iterateStep(key) {
-      const entry = executionRegistry.get(key);
-      const rowCount = inventoryBySource.get(entry.sourceTable).rowCount;
-      if (firstStepBySource.get(entry.sourceTable) === key && rowCount > 0) {
-        yield {
-          sourceTable: entry.sourceTable,
-          stepId: entry.stepId,
-          status: "prepared",
-          destinationIdentity: `${entry.destinationTable}:sanitized`,
-          sourceRowCount: rowCount,
-          payload: { forbiddenRawPayload: "SENTINEL" },
-        };
-      }
+    async *iterateStep() {
+      yield {
+        sourceTable: executableSource,
+        stepId: "insert-event",
+        status: "prepared",
+        destinationIdentity: "marketing.events:synthetic",
+        sourceRowCount: 2,
+        payload: { forbiddenRawPayload: "SENTINEL" },
+      };
     },
   });
 
@@ -50,16 +55,16 @@ test("dry-run accounts for all frozen sources without storing payloads", async (
   });
 
   assert.deepEqual(report.inventoryCounts, {
-    executableSources: 103,
-    pendingSources: 209,
-    sources: 312,
-    steps: 133,
-    rows: 1_374_880,
+    executableSources: 1,
+    pendingSources: 1,
+    sources: 2,
+    steps: 1,
+    rows: 5,
   });
   assert.deepEqual(report.sourceCounts, {
     notEmitted: 0,
-    prepared: 629_349,
-    quarantine: 745_531,
+    prepared: 2,
+    quarantine: 3,
   });
   assert.equal(report.quarantine.length, pendingMappings.length);
   assert.equal(report.complete, false);

@@ -8,6 +8,11 @@ import type { Logger } from "@workspace/shared/logger";
 import { mountOpenApiDocs } from "@workspace/shared/openapi";
 import cors from "cors";
 import express, { type Express, type Request } from "express";
+import {
+  createMarketingMigrationReconciliationRoutes,
+  type MarketingMigrationReconciliationProvider,
+  type MarketingMigrationReconciliationRunnerProvider,
+} from "./routes/marketingMigrationReconciliation.routes.js";
 import "express-async-errors";
 
 import { EncryptionService } from "@workspace/shared";
@@ -40,6 +45,8 @@ import { MarketingAiUsageControlService } from "./services/marketingAiUsageContr
 import { MarketingDashboardService } from "./services/marketingDashboardService.js";
 import { MarketingEventEditionsService } from "./services/marketingEventEditionsService.js";
 import { MarketingEventsService } from "./services/marketingEventsService.js";
+import { createConfiguredMarketingMigrationReconciliationRunner } from "./services/marketingMigrationReconciliationRunner.js";
+import { MarketingMigrationReconciliationService } from "./services/marketingMigrationReconciliationService.js";
 import { MarketingPasswordService } from "./services/marketingPasswordService.js";
 
 interface CreateMarketingAppOptions {
@@ -50,6 +57,8 @@ interface CreateMarketingAppOptions {
   passwordService?: MarketingPasswordProvider;
   eventsService?: MarketingEventsProvider;
   editionsService?: MarketingEventEditionsProvider;
+  reconciliationService?: MarketingMigrationReconciliationProvider;
+  reconciliationRunner?: MarketingMigrationReconciliationRunnerProvider;
   prisma?: PrismaClient;
 }
 
@@ -71,6 +80,8 @@ export function createMarketingApp({
   passwordService,
   eventsService,
   editionsService,
+  reconciliationService,
+  reconciliationRunner,
   prisma,
 }: CreateMarketingAppOptions): Express {
   const app = express();
@@ -85,6 +96,16 @@ export function createMarketingApp({
   const marketingEvents = eventsService ?? (prisma ? new MarketingEventsService(prisma) : null);
   const marketingEventEditions =
     editionsService ?? (prisma ? new MarketingEventEditionsService(prisma) : null);
+  const reconciliation =
+    reconciliationService ?? (prisma ? new MarketingMigrationReconciliationService(prisma) : null);
+  const reconciliationOperations =
+    reconciliationRunner ??
+    (prisma && reconciliation instanceof MarketingMigrationReconciliationService
+      ? createConfiguredMarketingMigrationReconciliationRunner(prisma, {
+          sourceDir: env.migrationSourceDir,
+          getImportedTotals: (organizationId) => reconciliation.getImportedTotals(organizationId),
+        })
+      : undefined);
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "marketing-service")));
@@ -118,6 +139,12 @@ export function createMarketingApp({
   }
   if (marketingEventEditions) {
     app.use("/marketing", createMarketingEventEditionsRoutes(marketingEventEditions, auth));
+  }
+  if (reconciliation) {
+    app.use(
+      "/marketing",
+      createMarketingMigrationReconciliationRoutes(reconciliation, reconciliationOperations, env),
+    );
   }
 
   app.use(
