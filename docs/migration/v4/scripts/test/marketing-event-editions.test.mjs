@@ -144,12 +144,22 @@ test("feedback period and evaluation are tenant scoped and one-to-one with a val
   assert.equal(getFieldByDatabaseName(feedback, "rating")?.prismaType, "Int");
   assert.ok(getFieldByDatabaseName(feedback, "observation")?.nullable);
   assert.equal(getFieldByDatabaseName(feedback, "evaluated_at")?.prismaType, "DateTime");
-  assert.ok(feedback.compoundUnique.some((fields) => fields.join(",") === "edition_id,organization_id"));
+  assert.ok(
+    feedback.compoundUnique.some((fields) => fields.join(",") === "edition_id,organization_id"),
+  );
   assert.ok(feedback.fields.some((field) => field.relationModel === "MarketingEventEdition"));
 });
 
 test("legacy feedback tables emit period updates and one relational evaluation", () => {
-  const eventRow = { id: 7, nome: "Feira anual", logo: "", status: "Novo", prioridade: "Média", objetivo: "", publico: "" };
+  const eventRow = {
+    id: 7,
+    nome: "Feira anual",
+    logo: "",
+    status: "Novo",
+    prioridade: "Média",
+    objetivo: "",
+    publico: "",
+  };
   const editionRow = {
     id: 19,
     evento_id: 7,
@@ -199,8 +209,8 @@ test("legacy feedback tables emit period updates and one relational evaluation",
   assert.equal(feedbackEmission.destinationTable, "mtk.event_edition_feedback");
   const period = periodEntry.projector(periodEmission, periodRow, runtime);
   const feedback = feedbackEntry.projector(feedbackEmission, feedbackRow, runtime);
-  const editionId = runtime.contextFor("tb_mkt.eventos_edicoes", editionRow)
-    .resolutions.event.importPlan.edition.id;
+  const editionId = runtime.contextFor("tb_mkt.eventos_edicoes", editionRow).resolutions.event
+    .importPlan.edition.id;
   assert.equal(period.id, editionId);
   assert.equal(period.feedback_period_start, "2026-10-01T09:00:00.000Z");
   assert.equal(period.feedback_period_end, "2026-10-30T18:00:00.000Z");
@@ -247,7 +257,9 @@ test("feedback rules satisfy destination contracts and quarantine unresolved or 
     },
   });
 
-  const periodEntry = REMAINING_EXECUTION_ENTRIES.find((entry) => entry.sourceTable === periodSource);
+  const periodEntry = REMAINING_EXECUTION_ENTRIES.find(
+    (entry) => entry.sourceTable === periodSource,
+  );
   const feedbackEntry = REMAINING_EXECUTION_ENTRIES.find(
     (entry) => entry.sourceTable === feedbackSource,
   );
@@ -294,8 +306,8 @@ test("feedback rules satisfy destination contracts and quarantine unresolved or 
       [feedbackSource]: [validEvaluation, duplicateEvaluation],
     },
   });
-  const duplicateDecisions = [validEvaluation, duplicateEvaluation].map((row) =>
-    feedbackEntry.emitRows(row, uniqueRuntime)[0],
+  const duplicateDecisions = [validEvaluation, duplicateEvaluation].map(
+    (row) => feedbackEntry.emitRows(row, uniqueRuntime)[0],
   );
   assert.ok(
     duplicateDecisions.every(

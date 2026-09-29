@@ -142,6 +142,7 @@ async function run() {
     await editionsDialog.getByRole("button", { name: "Relatório" }).click();
     const report = editionsDialog.locator("#marketing-event-edition-report");
     await expect(report.getByRole("heading", { name: "Edição de setembro" })).toBeVisible();
+    await expect(report.getByRole("heading", { name: "Antes do evento · marketing e comunicação" })).toBeVisible();
     await expect(report.getByText("Locação")).toBeVisible();
     await expect(report.getByText("Fornecedor confirmado")).toBeVisible();
     await expect(report.getByText("Boa participação e organização.")).toBeVisible();

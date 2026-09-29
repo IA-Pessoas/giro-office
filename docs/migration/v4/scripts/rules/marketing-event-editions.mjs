@@ -68,10 +68,16 @@ export function planMarketingEventEditionImport({ editionRow, eventCandidates })
   });
 }
 
-export function planMarketingEventEditionFeedbackImport({ sourceTable, feedbackRow, editionCandidates, evaluationRows }) {
+export function planMarketingEventEditionFeedbackImport({
+  sourceTable,
+  feedbackRow,
+  editionCandidates,
+  evaluationRows,
+}) {
   const isPeriod = sourceTable === "tb_mkt.eventos_feedbacks_periodos";
   const isEvaluation = sourceTable === "tb_mkt.eventos_feedbacks";
-  if (!isPeriod && !isEvaluation) return quarantine("sourceTable", "MKT_EDITION_FEEDBACK_SOURCE_INVALID");
+  if (!isPeriod && !isEvaluation)
+    return quarantine("sourceTable", "MKT_EDITION_FEEDBACK_SOURCE_INVALID");
 
   const editionField = isPeriod ? "edicao" : "edicao_id";
   const editionLegacyId = feedbackRow?.[editionField];

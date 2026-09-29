@@ -456,7 +456,7 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
               description: "Avaliação registrada.",
               content: { "application/json": { schema: marketingEventEditionFeedbackResponse } },
             },
-            "400": { description: "Nota inválida ou fora do período permitido." },
+            "400": { description: "Nota inválida; informe um valor inteiro entre 1 e 5." },
             "401": { description: "Autenticação obrigatória." },
             "403": { description: "Permissão de edição do Marketing necessária." },
             "404": { description: "Edição não encontrada na organização." },
