@@ -76,6 +76,20 @@ runTest("dashboard distinguishes loading, retry and an empty activity feed", () 
   assert.match(dashboardComponent, /Nenhuma atividade recente/);
 });
 
+runTest("dashboard only renders recent activity for owners and platform super-admins", () => {
+  assert.match(dashboardComponent, /isOrganizationOwner\(user\)/);
+  assert.match(
+    dashboardComponent,
+    /user\?\.auth_kind === "platform" && user\.platform_role === "super_admin"/,
+  );
+  const cardStart = dashboardComponent.indexOf("{canViewRecentActivity ? (");
+  const cardEnd = dashboardComponent.indexOf("Ações Rápidas", cardStart);
+  assert.ok(cardStart >= 0 && cardEnd > cardStart);
+  const gatedCard = dashboardComponent.slice(cardStart, cardEnd);
+  assert.match(gatedCard, /Atividade Recente/);
+  assert.match(gatedCard, /\) : null\}/);
+});
+
 runTest("dashboard documents real financial, commercial and department indicators", () => {
   assert.match(dashboardTypes, /paidCertificateReceipts/);
   assert.match(dashboardTypes, /activeProspects/);
