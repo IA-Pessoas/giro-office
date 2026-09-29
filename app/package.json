@@ -70,7 +70,7 @@
     "test:parcelamento": "node --experimental-strip-types src/modules/parcelamento/run-parcelamento-tests.mjs",
     "test:fiscal": "node --experimental-strip-types src/modules/fiscal/run-fiscal-tests.mjs",
     "test:commercial": "node src/modules/commercial/run-commercial-tests.mjs",
-    "test:marketing": "node src/modules/marketing/run-marketing-tests.mjs",
+    "test:marketing": "node --experimental-strip-types src/modules/marketing/run-marketing-tests.mjs",
     "test:ti": "node --experimental-strip-types src/modules/ti/run-ti-tests.mjs",
     "test:dashboard": "node --experimental-strip-types src/modules/dashboard/run-dashboard-tests.mjs",
     "test:recharts-lazy": "node --experimental-strip-types src/modules/dashboard/run-recharts-lazy-tests.mjs",
