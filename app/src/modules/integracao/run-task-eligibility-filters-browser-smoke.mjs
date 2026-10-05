@@ -26,6 +26,9 @@ const financeMobileScreenshotPath =
 const releasedServicesScreenshotPath =
   process.env.TASKS_RELEASED_SERVICES_SCREENSHOT_PATH ??
   "output/playwright/issue-1243-released-services.png";
+const departmentChangeScreenshotPath =
+  process.env.TASKS_DEPARTMENT_CHANGE_SCREENSHOT_PATH ??
+  "../output/playwright/issue-1593-department-change.png";
 
 const smokeUser = {
   id: "user-task-smoke",
@@ -801,6 +804,11 @@ async function runBrowserProof() {
     await expect(persistedSwapDialog.getByLabel("Observações")).toHaveValue(
       "Legado preservado",
     );
+    await expect(page.locator(".Toastify__toast")).toHaveCount(0, { timeout: 7_000 });
+    await persistedSwapDialog
+      .locator("label")
+      .filter({ hasText: "Departamento" })
+      .screenshot({ path: departmentChangeScreenshotPath });
     await persistedSwapDialog.getByRole("button", { name: "Cancelar" }).click();
     await expect(persistedSwapDialog).toHaveCount(0);
 
@@ -817,6 +825,7 @@ async function runBrowserProof() {
     await page.getByRole("button", { name: `Editar tarefa ${assignedTask.name}` }).click();
     const restrictedDialog = page.getByRole("dialog", { name: "Editar tarefa" });
     await expect(restrictedDialog).toBeVisible();
+    await expect(restrictedDialog.getByLabel("Departamento")).toHaveCount(0);
     await expect(restrictedDialog.getByLabel("Responsável")).toHaveCount(0);
     await restrictedDialog.getByLabel("Observações").fill("Atualização restrita");
     await restrictedDialog
