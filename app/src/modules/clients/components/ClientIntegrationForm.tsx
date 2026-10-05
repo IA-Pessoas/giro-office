@@ -13,11 +13,10 @@ import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type {
-  ClientTaxRegime,
   CreateClientIntegrationFormValues,
   UpdateClientIntegrationFormValues,
 } from "../types";
-import { CLIENT_TAX_REGIME_OPTIONS } from "../utils/clientForm";
+import { CLIENT_TAX_REGIME_OPTIONS, getClientTaxRegime } from "../utils/clientForm";
 import {
   getIntegrationEmailError,
   getPhoneInputHint,
@@ -145,7 +144,7 @@ export function ClientIntegrationForm({
           </ClientNativeSelect>
           {legacyTaxRegime &&
           values.regime === "" &&
-          !CLIENT_TAX_REGIME_OPTIONS.includes(legacyTaxRegime as ClientTaxRegime) ? (
+          getClientTaxRegime(legacyTaxRegime) === "" ? (
             <span className="block text-xs text-slate-500 dark:text-slate-400">
               Regime atual: {legacyTaxRegime}
             </span>

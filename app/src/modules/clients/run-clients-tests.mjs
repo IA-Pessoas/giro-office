@@ -58,6 +58,7 @@ import {
   buildUpdateClientPayload,
   CLIENT_TAX_REGIME_OPTIONS,
   createClientFormInitialValues,
+  getClientTaxRegime,
 } from "./utils/clientForm.ts";
 import { getDocumentIssue } from "../../shared/utils/documentIssue.ts";
 import { toDatetimeLocalValue, toHistoryIsoDate } from "./utils/historyDate.ts";
@@ -119,6 +120,9 @@ runTest("client form sends the selected tax regime on creation and update", () =
     "Lucro Presumido",
     "Lucro Real",
   ]);
+  assert.equal(getClientTaxRegime("Lucro Presumido"), "Lucro Presumido");
+  assert.equal(getClientTaxRegime("MEI"), "");
+  assert.equal(getClientTaxRegime(null), "");
   assert.equal(createClientFormInitialValues({ regime: null }).regime, "");
 
   const values = {

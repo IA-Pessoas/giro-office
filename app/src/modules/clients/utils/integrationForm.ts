@@ -5,7 +5,6 @@ import {
   normalizeCnpjInput,
 } from "../../../shared/utils/inputFormatting.ts";
 import type {
-  ClientTaxRegime,
   Client,
   ClientCompanyLookup,
   CreateClientIntegrationFormValues,
@@ -13,8 +12,7 @@ import type {
   UpdateClientIntegrationFormValues,
   UpdateClientIntegrationPayload,
 } from "../types";
-import { CLIENT_TAX_REGIME_OPTIONS } from "./clientForm.ts";
-import { getClientInternalName } from "./clientForm.ts";
+import { getClientInternalName, getClientTaxRegime } from "./clientForm.ts";
 import { validateCpfCnpjDocument, validateOptionalCpfDocument } from "./documentValidation.ts";
 const nullableTextFieldNames = [
   "company_name",
@@ -73,12 +71,6 @@ export function hasUsableIntegrationData(client: Client | null | undefined): boo
 
 function normalizeIntegrationDocumentValue(value: string | null | undefined, type: "PJ" | "PF") {
   return type === "PJ" ? normalizeCnpjInput(value) : normalizeDocumentValue(value);
-}
-
-function getIntegrationTaxRegime(value: string | null | undefined): ClientTaxRegime | "" {
-  return CLIENT_TAX_REGIME_OPTIONS.includes(value as ClientTaxRegime)
-    ? (value as ClientTaxRegime)
-    : "";
 }
 
 export function mergeClientCompanyLookup(
@@ -150,7 +142,7 @@ export function createUpdateClientIntegrationInitialValues(
 
   return {
     type,
-    regime: getIntegrationTaxRegime(client.regime),
+    regime: getClientTaxRegime(client.regime),
     name: client.name ?? "",
     cpf_cnpj:
       type === "PJ"
