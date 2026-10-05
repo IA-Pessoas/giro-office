@@ -332,7 +332,7 @@ export function MarketingEvents() {
       >
         {viewingEvent ? (
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
-            <div><dt className="font-semibold text-gray-700 dark:text-slate-200">Logo</dt><dd className="mt-1 break-all text-gray-600 dark:text-slate-300">{viewingEvent.logo ? <><img alt={`Logo de ${viewingEvent.name}`} className="mb-2 max-h-20 max-w-40 object-contain" src={viewingEvent.logo} />{viewingEvent.logo}</> : "—"}</dd></div>
+            <div><dt className="font-semibold text-gray-700 dark:text-slate-200">Logo</dt><dd className="mt-1 break-all text-gray-600 dark:text-slate-300">{viewingEvent.logo ? <><img decoding="async" alt={`Logo de ${viewingEvent.name}`} className="mb-2 max-h-20 max-w-40 object-contain" src={viewingEvent.logo} />{viewingEvent.logo}</> : "—"}</dd></div>
             <div><dt className="font-semibold text-gray-700 dark:text-slate-200">Status</dt><dd className="mt-1 text-gray-600 dark:text-slate-300">{viewingEvent.status}</dd></div>
             <div><dt className="font-semibold text-gray-700 dark:text-slate-200">Prioridade</dt><dd className="mt-1 text-gray-600 dark:text-slate-300">{viewingEvent.priority}</dd></div>
             <div><dt className="font-semibold text-gray-700 dark:text-slate-200">Público-alvo</dt><dd className="mt-1 whitespace-pre-wrap text-gray-600 dark:text-slate-300">{viewingEvent.audience || "—"}</dd></div>
