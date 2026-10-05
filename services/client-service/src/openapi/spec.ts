@@ -1,5 +1,6 @@
 import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 
 import type { ClientServiceEnv } from "../config/env.js";
 
@@ -430,6 +431,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                         "Opcional. Quando informado, deve corresponder a organizacao autenticada.",
                     },
                     type: { type: "string" },
+                    regime: { type: ["string", "null"], enum: [...TAX_REGIME_OPTIONS, null] },
                     name: { type: "string" },
                     cpf_cnpj: { type: "string" },
                     company_name: { type: ["string", "null"] },
@@ -464,9 +466,16 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                 schema: {
                   type: "object",
                   additionalProperties: true,
+                  properties: {
+                    regime: {
+                      type: ["string", "null"],
+                      enum: [...TAX_REGIME_OPTIONS, null],
+                    },
+                  },
                   example: {
                     company_name: "Empresa Atualizada",
                     email: "contato@empresa.com",
+                    regime: "Lucro Real",
                   },
                 },
               },
