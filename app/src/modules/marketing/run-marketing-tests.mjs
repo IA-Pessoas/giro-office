@@ -90,10 +90,13 @@ assert.match(profiles, /clientService\.listInstagramProfiles/);
 assert.match(profiles, /clientService\.updateIntegration\(clientId, \{ instagram \}\)/);
 assert.match(profiles, /QRCodeSVG/);
 assert.match(passwords, /••••••••/);
-assert.match(passwords, /window\.confirm/);
+assert.match(passwords, /<ConfirmationDialog/);
+assert.doesNotMatch(passwords, /window\.confirm/);
+assert.match(passwords, /Revelar a senha de/);
+assert.match(passwords, /Exportar a senha de/);
 assert.match(passwords, /marketingPasswordService\.reveal/);
 assert.match(passwords, /marketingPasswordService\.export/);
-assert.match(passwords, /if \(!access\.canEdit\) setRevealed\(null\)/);
+assert.match(passwords, /if \(!access\.canEdit\) \{\s*setRevealed\(null\);\s*setPendingConfirmation\(null\);/);
 assert.match(
   passwords,
   /revealed\?\.organizationId === \(authUser\?\.organization_id \?\? null\)/,

@@ -3,6 +3,7 @@ import { Eye, EyeOff, KeyRound, Loader2, Pencil, Plus, Save, ShieldCheck } from 
 import { useEffect, useState } from "react";
 
 import { useModuleAccess } from "@modules/auth";
+import { ConfirmationDialog } from "@shared/components";
 import { useFetch } from "@shared/hooks";
 
 import {
@@ -14,6 +15,11 @@ import { marketingQueryKey } from "../utils/marketingQueryKeys";
 
 const PASSWORDS_QUERY_KEY = ["marketing", "passwords"] as const;
 const RECONCILIATION_QUERY_KEY = ["marketing", "passwords", "reconciliation"] as const;
+
+type PendingPasswordConfirmation = {
+  action: "reveal" | "export";
+  credential: MarketingPassword;
+};
 
 function triggerDownload(filename: string, content: string): void {
   const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
@@ -49,6 +55,9 @@ export function MarketingPasswords() {
     userId: string | null;
     organizationId: string | null;
   } | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] =
+    useState<PendingPasswordConfirmation | null>(null);
+  const [isConfirmingAction, setIsConfirmingAction] = useState(false);
   const [saving, setSaving] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [importJson, setImportJson] = useState("[]");
@@ -57,7 +66,10 @@ export function MarketingPasswords() {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    if (!access.canEdit) setRevealed(null);
+    if (!access.canEdit) {
+      setRevealed(null);
+      setPendingConfirmation(null);
+    }
   }, [access.canEdit]);
 
   useEffect(() => {
@@ -70,6 +82,7 @@ export function MarketingPasswords() {
     setImportJson("[]");
     setError("");
     setStatus("");
+    setPendingConfirmation(null);
   }, [authUser?.id, authUser?.organization_id]);
 
   const currentReveal =
@@ -77,6 +90,14 @@ export function MarketingPasswords() {
     revealed?.organizationId === (authUser?.organization_id ?? null)
       ? revealed
       : null;
+  const confirmationTitle =
+    pendingConfirmation?.action === "reveal" ? "Confirmar revelação" : "Confirmar exportação";
+  const confirmationDescription =
+    pendingConfirmation?.action === "reveal"
+      ? `Revelar a senha de ${pendingConfirmation.credential.local} para ${pendingConfirmation.credential.user}? A senha será exibida nesta tela.`
+      : pendingConfirmation
+        ? `Exportar a senha de ${pendingConfirmation.credential.local} para ${pendingConfirmation.credential.user} em um arquivo sem criptografia?`
+        : "";
 
   const resetForm = () => {
     setEditingId(null);
@@ -138,13 +159,6 @@ export function MarketingPasswords() {
   };
 
   const revealCredential = async (credential: MarketingPassword) => {
-    if (
-      !window.confirm(
-        `Revelar a senha de ${credential.local} para ${credential.user}? A senha será exibida nesta tela.`,
-      )
-    ) {
-      return;
-    }
     setRevealed(null);
     setError("");
     try {
@@ -161,13 +175,6 @@ export function MarketingPasswords() {
   };
 
   const exportCredential = async (credential: MarketingPassword) => {
-    if (
-      !window.confirm(
-        `Exportar a senha de ${credential.local} para ${credential.user} em um arquivo sem criptografia?`,
-      )
-    ) {
-      return;
-    }
     setExportingId(credential.id);
     setError("");
     try {
@@ -180,6 +187,21 @@ export function MarketingPasswords() {
       setError("Não foi possível exportar esta credencial.");
     } finally {
       setExportingId(null);
+    }
+  };
+
+  const confirmPendingAction = async () => {
+    if (!pendingConfirmation) return;
+
+    setIsConfirmingAction(true);
+    try {
+      if (pendingConfirmation.action === "reveal") {
+        await revealCredential(pendingConfirmation.credential);
+      } else {
+        await exportCredential(pendingConfirmation.credential);
+      }
+    } finally {
+      setIsConfirmingAction(false);
     }
   };
 
@@ -317,7 +339,7 @@ export function MarketingPasswords() {
                           onClick={() =>
                             currentReveal?.id === credential.id
                               ? setRevealed(null)
-                              : void revealCredential(credential)
+                              : setPendingConfirmation({ action: "reveal", credential })
                           }
                           type="button"
                           aria-label={
@@ -332,7 +354,7 @@ export function MarketingPasswords() {
                             <Eye className="h-4 w-4" aria-hidden="true" />
                           )}
                         </button>
-                        <button className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200" disabled={exportingId === credential.id} onClick={() => void exportCredential(credential)} type="button">
+                        <button className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200" disabled={exportingId === credential.id} onClick={() => setPendingConfirmation({ action: "export", credential })} type="button">
                           {exportingId === credential.id ? "Exportando…" : "Exportar"}
                         </button>
                       </>
@@ -369,6 +391,21 @@ export function MarketingPasswords() {
           </ul>
         </div>
       ) : null}
+
+      <ConfirmationDialog
+        open={pendingConfirmation !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingConfirmation(null);
+        }}
+        title={confirmationTitle}
+        description={confirmationDescription}
+        onConfirm={confirmPendingAction}
+        isConfirming={isConfirmingAction}
+        errorMessage={null}
+        confirmLabel={pendingConfirmation?.action === "reveal" ? "Revelar senha" : "Exportar senha"}
+        cancelLabel="Cancelar"
+        variant="neutral"
+      />
     </section>
   );
 }
