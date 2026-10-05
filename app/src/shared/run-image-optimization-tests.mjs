@@ -81,6 +81,7 @@ await runTest("dynamic img usages are intentional", async () => {
     "src/modules/chat/components/GroupInfoSidebar.tsx",
     "src/modules/chat/components/ChatListPanel.tsx",
     "src/modules/ti/components/TiRequestsTab.tsx",
+    "src/modules/marketing/components/MarketingEvents.tsx",
   ];
 
   const tsxFiles = await collectFiles(appSrc, [".tsx"]);
