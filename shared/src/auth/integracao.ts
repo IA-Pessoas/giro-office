@@ -128,6 +128,7 @@ const CLIENT_UPDATE_FIELDS = [
   "state",
   "city",
 ] as const;
+const CLIENT_INTEGRATION_UPDATE_FIELDS = [...CLIENT_UPDATE_FIELDS, "regime"] as const;
 
 const PROJECT_FIELDS = [
   "name",
@@ -277,7 +278,7 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     "/client/:id/integration",
     "client",
     "update",
-    [writeRule(writeUser, CLIENT_UPDATE_FIELDS)],
+    [writeRule(writeUser, CLIENT_INTEGRATION_UPDATE_FIELDS)],
     { audit: "required", test: "client.integration.update" },
   ),
   routePolicy("DELETE", "/client/:id", "client", "deactivate", [writeRule(admin, [])], {

@@ -13,9 +13,11 @@ import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type {
+  ClientTaxRegime,
   CreateClientIntegrationFormValues,
   UpdateClientIntegrationFormValues,
 } from "../types";
+import { CLIENT_TAX_REGIME_OPTIONS } from "../utils/clientForm";
 import {
   getIntegrationEmailError,
   getPhoneInputHint,
@@ -45,6 +47,7 @@ interface ClientIntegrationFormProps {
   showFieldErrors?: boolean;
   /** Erros do envio, mostrados abaixo de cada campo (#1367). */
   fieldErrors?: IntegrationFieldErrors;
+  legacyTaxRegime?: string | null;
 }
 
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-white";
@@ -68,6 +71,7 @@ export function ClientIntegrationForm({
   cnpjLookupError,
   showFieldErrors = false,
   fieldErrors = {},
+  legacyTaxRegime,
 }: ClientIntegrationFormProps) {
   const cnpjLookupReason = (cnpjLookupError as { response?: { data?: { error?: unknown } } })
     ?.response?.data?.error;
@@ -122,6 +126,30 @@ export function ClientIntegrationForm({
             <option value="Novo">Novo</option>
             <option value="Constituição de Empresa">Constituição de Empresa</option>
           </ClientNativeSelect>
+        </label>
+
+        <label className="space-y-1.5">
+          <span className={labelClassName}>Regime tributário</span>
+          <ClientNativeSelect
+            name="regime"
+            value={values.regime}
+            onChange={onChange}
+            disabled={disabled}
+          >
+            <option value="">Selecione um regime</option>
+            {CLIENT_TAX_REGIME_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </ClientNativeSelect>
+          {legacyTaxRegime &&
+          values.regime === "" &&
+          !CLIENT_TAX_REGIME_OPTIONS.includes(legacyTaxRegime as ClientTaxRegime) ? (
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
+              Regime atual: {legacyTaxRegime}
+            </span>
+          ) : null}
         </label>
 
         <div className="space-y-1.5">

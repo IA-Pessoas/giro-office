@@ -32,3 +32,26 @@ describe("integration email contract", () => {
     ).toBeNull();
   });
 });
+
+describe("integration tax regime contract", () => {
+  it.each([
+    "Simples Nacional",
+    "Lucro Presumido",
+    "Lucro Real",
+  ])("accepts the shared regime %s for create and edit", (regime) => {
+    expect(createIntegrationBodySchema.safeParse({ ...createBody, regime }).success).toBe(true);
+    expect(updateIntegrationBodySchema.safeParse({ regime }).success).toBe(true);
+  });
+
+  it.each(["MEI", ""])("rejects unsupported regime %s", (regime) => {
+    expect(createIntegrationBodySchema.safeParse({ ...createBody, regime }).success).toBe(false);
+    expect(updateIntegrationBodySchema.safeParse({ regime }).success).toBe(false);
+  });
+
+  it("accepts an unset regime", () => {
+    expect(createIntegrationBodySchema.safeParse({ ...createBody, regime: null }).success).toBe(
+      true,
+    );
+    expect(updateIntegrationBodySchema.safeParse({ regime: null }).success).toBe(true);
+  });
+});

@@ -25,7 +25,7 @@ export async function createIntegrationClient(
     level: INTEGRACAO_PERMISSION_LEVEL.BASIC,
     isOwner: false,
   },
-): Promise<{ id: string; name: string; cpf_cnpj: string }> {
+): Promise<{ id: string; name: string; cpf_cnpj: string; regime: string | null }> {
   requireIntegracaoRouteAccess("POST", "/client/integration", {
     userId: authorization.userId,
     level: authorization.level,
@@ -56,6 +56,7 @@ export async function createIntegrationClient(
         company_name: input.company_name ?? null,
         fantasy_name: input.fantasy_name ?? null,
         cpf_cnpj: cleanedCpf,
+        regime: input.regime ?? null,
         opening_date: input.opening_date ?? null,
         responsible: input.responsible ?? null,
         cpf_responsible: cleanedCpfResponsible,
@@ -76,6 +77,7 @@ export async function createIntegrationClient(
         id: true,
         name: true,
         cpf_cnpj: true,
+        regime: true,
       },
     });
 
@@ -144,6 +146,10 @@ export async function updateIntegrationClient(
 
   if (input.fantasy_name !== undefined) {
     data.fantasy_name = input.fantasy_name;
+  }
+
+  if (input.regime !== undefined) {
+    data.regime = input.regime;
   }
 
   if (cleanedCpfCnpj !== undefined) {
@@ -231,6 +237,7 @@ export async function updateIntegrationClient(
     name: true,
     company_name: true,
     fantasy_name: true,
+    regime: true,
     cpf_cnpj: true,
     responsible: true,
     cpf_responsible: true,
