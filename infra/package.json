@@ -9,7 +9,7 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:seed:qa": "tsx prisma/seed-qa.ts",
     "prisma:seed:qa:wizard": "tsx prisma/seed-qa-wizard.ts",
-    "test": "node --test prisma/scripts/test/global-login-collision-preflight.test.mjs prisma/scripts/test/platform-impersonation-permission-migration.test.mjs prisma/scripts/test/auth-session-impersonator-migration.test.mjs prisma/scripts/test/dedupe-clients-by-document.test.mjs prisma/scripts/test/report-invalid-documents.test.mjs prisma/scripts/test/backfill-client-service-flags.test.mjs prisma/scripts/test/backfill-installment-paid-count.test.mjs prisma/scripts/test/backfill-ti-inventory-from-terms.test.mjs prisma/scripts/test/seed-holidays-2026-2027.test.mjs prisma/scripts/test/report-non-person-users.test.mjs prisma/scripts/test/cleanup-legacy-test-data.test.mjs"
+    "test": "node --test --test-concurrency=1 prisma/scripts/test/global-login-collision-preflight.test.mjs prisma/scripts/test/platform-impersonation-permission-migration.test.mjs prisma/scripts/test/auth-session-impersonator-migration.test.mjs prisma/scripts/test/dedupe-clients-by-document.test.mjs prisma/scripts/test/report-invalid-documents.test.mjs prisma/scripts/test/backfill-client-service-flags.test.mjs prisma/scripts/test/backfill-installment-paid-count.test.mjs prisma/scripts/test/backfill-ti-inventory-from-terms.test.mjs prisma/scripts/test/seed-holidays-2026-2027.test.mjs prisma/scripts/test/report-non-person-users.test.mjs prisma/scripts/test/cleanup-legacy-test-data.test.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.9.1",
