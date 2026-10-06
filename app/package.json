@@ -21,6 +21,7 @@
     "test:auth-session": "node src/modules/auth/run-auth-session-browser-smoke.mjs",
     "test:users": "node --experimental-strip-types src/modules/users/run-users-tests.mjs",
     "test:clients": "node --experimental-strip-types src/modules/clients/run-clients-tests.mjs",
+    "test:client-pa-access-browser": "node src/modules/clients/run-client-pa-access-browser-smoke.mjs",
     "test:rh-point-adjustment": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/rh/run-rh-point-adjustment-tests.mjs",
     "test:rh-duration": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/rh/run-rh-duration-tests.mjs",
     "test:rh-request-assignee": "node --experimental-strip-types --experimental-specifier-resolution=node src/modules/rh/run-rh-request-assignee-tests.mjs",
