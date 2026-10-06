@@ -96,7 +96,7 @@ assert.match(passwords, /Revelar a senha de/);
 assert.match(passwords, /Exportar a senha de/);
 assert.match(passwords, /marketingPasswordService\.reveal/);
 assert.match(passwords, /marketingPasswordService\.export/);
-assert.match(passwords, /if \(!access\.canEdit\) \{\s*setRevealed\(null\);\s*setPendingConfirmation\(null\);/);
+assert.match(passwords, /if \(!access\.canEdit\) setRevealed\(null\);\s*if \(!access\.canEdit\) setConfirmation\(null\);/);
 assert.match(
   passwords,
   /revealed\?\.organizationId === \(authUser\?\.organization_id \?\? null\)/,
