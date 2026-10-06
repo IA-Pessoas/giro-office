@@ -158,12 +158,17 @@ function buildPAPrismaMock() {
   } as unknown as PrismaClient;
 }
 
-function bearerToken(organizationId: string, permission?: number, integracao = 1): string {
+function bearerToken(
+  organizationId: string,
+  permission?: number,
+  integracao = 1,
+  pessoal?: number,
+): string {
   return jwt.sign(
     {
       user_id: "user-test-1",
       organization_id: organizationId,
-      modules: { integracao },
+      modules: { integracao, ...(pessoal !== undefined ? { pessoal } : {}) },
       ...(permission !== undefined ? { permission } : {}),
     },
     TEST_JWT_SECRET,
@@ -1041,11 +1046,20 @@ describe("client-service", () => {
     );
   });
 
-  it("supports create, detail and update for client PA", async () => {
+  it.each([
+    { globalLevel: 0, pessoalLevel: 0 },
+    { globalLevel: 1, pessoalLevel: 0 },
+    { globalLevel: 2, pessoalLevel: 0 },
+    { globalLevel: 3, pessoalLevel: 0 },
+    { globalLevel: 0, pessoalLevel: 1 },
+  ])("preserva acesso autenticado ao PA com níveis global $globalLevel e Pessoal $pessoalLevel", async ({
+    globalLevel,
+    pessoalLevel,
+  }) => {
     const mock: IClientService = { ...mockServiceBase() };
     const prisma = buildPAPrismaMock();
     const app = buildTestApp(mock, { prisma });
-    const token = bearerToken(TEST_ORG_ID);
+    const token = bearerToken(TEST_ORG_ID, globalLevel, 1, pessoalLevel);
 
     const createResponse = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/pa`)
@@ -1071,6 +1085,56 @@ describe("client-service", () => {
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body.success).toBe(true);
     expect(updateResponse.body.data.activities).toBe("Atualizado");
+  });
+
+  it("nega leitura, criação e alteração de PA sem autenticação", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const prisma = buildPAPrismaMock();
+    const app = buildTestApp(mock, { prisma });
+    const path = `/client/${TEST_CLIENT_ID}/pa`;
+
+    const responses = await Promise.all([
+      request(app).get(path),
+      request(app).post(path).send({}),
+      request(app).patch(path).send({ activities: "Alterado" }),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([401, 401, 401]);
+    expect(
+      (prisma as unknown as { client: { findFirst: ReturnType<typeof vi.fn> } }).client.findFirst,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("nega leitura, criação e alteração de PA de cliente de outra organização", async () => {
+    const clientFindFirst = vi.fn().mockResolvedValue(null);
+    const paFindFirst = vi.fn().mockResolvedValue(null);
+    const paCreate = vi.fn();
+    const paUpdate = vi.fn();
+    const prisma = {
+      client: { findFirst: clientFindFirst },
+      pA: { findFirst: paFindFirst, create: paCreate, update: paUpdate },
+    } as unknown as PrismaClient;
+    const app = buildTestApp({ ...mockServiceBase() }, { prisma });
+    const path = `/client/${TEST_CLIENT_ID}/pa`;
+    const authorization = `Bearer ${bearerToken(TEST_ORG_ID, 3)}`;
+
+    const responses = await Promise.all([
+      request(app).get(path).set("Authorization", authorization),
+      request(app).post(path).set("Authorization", authorization).send({}),
+      request(app).patch(path).set("Authorization", authorization).send({ activities: "Alterado" }),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([404, 404, 404]);
+    expect(clientFindFirst).toHaveBeenCalledWith({
+      where: { id: TEST_CLIENT_ID, organization_id: TEST_ORG_ID },
+      select: { id: true },
+    });
+    expect(paFindFirst).toHaveBeenCalledWith({
+      where: { client_id: TEST_CLIENT_ID, organization_id: TEST_ORG_ID },
+      select: { client_id: true },
+    });
+    expect(paCreate).not.toHaveBeenCalled();
+    expect(paUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects POST on an existing client PA without overwriting its data (#1310)", async () => {
