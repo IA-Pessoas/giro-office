@@ -9,7 +9,8 @@ import { useReportsCatalog } from "../hooks/useReportsCatalog";
 import { reportsCatalogQueryKey } from "../hooks/queryKeys";
 import { reportsService } from "../services/reportsService";
 import { getSelectableReportFields } from "../utils/reportBuilder";
-import { getPessoalReportPresets, type PessoalReportPreset } from "../utils/pessoalReportPresets";
+import { getPessoalReportPresets } from "../utils/pessoalReportPresets";
+import { getTaskDepartmentReportPreset } from "../utils/taskDepartmentReportPreset";
 import { ReportFieldsStep } from "./ReportFieldsStep";
 import { ReportCriteriaStep } from "./ReportCriteriaStep";
 import { buildReportComposition, buildReportCompositionV3, operatorLabels, summaryLabels } from "../utils/reportCriteria";
@@ -160,6 +161,10 @@ export function ReportsCreatePanel({
   const pessoalPresets = builder.areas.every((area) => area.source.startsWith("pessoal."))
     ? getPessoalReportPresets(sources)
     : [];
+  const taskDepartmentPreset = builder.areas.every((area) => area.source === "integracao.tasks")
+    ? getTaskDepartmentReportPreset(sources)
+    : null;
+  const presets = [...pessoalPresets, ...(taskDepartmentPreset ? [taskDepartmentPreset] : [])];
   const selected = builder.areas.map((area) => ({
     ...area,
     catalog: sources.find((source) => source.key === area.source),
@@ -211,10 +216,10 @@ export function ReportsCreatePanel({
     setError("");
     review.reset();
   }
-  function applyPreset(preset: PessoalReportPreset) {
+  function applyPreset(areas: ReportArea[]) {
     if (busy) return;
     builder.setAreas(
-      preset.areas.map((area) => ({
+      areas.map((area) => ({
         ...area,
         fields: [...area.fields],
         ...(area.filters ? { filters: area.filters.map((filter) => ({ ...filter })) } : {}),
@@ -409,20 +414,20 @@ export function ReportsCreatePanel({
 
   return (
     <div className="space-y-6">
-      {pessoalPresets.length ? (
+      {presets.length ? (
         <section className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Presets de Pessoal</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Modelos prontos</h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
             Comece por uma estrutura pronta e ajuste os critérios antes de gerar.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {pessoalPresets.map((preset) => (
+            {presets.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
                 disabled={busy}
                 title={preset.description}
-                onClick={() => applyPreset(preset)}
+                onClick={() => applyPreset(preset.areas)}
                 className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
               >
                 {preset.label}
