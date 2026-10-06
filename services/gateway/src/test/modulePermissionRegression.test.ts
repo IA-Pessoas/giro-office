@@ -316,6 +316,53 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(true);
   });
 
+  it("documenta os limiares atuais do gateway para leitura e escrita de PA", () => {
+    const path = "/client/client-1/pa";
+    const cases = [
+      { name: "Pessoal 0 isolado", modules: { pessoal: 0 }, canRead: false, canWrite: false },
+      { name: "Pessoal 1 isolado", modules: { pessoal: 1 }, canRead: false, canWrite: false },
+      { name: "Pessoal 2 isolado", modules: { pessoal: 2 }, canRead: false, canWrite: true },
+      {
+        name: "Comercial 1 e Pessoal 1",
+        modules: { comercial: 1, pessoal: 1 },
+        canRead: true,
+        canWrite: false,
+      },
+      {
+        name: "Comercial 1 e Pessoal 2",
+        modules: { comercial: 1, pessoal: 2 },
+        canRead: true,
+        canWrite: true,
+      },
+      {
+        name: "Comercial 2 e Pessoal 0",
+        modules: { comercial: 2, pessoal: 0 },
+        canRead: true,
+        canWrite: true,
+      },
+    ];
+
+    for (const { name, modules, canRead, canWrite } of cases) {
+      const context = authContext({ modules });
+      expect(canAccessRoute(context, requiredRoutePolicy("GET", path)), `${name}: GET`).toBe(
+        canRead,
+      );
+      for (const method of ["POST", "PATCH"]) {
+        expect(
+          canAccessRoute(context, requiredRoutePolicy(method, path)),
+          `${name}: ${method}`,
+        ).toBe(canWrite);
+      }
+    }
+
+    const owner = authContext({ type: "owner", modules: {} });
+    for (const method of ["GET", "POST", "PATCH"]) {
+      expect(canAccessRoute(owner, requiredRoutePolicy(method, path)), `owner: ${method}`).toBe(
+        true,
+      );
+    }
+  });
+
   it.each([
     1, 2, 3,
   ])("permite Integração nível %i consultar a lista sem permission global", (level) => {
