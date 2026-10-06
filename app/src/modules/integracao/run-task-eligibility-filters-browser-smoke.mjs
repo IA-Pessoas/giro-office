@@ -723,6 +723,11 @@ async function runBrowserProof() {
       },
     );
 
+    smokeUser.type = "user";
+    smokeUser.modules.integracao = 2;
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: `Editar tarefa ${task.name}` })).toBeVisible();
+
     await page.getByRole("button", { name: `Editar tarefa ${task.name}` }).click();
     const editDialog = page.getByRole("dialog", { name: "Editar tarefa" });
     await expect(editDialog).toBeVisible();
