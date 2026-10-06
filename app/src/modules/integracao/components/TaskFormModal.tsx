@@ -279,6 +279,11 @@ export function TaskFormModal({
     !departments.some((department) => department.id === editValues.department_id);
   const shouldRenderCurrentModelOption =
     Boolean(editValues.model_id) && !editTaskModels.some((model) => model.id === editValues.model_id);
+  const shouldExplainEditModelRequirement =
+    Boolean(editValues.department_id) &&
+    Boolean(taskDetailQuery.data) &&
+    editValues.department_id !== taskDetailQuery.data?.department_id &&
+    !editValues.model_id;
   const createProjectsCount = projectsQuery.data?.length ?? null;
   const hasNoProjectsForSelectedClient =
     Boolean(createValues.client_id) && !projectsQuery.isLoading && createProjectsCount === 0;
@@ -650,6 +655,11 @@ export function TaskFormModal({
                   <ProjectSelect
                     value={editValues.model_id}
                     onChange={(event) => updateEditValue("model_id", event.target.value)}
+                    aria-describedby={
+                      shouldExplainEditModelRequirement
+                        ? "edit-task-model-department-help"
+                        : undefined
+                    }
                     disabled={
                       !editValues.department_id ||
                       taskModelsQuery.isLoading ||
@@ -666,6 +676,15 @@ export function TaskFormModal({
                       </option>
                     ))}
                   </ProjectSelect>
+                  {shouldExplainEditModelRequirement ? (
+                    <span
+                      id="edit-task-model-department-help"
+                      className="text-xs text-slate-500 dark:text-slate-400"
+                    >
+                      Ao mudar o departamento, selecione um modelo elegível para o novo
+                      departamento.
+                    </span>
+                  ) : null}
                 </label>
 
                 <label className={TASK_FORM_LABEL_CLASSNAME}>
