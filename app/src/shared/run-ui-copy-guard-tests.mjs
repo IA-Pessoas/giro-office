@@ -41,6 +41,11 @@ const UNACCENTED = new RegExp(`(?<!${WORD})(?:${UNACCENTED_WORDS.join("|")})(?!$
 
 // Exceções explícitas: { file (relativo à raiz do repo), text, reason }.
 const ALLOWLIST = [
+  ...['fail("[user-service]', 'fail(`[user-service]'].map((text) => ({
+    file: "workers/user-service/src/audit.ts",
+    text,
+    reason: "helper fail registra console.warn; evento obrigatório devolve apenas Auditoria indisponível",
+  })),
   {
     file: "app/src/modules/rh/components/RhTimesheetDetailView.tsx",
     text: '"Nao previsto"',
