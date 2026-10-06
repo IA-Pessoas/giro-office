@@ -115,6 +115,16 @@ const ALLOWLIST = [
     text,
     reason: "502 sem expose (ServiceError multilinha); o serializeError devolve a mensagem genérica",
   })),
+  ...[
+    ['"[user-service] AUDIT_SERVICE binding ausente; auditoria não foi enviada."'],
+    ['"[user-service] AUDIT_SERVICE_TOKEN ausente; auditoria não foi enviada."'],
+    ['`[user-service] AUDIT_SERVICE respondeu ${response.status}; auditoria falhou.`'],
+    ['"[user-service] falha ao comunicar com AUDIT_SERVICE; auditoria falhou."'],
+  ].map(([text]) => ({
+    file: "workers/user-service/src/audit.ts",
+    text,
+    reason: "mensagem interna enviada somente a console.warn; a resposta pública usa erro genérico",
+  })),
 ];
 
 // Linhas que não chegam ao usuário: logs (inclusive "[tag] ..."), SQL, títulos de docs
@@ -301,7 +311,7 @@ const targets = [
 
 const violations = [];
 for (const { file, mode } of targets) {
-  const path = relative(repoRoot, file);
+  const path = relative(repoRoot, file).replaceAll("\\", "/");
   readFileSync(file, "utf8")
     .split("\n")
     .forEach((line, index) => {

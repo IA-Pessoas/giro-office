@@ -336,6 +336,22 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
   }
 });
 
+test("editar regime tributário pela integração segue a permissão de edição existente", () => {
+  const policy = requirePolicy("PATCH", "/client/:id/integration");
+  const base = {
+    userId: "user-1",
+    organizationId: "org-1",
+    resourceOrganizationId: "org-1",
+    isOwner: false,
+    requestedFields: ["regime"],
+  } as const;
+
+  assert.equal(evaluateIntegracaoAction(policy, { ...base, level: 1 }), "forbidden");
+  assert.equal(evaluateIntegracaoAction(policy, { ...base, level: 2 }), "allow");
+  assert.equal(evaluateIntegracaoAction(policy, { ...base, level: 3 }), "allow");
+  assert.equal(evaluateIntegracaoAction(policy, { ...base, level: 0, isOwner: true }), "allow");
+});
+
 test("prorrogação conserva escopo de responsável para os níveis básicos", () => {
   const policy = requirePolicy("POST", "/task/postponement");
   const input = {

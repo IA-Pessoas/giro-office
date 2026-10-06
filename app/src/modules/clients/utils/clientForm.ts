@@ -23,7 +23,7 @@ function normalizeTaxRegime(value: ClientTaxRegime | ""): ClientTaxRegime | null
   return value || null;
 }
 
-function getClientTaxRegime(value: string | null | undefined): ClientTaxRegime | "" {
+export function getClientTaxRegime(value: string | null | undefined): ClientTaxRegime | "" {
   return isClientTaxRegime(value) ? value : "";
 }
 

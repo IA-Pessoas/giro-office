@@ -12,7 +12,7 @@ import type {
   UpdateClientIntegrationFormValues,
   UpdateClientIntegrationPayload,
 } from "../types";
-import { getClientInternalName } from "./clientForm.ts";
+import { getClientInternalName, getClientTaxRegime } from "./clientForm.ts";
 import { validateCpfCnpjDocument, validateOptionalCpfDocument } from "./documentValidation.ts";
 const nullableTextFieldNames = [
   "company_name",
@@ -114,6 +114,7 @@ export function mergeClientCompanyLookup(
 export function createClientIntegrationInitialValues(): CreateClientIntegrationFormValues {
   return {
     type: "PJ",
+    regime: "",
     name: "",
     cpf_cnpj: "",
     company_name: "",
@@ -141,6 +142,7 @@ export function createUpdateClientIntegrationInitialValues(
 
   return {
     type,
+    regime: getClientTaxRegime(client.regime),
     name: client.name ?? "",
     cpf_cnpj:
       type === "PJ"
@@ -173,6 +175,7 @@ export function buildCreateClientIntegrationPayload(
   return {
     organization_id: organizationId,
     type: values.type,
+    regime: values.regime || null,
     name: getClientInternalName(values),
     cpf_cnpj: normalizeIntegrationDocumentValue(values.cpf_cnpj, values.type),
     company_name: normalizeNullableTextValue(values.company_name),
@@ -202,6 +205,10 @@ export function buildUpdateClientIntegrationPayload(
 
   if (values.type !== currentValues.type) {
     payload.type = values.type;
+  }
+
+  if (values.regime !== currentValues.regime) {
+    payload.regime = values.regime || null;
   }
 
   const nextName = getClientInternalName(values);

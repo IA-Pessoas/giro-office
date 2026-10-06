@@ -26,6 +26,9 @@ const financeMobileScreenshotPath =
 const releasedServicesScreenshotPath =
   process.env.TASKS_RELEASED_SERVICES_SCREENSHOT_PATH ??
   "output/playwright/issue-1243-released-services.png";
+const departmentChangeScreenshotPath =
+  process.env.TASKS_DEPARTMENT_CHANGE_SCREENSHOT_PATH ??
+  "../output/playwright/issue-1593-department-change.png";
 
 const smokeUser = {
   id: "user-task-smoke",
@@ -751,6 +754,20 @@ async function runBrowserProof() {
     await expect(swapDialog.getByLabel("Nome")).toHaveValue(task.name);
     await expect(swapDialog.getByLabel("Observações")).toHaveValue("Legado preservado");
     await swapDialog.getByLabel("Departamento").selectOption("department-one");
+    await expect(
+      swapDialog.getByText(
+        "Ao mudar o departamento, selecione um modelo elegível para o novo departamento.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    const toastScreenshotStyle = await page.addStyleTag({
+      content: ".Toastify__toast-container { visibility: hidden !important; }",
+    });
+    await swapDialog
+      .locator("label")
+      .filter({ hasText: "Modelo de tarefa" })
+      .screenshot({ path: departmentChangeScreenshotPath });
+    await toastScreenshotStyle.evaluate((style) => style.remove());
     await swapDialog.getByLabel("Modelo de tarefa").selectOption("model-stale");
     await expect(swapDialog.getByLabel("Responsável")).toHaveValue("responsible-default");
     await swapDialog.getByRole("button", { name: "Salvar alterações" }).click();
@@ -763,6 +780,12 @@ async function runBrowserProof() {
     await expect.poll(() => updateTaskRequests.length).toBe(2);
 
     await swapDialog.getByLabel("Modelo de tarefa").selectOption("model-default");
+    await expect(
+      swapDialog.getByText(
+        "Ao mudar o departamento, selecione um modelo elegível para o novo departamento.",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
     await swapDialog.getByRole("button", { name: "Salvar alterações" }).click();
     await expect(swapDialog).toHaveCount(0);
     await expect.poll(() => updateTaskRequests.length).toBe(3);
@@ -801,6 +824,11 @@ async function runBrowserProof() {
     await expect(persistedSwapDialog.getByLabel("Observações")).toHaveValue(
       "Legado preservado",
     );
+    await expect(
+      page.getByText("Modelo de tarefa não é elegível para o departamento informado.", {
+        exact: true,
+      }),
+    ).toHaveCount(0);
     await persistedSwapDialog.getByRole("button", { name: "Cancelar" }).click();
     await expect(persistedSwapDialog).toHaveCount(0);
 
@@ -817,6 +845,7 @@ async function runBrowserProof() {
     await page.getByRole("button", { name: `Editar tarefa ${assignedTask.name}` }).click();
     const restrictedDialog = page.getByRole("dialog", { name: "Editar tarefa" });
     await expect(restrictedDialog).toBeVisible();
+    await expect(restrictedDialog.getByLabel("Departamento")).toHaveCount(0);
     await expect(restrictedDialog.getByLabel("Responsável")).toHaveCount(0);
     await restrictedDialog.getByLabel("Observações").fill("Atualização restrita");
     await restrictedDialog

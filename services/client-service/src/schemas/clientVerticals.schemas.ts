@@ -1,3 +1,4 @@
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 import { z } from "zod";
 
 import { cnaeSchema, openingDateSchema } from "./client.schemas.js";
@@ -9,10 +10,13 @@ const clientEmailSchema = z
   .nullable()
   .optional();
 
+const clientTaxRegimeSchema = z.enum(TAX_REGIME_OPTIONS).nullable().optional();
+
 export const createIntegrationBodySchema = z
   .object({
     organization_id: z.string().uuid({ message: "organization_id inválido." }).optional(),
     type: z.string().min(1),
+    regime: clientTaxRegimeSchema,
     name: z.string().min(1),
     company_name: z.string().nullable().optional(),
     fantasy_name: z.string().nullable().optional(),
@@ -47,6 +51,7 @@ export const cnpjLookupQuerySchema = z
 export const updateIntegrationBodySchema = z
   .object({
     type: z.string().min(1).optional(),
+    regime: clientTaxRegimeSchema,
     name: z.string().min(1).optional(),
     company_name: z.string().nullable().optional(),
     fantasy_name: z.string().nullable().optional(),

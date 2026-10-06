@@ -893,6 +893,47 @@ describe("TaskCrudService", () => {
     });
   });
 
+  it("updateTask rejeita modelo incompatível com o novo departamento sem persistir", async () => {
+    prismaMock.task.findFirst.mockResolvedValue({
+      id: "task-1",
+      organization_id: "org-1",
+      model_id: "model-1",
+      project_id: "project-1",
+      department_id: "dep-1",
+      responsible_id: "responsible-1",
+      responsible2_id: null,
+      responsible3_id: null,
+      status: "Em Andamento",
+    });
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-2" });
+    prismaMock.taskModel.findFirst.mockResolvedValue(null);
+
+    await expect(
+      makeTaskCrudService().updateTask({
+        user_id: "user-1",
+        organization_id: "org-1",
+        task_id: "task-1",
+        department_id: "dep-2",
+        integracaoLevel: 2,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      message: "Modelo de tarefa não é elegível para o departamento informado.",
+    });
+
+    expect(prismaMock.taskModel.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "model-1",
+        organization_id: "org-1",
+        department_id: "dep-2",
+        type: "Projeto",
+        department: { status: "Ativo" },
+      },
+      select: { id: true, responsible_id: true },
+    });
+    expect(prismaMock.task.update).not.toHaveBeenCalled();
+  });
+
   it("updateTask rejeita troca para modelo com outra tarefa ativa no projeto", async () => {
     prismaMock.task.findFirst
       .mockResolvedValueOnce({

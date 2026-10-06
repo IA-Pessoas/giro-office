@@ -209,6 +209,7 @@ export default function ClientIntegrationPage() {
             <ClientIntegrationForm
               mode="edit"
               values={formValues}
+              legacyTaxRegime={client.regime}
               onChange={handleInputChange}
               onSubmit={() => void handleSubmit()}
               onCancel={() => setFormValues(createUpdateClientIntegrationInitialValues(client))}

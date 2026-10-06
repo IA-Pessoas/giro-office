@@ -58,6 +58,7 @@ import {
   buildUpdateClientPayload,
   CLIENT_TAX_REGIME_OPTIONS,
   createClientFormInitialValues,
+  getClientTaxRegime,
 } from "./utils/clientForm.ts";
 import { getDocumentIssue } from "../../shared/utils/documentIssue.ts";
 import { toDatetimeLocalValue, toHistoryIsoDate } from "./utils/historyDate.ts";
@@ -119,6 +120,9 @@ runTest("client form sends the selected tax regime on creation and update", () =
     "Lucro Presumido",
     "Lucro Real",
   ]);
+  assert.equal(getClientTaxRegime("Lucro Presumido"), "Lucro Presumido");
+  assert.equal(getClientTaxRegime("MEI"), "");
+  assert.equal(getClientTaxRegime(null), "");
   assert.equal(createClientFormInitialValues({ regime: null }).regime, "");
 
   const values = {
@@ -202,6 +206,33 @@ runTest("PJ integration creation derives required API name from company identity
     ).name,
     "Nova LTDA",
   );
+});
+
+runTest("client integration preserves the shared tax regime through create and edit", () => {
+  const values = {
+    ...createClientIntegrationInitialValues(),
+    regime: "Simples Nacional",
+  };
+
+  const payload = buildCreateClientIntegrationPayload(values, "organization-1");
+  assert.equal(payload.regime, "Simples Nacional");
+  assert.equal(payload.type_registration, "Existente");
+
+  const client = { ...values, regime: "Simples Nacional" };
+  const initialValues = createUpdateClientIntegrationInitialValues(client);
+  assert.equal(initialValues.regime, "Simples Nacional");
+  const editedValues = { ...initialValues, regime: "Lucro Real" };
+  assert.equal(buildUpdateClientIntegrationPayload(editedValues, client).regime, "Lucro Real");
+
+  const legacyClient = { ...client, regime: "MEI" };
+  const legacyValues = createUpdateClientIntegrationInitialValues(legacyClient);
+  assert.equal("regime" in buildUpdateClientIntegrationPayload(legacyValues, legacyClient), false);
+});
+
+runTest("integration form keeps tax regime separate from registration type", () => {
+  const form = readFileSync("src/modules/clients/components/ClientIntegrationForm.tsx", "utf8");
+  assert.match(form, /Tipo de Registro[\s\S]*?name="type_registration"/);
+  assert.match(form, /Regime tributário[\s\S]*?name="regime"[\s\S]*?CLIENT_TAX_REGIME_OPTIONS/);
 });
 
 runTest("PJ client forms hide manual name while PF forms retain it", () => {
@@ -414,6 +445,7 @@ runTest("integration edit hydration masks client documents and phone", () => {
     cpf_cnpj: "12345678000190",
     company_name: "Acme LTDA",
     fantasy_name: "Acme",
+    regime: "Lucro Presumido",
     responsible: "Maria",
     cpf_responsible: "12345678910",
     number: "11999999999",
@@ -433,6 +465,7 @@ runTest("integration edit hydration masks client documents and phone", () => {
 
   assert.deepEqual(createUpdateClientIntegrationInitialValues(client), {
     type: "PJ",
+    regime: "Lucro Presumido",
     name: "Acme",
     cpf_cnpj: "12.345.678/0001-90",
     company_name: "Acme LTDA",

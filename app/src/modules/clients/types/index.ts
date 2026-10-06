@@ -157,6 +157,7 @@ export interface ClientFormValues {
 
 export interface ClientIntegrationFormValuesBase {
   type: "PJ" | "PF";
+  regime: ClientTaxRegime | "";
   name: string;
   cpf_cnpj: string;
   company_name: string;
@@ -308,6 +309,7 @@ export interface CreateClientPayload {
 export interface CreateClientIntegrationPayload {
   organization_id: string;
   type: "PJ" | "PF";
+  regime?: ClientTaxRegime | null;
   name: string;
   cpf_cnpj: string;
   company_name?: string | null;
@@ -343,6 +345,7 @@ export interface UpdateClientPayload {
 
 export interface UpdateClientIntegrationPayload {
   type?: "PJ" | "PF";
+  regime?: ClientTaxRegime | null;
   name?: string;
   cpf_cnpj?: string;
   company_name?: string | null;
