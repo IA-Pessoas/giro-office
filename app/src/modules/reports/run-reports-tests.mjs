@@ -33,6 +33,7 @@ const {
 const appPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url)));
 const { buildReportComposition, buildReportCompositionV3 } = await import("./utils/reportCriteria.ts");
 const { getPessoalReportPresets } = await import("./utils/pessoalReportPresets.ts");
+const { getTaskDepartmentReportPreset } = await import("./utils/taskDepartmentReportPreset.ts");
 const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
 const { getReportAuthorLabel, getReportForbiddenMessage, isReportCsrfError } = await import(
   "./components/reportUi.ts"
@@ -319,6 +320,33 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
     [{ field: "competence", operator: "eq", value: "" }],
   );
   assert.equal(getPessoalReportPresets(sources.slice(0, 2)).length, 2);
+});
+
+runTest("offers a task count by current department only for an authorized report source", () => {
+  const source = {
+    key: "integracao.tasks",
+    label: "Tarefas de Integração",
+    module: "integracao",
+    fields: [{
+      key: "department", label: "Departamento", type: "string", selectable: true,
+      groupable: true, aggregationFunctions: ["count"],
+    }],
+  };
+  const preset = getTaskDepartmentReportPreset([source]);
+  assert.equal(preset?.label, "Quantidade de tarefas por departamento");
+  assert.deepEqual(buildReportComposition(preset.areas, [source]), {
+    version: 2,
+    areas: [{
+      source: "integracao.tasks",
+      fields: ["department"],
+      groupBy: ["department"],
+      aggregations: [{ field: "department", function: "count" }],
+      filters: [],
+    }],
+  });
+  assert.equal(getTaskDepartmentReportPreset([]), null);
+  assert.equal(getTaskDepartmentReportPreset([{ ...source, fields: [] }]), null);
+  assert.equal(getTaskDepartmentReportPreset([{ ...source, fields: [{ ...source.fields[0], groupable: false }] }]), null);
 });
 
 runTest("unwraps the shared success envelope", () => {
