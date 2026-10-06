@@ -423,7 +423,7 @@ export function ReportsCreatePanel({
           <div className="mt-3 flex flex-wrap gap-2">
             {presets.map((preset) => (
               <button
-                key={preset.label}
+                key={preset.id}
                 type="button"
                 disabled={busy}
                 title={preset.description}

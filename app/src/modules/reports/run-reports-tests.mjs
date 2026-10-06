@@ -346,7 +346,15 @@ runTest("offers a task count by current department only for an authorized report
   });
   assert.equal(getTaskDepartmentReportPreset([]), null);
   assert.equal(getTaskDepartmentReportPreset([{ ...source, fields: [] }]), null);
+  assert.equal(getTaskDepartmentReportPreset([{ ...source, fields: [{ ...source.fields[0], selectable: undefined }] }]), null);
   assert.equal(getTaskDepartmentReportPreset([{ ...source, fields: [{ ...source.fields[0], groupable: false }] }]), null);
+  assert.equal(getTaskDepartmentReportPreset([{
+    ...source,
+    fields: [{
+      ...source.fields[0], groupable: undefined, aggregationFunctions: undefined,
+      capabilities: { groupable: true, aggregationFunctions: ["count"] },
+    }],
+  }])?.id, "integracao-tarefas-por-departamento");
 });
 
 runTest("unwraps the shared success envelope", () => {
