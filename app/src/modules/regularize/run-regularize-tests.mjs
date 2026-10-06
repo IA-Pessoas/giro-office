@@ -11,6 +11,7 @@ import {
   buildRegularizeSitePasswordListParams,
   unwrapRegularizePage,
 } from "./services/regularizeService.contract.ts";
+import { groupRegularizeProcessesByStatus } from "./utils/processBoard.ts";
 
 const moduleRoot = fileURLToPath(new URL("./", import.meta.url));
 const appRoot = join(moduleRoot, "../../..");
@@ -754,6 +755,61 @@ await runTest("regularize page renders aggregate dashboard and lazy list options
   assert.doesNotMatch(pageSource, /const metricData = useMemo/);
 });
 
+await runTest("regularize process board uses the existing filter and detail flow", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const \[processView, setProcessView\] = useState<"table" \| "board">\("table"\)/);
+  assert.match(pageSource, /useRegularizeProcesses\(\s*\{\s*status: processStatus,\s*search: debouncedProcessSearch\s*\}/);
+  assert.match(pageSource, /enabled:\s*activeTab === "processes" && processView === "board"/);
+  assert.match(pageSource, /aria-pressed=\{processView === "board"\}/);
+  assert.match(pageSource, /<RegularizeProcessBoard[\s\S]{0,1000}onOpenProcessDetail=\{openProcessDetail\}/);
+  assert.match(pageSource, /processView === "table"/);
+});
+
+await runTest("process board groups canonical, legacy and unknown statuses", () => {
+  const columns = groupRegularizeProcessesByStatus([
+    { id: "pending", process_type: "Abertura", status: "Pendente" },
+    { id: "open", process_type: "Alteração", status: "Aberto" },
+    { id: "in-progress", process_type: "Baixa", status: "Em andamento" },
+    { id: "completed", process_type: "Licença", status: "Concluído" },
+    { id: "paused", process_type: "Certidão", status: "Paralizado" },
+    { id: "legacy", process_type: "Histórico", status: "Status legado" },
+  ]);
+
+  assert.deepEqual(
+    columns.map(({ label, items }) => [label, items.map(({ id }) => id)]),
+    [
+      ["Pendente", ["pending"]],
+      ["Em andamento", ["open", "in-progress"]],
+      ["Protocolado", []],
+      ["Finalizado", ["completed"]],
+      ["Paralisado", ["paused"]],
+      ["Outros status", ["legacy"]],
+    ],
+  );
+});
+
+await runTest("process board keeps canonical columns when no processes match", () => {
+  const columns = groupRegularizeProcessesByStatus([]);
+
+  assert.deepEqual(columns.map(({ label, items }) => [label, items]), [
+    ["Pendente", []],
+    ["Em andamento", []],
+    ["Protocolado", []],
+    ["Finalizado", []],
+    ["Paralisado", []],
+  ]);
+});
+
+await runTest("process list query key separates independent board searches", async () => {
+  const queryKeysSource = await readModuleSource("hooks/queryKeys.ts");
+
+  assert.match(
+    queryKeysSource,
+    /processes: \(filters: RegularizeProcessListFilters, scope: RegularizeQueryScope\) =>\s*\[\s*\.\.\.regularizeQueryKeys\.operations\(scope\),\s*"processes",\s*filters\.status,\s*filters\.search \?\? ""/,
+  );
+});
+
 await runTest("regularize list params carry server search and pagination", async () => {
   assert.deepEqual(
     buildRegularizeProcessListParams({
@@ -778,7 +834,7 @@ await runTest("regularize list params carry server search and pagination", async
 });
 
 await runTest("regularize process contract keeps canonical states and explicit Fiscal actions", async () => {
-  const [controlsSource, formSource, pageSource, contractSource, serviceSource, hooksSource] =
+  const [controlsSource, formSource, pageSource, contractSource, serviceSource, hooksSource, boardSource] =
     await Promise.all([
       readModuleSource("components/regularizeFormControls.tsx"),
       readModuleSource("components/RegularizeProcessForm.tsx"),
@@ -786,12 +842,12 @@ await runTest("regularize process contract keeps canonical states and explicit F
       readModuleSource("services/regularizeService.contract.ts"),
       readModuleSource("services/regularizeService.ts"),
       readModuleSource("hooks/useRegularizeOperations.ts"),
+      readModuleSource("utils/processBoard.ts"),
     ]);
 
-  assert.match(
-    controlsSource,
-    /regularizeProcessStatusOptions = \[\s*"Pendente",\s*"Andamento",\s*"Protocolado",\s*"Finalizado",\s*"Paralisado",\s*\]/,
-  );
+  assert.match(boardSource, /regularizeProcessStatusOptions = \[\s*"Pendente",\s*"Andamento",\s*"Protocolado",\s*"Finalizado",\s*"Paralisado",\s*\]/);
+  assert.match(controlsSource, /import \{ regularizeProcessStatusOptions \} from "\.\.\/utils\/processBoard"/);
+  assert.match(controlsSource, /export \{ regularizeProcessStatusOptions \}/);
   assert.match(
     controlsSource,
     /regularizeFinancialStatusOptions = \[\s*"Pendente",\s*"Regular",\s*"Bônus",\s*"Não Contratado",\s*\]/,

@@ -50,6 +50,7 @@ import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
 import { RegularizePasswordForm } from "./RegularizePasswordForm";
+import { RegularizeProcessBoard } from "./RegularizeProcessBoard";
 import { RegularizeProcessForm } from "./RegularizeProcessForm";
 import { RegularizeSitePasswordForm } from "./RegularizeSitePasswordForm";
 import { useRegularizeDashboard } from "../hooks/useRegularizeDashboard";
@@ -138,6 +139,7 @@ import type {
   UpdateRegularizeSitePasswordPayload,
 } from "../types";
 import { getRegularizeRequestId } from "../utils/regularizeApiError";
+import { groupRegularizeProcessesByStatus } from "../utils/processBoard";
 import {
   formatSiteSphere,
   getRegularizeErrorMessage,
@@ -1119,6 +1121,7 @@ export function RegularizePage() {
   const [licenseFormSessionKey, setLicenseFormSessionKey] = useState(0);
   const [processSearch, setProcessSearch] = useState("");
   const [processStatus, setProcessStatus] = useState("Todos");
+  const [processView, setProcessView] = useState<"table" | "board">("table");
   const [processPage, setProcessPage] = useState(1);
   const [siteSearch, setSiteSearch] = useState("");
   const [siteStatus, setSiteStatus] = useState(true);
@@ -1178,6 +1181,13 @@ export function RegularizePage() {
   const processQuery = useRegularizeProcesses(
     { status: "Todos" },
     { enabled: activeForm?.type === "guidance" },
+  );
+  const processBoardQuery = useRegularizeProcesses(
+    { status: processStatus, search: debouncedProcessSearch },
+    {
+      enabled:
+        activeTab === "processes" && processView === "board" && !isProcessSearchPending,
+    },
   );
   const licensePageQuery = usePaginatedRegularizeLicenses(
     {
@@ -1337,6 +1347,10 @@ export function RegularizePage() {
     data: isProcessSearchPending ? undefined : visibleProcessRows,
     isLoading: isProcessSearchPending || processPageQuery.isLoading,
   };
+  const processBoardColumns = useMemo(
+    () => groupRegularizeProcessesByStatus(processBoardQuery.data ?? []),
+    [processBoardQuery.data],
+  );
   const siteTableQuery: ListQuery<RegularizeSitePasswordListItem> = {
     ...sitePageQuery,
     data: isSiteSearchPending ? undefined : sitePageQuery.data?.data,
@@ -2076,97 +2090,151 @@ export function RegularizePage() {
                 )}
               </RegularizeNativeSelect>
             </label>
+            <div className="space-y-1.5 sm:col-span-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Visualização
+              </span>
+              <div
+                aria-label="Visualização dos processos"
+                className="inline-flex rounded-lg border border-gray-300 p-1 dark:border-gray-600"
+                role="group"
+              >
+                <button
+                  aria-pressed={processView === "table"}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    processView === "table"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
+                  )}
+                  onClick={() => setProcessView("table")}
+                  type="button"
+                >
+                  Tabela
+                </button>
+                <button
+                  aria-pressed={processView === "board"}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    processView === "board"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
+                  )}
+                  onClick={() => setProcessView("board")}
+                  type="button"
+                >
+                  Quadro
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
-            <QueryStatePanel
-              query={processTableQuery}
-              emptyTitle="Nenhum processo encontrado."
-              emptyClassName="xl:col-span-2 min-h-[220px] items-center justify-center"
-            >
-              {(processRows) => (
-                <div>
-                  <DataTable
-                    headers={["Processo", "Cliente", "Documento", "Status", "Financeiro", ""]}
-                  >
-                    {processRows.map((item) => (
-                    <tr
-                      key={item.id}
-                      aria-selected={currentProcessId === item.id}
-                      className={cn(
-                        "text-gray-700 transition-colors dark:text-slate-200",
-                        currentProcessId === item.id && "bg-blue-50 dark:bg-blue-950/30",
-                      )}
+          {processView === "board" ? (
+            <RegularizeProcessBoard
+              columns={processBoardColumns}
+              errorMessage={
+                processBoardQuery.isError
+                  ? getRegularizeErrorMessage(
+                      processBoardQuery.error,
+                      "Não foi possível carregar os processos.",
+                    )
+                  : undefined
+              }
+              getClientName={getProcessClientName}
+              isLoading={isProcessSearchPending || processBoardQuery.isLoading}
+              onOpenProcessDetail={openProcessDetail}
+            />
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
+              <QueryStatePanel
+                query={processTableQuery}
+                emptyTitle="Nenhum processo encontrado."
+                emptyClassName="xl:col-span-2 min-h-[220px] items-center justify-center"
+              >
+                {(processRows) => (
+                  <div>
+                    <DataTable
+                      headers={["Processo", "Cliente", "Documento", "Status", "Financeiro", ""]}
                     >
-                      <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
-                      <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                      <td className="px-4 py-3">
-                        {formatDocument(item.cpf_cnpj)}
-                        <DocumentIssueBadge value={item.cpf_cnpj} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
-                      </td>
-                      <td className="px-4 py-3 text-sm">{formatText(item.financial_status)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
-                          <TableActionButton
-                            icon={Eye}
-                            title="Ver detalhe"
-                            onClick={() => openProcessDetail(item.id)}
-                          />
-                          {canManageRegularizeCore ? (
-                            <TableActionButton
-                              icon={Pencil}
-                              title="Editar processo"
-                              onClick={() => {
-                                selectProcessManually(item.id);
-                                setActiveForm({ type: "process", mode: "edit", id: item.id });
-                              }}
-                            />
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                    ))}
-                  </DataTable>
-                  <PaginationControls
-                    page={processPage}
-                    limit={REGULARIZE_PAGE_SIZE}
-                    total={processPageQuery.data?.total ?? 0}
-                    count={processRows.length}
-                    hasMore={processPageQuery.data?.hasMore ?? false}
-                    isFetching={processPageQuery.isFetching || isProcessSearchPending}
-                    onPrevious={() => {
-                      resetProcessSelection();
-                      setProcessPage((current) => Math.max(1, current - 1));
-                    }}
-                    onNext={() => {
-                      resetProcessSelection();
-                      setProcessPage((current) => current + 1);
-                    }}
-                  />
-                </div>
-              )}
-            </QueryStatePanel>
+                      {processRows.map((item) => (
+                        <tr
+                          key={item.id}
+                          aria-selected={currentProcessId === item.id}
+                          className={cn(
+                            "text-gray-700 transition-colors dark:text-slate-200",
+                            currentProcessId === item.id && "bg-blue-50 dark:bg-blue-950/30",
+                          )}
+                        >
+                          <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
+                          <td className="px-4 py-3">{getProcessClientName(item)}</td>
+                          <td className="px-4 py-3">
+                            {formatDocument(item.cpf_cnpj)}
+                            <DocumentIssueBadge value={item.cpf_cnpj} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
+                          </td>
+                          <td className="px-4 py-3 text-sm">{formatText(item.financial_status)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-end gap-1">
+                              <TableActionButton
+                                icon={Eye}
+                                title="Ver detalhe"
+                                onClick={() => openProcessDetail(item.id)}
+                              />
+                              {canManageRegularizeCore ? (
+                                <TableActionButton
+                                  icon={Pencil}
+                                  title="Editar processo"
+                                  onClick={() => {
+                                    selectProcessManually(item.id);
+                                    setActiveForm({ type: "process", mode: "edit", id: item.id });
+                                  }}
+                                />
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </DataTable>
+                    <PaginationControls
+                      page={processPage}
+                      limit={REGULARIZE_PAGE_SIZE}
+                      total={processPageQuery.data?.total ?? 0}
+                      count={processRows.length}
+                      hasMore={processPageQuery.data?.hasMore ?? false}
+                      isFetching={processPageQuery.isFetching || isProcessSearchPending}
+                      onPrevious={() => {
+                        resetProcessSelection();
+                        setProcessPage((current) => Math.max(1, current - 1));
+                      }}
+                      onNext={() => {
+                        resetProcessSelection();
+                        setProcessPage((current) => current + 1);
+                      }}
+                    />
+                  </div>
+                )}
+              </QueryStatePanel>
 
-            {hasProcessRows ? (
-              <DetailPanel title="Processo selecionado" panelRef={selectedProcessDetailRef}>
-                <ProcessDetailContent
-                  canManageRegularizeCore={canManageRegularizeCore}
-                  currentProcessId={currentProcessId}
-                  guidanceQuery={guidanceQuery}
-                  onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
-                  onRemoveGuidancePartner={handleRemoveGuidancePartner}
-                  onReturnProcessFromFiscal={handleReturnProcessFromFiscal}
-                  onSendProcessToFiscal={handleSendProcessToFiscal}
-                  onSetActiveForm={setActiveForm}
-                  processDetailQuery={processDetailQuery}
-                  processSelectionOrigin={processSelectionOrigin}
-                />
-              </DetailPanel>
-            ) : null}
-          </div>
+              {hasProcessRows ? (
+                <DetailPanel title="Processo selecionado" panelRef={selectedProcessDetailRef}>
+                  <ProcessDetailContent
+                    canManageRegularizeCore={canManageRegularizeCore}
+                    currentProcessId={currentProcessId}
+                    guidanceQuery={guidanceQuery}
+                    onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
+                    onRemoveGuidancePartner={handleRemoveGuidancePartner}
+                    onReturnProcessFromFiscal={handleReturnProcessFromFiscal}
+                    onSendProcessToFiscal={handleSendProcessToFiscal}
+                    onSetActiveForm={setActiveForm}
+                    processDetailQuery={processDetailQuery}
+                    processSelectionOrigin={processSelectionOrigin}
+                  />
+                </DetailPanel>
+              ) : null}
+            </div>
+          )}
 
           {regularizeAccess.canView ? (
             <IndependentGuidanceSection

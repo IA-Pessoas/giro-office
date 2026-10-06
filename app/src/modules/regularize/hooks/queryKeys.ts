@@ -83,7 +83,12 @@ export const regularizeQueryKeys = {
   municipalTaxDetail: (id: RegularizeId | undefined | null, scope: RegularizeQueryScope) =>
     [...regularizeQueryKeys.operations(scope), "municipal-taxes", "detail", id ?? ""] as const,
   processes: (filters: RegularizeProcessListFilters, scope: RegularizeQueryScope) =>
-    [...regularizeQueryKeys.operations(scope), "processes", filters.status] as const,
+    [
+      ...regularizeQueryKeys.operations(scope),
+      "processes",
+      filters.status,
+      filters.search ?? "",
+    ] as const,
   processesPage: (filters: RegularizeProcessListFilters, scope: RegularizeQueryScope) =>
     [
       ...regularizeQueryKeys.operations(scope),
