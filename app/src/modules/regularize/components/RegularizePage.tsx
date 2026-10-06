@@ -1204,7 +1204,7 @@ export function RegularizePage() {
       page: processPage,
       limit: REGULARIZE_PAGE_SIZE,
     },
-    { enabled: activeTab === "processes" },
+    { enabled: activeTab === "processes" && processView === "table" },
   );
   const sitePageQuery = usePaginatedRegularizeSitePasswords(
     {
@@ -1372,7 +1372,9 @@ export function RegularizePage() {
   };
 
   const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
-  const hasProcessRows = visibleProcessRows.length > 0;
+  const hasProcessRows = processView === "board"
+    ? (processBoardQuery.data?.length ?? 0) > 0
+    : visibleProcessRows.length > 0;
 
   const siteOptions = useMemo<RegularizeFormOption[]>(
     () =>
@@ -1469,7 +1471,9 @@ export function RegularizePage() {
     if (queryPolicy.clientPfs) refreshes.push(pfPageQuery.refetch());
     if (queryPolicy.sitePasswords) refreshes.push(siteQuery.refetch());
     if (queryPolicy.municipalTaxes) refreshes.push(taxQuery.refetch());
-    if (activeTab === "processes") refreshes.push(processPageQuery.refetch());
+    if (activeTab === "processes") {
+      refreshes.push((processView === "board" ? processBoardQuery : processPageQuery).refetch());
+    }
     if (activeTab === "licenses") refreshes.push(licensePageQuery.refetch());
     if (queryPolicy.partners) refreshes.push(partnerQuery.refetch());
     if (queryPolicy.passwords) refreshes.push(credentialQuery.refetch());

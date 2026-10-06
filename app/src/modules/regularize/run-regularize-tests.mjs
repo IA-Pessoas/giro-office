@@ -748,7 +748,10 @@ await runTest("regularize page renders aggregate dashboard and lazy list options
   assert.match(pageSource, /enabled: queryPolicy\.municipalTaxes/);
   // Lista completa de processos só alimenta o formulário de orientação (#1347).
   assert.match(pageSource, /useRegularizeProcesses\(\s*\{ status: "Todos" \},\s*\{ enabled: activeForm\?\.type === "guidance" \}/);
-  assert.match(pageSource, /if \(activeTab === "processes"\) refreshes\.push\(processPageQuery\.refetch\(\)\)/);
+  assert.match(
+    pageSource,
+    /if \(activeTab === "processes"\)\s*\{\s*refreshes\.push\(\(processView === "board" \? processBoardQuery : processPageQuery\)\.refetch\(\)\);/,
+  );
   assert.match(pageSource, /enabled: activeTab === "licenses"/);
   assert.match(pageSource, /dashboardQuery\.data\.metrics/);
   assert.match(pageSource, /getRegularizeRequestId\(dashboardQuery\.error\)/);
@@ -761,6 +764,8 @@ await runTest("regularize process board uses the existing filter and detail flow
   assert.match(pageSource, /const \[processView, setProcessView\] = useState<"table" \| "board">\("table"\)/);
   assert.match(pageSource, /useRegularizeProcesses\(\s*\{\s*status: processStatus,\s*search: debouncedProcessSearch\s*\}/);
   assert.match(pageSource, /enabled:\s*activeTab === "processes" && processView === "board"/);
+  assert.match(pageSource, /enabled: activeTab === "processes" && processView === "table"/);
+  assert.match(pageSource, /const hasProcessRows = processView === "board"\s*\? \(processBoardQuery\.data\?\.length \?\? 0\) > 0\s*:\s*visibleProcessRows\.length > 0;/);
   assert.match(pageSource, /aria-pressed=\{processView === "board"\}/);
   assert.match(pageSource, /<RegularizeProcessBoard[\s\S]{0,1000}onOpenProcessDetail=\{openProcessDetail\}/);
   assert.match(pageSource, /processView === "table"/);
