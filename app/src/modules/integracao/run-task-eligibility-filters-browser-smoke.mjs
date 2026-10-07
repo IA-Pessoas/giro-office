@@ -461,6 +461,14 @@ async function installApiMocks(
       },
     }),
   );
+  // O painel de conclusão é montado junto da edição, mas o histórico não faz parte deste smoke.
+  await page.route(/\/task\/complete-request\/list(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: [] },
+    }),
+  );
   await page.route("**/project/list*", (route) =>
     route.fulfill({
       status: 200,
