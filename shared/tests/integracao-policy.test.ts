@@ -352,6 +352,27 @@ test("editar regime tributário pela integração segue a permissão de edição
   assert.equal(evaluateIntegracaoAction(policy, { ...base, level: 0, isOwner: true }), "allow");
 });
 
+test("criação de cliente permite endereço nos mesmos níveis já autorizados", () => {
+  const addressFields = ["address", "cep", "neighborhood", "state", "city"] as const;
+
+  for (const path of ["/client", "/client/integration"]) {
+    const policy = requirePolicy("POST", path);
+    for (const field of addressFields) {
+      const input = {
+        userId: "user-1",
+        organizationId: "org-1",
+        resourceOrganizationId: "org-1",
+        isOwner: false,
+        requestedFields: [field],
+      } as const;
+
+      assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 1 }), "forbidden", field);
+      assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 2 }), "allow", field);
+      assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 3 }), "allow", field);
+    }
+  }
+});
+
 test("prorrogação conserva escopo de responsável para os níveis básicos", () => {
   const policy = requirePolicy("POST", "/task/postponement");
   const input = {

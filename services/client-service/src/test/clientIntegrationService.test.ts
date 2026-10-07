@@ -159,3 +159,62 @@ describe("integration tax regime persistence", () => {
     );
   });
 });
+
+describe("integration address persistence", () => {
+  it("persists the optional address without changing contact or identity fields", async () => {
+    const { prisma, findFirst, create } = createPrisma();
+    findFirst.mockResolvedValue(null);
+    create.mockResolvedValue({
+      id: CLIENT_ID,
+      name: "Acme",
+      cpf_cnpj: "12345678000195",
+      regime: "Simples Nacional",
+      address: "Rua A, 10",
+      cep: "01001-000",
+      neighborhood: "Centro",
+      state: "SP",
+      city: "São Paulo",
+      number: "11999999999",
+      email: "contato@acme.com",
+    });
+
+    const contact = {
+      cpf_cnpj: "12.345.678/0001-95",
+      number: "11999999999",
+      email: "contato@acme.com",
+      address: "Rua A, 10",
+      cep: "01001-000",
+      neighborhood: "Centro",
+      state: "SP",
+      city: "São Paulo",
+    };
+    await createIntegrationClient(
+      prisma,
+      {
+        organization_id: ORGANIZATION_ID,
+        type: "PJ",
+        name: "Acme",
+        type_registration: "Novo",
+        service_unique: false,
+        ...contact,
+      },
+      { userId: "user-1", level: 2, isOwner: false },
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cpf_cnpj: "12345678000195",
+          number: contact.number,
+          email: contact.email,
+          address: contact.address,
+          cep: contact.cep,
+          neighborhood: contact.neighborhood,
+          state: contact.state,
+          city: contact.city,
+        }),
+        select: expect.objectContaining({ id: true, cpf_cnpj: true }),
+      }),
+    );
+  });
+});

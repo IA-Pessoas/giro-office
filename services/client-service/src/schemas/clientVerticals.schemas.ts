@@ -26,6 +26,11 @@ export const createIntegrationBodySchema = z
     cpf_responsible: z.string().nullable().optional(),
     number: z.string().nullable().optional(),
     email: clientEmailSchema,
+    address: z.string().nullable().optional(),
+    cep: z.string().nullable().optional(),
+    neighborhood: z.string().nullable().optional(),
+    state: z.string().nullable().optional(),
+    city: z.string().nullable().optional(),
     agent: z.string().nullable().optional(),
     cpf_agent: z.string().nullable().optional(),
     instagram: z

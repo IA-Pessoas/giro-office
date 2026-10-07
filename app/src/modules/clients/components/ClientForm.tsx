@@ -3,6 +3,7 @@ import { useState, type ChangeEvent } from "react";
 import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
+import { ClientAddressFields } from "../form/ClientAddressFields";
 import { FormField } from "@shared/components/FormField";
 import type { ClientFormValues } from "../types";
 import { CLIENT_TAX_REGIME_OPTIONS, getClientInternalName } from "../utils/clientForm";
@@ -177,6 +178,8 @@ export function ClientForm({
             </span>
           ) : null}
         </label>
+
+        <ClientAddressFields values={values} disabled={disabled} onChange={onChange} />
 
         <label className="flex items-center gap-2 md:col-span-2">
           <input
