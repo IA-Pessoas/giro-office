@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
-const port = process.env.TRIAGE_EXTERNAL_LINKS_SMOKE_PORT ?? "3127";
+const port = process.env.TRIAGE_EXTERNAL_LINKS_SMOKE_PORT ?? "3124";
 const baseUrl = configuredBaseUrl ?? `http://127.0.0.1:${port}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const screenshotPath =

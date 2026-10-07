@@ -95,6 +95,22 @@ export interface ClientRecord {
   organization?: ClientOrganizationSummary;
 }
 
+export interface ClientGroupMember {
+  id: string;
+  name: string;
+  company_name: string | null;
+  fantasy_name: string | null;
+  cpf_cnpj: string;
+}
+
+export interface ClientGroup {
+  id: string;
+  name: string;
+  status: boolean;
+  organization_id: string;
+  clients: ClientGroupMember[];
+}
+
 export interface ClientListPage {
   items: ClientRecord[];
   total: number;

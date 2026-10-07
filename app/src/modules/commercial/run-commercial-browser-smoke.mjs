@@ -12,7 +12,7 @@ import { chromium } from "@playwright/test";
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
-const PORT = process.env.COMMERCIAL_SMOKE_PORT || "3127";
+const PORT = process.env.COMMERCIAL_SMOKE_PORT || "3123";
 const baseUrl = (process.env.COMMERCIAL_SMOKE_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));

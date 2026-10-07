@@ -10,7 +10,7 @@ const expect = baseExpect.configure({ timeout: 15_000 });
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
-const PORT = process.env.TASKS_BROWSER_PORT || "3116";
+const PORT = process.env.TASKS_BROWSER_PORT || "3120";
 const configuredBaseUrl = process.env.TASKS_BROWSER_BASE_URL?.replace(/\/$/, "");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
@@ -113,6 +113,20 @@ async function installApiMocks(
   financeSettlementRequests,
 ) {
   let currentLegacyTaskDetail = { ...legacyTaskDetail };
+  for (const endpoint of [
+    "task/notifications",
+    "task/complete-request/list",
+    "task/postponement/list",
+    "task/attachment/list",
+  ]) {
+    await page.route(`**/${endpoint}*`, (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        json: { success: false, error: "Recurso indisponível no smoke." },
+      }),
+    );
+  }
   let financeQueue = [
     {
       id: "task-finance-pending",
@@ -778,14 +792,14 @@ async function runBrowserProof() {
     await toastScreenshotStyle.evaluate((style) => style.remove());
     await swapDialog.getByLabel("Modelo de tarefa").selectOption("model-stale");
     await expect(swapDialog.getByLabel("Responsável")).toHaveValue("responsible-default");
+    const staleModelError = page.getByText(
+      "Modelo de tarefa não é elegível para o departamento informado.",
+      { exact: true },
+    );
     await swapDialog.getByRole("button", { name: "Salvar alterações" }).click();
-    await expect(swapDialog).toBeVisible();
-    await expect(
-      page.getByText("Modelo de tarefa não é elegível para o departamento informado.", {
-        exact: true,
-      }),
-    ).toBeVisible();
     await expect.poll(() => updateTaskRequests.length).toBe(2);
+    await expect(staleModelError).toBeVisible();
+    await expect(swapDialog).toBeVisible();
 
     await swapDialog.getByLabel("Modelo de tarefa").selectOption("model-default");
     await expect(

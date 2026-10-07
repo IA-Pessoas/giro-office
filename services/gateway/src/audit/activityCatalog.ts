@@ -55,6 +55,26 @@ const TECHNICAL_RULES = [
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
     methods: ["GET"],
+    pattern: /^\/client\/groups$/,
+    description: { action: "consultou", item: "a lista de grupos de empresas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/client\/groups$/,
+    description: { action: "cadastrou", item: "um novo grupo de empresas" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/client\/groups\/[^/]+$/,
+    description: { action: "atualizou", item: "um grupo de empresas" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/client\/groups\/[^/]+\/clients$/,
+    description: { action: "atualizou", item: "as empresas de um grupo" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/client\/coringa\/list$/,
     description: { action: "consultou", item: "a Lista Coringa de clientes" },
   },

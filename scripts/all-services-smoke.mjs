@@ -4120,6 +4120,37 @@ const handlers = {
     });
   },
 
+  async clientGroupsList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/groups" });
+  },
+
+  async clientGroupCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/client/groups",
+      json: { name: uniqueText("Smoke Client Group") },
+    });
+    if (!isBadExpectation(op)) {
+      state.clientGroupId = pickFirst(response.body, "data.id");
+    }
+  },
+
+  async clientGroupPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/groups/${requireState("clientGroupId")}`,
+      json: { name: uniqueText("Smoke Client Group Updated") },
+    });
+  },
+
+  async clientGroupClientsReplace(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/groups/${requireState("clientGroupId")}/clients`,
+      json: { client_ids: [requireState("primaryClientId")] },
+    });
+  },
+
   async clientCoringaList(op) {
     await httpRequest(op, { expectedStatus: [200], query: { page: 1, limit: 5 } });
   },

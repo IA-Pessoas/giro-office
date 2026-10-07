@@ -1246,3 +1246,15 @@ runTest("regularize keeps a legacy regime visible instead of dropping it", () =>
     assert.doesNotMatch(readFileSync(path, "utf8"), /CAEPF|E-SOCIAL/);
   }
 });
+
+runTest("client groups let users manage names and multiple client memberships", () => {
+  const panel = readFileSync("src/modules/clients/components/ClientGroupsPanel.tsx", "utf8");
+  const service = readFileSync("src/modules/clients/services/clientService.ts", "utf8");
+
+  assert.match(panel, /Grupos de empresas/);
+  assert.match(panel, /Substituir clientes do grupo/);
+  assert.match(panel, /clientService\.replaceGroupClients/);
+  assert.match(service, /async listGroups/);
+  assert.match(service, /async createGroup/);
+  assert.match(service, /async updateGroup/);
+});

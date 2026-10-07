@@ -233,6 +233,27 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
   });
 
+  it("restringe a gestão de grupos de empresas ao módulo Integração", () => {
+    const reader = authContext({ modules: { integracao: 1, comercial: 3 } });
+    const editor = authContext({ modules: { integracao: 2 } });
+    const otherModule = authContext({ modules: { comercial: 3, contabil: 3 } });
+    const routes = [
+      ["GET", "/client/groups", true, true],
+      ["POST", "/client/groups", false, true],
+      ["PATCH", "/client/groups/group-1", false, true],
+      ["PUT", "/client/groups/group-1/clients", false, true],
+    ] as const;
+
+    for (const [method, path, canRead, canWrite] of routes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(reader, policy), `Integração nível 1: ${method} ${path}`).toBe(canRead);
+      expect(canAccessRoute(editor, policy), `Integração nível 2: ${method} ${path}`).toBe(
+        canWrite,
+      );
+      expect(canAccessRoute(otherModule, policy), `outro módulo: ${method} ${path}`).toBe(false);
+    }
+  });
+
   it.each([
     "/client/coringa/list",
     "/client/coringa/pdf",
