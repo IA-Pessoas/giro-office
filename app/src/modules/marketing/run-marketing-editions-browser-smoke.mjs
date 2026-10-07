@@ -210,7 +210,7 @@ async function run() {
 
 const server = spawn(
   process.execPath,
-  ["node_modules/next/dist/bin/next", "dev", "--webpack", "--port", "3116", "--hostname", "127.0.0.1"],
+  ["node_modules/next/dist/bin/next", "dev", "--webpack", "--port", "3121", "--hostname", "127.0.0.1"],
   { cwd: appRoot, env: browserSmokeEnv(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
 );
 let output = "";

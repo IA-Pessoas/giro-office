@@ -10,7 +10,7 @@ const expect = baseExpect.configure({ timeout: 15_000 });
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
-const PORT = process.env.TASKS_BROWSER_PORT || "3116";
+const PORT = process.env.TASKS_BROWSER_PORT || "3120";
 const configuredBaseUrl = process.env.TASKS_BROWSER_BASE_URL?.replace(/\/$/, "");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
