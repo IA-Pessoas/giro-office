@@ -48,9 +48,11 @@ for (const source of reportingSources.filter((source) => source.key !== "marketi
           ? "task"
           : source.key === "integracao.clients"
             ? "client"
-            : source.key.startsWith("certificado.")
-              ? "certificate"
-              : source.key.split(".")[0];
+            : source.key === "integracao.client_groups"
+              ? "client"
+              : source.key.startsWith("certificado.")
+                ? "certificate"
+                : source.key.split(".")[0];
     const router = routers[service as keyof typeof routers];
     const extract = vi.fn().mockResolvedValue({ rows: [], reachedLimit: false });
     const stub = { extract, consumeGrant: vi.fn() };

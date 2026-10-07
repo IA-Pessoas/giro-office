@@ -1,6 +1,7 @@
 import { setupAPIClient } from "@shared/services/api";
 
 import type {
+  ClientGroup,
   Client,
   ClientCompanyLookup,
   ClientFinanceRecord,
@@ -28,6 +29,7 @@ import type {
   UpdateClientData,
 } from "../types";
 import {
+  CLIENT_GROUP_ENDPOINTS,
   buildClientListParams,
   CLIENT_ENDPOINTS,
   unwrapClientEnvelope,
@@ -36,6 +38,30 @@ import {
 import { toHistoryIsoDate } from "../utils/historyDate";
 
 export const clientService = {
+  async listGroups(): Promise<ClientGroup[]> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_GROUP_ENDPOINTS.list);
+    return unwrapClientEnvelope<ClientGroup[]>(response.data);
+  },
+
+  async createGroup(name: string): Promise<ClientGroup> {
+    const api = setupAPIClient();
+    const response = await api.post(CLIENT_GROUP_ENDPOINTS.create, { name });
+    return unwrapClientEnvelope<ClientGroup>(response.data);
+  },
+
+  async updateGroup(id: string, name: string): Promise<ClientGroup> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_GROUP_ENDPOINTS.detail(id), { name });
+    return unwrapClientEnvelope<ClientGroup>(response.data);
+  },
+
+  async replaceGroupClients(id: string, client_ids: string[]): Promise<{ id: string; clients: { id: string }[] }> {
+    const api = setupAPIClient();
+    const response = await api.put(CLIENT_GROUP_ENDPOINTS.clients(id), { client_ids });
+    return unwrapClientEnvelope<{ id: string; clients: { id: string }[] }>(response.data);
+  },
+
   async list(filters: ClientListFilters = {}): Promise<ClientListPage> {
     const api = setupAPIClient();
     const response = await api.get(CLIENT_ENDPOINTS.list, {

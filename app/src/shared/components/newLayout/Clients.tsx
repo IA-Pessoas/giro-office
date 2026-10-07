@@ -5,6 +5,7 @@ import { Building2, Plus, Search } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
 import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal";
+import { ClientGroupsPanel } from "@modules/clients/components/ClientGroupsPanel";
 import { useClients } from "@modules/clients/hooks/useClients";
 import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
 import { PaginationControls } from "@shared/components";
@@ -271,6 +272,8 @@ export function Clients() {
           onLast={() => setPage(pageCount)}
         />
       </section>
+
+      <ClientGroupsPanel canEdit={integracaoAccess.canEdit} />
     </div>
   );
 }

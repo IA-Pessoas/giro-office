@@ -23,6 +23,13 @@ export const CLIENT_ENDPOINTS = {
   deleteHistoryPending: (pendingId: string) => `/client/histories/pending/${pendingId}`,
 } as const;
 
+export const CLIENT_GROUP_ENDPOINTS = {
+  list: "/client/groups",
+  create: "/client/groups",
+  detail: (id: string) => `/client/groups/${id}`,
+  clients: (id: string) => `/client/groups/${id}/clients`,
+} as const;
+
 const LEGACY_CLIENT_STATUS_FILTERS = new Set(["Ativo", "Inativo"]);
 
 export function buildClientListParams(filters: ClientListFilters) {

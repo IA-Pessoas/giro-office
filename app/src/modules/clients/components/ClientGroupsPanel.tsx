@@ -1,0 +1,314 @@
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+
+import { clientService } from "../services/clientService";
+import type { ClientGroup } from "../types";
+import { useClients } from "../hooks/useClients";
+
+interface ClientGroupsPanelProps {
+  canEdit: boolean;
+}
+
+const fieldClassName =
+  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800";
+
+export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
+  const [groups, setGroups] = useState<ClientGroup[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const [groupName, setGroupName] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const deferredSearch = useDeferredValue(search.trim());
+  const clientsQuery = useClients({
+    search: deferredSearch || undefined,
+    ref: "integracao",
+    page: 1,
+    limit: 100,
+    legacyIntegrationStatusFilter: false,
+  });
+  const selectedGroup = groups.find((group) => group.id === selectedGroupId);
+  const selectedMemberSet = useMemo(() => new Set(selectedClientIds), [selectedClientIds]);
+
+  useEffect(() => {
+    let active = true;
+    clientService
+      .listGroups()
+      .then((result) => {
+        if (active) setGroups(result);
+      })
+      .catch(() => {
+        if (active) setError("Não foi possível carregar os grupos. Tente novamente.");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function selectGroup(group: ClientGroup) {
+    setSelectedGroupId(group.id);
+    setGroupName(group.name);
+    setSelectedClientIds(group.clients.map((client) => client.id));
+    setError("");
+  }
+
+  async function refreshGroups(selectId = selectedGroupId) {
+    const result = await clientService.listGroups();
+    setGroups(result);
+    const next = result.find((group) => group.id === selectId);
+    if (next) {
+      setSelectedGroupId(next.id);
+      setGroupName(next.name);
+      setSelectedClientIds(next.clients.map((client) => client.id));
+    }
+  }
+
+  async function createGroup() {
+    if (!canEdit || !newGroupName.trim()) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      const group = await clientService.createGroup(newGroupName.trim());
+      setGroups((current) => [...current, group].sort((left, right) => left.name.localeCompare(right.name)));
+      selectGroup(group);
+      setNewGroupName("");
+    } catch {
+      setError("Não foi possível criar o grupo. Confira o nome e tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveGroupName() {
+    if (!canEdit || !selectedGroup || !groupName.trim()) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      await clientService.updateGroup(selectedGroup.id, groupName.trim());
+      await refreshGroups(selectedGroup.id);
+    } catch {
+      setError("Não foi possível renomear o grupo. Confira o nome e tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveClients() {
+    if (!canEdit || !selectedGroup) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      await clientService.replaceGroupClients(selectedGroup.id, selectedClientIds);
+      await refreshGroups(selectedGroup.id);
+    } catch {
+      setError("Não foi possível salvar as empresas do grupo. Atualize a lista e tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Grupos de empresas</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Organize clientes em grupos e mantenha os vínculos para consulta nos relatórios.
+        </p>
+      </div>
+
+      {canEdit ? (
+        <form
+          className="mt-5 flex flex-col gap-3 sm:flex-row"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void createGroup();
+          }}
+        >
+          <label className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            Novo grupo
+            <input
+              className={`${fieldClassName} mt-1.5`}
+              value={newGroupName}
+              onChange={(event) => setNewGroupName(event.target.value)}
+              maxLength={120}
+              placeholder="Nome do grupo"
+              disabled={isSaving}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={isSaving || !newGroupName.trim()}
+            className="self-end rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Criar grupo
+          </button>
+        </form>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.2fr)]">
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Grupos cadastrados</h3>
+          {isLoading ? (
+            <p role="status" className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+              Carregando grupos…
+            </p>
+          ) : groups.length ? (
+            <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+              {groups.map((group) => (
+                <li key={group.id}>
+                  <button
+                    type="button"
+                    onClick={() => selectGroup(group)}
+                    aria-pressed={selectedGroupId === group.id}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 ${selectedGroupId === group.id ? "bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100" : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"}`}
+                  >
+                    <span className="font-medium">{group.name}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {group.clients.length} {group.clients.length === 1 ? "empresa" : "empresas"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-600 dark:bg-slate-950/40 dark:text-slate-400">
+              Nenhum grupo cadastrado. Crie um grupo para começar.
+            </p>
+          )}
+        </div>
+
+        <div>
+          {selectedGroup ? (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <label className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Nome do grupo
+                  <input
+                    className={`${fieldClassName} mt-1.5`}
+                    value={groupName}
+                    onChange={(event) => setGroupName(event.target.value)}
+                    maxLength={120}
+                    disabled={!canEdit || isSaving}
+                  />
+                </label>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => void saveGroupName()}
+                    disabled={isSaving || !groupName.trim() || groupName.trim() === selectedGroup.name}
+                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Salvar nome
+                  </button>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200" htmlFor="client-group-search">
+                  Buscar empresas
+                </label>
+                <input
+                  id="client-group-search"
+                  className={`${fieldClassName} mt-1.5`}
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Nome, razão social ou documento"
+                  disabled={!canEdit || isSaving}
+                />
+              </div>
+
+              <div>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Empresas vinculadas ({selectedClientIds.length})
+                </h4>
+                {selectedGroup.clients.length ? (
+                  <ul className="mb-3 flex flex-wrap gap-2">
+                    {selectedGroup.clients.map((client) => (
+                      <li key={client.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedClientIds((current) => current.filter((id) => id !== client.id))}
+                          disabled={!canEdit || isSaving}
+                          className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-default disabled:opacity-75 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                          aria-label={`Remover ${client.name} do grupo`}
+                        >
+                          {client.name} ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : selectedClientIds.length === 0 ? (
+                  <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
+                    Este grupo ainda não tem empresas.
+                  </p>
+                ) : null}
+
+                {clientsQuery.isLoading ? (
+                  <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Carregando empresas…</p>
+                ) : clientsQuery.error ? (
+                  <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">Não foi possível carregar as empresas.</p>
+                ) : clientsQuery.data?.items.length ? (
+                  <ul className="max-h-64 divide-y divide-slate-200 overflow-y-auto rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+                    {clientsQuery.data.items.map((client) => (
+                      <li key={client.id}>
+                        <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
+                          <input
+                            type="checkbox"
+                            checked={selectedMemberSet.has(client.id)}
+                            onChange={(event) => {
+                              setSelectedClientIds((current) => event.target.checked
+                                ? [...new Set([...current, client.id])]
+                                : current.filter((id) => id !== client.id));
+                            }}
+                            disabled={!canEdit || isSaving}
+                            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600 disabled:opacity-60"
+                          />
+                          <span className="min-w-0 text-slate-800 dark:text-slate-100">
+                            <span className="block truncate font-medium">{client.name}</span>
+                            {client.company_name ? (
+                              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{client.company_name}</span>
+                            ) : null}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-600 dark:bg-slate-950/40 dark:text-slate-400">
+                    Nenhuma empresa encontrada.
+                  </p>
+                )}
+              </div>
+
+              {canEdit ? (
+                <button
+                  type="button"
+                  onClick={() => void saveClients()}
+                  disabled={isSaving || selectedClientIds.length > 500}
+                  className="rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSaving ? "Salvando…" : "Substituir clientes do grupo"}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <p className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-600 dark:bg-slate-950/40 dark:text-slate-400">
+              Selecione um grupo para consultar empresas e vínculos.
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
