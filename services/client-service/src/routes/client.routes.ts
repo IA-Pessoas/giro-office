@@ -22,4 +22,3 @@ export function createClientRouter(deps: ClientRouterDeps): RouterType {
 
   return router;
 }
-

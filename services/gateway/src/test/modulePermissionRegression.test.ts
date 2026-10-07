@@ -398,8 +398,6 @@ describe("matriz de regressão das políticas modulares", () => {
     }
   });
 
-  });
-
   it.each([
     1, 2, 3,
   ])("permite Integração nível %i consultar a lista sem permission global", (level) => {
@@ -442,8 +440,6 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(level >= 1);
   });
 
-  });
-
   it.each([0, 1, 2, 3])("avalia o módulo Parcelamento no nível %i", (level) => {
     const policy = requiredRoutePolicy("GET", "/parcelamento/installments");
 
@@ -481,8 +477,6 @@ describe("matriz de regressão das políticas modulares", () => {
     for (const [method, path] of mutationRoutes) {
       expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(false);
     }
-  });
-
   });
 
   it.each([1, 2, 3])("respeita o limiar modular %i em toda a matriz 0-3", (minPermission) => {
@@ -569,8 +563,6 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), policy)).toBe(true);
   });
 
-  });
-
   it.each([
     "/pessoal",
     "/pessoal/unions",
@@ -583,8 +575,6 @@ describe("matriz de regressão das políticas modulares", () => {
     const policy = requiredRoutePolicy("GET", path);
 
     expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), policy)).toBe(true);
-  });
-
   });
 
   it.each([
