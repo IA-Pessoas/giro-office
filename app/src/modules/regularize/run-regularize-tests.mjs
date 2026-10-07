@@ -11,7 +11,10 @@ import {
   buildRegularizeSitePasswordListParams,
   unwrapRegularizePage,
 } from "./services/regularizeService.contract.ts";
-import { groupRegularizeProcessesByStatus } from "./utils/processBoard.ts";
+import {
+  buildRegularizeProcessStatusUpdatePayload,
+  groupRegularizeProcessesByStatus,
+} from "./utils/processBoard.ts";
 
 const moduleRoot = fileURLToPath(new URL("./", import.meta.url));
 const appRoot = join(moduleRoot, "../../..");
@@ -769,6 +772,58 @@ await runTest("regularize process board uses the existing filter and detail flow
   assert.match(pageSource, /aria-pressed=\{processView === "board"\}/);
   assert.match(pageSource, /<RegularizeProcessBoard[\s\S]{0,1000}onOpenProcessDetail=\{openProcessDetail\}/);
   assert.match(pageSource, /processView === "table"/);
+});
+
+await runTest("process status payload preserves editable fields", () => {
+  const process = {
+    id: "process-1",
+    client_pj_id: "client-1",
+    cpf_cnpj: "12345678000199",
+    process_type: "Abertura",
+    description: "Abrir filial",
+    entry_date: "2026-09-01",
+    completion_date: "2026-10-01",
+    expected_date: "2026-10-15",
+    client_notice_date: "2026-09-15",
+    status: "Pendente",
+    financial_status: "Regular",
+    responsible1_id: "user-1",
+    responsible2_id: "user-2",
+    responsible3_id: "user-3",
+    locking_type: "Manual",
+    urgency: "Alta",
+    task_id: "task-1",
+    observation: "Aguardando protocolo",
+    clientPJ: { cpf_cnpj: "12345678000199" },
+    clientPF: null,
+    history: [{ id: "history-1" }],
+    elapsed_days: 12,
+  };
+
+  const payload = buildRegularizeProcessStatusUpdatePayload(process, "Protocolado");
+
+  assert.equal(payload.id, process.id);
+  assert.equal(payload.client_pj_id, process.client_pj_id);
+  assert.equal(payload.cpf_cnpj, process.cpf_cnpj);
+  assert.equal(payload.process_type, process.process_type);
+  assert.equal(payload.description, process.description);
+  assert.equal(payload.entry_date, process.entry_date);
+  assert.equal(payload.completion_date, process.completion_date);
+  assert.equal(payload.expected_date, process.expected_date);
+  assert.equal(payload.client_notice_date, process.client_notice_date);
+  assert.equal(payload.financial_status, process.financial_status);
+  assert.equal(payload.responsible1_id, process.responsible1_id);
+  assert.equal(payload.responsible2_id, process.responsible2_id);
+  assert.equal(payload.responsible3_id, process.responsible3_id);
+  assert.equal(payload.locking_type, process.locking_type);
+  assert.equal(payload.urgency, process.urgency);
+  assert.equal(payload.task_id, process.task_id);
+  assert.equal(payload.observation, process.observation);
+  assert.equal(payload.status, "Protocolado");
+  assert.equal("clientPJ" in payload, false);
+  assert.equal("clientPF" in payload, false);
+  assert.equal("history" in payload, false);
+  assert.equal("elapsed_days" in payload, false);
 });
 
 await runTest("process board groups canonical, legacy and unknown statuses", () => {

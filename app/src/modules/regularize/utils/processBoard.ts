@@ -1,4 +1,8 @@
-import type { RegularizeProcessListItem } from "../types";
+import type {
+  RegularizeProcessDetail,
+  RegularizeProcessListItem,
+  UpdateRegularizeProcessPayload,
+} from "../types";
 
 export const regularizeProcessStatusOptions = [
   "Pendente",
@@ -7,6 +11,35 @@ export const regularizeProcessStatusOptions = [
   "Finalizado",
   "Paralisado",
 ] as const;
+
+export type RegularizeProcessStatus = (typeof regularizeProcessStatusOptions)[number];
+
+export function buildRegularizeProcessStatusUpdatePayload(
+  process: RegularizeProcessDetail,
+  status: RegularizeProcessStatus,
+): UpdateRegularizeProcessPayload {
+  return {
+    id: process.id,
+    client_pj_id: process.client_pj_id ?? undefined,
+    client_pf_id: process.client_pf_id ?? undefined,
+    cpf_cnpj: process.cpf_cnpj ?? process.clientPF?.cpf ?? process.clientPJ?.cpf_cnpj ?? "",
+    process_type: process.process_type,
+    description: process.description ?? "",
+    entry_date: process.entry_date ?? undefined,
+    completion_date: process.completion_date ?? undefined,
+    expected_date: process.expected_date ?? undefined,
+    client_notice_date: process.client_notice_date,
+    status,
+    financial_status: process.financial_status ?? undefined,
+    observation: process.observation ?? null,
+    responsible1_id: process.responsible1_id ?? undefined,
+    responsible2_id: process.responsible2_id ?? undefined,
+    responsible3_id: process.responsible3_id ?? undefined,
+    locking_type: process.locking_type ?? null,
+    urgency: process.urgency ?? null,
+    task_id: process.task_id ?? undefined,
+  };
+}
 
 export type RegularizeProcessBoardColumn = {
   status: string;
