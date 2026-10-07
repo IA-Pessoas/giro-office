@@ -7,7 +7,7 @@ import { chromium, expect } from "@playwright/test";
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
-const baseUrl = process.env.REPORTS_BROWSER_BASE_URL || "http://127.0.0.1:3115";
+const baseUrl = process.env.REPORTS_BROWSER_BASE_URL || "http://127.0.0.1:3122";
 const evidenceDir = process.env.REPORTS_EVIDENCE_DIR;
 const letterhead = { id: "approved-letterhead", label: "Timbrado aprovado", kind: "organization", sha256: "a".repeat(64) };
 const user = {
@@ -718,7 +718,7 @@ if (process.env.REPORTS_BROWSER_BASE_URL) {
 } else {
   const server = spawn(
     process.execPath,
-    ["node_modules/next/dist/bin/next", "start", "--port", "3115", "--hostname", "127.0.0.1"],
+    ["node_modules/next/dist/bin/next", "start", "--port", "3122", "--hostname", "127.0.0.1"],
     {
       cwd: appRoot,
       env: browserSmokeEnv(),
@@ -726,7 +726,7 @@ if (process.env.REPORTS_BROWSER_BASE_URL) {
       windowsHide: true,
     },
   );
-  console.log(`Next compilado PID=${server.pid} porta=3115 worktree=${appRoot}`);
+  console.log(`Next compilado PID=${server.pid} porta=3122 worktree=${appRoot}`);
   let output = "";
   server.stdout.on("data", (chunk) => {
     output += chunk;

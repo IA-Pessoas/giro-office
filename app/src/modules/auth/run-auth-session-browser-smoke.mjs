@@ -8,7 +8,7 @@ import { chromium } from "@playwright/test";
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
-const PORT = process.env.AUTH_SESSION_SMOKE_PORT || "3116";
+const PORT = process.env.AUTH_SESSION_SMOKE_PORT || "3119";
 const configuredBaseUrl = process.env.AUTH_SESSION_SMOKE_BASE_URL?.replace(/\/$/, "");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));

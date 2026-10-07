@@ -9,7 +9,7 @@ import { chromium, expect } from "@playwright/test";
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
-const baseUrl = process.env.MARKETING_EDITIONS_BASE_URL || "http://127.0.0.1:3116";
+const baseUrl = process.env.MARKETING_EDITIONS_BASE_URL || "http://127.0.0.1:3121";
 const outputDirectory = path.resolve(appRoot, "../output/playwright");
 const event = {
   id: "72b62514-602b-4c63-b6af-5f75a18cebd2",
@@ -210,7 +210,7 @@ async function run() {
 
 const server = spawn(
   process.execPath,
-  ["node_modules/next/dist/bin/next", "dev", "--webpack", "--port", "3116", "--hostname", "127.0.0.1"],
+  ["node_modules/next/dist/bin/next", "dev", "--webpack", "--port", "3121", "--hostname", "127.0.0.1"],
   { cwd: appRoot, env: browserSmokeEnv(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
 );
 let output = "";

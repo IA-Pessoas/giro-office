@@ -4,6 +4,9 @@ import { AlertTriangle } from "lucide-react";
 import { FormField } from "@shared/components/FormField";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
+import { regularizeProcessStatusOptions } from "../utils/processBoard";
+
+export { regularizeProcessStatusOptions };
 
 export const regularizeTextFieldClassName =
   "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:disabled:bg-gray-800";
@@ -67,14 +70,6 @@ export const regularizeClientPfStateOptions = [
   "SP",
   "SE",
   "TO",
-] as const;
-
-export const regularizeProcessStatusOptions = [
-  "Pendente",
-  "Andamento",
-  "Protocolado",
-  "Finalizado",
-  "Paralisado",
 ] as const;
 
 // Sugestões do campo "Tipo do processo"; o valor continua livre para tipos já gravados (#1347).

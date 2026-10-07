@@ -8,7 +8,7 @@ import { chromium } from "@playwright/test";
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
-const PORT = process.env.PLAYWRIGHT_PORT || "3115";
+const PORT = process.env.PLAYWRIGHT_PORT || "3118";
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 const useProductionBuild = process.argv.includes("--production");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
