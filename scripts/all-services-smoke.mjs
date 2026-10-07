@@ -4120,7 +4120,6 @@ const handlers = {
     });
   },
 
-
   async clientGroupsList(op) {
     await httpRequest(op, { expectedStatus: [200], path: "/client/groups" });
   },

@@ -359,7 +359,6 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             "401": { description: "Não autenticado" },
             "403": { description: "Permissão insuficiente" },
             "404": { description: "Grupo ou cliente não encontrado na organização" },
-
           },
         },
       },
