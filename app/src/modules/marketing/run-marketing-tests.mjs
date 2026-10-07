@@ -8,6 +8,7 @@ const events = await readFile(new URL("./components/MarketingEvents.tsx", import
 const eventsService = await readFile(new URL("./services/marketingEventsService.ts", import.meta.url), "utf8");
 const eventsHooks = await readFile(new URL("./hooks/useMarketingEvents.ts", import.meta.url), "utf8");
 const editions = await readFile(new URL("./components/MarketingEventEditions.tsx", import.meta.url), "utf8");
+const editionsSmoke = await readFile(new URL("./run-marketing-editions-browser-smoke.mjs", import.meta.url), "utf8");
 const editionsService = await readFile(new URL("./services/marketingEventEditionsService.ts", import.meta.url), "utf8");
 const editionsHooks = await readFile(new URL("./hooks/useMarketingEventEditions.ts", import.meta.url), "utf8");
 const editionReport = await readFile(new URL("./components/MarketingEventEditionReport.tsx", import.meta.url), "utf8").catch(() => "");
@@ -75,6 +76,10 @@ assert.match(service, /"\/marketing\/dashboard"/);
 assert.doesNotMatch(dashboard, /campaigns|mockData|fakeData/i);
 assert.doesNotMatch(page, /notFound:\s*true/);
 assert.match(page, /MarketingDashboard/);
+const editionsSmokePort = editionsSmoke.match(/--port", "(\d+)"/);
+const editionsSmokeBasePort = editionsSmoke.match(/127\.0\.0\.1:(\d+)/);
+assert.ok(editionsSmokePort && editionsSmokeBasePort, "Marketing editions smoke must use an explicit matching port.");
+assert.equal(editionsSmokeBasePort[1], editionsSmokePort[1], "Marketing editions smoke must query the port it starts.");
 assert.match(page, /MarketingInstagramProfiles/);
 assert.match(page, /MarketingPasswords/);
 assert.match(page, /MarketingCanonicalQueries/);

@@ -1127,6 +1127,8 @@ export function RegularizePage() {
   const [processSearch, setProcessSearch] = useState("");
   const [processStatus, setProcessStatus] = useState("Todos");
   const [processView, setProcessView] = useState<"table" | "board">("table");
+  const [movingProcessIds, setMovingProcessIds] = useState<Set<string>>(() => new Set());
+  const movingProcessIdsRef = useRef(new Set<string>());
   const [processPage, setProcessPage] = useState(1);
   const [siteSearch, setSiteSearch] = useState("");
   const [siteStatus, setSiteStatus] = useState(true);
@@ -1472,15 +1474,18 @@ export function RegularizePage() {
   async function handleMoveProcessStatus(
     processId: RegularizeId,
     status: RegularizeProcessStatus,
-  ): Promise<RegularizeProcessStatus> {
-    if (!canManageRegularizeCore) throw new Error("Sem permissão para alterar processos.");
+  ): Promise<void> {
+    if (!canManageRegularizeCore || movingProcessIdsRef.current.has(processId)) {
+      throw new Error("Sem permissão para alterar processos.");
+    }
+    movingProcessIdsRef.current.add(processId);
+    setMovingProcessIds((current) => new Set(current).add(processId));
     try {
       const process = await regularizeService.getProcess(processId);
-      const savedProcess = await updateProcessMutation.mutateAsync(
+      await updateProcessMutation.mutateAsync(
         buildRegularizeProcessStatusUpdatePayload(process, status),
       );
       toast.success("Status do processo atualizado.");
-      return savedProcess.status as RegularizeProcessStatus;
     } catch (error) {
       toast.error(
         getRegularizeMutationErrorMessage(
@@ -1489,6 +1494,13 @@ export function RegularizePage() {
         ),
       );
       throw error;
+    } finally {
+      movingProcessIdsRef.current.delete(processId);
+      setMovingProcessIds((current) => {
+        const next = new Set(current);
+        next.delete(processId);
+        return next;
+      });
     }
   }
 
@@ -2175,6 +2187,7 @@ export function RegularizePage() {
               getClientName={getProcessClientName}
               isLoading={isProcessSearchPending || processBoardQuery.isLoading}
               canChangeStatus={canManageRegularizeCore}
+              movingProcessIds={movingProcessIds}
               onMoveProcessStatus={handleMoveProcessStatus}
               onOpenProcessDetail={openProcessDetail}
             />

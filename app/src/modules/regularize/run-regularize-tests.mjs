@@ -772,10 +772,13 @@ await runTest("regularize process board uses the existing filter and detail flow
   assert.match(pageSource, /aria-pressed=\{processView === "board"\}/);
   assert.match(pageSource, /<RegularizeProcessBoard[\s\S]{0,1000}onOpenProcessDetail=\{openProcessDetail\}/);
   assert.match(pageSource, /canChangeStatus=\{canManageRegularizeCore\}/);
+  assert.match(pageSource, /const \[movingProcessIds, setMovingProcessIds\] = useState<Set<string>>\(\(\) => new Set\(\)\);/);
+  assert.match(pageSource, /if \(!canManageRegularizeCore \|\| movingProcessIdsRef\.current\.has\(processId\)\)/);
   assert.match(pageSource, /async function handleMoveProcessStatus\(/);
   assert.match(pageSource, /regularizeService\.getProcess\(processId\)/);
   assert.match(pageSource, /buildRegularizeProcessStatusUpdatePayload\(process, status\)/);
   assert.match(pageSource, /updateProcessMutation\.mutateAsync\(/);
+  assert.match(pageSource, /movingProcessIds=\{movingProcessIds\}/);
   assert.match(pageSource, /Não foi possível atualizar o status do processo\./);
   assert.match(pageSource, /processView === "table"/);
 });
@@ -783,6 +786,9 @@ await runTest("regularize process board uses the existing filter and detail flow
 await runTest("process board exposes status moves only for editable users", async () => {
   const boardSource = await readModuleSource("components/RegularizeProcessBoard.tsx");
 
+  assert.match(boardSource, /movingProcessIds: ReadonlySet<string>/);
+  assert.match(boardSource, /if \(!canChangeStatus \|\| movingProcessIds\.has\(processId\)\) return;/);
+  assert.match(boardSource, /delete next\[processId\]/);
   assert.match(boardSource, /draggable=\{canChangeStatus && !movingProcessIds\.has\(item\.id\)\}/);
   assert.match(
     boardSource,

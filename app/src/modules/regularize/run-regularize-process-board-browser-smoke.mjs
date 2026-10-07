@@ -54,6 +54,8 @@ const smokeUser = {
 async function installApiMocks(page, updates) {
   let persistedProcess = { ...processDetail };
   let failNextUpdate = false;
+  let deferredUpdate = null;
+  let nextSavedStatus = null;
 
   await page.route("**/user/me", (route) =>
     route.fulfill({
@@ -167,7 +169,18 @@ async function installApiMocks(page, updates) {
       });
     }
 
-    persistedProcess = { ...persistedProcess, ...payload };
+    const gate = deferredUpdate;
+    deferredUpdate = null;
+    if (gate) {
+      gate.started();
+      await gate.response;
+    }
+    persistedProcess = {
+      ...persistedProcess,
+      ...payload,
+      status: nextSavedStatus ?? payload.status,
+    };
+    nextSavedStatus = null;
     return route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -178,6 +191,17 @@ async function installApiMocks(page, updates) {
   return {
     failNextUpdate() {
       failNextUpdate = true;
+    },
+    deferNextUpdate() {
+      let signalStarted;
+      let releaseResponse;
+      const started = new Promise((resolve) => { signalStarted = resolve; });
+      const response = new Promise((resolve) => { releaseResponse = resolve; });
+      deferredUpdate = { started: signalStarted, response };
+      return { started, release: releaseResponse };
+    },
+    respondWithStatus(status) {
+      nextSavedStatus = status;
     },
     getPersistedStatus() {
       return persistedProcess.status;
@@ -243,17 +267,51 @@ async function runBrowserProof() {
     await page.screenshot({ path: screenshotPath, fullPage: true });
     console.log(`Evidência do quadro: ${screenshotPath}`);
 
-    api.failNextUpdate();
+    const deferred = api.deferNextUpdate();
     await page
       .getByRole("combobox", { name: "Mover Abertura para outro status" })
       .selectOption("Finalizado");
     await expect.poll(() => updates.length).toBe(2);
+    await deferred.started;
+    await expect(page.getByRole("region", { name: "Finalizado" }).locator("article")).toHaveCount(1);
+    await page.getByRole("button", { name: "Tabela", exact: true }).click();
+    await page.getByRole("button", { name: "Quadro", exact: true }).click();
+    const pendingMove = page.getByRole("combobox", { name: "Mover Abertura para outro status" });
+    await expect(pendingMove).toBeDisabled();
+    deferred.release();
+    await expect(page.getByRole("region", { name: "Finalizado" }).locator("article")).toHaveCount(1);
+
+    api.respondWithStatus("Paralisado");
+    await page
+      .getByRole("combobox", { name: "Mover Abertura para outro status" })
+      .selectOption("Protocolado");
+    await expect.poll(() => updates.length).toBe(3);
+    await expect(page.getByRole("region", { name: "Paralisado" }).locator("article")).toHaveCount(1);
+    await expect(page.getByRole("region", { name: "Protocolado" }).locator("article")).toHaveCount(0);
+
+    const processStatusFilter = page.getByRole("combobox").first();
+    await processStatusFilter.selectOption("Paralisado");
+    await expect(page.getByRole("region", { name: "Paralisado" }).locator("article")).toHaveCount(1);
+    api.respondWithStatus("Andamento");
+    await page
+      .getByRole("combobox", { name: "Mover Abertura para outro status" })
+      .selectOption("Protocolado");
+    await expect.poll(() => updates.length).toBe(4);
+    await expect(page.getByRole("region", { name: "Paralisado" }).locator("article")).toHaveCount(0);
+
+    await processStatusFilter.selectOption("Todos");
+    await expect(page.getByRole("region", { name: "Andamento" }).locator("article")).toHaveCount(1);
+    api.failNextUpdate();
+    await page
+      .getByRole("combobox", { name: "Mover Abertura para outro status" })
+      .selectOption("Finalizado");
+    await expect.poll(() => updates.length).toBe(5);
     await expect(
       page
         .getByRole("alert")
         .filter({ hasText: "Processo foi alterado; recarregue e tente novamente." }),
     ).toBeVisible();
-    await expect(protocolado.locator("article").filter({ hasText: "Abertura" })).toHaveCount(1);
+    await expect(page.getByRole("region", { name: "Andamento" }).locator("article")).toHaveCount(1);
     await expect(page.getByRole("region", { name: "Finalizado" }).locator("article")).toHaveCount(0);
 
     smokeUser.modules.regularize = 1;

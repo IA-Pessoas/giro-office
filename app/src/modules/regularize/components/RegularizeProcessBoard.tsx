@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { cn } from "@shared/ui/newLayout/utils";
@@ -19,10 +19,11 @@ type RegularizeProcessBoardProps = {
   getClientName: (item: RegularizeProcessListItem) => string;
   isLoading: boolean;
   canChangeStatus: boolean;
+  movingProcessIds: ReadonlySet<string>;
   onMoveProcessStatus: (
     processId: string,
     status: RegularizeProcessStatus,
-  ) => Promise<RegularizeProcessStatus>;
+  ) => Promise<void>;
   onOpenProcessDetail: (processId: string) => void;
 };
 
@@ -32,10 +33,10 @@ export function RegularizeProcessBoard({
   getClientName,
   isLoading,
   canChangeStatus,
+  movingProcessIds,
   onMoveProcessStatus,
   onOpenProcessDetail,
 }: RegularizeProcessBoardProps) {
-  const [movingProcessIds, setMovingProcessIds] = useState<Set<string>>(() => new Set());
   const [optimisticStatuses, setOptimisticStatuses] = useState<
     Record<string, RegularizeProcessStatus>
   >({});
@@ -50,39 +51,17 @@ export function RegularizeProcessBoard({
     [columns, optimisticStatuses],
   );
 
-  useEffect(() => {
-    const persistedStatuses = new Map(
-      columns.flatMap((column) => column.items.map((item) => [item.id, item.status] as const)),
-    );
-    setOptimisticStatuses((current) =>
-      Object.fromEntries(
-        Object.entries(current).filter(([processId, status]) => {
-          const persistedStatus = persistedStatuses.get(processId);
-          return persistedStatus === undefined
-            ? movingProcessIds.has(processId)
-            : persistedStatus !== status;
-        }),
-      ),
-    );
-  }, [columns, movingProcessIds]);
-
   async function moveProcess(processId: string, status: RegularizeProcessStatus) {
     if (!canChangeStatus || movingProcessIds.has(processId)) return;
-    setMovingProcessIds((current) => new Set(current).add(processId));
     setOptimisticStatuses((current) => ({ ...current, [processId]: status }));
     try {
-      const savedStatus = await onMoveProcessStatus(processId, status);
-      setOptimisticStatuses((current) => ({ ...current, [processId]: savedStatus }));
+      await onMoveProcessStatus(processId, status);
     } catch {
+      // Keep the server-backed status after a failed update.
+    } finally {
       setOptimisticStatuses((current) => {
         const next = { ...current };
         delete next[processId];
-        return next;
-      });
-    } finally {
-      setMovingProcessIds((current) => {
-        const next = new Set(current);
-        next.delete(processId);
         return next;
       });
     }
