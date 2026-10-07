@@ -184,6 +184,33 @@ runTest("common client creation sends optional address and preserves client iden
   );
 });
 
+runTest("common client edit hydration retains the saved address", () => {
+  const values = createClientFormInitialValues({
+    address: "Rua A, 10",
+    cep: "01001-000",
+    neighborhood: "Centro",
+    state: "SP",
+    city: "São Paulo",
+  });
+
+  assert.deepEqual(
+    (({ address, cep, neighborhood, state, city }) => ({
+      address,
+      cep,
+      neighborhood,
+      state,
+      city,
+    }))(values),
+    {
+      address: "Rua A, 10",
+      cep: "01001-000",
+      neighborhood: "Centro",
+      state: "SP",
+      city: "São Paulo",
+    },
+  );
+});
+
 runTest("common client update sends optional address without changing identity or contact fields", () => {
   const values = {
     ...createClientFormInitialValues(),
