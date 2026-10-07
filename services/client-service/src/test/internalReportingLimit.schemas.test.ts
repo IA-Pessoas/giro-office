@@ -29,5 +29,4 @@ describe("client reporting extraction limit", () => {
       }).success,
     ).toBe(true);
   });
-
 });
