@@ -2,6 +2,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Download, Filter, Search } from "lucide-react";
 
+import { ClientNativeSelect } from "../form/ClientNativeSelect";
+import { clientTextFieldClassName } from "../form/clientFormControls";
 import { useCoringaClients } from "../hooks/useClients";
 import { clientService } from "../services/clientService";
 import type { ClientCoringaFilters, ClientCoringaRow } from "../types";
@@ -85,7 +87,6 @@ export function ClientCoringaList() {
     }
   }
 
-  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white";
   const labelClass = "space-y-1 text-xs font-medium text-slate-600 dark:text-slate-300";
 
   return <div className="space-y-5">
@@ -105,13 +106,13 @@ export function ClientCoringaList() {
       className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white"><Filter size={17} /> Filtros</div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-        <label className={labelClass}>Busca<input className={inputClass} value={draft.search} onChange={(event) => update("search", event.target.value)} placeholder="Empresa, CNPJ ou código" /></label>
-        <label className={labelClass}>Regime<input className={inputClass} list="coringa-regimes" value={draft.regime} onChange={(event) => update("regime", event.target.value)} placeholder="Todos" /><datalist id="coringa-regimes">{selectOptions(TAX_REGIME_OPTIONS)}</datalist></label>
-        <label className={labelClass}>Data Entrada<input type="date" className={inputClass} value={draft.dataEntrada} onChange={(event) => update("dataEntrada", event.target.value)} /></label>
-        <label className={labelClass}>Porte<input className={inputClass} list="coringa-portes" value={draft.porte} onChange={(event) => update("porte", event.target.value)} placeholder="Todos" /><datalist id="coringa-portes">{selectOptions(REGULARIZE_SIZE_OPTIONS)}</datalist></label>
-        <label className={labelClass}>Segmento<input className={inputClass} list="coringa-segmentos" value={draft.segmento} onChange={(event) => update("segmento", event.target.value)} placeholder="Todos" /><datalist id="coringa-segmentos">{selectOptions(REGULARIZE_SEGMENT_OPTIONS)}</datalist></label>
-        <label className={labelClass}>Status Coringa<input className={inputClass} value={draft.status} onChange={(event) => update("status", event.target.value)} placeholder="Todos" /></label>
-        {indicatorFields.map(([field, label]) => <label className={labelClass} key={field}>{label}<select className={inputClass} value={draft[field]} onChange={(event) => update(field, event.target.value)}><option value="">Todos</option><option value="true">Sim</option><option value="false">Não</option></select></label>)}
+        <label className={labelClass}>Busca<input className={clientTextFieldClassName} value={draft.search} onChange={(event) => update("search", event.target.value)} placeholder="Empresa, CNPJ ou código" /></label>
+        <label className={labelClass}>Regime<input className={clientTextFieldClassName} list="coringa-regimes" value={draft.regime} onChange={(event) => update("regime", event.target.value)} placeholder="Todos" /><datalist id="coringa-regimes">{selectOptions(TAX_REGIME_OPTIONS)}</datalist></label>
+        <label className={labelClass}>Data Entrada<input type="date" className={clientTextFieldClassName} value={draft.dataEntrada} onChange={(event) => update("dataEntrada", event.target.value)} /></label>
+        <label className={labelClass}>Porte<input className={clientTextFieldClassName} list="coringa-portes" value={draft.porte} onChange={(event) => update("porte", event.target.value)} placeholder="Todos" /><datalist id="coringa-portes">{selectOptions(REGULARIZE_SIZE_OPTIONS)}</datalist></label>
+        <label className={labelClass}>Segmento<input className={clientTextFieldClassName} list="coringa-segmentos" value={draft.segmento} onChange={(event) => update("segmento", event.target.value)} placeholder="Todos" /><datalist id="coringa-segmentos">{selectOptions(REGULARIZE_SEGMENT_OPTIONS)}</datalist></label>
+        <label className={labelClass}>Status Coringa<input className={clientTextFieldClassName} value={draft.status} onChange={(event) => update("status", event.target.value)} placeholder="Todos" /></label>
+        {indicatorFields.map(([field, label]) => <label className={labelClass} key={field}>{label}<ClientNativeSelect value={draft[field]} onChange={(event) => update(field, event.target.value)}><option value="">Todos</option><option value="true">Sim</option><option value="false">Não</option></ClientNativeSelect></label>)}
       </div>
       <div className="mt-4 flex gap-2">
         <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"><Search size={16} /> Aplicar filtros</button>

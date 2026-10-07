@@ -48,7 +48,11 @@ function drawHeader(document: PDFKit.PDFDocument, count: number): void {
   document.moveTo(28, 107).lineTo(814, 107).strokeColor("#b8c2d1").stroke();
 }
 
-export function createCoringaPdf(count: number) {
+export function createCoringaPdf(count: number): {
+  document: PDFKit.PDFDocument;
+  append(row: CoringaClient): void;
+  end(): void;
+} {
   const document = new PDFDocument({ size: "A4", layout: "landscape", margin: 28, compress: true });
   drawHeader(document, count);
   let y = 110;
