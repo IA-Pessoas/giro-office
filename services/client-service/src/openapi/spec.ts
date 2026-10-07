@@ -232,6 +232,110 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/client/groups": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar grupos de clientes e empresas vinculadas",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Grupos da organização autenticada",
+              ...successEnvelopeContent(),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+        post: {
+          tags: ["Clients"],
+          summary: "Criar grupo de clientes",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", minLength: 1, maxLength: 120 } },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Grupo criado", ...successEnvelopeContent() },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "409": { description: "Já existe grupo com o nome" },
+          },
+        },
+      },
+      "/client/groups/{id}": {
+        patch: {
+          tags: ["Clients"],
+          summary: "Renomear grupo de clientes",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", minLength: 1, maxLength: 120 } },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Grupo atualizado", ...successEnvelopeContent() },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Grupo não encontrado" },
+            "409": { description: "Já existe grupo com o nome" },
+          },
+        },
+      },
+      "/client/groups/{id}/clients": {
+        put: {
+          tags: ["Clients"],
+          summary: "Atualizar clientes vinculados ao grupo",
+          description: "Substitui os vínculos do grupo; clientes podem pertencer a vários grupos.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_ids"],
+                  properties: {
+                    client_ids: {
+                      type: "array",
+                      items: { type: "string", format: "uuid" },
+                    },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Vínculos atualizados", ...successEnvelopeContent() },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Grupo ou cliente não encontrado na organização" },
+          },
+        },
+      },
       "/client/instagram-profiles/report": {
         get: {
           tags: ["Clients"],
@@ -935,7 +1039,10 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                   additionalProperties: false,
                   required: ["source", "fields", "limit"],
                   properties: {
-                    source: { type: "string", enum: ["integracao.clients"] },
+                    source: {
+                      type: "string",
+                      enum: ["integracao.clients", "integracao.client_groups"],
+                    },
                     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
                     limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
                     query: reportingQueryOpenApiSchema,

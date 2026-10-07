@@ -4,6 +4,20 @@ import { classifyActivity, describeActivity } from "../audit/activityCatalog.js"
 
 describe("activityCatalog", () => {
   it.each([
+    ["GET", "/client/groups", "consultou", "a lista de grupos de empresas"],
+    ["POST", "/client/groups", "cadastrou", "um novo grupo de empresas"],
+    [
+      "PATCH",
+      "/client/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "atualizou",
+      "um grupo de empresas",
+    ],
+    [
+      "PUT",
+      "/client/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/clients",
+      "atualizou",
+      "as empresas de um grupo",
+    ],
     ["GET", "/task/list", "consultou", "a lista de tarefas"],
     ["GET", "/reports/catalog", "consultou", "o catálogo de relatórios"],
     [

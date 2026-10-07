@@ -10,6 +10,10 @@ import {
 
 const expectedRoutes = [
   "GET /client/list",
+  "GET /client/groups",
+  "POST /client/groups",
+  "PATCH /client/groups/:id",
+  "PUT /client/groups/:id/clients",
   "GET /client/integration",
   "GET /client/:id",
   "POST /client",
@@ -244,6 +248,10 @@ test("a propriedade da tarefa vale para os três responsáveis", () => {
 test("a matriz de níveis mantém leitura, edição e administração separadas", () => {
   const cases = [
     { method: "GET", path: "/client/list", allowedLevels: [1, 2, 3] },
+    { method: "GET", path: "/client/groups", allowedLevels: [1, 2, 3] },
+    { method: "POST", path: "/client/groups", allowedLevels: [2, 3] },
+    { method: "PATCH", path: "/client/groups/:id", allowedLevels: [2, 3] },
+    { method: "PUT", path: "/client/groups/:id/clients", allowedLevels: [2, 3] },
     { method: "GET", path: "/client/integration", allowedLevels: [1, 2, 3] },
     { method: "GET", path: "/client/:id", allowedLevels: [1, 2, 3] },
     { method: "POST", path: "/client", allowedLevels: [2, 3] },

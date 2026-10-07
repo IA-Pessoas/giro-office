@@ -244,6 +244,25 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
   routePolicy("GET", "/client/list", "client", "read", [readRule(readOrganization)], {
     test: "client.list",
   }),
+  routePolicy("GET", "/client/groups", "client", "read", [readRule(readOrganization)], {
+    test: "client.groups.list",
+  }),
+  routePolicy("POST", "/client/groups", "client", "create", [writeRule(writeUser, ["name"])], {
+    audit: "required",
+    test: "client.groups.create",
+  }),
+  routePolicy("PATCH", "/client/groups/:id", "client", "update", [writeRule(writeUser, ["name"])], {
+    audit: "required",
+    test: "client.groups.update",
+  }),
+  routePolicy(
+    "PUT",
+    "/client/groups/:id/clients",
+    "client",
+    "update",
+    [writeRule(writeUser, ["client_ids"])],
+    { audit: "required", test: "client.groups.clients.replace" },
+  ),
   routePolicy("GET", "/client/integration", "client", "read", [readRule(readOrganization)], {
     test: "client.integration.lookup",
   }),

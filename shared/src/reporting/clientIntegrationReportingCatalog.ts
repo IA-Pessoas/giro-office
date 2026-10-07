@@ -20,7 +20,11 @@ function field(
   };
 }
 
-export const CLIENT_INTEGRATION_REPORTING_SOURCES = ["integracao.clients"] as const;
+export const CLIENT_GROUP_REPORTING_SOURCE = "integracao.client_groups" as const;
+export const CLIENT_INTEGRATION_REPORTING_SOURCES = [
+  "integracao.clients",
+  CLIENT_GROUP_REPORTING_SOURCE,
+] as const;
 export type ClientIntegrationReportingSource =
   (typeof CLIENT_INTEGRATION_REPORTING_SOURCES)[number];
 
@@ -46,6 +50,28 @@ export const clientIntegrationReportingCatalog = {
         field("segment", "Segmento", "string", stringOperators),
         field("regime", "Regime", "string", stringOperators),
         field("service_unique", "Serviço único", "boolean", booleanOperators),
+      ],
+    },
+    {
+      key: CLIENT_GROUP_REPORTING_SOURCE,
+      label: "Clientes por grupo",
+      module: "integracao",
+      minimum_permission: 1,
+      keys: [field("client_id", "Cliente", "string", ["eq", "in"])],
+      fields: [
+        field("client_id", "ID do cliente", "string", stringOperators),
+        field("group_id", "ID do grupo", "string", stringOperators),
+        field("group_name", "Grupo", "string", stringOperators),
+        field("name", "Nome", "string", stringOperators),
+        field("company_name", "Razão social", "string", stringOperators),
+        field("fantasy_name", "Nome fantasia", "string", stringOperators),
+        field("cpf_cnpj", "CPF/CNPJ", "string", stringOperators),
+        field("status", "Status", "string", stringOperators),
+        field("type", "Tipo", "string", stringOperators),
+        field("city", "Cidade", "string", stringOperators),
+        field("state", "Estado", "string", stringOperators),
+        field("segment", "Segmento", "string", stringOperators),
+        field("regime", "Regime", "string", stringOperators),
       ],
     },
   ],
