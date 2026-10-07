@@ -919,6 +919,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/regularize\/guidance\/pdf$/,
+    description: { action: "visualizou", item: "o PDF de uma orientação processual" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/rh\/point\/me\/today$/,
     description: { action: "consultou", item: "o ponto do dia" },
   },

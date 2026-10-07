@@ -397,6 +397,14 @@ export const regularizeService = {
     return unwrapRegularizeEntity<RegularizeGuidance>(response.data);
   },
 
+  async downloadGuidancePdf(id: RegularizeId): Promise<Blob> {
+    const response = await setupAPIClient().get<Blob>(REGULARIZE_ENDPOINTS.guidancePdf, {
+      params: buildRegularizeIdParams(id),
+      responseType: "blob",
+    });
+    return response.data;
+  },
+
   async createGuidance(payload: CreateRegularizeGuidancePayload): Promise<RegularizeGuidance> {
     if (isLegacyGuidanceDraft(payload)) {
       throw new Error(
