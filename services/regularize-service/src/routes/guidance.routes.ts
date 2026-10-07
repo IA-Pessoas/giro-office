@@ -74,7 +74,7 @@ export function createGuidanceRoutes(deps: RegularizeRouteDeps): Router {
       response.setHeader("Content-Type", "application/pdf");
       response.setHeader(
         "Content-Disposition",
-        `inline; filename="orientacao-processual-${query.id}.pdf"`,
+        `inline; filename="regularize-${query.id}.pdf"; filename*=UTF-8''orienta%C3%A7%C3%A3o-processual-${query.id}.pdf`,
       );
       response.send(pdf);
     } catch (err) {
