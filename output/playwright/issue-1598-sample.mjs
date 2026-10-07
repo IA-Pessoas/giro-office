@@ -22,6 +22,9 @@ const pdf = await renderGuidancePdf({
     { type: "Principal", code: "8211-3/00", description: "Serviços combinados de escritório e apoio administrativo" },
     { type: "Secundária", code: "7020-4/00", description: "Atividades de consultoria em gestão empresarial" },
   ],
-  partners: [{ name: "Ana Silva", percentage: 60, profession: "Empresária", marital_status: "Casada", rg: "1234567", cpf: "12345678901", address: "Rua C, 30", role: "Administradora" }],
+  partners: [
+    { name: "Ana Silva", percentage: 60, profession: "Empresária", marital_status: "Casada", rg: "1234567", cpf: "12345678901", address: "Rua C, 30", role: "Administradora" },
+    { name: "Beto Lima", percentage: 40, profession: "Contador", marital_status: "Solteiro", rg: "7654321", cpf: "98765432100", address: "Rua D, 40", role: "Sócio" },
+  ],
 });
 writeFileSync("output/playwright/issue-1598-orientacao-amostra.pdf", pdf);

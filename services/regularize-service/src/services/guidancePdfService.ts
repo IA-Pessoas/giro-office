@@ -128,6 +128,23 @@ class GuidancePdfLayout {
     if (this.y + height > BOTTOM) this.page();
   }
 
+  private takeText(raw: string, width: number, available: number): [string, string] {
+    let cut = raw.length;
+    if (this.doc.heightOfString(raw, { width }) > available) {
+      let low = 1;
+      let high = raw.length;
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+        if (this.doc.heightOfString(raw.slice(0, middle), { width }) <= available) low = middle;
+        else high = middle - 1;
+      }
+      cut = low;
+      const wordBoundary = raw.lastIndexOf(" ", cut);
+      if (wordBoundary > cut / 2) cut = wordBoundary;
+    }
+    return [raw.slice(0, cut).trimEnd(), raw.slice(cut).trimStart()];
+  }
+
   section(title: string, followingHeight = 0): void {
     this.room(47 + followingHeight);
     this.y += 10;
@@ -151,24 +168,8 @@ class GuidancePdfLayout {
       const available = BOTTOM - this.y - 16;
       const valueWidth = label ? WIDTH * 0.71 - 14 : WIDTH - 20;
       this.doc.font("Helvetica").fontSize(9);
-      let cut = remaining.length;
-      if (this.doc.heightOfString(remaining, { width: valueWidth }) > available) {
-        let low = 1;
-        let high = remaining.length;
-        while (low < high) {
-          const middle = Math.ceil((low + high) / 2);
-          if (
-            this.doc.heightOfString(remaining.slice(0, middle), { width: valueWidth }) <= available
-          )
-            low = middle;
-          else high = middle - 1;
-        }
-        cut = low;
-        const wordBoundary = remaining.lastIndexOf(" ", cut);
-        if (wordBoundary > cut / 2) cut = wordBoundary;
-      }
-      const chunk = remaining.slice(0, cut).trimEnd();
-      remaining = remaining.slice(cut).trimStart();
+      const [chunk, rest] = this.takeText(remaining, valueWidth, available);
+      remaining = rest;
       const rowHeight = Math.max(31, this.doc.heightOfString(chunk, { width: valueWidth }) + 15);
       this.room(rowHeight);
       this.doc.rect(LEFT, this.y, WIDTH, rowHeight).lineWidth(0.8).stroke(RED);
@@ -196,24 +197,84 @@ class GuidancePdfLayout {
     this.field("", value);
   }
 
+  checkboxParagraph(value: string): void {
+    this.room(72);
+    this.doc.font("Helvetica").fontSize(9);
+    const height = Math.max(31, this.doc.heightOfString(value, { width: WIDTH - 45 }) + 15);
+    this.doc.rect(LEFT, this.y, WIDTH, height).lineWidth(0.8).stroke(RED);
+    this.doc.rect(LEFT + 10, this.y + 9, 9, 9).stroke("#222222");
+    this.doc.fillColor("#222222").text(value, LEFT + 25, this.y + 8, { width: WIDTH - 45 });
+    this.y += height;
+  }
+
+  partnerCards(cards: readonly (readonly [string, string][])[]): void {
+    const half = WIDTH / 2;
+    const valueWidth = half - 108;
+    for (let index = 0; index < cards.length; index += 2) {
+      const pair = cards.slice(index, index + 2);
+      for (let row = 0; row < Math.max(...pair.map((card) => card.length)); row++) {
+        const remaining = pair.map((card) => card[row]?.[1] || " ");
+        let continued = false;
+        do {
+          this.room(40);
+          this.doc.font("Helvetica").fontSize(8);
+          const available = BOTTOM - this.y - 16;
+          const fitted = remaining.map((value) => this.takeText(value, valueWidth, available));
+          const height = Math.max(
+            31,
+            ...fitted.map(([chunk]) => this.doc.heightOfString(chunk, { width: valueWidth }) + 15),
+          );
+          pair.forEach((card, column) => {
+            const x = LEFT + column * half;
+            this.doc.rect(x, this.y, half, height).lineWidth(0.8).stroke(RED);
+            this.doc
+              .font("Helvetica-Bold")
+              .fontSize(8)
+              .fillColor("#222222")
+              .text(continued ? `${card[row][0]} (CONT.)` : card[row][0], x + 7, this.y + 8, {
+                width: 91,
+              });
+            this.doc
+              .font("Helvetica")
+              .fontSize(8)
+              .text(fitted[column][0], x + 101, this.y + 8, { width: valueWidth });
+          });
+          this.y += height;
+          fitted.forEach(([, rest], column) => {
+            remaining[column] = rest;
+          });
+          continued = true;
+        } while (remaining.some(Boolean));
+      }
+    }
+  }
+
   columns(items: readonly string[]): void {
     for (let index = 0; index < items.length; index += 3) {
-      const group = items.slice(index, index + 3);
+      const remaining = items.slice(index, index + 3);
       const columnWidth = WIDTH / 3;
-      this.doc.font("Helvetica").fontSize(8).fillColor("#222222");
-      const height = Math.max(
-        31,
-        ...group.map((item) => this.doc.heightOfString(item, { width: columnWidth - 16 }) + 14),
-      );
-      this.room(height);
-      this.doc.rect(LEFT, this.y, WIDTH, height).lineWidth(0.8).stroke(RED);
-      this.doc.font("Helvetica").fontSize(8).fillColor("#222222");
-      group.forEach((item, column) => {
-        this.doc.text(item, LEFT + column * columnWidth + 8, this.y + 8, {
-          width: columnWidth - 16,
+      do {
+        this.room(40);
+        this.doc.font("Helvetica").fontSize(8).fillColor("#222222");
+        const fitted = remaining.map((item) =>
+          this.takeText(item, columnWidth - 16, BOTTOM - this.y - 16),
+        );
+        const height = Math.max(
+          31,
+          ...fitted.map(
+            ([chunk]) => this.doc.heightOfString(chunk, { width: columnWidth - 16 }) + 14,
+          ),
+        );
+        this.doc.rect(LEFT, this.y, WIDTH, height).lineWidth(0.8).stroke(RED);
+        this.doc.font("Helvetica").fontSize(8).fillColor("#222222");
+        fitted.forEach(([chunk, rest], column) => {
+          this.doc.text(chunk, LEFT + column * columnWidth + 8, this.y + 8, {
+            width: columnWidth - 16,
+          });
+          remaining[column] = rest;
         });
-      });
-      this.y += height;
+        this.y += height;
+      } while (remaining.some(Boolean));
     }
   }
 
@@ -253,17 +314,14 @@ export async function renderGuidancePdf(guidance: Guidance): Promise<Buffer> {
   pdf.section("SOLICITAÇÃO");
   const isAlteration = key(request).includes("ALTERACAO CONTRATUAL");
   if (isAlteration) {
-    const changes = request.replace(/^.*?ALTERAÇÃO CONTRATUAL\s*-?/iu, "").trim();
-    pdf.field(
-      "ALTERAÇÕES REALIZADAS",
-      changes
-        ? changes
-            .split(/[,;]/)
-            .map((change, index) => `${index + 1}. ${change.trim()}`)
-            .join("\n")
-        : request,
+    const changes = request.replace(/^.*?ALTERA(?:Ç|C)[ÃA]O CONTRATUAL\s*-?/iu, "").trim();
+    pdf.paragraph("ALTERAÇÕES REALIZADAS:");
+    pdf.columns(
+      (changes || request).split(/[,;]/).map((change, index) => `${index + 1}. ${change.trim()}`),
     );
     pdf.field("OBS-", first(guidance.framework_obs, snapshot.framework_obs));
+  } else if (key(request) === "CONSTITUICAO") {
+    pdf.paragraph(first(guidance.framework_obs, snapshot.framework_obs));
   } else {
     pdf.field("", request);
     pdf.field("", first(guidance.framework_obs, snapshot.framework_obs));
@@ -322,21 +380,23 @@ export async function renderGuidancePdf(guidance: Guidance): Promise<Buffer> {
   const partners = rows(guidance.partners).sort(
     (a, b) => Number(b.percentage ?? b.share ?? 0) - Number(a.percentage ?? a.share ?? 0),
   );
-  for (const partner of partners) {
-    pdf.field("SÓCIO(A)", text(partner.name));
-    pdf.field(
-      "PORCENTAGEM",
-      partner.percentage === undefined && partner.share === undefined
-        ? ""
-        : `${text(partner.percentage ?? partner.share)}%`,
-    );
-    pdf.field("PROFISSÃO", text(partner.profession));
-    pdf.field("ESTADO CIVIL", text(partner.marital_status));
-    pdf.field(text(partner.cnh) ? "CNH" : "RG", first(partner.cnh, partner.rg));
-    pdf.field("CPF", documentNumber(partner.cpf));
-    pdf.field("ENDEREÇO RESIDENCIAL", text(partner.address));
-    pdf.field("CARGO", text(partner.role));
-  }
+  pdf.partnerCards(
+    partners.map((partner) => [
+      ["SÓCIO(A)", text(partner.name)],
+      [
+        "PORCENTAGEM",
+        partner.percentage === undefined && partner.share === undefined
+          ? ""
+          : `${text(partner.percentage ?? partner.share)}%`,
+      ],
+      ["PROFISSÃO", text(partner.profession)],
+      ["ESTADO CIVIL", text(partner.marital_status)],
+      [text(partner.cnh) ? "CNH" : "RG", first(partner.cnh, partner.rg)],
+      ["CPF", documentNumber(partner.cpf)],
+      ["ENDEREÇO RESIDENCIAL", text(partner.address)],
+      ["CARGO", text(partner.role)],
+    ]),
+  );
 
   const notAltered = isAlteration
     ? alterationTopics.filter((topic) => !key(request).includes(key(topic)))
@@ -347,7 +407,7 @@ export async function renderGuidancePdf(guidance: Guidance): Promise<Buffer> {
   pdf.section("DECLARAÇÃO DE CIÊNCIA");
   pdf.paragraph("Eu, _____________________________________________________________");
   pdf.paragraph("portador(a) da CARTEIRA DE IDENTIDADE Nº _____________________________");
-  pdf.paragraph(
+  pdf.checkboxParagraph(
     "Estou ciente da solicitação e uso dos dados pessoais supracitados nesta orientação processual, conforme as leis governamentais, seguindo os preceitos da Lei 13.709/2018 - LGPD.",
   );
   pdf.paragraph(`_________ de __________ de ${new Date().getFullYear()}, FEIRA DE SANTANA - BA`);
