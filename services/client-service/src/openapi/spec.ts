@@ -27,6 +27,23 @@ const reportingGrantParameters = [
   },
 ];
 
+const coringaFilterParameters = [
+  { name: "organization_id", in: "query", schema: { type: "string", format: "uuid" } },
+  { name: "search", in: "query", schema: { type: "string", maxLength: 200 } },
+  { name: "regime", in: "query", schema: { type: "string" } },
+  { name: "dataEntrada", in: "query", schema: { type: "string", format: "date" } },
+  { name: "porte", in: "query", schema: { type: "string" } },
+  { name: "segmento", in: "query", schema: { type: "string" } },
+  { name: "status", in: "query", schema: { type: "string" } },
+  ...["contabil", "fiscal", "pessoal", "tecnologia", "infoproduto", "consultoria", "licitacao"].map(
+    (name) => ({
+      name,
+      in: "query",
+      schema: { type: "boolean" },
+    }),
+  ),
+];
+
 const reportingExtractResponseSchema: OpenApiSchema = {
   type: "object",
   required: ["rows", "reachedLimit"],
@@ -228,6 +245,42 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             "200": {
               description: "Lista paginada de clientes",
               ...successEnvelopeContent(),
+            },
+          },
+        },
+      },
+      "/client/coringa/list": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar clientes na Lista Coringa",
+          description:
+            "Usa o cadastro único por organização. Data Entrada é a criação auditável do cliente; registros antigos sem data retornam null.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            ...coringaFilterParameters,
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": { description: "Lista paginada de clientes", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/client/coringa/pdf": {
+        get: {
+          tags: ["Clients"],
+          summary: "Exportar Lista Coringa filtrada em PDF",
+          description: "Exporta todos os clientes filtrados com as 15 colunas, em fluxo de lotes.",
+          security: [{ bearerAuth: [] }],
+          parameters: coringaFilterParameters,
+          responses: {
+            "200": {
+              description: "PDF da Lista Coringa",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
             },
           },
         },
