@@ -103,6 +103,7 @@ import {
   useUploadRegularizeLicenseProtocolMutation,
 } from "../hooks/useRegularizeOperations";
 import { submitRegularizeLicense } from "../services/regularizeLicenseSubmission";
+import { regularizeService } from "../services/regularizeService";
 import type {
   AddRegularizeGuidanceActivityPayload,
   AddRegularizeGuidancePartnerPayload,
@@ -139,7 +140,11 @@ import type {
   UpdateRegularizeSitePasswordPayload,
 } from "../types";
 import { getRegularizeRequestId } from "../utils/regularizeApiError";
-import { groupRegularizeProcessesByStatus } from "../utils/processBoard";
+import {
+  buildRegularizeProcessStatusUpdatePayload,
+  groupRegularizeProcessesByStatus,
+} from "../utils/processBoard";
+import type { RegularizeProcessStatus } from "../utils/processBoard";
 import {
   formatSiteSphere,
   getRegularizeErrorMessage,
@@ -1464,6 +1469,29 @@ export function RegularizePage() {
     setIsProcessDetailDialogOpen(true);
   }
 
+  async function handleMoveProcessStatus(
+    processId: RegularizeId,
+    status: RegularizeProcessStatus,
+  ): Promise<RegularizeProcessStatus> {
+    if (!canManageRegularizeCore) throw new Error("Sem permissão para alterar processos.");
+    try {
+      const process = await regularizeService.getProcess(processId);
+      const savedProcess = await updateProcessMutation.mutateAsync(
+        buildRegularizeProcessStatusUpdatePayload(process, status),
+      );
+      toast.success("Status do processo atualizado.");
+      return savedProcess.status as RegularizeProcessStatus;
+    } catch (error) {
+      toast.error(
+        getRegularizeMutationErrorMessage(
+          error,
+          "Não foi possível atualizar o status do processo.",
+        ),
+      );
+      throw error;
+    }
+  }
+
   function handleRefreshRegularize() {
     const refreshes: Promise<unknown>[] = [];
 
@@ -2146,6 +2174,8 @@ export function RegularizePage() {
               }
               getClientName={getProcessClientName}
               isLoading={isProcessSearchPending || processBoardQuery.isLoading}
+              canChangeStatus={canManageRegularizeCore}
+              onMoveProcessStatus={handleMoveProcessStatus}
               onOpenProcessDetail={openProcessDetail}
             />
           ) : (
