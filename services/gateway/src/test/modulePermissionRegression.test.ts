@@ -233,6 +233,20 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
   });
 
+  it.each([
+    "/client/coringa/list",
+    "/client/coringa/pdf",
+  ])("aplica a permissão da lista de clientes em %s", (path) => {
+    const listPolicy = requiredRoutePolicy("GET", "/client/list");
+    const policy = requiredRoutePolicy("GET", path);
+    expect(policy).toEqual(listPolicy);
+    for (const module of ["regularize", "pessoal", "integracao"]) {
+      expect(canAccessRoute(authContext({ modules: { [module]: 1 } }), policy)).toBe(true);
+    }
+    expect(canAccessRoute(authContext({ permission: 1, modules: {} }), policy)).toBe(true);
+    expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
+  });
+
   it("permite usuário autenticado consultar relatórios sem política modular do gateway", () => {
     const policy = requiredRoutePolicy("GET", "/reports/catalog");
 
