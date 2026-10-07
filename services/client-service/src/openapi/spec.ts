@@ -360,6 +360,9 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             "403": { description: "Permissão insuficiente" },
             "404": { description: "Grupo ou cliente não encontrado na organização" },
 
+          },
+        },
+      },
       "/client/coringa/list": {
         get: {
           tags: ["Clients"],
@@ -392,7 +395,6 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             "200": {
               description: "PDF da Lista Coringa",
               content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
-            },
             },
           },
         },

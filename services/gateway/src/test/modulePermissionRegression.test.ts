@@ -182,6 +182,8 @@ describe("matriz de regressão das políticas modulares", () => {
     );
   });
 
+  });
+
   it.each([
     ["user", 0, false, false],
     ["user", 1, true, false],
@@ -233,7 +235,6 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
   });
 
-
   it("restringe a gestão de grupos de empresas ao módulo Integração", () => {
     const reader = authContext({ modules: { integracao: 1, comercial: 3 } });
     const editor = authContext({ modules: { integracao: 2 } });
@@ -253,6 +254,7 @@ describe("matriz de regressão das políticas modulares", () => {
       );
       expect(canAccessRoute(otherModule, policy), `outro módulo: ${method} ${path}`).toBe(false);
     }
+  });
 
   it.each([
     "/client/coringa/list",
@@ -266,7 +268,6 @@ describe("matriz de regressão das políticas modulares", () => {
     }
     expect(canAccessRoute(authContext({ permission: 1, modules: {} }), policy)).toBe(true);
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
-
   });
 
   it("permite usuário autenticado consultar relatórios sem política modular do gateway", () => {
@@ -322,6 +323,8 @@ describe("matriz de regressão das políticas modulares", () => {
         clientDetailPolicy,
       ),
     ).toBe(false);
+  });
+
   });
 
   it.each([
@@ -399,6 +402,8 @@ describe("matriz de regressão das políticas modulares", () => {
     }
   });
 
+  });
+
   it.each([
     1, 2, 3,
   ])("permite Integração nível %i consultar a lista sem permission global", (level) => {
@@ -429,6 +434,8 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(false);
   });
 
+  });
+
   it.each([0, 1, 2, 3])("avalia o módulo Integração no nível %i", (level) => {
     const policy = requiredRoutePolicy("GET", "/client/123");
     expect(
@@ -439,6 +446,8 @@ describe("matriz de regressão das políticas modulares", () => {
         policy,
       ),
     ).toBe(level >= 1);
+  });
+
   });
 
   it.each([0, 1, 2, 3])("avalia o módulo Parcelamento no nível %i", (level) => {
@@ -478,6 +487,8 @@ describe("matriz de regressão das políticas modulares", () => {
     for (const [method, path] of mutationRoutes) {
       expect(canAccessRoute(viewer, requiredRoutePolicy(method, path))).toBe(false);
     }
+  });
+
   });
 
   it.each([1, 2, 3])("respeita o limiar modular %i em toda a matriz 0-3", (minPermission) => {
@@ -564,6 +575,8 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ modules: { integracao: 1 } }), policy)).toBe(true);
   });
 
+  });
+
   it.each([
     "/pessoal",
     "/pessoal/unions",
@@ -576,6 +589,8 @@ describe("matriz de regressão das políticas modulares", () => {
     const policy = requiredRoutePolicy("GET", path);
 
     expect(canAccessRoute(authContext({ modules: { pessoal: 1 } }), policy)).toBe(true);
+  });
+
   });
 
   it.each([
