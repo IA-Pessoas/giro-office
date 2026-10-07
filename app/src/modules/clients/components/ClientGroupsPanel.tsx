@@ -4,13 +4,11 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { clientService } from "../services/clientService";
 import type { ClientGroup } from "../types";
 import { useClients } from "../hooks/useClients";
+import { clientTextFieldClassName } from "../form/clientFormControls";
 
 interface ClientGroupsPanelProps {
   canEdit: boolean;
 }
-
-const fieldClassName =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-[var(--colors-brand-gradient-end)] focus:ring-2 focus:ring-[var(--colors-brand-gradient-start)]/20 disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:disabled:bg-slate-800";
 
 export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
   const queryClient = useQueryClient();
@@ -105,7 +103,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
           <label className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             Novo grupo
             <input
-              className={`${fieldClassName} mt-1.5`}
+              className={`${clientTextFieldClassName} mt-1.5`}
               value={newGroupName}
               onChange={(event) => setNewGroupName(event.target.value)}
               maxLength={120}
@@ -124,20 +122,31 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+        <p
+          role="alert"
+          className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+        >
           {error}
         </p>
       ) : null}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.2fr)]">
         <div>
-          <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Grupos cadastrados</h3>
+          <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Grupos cadastrados
+          </h3>
           {groupsQuery.isLoading ? (
-            <p role="status" className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+            <p
+              role="status"
+              className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-slate-950/40 dark:text-slate-400"
+            >
               Carregando grupos…
             </p>
           ) : groupsQuery.error ? (
-            <p role="alert" className="rounded-xl bg-rose-50 px-3 py-4 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+            <p
+              role="alert"
+              className="rounded-xl bg-rose-50 px-3 py-4 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+            >
               Não foi possível carregar os grupos. Tente novamente.
             </p>
           ) : groups.length ? (
@@ -172,7 +181,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                 <label className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   Nome do grupo
                   <input
-                    className={`${fieldClassName} mt-1.5`}
+                    className={`${clientTextFieldClassName} mt-1.5`}
                     value={groupName}
                     onChange={(event) => setGroupName(event.target.value)}
                     maxLength={120}
@@ -183,7 +192,9 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                   <button
                     type="button"
                     onClick={() => void saveGroupName()}
-                    disabled={isSaving || !groupName.trim() || groupName.trim() === selectedGroup.name}
+                    disabled={
+                      isSaving || !groupName.trim() || groupName.trim() === selectedGroup.name
+                    }
                     className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     Salvar nome
@@ -192,12 +203,15 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200" htmlFor="client-group-search">
+                <label
+                  className="block text-sm font-medium text-slate-700 dark:text-slate-200"
+                  htmlFor="client-group-search"
+                >
                   Buscar empresas
                 </label>
                 <input
                   id="client-group-search"
-                  className={`${fieldClassName} mt-1.5`}
+                  className={`${clientTextFieldClassName} mt-1.5`}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Nome, razão social ou documento"
@@ -215,7 +229,11 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                       <li key={client.id}>
                         <button
                           type="button"
-                          onClick={() => setSelectedClientIds((current) => current.filter((id) => id !== client.id))}
+                          onClick={() =>
+                            setSelectedClientIds((current) =>
+                              current.filter((id) => id !== client.id),
+                            )
+                          }
                           disabled={!canEdit || isSaving}
                           className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:cursor-default disabled:opacity-75 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                           aria-label={`Remover ${client.name} do grupo`}
@@ -232,9 +250,13 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                 ) : null}
 
                 {clientsQuery.isLoading ? (
-                  <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Carregando empresas…</p>
+                  <p role="status" className="text-sm text-slate-500 dark:text-slate-400">
+                    Carregando empresas…
+                  </p>
                 ) : clientsQuery.error ? (
-                  <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">Não foi possível carregar as empresas.</p>
+                  <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">
+                    Não foi possível carregar as empresas.
+                  </p>
                 ) : clientsQuery.data?.items.length ? (
                   <ul className="max-h-64 divide-y divide-slate-200 overflow-y-auto rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
                     {clientsQuery.data.items.map((client) => (
@@ -244,9 +266,11 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                             type="checkbox"
                             checked={selectedMemberSet.has(client.id)}
                             onChange={(event) => {
-                              setSelectedClientIds((current) => event.target.checked
-                                ? [...new Set([...current, client.id])]
-                                : current.filter((id) => id !== client.id));
+                              setSelectedClientIds((current) =>
+                                event.target.checked
+                                  ? [...new Set([...current, client.id])]
+                                  : current.filter((id) => id !== client.id),
+                              );
                             }}
                             disabled={!canEdit || isSaving}
                             className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-600 disabled:opacity-60"
@@ -254,7 +278,9 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                           <span className="min-w-0 text-slate-800 dark:text-slate-100">
                             <span className="block truncate font-medium">{client.name}</span>
                             {client.company_name ? (
-                              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{client.company_name}</span>
+                              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                                {client.company_name}
+                              </span>
                             ) : null}
                           </span>
                         </label>
