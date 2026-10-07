@@ -6,6 +6,14 @@ import type { ClientServiceEnv } from "../config/env.js";
 
 type OpenApiSchema = Record<string, unknown>;
 
+const clientAddressOpenApiProperties = {
+  address: { type: ["string", "null"] },
+  cep: { type: ["string", "null"] },
+  neighborhood: { type: ["string", "null"] },
+  state: { type: ["string", "null"] },
+  city: { type: ["string", "null"] },
+};
+
 const reportingGrantParameters = [
   {
     name: "x-request-id",
@@ -346,6 +354,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                     type: { type: "string" },
                     type_registration: { type: "string" },
                     service_unique: { type: "boolean" },
+                    ...clientAddressOpenApiProperties,
                   },
                   example: {
                     organization_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -397,6 +406,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                 schema: {
                   type: "object",
                   additionalProperties: true,
+                  properties: clientAddressOpenApiProperties,
                   example: {
                     name: "Cliente Atualizado",
                     company_name: "ACME LTDA",
@@ -491,6 +501,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                     fantasy_name: { type: ["string", "null"] },
                     type_registration: { type: "string" },
                     service_unique: { type: "boolean" },
+                    ...clientAddressOpenApiProperties,
                   },
                 },
               },
@@ -520,6 +531,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                   type: "object",
                   additionalProperties: true,
                   properties: {
+                    ...clientAddressOpenApiProperties,
                     regime: {
                       type: ["string", "null"],
                       enum: [...TAX_REGIME_OPTIONS, null],

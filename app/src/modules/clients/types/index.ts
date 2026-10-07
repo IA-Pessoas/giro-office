@@ -202,6 +202,11 @@ export interface ClientFormValues {
   status: string;
   regime: ClientTaxRegime | "";
   service_unique: boolean;
+  address: string;
+  cep: string;
+  neighborhood: string;
+  state: string;
+  city: string;
 }
 
 export interface ClientIntegrationFormValuesBase {
@@ -221,6 +226,11 @@ export interface ClientIntegrationFormValuesBase {
   indication: string;
   type_registration: string;
   service_unique: boolean;
+  address: string;
+  cep: string;
+  neighborhood: string;
+  state: string;
+  city: string;
 }
 
 export interface CreateClientIntegrationFormValues extends ClientIntegrationFormValuesBase {
@@ -229,13 +239,7 @@ export interface CreateClientIntegrationFormValues extends ClientIntegrationForm
   meet_type: string;
 }
 
-export interface UpdateClientIntegrationFormValues extends ClientIntegrationFormValuesBase {
-  address: string;
-  cep: string;
-  neighborhood: string;
-  state: string;
-  city: string;
-}
+export type UpdateClientIntegrationFormValues = ClientIntegrationFormValuesBase;
 
 export interface ClientPaRelatedClient {
   company_name: string | null;
@@ -353,6 +357,11 @@ export interface CreateClientPayload {
   fantasy_name?: string | null;
   regime?: ClientTaxRegime | null;
   service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }
 
 export interface CreateClientIntegrationPayload {
@@ -376,6 +385,11 @@ export interface CreateClientIntegrationPayload {
   meet_type?: string | null;
   type_registration?: string | null;
   service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }
 
 export interface UpdateClientData {
@@ -390,6 +404,11 @@ export interface UpdateClientPayload {
   fantasy_name?: string | null;
   regime?: ClientTaxRegime | null;
   service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }
 
 export interface UpdateClientIntegrationPayload {

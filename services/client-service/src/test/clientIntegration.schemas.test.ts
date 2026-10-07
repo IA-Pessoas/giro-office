@@ -55,3 +55,32 @@ describe("integration tax regime contract", () => {
     expect(updateIntegrationBodySchema.safeParse({ regime: null }).success).toBe(true);
   });
 });
+
+describe("integration client address contract", () => {
+  const address = {
+    address: "Rua A, 10",
+    cep: "01001-000",
+    neighborhood: "Centro",
+    state: "SP",
+    city: "São Paulo",
+  };
+
+  it("accepts optional address fields for create and edit", () => {
+    expect(createIntegrationBodySchema.safeParse({ ...createBody, ...address }).success).toBe(true);
+    expect(updateIntegrationBodySchema.safeParse(address).success).toBe(true);
+  });
+
+  it("accepts unset address values without introducing required fields", () => {
+    expect(createIntegrationBodySchema.safeParse(createBody).success).toBe(true);
+    expect(
+      createIntegrationBodySchema.safeParse({
+        ...createBody,
+        address: null,
+        cep: null,
+        neighborhood: null,
+        state: null,
+        city: null,
+      }).success,
+    ).toBe(true);
+  });
+});

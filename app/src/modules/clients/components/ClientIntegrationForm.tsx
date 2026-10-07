@@ -11,6 +11,7 @@ import {
 
 import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
+import { ClientAddressFields } from "../form/ClientAddressFields";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type {
   CreateClientIntegrationFormValues,
@@ -76,7 +77,6 @@ export function ClientIntegrationForm({
     ?.response?.data?.error;
   const isCreate = mode === "create" && isCreateValues(values);
   const createValues = isCreate ? values : null;
-  const editValues = !isCreate ? (values as UpdateClientIntegrationFormValues) : null;
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
     const formatDocument = values.type === "PJ" ? formatCnpjInput : formatCpfInput;
 
@@ -378,64 +378,12 @@ export function ClientIntegrationForm({
           </>
         ) : null}
 
-        {editValues ? (
-          <>
-            <label className="space-y-1.5 md:col-span-2 xl:col-span-2">
-              <span className={labelClassName}>Endereço</span>
-              <input
-                name="address"
-                value={editValues.address}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className={labelClassName}>CEP</span>
-              <input
-                name="cep"
-                value={editValues.cep}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className={labelClassName}>Bairro</span>
-              <input
-                name="neighborhood"
-                value={editValues.neighborhood}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className={labelClassName}>Estado</span>
-              <input
-                name="state"
-                value={editValues.state}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className={labelClassName}>Cidade</span>
-              <input
-                name="city"
-                value={editValues.city}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-          </>
-        ) : null}
+        <ClientAddressFields
+          values={values}
+          disabled={disabled}
+          onChange={onChange}
+          addressFieldClassName="space-y-1.5 md:col-span-2 xl:col-span-2"
+        />
 
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 md:col-span-2 xl:col-span-3 dark:border-slate-700 dark:bg-slate-950/40">
           <input

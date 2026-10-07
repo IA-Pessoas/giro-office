@@ -44,6 +44,11 @@ export function createClientFormInitialValues(client?: Partial<Client>): ClientF
     status: client?.status ? mapClientStatusFromApi(client.status) : "Ativo",
     regime: getClientTaxRegime(client?.regime),
     service_unique: client?.service_unique ?? false,
+    address: client?.address ?? "",
+    cep: client?.cep ?? "",
+    neighborhood: client?.neighborhood ?? "",
+    state: client?.state ?? "",
+    city: client?.city ?? "",
   };
 }
 
@@ -76,7 +81,16 @@ export function buildCreateClientPayload(
     status: mapClientStatusToApi(values.status),
     regime: normalizeTaxRegime(values.regime),
     service_unique: values.service_unique,
+    address: normalizeOptionalAddress(values.address),
+    cep: normalizeOptionalAddress(values.cep),
+    neighborhood: normalizeOptionalAddress(values.neighborhood),
+    state: normalizeOptionalAddress(values.state),
+    city: normalizeOptionalAddress(values.city),
   };
+}
+
+function normalizeOptionalAddress(value: string): string | null {
+  return value.trim() || null;
 }
 
 export function buildUpdateClientPayload(
@@ -94,5 +108,10 @@ export function buildUpdateClientPayload(
     status: mapClientStatusToApi(values.status),
     ...(preservesLegacyRegime ? {} : { regime }),
     service_unique: values.service_unique,
+    address: normalizeOptionalAddress(values.address),
+    cep: normalizeOptionalAddress(values.cep),
+    neighborhood: normalizeOptionalAddress(values.neighborhood),
+    state: normalizeOptionalAddress(values.state),
+    city: normalizeOptionalAddress(values.city),
   };
 }

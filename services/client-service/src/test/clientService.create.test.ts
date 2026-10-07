@@ -94,6 +94,34 @@ describe("ClientService.create", () => {
     );
   });
 
+  it("persists optional client address fields while preserving contact and identity", async () => {
+    const prisma = createPrismaMock();
+    const service = new ClientService(prisma);
+    const contact = {
+      number: "11999999999",
+      email: "contato@acme.com",
+      address: "Rua A, 10",
+      cep: "01001-000",
+      neighborhood: "Centro",
+      state: "SP",
+      city: "São Paulo",
+    };
+
+    await service.create(
+      { ...input, cpf_cnpj: "12.345.678/0001-95", ...contact },
+      { userId: "user-1", level: 2, isOwner: false },
+    );
+
+    expect(prisma.client.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cpf_cnpj: "12345678000195",
+          ...contact,
+        }),
+      }),
+    );
+  });
+
   it.each([0, 1] as const)("rejeita regime no nível de Integração %s", async (level) => {
     const prisma = createPrismaMock();
     const service = new ClientService(prisma);
