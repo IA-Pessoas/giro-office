@@ -1706,6 +1706,7 @@ const baseManifest = [
     action: "clientCoringaPdf",
     target: "gateway",
     auth: "bearer",
+    expectEnvelope: false,
   }),
   op({
     service: "client-service",
