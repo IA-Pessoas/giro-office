@@ -38,6 +38,9 @@ describe("GET /regularize/guidance/pdf", () => {
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toMatch(/^application\/pdf/);
     expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.headers["content-disposition"]).toContain(
+      "filename*=UTF-8''orienta%C3%A7%C3%A3o-processual-",
+    );
     expect(response.body.subarray(0, 5).toString()).toBe("%PDF-");
     expect(findFirst).toHaveBeenCalledWith(
       expect.objectContaining({

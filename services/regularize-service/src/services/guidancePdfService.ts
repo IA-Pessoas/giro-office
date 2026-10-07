@@ -312,7 +312,7 @@ export async function renderGuidancePdf(guidance: Guidance): Promise<Buffer> {
 
   const pdf = new GuidancePdfLayout(first(company, snapshot.name));
   pdf.section("SOLICITAÇÃO");
-  const isAlteration = key(request).includes("ALTERACAO CONTRATUAL");
+  const isAlteration = key(request).includes(key("ALTERAÇÃO CONTRATUAL"));
   if (isAlteration) {
     const changes = request.replace(/^.*?ALTERA(?:Ç|C)[ÃA]O CONTRATUAL\s*-?/iu, "").trim();
     pdf.paragraph("ALTERAÇÕES REALIZADAS:");
