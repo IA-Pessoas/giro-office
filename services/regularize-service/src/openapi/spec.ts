@@ -1080,6 +1080,23 @@ export function buildRegularizeServiceOpenApiSpec(
           },
         },
       },
+      "/regularize/guidance/pdf": {
+        get: {
+          tags: ["Guidance"],
+          summary: "Visualizar PDF da orientação processual selecionada",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "PDF da orientação processual",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+            ...guidanceErrorResponses(),
+          },
+        },
+      },
       "/regularize/guidance/list": {
         get: {
           tags: ["Guidance"],
