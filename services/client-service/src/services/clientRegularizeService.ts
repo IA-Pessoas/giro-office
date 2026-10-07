@@ -138,6 +138,10 @@ export async function updateRegularizeClient(
     data.segment = input.segment;
   }
 
+  if (input.coringa_status !== undefined) data.coringa_status = input.coringa_status;
+  if (input.tecnologia !== undefined) data.tecnologia = input.tecnologia;
+  if (input.licitacao !== undefined) data.licitacao = input.licitacao;
+
   if (input.contabil !== undefined) {
     data.contabil = input.contabil;
   }
@@ -197,6 +201,9 @@ export async function updateRegularizeClient(
     regime: true,
     size: true,
     segment: true,
+    coringa_status: true,
+    tecnologia: true,
+    licitacao: true,
     contabil: true,
     fiscal: true,
     pessoal: true,

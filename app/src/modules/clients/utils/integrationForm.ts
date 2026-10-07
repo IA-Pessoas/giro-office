@@ -132,6 +132,11 @@ export function createClientIntegrationInitialValues(): CreateClientIntegrationF
     meet_type: "",
     type_registration: "Existente",
     service_unique: false,
+    address: "",
+    cep: "",
+    neighborhood: "",
+    state: "",
+    city: "",
   };
 }
 
@@ -193,6 +198,11 @@ export function buildCreateClientIntegrationPayload(
     meet_type: normalizeNullableTextValue(values.meet_type),
     type_registration: normalizeNullableTextValue(values.type_registration),
     service_unique: values.service_unique,
+    address: normalizeNullableTextValue(values.address),
+    cep: normalizeNullableTextValue(values.cep),
+    neighborhood: normalizeNullableTextValue(values.neighborhood),
+    state: normalizeNullableTextValue(values.state),
+    city: normalizeNullableTextValue(values.city),
   };
 }
 

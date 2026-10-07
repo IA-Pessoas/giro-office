@@ -107,6 +107,7 @@ export function Clients() {
         </div>
 
         <div className="flex flex-wrap justify-end gap-3">
+          <Link href="/clients/coringa" className="inline-flex w-fit items-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Lista Coringa</Link>
           {canCreateClient ? (
             <>
               <Link

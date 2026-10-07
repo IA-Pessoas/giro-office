@@ -31,6 +31,9 @@ export interface Client {
   regime: string | null;
   size: string;
   segment: string;
+  coringa_status?: string | null;
+  tecnologia?: boolean | null;
+  licitacao?: boolean | null;
   contabil: boolean;
   fiscal: boolean;
   pessoal: boolean;
@@ -116,6 +119,52 @@ export interface ClientListPage {
   hasMore: boolean;
 }
 
+export interface ClientCoringaRow {
+  id: string;
+  dominio_code: string | null;
+  name: string;
+  company_name: string | null;
+  cpf_cnpj: string;
+  regime: string | null;
+  created_at: string | null;
+  size: string | null;
+  segment: string | null;
+  coringa_status: string | null;
+  contabil: boolean | null;
+  fiscal: boolean | null;
+  pessoal: boolean | null;
+  tecnologia: boolean | null;
+  infoproduto: boolean | null;
+  consultoria: boolean | null;
+  licitacao: boolean | null;
+}
+
+export interface ClientCoringaFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  regime?: string;
+  dataEntrada?: string;
+  porte?: string;
+  segmento?: string;
+  status?: string;
+  contabil?: boolean;
+  fiscal?: boolean;
+  pessoal?: boolean;
+  tecnologia?: boolean;
+  infoproduto?: boolean;
+  consultoria?: boolean;
+  licitacao?: boolean;
+}
+
+export interface ClientCoringaPage {
+  items: ClientCoringaRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
 export interface ClientInstagramProfile {
   id: string;
   name: string;
@@ -169,6 +218,11 @@ export interface ClientFormValues {
   status: string;
   regime: ClientTaxRegime | "";
   service_unique: boolean;
+  address: string;
+  cep: string;
+  neighborhood: string;
+  state: string;
+  city: string;
 }
 
 export interface ClientIntegrationFormValuesBase {
@@ -188,6 +242,11 @@ export interface ClientIntegrationFormValuesBase {
   indication: string;
   type_registration: string;
   service_unique: boolean;
+  address: string;
+  cep: string;
+  neighborhood: string;
+  state: string;
+  city: string;
 }
 
 export interface CreateClientIntegrationFormValues extends ClientIntegrationFormValuesBase {
@@ -196,13 +255,7 @@ export interface CreateClientIntegrationFormValues extends ClientIntegrationForm
   meet_type: string;
 }
 
-export interface UpdateClientIntegrationFormValues extends ClientIntegrationFormValuesBase {
-  address: string;
-  cep: string;
-  neighborhood: string;
-  state: string;
-  city: string;
-}
+export type UpdateClientIntegrationFormValues = ClientIntegrationFormValuesBase;
 
 export interface ClientPaRelatedClient {
   company_name: string | null;
@@ -320,6 +373,11 @@ export interface CreateClientPayload {
   fantasy_name?: string | null;
   regime?: ClientTaxRegime | null;
   service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }
 
 export interface CreateClientIntegrationPayload {
@@ -343,6 +401,11 @@ export interface CreateClientIntegrationPayload {
   meet_type?: string | null;
   type_registration?: string | null;
   service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }
 
 export interface UpdateClientData {
@@ -357,6 +420,11 @@ export interface UpdateClientPayload {
   fantasy_name?: string | null;
   regime?: ClientTaxRegime | null;
   service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }
 
 export interface UpdateClientIntegrationPayload {
@@ -412,6 +480,9 @@ export interface UpdateClientRegularizePayload {
   regime?: string | null;
   size?: string | null;
   segment?: string | null;
+  coringa_status?: string | null;
+  tecnologia?: boolean | null;
+  licitacao?: boolean | null;
   contabil?: boolean;
   fiscal?: boolean;
   pessoal?: boolean;
@@ -458,6 +529,9 @@ export interface ClientRegularizeFormValues {
   regime: string;
   size: string;
   segment: string;
+  coringa_status: string;
+  tecnologia: "" | "true" | "false";
+  licitacao: "" | "true" | "false";
   contabil: boolean;
   fiscal: boolean;
   pessoal: boolean;

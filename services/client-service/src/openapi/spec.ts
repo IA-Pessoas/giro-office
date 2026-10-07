@@ -6,6 +6,14 @@ import type { ClientServiceEnv } from "../config/env.js";
 
 type OpenApiSchema = Record<string, unknown>;
 
+const clientAddressOpenApiProperties = {
+  address: { type: ["string", "null"] },
+  cep: { type: ["string", "null"] },
+  neighborhood: { type: ["string", "null"] },
+  state: { type: ["string", "null"] },
+  city: { type: ["string", "null"] },
+};
+
 const reportingGrantParameters = [
   {
     name: "x-request-id",
@@ -25,6 +33,23 @@ const reportingGrantParameters = [
     required: true,
     schema: { type: "string" },
   },
+];
+
+const coringaFilterParameters = [
+  { name: "organization_id", in: "query", schema: { type: "string", format: "uuid" } },
+  { name: "search", in: "query", schema: { type: "string", maxLength: 200 } },
+  { name: "regime", in: "query", schema: { type: "string" } },
+  { name: "dataEntrada", in: "query", schema: { type: "string", format: "date" } },
+  { name: "porte", in: "query", schema: { type: "string" } },
+  { name: "segmento", in: "query", schema: { type: "string" } },
+  { name: "status", in: "query", schema: { type: "string" } },
+  ...["contabil", "fiscal", "pessoal", "tecnologia", "infoproduto", "consultoria", "licitacao"].map(
+    (name) => ({
+      name,
+      in: "query",
+      schema: { type: "boolean" },
+    }),
+  ),
 ];
 
 const reportingExtractResponseSchema: OpenApiSchema = {
@@ -232,6 +257,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+
       "/client/groups": {
         get: {
           tags: ["Clients"],
@@ -333,6 +359,41 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             "401": { description: "Não autenticado" },
             "403": { description: "Permissão insuficiente" },
             "404": { description: "Grupo ou cliente não encontrado na organização" },
+
+      "/client/coringa/list": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar clientes na Lista Coringa",
+          description:
+            "Usa o cadastro único por organização. Data Entrada é a criação auditável do cliente; registros antigos sem data retornam null.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            ...coringaFilterParameters,
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": { description: "Lista paginada de clientes", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/client/coringa/pdf": {
+        get: {
+          tags: ["Clients"],
+          summary: "Exportar Lista Coringa filtrada em PDF",
+          description: "Exporta todos os clientes filtrados com as 15 colunas, em fluxo de lotes.",
+          security: [{ bearerAuth: [] }],
+          parameters: coringaFilterParameters,
+          responses: {
+            "200": {
+              description: "PDF da Lista Coringa",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+            },
           },
         },
       },
@@ -397,6 +458,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                     type: { type: "string" },
                     type_registration: { type: "string" },
                     service_unique: { type: "boolean" },
+                    ...clientAddressOpenApiProperties,
                   },
                   example: {
                     organization_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -448,6 +510,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                 schema: {
                   type: "object",
                   additionalProperties: true,
+                  properties: clientAddressOpenApiProperties,
                   example: {
                     name: "Cliente Atualizado",
                     company_name: "ACME LTDA",
@@ -542,6 +605,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                     fantasy_name: { type: ["string", "null"] },
                     type_registration: { type: "string" },
                     service_unique: { type: "boolean" },
+                    ...clientAddressOpenApiProperties,
                   },
                 },
               },
@@ -571,6 +635,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                   type: "object",
                   additionalProperties: true,
                   properties: {
+                    ...clientAddressOpenApiProperties,
                     regime: {
                       type: ["string", "null"],
                       enum: [...TAX_REGIME_OPTIONS, null],

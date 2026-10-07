@@ -33,10 +33,10 @@ overrides:
   postcss: 8.5.26
   socket.io-parser: 4.2.7
   body-parser: 1.20.6
+  uuid: 11.1.1
   source-map-js: 1.2.2
   proxy-addr: 2.0.8
-  fast-copy: 4.1.0
-  uuid: 11.1.1
+  fast-copy: 4.1.2
   sharp: 0.35.5
   '@grpc/grpc-js': 1.14.5
   engine.io: 6.6.10
@@ -381,6 +381,9 @@ importers:
       multer:
         specifier: ^2.3.0
         version: 2.4.0
+      pdfkit:
+        specifier: 0.19.1
+        version: 0.19.1
       pg:
         specifier: ^8.13.0
         version: 8.20.0
@@ -409,6 +412,9 @@ importers:
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.2
+      '@types/pdfkit':
+        specifier: 0.17.6
+        version: 0.17.6
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
@@ -1079,6 +1085,9 @@ importers:
       pg:
         specifier: ^8.13.0
         version: 8.20.0
+      pdfkit:
+        specifier: 0.19.1
+        version: 0.19.1
       prisma:
         specifier: 7.9.1
         version: 7.9.1(@types/node@25.5.2)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.3.3)
@@ -1095,6 +1104,9 @@ importers:
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.2
+      '@types/pdfkit':
+        specifier: 0.17.6
+        version: 0.17.6
       '@types/supertest':
         specifier: ^7.0.0
         version: 7.2.0
@@ -5562,8 +5574,8 @@ packages:
     resolution: {integrity: sha512-h5+1OzzfCC3Ef7VbtKdcv7zsstUQwUDlYpUTvjeUsJAssPgLn7QzbboPtL5ro04Mq0rPOsMzl7q5hIbRs2wD1A==}
     engines: {node: '>=8.0.0'}
 
-  fast-copy@4.1.0:
-    resolution: {integrity: sha512-f5oNUvGAmBPLP85im9czQ7fVWh3RfcIIIzyXrcXKmCiWoDn+CRmfsoQN3jmE5J+UEquj4Ugc1woTaxD0oa37Gg==}
+  fast-copy@4.1.2:
+    resolution: {integrity: sha512-DUHggaYcouhy5I1LacDJ+JDSqGlumVJP2EAi5Nwt1pWPeLpSvIjkrY+x4fsoI1/+GlTyq+DM9zdgWCFSfqNODA==}
 
   fast-csv@4.3.6:
     resolution: {integrity: sha512-2RNSpuwwsJGP0frGsOmTb9oUF+VkFSM4SyLTDgwf2ciHWTarN0lQTC+F2f/t5J9QjW+c65VFIAAu85GsvMIusw==}
@@ -11211,7 +11223,7 @@ snapshots:
     dependencies:
       pure-rand: 6.1.0
 
-  fast-copy@4.1.0: {}
+  fast-copy@4.1.2: {}
 
   fast-csv@4.3.6:
     dependencies:
@@ -12325,7 +12337,7 @@ snapshots:
     dependencies:
       colorette: 2.0.20
       dateformat: 4.6.3
-      fast-copy: 4.1.0
+      fast-copy: 4.1.2
       fast-safe-stringify: 2.1.1
       help-me: 5.0.0
       joycon: 3.1.1

@@ -51,11 +51,32 @@ Exemplos de paths publicos:
 - `/regularize/process`
 - `/regularize/processes`
 - `/regularize/guidance`
+- `/regularize/guidance/pdf?id=<uuid>` - PDF da orientação selecionada, com leitura restrita à organização autenticada
 - `/regularize/license`
 - `/regularize/license/:id/protocol` - substitui o arquivo vigente ou gera acesso assinado temporario
 - `/regularize/licenses`
 
 Infraestrutura direto no servico: `GET /health` e, quando habilitado, `GET /docs`.
+
+## PDF de orientação processual
+
+Referência: `workspace/regularize/pages/processos/orientacao.php`, ramo `?print=<id>` do
+Workspace antigo, e `workspace/assets/css/style-regularize.css` (cor `#cf6363`, cabeçalho
+e seções com bordas vermelhas). O ramo `?print2` é o checklist separado e não integra
+este documento. O padrão usa o logo Regularize, sem seleção de timbrado da Central de
+Relatórios.
+
+Os dados vêm somente da orientação consultada por `id` e `organization_id`. Solicitação,
+observação, dados da empresa, atividades, objeto social e sócios correspondem aos campos
+homônimos de `ProceduralGuidance`; dados de `target_snapshot` da mesma orientação são usados
+quando o campo principal está ausente. A filial usa `branch_data` (`name`, `document`,
+`address`, `city`, `state`). O contrato atual não registra IPTU, atividades ou objeto social
+da filial: esses rótulos permanecem vazios no PDF. Também não há equivalente separado para
+o campo legado `orientaoes_filiais.atividades`. Campos opcionais ausentes não recebem
+valores fictícios. A seção “Não alterado” deriva apenas dos tópicos ausentes da solicitação
+de alteração contratual, como no impresso legado.
+O endpoint impede cache do PDF e retorna 422 quando a orientação supera 32 KiB de dados,
+50 sócios ou 100 atividades; não corta o conteúdo para caber no documento.
 
 ## Rotas internas
 

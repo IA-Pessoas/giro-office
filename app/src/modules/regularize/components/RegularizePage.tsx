@@ -7,6 +7,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardList,
+  Download,
   Eye,
   FileKey2,
   Landmark,
@@ -330,6 +331,40 @@ function getGuidanceDescription(item: RegularizeGuidance): string {
   return formatText(
     item.description ?? item.framework_obs ?? item.comporate_purpose,
     "Sem descrição.",
+  );
+}
+
+function GuidancePdfButton({ id }: { id: RegularizeId }) {
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  async function download() {
+    setIsGenerating(true);
+    try {
+      const blob = await regularizeService.downloadGuidancePdf(id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `orientacao-processual-${id}.pdf`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast.error(
+        getRegularizeMutationErrorMessage(error, "Não foi possível gerar o PDF desta orientação."),
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  return (
+    <TableActionButton
+      icon={isGenerating ? Loader2 : Download}
+      title={isGenerating ? "Gerando PDF" : "Baixar PDF da orientação"}
+      disabled={isGenerating}
+      onClick={() => void download()}
+    />
   );
 }
 
@@ -761,13 +796,16 @@ function IndependentGuidanceSection({
                     <p className="font-medium">{getGuidanceTitle(item)}</p>
                     <p className="text-sm text-gray-500">{getGuidanceDescription(item)}</p>
                   </div>
-                  <TableActionButton
-                    icon={canManageRegularizeCore ? Pencil : Eye}
-                    title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
-                    onClick={() =>
-                      onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
-                    }
-                  />
+                  <div className="flex items-center gap-1">
+                    <GuidancePdfButton id={item.id} />
+                    <TableActionButton
+                      icon={canManageRegularizeCore ? Pencil : Eye}
+                      title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
+                      onClick={() =>
+                        onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                      }
+                    />
+                  </div>
                 </div>
                 <FieldLine
                   label="Alvo"
@@ -954,13 +992,16 @@ function ProcessDetailContent({
                         {getGuidanceDescription(item)}
                       </p>
                     </div>
-                    <TableActionButton
-                      icon={canManageRegularizeCore ? Pencil : Eye}
-                      title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
-                      onClick={() =>
-                        onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
-                      }
-                    />
+                    <div className="flex items-center gap-1">
+                      <GuidancePdfButton id={item.id} />
+                      <TableActionButton
+                        icon={canManageRegularizeCore ? Pencil : Eye}
+                        title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
+                        onClick={() =>
+                          onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                        }
+                      />
+                    </div>
                   </div>
 
                   {canManageRegularizeCore ? (

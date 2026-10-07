@@ -78,6 +78,13 @@ const items = [
     fields: [field("name", "Nome"), field("email", "E-mail")],
   },
   {
+    key: "integracao.tasks",
+    label: "Tarefas de Integração",
+    module: "integracao",
+    department_label: "Integração",
+    fields: [field("department", "Departamento")],
+  },
+  {
     key: "fiscal.tax",
     label: "Tributos",
     module: "fiscal",
@@ -319,16 +326,26 @@ async function run() {
             blocks: payload.definition.areas.map((area, index) => ({
               source: area.source,
               label: items.find((item) => item.key === area.source).label,
-              rows: index
-                ? []
-                : [{ name: area.filters?.[0]?.value ?? "Projeto de exemplo", name_count: 7 }],
+              rows: area.source === "integracao.tasks"
+                ? [
+                    { department: "Fiscal", department_count: 2 },
+                    { department: "Pessoal", department_count: 1 },
+                  ]
+                : index
+                  ? []
+                  : [{ name: area.filters?.[0]?.value ?? "Projeto de exemplo", name_count: 7 }],
               presentation: {
-                columns: [
-                  { key: index ? "email" : "name", label: index ? "E-mail" : "Nome" },
-                  ...(!index && area.aggregations?.length
-                    ? [{ key: "name_count", label: "Contagem de Nome" }]
-                    : []),
-                ],
+                columns: area.source === "integracao.tasks"
+                  ? [
+                      { key: "department", label: "Departamento" },
+                      { key: "department_count", label: "Contagem de Departamento" },
+                    ]
+                  : [
+                      { key: index ? "email" : "name", label: index ? "E-mail" : "Nome" },
+                      ...(!index && area.aggregations?.length
+                        ? [{ key: "name_count", label: "Contagem de Nome" }]
+                        : []),
+                    ],
               },
               limit: 100,
               hasMore: false,
@@ -394,6 +411,35 @@ async function run() {
   try {
     await page.goto("/relatorios", { waitUntil: "domcontentloaded" });
     const panel = page.getByRole("tabpanel");
+    await panel.getByRole("button", { name: "Quantidade de tarefas por departamento" }).click();
+    await expect(panel.getByRole("group", { name: "Campos de Tarefas de Integração" })
+      .getByRole("checkbox", { name: "Departamento" })).toBeChecked();
+    await panel.getByRole("button", { name: "3. Definir critérios" }).click();
+    await panel.getByText("Mais opções").click();
+    await expect(panel.getByRole("group", { name: "Agrupamento" })
+      .getByRole("checkbox", { name: "Departamento" })).toBeChecked();
+    await expect(panel.getByLabel("Resumo de Departamento")).toHaveValue("count");
+    await screenshot("00-tarefas-por-departamento");
+    await panel.getByRole("button", { name: "4. Revisar relatório" }).click();
+    assert.deepEqual(definitions[0], {
+      version: 2,
+      areas: [{
+        source: "integracao.tasks",
+        fields: ["department"],
+        groupBy: ["department"],
+        aggregations: [{ field: "department", function: "count" }],
+        filters: [],
+      }],
+    });
+    await panel.getByRole("button", { name: "Visualizar prévia" }).click();
+    const taskResults = panel.getByRole("region", { name: "Dados de Tarefas de Integração" });
+    await expect(taskResults).toContainText("Fiscal");
+    await expect(taskResults).toContainText("Pessoal");
+    await expect(taskResults.getByRole("row")).toHaveCount(3);
+    await screenshot("00-tarefas-por-departamento-resultado");
+    definitions.length = 0;
+    previews.length = 0;
+    await page.reload({ waitUntil: "domcontentloaded" });
     await expect(panel.getByRole("button", { name: "Ficha completa", exact: true })).toBeVisible();
     await panel.getByRole("button", { name: "Ficha completa", exact: true }).click();
     await expect(
@@ -410,7 +456,7 @@ async function run() {
     await expect(panel.getByText("2 áreas selecionadas", { exact: true })).toBeVisible();
     await expect(
       panel.getByRole("group", { name: "Integração", exact: true }).getByRole("checkbox"),
-    ).toHaveCount(2);
+    ).toHaveCount(3);
     await expect(
       panel.getByRole("group", { name: "Fiscal", exact: true }).getByRole("checkbox"),
     ).toHaveCount(1);

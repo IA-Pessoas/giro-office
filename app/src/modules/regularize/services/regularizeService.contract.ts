@@ -30,6 +30,7 @@ export const REGULARIZE_ENDPOINTS = {
   returnFromFiscal: "/regularize/process/return-from-fiscal",
   guidanceList: "/regularize/guidance/list",
   guidanceDetail: "/regularize/guidance/detail",
+  guidancePdf: "/regularize/guidance/pdf",
   guidance: "/regularize/guidance",
   guidanceActivityAdd: "/regularize/guidance/activity/add",
   guidanceActivityRemove: "/regularize/guidance/activity/remove",

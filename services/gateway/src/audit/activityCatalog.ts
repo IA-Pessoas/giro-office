@@ -55,6 +55,7 @@ const TECHNICAL_RULES = [
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
     methods: ["GET"],
+
     pattern: /^\/client\/groups$/,
     description: { action: "consultou", item: "a lista de grupos de empresas" },
   },
@@ -72,6 +73,15 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["PUT"],
     pattern: /^\/client\/groups\/[^/]+\/clients$/,
     description: { action: "atualizou", item: "as empresas de um grupo" },
+
+    pattern: /^\/client\/coringa\/list$/,
+    description: { action: "consultou", item: "a Lista Coringa de clientes" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/coringa\/pdf$/,
+    description: { action: "exportou", item: "a Lista Coringa de clientes em PDF" },
+
   },
   {
     methods: ["GET"],
@@ -926,6 +936,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/regularize\/guidance\/detail$/,
     description: { action: "consultou", item: "os detalhes de uma orientação de regularização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/guidance\/pdf$/,
+    description: { action: "visualizou", item: "o PDF de uma orientação processual" },
   },
   {
     methods: ["GET"],

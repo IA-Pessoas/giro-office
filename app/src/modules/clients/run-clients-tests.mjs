@@ -158,6 +158,90 @@ runTest("new client form sends Ativo when status remains unchanged", () => {
   assert.equal(buildCreateClientPayload(values, "organization-1").status, "Ativo");
 });
 
+runTest("common client creation sends optional address and preserves client identity", () => {
+  const values = {
+    ...createClientFormInitialValues(),
+    name: "Acme",
+    cpf_cnpj: "12.345.678/0001-90",
+    address: " Rua A, 10 ",
+    cep: "01001-000",
+    neighborhood: "Centro",
+    state: "SP",
+    city: "São Paulo",
+  };
+  assert.deepEqual(
+    (({ address, cep, neighborhood, state, city, cpf_cnpj }) => ({
+      address, cep, neighborhood, state, city, cpf_cnpj,
+    }))(buildCreateClientPayload(values, "organization-1")),
+    {
+      address: "Rua A, 10",
+      cep: "01001-000",
+      neighborhood: "Centro",
+      state: "SP",
+      city: "São Paulo",
+      cpf_cnpj: "12345678000190",
+    },
+  );
+});
+
+runTest("common client edit hydration retains the saved address", () => {
+  const values = createClientFormInitialValues({
+    address: "Rua A, 10",
+    cep: "01001-000",
+    neighborhood: "Centro",
+    state: "SP",
+    city: "São Paulo",
+  });
+
+  assert.deepEqual(
+    (({ address, cep, neighborhood, state, city }) => ({
+      address,
+      cep,
+      neighborhood,
+      state,
+      city,
+    }))(values),
+    {
+      address: "Rua A, 10",
+      cep: "01001-000",
+      neighborhood: "Centro",
+      state: "SP",
+      city: "São Paulo",
+    },
+  );
+});
+
+runTest("common client update sends optional address without changing identity or contact fields", () => {
+  const values = {
+    ...createClientFormInitialValues(),
+    name: "Acme",
+    cpf_cnpj: "12.345.678/0001-90",
+    address: " Rua B, 20 ",
+    cep: "02002-000",
+    neighborhood: "Bairro",
+    state: "RJ",
+    city: "Rio de Janeiro",
+  };
+  const payload = buildUpdateClientPayload(values);
+
+  assert.deepEqual(
+    (({ address, cep, neighborhood, state, city, name, cpf_cnpj }) => ({
+      address, cep, neighborhood, state, city, name, cpf_cnpj,
+    }))(payload),
+    {
+      address: "Rua B, 20",
+      cep: "02002-000",
+      neighborhood: "Bairro",
+      state: "RJ",
+      city: "Rio de Janeiro",
+      name: "Acme",
+      cpf_cnpj: "12345678000190",
+    },
+  );
+  assert.equal("number" in payload, false);
+  assert.equal("email" in payload, false);
+});
+
 runTest("PJ client payloads derive the required API name while PF keeps its entered name", () => {
   const pjValues = {
     ...createClientFormInitialValues(),
@@ -233,6 +317,20 @@ runTest("integration form keeps tax regime separate from registration type", () 
   const form = readFileSync("src/modules/clients/components/ClientIntegrationForm.tsx", "utf8");
   assert.match(form, /Tipo de Registro[\s\S]*?name="type_registration"/);
   assert.match(form, /Regime tributário[\s\S]*?name="regime"[\s\S]*?CLIENT_TAX_REGIME_OPTIONS/);
+});
+
+runTest("client creation forms expose optional address fields", () => {
+  const clientForm = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+  const integrationForm = readFileSync(
+    "src/modules/clients/components/ClientIntegrationForm.tsx",
+    "utf8",
+  );
+  const addressFields = readFileSync("src/modules/clients/form/ClientAddressFields.tsx", "utf8");
+  assert.match(clientForm, /<ClientAddressFields/);
+  assert.match(integrationForm, /<ClientAddressFields/);
+  for (const field of ["address", "cep", "neighborhood", "state", "city"]) {
+    assert.match(addressFields, new RegExp(`name="${field}"`));
+  }
 });
 
 runTest("PJ client forms hide manual name while PF forms retain it", () => {
@@ -434,6 +532,36 @@ runTest("integration create payload sends a canonical phone", () => {
       "organization-1",
     ).number,
     "11999999999",
+  );
+});
+
+runTest("integration create payload sends optional address without changing contact and identity", () => {
+  const values = {
+    ...createClientIntegrationInitialValues(),
+    name: "Acme",
+    cpf_cnpj: "12.345.678/0001-90",
+    number: "(11) 99999-9999",
+    email: "contato@acme.com",
+    address: " Rua A, 10 ",
+    cep: "01001-000",
+    neighborhood: " Centro ",
+    state: "SP",
+    city: "São Paulo",
+  };
+  assert.deepEqual(
+    (({ address, cep, neighborhood, state, city, number, email, cpf_cnpj }) => ({
+      address, cep, neighborhood, state, city, number, email, cpf_cnpj,
+    }))(buildCreateClientIntegrationPayload(values, "organization-1")),
+    {
+      address: "Rua A, 10",
+      cep: "01001-000",
+      neighborhood: "Centro",
+      state: "SP",
+      city: "São Paulo",
+      number: "11999999999",
+      email: "contato@acme.com",
+      cpf_cnpj: "12345678000190",
+    },
   );
 });
 
@@ -726,6 +854,20 @@ runTest("regularize payload normalizes documents, nullable text, and dates", () 
     customer_since: "2026-04-02",
   });
   assert.equal(hasRegularizeChanges(values, client), true);
+});
+
+runTest("regularize preserves unknown Coringa indicators and saves explicit values", () => {
+  const client = { type: "PJ", name: "Acme", cpf_cnpj: "12345678000190",
+    coringa_status: null, tecnologia: null, licitacao: null };
+  const initial = createRegularizeInitialValues(client);
+  assert.equal(initial.coringa_status, "");
+  assert.equal(initial.tecnologia, "");
+  assert.equal(initial.licitacao, "");
+  assert.deepEqual(buildRegularizePayload(initial, client), {});
+  assert.deepEqual(buildRegularizePayload({ ...initial, coringa_status: "Em análise",
+    tecnologia: "false", licitacao: "true" }, client), {
+    coringa_status: "Em análise", tecnologia: false, licitacao: true,
+  });
 });
 
 runTest("regularize hydration masks documents and phone while phone payload stays canonical", () => {

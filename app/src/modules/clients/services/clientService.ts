@@ -11,6 +11,8 @@ import type {
   ClientHistoryPendingItem,
   ClientListFilters,
   ClientListPage,
+  ClientCoringaFilters,
+  ClientCoringaPage,
   ClientInstagramProfileFilters,
   ClientInstagramProfilePage,
   CreateClientPayload,
@@ -38,6 +40,7 @@ import {
 import { toHistoryIsoDate } from "../utils/historyDate";
 
 export const clientService = {
+
   async listGroups(): Promise<ClientGroup[]> {
     const api = setupAPIClient();
     const response = await api.get(CLIENT_GROUP_ENDPOINTS.list);
@@ -60,6 +63,20 @@ export const clientService = {
     const api = setupAPIClient();
     const response = await api.put(CLIENT_GROUP_ENDPOINTS.clients(id), { client_ids });
     return unwrapClientEnvelope<{ id: string; clients: { id: string }[] }>(response.data);
+  },
+  async listCoringa(filters: ClientCoringaFilters): Promise<ClientCoringaPage> {
+    const response = await setupAPIClient().get(CLIENT_ENDPOINTS.coringaList, { params: filters });
+    return unwrapClientEnvelope<ClientCoringaPage>(response.data);
+  },
+
+  async downloadCoringaPdf(filters: ClientCoringaFilters): Promise<Blob> {
+    const { page: _page, limit: _limit, ...allFilteredRows } = filters;
+    const response = await setupAPIClient().get(CLIENT_ENDPOINTS.coringaPdf, {
+      params: allFilteredRows,
+      responseType: "blob",
+    });
+    return response.data as Blob;
+
   },
 
   async list(filters: ClientListFilters = {}): Promise<ClientListPage> {
