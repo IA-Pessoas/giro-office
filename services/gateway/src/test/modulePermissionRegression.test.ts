@@ -182,8 +182,6 @@ describe("matriz de regressão das políticas modulares", () => {
     );
   });
 
-  });
-
   it.each([
     ["user", 0, false, false],
     ["user", 1, true, false],
@@ -325,8 +323,6 @@ describe("matriz de regressão das políticas modulares", () => {
     ).toBe(false);
   });
 
-  });
-
   it.each([
     ["PATCH", "/client/client-1/regularize"],
     ["PATCH", "/client/client-1/termination"],
@@ -432,8 +428,6 @@ describe("matriz de regressão das políticas modulares", () => {
         policy,
       ),
     ).toBe(false);
-  });
-
   });
 
   it.each([0, 1, 2, 3])("avalia o módulo Integração no nível %i", (level) => {
