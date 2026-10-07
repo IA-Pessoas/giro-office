@@ -76,6 +76,7 @@ const nullableTextFieldNames = [
   "regime",
   "size",
   "segment",
+  "coringa_status",
 ] as const satisfies ReadonlyArray<keyof ClientRegularizeFormValues>;
 
 const optionalDateFieldNames = [
@@ -145,6 +146,9 @@ export function createRegularizeInitialValues(client: Client): ClientRegularizeF
     regime: client.regime ?? "",
     size: client.size ?? "",
     segment: client.segment ?? "",
+    coringa_status: client.coringa_status ?? "",
+    tecnologia: client.tecnologia === null || client.tecnologia === undefined ? "" : String(client.tecnologia) as "true" | "false",
+    licitacao: client.licitacao === null || client.licitacao === undefined ? "" : String(client.licitacao) as "true" | "false",
     contabil: Boolean(client.contabil),
     fiscal: Boolean(client.fiscal),
     pessoal: Boolean(client.pessoal),
@@ -231,6 +235,12 @@ export function buildRegularizePayload(
   for (const fieldName of booleanFieldNames) {
     if (values[fieldName] !== currentValues[fieldName]) {
       payload[fieldName] = values[fieldName];
+    }
+  }
+
+  for (const fieldName of ["tecnologia", "licitacao"] as const) {
+    if (values[fieldName] !== currentValues[fieldName]) {
+      payload[fieldName] = values[fieldName] === "" ? null : values[fieldName] === "true";
     }
   }
 

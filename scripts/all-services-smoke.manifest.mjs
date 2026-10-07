@@ -1693,6 +1693,22 @@ const baseManifest = [
   }),
   op({
     service: "client-service",
+    method: "GET",
+    path: "/client/coringa/list",
+    action: "clientCoringaList",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
+    method: "GET",
+    path: "/client/coringa/pdf",
+    action: "clientCoringaPdf",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "client-service",
     method: "POST",
     path: "/internal/commercial/prospecting-transition",
     action: "clientCommercialProspectingTransition",

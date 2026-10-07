@@ -376,6 +376,8 @@ describe("activityCatalog", () => {
   });
 
   it.each([
+    ["GET", "/client/coringa/list", "consultou", "a Lista Coringa de clientes"],
+    ["GET", "/client/coringa/pdf", "exportou", "a Lista Coringa de clientes em PDF"],
     ["GET", "/client/instagram-profiles/report", "consultou", "o relatório de perfis do Instagram"],
     ["GET", "/marketing/dashboard", "consultou", "o dashboard do Marketing"],
     [

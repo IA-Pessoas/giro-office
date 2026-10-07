@@ -19,6 +19,8 @@ import type {
   ClientTerminationRecord,
   ClientListFilters,
   ClientListPage,
+  ClientCoringaFilters,
+  ClientCoringaPage,
   CreateClientPayload,
   CreateClientIntegrationPayload,
   TerminateClientPayload,
@@ -30,6 +32,12 @@ import type {
 } from "../types";
 
 export const CLIENTS_QUERY_KEY = ["clients"] as const;
+
+export function useCoringaClients(filters: ClientCoringaFilters): UseQueryResult<ClientCoringaPage, Error> {
+  return useFetch([...CLIENTS_QUERY_KEY, "coringa", filters], () => clientService.listCoringa(filters), {
+    placeholderData: (previousData) => previousData,
+  });
+}
 
 export function clientListQueryKey(filters: ClientListFilters) {
   return [

@@ -4120,6 +4120,14 @@ const handlers = {
     });
   },
 
+  async clientCoringaList(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { page: 1, limit: 5 } });
+  },
+
+  async clientCoringaPdf(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { regime: "Simples Nacional" } });
+  },
+
   async clientCnpjLookup(op) {
     await httpRequest(op, {
       expectedStatus: [200],
