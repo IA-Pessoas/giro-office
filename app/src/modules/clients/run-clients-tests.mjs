@@ -829,6 +829,20 @@ runTest("regularize payload normalizes documents, nullable text, and dates", () 
   assert.equal(hasRegularizeChanges(values, client), true);
 });
 
+runTest("regularize preserves unknown Coringa indicators and saves explicit values", () => {
+  const client = { type: "PJ", name: "Acme", cpf_cnpj: "12345678000190",
+    coringa_status: null, tecnologia: null, licitacao: null };
+  const initial = createRegularizeInitialValues(client);
+  assert.equal(initial.coringa_status, "");
+  assert.equal(initial.tecnologia, "");
+  assert.equal(initial.licitacao, "");
+  assert.deepEqual(buildRegularizePayload(initial, client), {});
+  assert.deepEqual(buildRegularizePayload({ ...initial, coringa_status: "Em análise",
+    tecnologia: "false", licitacao: "true" }, client), {
+    coringa_status: "Em análise", tecnologia: false, licitacao: true,
+  });
+});
+
 runTest("regularize hydration masks documents and phone while phone payload stays canonical", () => {
   const client = {
     id: "client-1",

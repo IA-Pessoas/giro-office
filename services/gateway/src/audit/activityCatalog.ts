@@ -55,6 +55,16 @@ const TECHNICAL_RULES = [
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
     methods: ["GET"],
+    pattern: /^\/client\/coringa\/list$/,
+    description: { action: "consultou", item: "a Lista Coringa de clientes" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/coringa\/pdf$/,
+    description: { action: "exportou", item: "a Lista Coringa de clientes em PDF" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/client\/instagram-profiles\/report$/,
     description: { action: "consultou", item: "o relatório de perfis do Instagram" },
   },
@@ -906,6 +916,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/regularize\/guidance\/detail$/,
     description: { action: "consultou", item: "os detalhes de uma orientação de regularização" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/regularize\/guidance\/pdf$/,
+    description: { action: "visualizou", item: "o PDF de uma orientação processual" },
   },
   {
     methods: ["GET"],

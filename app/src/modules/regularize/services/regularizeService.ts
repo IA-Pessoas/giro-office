@@ -1,4 +1,5 @@
 import { setupAPIClient } from "@shared/services/api";
+import { isAxiosError } from "axios";
 
 import type {
   AddRegularizeGuidanceActivityPayload,
@@ -395,6 +396,27 @@ export const regularizeService = {
     });
 
     return unwrapRegularizeEntity<RegularizeGuidance>(response.data);
+  },
+
+  async downloadGuidancePdf(id: RegularizeId): Promise<Blob> {
+    try {
+      const response = await setupAPIClient(undefined, undefined, undefined, {
+        notifyServerErrors: false,
+      }).get<Blob>(REGULARIZE_ENDPOINTS.guidancePdf, {
+        params: buildRegularizeIdParams(id),
+        responseType: "blob",
+      });
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.data instanceof Blob) {
+        try {
+          error.response.data = JSON.parse(await error.response.data.text());
+        } catch {
+          // Um corpo não JSON mantém a mensagem genérica do fluxo.
+        }
+      }
+      throw error;
+    }
   },
 
   async createGuidance(payload: CreateRegularizeGuidancePayload): Promise<RegularizeGuidance> {

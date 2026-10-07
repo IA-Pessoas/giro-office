@@ -2,6 +2,8 @@ import type { ClientListFilters } from "../types";
 
 export const CLIENT_ENDPOINTS = {
   list: "/client/list",
+  coringaList: "/client/coringa/list",
+  coringaPdf: "/client/coringa/pdf",
   instagramProfilesReport: "/client/instagram-profiles/report",
   create: "/client",
   createIntegration: "/client/integration",

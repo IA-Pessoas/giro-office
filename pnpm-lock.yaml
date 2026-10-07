@@ -381,6 +381,9 @@ importers:
       multer:
         specifier: ^2.3.0
         version: 2.4.0
+      pdfkit:
+        specifier: 0.19.1
+        version: 0.19.1
       pg:
         specifier: ^8.13.0
         version: 8.20.0
@@ -409,6 +412,9 @@ importers:
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.2
+      '@types/pdfkit':
+        specifier: 0.17.6
+        version: 0.17.6
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
@@ -1079,6 +1085,9 @@ importers:
       pg:
         specifier: ^8.13.0
         version: 8.20.0
+      pdfkit:
+        specifier: 0.19.1
+        version: 0.19.1
       prisma:
         specifier: 7.9.1
         version: 7.9.1(@types/node@25.5.2)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.3.3)
@@ -1095,6 +1104,9 @@ importers:
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.2
+      '@types/pdfkit':
+        specifier: 0.17.6
+        version: 0.17.6
       '@types/supertest':
         specifier: ^7.0.0
         version: 7.2.0
