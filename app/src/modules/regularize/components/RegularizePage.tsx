@@ -343,8 +343,10 @@ function GuidancePdfButton({ id }: { id: RegularizeId }) {
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      toast.error("Não foi possível gerar o PDF desta orientação. Confira os dados e tente novamente.");
+    } catch (error) {
+      toast.error(
+        getRegularizeMutationErrorMessage(error, "Não foi possível gerar o PDF desta orientação."),
+      );
     } finally {
       setIsGenerating(false);
     }
