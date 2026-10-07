@@ -190,6 +190,7 @@ export function ClientRegularizeForm({
               ))}
             </ClientNativeSelect>
           </label>
+          <TextField label="Status Lista Coringa" name="coringa_status" value={values.coringa_status} onChange={onChange} disabled={disabled} />
         </div>
       </section>
 
@@ -201,6 +202,16 @@ export function ClientRegularizeForm({
           <ToggleField label="Pessoal" name="pessoal" checked={values.pessoal} onChange={onChange} disabled={disabled} />
           <ToggleField label="Infoproduto" name="infoproduto" checked={values.infoproduto} onChange={onChange} disabled={disabled} />
           <ToggleField label="Consultoria" name="consultoria" checked={values.consultoria} onChange={onChange} disabled={disabled} />
+          {(["tecnologia", "licitacao"] as const).map((field) => (
+            <label className="space-y-1.5" key={field}>
+              <span className={labelClassName}>{field === "tecnologia" ? "Tecnologia" : "Licitação"}</span>
+              <ClientNativeSelect name={field} value={values[field]} onChange={onChange} disabled={disabled}>
+                <option value="">Não informado</option>
+                <option value="true">Sim</option>
+                <option value="false">Não</option>
+              </ClientNativeSelect>
+            </label>
+          ))}
         </div>
       </section>
 

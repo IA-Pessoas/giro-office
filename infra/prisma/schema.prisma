@@ -776,6 +776,10 @@ model Client {
   type                          String                      @default("PJ")
   type_registration             String                      @default("Novo")
   organization_id               String
+  created_at                    DateTime?                   @default(now())
+  coringa_status                String?
+  tecnologia                    Boolean?
+  licitacao                     Boolean?
   agenda                        Agenda[]
   agendaRecurring               RecurringAgenda[]
   clouds                        ClientClouds[]

@@ -296,6 +296,16 @@ const regularizeOpenApiOperations = [
   {
     service,
     method: "GET",
+    path: "/regularize/guidance/pdf",
+    action: "regularizeGuidancePdf",
+    target: "gateway",
+    auth: "bearer",
+    expectedStatus: [200],
+    expectEnvelope: false,
+  },
+  {
+    service,
+    method: "GET",
     path: "/regularize/guidance/list",
     action: "regularizeGuidanceList",
     target: "gateway",
