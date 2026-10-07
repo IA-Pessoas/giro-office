@@ -5,6 +5,7 @@ import { ClientGroupService } from "../services/clientGroupService.js";
 const organizationId = "00000000-0000-4000-8000-000000000002";
 const clientId = "00000000-0000-4000-8000-000000000003";
 const groupId = "00000000-0000-4000-8000-000000000004";
+const secondGroupId = "00000000-0000-4000-8000-000000000005";
 const authorization = { userId: "user-1", level: 2, isOwner: false } as const;
 
 describe("ClientGroupService", () => {
@@ -45,13 +46,32 @@ describe("ClientGroupService", () => {
   });
 
   it("allows empty groups and persists clients in more than one group", async () => {
-    const group = { id: groupId, organization_id: organizationId, name: "Holding" };
+    const groupIds = new Set([groupId, secondGroupId]);
+    const memberships: { group_id: string; client_id: string; organization_id: string }[] = [];
     const transaction = {
-      group: { findFirst: vi.fn().mockResolvedValue(group) },
+      group: {
+        findFirst: vi.fn(async ({ where }: { where: { id: string } }) =>
+          groupIds.has(where.id)
+            ? { id: where.id, organization_id: organizationId, name: "Holding" }
+            : null,
+        ),
+      },
       client: { findMany: vi.fn().mockResolvedValue([{ id: clientId }]) },
       clientsGroup: {
-        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-        createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        deleteMany: vi.fn(async ({ where }: { where: { group_id: string } }) => {
+          const remainingMemberships = memberships.filter(
+            (membership) => membership.group_id !== where.group_id,
+          );
+          const count = memberships.length - remainingMemberships.length;
+          memberships.splice(0, memberships.length, ...remainingMemberships);
+          return { count };
+        }),
+        createMany: vi.fn(
+          async ({ data }: { data: typeof memberships; skipDuplicates: boolean }) => {
+            memberships.push(...data);
+            return { count: data.length };
+          },
+        ),
       },
     };
     const prisma = {
@@ -63,11 +83,14 @@ describe("ClientGroupService", () => {
     const service = new ClientGroupService(prisma as never);
 
     await expect(
-      service.replaceClients(groupId, organizationId, [clientId], authorization),
-    ).resolves.toEqual({ id: groupId, clients: [{ id: clientId }] });
-    expect(transaction.clientsGroup.createMany).toHaveBeenCalledWith({
-      data: [{ group_id: groupId, client_id: clientId, organization_id: organizationId }],
-      skipDuplicates: true,
-    });
+      service.replaceClients(groupId, organizationId, [], authorization),
+    ).resolves.toEqual({ id: groupId, clients: [] });
+    await service.replaceClients(groupId, organizationId, [clientId], authorization);
+    await service.replaceClients(secondGroupId, organizationId, [clientId], authorization);
+
+    expect(memberships).toEqual([
+      { group_id: groupId, client_id: clientId, organization_id: organizationId },
+      { group_id: secondGroupId, client_id: clientId, organization_id: organizationId },
+    ]);
   });
 });
