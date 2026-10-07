@@ -8,6 +8,26 @@ export type ClientGroupAuthorization = {
   isOwner: boolean;
 };
 
+type ClientGroupMember = {
+  id: string;
+  name: string;
+  company_name: string | null;
+  fantasy_name: string | null;
+  cpf_cnpj: string;
+};
+
+type ClientGroupRecord = {
+  id: string;
+  name: string;
+  status: boolean;
+  organization_id: string;
+  clients: readonly { client: ClientGroupMember }[];
+};
+
+type ClientGroupResult = Omit<ClientGroupRecord, "clients"> & {
+  clients: ClientGroupMember[];
+};
+
 function groupSelect(organizationId: string) {
   return {
     id: true,
@@ -28,14 +48,17 @@ function groupSelect(organizationId: string) {
   } as const;
 }
 
-function presentGroup<T extends { clients: readonly { client: unknown }[] }>(group: T) {
+function presentGroup(group: ClientGroupRecord): ClientGroupResult {
   return { ...group, clients: group.clients.map(({ client }) => client) };
 }
 
 export class ClientGroupService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async list(organizationId: string, authorization: ClientGroupAuthorization) {
+  async list(
+    organizationId: string,
+    authorization: ClientGroupAuthorization,
+  ): Promise<ClientGroupResult[]> {
     requireIntegracaoRouteAccess("GET", "/client/groups", {
       ...authorization,
       organizationId,
@@ -49,7 +72,11 @@ export class ClientGroupService {
     return groups.map(presentGroup);
   }
 
-  async create(organizationId: string, name: string, authorization: ClientGroupAuthorization) {
+  async create(
+    organizationId: string,
+    name: string,
+    authorization: ClientGroupAuthorization,
+  ): Promise<ClientGroupResult> {
     requireIntegracaoRouteAccess("POST", "/client/groups", {
       ...authorization,
       organizationId,
@@ -78,7 +105,7 @@ export class ClientGroupService {
     organizationId: string,
     name: string,
     authorization: ClientGroupAuthorization,
-  ) {
+  ): Promise<ClientGroupResult> {
     requireIntegracaoRouteAccess("PATCH", "/client/groups/:id", {
       ...authorization,
       organizationId,

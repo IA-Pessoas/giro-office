@@ -6,5 +6,5 @@ export const createClientGroupBodySchema = z
   .strict();
 export const updateClientGroupBodySchema = createClientGroupBodySchema;
 export const replaceClientGroupClientsBodySchema = z
-  .object({ client_ids: z.array(z.string().uuid()).max(500) })
+  .object({ client_ids: z.array(z.string().uuid()) })
   .strict();

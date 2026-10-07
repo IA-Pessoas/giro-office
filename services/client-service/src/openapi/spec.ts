@@ -320,7 +320,6 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                   properties: {
                     client_ids: {
                       type: "array",
-                      maxItems: 500,
                       items: { type: "string", format: "uuid" },
                     },
                   },
