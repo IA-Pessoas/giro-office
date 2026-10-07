@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { renderGuidancePdf } from "../../services/regularize-service/src/services/guidancePdfService.ts";
+
 const pdf = await renderGuidancePdf({
   id: "sample-guidance",
   target_type: "PJ",
@@ -17,14 +18,46 @@ const pdf = await renderGuidancePdf({
   legal_representative: "Ana Silva",
   address: "Rua das Acácias, 100, Centro, Feira de Santana - BA",
   comporate_purpose: "Prestação de serviços administrativos e consultoria empresarial.",
-  branch_data: { name: "Filial Centro", document: "12345678000271", address: "Rua B, 20", city: "Salvador", state: "BA" },
+  branch_data: {
+    name: "Filial Centro",
+    document: "12345678000271",
+    address: "Rua B, 20",
+    city: "Salvador",
+    state: "BA",
+  },
   economic_activities: [
-    { type: "Principal", code: "8211-3/00", description: "Serviços combinados de escritório e apoio administrativo" },
-    { type: "Secundária", code: "7020-4/00", description: "Atividades de consultoria em gestão empresarial" },
+    {
+      type: "Principal",
+      code: "8211-3/00",
+      description: "Serviços combinados de escritório e apoio administrativo",
+    },
+    {
+      type: "Secundária",
+      code: "7020-4/00",
+      description: "Atividades de consultoria em gestão empresarial",
+    },
   ],
   partners: [
-    { name: "Ana Silva", percentage: 60, profession: "Empresária", marital_status: "Casada", rg: "1234567", cpf: "12345678901", address: "Rua C, 30", role: "Administradora" },
-    { name: "Beto Lima", percentage: 40, profession: "Contador", marital_status: "Solteiro", rg: "7654321", cpf: "98765432100", address: "Rua D, 40", role: "Sócio" },
+    {
+      name: "Ana Silva",
+      percentage: 60,
+      profession: "Empresária",
+      marital_status: "Casada",
+      rg: "1234567",
+      cpf: "12345678901",
+      address: "Rua C, 30",
+      role: "Administradora",
+    },
+    {
+      name: "Beto Lima",
+      percentage: 40,
+      profession: "Contador",
+      marital_status: "Solteiro",
+      rg: "7654321",
+      cpf: "98765432100",
+      address: "Rua D, 40",
+      role: "Sócio",
+    },
   ],
 });
 writeFileSync("output/playwright/issue-1598-orientacao-amostra.pdf", pdf);
