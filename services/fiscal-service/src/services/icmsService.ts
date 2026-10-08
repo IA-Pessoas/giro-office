@@ -1,15 +1,10 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 
-import {
-  type CreateLogParams,
-  createLog,
-  type LogUpdateParams,
-  logUpdateIfChanged,
-} from "../integrations/audit.js";
-import prismaClient from "../integrations/prisma.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
+import type { CreateLogParams, LogUpdateParams } from "../integrations/audit.js";
 import { getPaginationParams, type PaginationQuery } from "../schemas/pagination.schemas.js";
 
-export type IcmsServicePrisma = typeof prismaClient;
+export type IcmsServicePrisma = Pick<PrismaClient, "icms">;
 
 type IcmsServiceAuditFns = {
   createLog: (params: CreateLogParams) => Promise<void>;
@@ -75,8 +70,8 @@ const ICMS_SELECT = {
 
 export class IcmsService {
   constructor(
-    private readonly prisma: IcmsServicePrisma = prismaClient,
-    private readonly audit: IcmsServiceAuditFns = { createLog, logUpdateIfChanged },
+    private readonly prisma: IcmsServicePrisma,
+    private readonly audit: IcmsServiceAuditFns,
   ) {}
 
   async create(data: CreateIcmsRequest): Promise<{ create: unknown }> {
@@ -178,7 +173,7 @@ export class IcmsService {
       });
 
       if (!exists) {
-        throw new ServiceError(404, "ICMS nao existe.");
+        throw new ServiceError(404, "ICMS não existe.");
       }
 
       const deleted = await this.prisma.icms.delete({

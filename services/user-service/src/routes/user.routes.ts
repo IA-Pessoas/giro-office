@@ -57,9 +57,11 @@ export function createUserRoutes(
   }
 
   function isSelfPasswordUpdate(request: Request, id: string, body: object): boolean {
-    const keys = Object.keys(body);
-
-    return request.user_id === id && keys.length === 1 && keys[0] === "password";
+    return (
+      request.user_id === id &&
+      "password" in body &&
+      Object.keys(body).every((key) => key === "password" || key === "current_password")
+    );
   }
 
   router.get(
@@ -90,7 +92,7 @@ export function createUserRoutes(
         const publicPhotoUrl = storageService.readUserPhoto(user.photo_url);
 
         if (!publicPhotoUrl) {
-          throw new ServiceError(404, "Foto nao encontrada.");
+          throw new ServiceError(404, "Foto não encontrada.");
         }
 
         response.json(createSuccessResponse({ url: publicPhotoUrl }));
@@ -126,7 +128,7 @@ export function createUserRoutes(
         const auth = requireManageUsersAuth(request);
         const body = parseWithZod(createUserBodySchema, request.body);
         if (body.organization_id !== undefined && body.organization_id !== auth.organization_id) {
-          throw new ServiceError(403, "Organizacao da requisicao nao confere.");
+          throw new ServiceError(403, "Organização da requisição não confere.");
         }
         if (isOwnerMutationPayload(body)) {
           requireOwnerUserAuth(request);
@@ -164,7 +166,23 @@ export function createUserRoutes(
           requireOwnerUserAuth(request);
         }
 
-        const user = await userManagement(auth).update(id, body);
+        const { current_password: currentPassword, ...changes } = body;
+        if (changes.password !== undefined && request.user_id !== id) {
+          throw new ServiceError(
+            403,
+            "Administradores não definem a senha de outro usuário. Envie um link de redefinição.",
+          );
+        }
+        if (changes.password !== undefined) {
+          await userService.assertOwnPasswordChange(
+            id,
+            auth.organization_id,
+            currentPassword,
+            changes.password,
+          );
+        }
+
+        const user = await userManagement(auth).update(id, changes);
 
         response.json(createSuccessResponse(user));
       } catch (err) {
@@ -185,7 +203,7 @@ export function createUserRoutes(
         const { id } = parseWithZod(userIdParamsSchema, request.params);
 
         if (!request.file) {
-          throw new ServiceError(400, "Arquivo de imagem e obrigatorio.");
+          throw new ServiceError(400, "Arquivo de imagem é obrigatório.");
         }
 
         validateUploadFileSignature(request.file);
@@ -229,7 +247,7 @@ export function createUserRoutes(
 
         await userManagement(auth).delete(id);
 
-        response.json(createSuccessResponse({ message: "Usuario desativado com sucesso." }));
+        response.json(createSuccessResponse({ message: "Usuário desativado com sucesso." }));
       } catch (err) {
         logError("Erro ao desativar usuario", { err });
         next(err);

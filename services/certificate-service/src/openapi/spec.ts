@@ -183,6 +183,24 @@ function paginatedListSchema(name: string) {
   };
 }
 
+function certificateListSchema(name: string) {
+  const schema = paginatedListSchema(name);
+  const count = { type: "integer", minimum: 0 };
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      summary: {
+        type: "object",
+        description: "KPIs sobre todos os registros filtrados, não só a página.",
+        properties: { expired: count, expiring_30_days: count, with_certificate: count },
+        required: ["expired", "expiring_30_days", "with_certificate"],
+      },
+    },
+    required: [...schema.required, "summary"],
+  };
+}
+
 function certificateFileUploadOperation({
   idParameter,
   operationIdSuffix,
@@ -313,10 +331,21 @@ function certificateNotificationListOperation() {
     security: [{ bearerAuth: [] }],
     parameters: paginationQueryParameters(),
     responses: {
-      "200": successResponse(
-        "Notificacoes de certificados listadas",
-        paginatedListSchema("CertificateNotification"),
-      ),
+      "200": successResponse("Notificacoes de certificados listadas", {
+        ...paginatedListSchema("CertificateNotification"),
+        properties: {
+          ...paginatedListSchema("CertificateNotification").properties,
+          summary: {
+            type: "object",
+            description: "Notificações por tipo em toda a organização, não só a página.",
+            properties: {
+              pj: { type: "integer", minimum: 0 },
+              pf: { type: "integer", minimum: 0 },
+            },
+            required: ["pj", "pf"],
+          },
+        },
+      }),
       "400": errorResponse("Requisicao invalida"),
       "401": errorResponse("Autenticacao obrigatoria"),
       "403": errorResponse("Permissao insuficiente"),
@@ -498,7 +527,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PJ",
           summary: "Lista certificados PJ da organizacao autenticada",
           successDescription: "Certificados PJ listados",
-          successDataSchema: paginatedListSchema("CertificatePj"),
+          successDataSchema: certificateListSchema("CertificatePj"),
           notFoundDescription: "Certificado PJ nao encontrado",
           parameters: [
             ...paginationQueryParameters(),
@@ -597,7 +626,7 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
           tag: "Certificate PF",
           summary: "Lista certificados PF da organizacao autenticada",
           successDescription: "Certificados PF listados",
-          successDataSchema: paginatedListSchema("CertificatePf"),
+          successDataSchema: certificateListSchema("CertificatePf"),
           notFoundDescription: "Certificado PF nao encontrado",
           parameters: [
             ...paginationQueryParameters(),
@@ -753,6 +782,10 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
             model: { type: "string" },
             legal_nature: { type: "string" },
             password: { type: "string", nullable: true },
+            password_unavailable: {
+              type: "boolean",
+              description: "Senha cadastrada, mas ilegível com as chaves configuradas.",
+            },
             expiration_date: { type: "string", format: "date-time" },
             notes: { type: "string", nullable: true },
             was_paid: { type: "boolean" },
@@ -806,6 +839,10 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
             cpf: { type: "string" },
             model: { type: "string" },
             password: { type: "string", nullable: true },
+            password_unavailable: {
+              type: "boolean",
+              description: "Senha cadastrada, mas ilegível com as chaves configuradas.",
+            },
             expiration_date: { type: "string", format: "date-time" },
             notes: { type: "string", nullable: true },
             enterprise: { type: "string", nullable: true },
@@ -893,8 +930,9 @@ export function buildCertificateServiceOpenApiSpec(env: CertificateServiceEnv): 
             evaluated: { type: "integer", minimum: 0 },
             created: { type: "integer", minimum: 0 },
             updated: { type: "integer", minimum: 0 },
+            removed: { type: "integer", minimum: 0 },
           },
-          required: ["evaluated", "created", "updated"],
+          required: ["evaluated", "created", "updated", "removed"],
         },
       },
     },

@@ -49,6 +49,7 @@ import {
   Bell
 } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { formatCount } from "@shared/utils/formatters";
 
 interface Certificate {
   id: string;
@@ -967,7 +968,7 @@ export function Parcelamento() {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs text-gray-600 dark:text-gray-400">
-                            Progresso: {inst.paidInstallments} de {inst.installmentCount} parcelas
+                            Progresso: {inst.paidInstallments} de {formatCount(inst.installmentCount, "parcela", "parcelas")}
                           </span>
                           <span className="text-xs font-semibold text-gray-900 dark:text-white">{progress.toFixed(0)}%</span>
                         </div>

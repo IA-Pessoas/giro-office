@@ -9,13 +9,16 @@ export function ReportCriteriaStep({
   source,
   onChange,
   disabled,
+  relationshipMode = false,
 }: {
   area: ReportArea;
   source: ReportsCatalogSource;
   onChange: (area: ReportArea) => void;
   disabled: boolean;
+  relationshipMode?: boolean;
 }) {
   const fields = getSelectableReportFields(source);
+  const selectedFields = fields.filter((field) => area.fields.includes(field.key));
   const filterFields = fields.filter(
     (field) => field.filterable && field.operators?.some((operator) => operatorLabels[operator]),
   );
@@ -212,7 +215,7 @@ export function ReportCriteriaStep({
           Esta área não oferece critérios adicionais.
         </p>
       )}
-      <details className="border-t border-gray-200 pt-4 dark:border-slate-700">
+      {!relationshipMode ? <details className="border-t border-gray-200 pt-4 dark:border-slate-700">
         <summary className="cursor-pointer rounded text-sm font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 dark:text-white">
           Mais opções
         </summary>
@@ -253,7 +256,7 @@ export function ReportCriteriaStep({
               A contagem considera valores preenchidos. Com resumo, aparecem os grupos e os totais
               escolhidos.
             </p>
-            {fields
+            {selectedFields
               .filter((field) => field.aggregationFunctions?.length)
               .map((field) => (
                 <label key={field.key} className="block text-sm text-gray-800 dark:text-slate-200">
@@ -324,7 +327,7 @@ export function ReportCriteriaStep({
               ))}
           </fieldset>
         </div>
-      </details>
+      </details> : null}
     </fieldset>
   );
 }

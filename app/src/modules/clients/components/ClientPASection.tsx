@@ -1,6 +1,8 @@
+import { formatCivilDate } from "@shared/utils/dateFormat";
 import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { BriefcaseBusiness, CircleAlert, Database, Landmark, Plus, Save } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
+import { isAxiosError } from "axios";
 
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName, clientTextareaClassName } from "../form/clientFormControls";
@@ -10,6 +12,12 @@ import {
   useUpdateClientPaMutation,
 } from "../hooks/useClients";
 import type { ClientPaResponse, UpdateClientPaPayload } from "../types";
+import {
+  formatPaMoneyFromApi,
+  formatPaMoneyInput,
+  PA_MONEY_FIELD_NAMES,
+  parsePaMoneyCents,
+} from "../utils/paForm";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -151,8 +159,8 @@ function normalizeBooleanValue(value: BooleanInputValue): boolean | null {
 function createInitialValues(pa?: ClientPaResponse | null): ClientPaFormValues {
   return {
     activities: toTextValue(pa?.activities),
-    tax_billing: toTextValue(pa?.tax_billing),
-    management_billing: toTextValue(pa?.management_billing),
+    tax_billing: formatPaMoneyFromApi(pa?.tax_billing),
+    management_billing: formatPaMoneyFromApi(pa?.management_billing),
     works_bidding: toBooleanValue(pa?.works_bidding),
     dissatisfaction: toTextValue(pa?.dissatisfaction),
     registered_collabortors: toNumberValue(pa?.registered_collabortors),
@@ -164,7 +172,7 @@ function createInitialValues(pa?: ClientPaResponse | null): ClientPaFormValues {
     works_system: toBooleanValue(pa?.works_system),
     system_name: toTextValue(pa?.system_name),
     system_usage_time: toTextValue(pa?.system_usage_time),
-    system_value: toTextValue(pa?.system_value),
+    system_value: formatPaMoneyFromApi(pa?.system_value),
     system_contact: toTextValue(pa?.system_contact),
     system_operations: toTextValue(pa?.system_operations),
     cloud_storage: toBooleanValue(pa?.cloud_storage),
@@ -183,10 +191,18 @@ function buildUpdatePayload(
   const payload: UpdateClientPaPayload = {};
 
   for (const fieldName of textFieldNames) {
-    const nextValue = normalizeTextValue(values[fieldName]);
+    const rawValue = normalizeTextValue(values[fieldName]);
+    // "R$ 150," (vírgula ainda sem centavos) o backend rejeita; envia "R$ 150".
+    const nextValue =
+      rawValue !== null && PA_MONEY_FIELD_NAMES.has(fieldName) ? rawValue.replace(/,$/u, "") : rawValue;
     const currentValue = pa[fieldName] ?? null;
+    const sameMoneyAmount =
+      PA_MONEY_FIELD_NAMES.has(fieldName) &&
+      nextValue !== null &&
+      parsePaMoneyCents(nextValue) !== null &&
+      parsePaMoneyCents(nextValue) === parsePaMoneyCents(currentValue);
 
-    if (nextValue !== currentValue) {
+    if (nextValue !== currentValue && !sameMoneyAmount) {
       payload[fieldName] = nextValue;
     }
   }
@@ -213,11 +229,7 @@ function buildUpdatePayload(
 }
 
 function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Não informado";
-  }
-
-  return new Date(value).toLocaleDateString("pt-BR");
+  return formatCivilDate(value, "Não informado");
 }
 
 export function ClientPASection({ clientId }: { clientId: string }) {
@@ -243,10 +255,11 @@ export function ClientPASection({ clientId }: { clientId: string }) {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) => {
     const { name, value } = event.target;
+    const isMoneyField = PA_MONEY_FIELD_NAMES.has(name);
 
     setFormValues((current) => ({
       ...current,
-      [name]: value,
+      [name]: isMoneyField ? formatPaMoneyInput(value) : value,
     }));
   };
 
@@ -254,8 +267,14 @@ export function ClientPASection({ clientId }: { clientId: string }) {
     try {
       await createPaMutation.mutateAsync();
       toast.success("PA criado com sucesso.");
-      await paQuery.refetch();
     } catch (error) {
+      // Tela desatualizada: o PA já existe; recarrega para o salvar usar PATCH.
+      if (isAxiosError(error) && error.response?.status === 409) {
+        toast.info("Este cliente já possui PA. Dados recarregados.");
+        await paQuery.refetch();
+        return;
+      }
+
       const message =
         typeof error === "object" &&
         error !== null &&
@@ -283,7 +302,6 @@ export function ClientPASection({ clientId }: { clientId: string }) {
     try {
       await updatePaMutation.mutateAsync(updatePayload);
       toast.success("PA atualizado com sucesso.");
-      await paQuery.refetch();
     } catch (error) {
       const message =
         typeof error === "object" &&

@@ -25,6 +25,16 @@ test("session cookies carry the production security attributes", () => {
   assert.match(headers[1], /^cw\.csrf=csrf-value;/);
 });
 
+test("session cookie lifetime can be shortened for impersonation", () => {
+  const headers = createSessionCookieHeaders("signed.jwt", "csrf-value", {
+    secure: true,
+    maxAgeSeconds: 3600,
+  });
+
+  assert.match(headers[0], /Max-Age=3600/u);
+  assert.match(headers[1], /Max-Age=3600/u);
+});
+
 test("expired session cookies clear both browser values", () => {
   const headers = createExpiredSessionCookieHeaders({ secure: true });
 

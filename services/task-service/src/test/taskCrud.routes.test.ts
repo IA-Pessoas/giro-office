@@ -9,6 +9,21 @@ describe("task crud routes", () => {
     resetTaskRouteMocks();
   });
 
+  it("POST /task aceita tarefa operacional sem status de prospecção", async () => {
+    const res = await request(createTestApp()).post("/task").send({
+      model_id: "model-1",
+      project_id: "project-1",
+      client_id: "client-1",
+      prospecting_status: "",
+      department_id: "department-1",
+      urgency: "Alta",
+    });
+    expect(res.status).toBe(201);
+    expect(taskCrudServiceMock.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({ prospecting_status: undefined }),
+    );
+  });
+
   it("POST /task preserva null explícito no responsável principal", async () => {
     const res = await request(createTestApp()).post("/task").send({
       model_id: "model-1",
@@ -243,7 +258,14 @@ describe("task crud routes", () => {
     );
     expect(pathSpec).toContain('"isOwn":{"type":"boolean"}');
     expect(pathSpec).toContain('"isUnassigned":{"type":"boolean"}');
-    expect(pathSpec).toContain('"required":["id","isOwn","isUnassigned"]');
+    expect(pathSpec).toContain(
+      '"unique_service_released","in":"query","schema":{"type":"boolean"}',
+    );
+    expect(pathSpec).toContain('"client_name":{"type":"string"}');
+    expect(pathSpec).toContain('"project_name":{"type":"string"}');
+    expect(pathSpec).toContain(
+      '"required":["id","client_name","project_name","responsible_name","isOwn","isUnassigned"]',
+    );
   });
 
   it("GET /task/list encaminha busca e pagina validadas", async () => {
@@ -282,9 +304,21 @@ describe("task crud routes", () => {
     );
   });
 
+  it("GET /task/list encaminha filtro de serviço único liberado", async () => {
+    const res = await request(createTestApp())
+      .get("/task/list")
+      .query({ unique_service_released: "true" });
+
+    expect(res.status).toBe(200);
+    expect(taskCrudServiceMock.listTasks).toHaveBeenCalledWith(
+      expect.objectContaining({ unique_service_released: true }),
+    );
+  });
+
   it.each([
     { client_id: "cliente-invalido" },
     { assignment: "anyone" },
+    { unique_service_released: "yes" },
   ])("GET /task/list rejeita filtro inválido: %o", async (query) => {
     const res = await request(createTestApp()).get("/task/list").query(query);
 
@@ -310,12 +344,22 @@ describe("task crud routes", () => {
     expect(taskCrudServiceMock.updateTask).toHaveBeenCalledTimes(1);
   });
 
-  it("PUT /task rejeita alteração direta da previsão", async () => {
-    const app = createTestApp();
-
-    const res = await request(app).put("/task").send({
+  it("PUT /task encaminha a previsão ao serviço, que só aceita a primeira data", async () => {
+    const res = await request(createTestApp()).put("/task").send({
       task_id: "task-1",
       prevision_date: "2026-09-20",
+    });
+
+    expect(res.status).toBe(200);
+    expect(taskCrudServiceMock.updateTask).toHaveBeenCalledWith(
+      expect.objectContaining({ prevision_date: "2026-09-20" }),
+    );
+  });
+
+  it("PUT /task rejeita previsão fora do formato YYYY-MM-DD", async () => {
+    const res = await request(createTestApp()).put("/task").send({
+      task_id: "task-1",
+      prevision_date: "20/09/2026",
     });
 
     expect(res.status).toBe(400);

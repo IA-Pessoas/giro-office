@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getRegularizeRegimeOptions } from '@modules/clients/utils/regularizeForm';
 import { 
     Button, 
     Flex, 
@@ -8,7 +9,7 @@ import {
     Switch, 
 } from '@shared/ui/chakraShims';
 import { IoCreate } from 'react-icons/io5';
-import { toast } from 'react-toastify';
+import { toast } from "@shared/services/toast";
 import { setupAPIClient } from '@shared/services/api';
 
 import StateCity from '../../StateCity';
@@ -305,14 +306,9 @@ export default function DataTabRegularize({ client }) {
                                     onChange={(e) => setRegime(e.target.value)}
                                     borderColor='main.divisor'
                                 >
-                                    <option>CAEPF</option>
-                                    <option>CNO</option>
-                                    <option>E-Social</option>
-                                    <option>Isento de IRPF</option>
-                                    <option>Lucro Presumido</option>
-                                    <option>Lucro Real</option>
-                                    <option>MEI</option>
-                                    <option>Simples Nacional</option>
+                                    {getRegularizeRegimeOptions(regime ?? '').map((option) => (
+                                        <option key={option}>{option}</option>
+                                    ))}
                                 </Select>
                             </Flex>
                             <Flex w="50%" direction="column" justifyContent={'flex-end'}>
@@ -389,7 +385,7 @@ export default function DataTabRegularize({ client }) {
                         </Flex>
                         <Flex w="100%" direction="row" gap={2}>
                             <Flex w="50%" direction="column" justifyContent={'flex-end'}>
-                                <FormLabel htmlFor="start_strike">Inicio Paralisação</FormLabel>
+                                <FormLabel htmlFor="start_strike">Início Paralisação</FormLabel>
                                 <Input
                                     type='date'
                                     value={formatDateToInput(start_strike)}

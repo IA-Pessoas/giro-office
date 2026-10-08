@@ -144,7 +144,19 @@ export function unwrapReportsCatalogEnvelope(body: unknown): ReportsCatalog {
 
   return {
     items: catalog.items.map((source) => normalizeCatalogSource(source as Record<string, unknown>)),
+    ...(isRecord(catalog.letterheads) ? { letterheads: {
+      personal: normalizeLetterheadOptions(catalog.letterheads.personal),
+      shared: normalizeLetterheadOptions(catalog.letterheads.shared),
+    } } : {}),
   };
+}
+
+function normalizeLetterheadOptions(value: unknown): NonNullable<ReportsCatalog["letterheads"]>["personal"] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item) => isRecord(item) && typeof item.id === "string" && typeof item.label === "string" &&
+    (item.kind === "organization" || item.kind === "department") && typeof item.sha256 === "string")
+    .map((item) => ({ id: item.id as string, label: item.label as string,
+      kind: item.kind as "organization" | "department", sha256: item.sha256 as string }));
 }
 
 export function normalizeReportsError(error: unknown): ReportsServiceError {
@@ -231,6 +243,8 @@ export function unwrapReportCompositionPreview(body: unknown): ReportComposition
       ...unwrapReportsPreviewEnvelope(block),
       source: block.source,
       label: block.label,
+      ...(block.layout === "grouped_list" || block.layout === "summary" ? { layout: block.layout } : {}),
+      ...(asStringArray(block.dimensions) ? { dimensions: asStringArray(block.dimensions) } : {}),
     })),
   };
 }

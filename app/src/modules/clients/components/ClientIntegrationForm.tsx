@@ -1,4 +1,7 @@
-import type { ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
+
+import { FormField } from "@shared/components/FormField";
+import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 
 import {
   formatBrazilianPhoneInput,
@@ -8,11 +11,18 @@ import {
 
 import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
+import { ClientAddressFields } from "../form/ClientAddressFields";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type {
   CreateClientIntegrationFormValues,
   UpdateClientIntegrationFormValues,
 } from "../types";
+import { CLIENT_TAX_REGIME_OPTIONS, getClientTaxRegime } from "../utils/clientForm";
+import {
+  getIntegrationEmailError,
+  getPhoneInputHint,
+  type IntegrationFieldErrors,
+} from "../utils/integrationForm";
 
 type IntegrationFormMode = "create" | "edit";
 
@@ -32,6 +42,12 @@ interface ClientIntegrationFormProps {
   onSubmit: () => void;
   onCancel: () => void;
   cnpjLookupStatus?: "idle" | "loading" | "success" | "unavailable";
+  cnpjLookupError?: unknown;
+  /** Liga os erros de campo depois de uma tentativa de salvar, mesmo sem blur. */
+  showFieldErrors?: boolean;
+  /** Erros do envio, mostrados abaixo de cada campo (#1367). */
+  fieldErrors?: IntegrationFieldErrors;
+  legacyTaxRegime?: string | null;
 }
 
 const labelClassName = "block text-sm font-medium text-slate-700 dark:text-white";
@@ -52,10 +68,15 @@ export function ClientIntegrationForm({
   onSubmit,
   onCancel,
   cnpjLookupStatus = "idle",
+  cnpjLookupError,
+  showFieldErrors = false,
+  fieldErrors = {},
+  legacyTaxRegime,
 }: ClientIntegrationFormProps) {
+  const cnpjLookupReason = (cnpjLookupError as { response?: { data?: { error?: unknown } } })
+    ?.response?.data?.error;
   const isCreate = mode === "create" && isCreateValues(values);
   const createValues = isCreate ? values : null;
-  const editValues = !isCreate ? (values as UpdateClientIntegrationFormValues) : null;
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
     const formatDocument = values.type === "PJ" ? formatCnpjInput : formatCpfInput;
 
@@ -64,7 +85,13 @@ export function ClientIntegrationForm({
   const handleCpfChange = (event: ChangeEvent<HTMLInputElement>) => {
     forwardFormattedInputChange(event, formatCpfInput, onChange);
   };
+  const [phoneHint, setPhoneHint] = useState<string | null>(null);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const emailError =
+    fieldErrors.email ??
+    (emailTouched || showFieldErrors ? getIntegrationEmailError(values.email) : null);
   const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setPhoneHint(getPhoneInputHint(event.target.value));
     forwardFormattedInputChange(event, formatBrazilianPhoneInput, onChange);
   };
 
@@ -72,7 +99,9 @@ export function ClientIntegrationForm({
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <label className="space-y-1.5">
-          <span className={labelClassName}>Tipo de Pessoa</span>
+          <RequiredFieldLabel className={labelClassName} required>
+            Tipo de Pessoa
+          </RequiredFieldLabel>
           <ClientNativeSelect
             name="type"
             value={values.type}
@@ -99,39 +128,86 @@ export function ClientIntegrationForm({
         </label>
 
         <label className="space-y-1.5">
-          <span className={labelClassName}>{values.type === "PJ" ? "CNPJ" : "CPF"}</span>
-          <input
-            name="cpf_cnpj"
-            value={values.cpf_cnpj}
-            onChange={handleCpfCnpjChange}
+          <span className={labelClassName}>Regime tributário</span>
+          <ClientNativeSelect
+            name="regime"
+            value={values.regime}
+            onChange={onChange}
             disabled={disabled}
-            placeholder="Somente números"
-            className={clientTextFieldClassName}
-          />
-          {cnpjLookupStatus === "loading" ? (
-            <span className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
-              Consultando dados oficiais...
-            </span>
-          ) : cnpjLookupStatus === "unavailable" ? (
-            <span className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
-              Consulta automática indisponível; preencha os dados manualmente.
+          >
+            <option value="">Selecione um regime</option>
+            {CLIENT_TAX_REGIME_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </ClientNativeSelect>
+          {legacyTaxRegime &&
+          values.regime === "" &&
+          getClientTaxRegime(legacyTaxRegime) === "" ? (
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
+              Regime atual: {legacyTaxRegime}
             </span>
           ) : null}
         </label>
 
-        <label className="space-y-1.5">
-          <span className={labelClassName}>Nome / Apelido</span>
-          <input
-            name="name"
-            value={values.name}
-            onChange={onChange}
-            disabled={disabled}
-            className={clientTextFieldClassName}
-          />
-        </label>
+        <div className="space-y-1.5">
+          <FormField
+            className="gap-1.5"
+            labelClassName={labelClassName}
+            label={values.type === "PJ" ? "CNPJ" : "CPF"}
+            required
+            error={fieldErrors.cpf_cnpj}
+          >
+            <input
+              name="cpf_cnpj"
+              value={values.cpf_cnpj}
+              onChange={handleCpfCnpjChange}
+              disabled={disabled}
+              placeholder="Somente números"
+              className={clientTextFieldClassName}
+            />
+          </FormField>
+          {/* Espaço reservado: o aviso da consulta chega depois e não pode empurrar os campos. */}
+          <span className="block min-h-12 text-xs" aria-live="polite">
+            {cnpjLookupStatus === "loading" ? (
+              <span className="text-slate-500 dark:text-slate-400">
+                Consultando dados oficiais...
+              </span>
+            ) : cnpjLookupStatus === "unavailable" ? (
+              <span className="line-clamp-3 text-amber-700 dark:text-amber-300">
+                {typeof cnpjLookupReason === "string" ? `${cnpjLookupReason} ` : null}
+                Consulta automática indisponível. Preencha os dados manualmente; você pode salvar
+                normalmente.
+              </span>
+            ) : null}
+          </span>
+        </div>
 
-        <label className="space-y-1.5">
-          <span className={labelClassName}>Razão Social</span>
+        {values.type === "PF" ? (
+          <FormField
+            className="gap-1.5"
+            labelClassName={labelClassName}
+            label="Nome / Apelido"
+            required
+            error={fieldErrors.name}
+          >
+            <input
+              name="name"
+              value={values.name}
+              onChange={onChange}
+              disabled={disabled}
+              className={clientTextFieldClassName}
+            />
+          </FormField>
+        ) : null}
+
+        <FormField
+          className="gap-1.5"
+          labelClassName={labelClassName}
+          label="Razão Social"
+          error={values.type === "PF" ? null : fieldErrors.name}
+        >
           <input
             name="company_name"
             value={values.company_name}
@@ -139,7 +215,7 @@ export function ClientIntegrationForm({
             disabled={disabled}
             className={clientTextFieldClassName}
           />
-        </label>
+        </FormField>
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Nome Fantasia</span>
@@ -173,21 +249,32 @@ export function ClientIntegrationForm({
             value={values.number}
             onChange={handlePhoneChange}
             disabled={disabled}
+            inputMode="tel"
             className={clientTextFieldClassName}
           />
+          {phoneHint ? (
+            <span className="block text-xs text-amber-700 dark:text-amber-300" role="status">
+              {phoneHint}
+            </span>
+          ) : null}
         </label>
 
-        <label className="space-y-1.5 md:col-span-2 xl:col-span-2">
-          <span className={labelClassName}>E-mail</span>
+        <FormField
+          className="gap-1.5 md:col-span-2 xl:col-span-2"
+          labelClassName={labelClassName}
+          label="E-mail"
+          error={emailError}
+        >
           <input
             type="email"
             name="email"
             value={values.email}
             onChange={onChange}
+            onBlur={() => setEmailTouched(true)}
             disabled={disabled}
             className={clientTextFieldClassName}
           />
-        </label>
+        </FormField>
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Responsável Legal</span>
@@ -200,8 +287,12 @@ export function ClientIntegrationForm({
           />
         </label>
 
-        <label className="space-y-1.5">
-          <span className={labelClassName}>CPF Responsável</span>
+        <FormField
+          className="gap-1.5"
+          labelClassName={labelClassName}
+          label="CPF Responsável"
+          error={fieldErrors.cpf_responsible}
+        >
           <input
             name="cpf_responsible"
             value={values.cpf_responsible}
@@ -210,7 +301,7 @@ export function ClientIntegrationForm({
             placeholder="Somente números"
             className={clientTextFieldClassName}
           />
-        </label>
+        </FormField>
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Preposto</span>
@@ -223,8 +314,12 @@ export function ClientIntegrationForm({
           />
         </label>
 
-        <label className="space-y-1.5">
-          <span className={labelClassName}>CPF Preposto</span>
+        <FormField
+          className="gap-1.5"
+          labelClassName={labelClassName}
+          label="CPF Preposto"
+          error={fieldErrors.cpf_agent}
+        >
           <input
             name="cpf_agent"
             value={values.cpf_agent}
@@ -233,7 +328,7 @@ export function ClientIntegrationForm({
             placeholder="Somente números"
             className={clientTextFieldClassName}
           />
-        </label>
+        </FormField>
 
         <label className="space-y-1.5">
           <span className={labelClassName}>Instagram</span>
@@ -283,64 +378,12 @@ export function ClientIntegrationForm({
           </>
         ) : null}
 
-        {editValues ? (
-          <>
-            <label className="space-y-1.5 md:col-span-2 xl:col-span-2">
-              <span className={labelClassName}>Endereço</span>
-              <input
-                name="address"
-                value={editValues.address}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className={labelClassName}>CEP</span>
-              <input
-                name="cep"
-                value={editValues.cep}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className={labelClassName}>Bairro</span>
-              <input
-                name="neighborhood"
-                value={editValues.neighborhood}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className={labelClassName}>Estado</span>
-              <input
-                name="state"
-                value={editValues.state}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className={labelClassName}>Cidade</span>
-              <input
-                name="city"
-                value={editValues.city}
-                onChange={onChange}
-                disabled={disabled}
-                className={clientTextFieldClassName}
-              />
-            </label>
-          </>
-        ) : null}
+        <ClientAddressFields
+          values={values}
+          disabled={disabled}
+          onChange={onChange}
+          addressFieldClassName="space-y-1.5 md:col-span-2 xl:col-span-2"
+        />
 
         <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 md:col-span-2 xl:col-span-3 dark:border-slate-700 dark:bg-slate-950/40">
           <input

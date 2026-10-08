@@ -10,9 +10,10 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
-import { Dialog, PaginationControls } from "@shared/components";
+import { ConfirmationDialog, PaginationControls } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { useDebouncedValue } from "@shared/hooks";
 import { getLastPage } from "@shared/pagination/pagination";
 import { cn } from "@shared/ui/newLayout/utils";
@@ -35,7 +36,6 @@ import {
   type UnionDeletionState,
 } from "../utils/unionDeletionFlow";
 import {
-  pessoalDangerButtonClassName,
   pessoalPrimaryButtonClassName,
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
@@ -44,6 +44,7 @@ import {
   buildPessoalUnionFormPayload,
   buildPessoalUnionFormValues,
   formatPessoalUnionCnpjInput,
+  validatePessoalUnionPayload,
 } from "./pessoalFormValueHelpers";
 
 const UNIONS_PAGE_SIZE = 20;
@@ -164,6 +165,8 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
       const message = getPessoalErrorMessage(error, "Não foi possível remover o sindicato.");
       setUnionDeletion((current) => failUnionDeletion(current, unionId, message));
       toast.error(message);
+      // Relança para o ConfirmationDialog permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -172,6 +175,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
       ...current,
       [field]: field === "cnpj" ? formatPessoalUnionCnpjInput(value) : value,
     }));
+    setFormError(null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -183,8 +187,9 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
 
     const payload = buildPessoalUnionFormPayload(formValues);
 
-    if (!payload.name || !payload.cnpj) {
-      setFormError("Informe nome e CNPJ.");
+    const validationError = validatePessoalUnionPayload(payload, selectedUnion?.cnpj);
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
 
@@ -307,6 +312,7 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         {formatCPF_CNPJ(union.cnpj) || "-"}
+                        <DocumentIssueBadge value={union.cnpj} />
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         {formatUnionDate(union.base_date)}
@@ -355,59 +361,23 @@ export function PessoalUnionsSection({ canEdit }: PessoalUnionsSectionProps) {
         </div>
       </div>
 
-      <Dialog
+      <ConfirmationDialog
         open={Boolean(unionDeletion)}
         onOpenChange={handleDeleteDialogOpenChange}
         title="Remover sindicato"
-        description="Confirmação de remoção de sindicato"
-        contentClassName="w-[min(92vw,520px)]"
-        bodyClassName="space-y-3"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() =>
-                setUnionDeletion((current) =>
-                  cancelUnionDeletion(current, deleteMutation.isPending),
-                )
-              }
-              disabled={deleteMutation.isPending}
-              className={pessoalSecondaryButtonClassName}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDelete}
-              disabled={deleteMutation.isPending}
-              className={pessoalDangerButtonClassName}
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Confirmar remoção
-            </button>
-          </>
+        description={
+          unionDeletion
+            ? `Remover o sindicato ${unionDeletion.union.name} · ${
+                formatCPF_CNPJ(unionDeletion.union.cnpj) || unionDeletion.union.cnpj
+              }? Se ele estiver vinculado a uma configuração de folha, a remoção será bloqueada até que o vínculo seja alterado.`
+            : ""
         }
-      >
-        <p className="text-sm text-gray-700 dark:text-slate-300">
-          Esta ação remove o sindicato selecionado. Se ele estiver vinculado a uma configuração de
-          folha, a remoção será bloqueada até que o vínculo seja alterado.
-        </p>
-        {unionDeletion ? (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
-            {unionDeletion.union.name} ·{" "}
-            {formatCPF_CNPJ(unionDeletion.union.cnpj) || unionDeletion.union.cnpj}
-          </p>
-        ) : null}
-        {unionDeletion?.error ? (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-300">
-            {unionDeletion.error}
-          </p>
-        ) : null}
-      </Dialog>
+        onConfirm={handleConfirmDelete}
+        isConfirming={deleteMutation.isPending}
+        errorMessage={unionDeletion?.error ?? null}
+        confirmLabel="Confirmar remoção"
+        cancelLabel="Cancelar"
+      />
 
       {isFormOpen && canEdit ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 p-4 backdrop-blur-sm">

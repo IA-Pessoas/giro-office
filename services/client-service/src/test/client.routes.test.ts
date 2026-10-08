@@ -65,10 +65,17 @@ function emptyListPage(): ClientListPage {
 
 function mockServiceBase(): Pick<
   IClientService,
-  "listByOrganization" | "getById" | "create" | "update" | "deactivate" | "activate"
+  | "listByOrganization"
+  | "listInstagramProfiles"
+  | "getById"
+  | "create"
+  | "update"
+  | "deactivate"
+  | "activate"
 > {
   return {
     listByOrganization: vi.fn(),
+    listInstagramProfiles: vi.fn(),
     getById: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -151,12 +158,17 @@ function buildPAPrismaMock() {
   } as unknown as PrismaClient;
 }
 
-function bearerToken(organizationId: string, permission?: number, integracao = 1): string {
+function bearerToken(
+  organizationId: string,
+  permission?: number,
+  integracao = 1,
+  pessoal?: number,
+): string {
   return jwt.sign(
     {
       user_id: "user-test-1",
       organization_id: organizationId,
-      modules: { integracao },
+      modules: { integracao, ...(pessoal !== undefined ? { pessoal } : {}) },
       ...(permission !== undefined ? { permission } : {}),
     },
     TEST_JWT_SECRET,
@@ -311,6 +323,63 @@ describe("client-service", () => {
       },
       { userId: "user-test-1", level: 1, isOwner: false },
     );
+  });
+
+  it("GET /client/instagram-profiles/report uses organization context and Office read permission", async () => {
+    const report = {
+      items: [{ id: TEST_CLIENT_ID, name: "Cliente A", status: "Ativo", instagram: "@cliente" }],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      hasMore: false,
+    };
+    const mock: IClientService = {
+      ...mockServiceBase(),
+      listInstagramProfiles: vi.fn().mockResolvedValue(report),
+    };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID, 0, 1);
+
+    const response = await request(app)
+      .get("/client/instagram-profiles/report")
+      .query({ profile: "with", page: "1", limit: "10" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(report);
+    expect(mock.listInstagramProfiles).toHaveBeenCalledWith(TEST_ORG_ID, {
+      page: 1,
+      pageSize: 10,
+      profile: "with",
+      search: undefined,
+    });
+  });
+
+  it("GET /client/instagram-profiles/report rejects client-selected organization scope", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID);
+
+    const response = await request(app)
+      .get("/client/instagram-profiles/report")
+      .query({ organization_id: "660e8400-e29b-41d4-a716-446655440001" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(400);
+    expect(mock.listInstagramProfiles).not.toHaveBeenCalled();
+  });
+
+  it("GET /client/instagram-profiles/report blocks Office users without integration read access", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const app = buildTestApp(mock);
+    const token = bearerToken(TEST_ORG_ID, 3, 0);
+
+    const response = await request(app)
+      .get("/client/instagram-profiles/report")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(403);
+    expect(mock.listInstagramProfiles).not.toHaveBeenCalled();
   });
 
   it("GET /client/integration consulta CNPJ alfanumérico pelo provider injetado", async () => {
@@ -780,7 +849,7 @@ describe("client-service", () => {
     const res = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("<script>alert(1)</script>"), {
         filename: "payload.html",
@@ -802,7 +871,7 @@ describe("client-service", () => {
     const res = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("<script>alert(1)</script>"), {
         filename: "payload.pdf",
@@ -826,7 +895,7 @@ describe("client-service", () => {
     await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("<script>alert(1)</script>"), {
         filename: "payload.html",
@@ -836,7 +905,7 @@ describe("client-service", () => {
     const second = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("<script>alert(1)</script>"), {
         filename: "payload.html",
@@ -854,7 +923,7 @@ describe("client-service", () => {
     const res = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.alloc(10 * 1024 * 1024 + 1), {
         filename: "large.pdf",
@@ -888,7 +957,7 @@ describe("client-service", () => {
     const res = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/histories`)
       .set("Authorization", `Bearer ${token}`)
-      .field("date", "2026-01-01")
+      .field("date", "2026-01-01T12:00:00.000Z")
       .field("history", "Histórico")
       .attach("file", Buffer.from("%PDF-1.7"), {
         filename: "doc.pdf",
@@ -903,6 +972,34 @@ describe("client-service", () => {
         originalName: "doc.pdf",
       }),
     );
+  });
+
+  it("DELETE /client/:id/histories/:historyId lets the author or an admin remove it", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const historyId = "770e8400-e29b-41d4-a716-446655440003";
+    const prisma = {
+      clientHistory: {
+        findFirst: vi.fn().mockResolvedValue({ id: historyId, user_id: "someone-else" }),
+        delete: vi.fn().mockResolvedValue({ id: historyId }),
+      },
+    } as unknown as PrismaClient;
+    const app = buildTestApp(mock, { prisma });
+    const remove = (token: string) =>
+      request(app)
+        .delete(`/client/${TEST_CLIENT_ID}/histories/${historyId}`)
+        .set("Authorization", `Bearer ${token}`);
+
+    const byOtherUser = await remove(bearerToken(TEST_ORG_ID, 1));
+    const byAdmin = await remove(bearerToken(TEST_ORG_ID, 2));
+
+    expect(byOtherUser.status).toBe(403);
+    expect(byOtherUser.body.error).toBe("Usuário não tem permissão para excluir este histórico.");
+    expect(byAdmin.status).toBe(200);
+    expect(prisma.clientHistory.delete).toHaveBeenCalledTimes(1);
+    expect(prisma.clientHistory.findFirst).toHaveBeenCalledWith({
+      where: { id: historyId, client_id: TEST_CLIENT_ID, organization_id: TEST_ORG_ID },
+      select: { id: true, user_id: true },
+    });
   });
 
   it("GET /client/:id/histories/:historyId/file returns a signed attachment URL", async () => {
@@ -949,11 +1046,20 @@ describe("client-service", () => {
     );
   });
 
-  it("supports create, detail and update for client PA", async () => {
+  it.each([
+    { globalLevel: 0, pessoalLevel: 0 },
+    { globalLevel: 1, pessoalLevel: 0 },
+    { globalLevel: 2, pessoalLevel: 0 },
+    { globalLevel: 3, pessoalLevel: 0 },
+    { globalLevel: 0, pessoalLevel: 1 },
+  ])("preserva acesso autenticado ao PA com níveis global $globalLevel e Pessoal $pessoalLevel", async ({
+    globalLevel,
+    pessoalLevel,
+  }) => {
     const mock: IClientService = { ...mockServiceBase() };
     const prisma = buildPAPrismaMock();
     const app = buildTestApp(mock, { prisma });
-    const token = bearerToken(TEST_ORG_ID);
+    const token = bearerToken(TEST_ORG_ID, globalLevel, 1, pessoalLevel);
 
     const createResponse = await request(app)
       .post(`/client/${TEST_CLIENT_ID}/pa`)
@@ -979,6 +1085,75 @@ describe("client-service", () => {
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body.success).toBe(true);
     expect(updateResponse.body.data.activities).toBe("Atualizado");
+  });
+
+  it("nega leitura, criação e alteração de PA sem autenticação", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const prisma = buildPAPrismaMock();
+    const app = buildTestApp(mock, { prisma });
+    const path = `/client/${TEST_CLIENT_ID}/pa`;
+
+    const responses = await Promise.all([
+      request(app).get(path),
+      request(app).post(path).send({}),
+      request(app).patch(path).send({ activities: "Alterado" }),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([401, 401, 401]);
+    expect(
+      (prisma as unknown as { client: { findFirst: ReturnType<typeof vi.fn> } }).client.findFirst,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("nega leitura, criação e alteração de PA de cliente de outra organização", async () => {
+    const clientFindFirst = vi.fn().mockResolvedValue(null);
+    const paFindFirst = vi.fn().mockResolvedValue(null);
+    const paCreate = vi.fn();
+    const paUpdate = vi.fn();
+    const prisma = {
+      client: { findFirst: clientFindFirst },
+      pA: { findFirst: paFindFirst, create: paCreate, update: paUpdate },
+    } as unknown as PrismaClient;
+    const app = buildTestApp({ ...mockServiceBase() }, { prisma });
+    const path = `/client/${TEST_CLIENT_ID}/pa`;
+    const authorization = `Bearer ${bearerToken(TEST_ORG_ID, 3)}`;
+
+    const responses = await Promise.all([
+      request(app).get(path).set("Authorization", authorization),
+      request(app).post(path).set("Authorization", authorization).send({}),
+      request(app).patch(path).set("Authorization", authorization).send({ activities: "Alterado" }),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([404, 404, 404]);
+    expect(clientFindFirst).toHaveBeenCalledWith({
+      where: { id: TEST_CLIENT_ID, organization_id: TEST_ORG_ID },
+      select: { id: true },
+    });
+    expect(paFindFirst).toHaveBeenCalledWith({
+      where: { client_id: TEST_CLIENT_ID, organization_id: TEST_ORG_ID },
+      select: { client_id: true },
+    });
+    expect(paCreate).not.toHaveBeenCalled();
+    expect(paUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects POST on an existing client PA without overwriting its data (#1310)", async () => {
+    const mock: IClientService = { ...mockServiceBase() };
+    const prisma = buildPAPrismaMock();
+    const pa = (prisma as unknown as { pA: Record<string, ReturnType<typeof vi.fn>> }).pA;
+    pa.findFirst.mockReset().mockResolvedValue({ client_id: TEST_CLIENT_ID });
+    const app = buildTestApp(mock, { prisma });
+
+    const response = await request(app)
+      .post(`/client/${TEST_CLIENT_ID}/pa`)
+      .set("Authorization", `Bearer ${bearerToken(TEST_ORG_ID)}`)
+      .send({});
+
+    expect(response.status).toBe(409);
+    expect(response.body.success).toBe(false);
+    expect(response.body.code).toBe("CONFLICT");
+    expect(pa.create).not.toHaveBeenCalled();
+    expect(pa.update).not.toHaveBeenCalled();
   });
 });
 

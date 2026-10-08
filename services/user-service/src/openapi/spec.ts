@@ -183,6 +183,22 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
         },
       },
+      "/platform/impersonation/exit": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Encerrar a personificação e retornar à plataforma",
+          description:
+            "Revoga a sessão de personificação, registra motivo e duração na organização-alvo e emite uma nova sessão da plataforma quando o operador continua ativo.",
+          security: browserSession,
+          parameters: [csrfHeader],
+          responses: {
+            "200": { description: "Cookies de plataforma emitidos ou expirados", ...successJson },
+            "401": { description: "Sessão de personificação ausente, inválida ou revogada" },
+            "403": { description: "CSRF inválido ou a sessão não é de personificação" },
+            "503": { description: "Auditoria durável indisponível antes de encerrar" },
+          },
+        },
+      },
       "/platform/me": {
         get: {
           tags: ["Platform auth"],
@@ -192,6 +208,60 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
             "200": { description: "Identidade server-side", ...successJson },
             "401": { description: "Sessão ausente, inválida ou revogada" },
             "403": { description: "Identidade organizacional não permitida" },
+          },
+        },
+      },
+      "/platform/super-admins": {
+        get: {
+          tags: ["Platform auth"],
+          summary: "Listar super admins da plataforma",
+          description:
+            "Consulta somente leitura de nome, email, status e permissão de personificar. Não retorna credenciais.",
+          security: platformBrowserSession,
+          responses: {
+            "200": { description: "Lista de super admins", ...successJson },
+            "401": { description: "Sessão ausente, inválida ou revogada" },
+            "403": { description: "Identidade organizacional não permitida" },
+          },
+        },
+      },
+      "/platform/super-admins/{superAdminId}/impersonation-permission": {
+        patch: {
+          tags: ["Platform auth"],
+          summary: "Alterar permissão de personificação de um super admin",
+          description:
+            "Somente um operador autorizado pode alterar outro super admin. A operação é auditada e não permite autoalteração.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "superAdminId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            csrfHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["can_impersonate"],
+                  properties: { can_impersonate: { type: "boolean" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Permissão atualizada", ...successJson },
+            "400": { description: "Path ou payload inválido" },
+            "401": { description: "Sessão de plataforma ausente ou inválida" },
+            "403": { description: "CSRF ou operador sem permissão" },
+            "404": { description: "Super admin não encontrado" },
+            "409": { description: "Autoalteração ou conflito de concorrência" },
+            "503": { description: "Auditoria durável indisponível" },
           },
         },
       },
@@ -367,7 +437,6 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                   properties: {
                     name: { type: "string" },
                     login: { type: "string" },
-                    password: { type: "string", writeOnly: true },
                     department_id: { type: "string" },
                     permission: { type: "integer", minimum: 0, maximum: 3 },
                     status: { type: "string", enum: ["active", "inactive"] },
@@ -417,6 +486,80 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
               description: "Último owner ativo, versão desatualizada ou conflito de estado",
             },
             "503": { description: "Auditoria durável indisponível antes da mutação" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/users/{userId}/impersonate": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Iniciar personificação de usuário da organização",
+          description:
+            "Emite a sessão de organização do alvo por 60 minutos, revoga a sessão atual da plataforma e registra o evento de auditoria.",
+          security: platformBrowserSession,
+          parameters: [
+            { name: "organizationId", in: "path", required: true, schema: { type: "string" } },
+            { name: "userId", in: "path", required: true, schema: { type: "string" } },
+            csrfHeader,
+          ],
+          responses: {
+            "200": {
+              description: "Sessão do alvo em cookies HttpOnly; nenhum token no JSON",
+              ...successJson,
+            },
+            "401": { description: "Sessão da plataforma ausente, inválida ou revogada" },
+            "403": {
+              description: "Operador sem permissão, usuário inativo ou organização inativa",
+            },
+            "404": { description: "Usuário não pertence à organização do path" },
+            "503": { description: "Auditoria indisponível antes de iniciar a sessão" },
+          },
+        },
+      },
+      "/platform/organizations/{organizationId}/users/{userId}/password-reset": {
+        post: {
+          tags: ["Platform auth"],
+          summary: "Definir a senha de outro usuário",
+          description:
+            "Implementado no Worker. O TI define a nova senha (mínimo de 10 caracteres), sem link por e-mail; todas as sessões do usuário e os links pendentes são revogados.",
+          security: platformBrowserSession,
+          parameters: [
+            {
+              name: "organizationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", minLength: 1 },
+            },
+            csrfHeader,
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["password"],
+                  additionalProperties: false,
+                  properties: { password: { type: "string", writeOnly: true, minLength: 10 } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Senha redefinida", ...successJson },
+            "400": { description: "Senha fora da política" },
+            "401": { description: "Sessão ausente" },
+            "403": {
+              description:
+                "Sem permissão sobre o usuário, alvo é o próprio usuário ou CSRF inválido",
+            },
+            "404": { description: "Usuário fora do tenant" },
+            "409": { description: "Usuário inativo" },
           },
         },
       },
@@ -638,7 +781,7 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           tags: ["Auth"],
           summary: "Usuário autenticado (JWT ou contexto encaminhado pelo gateway)",
           description:
-            "Retorna o usuário e o mapa de permissões modulares da organização autenticada. O mapa contém somente módulos ativos e níveis 0 a 3.",
+            "Retorna o usuário e o mapa de permissões modulares da organização autenticada. O mapa contém somente módulos ativos e níveis 0 a 3. Em sessões de personificação ativas, acrescenta `impersonation` com operador, organização e expiração; o campo é omitido nas sessões comuns.",
           security: bearer,
           responses: {
             "200": { description: "Dados do usuário", ...successJson },
@@ -736,7 +879,16 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
                   properties: {
                     name: { type: "string" },
                     login: { type: "string" },
-                    password: { type: "string" },
+                    password: {
+                      type: "string",
+                      description:
+                        "Só para a própria senha; administradores enviam um link de redefinição (403).",
+                    },
+                    current_password: {
+                      type: "string",
+                      description:
+                        "Obrigatória quando o usuário troca a própria senha; a nova senha precisa de ao menos 10 caracteres e diferir da atual.",
+                    },
                     department_id: { type: "string" },
                     permission: { type: "integer" },
                     status: { type: "string" },
@@ -773,6 +925,10 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           },
           responses: {
             "200": { description: "Atualizado", ...successJson },
+            "400": {
+              description: "Payload inválido, senha atual ausente ou nova senha fora da política",
+            },
+            "403": { description: "Sem permissão ou senha atual incorreta" },
           },
         },
         delete: {
@@ -782,6 +938,68 @@ export function buildUserServiceOpenApiSpec(env: UserServiceEnv): OpenApiDocumen
           parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
           responses: {
             "200": { description: "Desativado", ...successJson },
+          },
+        },
+      },
+      "/user/{id}/password-reset": {
+        post: {
+          tags: ["Users"],
+          summary: "Definir a senha de outro usuário",
+          description:
+            "Implementado no Worker. O TI define a nova senha (mínimo de 10 caracteres), sem link por e-mail; todas as sessões do usuário e os links pendentes são revogados.",
+          security: bearer,
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["password"],
+                  additionalProperties: false,
+                  properties: { password: { type: "string", writeOnly: true, minLength: 10 } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Senha redefinida", ...successJson },
+            "400": { description: "Senha fora da política" },
+            "401": { description: "Sessão ausente" },
+            "403": {
+              description:
+                "Sem permissão sobre o usuário, alvo é o próprio usuário ou CSRF inválido",
+            },
+            "404": { description: "Usuário fora do tenant" },
+            "409": { description: "Usuário inativo" },
+          },
+        },
+      },
+      "/user/password-reset/confirm": {
+        post: {
+          tags: ["Users"],
+          summary: "Definir a senha pelo link de redefinição",
+          description:
+            "Rota pública, implementada no Worker. Consome o token uma única vez, grava a nova senha (mínimo de 10 caracteres) e revoga todas as sessões do usuário.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["token", "password"],
+                  additionalProperties: false,
+                  properties: {
+                    token: { type: "string" },
+                    password: { type: "string", writeOnly: true, minLength: 10 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Senha redefinida", ...successJson },
+            "400": { description: "Link inválido, expirado, já usado ou senha fora da política" },
           },
         },
       },

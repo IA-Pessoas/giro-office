@@ -15,9 +15,17 @@ export interface CreateApiClientOptions {
   /** When set, non-browser 401 responses reject with this error (e.g. SSR). */
   getUnauthorizedErrorForSsr?: () => Error;
   /** Browser only: chamado em respostas HTTP 5xx (ex.: toast genérico). */
-  onServerError?: () => void;
+  onServerError?: (error: AxiosError) => void;
   /** Browser only: chamado quando o gateway rejeita a sessão por CSRF inválido. */
   onCsrfFailure?: () => void;
+}
+
+// POST /user/session e o proprio login: 401 ali e credencial invalida, nao sessao expirada.
+function isLoginAttempt(error: AxiosError): boolean {
+  return (
+    error.config?.method?.toUpperCase() === "POST" &&
+    !!error.config.url?.split(/[?#]/u, 1)[0]?.endsWith("/user/session")
+  );
 }
 
 function isCsrfFailure(error: AxiosError): boolean {
@@ -175,6 +183,7 @@ export function createApiClient(options: CreateApiClientOptions): AxiosInstance 
       }
       if (error.response?.status === 401) {
         if (typeof window !== "undefined") {
+          if (isLoginAttempt(error)) return Promise.reject(error);
           onUnauthorized?.();
         } else if (getUnauthorizedErrorForSsr) {
           return Promise.reject(getUnauthorizedErrorForSsr());
@@ -198,7 +207,7 @@ export function createApiClient(options: CreateApiClientOptions): AxiosInstance 
 
       const status = error.response?.status;
       if (typeof window !== "undefined" && status !== undefined && status >= 500) {
-        onServerError?.();
+        onServerError?.(error);
       }
 
       return Promise.reject(error);

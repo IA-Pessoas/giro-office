@@ -55,7 +55,7 @@ describe("TiInventoryCategoryService", () => {
 
     await expect(service.create(context, { name: "Notebook" })).rejects.toMatchObject({
       statusCode: 409,
-      message: "Ja existe uma categoria de inventario de TI ativa com este nome.",
+      message: "Já existe uma categoria de inventário de TI ativa com este nome.",
     });
   });
 });

@@ -25,7 +25,7 @@ function datePartsInTimezone(date: Date, timezone: string): Record<string, strin
         .map((part) => [part.type, part.value]),
     );
   } catch (err: unknown) {
-    throw new ServiceError(500, "Fuso horario da organizacao invalido.", err);
+    throw new ServiceError(500, "Fuso horário da organização inválido.", err);
   }
 }
 
@@ -47,14 +47,14 @@ function dateTimePartsInTimezone(date: Date, timezone: string): Record<string, s
         .map((part) => [part.type, part.value]),
     );
   } catch (err: unknown) {
-    throw new ServiceError(500, "Fuso horario da organizacao invalido.", err);
+    throw new ServiceError(500, "Fuso horário da organização inválido.", err);
   }
 }
 
 function organizationDateKeyToUtcStart(dateKey: string, timezone: string): Date {
   const target = new Date(`${dateKey}T00:00:00.000Z`);
   if (Number.isNaN(target.getTime())) {
-    throw new ServiceError(400, "Data invalida.");
+    throw new ServiceError(400, "Data inválida.");
   }
 
   let guess = target;
@@ -73,7 +73,7 @@ function organizationDateKeyToUtcStart(dateKey: string, timezone: string): Date 
 
 export function organizationDateKey(date: Date, timezone = DEFAULT_ORGANIZATION_TIMEZONE): string {
   if (Number.isNaN(date.getTime())) {
-    throw new ServiceError(400, "Data invalida.");
+    throw new ServiceError(400, "Data inválida.");
   }
 
   const parts = datePartsInTimezone(date, timezone);
@@ -91,12 +91,12 @@ export function organizationDateKeyFromInput(
       if (!Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value) {
         return value;
       }
-      throw new ServiceError(400, "Data invalida.");
+      throw new ServiceError(400, "Data inválida.");
     }
 
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) {
-      throw new ServiceError(400, "Data invalida.");
+      throw new ServiceError(400, "Data inválida.");
     }
     return organizationDateKey(parsed, timezone);
   }
@@ -125,6 +125,20 @@ export function organizationDayBounds(
   return { start, end: new Date(nextStart.getTime() - 1) };
 }
 
+// Feriado é data civil sem fuso: o holidayService grava à meia-noite UTC. Para achar o feriado de
+// um instante, use o dia civil da organização e procure esse dia em UTC, não os limites locais.
+export function holidayDayBounds(
+  date: Date,
+  timezone = DEFAULT_ORGANIZATION_TIMEZONE,
+): { start: Date; end: Date } {
+  const key = organizationDateKey(date, timezone);
+  return { start: new Date(`${key}T00:00:00.000Z`), end: new Date(`${key}T23:59:59.999Z`) };
+}
+
+export function holidayDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 export function assertSameOrganizationDay(
   times: PointTimes,
   timezone = DEFAULT_ORGANIZATION_TIMEZONE,
@@ -133,7 +147,7 @@ export function assertSameOrganizationDay(
   const fields: Array<keyof PointTimes> = ["lunch_out", "lunch_in", "clock_out"];
   for (const field of fields) {
     if (organizationDateKey(times[field], timezone) !== expected) {
-      throw new ServiceError(400, "Jornadas noturnas nao sao permitidas para ajustes de ponto.");
+      throw new ServiceError(400, "Jornadas noturnas não são permitidas para ajustes de ponto.");
     }
   }
 }
@@ -144,6 +158,6 @@ export function assertChronologicalPointTimes(times: PointTimes): void {
     times.lunch_out.getTime() >= times.lunch_in.getTime() ||
     times.lunch_in.getTime() >= times.clock_out.getTime()
   ) {
-    throw new ServiceError(400, "Os horarios do ajuste devem estar em ordem cronologica.");
+    throw new ServiceError(400, "Os horários do ajuste devem estar em ordem cronológica.");
   }
 }

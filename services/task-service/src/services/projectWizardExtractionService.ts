@@ -12,7 +12,7 @@ import type {
   AiTaskExtractionProvider,
   AiTaskProposal,
 } from "../integrations/aiTaskExtraction.js";
-import prismaClient from "../prisma/index.js";
+import type prismaClient from "../prisma/index.js";
 import { isIsoCalendarDate } from "../utils/civilDate.js";
 
 export const PROJECT_TASK_MODEL_TYPE = "Projeto";
@@ -98,7 +98,7 @@ function findUniqueByName<T extends { name: string }>(
 export class ProjectWizardExtractionService {
   constructor(
     private readonly provider: AiTaskExtractionProvider,
-    private readonly prisma: ExtractionPrisma = prismaClient,
+    private readonly prisma: ExtractionPrisma,
   ) {}
 
   async extractTasks(data: ExtractProjectTasksRequest): Promise<{ tasks: ProjectTaskProposal[] }> {
@@ -167,7 +167,13 @@ export class ProjectWizardExtractionService {
       return deduplicateProposalsBetweenParts(proposals);
     } catch {
       logError("Falha na extração de tarefas propostas pela IA.");
-      throw new ServiceError(502, "Não foi possível extrair tarefas da Ata inteira.");
+      throw new ServiceError(
+        502,
+        "Não foi possível extrair tarefas da Ata inteira.",
+        undefined,
+        undefined,
+        { expose: true },
+      );
     }
   }
 }

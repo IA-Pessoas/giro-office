@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, RotateCcw, Send, X } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import type { ModuleAccess } from "@modules/auth";
 
@@ -19,7 +19,12 @@ interface TaskCompletionPanelProps {
   canApproveCompletion: boolean;
   task: Pick<
     IntegracaoTaskDetail,
-    "id" | "status" | "responsible_id" | "responsible2_id" | "responsible3_id"
+    | "id"
+    | "status"
+    | "commercial_validation_pending"
+    | "responsible_id"
+    | "responsible2_id"
+    | "responsible3_id"
   >;
   currentUserId: string | undefined;
   accessLevel: ModuleAccess["level"];
@@ -71,6 +76,7 @@ export function TaskCompletionPanel({
     isOwner ||
     (accessLevel === "edit" && canApproveCompletion);
   const canReopen = accessLevel === "admin" || isOwner;
+  const awaitingCommercialValidation = task.commercial_validation_pending === true;
   const isMutating =
     requestMutation.isPending ||
     decisionMutation.isPending ||
@@ -140,7 +146,11 @@ export function TaskCompletionPanel({
         </p>
       </div>
 
-      {task.status === "Concluída" ? (
+      {awaitingCommercialValidation ? (
+        <p className="text-sm text-amber-700 dark:text-amber-300" role="status">
+          Aguardando validação do Comercial para liberar a execução.
+        </p>
+      ) : task.status === "Concluída" ? (
         canReopen ? (
           <div className="space-y-2">
             <textarea

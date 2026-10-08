@@ -43,6 +43,7 @@ function gatewayHeaders(
 
 function createMockDeps(): TriageDocumentsRouteDeps {
   return {
+    listFiscalPortfolio: vi.fn(async () => ({ competence: "2026-09", items: [] })),
     getMonthly: vi.fn(async () => ({ id: MONTHLY_ID })),
     getOrCreateMonthly: vi.fn(async () => ({ id: MONTHLY_ID })),
     updateItem: vi.fn(async () => ({ id: MONTHLY_ID })),
@@ -54,9 +55,35 @@ function createMockDeps(): TriageDocumentsRouteDeps {
 }
 
 describe("triage document routes", () => {
+  it("GET /triagem/fiscal-portfolio valida competência e encaminha contexto fiscal", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+    const headers = gatewayHeaders({ fiscal: 1, triagem: 1 });
+
+    const invalid = await request(app)
+      .get("/triagem/fiscal-portfolio?competence=2026-13")
+      .set(headers);
+    expect(invalid.status).toBe(400);
+    expect(deps.listFiscalPortfolio).not.toHaveBeenCalled();
+
+    const response = await request(app)
+      .get("/triagem/fiscal-portfolio?competence=2026-09")
+      .set(headers);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: { competence: "2026-09", items: [] } });
+    expect(deps.listFiscalPortfolio).toHaveBeenCalledWith(
+      "2026-09",
+      expect.objectContaining({
+        organizationId: ORG_ID,
+        modules: expect.objectContaining({ fiscal: 1 }),
+      }),
+    );
+  });
+
   it("publica cada operação de triagem como path OpenAPI de primeiro nível", () => {
     const spec = buildContabilServiceOpenApiSpec(env);
 
+    expect(spec.paths).toHaveProperty("/triagem/fiscal-portfolio.get.responses.200");
     expect(spec.paths).toHaveProperty("/triagem/monthly.get");
     expect(spec.paths).toHaveProperty("/triagem/monthly.post.responses.200");
     expect(spec.paths).toHaveProperty("/triagem/monthly/{id}/item.patch");
@@ -127,6 +154,19 @@ describe("triage document routes", () => {
         modules: expect.objectContaining({ contabil: 2, triagem: 1 }),
       }),
     );
+  });
+
+  it("GET /triagem/monthly sem registro retorna 200 com data null (#1322)", async () => {
+    const deps = createMockDeps();
+    vi.mocked(deps.getMonthly).mockResolvedValue(null);
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .get(`/triagem/monthly?client_id=${CLIENT_ID}&competence=2026-09`)
+      .set(gatewayHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: null });
   });
 
   it("POST /triagem/monthly aceita a rotina fiscal explicitamente", async () => {
@@ -247,6 +287,41 @@ describe("triage document routes", () => {
         status: "ATTENTION",
         delivery_method: "",
       });
+
+    expect(res.status).toBe(400);
+    expect(deps.updateItem).not.toHaveBeenCalled();
+  });
+
+  it("PATCH /triagem/monthly/:id/item aceita chaves fiscais nulas na rotina contábil", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({
+        field: "financial_transactions",
+        status: "PENDING",
+        note: "Aguardando extrato",
+        justification: null,
+        delivery_method: null,
+        state_site: null,
+      });
+
+    expect(res.status).toBe(200);
+    expect(deps.updateItem).toHaveBeenCalled();
+  });
+
+  it("PATCH /triagem/monthly/:id/item recusa site estadual na rotina contábil", async () => {
+    const deps = createMockDeps();
+    const app = createContabilApp({ env, logger, triageDocumentsRouteDeps: deps });
+
+    const res = await request(app)
+      .patch(`/triagem/monthly/${MONTHLY_ID}/item`)
+      .set("Content-Type", "application/json")
+      .set(gatewayHeaders())
+      .send({ field: "financial_transactions", status: "PENDING", state_site: "SP" });
 
     expect(res.status).toBe(400);
     expect(deps.updateItem).not.toHaveBeenCalled();

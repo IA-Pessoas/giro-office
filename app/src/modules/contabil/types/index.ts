@@ -79,6 +79,10 @@ export interface ContabilControlFilters {
 export interface ContabilControlPortfolioItem {
   client_id: string;
   legal_name: string;
+  cpf_cnpj: string;
+  regime: string | null;
+  person_responsible_id: string | null;
+  posted_by_id: string | null;
   control: ContabilControl | null;
   closing: TriageClosing;
 }
@@ -207,6 +211,24 @@ export interface TriageDocumentsMonthly {
   checklist: Record<string, TriageDocumentStatus>;
   item_notes: Record<string, TriageDocumentItemNotes>;
   summary: { applicable: number; completed: number; attention: number; pending: number; notApplicable: number; notPresent: number; percentage: number };
+}
+
+export interface FiscalTriagePortfolioItem {
+  client_id: string;
+  legal_name: string;
+  cpf_cnpj: string;
+  regime: string | null;
+  responsible_id: string | null;
+  responsible_name: string | null;
+  can_edit: boolean;
+  has_competence: boolean;
+  planned_checklist: Record<TriageFiscalChecklistField, TriageDocumentStatus> | null;
+  monthly: Pick<TriageDocumentsMonthly, "id" | "checklist" | "item_notes"> | null;
+}
+
+export interface FiscalTriagePortfolio {
+  competence: ContabilCompetence;
+  items: FiscalTriagePortfolioItem[];
 }
 
 export interface TriageBankStatement {

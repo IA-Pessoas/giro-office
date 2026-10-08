@@ -19,7 +19,9 @@ const contentSecurityPolicy = [
   "connect-src 'self'",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  "upgrade-insecure-requests",
+  ...(["develop", "staging"].includes(process.env.DEPLOY_SLOT)
+    ? []
+    : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 export const securityHeaders = [
@@ -40,12 +42,23 @@ const nextConfig = {
   reactStrictMode: true,
   allowedDevOrigins: ["localhost", "127.0.0.1"],
   transpilePackages: ["@workspace/api"],
+  // Os logos ja sao webp pequenos; servir direto evita depender de /_next/image no Worker.
+  images: { unoptimized: true },
   async headers() {
     return [
       {
         source: "/:path*",
         headers: securityHeaders,
       },
+    ];
+  },
+  // #1370: rotas legadas vão para as telas atuais (sem 308 permanente, para poder mudar depois).
+  async redirects() {
+    return [
+      { source: "/home", destination: "/dashboard", permanent: false },
+      { source: "/users", destination: "/administracao", permanent: false },
+      { source: "/me", destination: "/configuracoes", permanent: false },
+      { source: "/clients/:id/commercial", destination: "/clients/:id", permanent: false },
     ];
   },
   async rewrites() {

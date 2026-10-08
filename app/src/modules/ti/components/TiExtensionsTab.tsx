@@ -7,7 +7,7 @@ import {
   PhoneCall,
   Save,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import { listAdminUsers } from "@modules/users";
@@ -165,7 +165,7 @@ export function TiExtensionsTab() {
     const number = extensionForm.number.trim();
 
     if (!isValidTiExtensionNumber(number)) {
-      toast.error("Informe um ramal com exatamente 4 dígitos.");
+      toast.error("Informe um ramal com 3 ou 4 dígitos.");
       return null;
     }
 
@@ -184,7 +184,7 @@ export function TiExtensionsTab() {
     const number = extensionForm.number.trim();
 
     if (!isValidTiExtensionNumber(number)) {
-      toast.error("Informe um ramal com exatamente 4 dígitos.");
+      toast.error("Informe um ramal com 3 ou 4 dígitos.");
       return null;
     }
 
@@ -353,7 +353,7 @@ export function TiExtensionsTab() {
                     sanitizeTiExtensionNumber(event.target.value),
                   )
                 }
-                placeholder="Ex: 1001"
+                placeholder="Ex: 101 ou 1001"
                 value={extensionForm.number}
               />
               <TiNativeSelect

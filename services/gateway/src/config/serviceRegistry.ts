@@ -33,6 +33,7 @@ const PARCELAMENTO_SERVICE_PREFIXES = ["/parcelamento"] as const;
 const REPORTS_SERVICE_PREFIXES = ["/reports"] as const;
 
 const COMMERCIAL_SERVICE_PREFIXES = ["/commercial"] as const;
+const MARKETING_SERVICE_PREFIXES = ["/marketing"] as const;
 
 function matchesPrefix(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
@@ -93,9 +94,19 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
         },
         { methods: ["POST"], path: /^\/platform\/session\/refresh\/?$/ },
         { methods: ["GET"], path: /^\/platform\/me\/?$/ },
+        { methods: ["GET"], path: /^\/platform\/super-admins\/?$/ },
+        { methods: ["POST"], path: /^\/platform\/impersonation\/exit\/?$/ },
+        {
+          methods: ["PATCH"],
+          path: /^\/platform\/super-admins\/[^/]+\/impersonation-permission\/?$/,
+        },
         {
           methods: ["POST"],
           path: /^\/platform\/organizations\/[^/]+\/users\/?$/,
+        },
+        {
+          methods: ["POST"],
+          path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate\/?$/,
         },
         {
           methods: ["GET"],
@@ -289,6 +300,14 @@ export function getGatewayServiceDefinitions(env: GatewayEnv): GatewayServiceDef
       routePrefixes: [...COMMERCIAL_SERVICE_PREFIXES],
       internalServiceToken: env.auditServiceToken,
       permissionModule: "comercial",
+    },
+    {
+      key: "marketing-service",
+      targetUrl: env.marketingServiceUrl,
+      auditTarget: "marketing-service",
+      routePrefixes: [...MARKETING_SERVICE_PREFIXES],
+      internalServiceToken: env.marketingServiceInternalToken,
+      permissionModule: "marketing",
     },
     {
       key: "audit-service",

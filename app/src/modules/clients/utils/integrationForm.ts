@@ -12,6 +12,8 @@ import type {
   UpdateClientIntegrationFormValues,
   UpdateClientIntegrationPayload,
 } from "../types";
+import { getClientInternalName, getClientTaxRegime } from "./clientForm.ts";
+import { validateCpfCnpjDocument, validateOptionalCpfDocument } from "./documentValidation.ts";
 const nullableTextFieldNames = [
   "company_name",
   "fantasy_name",
@@ -41,6 +43,25 @@ export function normalizeNullableTextValue(value: string | null | undefined): st
 
 export function normalizeDocumentValue(value: string | null | undefined): string {
   return (value ?? "").replace(/\D/g, "");
+}
+
+// Mesmo padrão do z.string().email() do backend (zod 3), para o erro aparecer antes do 400.
+const EMAIL_PATTERN = /^(?!\.)(?!.*\.\.)([A-Z0-9_'+\-.]*)[A-Z0-9_+-]@([A-Z0-9][A-Z0-9-]*\.)+[A-Z]{2,}$/i;
+
+export function getIntegrationEmailError(value: string | null | undefined): string | null {
+  const email = (value ?? "").trim();
+
+  return email && !EMAIL_PATTERN.test(email) ? "Informe um e-mail válido." : null;
+}
+
+// A máscara descarta letras; o aviso diz por que o que foi digitado sumiu.
+export function getPhoneInputHint(rawValue: string): string | null {
+  return /[a-zA-Z]/.test(rawValue) ? "Telefone aceita apenas números." : null;
+}
+
+// CNPJ igual ao salvo já foi consultado no cadastro; só um CNPJ novo dispara a consulta oficial.
+export function getCnpjToLookup(current: string, saved: string | null | undefined): string {
+  return normalizeCnpjInput(current) === normalizeCnpjInput(saved) ? "" : current;
 }
 
 export function hasUsableIntegrationData(client: Client | null | undefined): boolean {
@@ -93,6 +114,7 @@ export function mergeClientCompanyLookup(
 export function createClientIntegrationInitialValues(): CreateClientIntegrationFormValues {
   return {
     type: "PJ",
+    regime: "",
     name: "",
     cpf_cnpj: "",
     company_name: "",
@@ -110,6 +132,11 @@ export function createClientIntegrationInitialValues(): CreateClientIntegrationF
     meet_type: "",
     type_registration: "Existente",
     service_unique: false,
+    address: "",
+    cep: "",
+    neighborhood: "",
+    state: "",
+    city: "",
   };
 }
 
@@ -120,6 +147,7 @@ export function createUpdateClientIntegrationInitialValues(
 
   return {
     type,
+    regime: getClientTaxRegime(client.regime),
     name: client.name ?? "",
     cpf_cnpj:
       type === "PJ"
@@ -152,7 +180,8 @@ export function buildCreateClientIntegrationPayload(
   return {
     organization_id: organizationId,
     type: values.type,
-    name: values.name.trim(),
+    regime: values.regime || null,
+    name: getClientInternalName(values),
     cpf_cnpj: normalizeIntegrationDocumentValue(values.cpf_cnpj, values.type),
     company_name: normalizeNullableTextValue(values.company_name),
     fantasy_name: normalizeNullableTextValue(values.fantasy_name),
@@ -169,6 +198,11 @@ export function buildCreateClientIntegrationPayload(
     meet_type: normalizeNullableTextValue(values.meet_type),
     type_registration: normalizeNullableTextValue(values.type_registration),
     service_unique: values.service_unique,
+    address: normalizeNullableTextValue(values.address),
+    cep: normalizeNullableTextValue(values.cep),
+    neighborhood: normalizeNullableTextValue(values.neighborhood),
+    state: normalizeNullableTextValue(values.state),
+    city: normalizeNullableTextValue(values.city),
   };
 }
 
@@ -183,7 +217,11 @@ export function buildUpdateClientIntegrationPayload(
     payload.type = values.type;
   }
 
-  const nextName = values.name.trim();
+  if (values.regime !== currentValues.regime) {
+    payload.regime = values.regime || null;
+  }
+
+  const nextName = getClientInternalName(values);
   const currentName = currentValues.name.trim();
 
   if (nextName.length > 0 && nextName !== currentName) {
@@ -227,4 +265,31 @@ export function buildUpdateClientIntegrationPayload(
   }
 
   return payload;
+}
+
+export type IntegrationFieldErrors = Partial<
+  Record<"name" | "cpf_cnpj" | "email" | "cpf_responsible" | "cpf_agent", string | null>
+>;
+
+/** Erros de cada campo do cadastro por integração, exibidos abaixo do campo (#1367). */
+export function getIntegrationFieldErrors(
+  values: Pick<
+    CreateClientIntegrationFormValues,
+    "type" | "name" | "company_name" | "fantasy_name" | "cpf_cnpj" | "email" | "cpf_responsible" | "cpf_agent"
+  >,
+): IntegrationFieldErrors {
+  const documentLabel = values.type === "PJ" ? "CNPJ" : "CPF";
+  return {
+    name: getClientInternalName(values)
+      ? null
+      : values.type === "PF"
+        ? "Informe o nome."
+        : "Informe a razão social.",
+    cpf_cnpj: values.cpf_cnpj.trim()
+      ? validateCpfCnpjDocument(values.cpf_cnpj, values.type)
+      : `Informe o ${documentLabel}.`,
+    email: getIntegrationEmailError(values.email),
+    cpf_responsible: validateOptionalCpfDocument("CPF do responsável", values.cpf_responsible),
+    cpf_agent: validateOptionalCpfDocument("CPF do preposto", values.cpf_agent),
+  };
 }

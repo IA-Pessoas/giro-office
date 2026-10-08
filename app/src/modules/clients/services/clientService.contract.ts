@@ -2,6 +2,9 @@ import type { ClientListFilters } from "../types";
 
 export const CLIENT_ENDPOINTS = {
   list: "/client/list",
+  coringaList: "/client/coringa/list",
+  coringaPdf: "/client/coringa/pdf",
+  instagramProfilesReport: "/client/instagram-profiles/report",
   create: "/client",
   createIntegration: "/client/integration",
   lookupCnpj: "/client/integration",
@@ -16,9 +19,17 @@ export const CLIENT_ENDPOINTS = {
   updatePa: (id: string) => `/client/${id}/pa`,
   histories: (id: string) => `/client/${id}/histories`,
   updateHistory: (id: string, historyId: string) => `/client/${id}/histories/${historyId}`,
+  deleteHistory: (id: string, historyId: string) => `/client/${id}/histories/${historyId}`,
   createHistoryPending: (id: string) => `/client/${id}/histories/pending`,
   listHistoryPending: "/client/histories/pending",
   deleteHistoryPending: (pendingId: string) => `/client/histories/pending/${pendingId}`,
+} as const;
+
+export const CLIENT_GROUP_ENDPOINTS = {
+  list: "/client/groups",
+  create: "/client/groups",
+  detail: (id: string) => `/client/groups/${id}`,
+  clients: (id: string) => `/client/groups/${id}/clients`,
 } as const;
 
 const LEGACY_CLIENT_STATUS_FILTERS = new Set(["Ativo", "Inativo"]);

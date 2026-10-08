@@ -9,6 +9,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import { integracaoTaskCompleteRequestBodySchema } from "../schemas/integracaoTaskCompleteRequestBody.schema.js";
 import {
   integracaoTaskCompletionRequestBodySchema,
@@ -19,7 +20,11 @@ import { integracaoTaskConclusionBodySchema } from "../schemas/integracaoTaskCon
 import { TaskLifecycleService } from "../services/taskLifecycleService.js";
 
 const router: ReturnType<typeof Router> = Router();
-const taskLifecycleService = new TaskLifecycleService();
+const taskLifecycleService = new TaskLifecycleService(
+  nodeDeps.prisma,
+  nodeDeps.audit,
+  nodeDeps.projectProgress,
+);
 
 router.put(
   "/conclusion",
@@ -64,7 +69,7 @@ router.post(
         integracaoLevel: normalizeModulePermission(req.modules?.integracao),
         isOwner: req.user_type === "owner",
       });
-      res.json(createSuccessResponse(result));
+      res.status(201).json(createSuccessResponse(result));
     } catch (err) {
       logError("Erro na rota de solicitação de conclusão de tarefa", { err });
       next(err);

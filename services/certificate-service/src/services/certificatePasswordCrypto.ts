@@ -1,10 +1,12 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
-import { ServiceError } from "@workspace/shared";
+import { error as logError, ServiceError } from "@workspace/shared";
 
 export interface CertificatePasswordCryptoOptions {
   keyBase64: string;
   keyVersion: string;
+  /** Chave anterior, só para leitura dos envelopes migrados; aceita qualquer versão. */
+  legacyKeyBase64?: string;
 }
 
 export interface CertificatePasswordCrypto {
@@ -37,7 +39,7 @@ function decodeBase64(value: string): Buffer {
   return Buffer.from(value, "base64");
 }
 
-function parseEncryptedTextPayload(value: string, keyVersion: string): EncryptedTextPayload {
+function parseEncryptedTextPayload(value: string, keyVersion?: string): EncryptedTextPayload {
   try {
     const payload: unknown = JSON.parse(value);
 
@@ -56,7 +58,7 @@ function parseEncryptedTextPayload(value: string, keyVersion: string): Encrypted
       typeof candidate.iv !== "string" ||
       typeof candidate.tag !== "string" ||
       typeof candidate.data !== "string" ||
-      candidate.v !== keyVersion
+      (keyVersion !== undefined && candidate.v !== keyVersion)
     ) {
       throw decryptionError();
     }
@@ -67,16 +69,39 @@ function parseEncryptedTextPayload(value: string, keyVersion: string): Encrypted
   }
 }
 
+function parseKey(keyBase64: string, envName: string): Buffer {
+  const key = isCanonicalBase64(keyBase64) ? Buffer.from(keyBase64, "base64") : undefined;
+
+  if (!key || key.length !== 32) {
+    throw new ServiceError(500, `${envName} deve ter 32 bytes em base64.`);
+  }
+
+  return key;
+}
+
+function decryptWithKey(value: string, key: Buffer, keyVersion?: string): string {
+  const payload = parseEncryptedTextPayload(value, keyVersion);
+  const iv = decodeBase64(payload.iv);
+  const tag = decodeBase64(payload.tag);
+  const data = decodeBase64(payload.data);
+
+  if (iv.length !== 12 || tag.length !== 16) {
+    throw decryptionError();
+  }
+
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+
+  return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+}
+
 export function createCertificatePasswordCrypto(
   options: CertificatePasswordCryptoOptions,
 ): CertificatePasswordCrypto {
-  const key = isCanonicalBase64(options.keyBase64)
-    ? Buffer.from(options.keyBase64, "base64")
+  const key = parseKey(options.keyBase64, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY");
+  const legacyKey = options.legacyKeyBase64
+    ? parseKey(options.legacyKeyBase64, "CERTIFICATE_PASSWORD_LEGACY_ENCRYPTION_KEY")
     : undefined;
-
-  if (!key || key.length !== 32) {
-    throw new ServiceError(500, "CERTIFICATE_PASSWORD_ENCRYPTION_KEY deve ter 32 bytes em base64.");
-  }
 
   return {
     encrypt(value: string): string {
@@ -94,22 +119,44 @@ export function createCertificatePasswordCrypto(
 
     decrypt(value: string): string {
       try {
-        const payload = parseEncryptedTextPayload(value, options.keyVersion);
-        const iv = decodeBase64(payload.iv);
-        const tag = decodeBase64(payload.tag);
-        const data = decodeBase64(payload.data);
+        return decryptWithKey(value, key, options.keyVersion);
+      } catch {
+        if (!legacyKey) throw decryptionError();
+      }
 
-        if (iv.length !== 12 || tag.length !== 16) {
-          throw decryptionError();
-        }
-
-        const decipher = createDecipheriv("aes-256-gcm", key, iv);
-        decipher.setAuthTag(tag);
-
-        return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+      try {
+        return decryptWithKey(value, legacyKey);
       } catch {
         throw decryptionError();
       }
     },
   };
+}
+
+/** Senha persistida em JSON é tratada como envelope cifrado; texto legado não-JSON fica em claro. */
+export function isEncryptedPasswordPayload(value: string): boolean {
+  try {
+    JSON.parse(value.trim());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Senha em claro para validar o arquivo enviado. `undefined` quando não há senha ou quando o
+ * envelope não abre com as chaves configuradas; texto legado não cifrado volta como está.
+ */
+export function readStoredCertificatePassword(
+  stored: string | null | undefined,
+  crypto: CertificatePasswordCrypto | undefined,
+): string | undefined {
+  if (!stored) return undefined;
+  if (!isEncryptedPasswordPayload(stored)) return stored;
+  try {
+    return crypto?.decrypt(stored);
+  } catch (err: unknown) {
+    logError("Senha de certificado ilegível; arquivo validado só pela estrutura", { err });
+    return undefined;
+  }
 }

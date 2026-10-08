@@ -2,19 +2,32 @@ import { MAX_REPORTING_QUERY_LIMIT, ServiceError } from "@workspace/shared";
 
 import type { SourceCatalogService } from "../catalog/sourceCatalogService.js";
 import { normalizeReportPreviewAdapterOutput, type ReportCatalogScope } from "../catalog/types.js";
-import { reportAggregationAlias } from "../integrations/reportCriteria.js";
+import {
+  REPORT_SNAPSHOT_LIMIT_MESSAGE,
+  reportAggregationAlias,
+} from "../integrations/reportCriteria.js";
 import type { ReportComposition } from "../schemas/reportComposition.schemas.js";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
 import { MAX_SNAPSHOT_ROWS } from "../schemas/reportSnapshot.schemas.js";
 import type { ReportDefinitionService } from "./reportDefinitionService.js";
+import { v3Columns, v3Rows } from "./reportV3Presentation.js";
 
-export type ReportResultColumn = { key: string; label: string };
+export type ReportResultColumn = {
+  key: string;
+  label: string;
+  hidden?: boolean;
+  exportable?: boolean;
+};
 export type ReportResultBlock = {
   source: string;
   label: string;
   columns: readonly ReportResultColumn[];
   rows: readonly Record<string, unknown>[];
+  layout?: "grouped_list" | "summary";
+  dimensions?: readonly string[];
 };
+
+export { REPORT_SNAPSHOT_LIMIT_MESSAGE };
 
 export class ReportAreaExecutionError extends Error {
   readonly userMessage: string;
@@ -25,7 +38,9 @@ export class ReportAreaExecutionError extends Error {
     cause: unknown,
   ) {
     super(
-      `Não foi possível gerar o bloco ${label}. Confira o acesso e os critérios e tente novamente.`,
+      cause instanceof ServiceError && cause.message === REPORT_SNAPSHOT_LIMIT_MESSAGE
+        ? REPORT_SNAPSHOT_LIMIT_MESSAGE
+        : `Não foi possível gerar o bloco ${label}. Confira o acesso e os critérios e tente novamente.`,
     );
     this.name = "ReportAreaExecutionError";
     this.userMessage = this.message;
@@ -53,11 +68,8 @@ export class ReportExecutionService {
       requestId: input.requestId,
       limit: MAX_REPORTING_QUERY_LIMIT,
     });
-    if (result.reachedLimit) {
-      throw new ServiceError(400, "A origem excedeu seu limite de linhas para o snapshot.");
-    }
-    if (result.rows.length > MAX_SNAPSHOT_ROWS) {
-      throw new ServiceError(400, "O resultado excede o limite de linhas do snapshot.");
+    if (result.reachedLimit || result.rows.length > MAX_SNAPSHOT_ROWS) {
+      throw new ServiceError(400, REPORT_SNAPSHOT_LIMIT_MESSAGE);
     }
     return result.rows;
   }
@@ -78,6 +90,9 @@ export class ReportExecutionService {
     scope: ReportCatalogScope;
     requestId: string;
   }): Promise<{ blocks: readonly ReportResultBlock[] }> {
+    if (input.definition.version === 3) {
+      return this.executeV3Composition({ ...input, definition: input.definition });
+    }
     const catalog = this.catalog.getAuthorizedCatalog(input.scope);
     const prepared = input.definition.areas.map((area) => {
       const source = catalog.sources.find((item) => item.key === area.source);
@@ -107,7 +122,7 @@ export class ReportExecutionService {
           limit: remaining + 1,
         });
         if (result.reachedLimit || result.rows.length > remaining) {
-          throw new ServiceError(400, "O resultado excede o limite de linhas do snapshot.");
+          throw new ServiceError(400, REPORT_SNAPSHOT_LIMIT_MESSAGE);
         }
         const columns = this.presentationColumns(item.prepared.definition, item.source);
         blocks.push({
@@ -122,6 +137,58 @@ export class ReportExecutionService {
       } catch (cause) {
         if (cause instanceof ReportAreaExecutionError) throw cause;
         throw new ReportAreaExecutionError(item.area.source, item.source.label, cause);
+      }
+    }
+    return { blocks };
+  }
+
+  private async executeV3Composition(input: {
+    definition: Extract<ReportComposition, { version: 3 }>;
+    scope: ReportCatalogScope;
+    requestId: string;
+  }): Promise<{ blocks: readonly ReportResultBlock[] }> {
+    const catalog = this.catalog.getAuthorizedCatalog(input.scope);
+    const prepared = input.definition.areas.map((area) => {
+      const source = catalog.sources.find((item) => item.key === area.source);
+      if (!source)
+        throw new ReportAreaExecutionError(
+          area.source,
+          "Área selecionada",
+          new ServiceError(403, "Área não autorizada."),
+        );
+      try {
+        return { source, prepared: this.definitions.prepareV3Area(area, input.scope) };
+      } catch (cause) {
+        throw new ReportAreaExecutionError(area.source, source.label, cause);
+      }
+    });
+    const blocks: ReportResultBlock[] = [];
+    let remaining = MAX_SNAPSHOT_ROWS;
+    for (const [index, area] of input.definition.areas.entries()) {
+      const { source, prepared: definition } = prepared[index];
+      try {
+        const result = await this.executeDefinition({
+          definition: definition.definition,
+          scope: input.scope,
+          parameterValues: definition.parameterValues,
+          requestId: input.requestId,
+          limit: remaining + 1,
+        });
+        if (result.reachedLimit || result.rows.length > remaining) {
+          throw new ServiceError(400, REPORT_SNAPSHOT_LIMIT_MESSAGE);
+        }
+        blocks.push({
+          source: area.source,
+          label: source.label,
+          columns: v3Columns(area, source, true),
+          rows: v3Rows(area, result.rows),
+          layout: area.layout,
+          dimensions: area.dimensions,
+        });
+        remaining -= result.rows.length;
+      } catch (cause) {
+        if (cause instanceof ReportAreaExecutionError) throw cause;
+        throw new ReportAreaExecutionError(area.source, source.label, cause);
       }
     }
     return { blocks };

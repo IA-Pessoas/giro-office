@@ -24,6 +24,8 @@ const monthlyIdentityShape = {
 
 export const triageMonthlyRequestSchema = z.object(monthlyRequestShape).strict();
 
+export const fiscalTriagePortfolioQuerySchema = z.object({ competence: competenceSchema }).strict();
+
 export const triageEditabilityRequestSchema = z
   .object({
     client_id: monthlyRequestShape.client_id,
@@ -67,14 +69,14 @@ export const triageDocumentItemBodySchema = z
     if (body.status === undefined) {
       context.addIssue({ code: "custom", path: ["status"], message: "status é obrigatório." });
     }
-    if (body.type === "CONTABIL" && body.delivery_method !== undefined) {
+    if (body.type === "CONTABIL" && body.delivery_method != null) {
       context.addIssue({
         code: "custom",
         path: ["delivery_method"],
         message: "método de entrega só é aceito na rotina fiscal.",
       });
     }
-    if (body.type !== "FISCAL" && body.state_site !== undefined) {
+    if (body.type !== "FISCAL" && body.state_site != null) {
       context.addIssue({
         code: "custom",
         path: ["state_site"],

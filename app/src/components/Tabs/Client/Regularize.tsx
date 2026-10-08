@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getRegularizeRegimeOptions } from '@modules/clients/utils/regularizeForm';
 import { Box, Flex, FormControl, FormLabel, Input, Switch, SimpleGrid, Select, Button } from '@shared/ui/chakraShims';
 import { IoCreate } from "react-icons/io5";
 
@@ -123,13 +124,9 @@ export const regularizeTab = ({ client, perms }: ClientTabProps) => {
                             <FormLabel>Regime</FormLabel>
                             <Select name='regime' value={formData.regime} onChange={handleInputChange} color={'bodyText'}>
                                 <option value="">Selecione um...</option>
-                                <option value="Simples Nacional">Simples Nacional</option>
-                                <option value="Lucro Real">Lucro Real</option>
-                                <option value="Lucro Presumido">Lucro Presumido</option>
-                                <option value="MEI">MEI</option>
-                                <option value="E-SOCIAL">E-SOCIAL</option>
-                                <option value="CNO">CNO</option>
-                                <option value="CAEPF">CAEPF</option>
+                                {getRegularizeRegimeOptions(formData.regime ?? '').map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                ))}
                             </Select>
                         </FormControl>
                         <FormControl>
@@ -223,7 +220,7 @@ export const regularizeTab = ({ client, perms }: ClientTabProps) => {
                             />
                         </FormControl>
                         <FormControl>
-                            <FormLabel>Inicio Paralisação</FormLabel>
+                            <FormLabel>Início Paralisação</FormLabel>
                             <Input name="start_strike" type="date" value={formData.start_strike} onChange={handleInputChange} color={'bodyText'} />
                         </FormControl>
                         <FormControl>

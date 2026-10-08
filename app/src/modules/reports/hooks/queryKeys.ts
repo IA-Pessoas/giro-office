@@ -1,3 +1,5 @@
+import type { ReportJobStatus } from "../types/report.types";
+
 export const REPORTS_QUERY_KEY = ["reports"] as const;
 
 export function reportsCatalogQueryKey() {
@@ -44,4 +46,13 @@ export function reportsSnapshotQueryKey(
 
 export function reportsJobQueryKey(id: string) {
   return [...REPORTS_QUERY_KEY, "job", id] as const;
+}
+
+/** Intervalo do acompanhamento do job: 1s, crescendo 1,5x até 4s; para em estado terminal. */
+export function reportJobPollInterval(
+  status: ReportJobStatus | undefined,
+  attempt: number,
+): number | false {
+  if (status !== "queued" && status !== "processing") return false;
+  return Math.min(Math.round(1000 * 1.5 ** attempt), 4000);
 }

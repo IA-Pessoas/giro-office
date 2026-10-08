@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState, type ChangeEvent } from "react";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientIntegrationForm } from "@modules/clients/components/ClientIntegrationForm";
@@ -15,12 +15,9 @@ import {
   buildCreateClientIntegrationPayload,
   createClientIntegrationInitialValues,
   mergeClientCompanyLookup,
+  getIntegrationFieldErrors,
 } from "@modules/clients/utils/integrationForm";
 import { useMe } from "@shared/hooks/useMe";
-import {
-  validateCpfCnpjDocument,
-  validateOptionalCpfDocument,
-} from "@modules/clients/utils/documentValidation";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -31,6 +28,7 @@ export default function NewClientIntegrationPage() {
   const meQuery = useMe();
   const createIntegrationMutation = useCreateClientIntegrationMutation();
   const [formValues, setFormValues] = useState(createClientIntegrationInitialValues);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
   const cnpjLookup = useClientCnpjLookup(formValues.cpf_cnpj);
 
   useEffect(() => {
@@ -61,32 +59,9 @@ export default function NewClientIntegrationPage() {
       return;
     }
 
-    if (!formValues.name.trim() || !formValues.cpf_cnpj.trim()) {
-      toast.error("Preencha nome e CPF/CNPJ para continuar.");
-      return;
-    }
-
-    const cpfCnpjError = validateCpfCnpjDocument(formValues.cpf_cnpj, formValues.type);
-
-    if (cpfCnpjError) {
-      toast.error(cpfCnpjError);
-      return;
-    }
-
-    const responsibleCpfError = validateOptionalCpfDocument(
-      "CPF do responsável",
-      formValues.cpf_responsible,
-    );
-
-    if (responsibleCpfError) {
-      toast.error(responsibleCpfError);
-      return;
-    }
-
-    const agentCpfError = validateOptionalCpfDocument("CPF do preposto", formValues.cpf_agent);
-
-    if (agentCpfError) {
-      toast.error(agentCpfError);
+    // Os erros aparecem abaixo de cada campo, ligados por aria-describedby (#1367).
+    setShowFieldErrors(true);
+    if (Object.values(getIntegrationFieldErrors(formValues)).some(Boolean)) {
       return;
     }
 
@@ -152,6 +127,9 @@ export default function NewClientIntegrationPage() {
               cnpjLookupStatus={
                 cnpjLookup.isFetching ? "loading" : cnpjLookup.isError ? "unavailable" : "idle"
               }
+              cnpjLookupError={cnpjLookup.error}
+              showFieldErrors={showFieldErrors}
+              fieldErrors={showFieldErrors ? getIntegrationFieldErrors(formValues) : undefined}
               submitLabel={createIntegrationMutation.isPending ? "Salvando..." : "Salvar"}
               disabled={createIntegrationMutation.isPending || meQuery.isLoading}
             />

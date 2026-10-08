@@ -31,6 +31,9 @@ export interface Client {
   regime: string | null;
   size: string;
   segment: string;
+  coringa_status?: string | null;
+  tecnologia?: boolean | null;
+  licitacao?: boolean | null;
   contabil: boolean;
   fiscal: boolean;
   pessoal: boolean;
@@ -92,12 +95,96 @@ export interface ClientRecord {
   organization?: ClientOrganizationSummary;
 }
 
+export interface ClientGroupMember {
+  id: string;
+  name: string;
+  company_name: string | null;
+  fantasy_name: string | null;
+  cpf_cnpj: string;
+}
+
+export interface ClientGroup {
+  id: string;
+  name: string;
+  status: boolean;
+  organization_id: string;
+  clients: ClientGroupMember[];
+}
+
 export interface ClientListPage {
   items: ClientRecord[];
   total: number;
   page: number;
   pageSize: number;
   hasMore: boolean;
+}
+
+export interface ClientCoringaRow {
+  id: string;
+  dominio_code: string | null;
+  name: string;
+  company_name: string | null;
+  cpf_cnpj: string;
+  regime: string | null;
+  created_at: string | null;
+  size: string | null;
+  segment: string | null;
+  coringa_status: string | null;
+  contabil: boolean | null;
+  fiscal: boolean | null;
+  pessoal: boolean | null;
+  tecnologia: boolean | null;
+  infoproduto: boolean | null;
+  consultoria: boolean | null;
+  licitacao: boolean | null;
+}
+
+export interface ClientCoringaFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  regime?: string;
+  dataEntrada?: string;
+  porte?: string;
+  segmento?: string;
+  status?: string;
+  contabil?: boolean;
+  fiscal?: boolean;
+  pessoal?: boolean;
+  tecnologia?: boolean;
+  infoproduto?: boolean;
+  consultoria?: boolean;
+  licitacao?: boolean;
+}
+
+export interface ClientCoringaPage {
+  items: ClientCoringaRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export interface ClientInstagramProfile {
+  id: string;
+  name: string;
+  status: ClientStatus;
+  instagram: string | null;
+}
+
+export interface ClientInstagramProfilePage {
+  items: ClientInstagramProfile[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export interface ClientInstagramProfileFilters {
+  profile: "all" | "with" | "without";
+  page: number;
+  limit: number;
+  search?: string;
 }
 
 export interface ClientCompanyLookup {
@@ -131,10 +218,16 @@ export interface ClientFormValues {
   status: string;
   regime: ClientTaxRegime | "";
   service_unique: boolean;
+  address: string;
+  cep: string;
+  neighborhood: string;
+  state: string;
+  city: string;
 }
 
 export interface ClientIntegrationFormValuesBase {
   type: "PJ" | "PF";
+  regime: ClientTaxRegime | "";
   name: string;
   cpf_cnpj: string;
   company_name: string;
@@ -149,6 +242,11 @@ export interface ClientIntegrationFormValuesBase {
   indication: string;
   type_registration: string;
   service_unique: boolean;
+  address: string;
+  cep: string;
+  neighborhood: string;
+  state: string;
+  city: string;
 }
 
 export interface CreateClientIntegrationFormValues extends ClientIntegrationFormValuesBase {
@@ -157,13 +255,7 @@ export interface CreateClientIntegrationFormValues extends ClientIntegrationForm
   meet_type: string;
 }
 
-export interface UpdateClientIntegrationFormValues extends ClientIntegrationFormValuesBase {
-  address: string;
-  cep: string;
-  neighborhood: string;
-  state: string;
-  city: string;
-}
+export type UpdateClientIntegrationFormValues = ClientIntegrationFormValuesBase;
 
 export interface ClientPaRelatedClient {
   company_name: string | null;
@@ -281,11 +373,17 @@ export interface CreateClientPayload {
   fantasy_name?: string | null;
   regime?: ClientTaxRegime | null;
   service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }
 
 export interface CreateClientIntegrationPayload {
   organization_id: string;
   type: "PJ" | "PF";
+  regime?: ClientTaxRegime | null;
   name: string;
   cpf_cnpj: string;
   company_name?: string | null;
@@ -303,6 +401,11 @@ export interface CreateClientIntegrationPayload {
   meet_type?: string | null;
   type_registration?: string | null;
   service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }
 
 export interface UpdateClientData {
@@ -317,10 +420,16 @@ export interface UpdateClientPayload {
   fantasy_name?: string | null;
   regime?: ClientTaxRegime | null;
   service_unique?: boolean;
+  address?: string | null;
+  cep?: string | null;
+  neighborhood?: string | null;
+  state?: string | null;
+  city?: string | null;
 }
 
 export interface UpdateClientIntegrationPayload {
   type?: "PJ" | "PF";
+  regime?: ClientTaxRegime | null;
   name?: string;
   cpf_cnpj?: string;
   company_name?: string | null;
@@ -371,6 +480,9 @@ export interface UpdateClientRegularizePayload {
   regime?: string | null;
   size?: string | null;
   segment?: string | null;
+  coringa_status?: string | null;
+  tecnologia?: boolean | null;
+  licitacao?: boolean | null;
   contabil?: boolean;
   fiscal?: boolean;
   pessoal?: boolean;
@@ -392,6 +504,7 @@ export interface ClientFinanceFormValues {
 }
 
 export interface ClientRegularizeFormValues {
+  type: "PJ" | "PF";
   dominio_code: string;
   name: string;
   company_name: string;
@@ -416,6 +529,9 @@ export interface ClientRegularizeFormValues {
   regime: string;
   size: string;
   segment: string;
+  coringa_status: string;
+  tecnologia: "" | "true" | "false";
+  licitacao: "" | "true" | "false";
   contabil: boolean;
   fiscal: boolean;
   pessoal: boolean;

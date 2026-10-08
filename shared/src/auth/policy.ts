@@ -26,9 +26,12 @@ function hasExplicitModulePermission(
   return typeof modulePermission === "number" && modulePermission >= minPermission;
 }
 
+/** Owner, admin de RH ou admin de TI (o teto de concessão é aplicado no user-service). */
 function canManageUsers(context: AuthContext): boolean {
   return (
-    isExplicitOwner(context) || hasExplicitModulePermission(context, "rh", MODULE_ADMIN_PERMISSION)
+    isExplicitOwner(context) ||
+    hasExplicitModulePermission(context, "rh", MODULE_ADMIN_PERMISSION) ||
+    hasExplicitModulePermission(context, "ti", MODULE_ADMIN_PERMISSION)
   );
 }
 
@@ -63,6 +66,14 @@ export function canAccessRoute(context: AuthContext, policy: AuthPolicy): boolea
 
   if (policy.special === "platformOnly") {
     return context.actorKind === "platform" && context.isPlatformAdmin;
+  }
+
+  if (policy.special === "impersonationOnly") {
+    return (
+      context.actorKind === "organization" &&
+      typeof context.claims.impersonator_platform_user_id === "string" &&
+      context.claims.impersonator_platform_user_id.length > 0
+    );
   }
 
   if (context.actorKind === "platform") {

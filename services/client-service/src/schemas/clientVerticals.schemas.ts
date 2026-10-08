@@ -1,21 +1,44 @@
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 import { z } from "zod";
+
+import { cnaeSchema, openingDateSchema } from "./client.schemas.js";
+
+const clientEmailSchema = z
+  .string()
+  .trim()
+  .email("Informe um e-mail válido.")
+  .nullable()
+  .optional();
+
+const clientTaxRegimeSchema = z.enum(TAX_REGIME_OPTIONS).nullable().optional();
 
 export const createIntegrationBodySchema = z
   .object({
     organization_id: z.string().uuid({ message: "organization_id inválido." }).optional(),
     type: z.string().min(1),
+    regime: clientTaxRegimeSchema,
     name: z.string().min(1),
     company_name: z.string().nullable().optional(),
     fantasy_name: z.string().nullable().optional(),
     cpf_cnpj: z.string().min(1),
-    opening_date: z.coerce.date().optional(),
+    opening_date: openingDateSchema,
     responsible: z.string().nullable().optional(),
     cpf_responsible: z.string().nullable().optional(),
     number: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
+    email: clientEmailSchema,
+    address: z.string().nullable().optional(),
+    cep: z.string().nullable().optional(),
+    neighborhood: z.string().nullable().optional(),
+    state: z.string().nullable().optional(),
+    city: z.string().nullable().optional(),
     agent: z.string().nullable().optional(),
     cpf_agent: z.string().nullable().optional(),
-    instagram: z.string().nullable().optional(),
+    instagram: z
+      .preprocess(
+        (value) => (typeof value === "string" ? value.trim() || null : value),
+        z.string().nullable(),
+      )
+      .optional(),
     indication: z.string().nullable().optional(),
     participants_meet: z.string().nullable().optional(),
     meet_type: z.string().nullable().optional(),
@@ -33,6 +56,7 @@ export const cnpjLookupQuerySchema = z
 export const updateIntegrationBodySchema = z
   .object({
     type: z.string().min(1).optional(),
+    regime: clientTaxRegimeSchema,
     name: z.string().min(1).optional(),
     company_name: z.string().nullable().optional(),
     fantasy_name: z.string().nullable().optional(),
@@ -42,13 +66,18 @@ export const updateIntegrationBodySchema = z
     agent: z.string().nullable().optional(),
     cpf_agent: z.string().nullable().optional(),
     number: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
+    email: clientEmailSchema,
     address: z.string().nullable().optional(),
     cep: z.string().nullable().optional(),
     neighborhood: z.string().nullable().optional(),
     state: z.string().nullable().optional(),
     city: z.string().nullable().optional(),
-    instagram: z.string().nullable().optional(),
+    instagram: z
+      .preprocess(
+        (value) => (typeof value === "string" ? value.trim() || null : value),
+        z.string().nullable(),
+      )
+      .optional(),
     indication: z.string().nullable().optional(),
     type_registration: z.string().optional(),
     service_unique: z.boolean().optional(),
@@ -80,44 +109,57 @@ export const updateRegularizeBodySchema = z
     company_name: z.string().nullable().optional(),
     fantasy_name: z.string().nullable().optional(),
     cpf_cnpj: z.string().min(1).optional(),
-    cnae: z.string().nullable().optional(),
+    cnae: cnaeSchema,
     cnae_secondary: z.string().nullable().optional(),
     responsible: z.string().nullable().optional(),
     cpf_responsible: z.string().nullable().optional(),
     number: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
+    email: clientEmailSchema,
     address: z.string().nullable().optional(),
     cep: z.string().nullable().optional(),
     neighborhood: z.string().nullable().optional(),
     state: z.string().nullable().optional(),
     city: z.string().nullable().optional(),
-    customer_since: z.coerce.date().optional(),
+    customer_since: z.coerce.date().nullable().optional(),
     municipal_registration: z.string().nullable().optional(),
     state_registration: z.string().nullable().optional(),
     commercial_board_registration: z.string().nullable().optional(),
-    opening_date: z.coerce.date().optional(),
+    opening_date: openingDateSchema,
     regime: z.string().nullable().optional(),
     size: z.string().nullable().optional(),
     segment: z.string().nullable().optional(),
+    coringa_status: z.string().trim().max(120).nullable().optional(),
+    tecnologia: z.boolean().nullable().optional(),
+    licitacao: z.boolean().nullable().optional(),
     contabil: z.boolean().optional(),
     fiscal: z.boolean().optional(),
     pessoal: z.boolean().optional(),
     infoproduto: z.boolean().optional(),
     consultoria: z.boolean().optional(),
-    start_strike: z.coerce.date().optional(),
-    end_strike: z.coerce.date().optional(),
+    start_strike: z.coerce.date().nullable().optional(),
+    end_strike: z.coerce.date().nullable().optional(),
     deletion_date: z.coerce.date().nullable().optional(),
   })
   .strict()
   .refine((d) => Object.keys(d).length > 0, "Informe ao menos um campo para atualizar.");
+
+// Valor monetário em texto: "R$ 1.234,56", "1234,56", "1500" ou "1234.56" (espelha app/.../utils/paForm.ts).
+const moneyTextSchema = z
+  .string()
+  .regex(
+    /^(R\$\s?)?((\d{1,3}(\.\d{3})+|\d+)(,\d{1,2})?|\d+\.\d{1,2})$/,
+    "Informe um valor numérico (ex.: R$ 1.234,56).",
+  )
+  .nullable()
+  .optional();
 
 export const createClientPABodySchema = z.object({}).strict();
 
 export const updateClientPABodySchema = z
   .object({
     activities: z.string().nullable().optional(),
-    tax_billing: z.string().nullable().optional(),
-    management_billing: z.string().nullable().optional(),
+    tax_billing: moneyTextSchema,
+    management_billing: moneyTextSchema,
     works_bidding: z.boolean().nullable().optional(),
     dissatisfaction: z.string().nullable().optional(),
     registered_collabortors: z.number().int().nullable().optional(),
@@ -129,7 +171,7 @@ export const updateClientPABodySchema = z
     works_system: z.boolean().nullable().optional(),
     system_name: z.string().nullable().optional(),
     system_usage_time: z.string().nullable().optional(),
-    system_value: z.string().nullable().optional(),
+    system_value: moneyTextSchema,
     system_contact: z.string().nullable().optional(),
     system_operations: z.string().nullable().optional(),
     cloud_storage: z.boolean().nullable().optional(),
@@ -142,43 +184,58 @@ export const updateClientPABodySchema = z
   .strict()
   .refine((d) => Object.keys(d).length > 0, "Informe ao menos um campo para atualizar.");
 
+const HISTORY_DATE_MESSAGE = "Informe data e hora com fuso horário (ISO 8601).";
+
+const historyFields = {
+  // Sem offset o backend gravaria a hora local como UTC e cada edição deslocaria o horário.
+  date: z
+    .string({ required_error: HISTORY_DATE_MESSAGE })
+    .datetime({ offset: true, message: HISTORY_DATE_MESSAGE })
+    .transform((value) => new Date(value)),
+  history: z
+    .string({ required_error: "Informe o texto do histórico." })
+    .trim()
+    .min(1, "Informe o texto do histórico."),
+};
+const HISTORY_UNKNOWN_FIELD_MESSAGE = "Campo não permitido no histórico.";
+
+// O anexo `file` chega fora do corpo validado (multer no Node, removido antes do parse no Worker).
 export const createHistoryBodySchema = z
   .object({
-    date: z.coerce.date(),
-    history: z.string().min(1),
-    pending_id: z.string().uuid().optional(),
+    ...historyFields,
+    pending_id: z.string().uuid("Pendência inválida.").optional(),
   })
-  .strict();
+  .strict(HISTORY_UNKNOWN_FIELD_MESSAGE);
 
 export const updateHistoryBodySchema = z
-  .object({
-    date: z.coerce.date(),
-    history: z.string().min(1),
-  })
-  .strict();
+  .object(historyFields)
+  .strict(HISTORY_UNKNOWN_FIELD_MESSAGE);
 
 export const createHistoryPendingBodySchema = z
   .object({
-    reason: z.string().min(1),
+    reason: z
+      .string({ required_error: "Informe o motivo da pendência." })
+      .trim()
+      .min(1, "Informe o motivo da pendência."),
   })
-  .strict();
+  .strict(HISTORY_UNKNOWN_FIELD_MESSAGE);
 
 export const historyIdParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    historyId: z.string().uuid(),
+    id: z.string().uuid("Cliente inválido."),
+    historyId: z.string().uuid("Histórico inválido."),
   })
   .strict();
 
 export const pendingListQuerySchema = z
   .object({
-    user_id: z.string().uuid().optional(),
+    user_id: z.string().uuid("Usuário inválido.").optional(),
   })
-  .strict();
+  .strict("Filtro não permitido.");
 
 export const pendingDeleteParamsSchema = z
   .object({
-    pendingId: z.string().uuid(),
+    pendingId: z.string().uuid("Pendência inválida."),
   })
   .strict();
 

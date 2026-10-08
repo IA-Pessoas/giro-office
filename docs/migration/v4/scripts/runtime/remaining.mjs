@@ -7,6 +7,9 @@ import {
   buildCbsStockEntryContexts,
   buildCbsStockExitContexts,
   buildCbsStockLocationContexts,
+  buildMarketingEventContexts,
+  buildMarketingEventEditionContexts,
+  buildMarketingEventEditionFeedbackContexts,
   buildMarketingPasswordContexts,
   buildMarketingSocialContexts,
   buildPecNoteContexts,
@@ -14,6 +17,7 @@ import {
   buildWorkspaceCategoryContexts,
   buildWorkspaceMessageContexts,
   buildWorkspaceRequestContexts,
+  projectMarketingEventEditionBudgetItem,
   projectRemainingRow,
   REMAINING_RULES,
   REMAINING_TRANSFORMERS,
@@ -29,7 +33,9 @@ export const REMAINING_EXECUTION_ENTRIES = Object.freeze(
   REMAINING_RULES.flatMap((rule) =>
     rule.destinations.map((step) => {
       const entry = createRemainingEntry({ rule, step });
-      ENTRIES_BY_SOURCE.set(rule.sourceTable, entry);
+      const entries = ENTRIES_BY_SOURCE.get(rule.sourceTable) ?? [];
+      entries.push(entry);
+      ENTRIES_BY_SOURCE.set(rule.sourceTable, entries);
       return entry;
     }),
   ),
@@ -57,30 +63,40 @@ export function buildRemainingRuntimeState(options = {}) {
     },
     async *iterateRows(sourceTable, rows) {
       if (!isIterable(rows)) throw new TypeError("rows deve ser iterável");
-      const entry = ENTRIES_BY_SOURCE.get(sourceTable);
-      if (entry === undefined) {
+      const entries = ENTRIES_BY_SOURCE.get(sourceTable);
+      if (entries === undefined) {
         throw new Error(`Origem Remaining desconhecida: ${String(sourceTable)}`);
       }
       for await (const row of rows) {
         const context = state.contextFor(sourceTable, row);
-        const [emission] = entry.emitRows(row, state);
-        if (emission.status !== "prepared") {
-          yield Object.freeze({
-            sourceTable,
-            stepId: entry.stepId,
-            status: emission.status,
-            field: emission.field,
-            reasonCode: emission.reasonCode,
-          });
-          continue;
+        for (const entry of entries) {
+          const emissions = entry
+            .emitRows(row, state)
+            .filter((emission) => emission.stepId === entry.stepId);
+          for (const emission of emissions) {
+            if (emission.status !== "prepared") {
+              yield Object.freeze({
+                sourceTable,
+                stepId: entry.stepId,
+                status: emission.status,
+                ...(sourceTable === "tb_mkt.eventos_feedbacks" ||
+                sourceTable === "tb_mkt.eventos_feedbacks_periodos"
+                  ? { identityRef: emission.identityRef }
+                  : {}),
+                field: emission.field,
+                reasonCode: emission.reasonCode,
+              });
+              continue;
+            }
+            yield Object.freeze({
+              sourceTable,
+              stepId: entry.stepId,
+              status: "prepared",
+              payload: entry.projector(emission, row, state),
+              context,
+            });
+          }
         }
-        yield Object.freeze({
-          sourceTable,
-          stepId: entry.stepId,
-          status: "prepared",
-          payload: entry.projector(emission, row, state),
-          context,
-        });
       }
     },
   });
@@ -103,7 +119,7 @@ function createRemainingEntry({ rule, step }) {
     organizationId: CASTELO_ORGANIZATION_ID,
     contextRequirements: [...(step.dependencies ?? []).map((dependency) => `source:${dependency}`)],
     projector: (emission, row, runtimeState) =>
-      projectRuntimePayload(rule, emission, row, runtimeState),
+      projectRuntimePayload(rule, step, emission, row, runtimeState),
     cleanup: cleanupForStep(step),
     projectionKind: "custom_projector",
   });
@@ -138,9 +154,26 @@ function runtimeEmission(rule, row, runtimeState) {
   return emissions;
 }
 
-function projectRuntimePayload(rule, emission, row, runtimeState) {
+function projectRuntimePayload(rule, step, emission, row, runtimeState) {
   if (emission?.status !== "prepared" || !isRemainingRuntimeState(runtimeState)) {
     throw new Error("REMAINING_PROJECTION_NOT_PREPARED");
+  }
+  if (
+    rule.sourceTable === "tb_mkt.eventos_feedbacks_periodos" ||
+    rule.sourceTable === "tb_mkt.eventos_feedbacks"
+  ) {
+    const plan = runtimeState.contextFor(rule.sourceTable, row)?.resolutions?.feedback?.importPlan;
+    if (plan?.status !== "prepared") throw new Error("MKT_EDITION_FEEDBACK_PLAN_INVALID");
+    if (plan.kind === "period") {
+      return {
+        id: plan.editionId,
+        organization_id: plan.organizationId,
+        feedback_period_start: plan.feedbackPeriodStart,
+        feedback_period_end: plan.feedbackPeriodEnd,
+      };
+    }
+    if (plan.kind === "evaluation") return plan.evaluation;
+    throw new Error("MKT_EDITION_FEEDBACK_KIND_INVALID");
   }
   const audit = projectRemainingRow({
     sourceTable: rule.sourceTable,
@@ -149,6 +182,13 @@ function projectRuntimePayload(rule, emission, row, runtimeState) {
   });
   if (audit.decision.status !== "prepared" || audit.payload === null) {
     throw new Error("REMAINING_PROJECTION_NOT_PREPARED");
+  }
+  if (step.stepId === "mkt-event-edition-budget-insert") {
+    return projectMarketingEventEditionBudgetItem({
+      row,
+      context: runtimeState.contextFor(rule.sourceTable, row),
+      identityRef: emission.identityRef,
+    });
   }
   return audit.payload;
 }
@@ -266,6 +306,42 @@ function buildContextIndexes(rowsBySource, options) {
     register(
       "tb_mkt.redes_sociais",
       buildMarketingSocialContexts({ rows: rows("tb_mkt.redes_sociais"), clientResolver }),
+    );
+  }
+  if (has("tb_mkt.eventos")) {
+    register("tb_mkt.eventos", buildMarketingEventContexts({ rows: rows("tb_mkt.eventos") }));
+  }
+  if (has("tb_mkt.eventos_edicoes")) {
+    register(
+      "tb_mkt.eventos_edicoes",
+      buildMarketingEventEditionContexts({
+        rows: rows("tb_mkt.eventos_edicoes"),
+        eventRows: rows("tb_mkt.eventos"),
+      }),
+    );
+  }
+  if (has("tb_mkt.eventos_feedbacks_periodos")) {
+    register(
+      "tb_mkt.eventos_feedbacks_periodos",
+      buildMarketingEventEditionFeedbackContexts({
+        sourceTable: "tb_mkt.eventos_feedbacks_periodos",
+        rows: rows("tb_mkt.eventos_feedbacks_periodos"),
+        editionRows: rows("tb_mkt.eventos_edicoes"),
+        eventRows: rows("tb_mkt.eventos"),
+        evaluationRows: rows("tb_mkt.eventos_feedbacks"),
+      }),
+    );
+  }
+  if (has("tb_mkt.eventos_feedbacks")) {
+    register(
+      "tb_mkt.eventos_feedbacks",
+      buildMarketingEventEditionFeedbackContexts({
+        sourceTable: "tb_mkt.eventos_feedbacks",
+        rows: rows("tb_mkt.eventos_feedbacks"),
+        editionRows: rows("tb_mkt.eventos_edicoes"),
+        eventRows: rows("tb_mkt.eventos"),
+        evaluationRows: rows("tb_mkt.eventos_feedbacks"),
+      }),
     );
   }
   if (has("tb_mkt.senhas")) {

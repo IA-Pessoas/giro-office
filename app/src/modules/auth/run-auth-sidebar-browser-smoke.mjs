@@ -8,7 +8,7 @@ import { chromium } from "@playwright/test";
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
-const PORT = process.env.PLAYWRIGHT_PORT || "3115";
+const PORT = process.env.PLAYWRIGHT_PORT || "3118";
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 const useProductionBuild = process.argv.includes("--production");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
@@ -16,6 +16,8 @@ const APP_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const evidenceDir = process.env.CONTABIL_SMOKE_EVIDENCE_DIR;
 const notificationEvidencePath = process.env.APP_SHELL_NOTIFICATIONS_SCREENSHOT_PATH;
 const assistantEvidencePath = process.env.APP_SHELL_ASSISTANT_SCREENSHOT_PATH;
+// Mesma flag de build do AppShell: sem ela, o assistente (ainda sem IA) fica oculto.
+const aiAssistantEnabled = process.env.NEXT_PUBLIC_AI_ASSISTANT_ENABLED === "true";
 const browserViewport =
   process.env.CONTABIL_SMOKE_MOBILE === "1" ? { width: 390, height: 844 } : { width: 1366, height: 768 };
 const isMobileSmoke = process.env.CONTABIL_SMOKE_MOBILE === "1";
@@ -281,8 +283,8 @@ async function assertContabilPageRendered(page, pageErrors, consoleErrors, label
   const controlTab = page.getByRole("tab", { name: "Controle", exact: true });
   const portfolio = page.getByRole("heading", { name: "Carteira operacional", exact: true });
   const competence = page.getByLabel("Competência da carteira", { exact: true });
-  const initializedClient = page.getByRole("cell", { name: "Alfa Contábil Ltda.", exact: true });
-  const missingClient = page.getByRole("cell", { name: "Beta Contábil Ltda.", exact: true });
+  const initializedClient = page.getByRole("checkbox", { name: "Alfa Contábil Ltda.", exact: true });
+  const missingClient = page.getByRole("checkbox", { name: "Beta Contábil Ltda.", exact: true });
 
   await heading.waitFor({ state: "visible" });
   await description.waitFor({ state: "visible" });
@@ -301,12 +303,15 @@ async function assertContabilPageRendered(page, pageErrors, consoleErrors, label
       consoleErrors,
     ),
   );
-  await competence.fill("2026-08");
-  await page.getByText("2 clientes, 1 controles iniciados e 1 sem controle mensal.", { exact: true }).waitFor({
-    state: "visible",
-  });
+  const competenceYear = page.getByLabel("Competência da carteira (ano)", { exact: true });
+  const competenceMonth = page.getByLabel("Competência da carteira (mês)", { exact: true });
+  await competenceYear.selectOption("2026");
+  await competenceMonth.selectOption("08");
+  await page.getByRole("heading", { name: "Selecione as empresas", exact: true }).waitFor({ state: "visible" });
+  await initializedClient.waitFor({ state: "visible" });
+  await missingClient.waitFor({ state: "visible" });
   assert.equal(
-    await competence.inputValue(),
+    `${await competenceYear.inputValue()}-${await competenceMonth.inputValue()}`,
     "2026-08",
     appendDiagnostics(
       `${label}: a carteira deve atualizar a competência selecionada.`,
@@ -431,32 +436,40 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
     assert.equal(notificationState.readCalls(), 1, "A interação deve marcar a notificação como lida.");
     await page.goto("/contabil", { waitUntil: "networkidle" });
     await page.locator("aside").waitFor({ state: "visible" });
-    const requestsBeforeAssistant = appRequests.length;
-    assistantObservationActive = true;
-    await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").fill("Como está minha operação?");
-    await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").press("Enter");
-    await page.getByRole("heading", { name: "Assistente IA", level: 2 }).waitFor({ state: "visible" });
-    await page.getByText(
-      "Este assistente ainda não está conectado a uma IA. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor.",
-      { exact: true },
-    ).waitFor({ state: "visible" });
-    await page.waitForTimeout(250);
-    assistantObservationActive = false;
-    assert.equal(
-      assistantUnexpectedRequest,
-      null,
-      `O fluxo local do Assistente IA gerou uma requisição inesperada: ${assistantUnexpectedRequest ?? ""}`,
-    );
-    assert.deepEqual(
-      appRequests.slice(requestsBeforeAssistant),
-      [],
-      "O fluxo local do Assistente IA não deve gerar requisições de rede.",
-    );
-    if (assistantEvidencePath && currentUser.id === integrationRestrictedProfiles[0].id) {
-      await mkdir(dirname(assistantEvidencePath), { recursive: true });
-      await page.screenshot({ path: assistantEvidencePath, fullPage: true });
+    if (!aiAssistantEnabled) {
+      assert.equal(
+        await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").count(),
+        0,
+        "Sem NEXT_PUBLIC_AI_ASSISTANT_ENABLED, o Assistente IA não aparece.",
+      );
+    } else {
+      const requestsBeforeAssistant = appRequests.length;
+      assistantObservationActive = true;
+      await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").fill("Como está minha operação?");
+      await page.getByPlaceholder("Pergunte qualquer coisa ao Assistente IA...").press("Enter");
+      await page.getByRole("heading", { name: "Assistente IA", level: 2 }).waitFor({ state: "visible" });
+      await page.getByText(
+        "Este assistente ainda não está conectado a uma IA. A mensagem foi mantida apenas nesta sessão e não foi enviada ao servidor.",
+        { exact: true },
+      ).waitFor({ state: "visible" });
+      await page.waitForTimeout(250);
+      assistantObservationActive = false;
+      assert.equal(
+        assistantUnexpectedRequest,
+        null,
+        `O fluxo local do Assistente IA gerou uma requisição inesperada: ${assistantUnexpectedRequest ?? ""}`,
+      );
+      assert.deepEqual(
+        appRequests.slice(requestsBeforeAssistant),
+        [],
+        "O fluxo local do Assistente IA não deve gerar requisições de rede.",
+      );
+      if (assistantEvidencePath && currentUser.id === integrationRestrictedProfiles[0].id) {
+        await mkdir(dirname(assistantEvidencePath), { recursive: true });
+        await page.screenshot({ path: assistantEvidencePath, fullPage: true });
+      }
+      await page.getByRole("button", { name: "Fechar Assistente IA" }).click();
     }
-    await page.getByRole("button", { name: "Fechar Assistente IA" }).click();
 
     notificationState.setMode("loading");
     await page.reload({ waitUntil: "domcontentloaded" });
@@ -467,7 +480,7 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
     notificationState.setMode("success");
     notificationState.releaseLoading();
     await page.getByRole("button", { name: /Tarefa operacional pendente/ }).waitFor({ state: "visible" });
-    await page.getByTestId("app-shell-notifications-backdrop").click({ position: { x: 1, y: 1 } });
+    await page.keyboard.press("Escape");
 
     notificationState.setMode("error");
     await page.reload({ waitUntil: "networkidle" });
@@ -476,7 +489,7 @@ async function assertIntegrationLevelZeroKeepsIndependentModuleAccess(currentUse
     notificationState.setMode("empty");
     await page.getByRole("button", { name: "Tentar novamente" }).click();
     await page.getByText("Nenhuma notificação encontrada.", { exact: true }).waitFor({ state: "visible" });
-    await page.getByTestId("app-shell-notifications-backdrop").click({ position: { x: 1, y: 1 } });
+    await page.keyboard.press("Escape");
     await captureContabilEvidence(page, currentUser.id);
     if (isMobileSmoke) return;
     assert.equal(

@@ -17,4 +17,33 @@ describe("OpenAPI de relatórios internos", () => {
       "x-reports-grant-signature",
     ]);
   });
+
+  it("documenta os campos de endereço nos fluxos normal e de integração", () => {
+    type RequestSchema = {
+      properties?: Record<string, { type?: string | string[] }>;
+    };
+    type Operation = {
+      requestBody?: {
+        content?: { "application/json"?: { schema?: RequestSchema } };
+      };
+    };
+    const spec = buildClientServiceOpenApiSpec({ port: 3035 } as never) as {
+      paths: Record<string, { post?: Operation; patch?: Operation }>;
+    };
+    const addressFields = ["address", "cep", "neighborhood", "state", "city"];
+    const operations = [
+      spec.paths["/client"]?.post,
+      spec.paths["/client/{id}"]?.patch,
+      spec.paths["/client/integration"]?.post,
+      spec.paths["/client/{id}/integration"]?.patch,
+    ];
+
+    for (const operation of operations) {
+      const properties = operation?.requestBody?.content?.["application/json"]?.schema?.properties;
+      expect(properties).toBeDefined();
+      for (const field of addressFields) {
+        expect(properties?.[field]?.type).toEqual(["string", "null"]);
+      }
+    }
+  });
 });

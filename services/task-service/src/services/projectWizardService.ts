@@ -14,18 +14,14 @@ import {
 } from "../constants/integracaoTask.js";
 import { PROSPECTING_STATUS_CLOSED } from "../constants/prospectingStatus.js";
 import type { Prisma } from "../generated/prisma/client.js";
-import * as audit from "../integrations/audit.js";
+import type { TaskAudit } from "../integrations/audit.js";
 import type {
   CreatedProject,
   CreateProjectFromWizardParams,
 } from "../integrations/projectWizard.js";
-import prismaClient from "../prisma/index.js";
+import type prismaClient from "../prisma/index.js";
 import { listEligibleTaskResponsibles } from "./responsibleUserContext.js";
-import {
-  type CreateTaskCrudRequest,
-  resolveEligibleTaskResponsible,
-  TaskCrudService,
-} from "./taskCrudService.js";
+import { type CreateTaskCrudRequest, resolveEligibleTaskResponsible } from "./taskCrudService.js";
 
 const PROJECT_WIZARD_MODEL_TYPE = "Projeto";
 const PROJECT_WIZARD_DEPARTMENT_STATUS_ACTIVE = "Ativo";
@@ -205,19 +201,38 @@ function revisionFor(tasks: ProjectWizardPreviewTask[]): string {
   return createHash("sha256").update(JSON.stringify(stableTasks)).digest("hex");
 }
 
+export interface ProjectWizardServiceDeps {
+  db: typeof prismaClient;
+  audit: Pick<TaskAudit, "createLog">;
+  taskService: {
+    createTaskInTransaction(
+      data: CreateTaskCrudRequest,
+      tx: Prisma.TransactionClient,
+      options?: { allowPendingCommercialProject?: boolean },
+    ): Promise<{
+      create: { id: string; responsible_id: string | null };
+    }>;
+  };
+  compositionRepository?: typeof createProjectWizardCompositionRepository;
+}
+
 export class ProjectWizardService {
-  constructor(
-    private readonly db = prismaClient,
-    private readonly taskService: {
-      createTaskInTransaction(
-        data: CreateTaskCrudRequest,
-        tx: Prisma.TransactionClient,
-      ): Promise<{
-        create: { id: string; responsible_id: string | null };
-      }>;
-    } = new TaskCrudService(),
-    private readonly compositionRepository = createProjectWizardCompositionRepository,
-  ) {}
+  private readonly db: ProjectWizardServiceDeps["db"];
+  private readonly audit: ProjectWizardServiceDeps["audit"];
+  private readonly taskService: ProjectWizardServiceDeps["taskService"];
+  private readonly compositionRepository: typeof createProjectWizardCompositionRepository;
+
+  constructor({
+    db,
+    audit,
+    taskService,
+    compositionRepository = createProjectWizardCompositionRepository,
+  }: ProjectWizardServiceDeps) {
+    this.db = db;
+    this.audit = audit;
+    this.taskService = taskService;
+    this.compositionRepository = compositionRepository;
+  }
 
   async preview(data: ProjectWizardPreviewRequest): Promise<{
     tasks: ProjectWizardPreviewTask[];
@@ -415,6 +430,7 @@ export class ProjectWizardService {
               createDependencies: false,
             },
             tx,
+            { allowPendingCommercialProject: true },
           );
           createdTasks.push(result.create);
         }
@@ -445,7 +461,7 @@ export class ProjectWizardService {
 
     if (result.taskIds) {
       try {
-        await audit.createLog({
+        await this.audit.createLog({
           userId: data.userId,
           organizationId: data.organizationId,
           action: "Cadastro",

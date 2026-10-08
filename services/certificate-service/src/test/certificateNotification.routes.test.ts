@@ -116,6 +116,7 @@ describe("certificate notification routes", () => {
           id: "40000000-0000-4000-8000-000000000001",
           ...create,
         })),
+        deleteMany: vi.fn(async () => ({ count: 0 })),
       },
     });
 

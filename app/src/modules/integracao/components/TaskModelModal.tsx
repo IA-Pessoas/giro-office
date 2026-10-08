@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileText, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { departmentService, type DepItem } from "@modules/departments";
 import { regularizeService } from "@modules/regularize";
@@ -110,12 +110,16 @@ export function TaskModelModal({
   const [loadingDependents, setLoadingDependents] = useState(false);
   const [pendingDependentDeletion, setPendingDependentDeletion] = useState<string | null>(null);
   const [dependentDeletionError, setDependentDeletionError] = useState<string | null>(null);
+  const [pendingRegularizeDeletion, setPendingRegularizeDeletion] =
+    useState<TaskIntegrationRegularize | null>(null);
+  const [regularizeDeletionError, setRegularizeDeletionError] = useState<string | null>(null);
+  const [deletingRegularizeLink, setDeletingRegularizeLink] = useState(false);
   const [saving, setSaving] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [optionsWarning, setOptionsWarning] = useState<string | null>(null);
   const usersQuery = useAssignableUsers({
     enabled: isOpen,
-    module: "integracao",
+    // Sem filtro de módulo: o task-service aceita qualquer ativo do departamento como responsável.
     departmentId: formData.department_id || undefined,
   });
   const users = usersQuery.data ?? [];
@@ -137,6 +141,8 @@ export function TaskModelModal({
       setNewDependent({ dependent_id: "", wait: false, observation: "" });
       setPendingDependentDeletion(null);
       setDependentDeletionError(null);
+      setPendingRegularizeDeletion(null);
+      setRegularizeDeletionError(null);
       setDetailError(false);
       setOptionsWarning(null);
       setOptionsRetryKey(0);
@@ -484,12 +490,30 @@ export function TaskModelModal({
     }
   }
 
-  async function handleDeleteRegularizeLink(id: string) {
+  function getRegularizeLinkLabel(link: TaskIntegrationRegularize) {
+    const destination =
+      regularizeOptions
+        .find((option) => option.id === link.referring)
+        ?.label.replace(/^(Processo|Licença): /, "") ?? link.referring;
+    return `${link.referring_type === "process" ? "Processo" : "Licença"}: ${destination}`;
+  }
+
+  async function handleDeleteRegularizeLink() {
+    const link = pendingRegularizeDeletion;
+    if (!link) return;
+    setDeletingRegularizeLink(true);
+    setRegularizeDeletionError(null);
     try {
-      await taskModelService.deleteRegularizeLink(id);
-      setRegularizeLinks((current) => current.filter((link) => link.id !== id));
+      await taskModelService.deleteRegularizeLink(link.id);
+      setRegularizeLinks((current) => current.filter((item) => item.id !== link.id));
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Não foi possível remover vínculo do Regularize."));
+      setRegularizeDeletionError(
+        getApiErrorMessage(error, "Não foi possível remover vínculo do Regularize."),
+      );
+      // Relança para o diálogo permanecer aberto exibindo o erro.
+      throw error;
+    } finally {
+      setDeletingRegularizeLink(false);
     }
   }
 
@@ -785,14 +809,12 @@ export function TaskModelModal({
                   regularizeLinks.map((link) => (
                     <li key={link.id} className="flex items-center justify-between gap-3">
                       <span>
-                        {link.referring_type === "process" ? "Processo" : "Licença"}:{" "}
-                        {regularizeOptions.find((option) => option.id === link.referring)?.label.replace(/^(Processo|Licença): /, "") ??
-                          link.referring}
+                        {getRegularizeLinkLabel(link)}
                         {link.available ? "" : " (indisponível)"}
                       </span>
                       <button
                         type="button"
-                        onClick={() => void handleDeleteRegularizeLink(link.id)}
+                        onClick={() => setPendingRegularizeDeletion(link)}
                         className={PROJECT_COMPACT_DANGER_BUTTON_CLASSNAME}
                         aria-label="Remover vínculo Regularize"
                       >
@@ -979,6 +1001,23 @@ export function TaskModelModal({
         confirmLabel="Remover dependência"
         cancelLabel="Cancelar"
         variant="destructive"
+      />
+
+      <ConfirmationDialog
+        open={pendingRegularizeDeletion !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingRegularizeDeletion(null);
+            setRegularizeDeletionError(null);
+          }
+        }}
+        title="Remover vínculo do Regularize?"
+        description={`Remover o vínculo "${pendingRegularizeDeletion ? getRegularizeLinkLabel(pendingRegularizeDeletion) : ""}" deste modelo de tarefa?`}
+        onConfirm={handleDeleteRegularizeLink}
+        isConfirming={deletingRegularizeLink}
+        errorMessage={regularizeDeletionError}
+        confirmLabel="Remover vínculo"
+        cancelLabel="Cancelar"
       />
     </>
   );

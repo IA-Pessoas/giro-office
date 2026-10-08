@@ -1,8 +1,12 @@
 import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 
+import { FormField } from "@shared/components/FormField";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
+import { regularizeProcessStatusOptions } from "../utils/processBoard";
+
+export { regularizeProcessStatusOptions };
 
 export const regularizeTextFieldClassName =
   "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:disabled:bg-gray-800";
@@ -19,12 +23,67 @@ export const regularizePrimaryButtonClassName =
 
 export const regularizeClientStatusOptions = ["Ativo", "Inativo"] as const;
 
-export const regularizeProcessStatusOptions = [
-  "Pendente",
-  "Andamento",
-  "Protocolado",
-  "Finalizado",
-  "Paralisado",
+export const regularizeClientPfSexOptions = [
+  { value: "F", label: "Feminino" },
+  { value: "M", label: "Masculino" },
+] as const;
+
+export const regularizeClientPfMaritalStatusOptions = [
+  "Solteiro",
+  "Solteira",
+  "Casado",
+  "Casada",
+  "Divorciado",
+  "Divorciada",
+  "Viúvo",
+  "Viúva",
+  "Separado",
+  "Separada",
+  "União estável",
+] as const;
+
+export const regularizeClientPfStateOptions = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
+] as const;
+
+// Sugestões do campo "Tipo do processo"; o valor continua livre para tipos já gravados (#1347).
+export const regularizeProcessTypeOptions = [
+  "Abertura de empresa",
+  "Alteração contratual",
+  "Baixa de empresa",
+  "Alvará de funcionamento",
+  "Licença sanitária",
+  "Licença ambiental",
+  "Certificado do Corpo de Bombeiros",
+  "Inscrição municipal",
+  "Inscrição estadual",
+  "Certidão negativa de débitos",
 ] as const;
 
 export const regularizeFinancialStatusOptions = [
@@ -135,29 +194,40 @@ export type RegularizeFormOption = {
 export function RegularizeFormField({
   children,
   className,
+  error,
   help,
   label,
   required,
 }: {
   children: ReactNode;
   className?: string;
+  error?: string;
   help?: string;
   label: string;
   required?: boolean;
 }) {
   return (
-    <label className={cn("flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300", className)}>
-      <span className="inline-flex items-center gap-1">
-        <span>{label}</span>
-        {required ? <span className="text-red-500">*</span> : null}
-        {help ? <FieldHelp label={label} description={help} /> : null}
-      </span>
+    <FormField
+      className={cn("text-sm text-gray-700 dark:text-gray-300", className)}
+      label={label}
+      required={required}
+      error={error}
+      help={help ? <FieldHelp label={label} description={help} /> : null}
+    >
       {children}
-    </label>
+    </FormField>
   );
 }
 
-export function RegularizeFormError({ message }: { message?: string | null }) {
+export function RegularizeFormError({
+  message,
+  sticky = true,
+  title = "Revise os campos obrigatórios",
+}: {
+  message?: string | null;
+  sticky?: boolean;
+  title?: string;
+}) {
   if (!message) {
     return null;
   }
@@ -165,13 +235,16 @@ export function RegularizeFormError({ message }: { message?: string | null }) {
   return (
     <div
       role="alert"
-      className="sticky top-0 z-20 flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg shadow-red-950/5 dark:border-red-800/80 dark:bg-red-950/80 dark:text-red-100"
+      className={cn(
+        sticky ? "sticky top-0 z-20" : "relative",
+        "flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg shadow-red-950/5 dark:border-red-800/80 dark:bg-red-950/80 dark:text-red-100",
+      )}
     >
       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-100">
         <AlertTriangle className="h-4 w-4" />
       </span>
       <span className="min-w-0">
-        <span className="block font-semibold">Revise os campos obrigatórios</span>
+        <span className="block font-semibold">{title}</span>
         <span className="mt-0.5 block">{message}</span>
       </span>
     </div>

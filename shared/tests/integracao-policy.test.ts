@@ -10,6 +10,10 @@ import {
 
 const expectedRoutes = [
   "GET /client/list",
+  "GET /client/groups",
+  "POST /client/groups",
+  "PATCH /client/groups/:id",
+  "PUT /client/groups/:id/clients",
   "GET /client/integration",
   "GET /client/:id",
   "POST /client",
@@ -192,6 +196,21 @@ test("a política manual de tarefa rejeita responsáveis secundários", () => {
   }
 });
 
+test("previsão direta da tarefa é só para USER/ADMIN", () => {
+  const policy = requirePolicy("PUT", "/task");
+  const input = {
+    userId: "user-1",
+    organizationId: "org-1",
+    resourceOrganizationId: "org-1",
+    responsibleId: "user-1",
+    isOwner: false,
+    requestedFields: ["prevision_date"],
+  };
+
+  assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 2 }), "allow");
+  assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 1 }), "forbidden");
+});
+
 test("a propriedade da tarefa vale para os três responsáveis", () => {
   const readPolicy = requirePolicy("GET", "/task");
   const updatePolicy = requirePolicy("PUT", "/task");
@@ -229,6 +248,10 @@ test("a propriedade da tarefa vale para os três responsáveis", () => {
 test("a matriz de níveis mantém leitura, edição e administração separadas", () => {
   const cases = [
     { method: "GET", path: "/client/list", allowedLevels: [1, 2, 3] },
+    { method: "GET", path: "/client/groups", allowedLevels: [1, 2, 3] },
+    { method: "POST", path: "/client/groups", allowedLevels: [2, 3] },
+    { method: "PATCH", path: "/client/groups/:id", allowedLevels: [2, 3] },
+    { method: "PUT", path: "/client/groups/:id/clients", allowedLevels: [2, 3] },
     { method: "GET", path: "/client/integration", allowedLevels: [1, 2, 3] },
     { method: "GET", path: "/client/:id", allowedLevels: [1, 2, 3] },
     { method: "POST", path: "/client", allowedLevels: [2, 3] },
@@ -318,6 +341,43 @@ test("a matriz de níveis mantém leitura, edição e administração separadas"
       "allow",
       `${routeCase.method} ${routeCase.path} owner`,
     );
+  }
+});
+
+test("editar regime tributário pela integração segue a permissão de edição existente", () => {
+  const policy = requirePolicy("PATCH", "/client/:id/integration");
+  const base = {
+    userId: "user-1",
+    organizationId: "org-1",
+    resourceOrganizationId: "org-1",
+    isOwner: false,
+    requestedFields: ["regime"],
+  } as const;
+
+  assert.equal(evaluateIntegracaoAction(policy, { ...base, level: 1 }), "forbidden");
+  assert.equal(evaluateIntegracaoAction(policy, { ...base, level: 2 }), "allow");
+  assert.equal(evaluateIntegracaoAction(policy, { ...base, level: 3 }), "allow");
+  assert.equal(evaluateIntegracaoAction(policy, { ...base, level: 0, isOwner: true }), "allow");
+});
+
+test("criação de cliente permite endereço nos mesmos níveis já autorizados", () => {
+  const addressFields = ["address", "cep", "neighborhood", "state", "city"] as const;
+
+  for (const path of ["/client", "/client/integration"]) {
+    const policy = requirePolicy("POST", path);
+    for (const field of addressFields) {
+      const input = {
+        userId: "user-1",
+        organizationId: "org-1",
+        resourceOrganizationId: "org-1",
+        isOwner: false,
+        requestedFields: [field],
+      } as const;
+
+      assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 1 }), "forbidden", field);
+      assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 2 }), "allow", field);
+      assert.equal(evaluateIntegracaoAction(policy, { ...input, level: 3 }), "allow", field);
+    }
   }
 });
 

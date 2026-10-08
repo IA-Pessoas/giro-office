@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { Dialog } from "@shared/components";
 import { Button } from "@shared/ui/newLayout/button";
 import { useReportBuilder } from "../hooks/useReportBuilder";
@@ -9,13 +9,21 @@ import { useReportsCatalog } from "../hooks/useReportsCatalog";
 import { reportsCatalogQueryKey } from "../hooks/queryKeys";
 import { reportsService } from "../services/reportsService";
 import { getSelectableReportFields } from "../utils/reportBuilder";
-import { getPessoalReportPresets, type PessoalReportPreset } from "../utils/pessoalReportPresets";
+import { getPessoalReportPresets } from "../utils/pessoalReportPresets";
+import { getTaskDepartmentReportPreset } from "../utils/taskDepartmentReportPreset";
 import { ReportFieldsStep } from "./ReportFieldsStep";
 import { ReportCriteriaStep } from "./ReportCriteriaStep";
-import { buildReportComposition, operatorLabels, summaryLabels } from "../utils/reportCriteria";
-import type { ReportArea } from "../types/report.types";
+import { buildReportComposition, buildReportCompositionV3, operatorLabels, summaryLabels } from "../utils/reportCriteria";
+import { ReportRelationshipSettings } from "./ReportRelationshipSettings";
+import type { ReportArea, ReportLetterheadSelection } from "../types/report.types";
 import { ReportSourceStep } from "./ReportSourceStep";
-import { getErrorStatus, getReportForbiddenMessage, isReportCsrfError } from "./reportUi";
+import {
+  getErrorStatus,
+  getReportForbiddenMessage,
+  isReportCsrfError,
+  reportCheckboxClassName,
+  reportInputClassName,
+} from "./reportUi";
 import {
   useCancelReportJobMutation,
   useCreateReportJobMutation,
@@ -31,7 +39,23 @@ const steps = ["Escolher áreas", "Escolher campos", "Definir critérios", "Revi
 
 function legacyDefinitionToAreas(model: ReportModel) {
   const definition = model.definition;
-  if ("areas" in definition) return definition.areas;
+  if ("areas" in definition) {
+    if (definition.version === 2) return definition.areas;
+    return definition.areas.map((area) => ({
+      source: area.source,
+      fields: [...new Set([...area.dimensions, ...area.details, ...area.measures.flatMap((measure) => measure.field ? [measure.field] : [])])],
+      filters: area.filters,
+      filterLogic: area.filterLogic,
+      parameterValues: area.parameterValues,
+      relationship: {
+        layout: area.layout,
+        dimensions: area.dimensions,
+        measures: area.measures,
+        visibleColumns: area.display.columns,
+        order: area.orderBy?.[0] ? { key: "measure" in area.orderBy[0] ? area.orderBy[0].measure : area.orderBy[0].field, direction: area.orderBy[0].direction } : undefined,
+      },
+    }));
+  }
   return definition.sources.map((source) => ({
     source,
     fields: definition.columns
@@ -85,12 +109,14 @@ export function ReportsCreatePanel({
     cancelJob.isPending ||
     job.data?.status === "queued" ||
     job.data?.status === "processing";
-  const configuration = JSON.stringify(builder.areas);
-  const stale = Boolean(preview.data && previewConfiguration !== configuration);
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [loadedModel, setLoadedModel] = useState<ReportModel | null>(null);
   const [loadedModelVersionId, setLoadedModelVersionId] = useState<string | null>(null);
+  const [selectedLetterhead, setSelectedLetterhead] = useState<ReportLetterheadSelection | undefined>();
+  const [relationshipMode, setRelationshipMode] = useState(false);
+  const configuration = JSON.stringify({ areas: builder.areas, relationshipMode });
+  const stale = Boolean(preview.data && previewConfiguration !== configuration);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
@@ -103,9 +129,22 @@ export function ReportsCreatePanel({
   }, [error]);
   useEffect(() => {
     if (!model) return;
-    builder.setAreas(legacyDefinitionToAreas(model));
+    const areas = legacyDefinitionToAreas(model);
+    const hasUnselectedAggregations = areas.some((area) =>
+      area.aggregations?.some((aggregation) => !area.fields.includes(aggregation.field)),
+    );
+    builder.setAreas(
+      areas.map((area) => ({
+        ...area,
+        aggregations: area.aggregations?.filter((aggregation) =>
+          area.fields.includes(aggregation.field),
+        ),
+      })),
+    );
     setLoadedModel(model);
-    setLoadedModelVersionId(model.version_id ?? null);
+    setLoadedModelVersionId(hasUnselectedAggregations ? null : (model.version_id ?? null));
+    setSelectedLetterhead(model.definition.letterhead);
+    setRelationshipMode("areas" in model.definition && model.definition.version === 3);
     setGeneratedJobId(null);
     createJob.reset();
     preview.reset();
@@ -117,7 +156,15 @@ export function ReportsCreatePanel({
   }, [model]);
 
   const sources = catalog.data?.items ?? [];
-  const pessoalPresets = getPessoalReportPresets(sources);
+  const letterheadOptions = catalog.data?.letterheads?.personal ?? [];
+  // Presets de Pessoal só fazem sentido antes de escolher áreas ou com áreas de Pessoal.
+  const pessoalPresets = builder.areas.every((area) => area.source.startsWith("pessoal."))
+    ? getPessoalReportPresets(sources)
+    : [];
+  const taskDepartmentPreset = builder.areas.every((area) => area.source === "integracao.tasks")
+    ? getTaskDepartmentReportPreset(sources)
+    : null;
+  const presets = [...pessoalPresets, ...(taskDepartmentPreset ? [taskDepartmentPreset] : [])];
   const selected = builder.areas.map((area) => ({
     ...area,
     catalog: sources.find((source) => source.key === area.source),
@@ -132,8 +179,14 @@ export function ReportsCreatePanel({
         ...(area.aggregations ?? []).map((item) => item.field),
         ...(area.orderBy ?? []).map((item) => item.field),
       ].some((key) => !getSelectableReportFields(area.catalog!).some((field) => field.key === key)),
-  );
+  ) || Boolean(selectedLetterhead && !letterheadOptions.some((option) => option.id === selectedLetterhead.id && option.sha256 === selectedLetterhead.sha256));
   const empty = selected.filter((area) => area.fields.length === 0);
+
+  function currentDefinition() {
+    return { ...(relationshipMode
+      ? buildReportCompositionV3(builder.areas, sources)
+      : buildReportComposition(builder.areas, sources)), ...(selectedLetterhead ? { letterhead: selectedLetterhead } : {}) };
+  }
 
   function clearGeneratedResult() {
     setGeneratedJobId(null);
@@ -163,10 +216,10 @@ export function ReportsCreatePanel({
     setError("");
     review.reset();
   }
-  function applyPreset(preset: PessoalReportPreset) {
+  function applyPreset(areas: ReportArea[]) {
     if (busy) return;
     builder.setAreas(
-      preset.areas.map((area) => ({
+      areas.map((area) => ({
         ...area,
         fields: [...area.fields],
         ...(area.filters ? { filters: area.filters.map((filter) => ({ ...filter })) } : {}),
@@ -183,7 +236,7 @@ export function ReportsCreatePanel({
     if (busy || unavailable) return;
     setError("");
     try {
-      const definition = buildReportComposition(builder.areas, sources);
+      const definition = currentDefinition();
       const created = await createJob.mutateAsync(
         loadedModelVersionId ? { modelVersionId: loadedModelVersionId } : definition,
       );
@@ -221,7 +274,7 @@ export function ReportsCreatePanel({
         definition:
           loadedModel && loadedModelVersionId
             ? loadedModel.definition
-            : buildReportComposition(builder.areas, sources),
+            : currentDefinition(),
       });
       setSaveDialogOpen(false);
       toast.success("Modelo salvo para usar novamente.");
@@ -250,7 +303,7 @@ export function ReportsCreatePanel({
     if (busy) return;
     setError("");
     try {
-      await preview.mutateAsync(buildReportComposition(builder.areas, sources));
+      await preview.mutateAsync(currentDefinition());
       setPreviewConfiguration(configuration);
     } catch (cause) {
       const status = getErrorStatus(cause);
@@ -306,7 +359,7 @@ export function ReportsCreatePanel({
     }
     let definition;
     try {
-      definition = buildReportComposition(builder.areas, sources);
+      definition = currentDefinition();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Confira os critérios da área.");
       return;
@@ -361,20 +414,20 @@ export function ReportsCreatePanel({
 
   return (
     <div className="space-y-6">
-      {pessoalPresets.length ? (
+      {presets.length ? (
         <section className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Presets de Pessoal</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Modelos prontos</h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
             Comece por uma estrutura pronta e ajuste os critérios antes de gerar.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {pessoalPresets.map((preset) => (
+            {presets.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
                 disabled={busy}
                 title={preset.description}
-                onClick={() => applyPreset(preset)}
+                onClick={() => applyPreset(preset.areas)}
                 className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
               >
                 {preset.label}
@@ -444,10 +497,29 @@ export function ReportsCreatePanel({
                     fieldKeys={area.fields}
                     disabled={busy}
                     onFieldKeysChange={(fields) => {
+                      const selectedFields = new Set(fields);
                       builder.setAreas((current) =>
-                        current.map((item) =>
-                          item.source === area.source ? { ...item, fields } : item,
-                        ),
+                        current.map((item) => {
+                          if (item.source !== area.source) return item;
+                          const relationship = item.relationship;
+                          const dimensions = relationship?.dimensions.filter((key) => selectedFields.has(key)) ?? [];
+                          const measures = relationship?.measures.filter((measure) =>
+                            measure.function === "count_rows" || (measure.field !== undefined && selectedFields.has(measure.field)),
+                          ) ?? [];
+                          const available = new Set([...fields, ...measures.map((measure) => measure.key)]);
+                          return {
+                            ...item,
+                            fields,
+                            aggregations: item.aggregations?.filter((aggregation) => selectedFields.has(aggregation.field)),
+                            ...(relationship ? { relationship: {
+                              ...relationship,
+                              dimensions,
+                              measures,
+                              visibleColumns: relationship.visibleColumns.filter((key) => available.has(key)),
+                              order: relationship.order && available.has(relationship.order.key) ? relationship.order : undefined,
+                            } } : {}),
+                          };
+                        }),
                       );
                       clearLoadedModel();
                       clearGeneratedResult();
@@ -472,15 +544,27 @@ export function ReportsCreatePanel({
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                 Definir critérios
               </h2>
+              <label className="flex items-start gap-2 rounded-lg border border-gray-200 p-3 text-sm text-gray-800 dark:border-slate-700 dark:text-slate-200">
+                <input type="checkbox" className={`mt-1 ${reportCheckboxClassName}`} disabled={busy} checked={relationshipMode} onChange={(event) => {
+                  setRelationshipMode(event.target.checked);
+                  clearLoadedModel();
+                  clearGeneratedResult();
+                  preview.reset();
+                }} />
+                <span><strong>Organizar relações entre campos</strong><br />Defina dimensões, detalhes ou medidas separadamente em cada área.</span>
+              </label>
               {selected.map(({ catalog: areaCatalog, ...area }) =>
                 areaCatalog ? (
-                  <ReportCriteriaStep
-                    key={area.source}
-                    area={area}
-                    source={areaCatalog}
-                    onChange={updateArea}
-                    disabled={busy}
-                  />
+                  <div key={area.source} className="space-y-4">
+                    <ReportCriteriaStep
+                      area={area}
+                      source={areaCatalog}
+                      onChange={updateArea}
+                      disabled={busy}
+                      relationshipMode={relationshipMode}
+                    />
+                    {relationshipMode ? <ReportRelationshipSettings area={area} source={areaCatalog} onChange={updateArea} disabled={busy} /> : null}
+                  </div>
                 ) : null,
               )}
             </>
@@ -495,6 +579,28 @@ export function ReportsCreatePanel({
                   Confira as áreas e os campos escolhidos. Cada área será apresentada separadamente.
                 </p>
               </div>
+              {letterheadOptions.length > 0 || selectedLetterhead ? (
+                <label className="block text-sm font-medium text-gray-800 dark:text-slate-200">
+                  Timbrado do PDF
+                  <select
+                    className={reportInputClassName}
+                    disabled={busy}
+                    value={selectedLetterhead?.id ?? ""}
+                    onChange={(event) => {
+                      const option = letterheadOptions.find((item) => item.id === event.target.value);
+                      setSelectedLetterhead(option ? { id: option.id, sha256: option.sha256 } : undefined);
+                      clearLoadedModel();
+                      clearGeneratedResult();
+                    }}
+                  >
+                    <option value="">Institucional (padrão)</option>
+                    {selectedLetterhead && !letterheadOptions.some((item) => item.id === selectedLetterhead.id && item.sha256 === selectedLetterhead.sha256) ? (
+                      <option value={selectedLetterhead.id} disabled>Timbrado selecionado indisponível</option>
+                    ) : null}
+                    {letterheadOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                  </select>
+                </label>
+              ) : null}
               {selected.map((area) => (
                 <section
                   key={area.source}
@@ -506,6 +612,10 @@ export function ReportsCreatePanel({
                   <p className="text-sm text-gray-600 dark:text-slate-300">
                     {area.catalog?.department_label || "Outras áreas"}
                   </p>
+                  {relationshipMode ? <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    {area.relationship?.layout === "summary" ? "Resumo por grupo" : "Lista por grupo"}
+                    {area.relationship?.dimensions.length ? ` · Dimensões: ${area.relationship.dimensions.join(", ")}` : " · Configure as dimensões na etapa anterior"}
+                  </p> : null}
                   <ul className="list-inside list-disc space-y-1 text-sm text-gray-800 dark:text-slate-200">
                     {area.fields.map((key) => (
                       <li key={key}>
@@ -549,24 +659,24 @@ export function ReportsCreatePanel({
                             : String(area.parameterValues?.[parameter.key] ?? "Não informado"))}
                       </li>
                     ))}
-                    {area.groupBy?.map((key) => (
+                    {!relationshipMode ? area.groupBy?.map((key) => (
                       <li key={`group-${key}`}>
                         Agrupar por {area.catalog?.fields.find((field) => field.key === key)?.label}
                       </li>
-                    ))}
-                    {area.aggregations?.map((item) => (
+                    )) : null}
+                    {!relationshipMode ? area.aggregations?.map((item) => (
                       <li key={`summary-${item.field}`}>
                         {summaryLabels[item.function]} de{" "}
                         {area.catalog?.fields.find((field) => field.key === item.field)?.label}
                       </li>
-                    ))}
-                    {area.orderBy?.map((item) => (
+                    )) : null}
+                    {!relationshipMode ? area.orderBy?.map((item) => (
                       <li key={`sort-${item.field}`}>
                         Ordenar por{" "}
                         {area.catalog?.fields.find((field) => field.key === item.field)?.label}:{" "}
                         {item.direction === "asc" ? "crescente" : "decrescente"}
                       </li>
-                    ))}
+                    )) : null}
                   </ul>
                 </section>
               ))}
@@ -579,68 +689,10 @@ export function ReportsCreatePanel({
                   <p role="status" className="text-sm text-gray-600 dark:text-slate-300">
                     Prévia pronta. Cada área aparece em um bloco independente.
                   </p>
-                  {preview.data.blocks.map((block) => (
-                    <section
-                      key={block.source}
-                      aria-label={`Prévia de ${block.label}`}
-                      className="min-w-0 space-y-2 border-t border-gray-200 pt-4 dark:border-slate-700"
-                    >
-                      <h3 className="font-semibold text-gray-900 dark:text-white">{block.label}</h3>
-                      <p className="text-sm text-gray-600 dark:text-slate-300">
-                        {block.rows.length} {block.rows.length === 1 ? "registro" : "registros"} na
-                        amostra
-                        {block.hasMore ? ". Há mais registros disponíveis." : "."}
-                      </p>
-                      {block.rows.length ? (
-                        <div
-                          className="overflow-x-auto rounded border border-gray-200 dark:border-slate-700"
-                          tabIndex={0}
-                          role="region"
-                          aria-label={`Dados de ${block.label}`}
-                        >
-                          <table className="w-full text-left text-sm text-gray-800 dark:text-slate-200">
-                            <thead>
-                              <tr>
-                                {block.columns.map((column) => (
-                                  <th
-                                    key={column.key}
-                                    scope="col"
-                                    className="bg-gray-50 px-3 py-2 dark:bg-slate-800"
-                                  >
-                                    {column.label}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {block.rows.map((row, index) => (
-                                <tr key={index}>
-                                  {block.columns.map((column) => (
-                                    <td
-                                      key={column.key}
-                                      className="border-t border-gray-200 px-3 py-2 dark:border-slate-700"
-                                    >
-                                      {typeof row[column.key] === "boolean"
-                                        ? row[column.key]
-                                          ? "Sim"
-                                          : "Não"
-                                        : row[column.key] == null
-                                          ? "—"
-                                          : String(row[column.key])}
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-600 dark:text-slate-300">
-                          Nenhum registro encontrado nesta área. Ajuste os critérios se necessário.
-                        </p>
-                      )}
-                    </section>
-                  ))}
+                  <ReportResultBlocks blocks={preview.data.blocks} preview />
+                  {preview.data.blocks.some((block) => block.hasMore) ? (
+                    <p className="text-xs text-gray-600 dark:text-slate-300">A prévia mostra apenas uma amostra; há mais registros no relatório.</p>
+                  ) : null}
                 </div>
               ) : null}
               {job.data ? (
@@ -694,7 +746,7 @@ export function ReportsCreatePanel({
                           <p className="text-sm text-gray-700 dark:text-slate-300">
                             {snapshot.data.blocks
                               ? "Resultado concluído. Escolha um formato para baixar as áreas separadamente."
-                              : "Resultado concluído. Escolha um formato para baixar o snapshot."}
+                              : "Resultado concluído. Escolha um formato para baixar o relatório."}
                           </p>
                           <ReportDownloadActions id={snapshot.data.snapshot.id} />
                         </div>
@@ -776,6 +828,9 @@ export function ReportsCreatePanel({
           </Button>
         ) : (
           <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" disabled={busy || unavailable} onClick={() => setSaveDialogOpen(true)}>
+              Salvar como modelo
+            </Button>
             <Button type="button" variant="outline" disabled={busy || unavailable} onClick={() => void showPreview()}>
               {preview.isPending ? "Carregando prévia..." : "Visualizar prévia"}
             </Button>

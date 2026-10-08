@@ -15,6 +15,7 @@ const {
   unwrapReportsEnvelope,
 } = await import("./services/reportsService.contract.ts");
 const {
+  reportJobPollInterval,
   reportsCatalogQueryKey,
   reportsHistoryQueryKey,
   reportsModelsQueryKey,
@@ -30,10 +31,13 @@ const {
   sanitizeReportPreviewResult,
 } = await import("./utils/reportBuilder.ts");
 const appPackage = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url)));
-const { buildReportComposition } = await import("./utils/reportCriteria.ts");
+const { buildReportComposition, buildReportCompositionV3 } = await import("./utils/reportCriteria.ts");
 const { getPessoalReportPresets } = await import("./utils/pessoalReportPresets.ts");
+const { getTaskDepartmentReportPreset } = await import("./utils/taskDepartmentReportPreset.ts");
 const { unwrapReportCompositionPreview } = await import("./services/reportsService.contract.ts");
-const { getReportForbiddenMessage, isReportCsrfError } = await import("./components/reportUi.ts");
+const { getReportAuthorLabel, getReportForbiddenMessage, isReportCsrfError } = await import(
+  "./components/reportUi.ts"
+);
 const reportsPageSource = await readFile(
   new URL("./components/ReportsCatalogPage.tsx", import.meta.url),
   "utf8",
@@ -127,6 +131,85 @@ runTest("rejects fields that disappeared from the authorized catalog", () => {
     () => buildReportComposition([{ source: source.key, fields: ["removed_field"] }], [source]),
     /não está mais disponível/,
   );
+});
+
+runTest("builds grouped summaries with hidden authorized dimensions and row counts", () => {
+  const source = {
+    key: "test.items", label: "Itens", module: "test",
+    fields: [
+      { key: "status", label: "Situação", type: "string", selectable: true, groupable: true },
+      { key: "amount", label: "Valor", type: "number", selectable: true, aggregatable: true, aggregationFunctions: ["sum"] },
+    ],
+  };
+  const result = buildReportCompositionV3([{ source: source.key, fields: ["status", "amount"],
+    relationship: { layout: "summary", dimensions: ["status"],
+      measures: [{ key: "report_total", function: "count_rows" }, { key: "report_sum", function: "sum", field: "amount" }],
+      visibleColumns: ["report_total", "report_sum"], order: { key: "report_total", direction: "desc" } } }], [source]);
+  assert.equal(result.version, 3);
+  assert.deepEqual(result.areas[0].display.columns, ["report_total", "report_sum"]);
+  assert.deepEqual(result.areas[0].orderBy, [{ measure: "report_total", direction: "desc" }]);
+});
+
+runTest("removes v3 measures when their source field is no longer selected", () => {
+  const source = { key: "test.items", label: "Itens", module: "test", fields: [
+    { key: "status", label: "Situação", type: "string", selectable: true, groupable: true },
+    { key: "amount", label: "Valor", type: "number", selectable: true, aggregatable: true, aggregationFunctions: ["sum"] },
+  ] };
+  const result = buildReportCompositionV3([{ source: source.key, fields: ["status"], relationship: {
+    layout: "summary", dimensions: ["status"],
+    measures: [{ key: "report_total", function: "count_rows" }, { key: "report_sum", function: "sum", field: "amount" }],
+    visibleColumns: ["status", "report_sum"], order: { key: "report_sum", direction: "desc" },
+  } }], [source]);
+  assert.deepEqual(result.areas[0].measures, [{ key: "report_total", function: "count_rows" }]);
+  assert.deepEqual(result.areas[0].display.columns, ["status"]);
+  assert.equal(result.areas[0].orderBy, undefined);
+});
+
+runTest("keeps authorized letterhead options in the catalog contract", () => {
+  const option = { id: "approved", label: "Timbrado aprovado", kind: "organization", sha256: "a".repeat(64) };
+  const parsed = unwrapReportsCatalogEnvelope({ success: true, data: { items: [], letterheads: { personal: [option], shared: [] } } });
+  assert.deepEqual(parsed.letterheads?.personal, [option]);
+});
+
+runTest("omits summary aggregations for fields that are not selected", () => {
+  const source = {
+    key: "integracao.clients",
+    label: "Clientes",
+    module: "integracao",
+    fields: [
+      {
+        key: "name",
+        label: "Nome",
+        type: "string",
+        selectable: true,
+        aggregatable: true,
+        aggregationFunctions: ["count"],
+      },
+      {
+        key: "state",
+        label: "Estado",
+        type: "string",
+        selectable: true,
+        aggregatable: true,
+        aggregationFunctions: ["count"],
+      },
+    ],
+  };
+  const definition = buildReportComposition(
+    [
+      {
+        source: source.key,
+        fields: ["name"],
+        aggregations: [
+          { field: "name", function: "count" },
+          { field: "state", function: "count" },
+        ],
+      },
+    ],
+    [source],
+  );
+
+  assert.deepEqual(definition.areas[0].aggregations, [{ field: "name", function: "count" }]);
 });
 
 runTest("distinguishes a CSRF failure from a report authorization denial", () => {
@@ -237,6 +320,41 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
     [{ field: "competence", operator: "eq", value: "" }],
   );
   assert.equal(getPessoalReportPresets(sources.slice(0, 2)).length, 2);
+});
+
+runTest("offers a task count by current department only for an authorized report source", () => {
+  const source = {
+    key: "integracao.tasks",
+    label: "Tarefas de Integração",
+    module: "integracao",
+    fields: [{
+      key: "department", label: "Departamento", type: "string", selectable: true,
+      groupable: true, aggregationFunctions: ["count"],
+    }],
+  };
+  const preset = getTaskDepartmentReportPreset([source]);
+  assert.equal(preset?.label, "Quantidade de tarefas por departamento");
+  assert.deepEqual(buildReportComposition(preset.areas, [source]), {
+    version: 2,
+    areas: [{
+      source: "integracao.tasks",
+      fields: ["department"],
+      groupBy: ["department"],
+      aggregations: [{ field: "department", function: "count" }],
+      filters: [],
+    }],
+  });
+  assert.equal(getTaskDepartmentReportPreset([]), null);
+  assert.equal(getTaskDepartmentReportPreset([{ ...source, fields: [] }]), null);
+  assert.equal(getTaskDepartmentReportPreset([{ ...source, fields: [{ ...source.fields[0], selectable: undefined }] }]), null);
+  assert.equal(getTaskDepartmentReportPreset([{ ...source, fields: [{ ...source.fields[0], groupable: false }] }]), null);
+  assert.equal(getTaskDepartmentReportPreset([{
+    ...source,
+    fields: [{
+      ...source.fields[0], groupable: undefined, aggregationFunctions: undefined,
+      capabilities: { groupable: true, aggregationFunctions: ["count"] },
+    }],
+  }])?.id, "integracao-tarefas-por-departamento");
 });
 
 runTest("unwraps the shared success envelope", () => {
@@ -593,6 +711,14 @@ runTest("salva modelos somente depois do resultado e reabre com nomes amigáveis
   assert.doesNotMatch(reportsModelsSource, /\{model\.(organization_id|department_id|version_id)\}/);
 });
 
+runTest("separa modelos pessoais do acervo compartilhado sem departamento", () => {
+  assert.match(reportsModelsSource, /useModuleAccessMap/);
+  assert.match(reportsModelsSource, /useSharedReportModels\(Boolean\(departmentModule\)\)/);
+  assert.match(reportsModelsSource, /personalQuery\.isError/);
+  assert.match(reportsModelsSource, /sharedQuery\.isError/);
+  assert.doesNotMatch(reportsModelsSource, /personalQuery\.isError \|\| sharedQuery\.isError/);
+});
+
 runTest("uses the materialized snapshot id for in-memory downloads", () => {
   assert.match(snapshotTableSource, /snapshotQuery\.data\?\.snapshot\.id/);
   assert.match(snapshotTableSource, /snapshotId \? <ReportDownloadActions id=\{snapshotId\}/);
@@ -650,4 +776,42 @@ runTest("does not render preview columns outside the published catalog", () => {
 
 runTest("includes reports coverage in the app test suite", () => {
   assert.match(appPackage.scripts.test, /test:reports/);
+});
+
+runTest("polls an active report job with capped backoff and stops on terminal states", () => {
+  assert.equal(reportJobPollInterval("queued", 0), 1000);
+  assert.equal(reportJobPollInterval("processing", 1), 1500);
+  assert.equal(reportJobPollInterval("processing", 3), 3375);
+  assert.equal(reportJobPollInterval("processing", 20), 4000);
+  for (const status of ["completed", "failed", "cancelled", "expired", "deleted", undefined]) {
+    assert.equal(reportJobPollInterval(status, 0), false);
+  }
+});
+
+const reportHooks = await readFile(new URL("./hooks/useReports.ts", import.meta.url), "utf8");
+runTest("report job keeps polling while the tab is hidden", () => {
+  const hooks = reportHooks;
+  assert.match(hooks, /reportJobPollInterval\(query\.state\.data\?\.status, query\.state\.dataUpdateCount\)/);
+  assert.match(hooks, /refetchIntervalInBackground: true/);
+});
+
+runTest("history shows a readable author instead of the requester UUID", () => {
+  const names = new Map([["user-2", "Ana"]]);
+  const current = { id: "user-1", name: "Eu" };
+  assert.equal(getReportAuthorLabel({ requester_id: "user-2" }, names, current), "Ana");
+  assert.equal(getReportAuthorLabel({ requester_id: "user-1" }, names, current), "Eu");
+  assert.equal(getReportAuthorLabel({ requester_id: "user-3", author_name: "Bia" }, names, current), "Bia");
+  assert.equal(getReportAuthorLabel({ requester_id: "user-9" }, names, current), "Usuário não encontrado");
+});
+
+const historyPanelSource = await readFile(new URL("./components/ReportHistoryPanel.tsx", import.meta.url), "utf8");
+const snapshotSource = await readFile(new URL("./components/ReportSnapshotTable.tsx", import.meta.url), "utf8");
+runTest("history shows failure reasons and scrolls to the opened snapshot", () => {
+  assert.match(historyPanelSource, /item\.status === "failed" && item\.error_message/);
+  assert.match(snapshotSource, /scrollIntoView\(/);
+});
+
+runTest("current configuration can be saved as a personal model before generating", () => {
+  assert.match(createPanelSource, /onClick=\{\(\) => setSaveDialogOpen\(true\)\}>\s*Salvar como modelo/);
+  assert.match(createPanelSource, /builder\.areas\.every\(\(area\) => area\.source\.startsWith\("pessoal\."\)\)/);
 });

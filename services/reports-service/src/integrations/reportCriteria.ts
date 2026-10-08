@@ -1,5 +1,14 @@
-import { type ReportingQuery, reportingQueryFields, ServiceError } from "@workspace/shared";
+import {
+  REPORTING_QUERY_BYTE_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_CODE,
+  type ReportingQuery,
+  reportingQueryFields,
+  ServiceError,
+} from "@workspace/shared";
 import type { ReportDefinition } from "../schemas/reportDefinition.schemas.js";
+
+export const REPORT_SNAPSHOT_LIMIT_MESSAGE =
+  "O relatório excede o limite global (50.000 linhas ou 20 MiB). Reduza os filtros ou as colunas e tente novamente.";
 
 export function reportAggregationAlias(
   aggregation: ReportDefinition["aggregations"][number],
@@ -85,11 +94,38 @@ export function reportResultFields(
     : fields;
 }
 
-export function assertReportSourceResponse(response: { status: number }): void {
+export function assertReportSourceResponse(response: { status: number }, payload?: unknown): void {
+  const errorCode =
+    payload && typeof payload === "object" && "code" in payload
+      ? (payload as { code?: unknown }).code
+      : undefined;
+  if (
+    response.status === 422 &&
+    [REPORTING_QUERY_ROW_LIMIT_CODE, REPORTING_QUERY_BYTE_LIMIT_CODE].includes(errorCode as string)
+  ) {
+    throw new ServiceError(422, REPORT_SNAPSHOT_LIMIT_MESSAGE);
+  }
   if (response.status === 422)
     throw new ServiceError(422, "A área excede a capacidade de consulta do relatório.");
   if (response.status === 400)
     throw new ServiceError(400, "Os critérios não são compatíveis com esta área.");
   if (response.status === 403)
     throw new ServiceError(403, "A consulta não está autorizada para esta área.");
+}
+
+export async function readReportSourcePayload(response: {
+  status: number;
+  json(): Promise<unknown>;
+}): Promise<unknown> {
+  if (response.status !== 422) assertReportSourceResponse(response);
+  try {
+    const payload = await response.json();
+    assertReportSourceResponse(response, payload);
+    return payload;
+  } catch (cause) {
+    if (response.status === 422 && cause instanceof SyntaxError) {
+      assertReportSourceResponse(response);
+    }
+    throw cause;
+  }
 }

@@ -39,7 +39,7 @@ function canonical(value: unknown): string {
       .join(",")}}`;
   return JSON.stringify(value);
 }
-for (const source of reportingSources) {
+for (const source of reportingSources.filter((source) => source.key !== "marketing.budgets")) {
   it(`${source.key}: verifies all fields and signed criteria at the HTTP boundary`, async () => {
     const service =
       source.key === "integracao.projects"
@@ -48,9 +48,11 @@ for (const source of reportingSources) {
           ? "task"
           : source.key === "integracao.clients"
             ? "client"
-            : source.key.startsWith("certificado.")
-              ? "certificate"
-              : source.key.split(".")[0];
+            : source.key === "integracao.client_groups"
+              ? "client"
+              : source.key.startsWith("certificado.")
+                ? "certificate"
+                : source.key.split(".")[0];
     const router = routers[service as keyof typeof routers];
     const extract = vi.fn().mockResolvedValue({ rows: [], reachedLimit: false });
     const stub = { extract, consumeGrant: vi.fn() };

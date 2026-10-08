@@ -2,27 +2,27 @@ import { z } from "zod";
 
 import { paginationQuerySchema } from "./pagination.schemas.js";
 
-const tiExtensionNumberSchema = z.string().regex(/^[0-9]{4}$/, {
-  message: "number deve conter exatamente 4 dígitos.",
+const tiExtensionNumberSchema = z.string().regex(/^[0-9]{3,4}$/, {
+  message: "number deve conter 3 ou 4 dígitos.",
 });
 
 export const tiExtensionIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "Ramal de TI invalido." }),
+    id: z.string().uuid({ message: "Ramal de TI inválido." }),
   })
   .strict();
 
 export const listTiExtensionsQuerySchema = paginationQuerySchema
   .merge(
     z.object({
-      user_id: z.string().uuid({ message: "Usuario invalido." }).optional(),
+      user_id: z.string().uuid({ message: "Usuário inválido." }).optional(),
     }),
   )
   .strict();
 
 export const createTiExtensionBodySchema = z
   .object({
-    user_id: z.string().uuid({ message: "Usuario invalido." }),
+    user_id: z.string().uuid({ message: "Usuário inválido." }),
     number: tiExtensionNumberSchema,
   })
   .strict();

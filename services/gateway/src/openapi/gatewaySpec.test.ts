@@ -34,6 +34,8 @@ it("agrega o catálogo público do reports-service", () => {
     parcelamentoServiceUrl: "http://127.0.0.1:3043",
     reportsServiceUrl: "http://127.0.0.1:3044",
     commercialServiceUrl: "http://127.0.0.1:3045",
+    marketingServiceUrl: "http://127.0.0.1:3047",
+    marketingServiceInternalToken: "marketing-service-token",
     databaseUrl: "postgres://test:test@127.0.0.1:5432/gateway_test",
     jwtSecret: "test-secret",
     logLevel: "silent",
@@ -53,6 +55,19 @@ it("agrega o catálogo público do reports-service", () => {
   expect(spec.paths["/commercial/prospecting"]?.post?.["x-origin-service"]).toBe(
     "commercial-service",
   );
+  expect(spec.paths["/marketing/dashboard"]?.get?.["x-origin-service"]).toBe("marketing-service");
+  expect(spec.paths["/marketing/dashboard"]).toBeDefined();
+  expect(spec.paths["/marketing/events/list"]).toBeDefined();
+  expect(spec.paths["/marketing/events"]?.post?.["x-origin-service"]).toBe("marketing-service");
+  expect(spec.paths["/marketing/events/{eventId}/editions"]?.get?.["x-origin-service"]).toBe(
+    "marketing-service",
+  );
+  expect(spec.paths["/marketing/events/{eventId}/editions"]?.post?.["x-origin-service"]).toBe(
+    "marketing-service",
+  );
+  expect(
+    spec.paths["/marketing/events/{eventId}/editions/{editionId}"]?.put?.["x-origin-service"],
+  ).toBe("marketing-service");
   expect(spec.paths["/triagem/catalogs"]?.get?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/triagem/external-links"]?.post?.["x-origin-service"]).toBe("triagem-service");
   expect(spec.paths["/triagem/overview"]?.get?.["x-origin-service"]).toBe("triagem-service");
@@ -68,6 +83,11 @@ it("agrega o catálogo público do reports-service", () => {
     expect.arrayContaining([expect.objectContaining({ name: "x-csrf-token", required: true })]),
   );
   expect(permissionUpdate?.responses).toHaveProperty("422");
+
+  expect(spec.paths["/platform/impersonation/exit"]?.post?.security).toEqual([
+    { cookieAuth: [] },
+    { bearerAuth: [] },
+  ]);
 
   for (const [path, method] of [
     ["/platform/organizations", "get"],

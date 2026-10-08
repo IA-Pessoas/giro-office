@@ -7,12 +7,12 @@ const UNION_REGARDING = "union";
 
 const tomorrowNotification = {
   title: "Sindicato prestes a vencer",
-  message: "Data base sera alcancada amanha.",
+  message: "Data base será alcançada amanhã.",
 } as const;
 
 const monthAgoNotification = {
   title: "Sindicato vencido",
-  message: "Data base foi alcancada no mes passado.",
+  message: "Data base foi alcançada no mês passado.",
 } as const;
 
 const unionOrganizationSelect = {
@@ -92,7 +92,7 @@ export class UnionNotificationService {
     } catch (err: unknown) {
       logError("Erro ao executar notificacoes de sindicatos de pessoal", { err });
       if (err instanceof ServiceError) throw err;
-      throw new ServiceError(500, "Erro ao executar notificacoes de sindicatos de pessoal.", err);
+      throw new ServiceError(500, "Erro ao executar notificações de sindicatos de pessoal.", err);
     }
   }
 
@@ -108,7 +108,7 @@ export class UnionNotificationService {
           pessoal: { gte: 1 },
           user: {
             organization_id: organizationId,
-            status: "Ativo",
+            status: "active",
           },
         },
         select: permissionUserSelect,

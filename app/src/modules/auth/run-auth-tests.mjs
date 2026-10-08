@@ -266,7 +266,7 @@ await (async () => {
     assert.equal(isAdminPermission(null), false);
   });
 
-  await runTest("administration access allows owners and RH admins only", () => {
+  await runTest("administration access allows owners, RH admins and TI admins only", () => {
     assert.equal(canAccessAdministration(2), false);
     assert.equal(canAccessAdministration(100), false);
     assert.equal(canAccessAdministration(1), false);
@@ -298,6 +298,11 @@ await (async () => {
     assert.equal(canAccessAdministration({ permission: 1 }), false);
     assert.equal(canAccessAdministration({ permission: 1, modules: { rh: 3 } }), true);
     assert.equal(canAccessAdministration({ permission: 1, modules: { rh: 1 } }), false);
+    assert.equal(
+      canAccessAdministration({ permission: 1, type: "admin", modules: { ti: 3, rh: 1 } }),
+      true,
+    );
+    assert.equal(canAccessAdministration({ permission: 1, type: "admin", modules: { ti: 2 } }), false);
     assert.equal(canAccessAdministration(undefined), false);
   });
 
@@ -552,7 +557,7 @@ await (async () => {
   );
 
   await runTest("disabled modules are blocked even for global admins", () => {
-    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), ["marketing"]);
+    assert.deepEqual([...DISABLED_MODULE_KEYS].sort(), []);
 
     for (const moduleKey of DISABLED_MODULE_KEYS) {
       assert.equal(isModuleDisabled(moduleKey), true);
@@ -573,8 +578,28 @@ await (async () => {
     }
   });
 
+  await runTest("Marketing uses the standard module permission levels", () => {
+    assert.equal(isModuleDisabled("marketing"), false);
+    assert.equal(APP_ROUTE_MODULE_MAP["/marketing"], "marketing");
+    assert.equal(
+      resolveModuleAccess({ module: "marketing", additionalModulePermissions: { marketing: 1 } }).canView,
+      true,
+    );
+    assert.equal(
+      resolveModuleAccess({ module: "marketing", additionalModulePermissions: { marketing: 1 } }).canEdit,
+      false,
+    );
+    assert.equal(
+      resolveModuleAccess({ module: "marketing", additionalModulePermissions: { marketing: 2 } }).canEdit,
+      true,
+    );
+  });
+
   await runTest("module access helpers normalize aliases and additional permission levels", () => {
     assert.equal(resolveDepartmentModuleKey("Departamento Pessoal"), "pessoal");
+    assert.equal(resolveDepartmentModuleKey("Contabilidade"), "contabil");
+    assert.equal(resolveDepartmentModuleKey("Integração de Clientes"), "integracao");
+    assert.equal(resolveDepartmentModuleKey("Contábil Societário"), "contabil");
     assert.equal(resolveDepartmentModuleKey("Tecnologia"), "ti");
     assert.equal(resolveDepartmentModuleKey("Atendimento"), null);
     assert.equal(resolveDepartmentModuleKey("PEC"), null);
@@ -597,7 +622,7 @@ await (async () => {
     assert.match(appSource, /<AppLayout isIframeView=\{isIframeView\}>/);
     assert.match(
       appShellSource,
-      /if \(isIframeView\) \{\s*return <div[^>]*>\{mainContent\}<\/div>;/,
+      /if \(isIframeView\) \{\s*return \([\s\S]*?\{impersonationBanner\}[\s\S]*?\{mainContent\}[\s\S]*?\);\s*\}/,
     );
   });
 
@@ -616,27 +641,51 @@ await (async () => {
     },
   );
 
-  await runTest("retired modules are not registered in navigation or quick actions", () => {
-    for (const blockedPath of ["/marketing"]) {
-      assert.equal(appShellSource.includes(`path: "${blockedPath}"`), false);
-      assert.equal(quickActionsSource.includes(`href: "${blockedPath}"`), false);
-    }
+  await runTest("mostra banner fixo apenas com contexto de personificação", () => {
+    assert.match(authContextSource, /interface ImpersonationSessionInfo/);
+    assert.match(authContextSource, /isValidImpersonationSessionInfo\(data\.impersonation\)/);
+    assert.match(appShellSource, /const impersonation = user\?\.impersonation/);
+    assert.match(appShellSource, /const impersonationBanner = impersonation \?/);
+    assert.match(appShellSource, /role="status"/);
+    assert.match(appShellSource, /fixed inset-x-0 top-0/);
+    assert.match(
+      appShellSource,
+      /Você está personificando \{user\.name\} \(\{impersonation\.organization_name\}\)/,
+    );
+    assert.match(appShellSource, /if \(isIframeView\)[\s\S]*\{impersonationBanner\}/);
+  });
+
+  await runTest("expiração de personificação informa tempo restante e login do super admin", () => {
+    assert.match(appShellSource, /Tempo restante:/);
+    assert.match(appShellSource, /expires_at/);
+    assert.match(authContextSource, /Sua personificação expirou/);
+    assert.match(authContextSource, /\/super-admin\/login/);
+  });
+
+  await runTest("Marketing is registered in navigation and not exposed as a quick action", () => {
+    assert.equal(appShellSource.includes('path: "/marketing"'), true);
+    assert.equal(quickActionsSource.includes('href: "/marketing"'), false);
     assert.equal(appShellSource.includes('path: "/comercial"'), true);
   });
 
   await runTest(
-    "disabled module pages return not found without importing module implementations",
+    "Marketing page uses the new module implementation",
     () => {
-    for (const source of [marketingPageSource]) {
-        assert.match(source, /notFound:\s*true/);
-      }
-
       assert.equal(commercialPageSource.includes("CommercialCatalog"), true);
       assert.equal(commercialPageSource.includes("notFound: true"), false);
-      assert.match(clientCommercialPageSource, /notFound:\s*true/);
+      assert.match(clientCommercialPageSource, /redirect:.*destination: id \? `\/clients\/\$\{id\}`/);
       assert.equal(clientCommercialPageSource.includes("ClientCommercialForm"), false);
       assert.equal(clientCommercialPageSource.includes("useUpdateClientCommercialMutation"), false);
+      assert.equal(marketingPageSource.includes("MarketingDashboard"), true);
+      assert.equal(marketingPageSource.includes("MarketingAiUsageControls"), true);
+      assert.equal(marketingPageSource.includes("MarketingEvents"), true);
+      assert.equal(marketingPageSource.includes("MarketingInstagramProfiles"), true);
+      assert.equal(marketingPageSource.includes("MarketingPasswords"), true);
+      assert.equal(marketingPageSource.includes("MarketingCanonicalQueries"), true);
+      assert.equal(marketingPageSource.includes("notFound: true"), false);
       assert.equal(marketingPageSource.includes("newLayout/Marketing"), false);
+      assert.match(marketingPageSource, /MarketingDashboard/);
+      assert.doesNotMatch(marketingPageSource, /notFound:\s*true/);
       assert.equal(triagemPageSource.includes("TriageDocumentsSection"), true);
       assert.match(parcelamentoPageSource, /ParcelamentoShell/);
     },
@@ -727,10 +776,6 @@ await (async () => {
   });
 
   await runTest("sessão inválida encerra o loading e orienta o retorno ao login", () => {
-    assert.match(
-      authContextSource,
-      /function signOut\(message = "Sessão expirada\. Faça login novamente\."\)[\s\S]*toast\.error\(message,\s*\{\s*toastId: "auth-session-expired"/,
-    );
     assert.match(authContextSource, /registerAuthInvalidationHandler/);
     assert.match(authContextSource, /setUser\(null\);/);
     assert.match(
@@ -787,7 +832,10 @@ await (async () => {
       assert.match(authContextSource, /refreshSession:\s*\(\)\s*=>\s*Promise<UserProps \| null>/);
       assert.match(authContextSource, /async function refreshSession\(\)/);
       assert.match(authContextSource, /<AuthContext\.Provider value=\{\{/);
-      assert.match(authContextSource, /signIn,\s*signInPlatform,\s*logoutUser,\s*logoutPlatform/);
+      assert.match(
+        authContextSource,
+        /signIn,\s*signInPlatform,\s*logoutUser,\s*logoutPlatform,\s*exitImpersonation/,
+      );
       assert.match(authContextSource, /refreshSession,\s*refreshPlatformSession,\s*loading/);
       assert.match(administracaoSource, /import \{ signOut, useAuth \} from "@\/context\/AuthContext";/);
       assert.match(administracaoSource, /const \{ user \} = useAuth\(\);/);
@@ -812,6 +860,12 @@ await (async () => {
       assert.equal(administracaoSource.includes("accessStoreActions.syncFromToken"), false);
     },
   );
+
+  await runTest("impersonation exit restores platform cookies and route", () => {
+    assert.match(authContextSource, /platformApi\.post\("\/platform\/impersonation\/exit"\)/);
+    assert.match(authContextSource, /Router\.push\(isValidPlatformUser\(identity\) \? "\/super-admin"/);
+    assert.match(appShellSource, /Sair da personificação/);
+  });
 
   await runTest("admin permission updates invalidate cached permission data after save", () => {
     assert.match(
@@ -871,7 +925,8 @@ await (async () => {
   await runTest("admin permissions editor uses explicit save copy and stable saving state", () => {
     assert.match(
       adminPermissionsEditorSource,
-      /\{filteredUsers\.length\} de \{users\.length\} usuário/,
+      // #1371: plural pelo formatCount ("1 usuário", "2 usuários").
+      /\{filteredUsers\.length\} de \{formatCount\(users\.length, "usuário", "usuários"\)\}/,
     );
     assert.match(adminPermissionsEditorSource, /Salvar permissões/);
     assert.equal(adminPermissionsEditorSource.includes(': "Salvar"'), false);

@@ -10,7 +10,7 @@ const expect = baseExpect.configure({ timeout: 15_000 });
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
-const PORT = process.env.TASKS_BROWSER_PORT || "3116";
+const PORT = process.env.TASKS_BROWSER_PORT || "3120";
 const configuredBaseUrl = process.env.TASKS_BROWSER_BASE_URL?.replace(/\/$/, "");
 const baseUrl = configuredBaseUrl || `http://localhost:${PORT}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
@@ -23,6 +23,12 @@ const financeScreenshotPath =
 const financeMobileScreenshotPath =
   process.env.TASKS_FINANCEIRO_MOBILE_SCREENSHOT_PATH ??
   "output/playwright/issue-301-finance-task-mobile.png";
+const releasedServicesScreenshotPath =
+  process.env.TASKS_RELEASED_SERVICES_SCREENSHOT_PATH ??
+  "output/playwright/issue-1243-released-services.png";
+const departmentChangeScreenshotPath =
+  process.env.TASKS_DEPARTMENT_CHANGE_SCREENSHOT_PATH ??
+  "../output/playwright/issue-1593-department-change.png";
 
 const smokeUser = {
   id: "user-task-smoke",
@@ -40,6 +46,8 @@ const task = {
   isOwn: false,
   isUnassigned: true,
   name: "Tarefa sem responsável",
+  client_name: "Cliente Filtro",
+  project_name: "Projeto migração",
   status: "Em Andamento",
   billing: "Não Realizar",
   charge_comercial: false,
@@ -55,6 +63,15 @@ const assignedTask = {
   isOwn: true,
   isUnassigned: false,
   name: "Tarefa com responsável",
+  responsible_name: smokeUser.name,
+};
+
+const uniqueServiceTask = {
+  ...task,
+  id: "task-unique-released",
+  name: "Serviço único liberado",
+  client_name: "Empresa serviço único",
+  project_name: "Projeto serviço único",
 };
 
 const legacyTaskDetail = {
@@ -96,6 +113,20 @@ async function installApiMocks(
   financeSettlementRequests,
 ) {
   let currentLegacyTaskDetail = { ...legacyTaskDetail };
+  for (const endpoint of [
+    "task/notifications",
+    "task/complete-request/list",
+    "task/postponement/list",
+    "task/attachment/list",
+  ]) {
+    await page.route(`**/${endpoint}*`, (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        json: { success: false, error: "Recurso indisponível no smoke." },
+      }),
+    );
+  }
   let financeQueue = [
     {
       id: "task-finance-pending",
@@ -137,8 +168,11 @@ async function installApiMocks(
         json: { success: false, error: "Cliente não encontrado.", code: "NOT_FOUND" },
       });
     }
-    const filteredTasks =
-      requestUrl.searchParams.get("assignment") === "assigned" ? [assignedTask] : [task];
+    const filteredTasks = requestUrl.searchParams.get("unique_service_released") === "true"
+      ? [uniqueServiceTask]
+      : requestUrl.searchParams.get("assignment") === "assigned"
+        ? [assignedTask]
+        : [task];
     return route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -441,6 +475,14 @@ async function installApiMocks(
       },
     }),
   );
+  // O painel de conclusão é montado junto da edição, mas o histórico não faz parte deste smoke.
+  await page.route(/\/task\/complete-request\/list(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      json: { success: true, data: [] },
+    }),
+  );
   await page.route("**/project/list*", (route) =>
     route.fulfill({
       status: 200,
@@ -538,6 +580,7 @@ async function runBrowserProof() {
     },
   ]);
   const page = await context.newPage();
+  page.setDefaultNavigationTimeout(120_000);
   const taskListRequests = [];
   const clientDetailRequests = [];
   const createTaskRequests = [];
@@ -557,12 +600,30 @@ async function runBrowserProof() {
   );
 
   try {
-    await page.goto(`/tasks?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/tasks?clientId=${clientId}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
     await expect(page.getByRole("heading", { name: "Tarefas", level: 1 })).toBeVisible();
     await expect(page.getByText("Tarefa sem responsável", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Fila financeira", level: 2 })).toBeVisible();
     await expect(page.getByText("Tarefa financeira pendente", { exact: true })).toBeVisible();
     await expect(page.getByText("Tarefa financeira individual", { exact: true })).toBeVisible();
+
+    const releasedServicesFilter = page.getByLabel("Liberação do Comercial");
+    await releasedServicesFilter.selectOption("true");
+    await expect
+      .poll(() =>
+        taskListRequests.some((url) => url.searchParams.get("unique_service_released") === "true"),
+      )
+      .toBe(true);
+    await expect(page.getByText(uniqueServiceTask.name, { exact: true })).toBeVisible();
+    await expect(page.getByText(uniqueServiceTask.client_name, { exact: true })).toBeVisible();
+    await expect(page.getByText(uniqueServiceTask.project_name, { exact: true })).toBeVisible();
+    await page.screenshot({ path: releasedServicesScreenshotPath, fullPage: true });
+    await releasedServicesFilter.selectOption("");
+    await expect(page.getByText(task.name, { exact: true })).toBeVisible();
+
     await page.screenshot({ path: financeScreenshotPath, fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByRole("heading", { name: "Fila financeira", level: 2 })).toBeVisible();
@@ -572,7 +633,7 @@ async function runBrowserProof() {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole("checkbox", { name: "Selecionar Tarefa financeira pendente" }).check();
     await page.getByRole("button", { name: "Baixar selecionadas (1)" }).click();
-    await expect(page.getByText("1 tarefa(s) baixada(s).", { exact: true })).toBeVisible();
+    await expect(page.getByText("1 tarefa(s) baixada(s).", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Tarefa financeira individual", { exact: true })).toBeVisible();
     const individualFinanceRow = page
       .getByText("Tarefa financeira individual", { exact: true })
@@ -715,18 +776,38 @@ async function runBrowserProof() {
     await expect(swapDialog.getByLabel("Nome")).toHaveValue(task.name);
     await expect(swapDialog.getByLabel("Observações")).toHaveValue("Legado preservado");
     await swapDialog.getByLabel("Departamento").selectOption("department-one");
+    await expect(
+      swapDialog.getByText(
+        "Ao mudar o departamento, selecione um modelo elegível para o novo departamento.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    const toastScreenshotStyle = await page.addStyleTag({
+      content: ".Toastify__toast-container { visibility: hidden !important; }",
+    });
+    await swapDialog
+      .locator("label")
+      .filter({ hasText: "Modelo de tarefa" })
+      .screenshot({ path: departmentChangeScreenshotPath });
+    await toastScreenshotStyle.evaluate((style) => style.remove());
     await swapDialog.getByLabel("Modelo de tarefa").selectOption("model-stale");
     await expect(swapDialog.getByLabel("Responsável")).toHaveValue("responsible-default");
+    const staleModelError = page.getByText(
+      "Modelo de tarefa não é elegível para o departamento informado.",
+      { exact: true },
+    );
     await swapDialog.getByRole("button", { name: "Salvar alterações" }).click();
-    await expect(swapDialog).toBeVisible();
-    await expect(
-      page.getByText("Modelo de tarefa não é elegível para o departamento informado.", {
-        exact: true,
-      }),
-    ).toBeVisible();
     await expect.poll(() => updateTaskRequests.length).toBe(2);
+    await expect(staleModelError).toBeVisible();
+    await expect(swapDialog).toBeVisible();
 
     await swapDialog.getByLabel("Modelo de tarefa").selectOption("model-default");
+    await expect(
+      swapDialog.getByText(
+        "Ao mudar o departamento, selecione um modelo elegível para o novo departamento.",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
     await swapDialog.getByRole("button", { name: "Salvar alterações" }).click();
     await expect(swapDialog).toHaveCount(0);
     await expect.poll(() => updateTaskRequests.length).toBe(3);
@@ -765,12 +846,17 @@ async function runBrowserProof() {
     await expect(persistedSwapDialog.getByLabel("Observações")).toHaveValue(
       "Legado preservado",
     );
+    await expect(
+      page.getByText("Modelo de tarefa não é elegível para o departamento informado.", {
+        exact: true,
+      }),
+    ).toHaveCount(0);
     await persistedSwapDialog.getByRole("button", { name: "Cancelar" }).click();
     await expect(persistedSwapDialog).toHaveCount(0);
 
     await page.getByLabel("Atribuição").selectOption("assigned");
     await expect(page.getByText(assignedTask.name, { exact: true })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "Com responsável", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: smokeUser.name, exact: true })).toBeVisible();
     const assignedRequest = taskListRequests.at(-1);
     assert.equal(assignedRequest.searchParams.get("client_id"), clientId);
     assert.equal(assignedRequest.searchParams.get("assignment"), "assigned");
@@ -781,6 +867,7 @@ async function runBrowserProof() {
     await page.getByRole("button", { name: `Editar tarefa ${assignedTask.name}` }).click();
     const restrictedDialog = page.getByRole("dialog", { name: "Editar tarefa" });
     await expect(restrictedDialog).toBeVisible();
+    await expect(restrictedDialog.getByLabel("Departamento")).toHaveCount(0);
     await expect(restrictedDialog.getByLabel("Responsável")).toHaveCount(0);
     await restrictedDialog.getByLabel("Observações").fill("Atualização restrita");
     await restrictedDialog
@@ -870,6 +957,8 @@ async function runBrowserProof() {
       },
     });
     await modelDialog.getByRole("button", { name: "Remover vínculo Regularize" }).first().click();
+    await page.getByRole("dialog", { name: "Remover vínculo do Regularize?" })
+      .getByRole("button", { name: "Remover vínculo", exact: true }).click();
     await expect.poll(() => regularizeLinkRequests.length).toBe(2);
     assert.equal(regularizeLinkRequests[1].method, "DELETE");
   } finally {

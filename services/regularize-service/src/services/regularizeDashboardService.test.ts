@@ -98,9 +98,12 @@ describe("RegularizeDashboardService", () => {
     );
     expect(prisma.process.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organization_id: organizationId },
+        where: {
+          organization_id: organizationId,
+          process_type: { not: "Processo técnico para orientação legada" },
+        },
         take: 6,
-        orderBy: { entry_date: "desc" },
+        orderBy: { entry_date: { sort: "desc", nulls: "last" } },
         select: expect.objectContaining({
           clientPF: {
             where: { organization_id: organizationId },
@@ -113,8 +116,9 @@ describe("RegularizeDashboardService", () => {
         }),
       }),
     );
+    // Mesma regra do filtro "Em Andamento" da aba Licenças, para os números baterem (#1347).
     expect(prisma.license.count).toHaveBeenCalledWith({
-      where: { organization_id: organizationId, status: "Ativo" },
+      where: { organization_id: organizationId, status: { in: ["Em Andamento", "Ativo"] } },
     });
     expect(prisma.clientPF.count).toHaveBeenCalledWith({
       where: { organization_id: organizationId, status: "Ativo" },

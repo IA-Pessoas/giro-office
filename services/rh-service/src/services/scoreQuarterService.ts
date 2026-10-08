@@ -364,7 +364,7 @@ class ScoreQuarterService {
       }
 
       if (!input.can_manage && score.user_id !== userId) {
-        throw new ServiceError(403, "Permissao insuficiente para acessar score de terceiro.");
+        throw new ServiceError(403, "Permissão insuficiente para acessar score de terceiro.");
       }
 
       return score;

@@ -35,6 +35,9 @@ export function isOrganizationOwner(subject?: number | PermissionCarrier): boole
   return false;
 }
 
+/** Papel exibido para o owner; ele ignora os níveis por módulo (ADR 0002). */
+export const OWNER_ROLE_LABEL = "Owner";
+
 export function canCreateOrganizationOwner(subject?: number | PermissionCarrier): boolean {
   return isOrganizationOwner(subject);
 }
@@ -55,7 +58,8 @@ export function canCreateUsers(
     return true;
   }
 
-  return subject.modules?.rh === 3;
+  // Admin de RH ou de TI gerencia usuários; o teto de concessão fica no user-service.
+  return subject.modules?.rh === 3 || subject.modules?.ti === 3;
 }
 
 export function canAccessAdministration(

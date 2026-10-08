@@ -1,7 +1,9 @@
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 import {
   formatBrazilianPhoneInput,
   formatCpfCnpjInput,
   formatCpfInput,
+  normalizeCnpjInput,
 } from "../../../shared/utils/inputFormatting.ts";
 import type {
   Client,
@@ -11,6 +13,10 @@ import type {
 
 function normalizeDocumentValue(value: string | null | undefined): string {
   return (value ?? "").replace(/\D/g, "");
+}
+
+function normalizeClientDocumentValue(value: string | null | undefined, type: string | null | undefined): string {
+  return type === "PJ" ? normalizeCnpjInput(value) : normalizeDocumentValue(value);
 }
 
 function normalizeNullableTextValue(value: string | null | undefined): string | null {
@@ -70,6 +76,7 @@ const nullableTextFieldNames = [
   "regime",
   "size",
   "segment",
+  "coringa_status",
 ] as const satisfies ReadonlyArray<keyof ClientRegularizeFormValues>;
 
 const optionalDateFieldNames = [
@@ -98,15 +105,11 @@ const booleanFieldNames = [
   "consultoria",
 ] as const satisfies ReadonlyArray<keyof ClientRegularizeFormValues>;
 
-export const REGULARIZE_REGIME_OPTIONS = [
-  "Simples Nacional",
-  "Lucro Real",
-  "Lucro Presumido",
-  "MEI",
-  "E-SOCIAL",
-  "CNO",
-  "CAEPF",
-] as const;
+// Valor antigo (MEI, E-SOCIAL, CNO, CAEPF) continua visível até alguém escolher um regime válido.
+export function getRegularizeRegimeOptions(current: string): string[] {
+  const options: string[] = [...TAX_REGIME_OPTIONS];
+  return current && !options.includes(current) ? [...options, current] : options;
+}
 
 export const REGULARIZE_SIZE_OPTIONS = ["DEMAIS", "EPP", "ME"] as const;
 
@@ -118,6 +121,7 @@ export const REGULARIZE_SEGMENT_OPTIONS = [
 
 export function createRegularizeInitialValues(client: Client): ClientRegularizeFormValues {
   return {
+    type: client.type,
     dominio_code: client.dominio_code ?? "",
     name: client.name ?? "",
     company_name: client.company_name ?? "",
@@ -142,6 +146,9 @@ export function createRegularizeInitialValues(client: Client): ClientRegularizeF
     regime: client.regime ?? "",
     size: client.size ?? "",
     segment: client.segment ?? "",
+    coringa_status: client.coringa_status ?? "",
+    tecnologia: client.tecnologia === null || client.tecnologia === undefined ? "" : String(client.tecnologia) as "true" | "false",
+    licitacao: client.licitacao === null || client.licitacao === undefined ? "" : String(client.licitacao) as "true" | "false",
     contabil: Boolean(client.contabil),
     fiscal: Boolean(client.fiscal),
     pessoal: Boolean(client.pessoal),
@@ -151,6 +158,12 @@ export function createRegularizeInitialValues(client: Client): ClientRegularizeF
     end_strike: normalizeDateInputValue(client.end_strike),
     deletion_date: normalizeDateInputValue(client.deletion_date),
   };
+}
+
+export function isRegularizeCompanyClient(
+  values: Pick<ClientRegularizeFormValues, "type">,
+): boolean {
+  return values.type === "PJ";
 }
 
 export function buildRegularizePayload(
@@ -167,8 +180,8 @@ export function buildRegularizePayload(
     payload.name = nextName;
   }
 
-  const nextCpfCnpj = normalizeDocumentValue(values.cpf_cnpj);
-  const currentCpfCnpj = normalizeDocumentValue(currentValues.cpf_cnpj);
+  const nextCpfCnpj = normalizeClientDocumentValue(values.cpf_cnpj, client.type);
+  const currentCpfCnpj = normalizeClientDocumentValue(currentValues.cpf_cnpj, client.type);
 
   if (nextCpfCnpj.length > 0 && nextCpfCnpj !== currentCpfCnpj) {
     payload.cpf_cnpj = nextCpfCnpj;
@@ -222,6 +235,12 @@ export function buildRegularizePayload(
   for (const fieldName of booleanFieldNames) {
     if (values[fieldName] !== currentValues[fieldName]) {
       payload[fieldName] = values[fieldName];
+    }
+  }
+
+  for (const fieldName of ["tecnologia", "licitacao"] as const) {
+    if (values[fieldName] !== currentValues[fieldName]) {
+      payload[fieldName] = values[fieldName] === "" ? null : values[fieldName] === "true";
     }
   }
 

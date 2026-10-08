@@ -11,6 +11,10 @@ import {
   buildRegularizeSitePasswordListParams,
   unwrapRegularizePage,
 } from "./services/regularizeService.contract.ts";
+import {
+  buildRegularizeProcessStatusUpdatePayload,
+  groupRegularizeProcessesByStatus,
+} from "./utils/processBoard.ts";
 
 const moduleRoot = fileURLToPath(new URL("./", import.meta.url));
 const appRoot = join(moduleRoot, "../../..");
@@ -472,6 +476,7 @@ await runTest("regularize license upload failure retries from the persisted lice
     pageSource,
     /isCreateSubmission && persistedLicenseId[\s\S]*mode: "edit", id: persistedLicenseId/,
   );
+  assert.match(pageSource, /A licença foi salva, mas não foi possível armazenar o protocolo/);
   assert.match(pageSource, /key=\{licenseFormSessionKey\}/);
   assert.doesNotMatch(
     formSource,
@@ -662,7 +667,6 @@ await runTest("regularize dashboard enables only its aggregate query", async () 
     clientPfs: false,
     sitePasswords: false,
     municipalTaxes: false,
-    processes: false,
     licenses: false,
     partners: false,
     passwords: false,
@@ -678,7 +682,6 @@ await runTest("regularize tab query policy enables only owning contexts", async 
     clientPfs: false,
     sitePasswords: true,
     municipalTaxes: false,
-    processes: false,
     licenses: false,
     partners: false,
     passwords: true,
@@ -731,7 +734,7 @@ await runTest("simultaneous server errors produce one active toast", async () =>
 await runTest("API client delegates 5xx feedback to the deduplicated notifier", async () => {
   const apiSource = await readFile(join(appRoot, "src/shared/services/api.ts"), "utf8");
 
-  assert.match(apiSource, /notifyServerError\(toast\)/);
+  assert.match(apiSource, /notifyServerError\(toast, error\)/);
   assert.doesNotMatch(apiSource, /toast\.error\(SERVER_ERROR_TOAST_MESSAGE\)/);
 });
 
@@ -746,11 +749,151 @@ await runTest("regularize page renders aggregate dashboard and lazy list options
   assert.match(pageSource, /enabled: queryPolicy\.clientPfs/);
   assert.match(pageSource, /enabled: queryPolicy\.sitePasswords/);
   assert.match(pageSource, /enabled: queryPolicy\.municipalTaxes/);
-  assert.match(pageSource, /enabled: queryPolicy\.processes/);
+  // Lista completa de processos só alimenta o formulário de orientação (#1347).
+  assert.match(pageSource, /useRegularizeProcesses\(\s*\{ status: "Todos" \},\s*\{ enabled: activeForm\?\.type === "guidance" \}/);
+  assert.match(
+    pageSource,
+    /if \(activeTab === "processes"\)\s*\{\s*refreshes\.push\(\(processView === "board" \? processBoardQuery : processPageQuery\)\.refetch\(\)\);/,
+  );
   assert.match(pageSource, /enabled: activeTab === "licenses"/);
   assert.match(pageSource, /dashboardQuery\.data\.metrics/);
   assert.match(pageSource, /getRegularizeRequestId\(dashboardQuery\.error\)/);
   assert.doesNotMatch(pageSource, /const metricData = useMemo/);
+});
+
+await runTest("regularize process board uses the existing filter and detail flow", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.match(pageSource, /const \[processView, setProcessView\] = useState<"table" \| "board">\("table"\)/);
+  assert.match(pageSource, /useRegularizeProcesses\(\s*\{\s*status: processStatus,\s*search: debouncedProcessSearch\s*\}/);
+  assert.match(pageSource, /enabled:\s*activeTab === "processes" && processView === "board"/);
+  assert.match(pageSource, /enabled: activeTab === "processes" && processView === "table"/);
+  assert.match(pageSource, /const hasProcessRows = processView === "board"\s*\? \(processBoardQuery\.data\?\.length \?\? 0\) > 0\s*:\s*visibleProcessRows\.length > 0;/);
+  assert.match(pageSource, /aria-pressed=\{processView === "board"\}/);
+  assert.match(pageSource, /<RegularizeProcessBoard[\s\S]{0,1000}onOpenProcessDetail=\{openProcessDetail\}/);
+  assert.match(pageSource, /canChangeStatus=\{canManageRegularizeCore\}/);
+  assert.match(pageSource, /const \[movingProcessIds, setMovingProcessIds\] = useState<Set<string>>\(\(\) => new Set\(\)\);/);
+  assert.match(pageSource, /if \(!canManageRegularizeCore \|\| movingProcessIdsRef\.current\.has\(processId\)\)/);
+  assert.match(pageSource, /async function handleMoveProcessStatus\(/);
+  assert.match(pageSource, /regularizeService\.getProcess\(processId\)/);
+  assert.match(pageSource, /buildRegularizeProcessStatusUpdatePayload\(process, status\)/);
+  assert.match(pageSource, /updateProcessMutation\.mutateAsync\(/);
+  assert.match(pageSource, /movingProcessIds=\{movingProcessIds\}/);
+  assert.match(pageSource, /Não foi possível atualizar o status do processo\./);
+  assert.match(pageSource, /processView === "table"/);
+});
+
+await runTest("process board exposes status moves only for editable users", async () => {
+  const boardSource = await readModuleSource("components/RegularizeProcessBoard.tsx");
+
+  assert.match(boardSource, /movingProcessIds: ReadonlySet<string>/);
+  assert.match(boardSource, /if \(!canChangeStatus \|\| movingProcessIds\.has\(processId\)\) return;/);
+  assert.match(boardSource, /delete next\[processId\]/);
+  assert.match(boardSource, /draggable=\{canChangeStatus && !movingProcessIds\.has\(item\.id\)\}/);
+  assert.match(
+    boardSource,
+    /regularizeProcessStatusOptions\.includes\(column\.status as RegularizeProcessStatus\)/,
+  );
+  assert.match(boardSource, /htmlFor=\{`move-process-\$\{item\.id\}`\}/);
+  assert.match(boardSource, /disabled=\{!canChangeStatus \|\| movingProcessIds\.has\(item\.id\)\}/);
+  assert.match(boardSource, /onMoveProcessStatus\(processId, status\)/);
+  assert.match(boardSource, /delete next\[processId\]/);
+});
+
+await runTest("process status payload preserves editable fields", () => {
+  const process = {
+    id: "process-1",
+    client_pj_id: "client-1",
+    cpf_cnpj: "12345678000199",
+    process_type: "Abertura",
+    description: "Abrir filial",
+    entry_date: "2026-09-01",
+    completion_date: "2026-10-01",
+    expected_date: "2026-10-15",
+    client_notice_date: "2026-09-15",
+    status: "Pendente",
+    financial_status: "Regular",
+    responsible1_id: "user-1",
+    responsible2_id: "user-2",
+    responsible3_id: "user-3",
+    locking_type: "Manual",
+    urgency: "Alta",
+    task_id: "task-1",
+    observation: "Aguardando protocolo",
+    clientPJ: { cpf_cnpj: "12345678000199" },
+    clientPF: null,
+    history: [{ id: "history-1" }],
+    elapsed_days: 12,
+  };
+
+  const payload = buildRegularizeProcessStatusUpdatePayload(process, "Protocolado");
+
+  assert.equal(payload.id, process.id);
+  assert.equal(payload.client_pj_id, process.client_pj_id);
+  assert.equal(payload.cpf_cnpj, process.cpf_cnpj);
+  assert.equal(payload.process_type, process.process_type);
+  assert.equal(payload.description, process.description);
+  assert.equal(payload.entry_date, process.entry_date);
+  assert.equal(payload.completion_date, process.completion_date);
+  assert.equal(payload.expected_date, process.expected_date);
+  assert.equal(payload.client_notice_date, process.client_notice_date);
+  assert.equal(payload.financial_status, process.financial_status);
+  assert.equal(payload.responsible1_id, process.responsible1_id);
+  assert.equal(payload.responsible2_id, process.responsible2_id);
+  assert.equal(payload.responsible3_id, process.responsible3_id);
+  assert.equal(payload.locking_type, process.locking_type);
+  assert.equal(payload.urgency, process.urgency);
+  assert.equal(payload.task_id, process.task_id);
+  assert.equal(payload.observation, process.observation);
+  assert.equal(payload.status, "Protocolado");
+  assert.equal("clientPJ" in payload, false);
+  assert.equal("clientPF" in payload, false);
+  assert.equal("history" in payload, false);
+  assert.equal("elapsed_days" in payload, false);
+});
+
+await runTest("process board groups canonical, legacy and unknown statuses", () => {
+  const columns = groupRegularizeProcessesByStatus([
+    { id: "pending", process_type: "Abertura", status: "Pendente" },
+    { id: "open", process_type: "Alteração", status: "Aberto" },
+    { id: "in-progress", process_type: "Baixa", status: "Em andamento" },
+    { id: "completed", process_type: "Licença", status: "Concluído" },
+    { id: "paused", process_type: "Certidão", status: "Paralizado" },
+    { id: "legacy", process_type: "Histórico", status: "Status legado" },
+  ]);
+
+  assert.deepEqual(
+    columns.map(({ label, items }) => [label, items.map(({ id }) => id)]),
+    [
+      ["Pendente", ["pending"]],
+      ["Em andamento", ["open", "in-progress"]],
+      ["Protocolado", []],
+      ["Finalizado", ["completed"]],
+      ["Paralisado", ["paused"]],
+      ["Outros status", ["legacy"]],
+    ],
+  );
+});
+
+await runTest("process board keeps canonical columns when no processes match", () => {
+  const columns = groupRegularizeProcessesByStatus([]);
+
+  assert.deepEqual(columns.map(({ label, items }) => [label, items]), [
+    ["Pendente", []],
+    ["Em andamento", []],
+    ["Protocolado", []],
+    ["Finalizado", []],
+    ["Paralisado", []],
+  ]);
+});
+
+await runTest("process list query key separates independent board searches", async () => {
+  const queryKeysSource = await readModuleSource("hooks/queryKeys.ts");
+
+  assert.match(
+    queryKeysSource,
+    /processes: \(filters: RegularizeProcessListFilters, scope: RegularizeQueryScope\) =>\s*\[\s*\.\.\.regularizeQueryKeys\.operations\(scope\),\s*"processes",\s*filters\.status,\s*filters\.search \?\? ""/,
+  );
 });
 
 await runTest("regularize list params carry server search and pagination", async () => {
@@ -777,7 +920,7 @@ await runTest("regularize list params carry server search and pagination", async
 });
 
 await runTest("regularize process contract keeps canonical states and explicit Fiscal actions", async () => {
-  const [controlsSource, formSource, pageSource, contractSource, serviceSource, hooksSource] =
+  const [controlsSource, formSource, pageSource, contractSource, serviceSource, hooksSource, boardSource] =
     await Promise.all([
       readModuleSource("components/regularizeFormControls.tsx"),
       readModuleSource("components/RegularizeProcessForm.tsx"),
@@ -785,12 +928,12 @@ await runTest("regularize process contract keeps canonical states and explicit F
       readModuleSource("services/regularizeService.contract.ts"),
       readModuleSource("services/regularizeService.ts"),
       readModuleSource("hooks/useRegularizeOperations.ts"),
+      readModuleSource("utils/processBoard.ts"),
     ]);
 
-  assert.match(
-    controlsSource,
-    /regularizeProcessStatusOptions = \[\s*"Pendente",\s*"Andamento",\s*"Protocolado",\s*"Finalizado",\s*"Paralisado",\s*\]/,
-  );
+  assert.match(boardSource, /regularizeProcessStatusOptions = \[\s*"Pendente",\s*"Andamento",\s*"Protocolado",\s*"Finalizado",\s*"Paralisado",\s*\]/);
+  assert.match(controlsSource, /import \{ regularizeProcessStatusOptions \} from "\.\.\/utils\/processBoard"/);
+  assert.match(controlsSource, /export \{ regularizeProcessStatusOptions \}/);
   assert.match(
     controlsSource,
     /regularizeFinancialStatusOptions = \[\s*"Pendente",\s*"Regular",\s*"Bônus",\s*"Não Contratado",\s*\]/,
@@ -1099,13 +1242,18 @@ await runTest("regularize operational tabs expose write actions", async () => {
   }
 });
 
-await runTest("regularize partners render client names instead of internal ids", async () => {
+await runTest("regularize partners follow the header client and name both sides (#1347)", async () => {
   const pageSource = await readModuleSource("components/RegularizePage.tsx");
 
-  assert.match(pageSource, /const pfNameById = new Map\(\s*\(pfPageQuery\.data\?\.data \?\? \[\]\)/);
-  assert.match(pageSource, /const pjNameById = new Map\(\s*\(clientQuery\.data\?\.items \?\? \[\]\)/);
-  assert.match(pageSource, /pfNameById\.get\(item\.pf_id\)\s*(?:\?\?|\|\|)\s*"PF não identificado"/);
-  assert.match(pageSource, /pjNameById\.get\(item\.pj_id\)\s*(?:\?\?|\|\|)\s*"PJ não identificado"/);
+  assert.match(
+    pageSource,
+    /useRegularizePartners\(\s*currentCredentialClientId\s*\?\s*\{ type: "pj", client_id: currentCredentialClientId \}/,
+  );
+  assert.match(pageSource, /item\.clientPF\?\.name \|\| "PF não identificado"/);
+  assert.match(pageSource, /headerClientName \|\| "PJ não identificado"/);
+  assert.match(pageSource, /headerClientDetailQuery\.data\?\.company_name/);
+  assert.match(pageSource, /Selecione um cliente no topo para ver os sócios\./);
+  assert.doesNotMatch(pageSource, /useClients\(/);
   assert.doesNotMatch(pageSource, /formatText\(item\.pf_id\)\.slice\(0, 8\)/);
   assert.doesNotMatch(pageSource, /formatText\(item\.pj_id\)\.slice\(0, 8\)/);
 });
@@ -1206,9 +1354,8 @@ await runTest("regularize required field errors render as sticky alerts", async 
 await runTest("regularize required field markers keep label punctuation spacing clean", async () => {
   const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
 
-  assert.match(controlsSource, /inline-flex items-center gap-1/);
-  assert.match(controlsSource, /<span>\{label\}<\/span>/);
-  assert.match(controlsSource, /<span className="text-red-500">\*<\/span>/);
+  // #1367: o campo delega ao FormField compartilhado, que marca o obrigatório com RequiredFieldLabel.
+  assert.match(controlsSource, /<FormField[\s\S]*required=\{required\}/);
   assert.doesNotMatch(controlsSource, /> \*<\/span>/);
 });
 
@@ -1285,7 +1432,31 @@ await runTest("regularize finite status and urgency fields use native selects", 
   );
 });
 
-await runTest("regularize process task id uses the real task selector", async () => {
+await runTest("regularize PF uses fixed options, automatic code and field errors", async () => {
+  const controlsSource = await readModuleSource("components/regularizeFormControls.tsx");
+  const clientPfSource = await readModuleSource("components/RegularizeClientPfForm.tsx");
+
+  assert.match(controlsSource, /regularizeClientPfSexOptions/);
+  assert.match(controlsSource, /regularizeClientPfMaritalStatusOptions/);
+  assert.match(controlsSource, /regularizeClientPfStateOptions/);
+  assert.match(clientPfSource, /regularizeClientPfSexOptions\.map/);
+  assert.match(clientPfSource, /regularizeClientPfMaritalStatusOptions\.map/);
+  assert.match(clientPfSource, /regularizeClientPfStateOptions\.map/);
+  assert.match(clientPfSource, /generateClientPfCode/);
+  assert.match(clientPfSource, /Gerado automaticamente/);
+  const requiredFieldsBlock = clientPfSource.slice(
+    clientPfSource.indexOf("const REQUIRED_CLIENT_PF_FIELDS"),
+    clientPfSource.indexOf("type ClientPfFieldErrors"),
+  );
+  assert.doesNotMatch(requiredFieldsBlock, /"father"/);
+  assert.match(clientPfSource, /fieldErrors/);
+  assert.match(clientPfSource, /error=\{fieldErrors\.city\}/);
+  assert.match(clientPfSource, /aria-invalid=\{Boolean\(fieldErrors\.city\)\}/);
+  assert.match(clientPfSource, /<RegularizeFormError message=\{formError\} sticky=\{false\} \/>/);
+  assert.match(clientPfSource, /<RegularizeFormField label="Pai">/);
+});
+
+await runTest("regularize process task uses the real task selector", async () => {
   const processSource = await readModuleSource("components/RegularizeProcessForm.tsx");
   const tasksHookSource = await readFile(
     join(appRoot, "src/modules/integracao/hooks/useIntegracaoTasks.ts"),
@@ -1294,17 +1465,17 @@ await runTest("regularize process task id uses the real task selector", async ()
 
   assert.match(tasksHookSource, /options\??: \{\s*enabled\??: boolean/);
   assert.match(tasksHookSource, /enabled: options\.enabled \?\? true/);
-  assert.match(processSource, /useIntegracaoTasksList/);
-  assert.match(processSource, /status: "Todos",\s*limit: 100,\s*search: taskSearch/);
-  assert.match(processSource, /\{\s*enabled: open\s*\}/);
-  assert.match(processSource, /value=\{taskSearch\}/);
-  assert.match(processSource, /taskSearch/);
-  assert.match(processSource, /<RegularizeNativeSelect\s+value=\{formState\.task_id\}/);
-  assert.match(processSource, /taskOptions\.map/);
-  assert.match(processSource, /tasksQuery\.isLoading/);
-  assert.match(processSource, /tasksQuery\.error/);
-  assert.match(processSource, /disabled=/);
-  assert.match(processSource, /Sem task vinculada/);
+  const taskSelectSource = await readModuleSource("components/RegularizeTaskSelect.tsx");
+  assert.match(processSource, /<RegularizeTaskSelect\s+enabled=\{open\}\s+value=\{formState\.task_id\}/);
+  assert.match(taskSelectSource, /useIntegracaoTasksList/);
+  assert.match(taskSelectSource, /status: "Todos", limit: 100, search/);
+  assert.match(taskSelectSource, /\{ enabled \}/);
+  assert.match(taskSelectSource, /value=\{search\}/);
+  assert.match(taskSelectSource, /options\.map/);
+  assert.match(taskSelectSource, /tasksQuery\.isLoading/);
+  assert.match(taskSelectSource, /tasksQuery\.error/);
+  assert.match(taskSelectSource, /disabled=/);
+  assert.match(taskSelectSource, /Nenhuma tarefa/);
   assert.doesNotMatch(processSource, /<input\s+value=\{formState\.task_id\}/);
 });
 
@@ -1399,9 +1570,9 @@ await runTest("regularize site credential detail states are explicit", async () 
   assert.notEqual(taxesStart, -1);
   assert.match(sitesSource, /Selecione um site para revelar credenciais/);
   assert.match(sitesSource, /Acesso negado para revelar credenciais/);
-  assert.match(pageSource, /Credencial indispon[iÃ­]vel para revela[cÃ§][aÃ£]o/);
+  assert.match(pageSource, /Credencial indisponível para revelação/);
   assert.match(sitesSource, /getSiteCredentialDetailStatus\(sitePasswordDetailQuery\.error\)/);
-  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponivel para revelacao\."\)/);
+  assert.match(pageSource, /getRegularizeErrorMessage\(error, "Credencial indisponível para revelação\."\)/);
   assert.match(pageSource, /403\|forbidden\|permission\|permiss\|acesso negado/);
   assert.doesNotMatch(sitesSource, /Acesso negado ou indispon[iÃ­]vel/);
 });
@@ -1549,4 +1720,93 @@ await runTest("regularize selects clients in the header and shows the bound clie
     assert.match(formSource, /ClientSelectionField/);
     assert.doesNotMatch(formSource, /RegularizeClientPickerField/);
   });
+});
+
+await runTest("partner form validates each field before submitting", async () => {
+  const { validatePartnerForm } = await import("./utils/partnerForm.ts");
+  const valid = { pf_id: "pf", part: "50", entry: "2024-01-15", exit: "" };
+
+  assert.deepEqual(validatePartnerForm(valid), {});
+  assert.deepEqual(validatePartnerForm({ ...valid, part: "150" }), {
+    part: "Participação deve ser maior que 0% e no máximo 100%.",
+  });
+  assert.deepEqual(validatePartnerForm({ ...valid, part: "" }), {
+    part: "Informe a participação em %.",
+  });
+  assert.deepEqual(validatePartnerForm({ ...valid, exit: "2020-01-15" }), {
+    exit: "Data de saída não pode ser anterior à entrada.",
+  });
+  assert.deepEqual(
+    validatePartnerForm({ ...valid, entry: "" }, { entryIncomplete: true, exitIncomplete: true }),
+    {
+      entry: "Informe a data de entrada completa (dd/mm/aaaa).",
+      exit: "Informe a data de saída completa (dd/mm/aaaa).",
+    },
+  );
+  assert.deepEqual(validatePartnerForm({ ...valid, pf_id: "" }), {
+    pf_id: "Selecione a pessoa física.",
+  });
+});
+
+await runTest("partner table shows masked CPF and distinct action tooltips", async () => {
+  const source = await readFile(
+    join(appRoot, "src/modules/clients/components/ClientPartnersSection.tsx"),
+    "utf8",
+  );
+
+  assert.match(source, /formatCPF_CNPJ\(item\.clientPF\.cpf\)/);
+  assert.match(source, /title="Editar pessoa física"/);
+  assert.match(source, /title="Editar vínculo"/);
+  assert.match(source, /excludePfIds=/);
+  assert.match(source, /<ConfirmationDialog/);
+  assert.doesNotMatch(source, /window\.confirm/);
+});
+
+await runTest("regularize dashboard and lists stay consistent with the tabs (#1347)", async () => {
+  const pageSource = await readModuleSource("components/RegularizePage.tsx");
+
+  assert.doesNotMatch(pageSource, /DashboardHeroCard/);
+  assert.match(pageSource, /label="Processos abertos"/);
+  assert.match(
+    pageSource,
+    /headers=\{\["Licença", "Cliente", "Protocolo", "Contato", "Status", "Vencimento", ""\]\}/,
+  );
+  assert.match(pageSource, /formatText\(item\.client_name\)/);
+  assert.match(pageSource, /formatSiteSphere\(item\.sphere\)/);
+  assert.match(pageSource, /formatSiteSphere\(item\.site\?\.sphere\)/);
+});
+
+await runTest("regularize forms avoid technical jargon and prefill the client document (#1347)", async () => {
+  const processForm = await readModuleSource("components/RegularizeProcessForm.tsx");
+  const licenseForm = await readModuleSource("components/RegularizeLicenseForm.tsx");
+
+  for (const source of [processForm, licenseForm]) {
+    assert.doesNotMatch(source, /Task ID|Buscar task/);
+    assert.match(source, /<RegularizeTaskSelect/);
+  }
+  assert.match(processForm, /useClient\(/);
+  // Preenchimento roda depois do reset do formulário, senão o documento some ao reabrir.
+  assert.ok(
+    processForm.indexOf("}, [defaultClientId, open, process]);") <
+      processForm.indexOf("}, [open, pjClientDocument]);"),
+  );
+  assert.match(processForm, /list=\{processTypeListId\}/);
+
+  const taskSelect = await readModuleSource("components/RegularizeTaskSelect.tsx");
+  assert.match(taskSelect, /<legend[^>]*>Tarefa vinculada<\/legend>/);
+
+  const { formatSiteSphere } = await import("./utils/regularizeForm.ts");
+  assert.equal(formatSiteSphere("legacy"), "Não informado");
+  assert.equal(formatSiteSphere("Municipal"), "Municipal");
+  assert.equal(formatSiteSphere(null), "-");
+});
+
+await runTest("client picker warns when only active clients are listed (#1347)", async () => {
+  const source = await readFile(
+    join(appRoot, "src/modules/clients/components/ClientPickerModal.tsx"),
+    "utf8",
+  );
+
+  assert.match(source, /filters\.status === "Ativo"/);
+  assert.match(source, /Só clientes ativos aparecem aqui\./);
 });

@@ -4,6 +4,20 @@ import { classifyActivity, describeActivity } from "../audit/activityCatalog.js"
 
 describe("activityCatalog", () => {
   it.each([
+    ["GET", "/client/groups", "consultou", "a lista de grupos de empresas"],
+    ["POST", "/client/groups", "cadastrou", "um novo grupo de empresas"],
+    [
+      "PATCH",
+      "/client/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "atualizou",
+      "um grupo de empresas",
+    ],
+    [
+      "PUT",
+      "/client/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/clients",
+      "atualizou",
+      "as empresas de um grupo",
+    ],
     ["GET", "/task/list", "consultou", "a lista de tarefas"],
     ["GET", "/reports/catalog", "consultou", "o catálogo de relatórios"],
     [
@@ -82,6 +96,27 @@ describe("activityCatalog", () => {
     ["POST", "/reports/definitions/validate", "revisou", "a configuração de um relatório"],
     ["POST", "/reports/preview", "gerou", "uma prévia de relatório"],
     ["GET", "/reports/jobs/list", "consultou", "o histórico de relatórios"],
+    ["POST", "/fiscal/rates", "cadastrou", "um novo registro de alíquota fiscal"],
+    ["GET", "/fiscal/rates/list", "consultou", "a lista de registros de alíquotas fiscais"],
+    ["GET", "/triagem/fiscal-portfolio", "consultou", "a carteira fiscal mensal da Triagem"],
+    ["POST", "/fiscal/revenues", "cadastrou", "uma nova receita mensal"],
+    ["GET", "/fiscal/simples/preview", "consultou", "a prévia de alíquotas do Simples"],
+    ["GET", "/fiscal/simples/pdf", "baixou", "um PDF de alíquota do Simples"],
+    ["POST", "/fiscal/simples/csv", "exportou", "um CSV de alíquotas do Simples em lote"],
+    ["POST", "/fiscal/simples/zip", "exportou", "os PDFs de alíquotas do Simples em lote"],
+    ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
+    [
+      "PUT",
+      "/fiscal/revenues/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "atualizou",
+      "uma receita mensal",
+    ],
+    [
+      "GET",
+      "/fiscal/rates/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/pdf",
+      "baixou",
+      "um PDF de alíquota fiscal",
+    ],
     [
       "GET",
       "/reports/jobs/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
@@ -99,19 +134,19 @@ describe("activityCatalog", () => {
       "GET",
       "/reports/jobs/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/snapshot",
       "consultou",
-      "um snapshot de relatório",
+      "um relatório gerado",
     ],
     [
       "GET",
       "/reports/snapshots/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/export?format=csv",
       "exportou",
-      "um snapshot de relatório",
+      "um relatório gerado",
     ],
     [
       "POST",
       "/reports/snapshots/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/delete",
       "excluiu",
-      "um snapshot de relatório",
+      "um relatório gerado",
     ],
     ["GET", "/reports/retention", "consultou", "a política de retenção de relatórios"],
     ["PUT", "/reports/retention", "alterou", "a política de retenção de relatórios"],
@@ -288,11 +323,25 @@ describe("activityCatalog", () => {
       "uma atividade da orientação de regularização",
     ],
     ["PUT", "/regularize/guidance/partner", "atualizou", "um sócio da orientação de regularização"],
+    ["GET", "/regularize/guidance/pdf", "visualizou", "o PDF de uma orientação processual"],
     [
       "POST",
       "/pessoal/obrigations/competences/2026-07/generate",
       "gerou",
       "obrigações da competência",
+    ],
+    ["GET", "/platform/super-admins", "consultou", "a lista de super admins da plataforma"],
+    [
+      "POST",
+      "/platform/impersonation/exit",
+      "encerrou",
+      "uma personificação de usuário da organização",
+    ],
+    [
+      "PATCH",
+      "/platform/super-admins/platform-user-2/impersonation-permission",
+      "alterou",
+      "a permissão de personificação de um super admin",
     ],
     ["GET", "/platform/organizations", "consultou", "a lista global de organizações"],
     ["POST", "/platform/organizations", "criou", "uma organização"],
@@ -338,6 +387,45 @@ describe("activityCatalog", () => {
       "os departamentos da organização",
     ],
   ])("traduz %s %s", (method, path, action, item) => {
+    expect(describeActivity(method, path)).toEqual({ action, item });
+  });
+
+  it.each([
+    ["GET", "/client/coringa/list", "consultou", "a Lista Coringa de clientes"],
+    ["GET", "/client/coringa/pdf", "exportou", "a Lista Coringa de clientes em PDF"],
+    ["GET", "/client/instagram-profiles/report", "consultou", "o relatório de perfis do Instagram"],
+    ["GET", "/marketing/dashboard", "consultou", "o dashboard do Marketing"],
+    [
+      "GET",
+      "/marketing/ai-usage-controls/users",
+      "consultou",
+      "os usuários elegíveis para a pesquisa de IA",
+    ],
+    [
+      "POST",
+      "/marketing/ai-usage-controls/batch",
+      "criou",
+      "pesquisas mensais de uso de IA em lote",
+    ],
+    [
+      "POST",
+      "/marketing/passwords/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/reveal",
+      "revelou",
+      "uma credencial de Marketing",
+    ],
+    [
+      "GET",
+      "/marketing/events/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/editions/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/report",
+      "consultou",
+      "o relatório de uma edição de evento",
+    ],
+    [
+      "POST",
+      "/marketing/events/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/editions/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/feedback",
+      "registrou",
+      "uma avaliação de edição de evento",
+    ],
+  ])("classifica atividade %s %s", (method, path, action, item) => {
     expect(describeActivity(method, path)).toEqual({ action, item });
   });
 

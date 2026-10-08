@@ -8,8 +8,8 @@ import {
 import type { Prisma } from "../generated/prisma/client.js";
 import type { TaskModelGetPayload } from "../generated/prisma/models/TaskModel.js";
 
-import * as audit from "../integrations/audit.js";
-import prismaClient from "../prisma/index.js";
+import type { TaskAudit } from "../integrations/audit.js";
+import type prismaClient from "../prisma/index.js";
 import { parseTaskModelResponsibleSequence } from "../schemas/taskModelResponsibleSequence.schemas.js";
 import {
   assertResponsibleUsersInDepartment,
@@ -117,6 +117,11 @@ export interface PaginatedTaskModels {
 }
 
 export class TaskModelService {
+  constructor(
+    private readonly prisma: typeof prismaClient,
+    private readonly audit: TaskAudit,
+  ) {}
+
   async createModel(data: CreateModelRequest): Promise<{ create: TaskModelRow }> {
     try {
       requireIntegracaoRouteAccess("POST", "/task/model", {
@@ -131,7 +136,7 @@ export class TaskModelService {
         responsible2_id: data.responsible2_id ?? null,
         responsible3_id: data.responsible3_id ?? null,
       });
-      const exists = await prismaClient.taskModel.findFirst({
+      const exists = await this.prisma.taskModel.findFirst({
         where: {
           name: data.name,
           department_id: data.department_id,
@@ -144,7 +149,7 @@ export class TaskModelService {
       }
 
       await assertResponsibleUsersInDepartment(
-        prismaClient,
+        this.prisma,
         data.organization_id,
         data.department_id,
         [
@@ -154,7 +159,7 @@ export class TaskModelService {
         ],
       );
 
-      const create = await prismaClient.taskModel.create({
+      const create = await this.prisma.taskModel.create({
         data: {
           name: data.name,
           department_id: data.department_id,
@@ -170,7 +175,7 @@ export class TaskModelService {
         select: TASK_MODEL_SELECT,
       });
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Cadastro",
@@ -197,7 +202,7 @@ export class TaskModelService {
     } = { userId: "" },
   ): Promise<{ detail: TaskModelRow }> {
     try {
-      const detail = await prismaClient.taskModel.findFirst({
+      const detail = await this.prisma.taskModel.findFirst({
         where: { id: taskId, organization_id: organizationId },
         select: TASK_MODEL_SELECT,
       });
@@ -230,7 +235,7 @@ export class TaskModelService {
         responsible3_id: data.responsible3_id ?? null,
       });
       const organizationId = data.organization_id ?? "";
-      const exists = await prismaClient.taskModel.findFirst({
+      const exists = await this.prisma.taskModel.findFirst({
         where: { id: data.task_id, organization_id: organizationId },
       });
 
@@ -257,13 +262,13 @@ export class TaskModelService {
         ],
       });
 
-      await assertResponsibleUsersInDepartment(prismaClient, organizationId, data.department_id, [
+      await assertResponsibleUsersInDepartment(this.prisma, organizationId, data.department_id, [
         responsibleSequence.responsible_id,
         responsibleSequence.responsible2_id,
         responsibleSequence.responsible3_id,
       ]);
 
-      const updated = await prismaClient.taskModel.update({
+      const updated = await this.prisma.taskModel.update({
         where: { id: data.task_id, organization_id: organizationId },
         data: {
           name: data.name,
@@ -279,7 +284,7 @@ export class TaskModelService {
         select: TASK_MODEL_SELECT,
       });
 
-      await audit.logUpdateIfChanged({
+      await this.audit.logUpdateIfChanged({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Atualização",
@@ -336,12 +341,12 @@ export class TaskModelService {
       };
 
       if (!params.paginationRequested) {
-        return prismaClient.taskModel.findMany(findManyArgs);
+        return this.prisma.taskModel.findMany(findManyArgs);
       }
 
       const [list, total] = await Promise.all([
-        prismaClient.taskModel.findMany(findManyArgs),
-        prismaClient.taskModel.count({ where }),
+        this.prisma.taskModel.findMany(findManyArgs),
+        this.prisma.taskModel.count({ where }),
       ]);
 
       return {
@@ -361,7 +366,7 @@ export class TaskModelService {
   async deleteModel(data: DeleteModelRequest): Promise<{ response: true }> {
     try {
       const organizationId = data.organization_id ?? "";
-      const exists = await prismaClient.taskModel.findFirst({
+      const exists = await this.prisma.taskModel.findFirst({
         where: { id: data.task_id, organization_id: organizationId },
       });
 
@@ -378,7 +383,7 @@ export class TaskModelService {
       });
 
       try {
-        await prismaClient.taskModel.delete({
+        await this.prisma.taskModel.delete({
           where: { id: data.task_id, organization_id: organizationId },
         });
       } catch (err: unknown) {
@@ -392,7 +397,7 @@ export class TaskModelService {
         throw err;
       }
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Exclusão",

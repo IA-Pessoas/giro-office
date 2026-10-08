@@ -1,9 +1,18 @@
 import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 
 import type { ClientServiceEnv } from "../config/env.js";
 
 type OpenApiSchema = Record<string, unknown>;
+
+const clientAddressOpenApiProperties = {
+  address: { type: ["string", "null"] },
+  cep: { type: ["string", "null"] },
+  neighborhood: { type: ["string", "null"] },
+  state: { type: ["string", "null"] },
+  city: { type: ["string", "null"] },
+};
 
 const reportingGrantParameters = [
   {
@@ -24,6 +33,23 @@ const reportingGrantParameters = [
     required: true,
     schema: { type: "string" },
   },
+];
+
+const coringaFilterParameters = [
+  { name: "organization_id", in: "query", schema: { type: "string", format: "uuid" } },
+  { name: "search", in: "query", schema: { type: "string", maxLength: 200 } },
+  { name: "regime", in: "query", schema: { type: "string" } },
+  { name: "dataEntrada", in: "query", schema: { type: "string", format: "date" } },
+  { name: "porte", in: "query", schema: { type: "string" } },
+  { name: "segmento", in: "query", schema: { type: "string" } },
+  { name: "status", in: "query", schema: { type: "string" } },
+  ...["contabil", "fiscal", "pessoal", "tecnologia", "infoproduto", "consultoria", "licitacao"].map(
+    (name) => ({
+      name,
+      in: "query",
+      schema: { type: "boolean" },
+    }),
+  ),
 ];
 
 const reportingExtractResponseSchema: OpenApiSchema = {
@@ -146,7 +172,11 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             commercial_board_registration: { type: ["string", "null"] },
             competence_entry: { type: ["string", "null"], format: "date-time" },
             competence_output: { type: ["string", "null"], format: "date-time" },
-            opening_date: { type: ["string", "null"], format: "date-time" },
+            opening_date: {
+              type: ["string", "null"],
+              format: "date-time",
+              description: "Não pode ser no futuro (fuso de São Paulo); 400 caso contrário.",
+            },
             instagram: { type: ["string", "null"] },
             indication: { type: ["string", "null"] },
             regime: { type: ["string", "null"] },
@@ -154,7 +184,10 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             segment: { type: ["string", "null"] },
             start_strike: { type: ["string", "null"], format: "date-time" },
             end_strike: { type: ["string", "null"], format: "date-time" },
-            cnae: { type: ["string", "null"] },
+            cnae: {
+              type: ["string", "null"],
+              description: "7 dígitos, com ou sem máscara (ex.: 6201-5/01); vazio limpa o campo.",
+            },
             cnae_secondary: { type: ["string", "null"] },
             responsible: { type: ["string", "null"] },
             cpf_responsible: { type: ["string", "null"] },
@@ -224,6 +257,179 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+
+      "/client/groups": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar grupos de clientes e empresas vinculadas",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Grupos da organização autenticada",
+              ...successEnvelopeContent(),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+        post: {
+          tags: ["Clients"],
+          summary: "Criar grupo de clientes",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", minLength: 1, maxLength: 120 } },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Grupo criado", ...successEnvelopeContent() },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "409": { description: "Já existe grupo com o nome" },
+          },
+        },
+      },
+      "/client/groups/{id}": {
+        patch: {
+          tags: ["Clients"],
+          summary: "Renomear grupo de clientes",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", minLength: 1, maxLength: 120 } },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Grupo atualizado", ...successEnvelopeContent() },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Grupo não encontrado" },
+            "409": { description: "Já existe grupo com o nome" },
+          },
+        },
+      },
+      "/client/groups/{id}/clients": {
+        put: {
+          tags: ["Clients"],
+          summary: "Atualizar clientes vinculados ao grupo",
+          description: "Substitui os vínculos do grupo; clientes podem pertencer a vários grupos.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_ids"],
+                  properties: {
+                    client_ids: {
+                      type: "array",
+                      items: { type: "string", format: "uuid" },
+                    },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Vínculos atualizados", ...successEnvelopeContent() },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Grupo ou cliente não encontrado na organização" },
+          },
+        },
+      },
+      "/client/coringa/list": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar clientes na Lista Coringa",
+          description:
+            "Usa o cadastro único por organização. Data Entrada é a criação auditável do cliente; registros antigos sem data retornam null.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            ...coringaFilterParameters,
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": { description: "Lista paginada de clientes", ...successEnvelopeContent() },
+          },
+        },
+      },
+      "/client/coringa/pdf": {
+        get: {
+          tags: ["Clients"],
+          summary: "Exportar Lista Coringa filtrada em PDF",
+          description: "Exporta todos os clientes filtrados com as 15 colunas, em fluxo de lotes.",
+          security: [{ bearerAuth: [] }],
+          parameters: coringaFilterParameters,
+          responses: {
+            "200": {
+              description: "PDF da Lista Coringa",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+          },
+        },
+      },
+      "/client/instagram-profiles/report": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar clientes com ou sem perfil Instagram",
+          description:
+            "Leitura organizacional protegida pela permissão de Integração nível 1 ou superior. O escopo vem da organização autenticada.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "profile",
+              in: "query",
+              schema: { type: "string", enum: ["all", "with", "without"], default: "all" },
+            },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+            { name: "search", in: "query", schema: { type: "string", maxLength: 200 } },
+          ],
+          responses: {
+            "200": {
+              description: "Relatório paginado de perfis Instagram dos clientes da organização",
+              ...successEnvelopeContent(),
+            },
+            "400": { description: "Filtros inválidos" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+      },
       "/client": {
         post: {
           tags: ["Clients"],
@@ -253,6 +459,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                     type: { type: "string" },
                     type_registration: { type: "string" },
                     service_unique: { type: "boolean" },
+                    ...clientAddressOpenApiProperties,
                   },
                   example: {
                     organization_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -304,6 +511,7 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                 schema: {
                   type: "object",
                   additionalProperties: true,
+                  properties: clientAddressOpenApiProperties,
                   example: {
                     name: "Cliente Atualizado",
                     company_name: "ACME LTDA",
@@ -391,12 +599,14 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                         "Opcional. Quando informado, deve corresponder a organizacao autenticada.",
                     },
                     type: { type: "string" },
+                    regime: { type: ["string", "null"], enum: [...TAX_REGIME_OPTIONS, null] },
                     name: { type: "string" },
                     cpf_cnpj: { type: "string" },
                     company_name: { type: ["string", "null"] },
                     fantasy_name: { type: ["string", "null"] },
                     type_registration: { type: "string" },
                     service_unique: { type: "boolean" },
+                    ...clientAddressOpenApiProperties,
                   },
                 },
               },
@@ -425,9 +635,17 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                 schema: {
                   type: "object",
                   additionalProperties: true,
+                  properties: {
+                    ...clientAddressOpenApiProperties,
+                    regime: {
+                      type: ["string", "null"],
+                      enum: [...TAX_REGIME_OPTIONS, null],
+                    },
+                  },
                   example: {
                     company_name: "Empresa Atualizada",
                     email: "contato@empresa.com",
+                    regime: "Lucro Real",
                   },
                 },
               },
@@ -712,6 +930,26 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
             },
           },
         },
+        delete: {
+          tags: ["Histories"],
+          summary: "Excluir historico (autor, admin ou owner)",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "historyId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Historico excluido",
+              ...successEnvelopeContent(),
+            },
+          },
+        },
       },
       "/client/{id}/histories/{historyId}/file": {
         get: {
@@ -867,7 +1105,10 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
                   additionalProperties: false,
                   required: ["source", "fields", "limit"],
                   properties: {
-                    source: { type: "string", enum: ["integracao.clients"] },
+                    source: {
+                      type: "string",
+                      enum: ["integracao.clients", "integracao.client_groups"],
+                    },
                     fields: { type: "array", minItems: 1, maxItems: 25, items: { type: "string" } },
                     limit: { type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT },
                     query: reportingQueryOpenApiSchema,

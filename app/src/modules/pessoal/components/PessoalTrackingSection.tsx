@@ -14,10 +14,10 @@ import {
   X,
 } from "lucide-react";
 
-import { Dialog } from "@shared/components";
+import { ConfirmationDialog } from "@shared/components";
 import { cn } from "@shared/ui/newLayout/utils";
 import { FieldHelp } from "@shared/ui/newLayout/field-help";
-import { formatBrlInput, normalizeDigits, parseBrlInput } from "@shared/utils/inputFormatting";
+import { formatBrlDecimalInput, parseBrlDecimalInput } from "@shared/utils/inputFormatting";
 
 import {
   useCreatePessoalLddMutation,
@@ -38,7 +38,6 @@ import type {
 } from "../types/tracking";
 import { getPessoalErrorMessage } from "../utils/pessoalErrorMessage";
 import {
-  pessoalDangerButtonClassName,
   pessoalPrimaryButtonClassName,
   pessoalSecondaryButtonClassName,
   pessoalTextFieldClassName,
@@ -80,6 +79,9 @@ const emptySituationFormValues: SituationFormValues = {
   title: "",
   description: "",
 };
+
+const LDD_DESCRIPTION =
+  "LDD é o acompanhamento de um débito do cliente (INSS, FGTS, IRRF ou ISS), com período, vencimento, saldo e situação.";
 
 const lddTypeOptions = ["INSS", "FGTS", "IRRF", "ISS"] as const;
 const lddRegistrationStatusOptions = ["Pendente", "Cadastrado"] as const;
@@ -136,7 +138,7 @@ function buildLddFormValues(ldd: PessoalLdd | null): LddFormValues {
     due_date: ldd.due_date ? ldd.due_date.slice(0, 10) : "",
     balance_amount:
       typeof ldd.balance_amount === "number"
-        ? formatBrlInput(String(Math.round(ldd.balance_amount * 100)))
+        ? formatBrlDecimalInput(ldd.balance_amount.toFixed(2))
         : "",
     registration_status: ldd.registration_status ?? "",
     status: ldd.status ?? "",
@@ -253,7 +255,7 @@ export function PessoalTrackingSection({
       type: lddFormValues.type.trim(),
       period: optional(lddFormValues.period),
       due_date: optional(lddFormValues.due_date),
-      balance_amount: optional(lddFormValues.balance_amount, parseBrlInput),
+      balance_amount: optional(lddFormValues.balance_amount, parseBrlDecimalInput),
       registration_status: optional(lddFormValues.registration_status),
       status: optional(lddFormValues.status),
     };
@@ -307,6 +309,7 @@ export function PessoalTrackingSection({
       return;
     }
 
+    clearFeedback();
     setLddToDelete(ldd);
   }
 
@@ -331,7 +334,8 @@ export function PessoalTrackingSection({
       setSuccessMessage("LDD removido.");
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível remover o LDD."));
-      setLddToDelete(null);
+      // Relança para o ConfirmationDialog permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -380,6 +384,8 @@ export function PessoalTrackingSection({
       setSuccessMessage("Situação removida.");
     } catch (error) {
       setFormError(getPessoalErrorMessage(error, "Não foi possível remover a situação."));
+      // Relança para o ConfirmationDialog permanecer aberto com o erro.
+      throw error;
     }
   }
 
@@ -640,7 +646,7 @@ export function PessoalTrackingSection({
         </div>
       </div>
 
-      <Dialog
+      <ConfirmationDialog
         open={Boolean(lddToDelete)}
         onOpenChange={(open) => {
           if (!open) {
@@ -648,47 +654,15 @@ export function PessoalTrackingSection({
           }
         }}
         title="Remover LDD"
-        description="Confirmação de remoção de LDD"
-        contentClassName="w-[min(92vw,520px)]"
-        bodyClassName="space-y-3"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setLddToDelete(null)}
-              disabled={deleteLddMutation.isPending}
-              className={pessoalSecondaryButtonClassName}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDeleteLdd}
-              disabled={deleteLddMutation.isPending}
-              className={pessoalDangerButtonClassName}
-            >
-              {deleteLddMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Confirmar remoção
-            </button>
-          </>
-        }
-      >
-        <p className="text-sm text-gray-700 dark:text-slate-300">
-          Esta ação remove o LDD selecionado do cliente. O registro precisará ser cadastrado
-          novamente se ainda for necessário.
-        </p>
-        {lddToDelete ? (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
-            {lddToDelete.type} - {formatDate(lddToDelete.due_date)}
-          </p>
-        ) : null}
-      </Dialog>
+        description={`Remover o LDD ${lddToDelete?.type ?? ""} - ${lddToDelete ? formatDate(lddToDelete.due_date) : ""}? O registro precisará ser cadastrado novamente se ainda for necessário.`}
+        onConfirm={handleConfirmDeleteLdd}
+        isConfirming={deleteLddMutation.isPending}
+        errorMessage={formError}
+        confirmLabel="Confirmar remoção"
+        cancelLabel="Cancelar"
+      />
 
-      <Dialog
+      <ConfirmationDialog
         open={Boolean(situationToDelete)}
         onOpenChange={(open) => {
           if (!open && !deleteSituationMutation.isPending) {
@@ -696,49 +670,13 @@ export function PessoalTrackingSection({
           }
         }}
         title="Remover situação"
-        description="Confirmação de remoção de situação"
-        contentClassName="w-[min(92vw,520px)]"
-        bodyClassName="space-y-3"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setSituationToDelete(null)}
-              disabled={deleteSituationMutation.isPending}
-              className={pessoalSecondaryButtonClassName}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmDeleteSituation}
-              disabled={deleteSituationMutation.isPending}
-              className={pessoalDangerButtonClassName}
-            >
-              {deleteSituationMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Confirmar remoção
-            </button>
-          </>
-        }
-      >
-        <p className="text-sm text-gray-700 dark:text-slate-300">
-          Não será possível recuperar a situação, mesmo quando ela já estiver finalizada.
-        </p>
-        {situationToDelete ? (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-200">
-            {situationToDelete.title}
-          </p>
-        ) : null}
-        {formError ? (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-300">
-            {formError}
-          </p>
-        ) : null}
-      </Dialog>
+        description={`Remover a situação ${situationToDelete?.title ?? ""}? Não será possível recuperar a situação, mesmo quando ela já estiver finalizada.`}
+        onConfirm={handleConfirmDeleteSituation}
+        isConfirming={deleteSituationMutation.isPending}
+        errorMessage={formError}
+        confirmLabel="Confirmar remoção"
+        cancelLabel="Cancelar"
+      />
 
       {isLddFormOpen ? (
         <div
@@ -761,8 +699,9 @@ export function PessoalTrackingSection({
                   >
                     {selectedLdd ? "Editar LDD" : "Criar LDD"}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Campos seguem o contrato do pessoal-service.
+                  <p className="mt-1 inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                    O que é LDD?
+                    <FieldHelp label="LDD" description={LDD_DESCRIPTION} />
                   </p>
                 </div>
                 <button
@@ -832,7 +771,7 @@ export function PessoalTrackingSection({
                             if (
                               isMoney &&
                               (event.key === "Backspace" || event.key === "Delete") &&
-                              parseBrlInput(event.currentTarget.value) === 0
+                              parseBrlDecimalInput(event.currentTarget.value) === 0
                             ) {
                               event.preventDefault();
                               setLddFormValues((current) => ({
@@ -844,11 +783,17 @@ export function PessoalTrackingSection({
                           onChange={(event) =>
                             setLddFormValues((current) => ({
                               ...current,
+                              // Saldo é digitado em reais ("100" = R$ 100,00) e formatado ao sair.
                               [field.name]: isMoney
-                                ? formatBrlInput(normalizeDigits(event.target.value))
+                                ? event.target.value.replace(/[^\d,.R$\s]/g, "")
                                 : event.target.value,
                             }))
                           }
+                          onBlur={(event) => {
+                            if (!isMoney) return;
+                            const formatted = formatBrlDecimalInput(event.currentTarget.value);
+                            setLddFormValues((current) => ({ ...current, [field.name]: formatted }));
+                          }}
                           disabled={!canEdit || isLddSubmitting}
                           className={pessoalTextFieldClassName}
                         />

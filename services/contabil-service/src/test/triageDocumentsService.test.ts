@@ -34,7 +34,8 @@ const monthly = {
 
 function createMockPrisma(): TriageDocumentsServicePrisma {
   const prisma = {
-    client: { findFirst: vi.fn().mockResolvedValue({ id: CLIENT_ID }) },
+    client: { findFirst: vi.fn().mockResolvedValue({ id: CLIENT_ID }), findMany: vi.fn() },
+    user: { findMany: vi.fn() },
     triageConfig: { findFirst: vi.fn() },
     triageCompetence: { findFirst: vi.fn() },
     triageCompetenceCatalogSnapshot: { findMany: vi.fn() },
@@ -77,6 +78,133 @@ function fiscalEditor() {
 }
 
 describe("TriageDocumentsService", () => {
+  it("lista todas as empresas fiscais da competência, inclusive sem mensal iniciado", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      {
+        id: CLIENT_ID,
+        name: "Empresa A",
+        company_name: "Empresa A Ltda",
+        cpf_cnpj: "12345678000190",
+        regime: "MEI",
+        triageMonthlys: [
+          {
+            id: MONTHLY_ID,
+            checklist: { inbound_report: "COMPLETED" },
+            item_notes: { inbound_report: { required: true } },
+          },
+        ],
+        triageCompetences: [],
+        responsiblesTriage: [{ user_id: RESPONSIBLE_USER_ID }],
+      },
+      {
+        id: "b0000000-0000-4000-8000-000000000002",
+        name: "Empresa B",
+        company_name: null,
+        cpf_cnpj: "98765432000110",
+        regime: null,
+        triageMonthlys: [],
+        triageCompetences: [],
+        responsiblesTriage: [],
+      },
+    ] as never);
+    vi.mocked(prisma.user.findMany).mockResolvedValue([
+      { id: RESPONSIBLE_USER_ID, name: "Ana" },
+    ] as never);
+
+    const result = await new TriageDocumentsService(prisma).listFiscalPortfolio(COMPETENCE, {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      modules: { fiscal: 1 },
+    });
+
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organization_id: ORG_ID,
+          OR: expect.arrayContaining([
+            expect.objectContaining({
+              fiscal: true,
+              AND: expect.any(Array),
+            }),
+            expect.objectContaining({ triageMonthlys: expect.anything() }),
+          ]),
+        }),
+      }),
+    );
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0]).toMatchObject({
+      legal_name: "Empresa A Ltda",
+      responsible_name: "Ana",
+      monthly: { id: MONTHLY_ID, checklist: { inbound_report: "COMPLETED" } },
+    });
+    expect(result.items[1]).toMatchObject({ legal_name: "Empresa B", monthly: null });
+  });
+
+  it("nega a carteira fiscal a quem não tem leitura fiscal", async () => {
+    const prisma = createMockPrisma();
+    await expect(
+      new TriageDocumentsService(prisma).listFiscalPortfolio(COMPETENCE, {
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        modules: { fiscal: 0, triagem: 1 },
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(prisma.client.findMany).not.toHaveBeenCalled();
+  });
+
+  it("usa o responsável congelado da competência ao montar a carteira", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.client.findMany).mockResolvedValue([
+      {
+        id: CLIENT_ID,
+        name: "Empresa A",
+        company_name: null,
+        cpf_cnpj: "12345678000190",
+        regime: null,
+        triageMonthlys: [],
+        triageCompetences: [],
+        responsiblesTriage: [],
+      },
+      {
+        id: "b0000000-0000-4000-8000-000000000002",
+        name: "Empresa B",
+        company_name: null,
+        cpf_cnpj: "98765432000110",
+        regime: null,
+        triageMonthlys: [],
+        triageCompetences: [
+          {
+            id: COMPETENCE_ID,
+            configuration_snapshot: {
+              configs: [{ type: "FISCAL", active_items: ["inbound_report"] }],
+            },
+            responsible_snapshot: {
+              responsibles: [{ type: "FISCAL", user_id: RESPONSIBLE_USER_ID }],
+            },
+          },
+        ],
+        responsiblesTriage: [{ user_id: USER_ID }],
+      },
+    ] as never);
+    vi.mocked(prisma.user.findMany).mockResolvedValue([
+      { id: RESPONSIBLE_USER_ID, name: "Ana" },
+    ] as never);
+
+    const result = await new TriageDocumentsService(prisma).listFiscalPortfolio(COMPETENCE, {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      modules: { fiscal: 1 },
+    });
+
+    expect(result.items[0].responsible_id).toBeNull();
+    expect(result.items[1]).toMatchObject({
+      responsible_id: RESPONSIBLE_USER_ID,
+      responsible_name: "Ana",
+      planned_checklist: { inbound_report: "PENDING", outbound_report: "NOT_APPLICABLE" },
+    });
+  });
+
   it("expõe os 14 campos fiscais legados e lê métodos de entrega do catálogo", () => {
     expect(TRIAGE_FISCAL_FIELDS).toHaveLength(14);
     expect(TRIAGE_FISCAL_CHECKLIST_FIELDS).toHaveLength(13);
@@ -215,6 +343,33 @@ describe("TriageDocumentsService", () => {
       }),
     });
     expect(prisma.triageCatalogItem.findMany).not.toHaveBeenCalled();
+  });
+
+  it("ignora chaves fiscais nulas na rotina contábil", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    vi.mocked(prisma.triageMonthly.update).mockResolvedValue(monthly as never);
+
+    await new TriageDocumentsService(prisma, { logUpdateIfChanged: vi.fn() }).updateItem(
+      MONTHLY_ID,
+      {
+        field: "financial_transactions",
+        status: "PENDING",
+        note: "Aguardando extrato",
+        delivery_method: null,
+        state_site: null,
+      },
+      contabilEditor(),
+    );
+
+    const data = vi.mocked(prisma.triageMonthly.update).mock.calls[0]?.[0].data as {
+      item_notes: Record<string, Record<string, unknown>>;
+    };
+    expect(data.item_notes.financial_transactions).toEqual(
+      expect.objectContaining({ note: "Aguardando extrato" }),
+    );
+    expect(data.item_notes.financial_transactions).not.toHaveProperty("state_site");
+    expect(data.item_notes.financial_transactions).not.toHaveProperty("delivery_method");
   });
 
   it("valida o catálogo no mesmo transaction serializable que grava o mensal", async () => {
@@ -773,7 +928,7 @@ describe("TriageDocumentsService", () => {
       overviewClient,
     ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
 
-    expect(result.triagem_summary).toEqual(
+    expect(result?.triagem_summary).toEqual(
       expect.objectContaining({ client_id: CLIENT_ID, competence: COMPETENCE }),
     );
     expect(overviewClient.getSummary).toHaveBeenCalledWith({
@@ -791,6 +946,24 @@ describe("TriageDocumentsService", () => {
     vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
     const overviewClient = {
       getSummary: vi.fn().mockRejectedValue(new ServiceError(503, "Triagem indisponível.")),
+    };
+
+    const result = await new TriageDocumentsService(
+      prisma,
+      { logUpdateIfChanged: vi.fn() },
+      overviewClient,
+    ).getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, contabilEditor());
+
+    expect(result).toEqual(expect.objectContaining({ id: MONTHLY_ID, triagem_summary: null }));
+  });
+
+  it("cliente sem competência na Triagem mantém resposta mensal com resumo null (#1322)", async () => {
+    const prisma = createMockPrisma();
+    vi.mocked(prisma.triageMonthly.findFirst).mockResolvedValue(monthly as never);
+    const overviewClient = {
+      getSummary: vi
+        .fn()
+        .mockRejectedValue(new ServiceError(404, "Resumo da Triagem não encontrado.")),
     };
 
     const result = await new TriageDocumentsService(
@@ -931,7 +1104,7 @@ describe("TriageDocumentsService", () => {
     expect(prisma.triageBankStatement.upsert).toHaveBeenCalledTimes(2);
     await expect(
       service.getMonthly({ client_id: CLIENT_ID, competence: COMPETENCE }, OTHER_ORG_ID),
-    ).rejects.toMatchObject({ statusCode: 404 });
+    ).resolves.toBeNull();
   });
 
   it("não cria marcador bancário para cliente de outra organização", async () => {

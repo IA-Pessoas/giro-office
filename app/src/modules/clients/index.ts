@@ -9,6 +9,7 @@ export { ClientPickerModal, type ClientPickerOption } from './components/ClientP
 export { ClientSelectionField } from './components/ClientSelectionField';
 
 export {
+  CLIENTS_QUERY_KEY,
   useActivateClientMutation,
   useClient,
   useClientPa,
@@ -30,6 +31,7 @@ export { useClientFormRegularize } from './hooks/useFormRegularize';
 
 export { clientService } from './services/clientService';
 export { ClientIntegrationForm } from './components/ClientIntegrationForm';
+export { getClientDisplayName } from './utils/clientDisplayName';
 export {
   mapClientStatusFromApi,
   mapClientStatusToApi,

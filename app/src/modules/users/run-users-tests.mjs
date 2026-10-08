@@ -509,29 +509,21 @@ runTest("organization owner scope field uses a checkbox toggle", () => {
   assert.equal(createUserModalSource.includes('name="isOrganizationOwner"'), false);
 });
 
-runTest("admin user password update asks for explicit confirmation", () => {
-  const dialogStart = adminUserDetailsPanelSource.indexOf("<Dialog");
-  const dialogEnd = adminUserDetailsPanelSource.indexOf("</Dialog>", dialogStart);
-  const dialogSource = adminUserDetailsPanelSource.slice(dialogStart, dialogEnd);
-  const confirmHandlerBody = adminUserDetailsPanelSource.match(
-    /const handleConfirmPasswordUpdate = async \(\) => \{[\s\S]*?\n  \};/,
-  )?.[0] ?? "";
-
-  assert.match(adminUserDetailsPanelSource, /import \{ Dialog \} from "@shared\/components\/ui\/Dialog";/);
-  assert.match(adminUserDetailsPanelSource, /isPasswordConfirmationOpen/);
-  assert.match(adminUserDetailsPanelSource, /Confirmar alteração de senha/);
-  assert.match(adminUserDetailsPanelSource, /A senha do usuário selecionado será alterada/);
-  assert.doesNotMatch(adminUserDetailsPanelSource, /O valor digitado não será exibido nesta confirmação/);
-  assert.match(adminUserDetailsPanelSource, /!w-\[min\(92vw,520px\)\]/);
-  assert.match(adminUserDetailsPanelSource, /!rounded-lg/);
-  assert.match(adminUserDetailsPanelSource, /bodyClassName="!px-4 !py-3"/);
-  assert.match(dialogSource, /onClick=\{\(\) => setIsPasswordConfirmationOpen\(false\)\}/);
-  assert.match(dialogSource, /onClick=\{\(\) => void handleConfirmPasswordUpdate\(\)\}/);
-  assert.doesNotMatch(dialogSource, /formData\.password/);
-  assert.match(confirmHandlerBody, /await persistUserUpdate\(\)/);
+runTest("admin user details resets the password in a modal instead of a form field", () => {
+  assert.doesNotMatch(adminUserDetailsPanelSource, /name="password"/);
+  assert.doesNotMatch(adminUserDetailsPanelSource, /formData\.password/);
   assert.match(
     adminUserDetailsPanelSource,
-    /formData\.password\.trim\(\)[\s\S]*setIsPasswordConfirmationOpen\(true\)[\s\S]*return;/,
+    /<PasswordResetButton[\s\S]*onSubmit=\{\(password\) => dataSource\.resetPassword\(userId, password\)\}/,
+  );
+});
+
+runTest("admin user details shows Owner instead of a permission level for the owner", () => {
+  assert.match(adminUserDetailsPanelSource, /const isOwner = isOrganizationOwner\(user\)/);
+  assert.match(adminUserDetailsPanelSource, /\{isOwner \? \([\s\S]*?value=\{OWNER_ROLE_LABEL\}[\s\S]*?readOnly/);
+  assert.match(
+    adminUserDetailsPanelSource,
+    /\.\.\.\(isOwner \? \{\} : \{ permission: Number\(formData\.permission\) \}\)/,
   );
 });
 
@@ -698,4 +690,17 @@ runTest("create user modal discloses required account fields", () => {
   assert.match(source, /RequiredFieldLabel/);
   assert.match(source, /aria-required/);
   assert.match(source, /htmlFor="user-department"/);
+});
+
+runTest("user admin pages read the current API envelope and never call the legacy-api", () => {
+  const index = readFileSync(new URL("../../pages/users/index.tsx", import.meta.url), "utf8");
+  const details = readFileSync(new URL("../../pages/users/[id].tsx", import.meta.url), "utf8");
+
+  for (const source of [index, details]) {
+    assert.doesNotMatch(source, /meResponse\.data\.user/);
+    assert.match(source, /meResponse\.data\?\.data/);
+  }
+  assert.doesNotMatch(details, /["'`]\/users-detail/);
+  assert.match(details, /apiClient\.get\(`\/user\/\$\{encodeURIComponent\(id\)\}`\)/);
+  assert.match(details, /userResponse\.data\?\.data/);
 });

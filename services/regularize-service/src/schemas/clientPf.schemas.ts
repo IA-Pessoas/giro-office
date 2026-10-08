@@ -4,20 +4,20 @@ import { idQuerySchema } from "./common.schemas.js";
 
 export const createClientPfBodySchema = z
   .object({
-    code: z.string().min(1, "code obrigatorio."),
-    name: z.string().min(1, "name obrigatorio."),
-    sex: z.string().min(1, "sex obrigatorio."),
-    address: z.string().min(1, "address obrigatorio."),
-    city: z.string().min(1, "city obrigatorio."),
-    zip_code: z.string().min(1, "zip_code obrigatorio."),
-    state: z.string().min(1, "state obrigatorio."),
-    profession: z.string().min(1, "profession obrigatorio."),
-    father: z.string().min(1, "father obrigatorio."),
-    mother: z.string().min(1, "mother obrigatorio."),
-    marital_status: z.string().min(1, "marital_status obrigatorio."),
+    code: z.string().min(1, "code obrigatório."),
+    name: z.string().min(1, "name obrigatório."),
+    sex: z.string().min(1, "sex obrigatório."),
+    address: z.string().min(1, "address obrigatório."),
+    city: z.string().min(1, "city obrigatório."),
+    zip_code: z.string().min(1, "zip_code obrigatório."),
+    state: z.string().min(1, "state obrigatório."),
+    profession: z.string().min(1, "profession obrigatório."),
+    father: z.string().optional().default(""),
+    mother: z.string().min(1, "mother obrigatório."),
+    marital_status: z.string().min(1, "marital_status obrigatório."),
     date_of_birth: z.coerce.date(),
-    cpf: z.string().min(1, "cpf obrigatorio."),
-    rg: z.string().min(1, "rg obrigatorio."),
+    cpf: z.string().min(1, "cpf obrigatório."),
+    rg: z.string().min(1, "rg obrigatório."),
     rg_expedition: z.coerce.date().optional(),
     rg_validity: z.coerce.date().optional(),
     military_certificate: z.string().optional().default(""),
@@ -27,13 +27,13 @@ export const createClientPfBodySchema = z
     cnh_validity: z.coerce.date().optional(),
     spouse: z.string().optional().default(""),
     notes: z.string().optional().default(""),
-    status: z.string().min(1, "status obrigatorio."),
+    status: z.string().min(1, "status obrigatório."),
   })
   .strict();
 
 export const updateClientPfBodySchema = createClientPfBodySchema
   .extend({
-    id: z.string().uuid("id invalido."),
+    id: z.string().uuid("id inválido."),
   })
   .strict();
 
@@ -41,7 +41,7 @@ export const clientPfDetailQuerySchema = idQuerySchema;
 
 export const listClientPfQuerySchema = z
   .object({
-    status: z.string().min(1, "status obrigatorio."),
+    status: z.string().min(1, "status obrigatório."),
     search: z.string().trim().default(""),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),

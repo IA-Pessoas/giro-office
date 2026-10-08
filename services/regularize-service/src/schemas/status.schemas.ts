@@ -27,6 +27,10 @@ export const CANONICAL_LICENSE_STATUSES = [
 
 export const LEGACY_LICENSE_STATUS_ALIASES = ["Ativo", "Pendente", "Inativo", "Cancelado"] as const;
 
+// Licença ativa = "Em Andamento" (legado: "Ativo"). Dashboard e filtro da aba usam a mesma
+// lista para os números baterem (#1347).
+export const ACTIVE_LICENSE_STATUSES = ["Em Andamento", "Ativo"] as const;
+
 export const FINANCIAL_STATUS_VALUES = ["Pendente", "Regular", "Bônus", "Não Contratado"] as const;
 
 export const FINANCIAL_STATUS_BY_LEGACY_CODE: Record<number, FinancialStatus> = {
@@ -48,7 +52,7 @@ const financialStatusCodeSchema = z
     if (!status) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Status financeiro legado invalido.",
+        message: "Status financeiro inválido.",
       });
       return z.NEVER;
     }
@@ -88,6 +92,15 @@ const PROCESS_STATUS_EQUIVALENTS = {
   Paralisado: ["Paralisado", "Paralizado"],
 } as const;
 
+// A migração criou um processo técnico para cada orientação legada sem processo (a FK é
+// obrigatória). Ele segura a orientação, mas não é trabalho do Regularize: fica fora das listas,
+// do dashboard e dos relatórios e continua acessível pelo id (#1377). O texto vem da regra de
+// migração em docs/migration/v4/scripts/rules/v2.mjs (guidance-process-derived).
+export const LEGACY_GUIDANCE_PROCESS_TYPE = "Processo técnico para orientação legada";
+export const OPERATIONAL_PROCESS_FILTER = {
+  process_type: { not: LEGACY_GUIDANCE_PROCESS_TYPE },
+} as const;
+
 export function buildProcessStatusFilter(status: string): Record<string, unknown> {
   if (status === "Todos") {
     return {};
@@ -121,6 +134,10 @@ export function buildLicenseStatusFilter(
 
   if (status === "Vencido") {
     return { due_date: { lt: dueDateBounds.today } };
+  }
+
+  if ((ACTIVE_LICENSE_STATUSES as readonly string[]).includes(status)) {
+    return { status: { in: [...ACTIVE_LICENSE_STATUSES] } };
   }
 
   return { status };

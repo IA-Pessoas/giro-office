@@ -3,20 +3,53 @@ const brlFormatter = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
-function parseBrlCents(value: string): number | null {
-  const digits = normalizeDigits(value);
+/**
+ * Ponto como decimal, sem vírgula no texto: no fim ("R$ 150." do teclado numérico) ou colado
+ * de fora com 1 ou 2 casas ("150.50"). No texto que a própria máscara exibe, ponto é milhar.
+ */
+function decimalDotToComma(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.includes(",")) return trimmed;
+  if (trimmed.endsWith(".")) return `${trimmed.slice(0, -1)},`;
+  if (!trimmed.startsWith("R$") && /^\d*\.\d{1,2}$/u.test(trimmed)) return trimmed.replace(".", ",");
+  return trimmed;
+}
 
-  if (!digits) {
-    return null;
+/**
+ * Partes de um valor em reais digitado: vírgula é o decimal e ponto é milhar, como na própria
+ * exibição ("R$ 1.234,56"). Assim apagar um dígito de "R$ 1.234" não vira 1,23.
+ */
+function splitBrlTyped(value: string): { integer: string; fraction: string | null } | null {
+  const cleaned = decimalDotToComma(value).replace(/[^\d,]/g, "");
+  if (!/\d/u.test(cleaned)) return null;
+  const comma = cleaned.indexOf(",");
+  const integer = normalizeDigits(comma === -1 ? cleaned : cleaned.slice(0, comma)).replace(
+    /^0+(?=\d)/u,
+    "",
+  );
+  const fractionDigits = comma === -1 ? null : normalizeDigits(cleaned.slice(comma + 1));
+  // Campo pré-preenchido ("R$ 0,00" ou valor carregado): o dígito que chega depois de duas casas
+  // desloca o valor para a esquerda, como numa calculadora, em vez de ser descartado.
+  if (fractionDigits !== null && fractionDigits.length > 2) {
+    const shifted = fractionDigits.slice(0, -2);
+    const nextInteger = `${integer}${shifted}`.replace(/^0+(?=\d)/u, "");
+    return { integer: nextInteger || "0", fraction: fractionDigits.slice(-2) };
   }
-
-  const cents = Number(digits);
-
-  return Number.isSafeInteger(cents) ? cents : null;
+  return { integer: integer || "0", fraction: fractionDigits };
 }
 
 export function normalizeDigits(value: string | null | undefined): string {
   return value?.replace(/\D/g, "") ?? "";
+}
+
+/** Máscara HH:MM: o `<input type="time">` segue o locale do navegador e vira 12h em en-US. */
+export function formatTimeInput(value: string): string {
+  const digits = normalizeDigits(value).slice(0, 4);
+  return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
+}
+
+export function isValidTimeInput(value: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
 export function formatCpfInput(value: string): string {
@@ -67,6 +100,8 @@ export function normalizeCnpjInput(value: string | null | undefined): string {
   return (value ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 14);
 }
 
+export { isValidCnpj } from "@workspace/shared/validation";
+
 export function formatCpfCnpjInput(value: string): string {
   const normalized = normalizeCnpjInput(value);
 
@@ -96,18 +131,52 @@ export function formatBrazilianPhoneInput(value: string): string {
   )}`;
 }
 
+/**
+ * Máscara do campo de moeda enquanto o usuário digita, em reais com vírgula decimal (#1366):
+ * "150,5" mostra "R$ 150,5" e "100" mostra "R$ 100" (antes os dígitos viravam centavos).
+ */
 export function formatBrlInput(value: string): string {
-  const cents = parseBrlCents(value);
+  const parts = splitBrlTyped(value);
 
-  if (cents === null) {
+  if (parts === null) {
     return value.trim() ? value : "";
   }
 
-  return brlFormatter.format(cents / 100).replace(/\u00A0/g, " ");
+  const integer = parts.integer.replace(/\B(?=(\d{3})+(?!\d))/gu, ".");
+  return `R$ ${integer}${parts.fraction === null ? "" : `,${parts.fraction}`}`;
+}
+
+/** Valor numérico (da API) no formato do campo de moeda: 1234.5 → "R$ 1.234,50". */
+export function formatBrlAmount(value: number): string {
+  return brlFormatter.format(value).replace(/\u00A0/g, " ");
+}
+
+/**
+ * Valor em reais digitado como decimal pt-BR: "100" é R$ 100,00 e "1.234,56" é R$ 1.234,56.
+ * Diferente de parseBrlInput (máscara), aceita ponto decimal no texto livre.
+ */
+export function parseBrlDecimalInput(value: string): number | null {
+  const cleaned = value.replace(/[^\d,.]/g, "");
+  if (!/\d/u.test(cleaned)) return null;
+  const separator = cleaned.includes(",") ? "," : /\.\d{1,2}$/u.test(cleaned) ? "." : null;
+  const splitAt = separator ? cleaned.lastIndexOf(separator) : cleaned.length;
+  const integer = normalizeDigits(cleaned.slice(0, splitAt)) || "0";
+  const fraction = normalizeDigits(cleaned.slice(splitAt + 1))
+    .padEnd(2, "0")
+    .slice(0, 2);
+  const cents = Number(`${integer}${fraction}`);
+  return Number.isSafeInteger(cents) ? cents / 100 : null;
+}
+
+export function formatBrlDecimalInput(value: string): string {
+  const amount = parseBrlDecimalInput(value);
+  return amount === null ? "" : brlFormatter.format(amount).replace(/\u00A0/g, " ");
 }
 
 export function parseBrlInput(value: string): number | null {
-  const cents = parseBrlCents(value);
+  const parts = splitBrlTyped(value);
+  if (parts === null) return null;
 
-  return cents === null ? null : cents / 100;
+  const cents = Number(`${parts.integer}${(parts.fraction ?? "").padEnd(2, "0")}`);
+  return Number.isSafeInteger(cents) ? cents / 100 : null;
 }

@@ -2,6 +2,7 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   ContabilCompetence,
+  FiscalTriagePortfolio,
   TriageBankStatement,
   TriageDocumentStatus,
   TriageDocumentItemNotes,
@@ -11,6 +12,7 @@ import type {
   TriageRoutineType,
 } from "../types";
 import {
+  buildTriageItemPayload,
   CONTABIL_ENDPOINTS,
   executeNullableContabilRequest,
   unwrapContabilEnvelope,
@@ -24,6 +26,12 @@ type MonthlyParams = {
 type Editability = { can_edit: boolean };
 
 export const triageDocumentsService = {
+  async getFiscalPortfolio(competence: ContabilCompetence): Promise<FiscalTriagePortfolio> {
+    const response = await setupAPIClient().get("/triagem/fiscal-portfolio", {
+      params: { competence },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
   async getEditability(clientId: string, type: TriageRoutineType = "CONTABIL"): Promise<Editability> {
     const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageEditability, {
       params: { client_id: clientId, ...(type === "FISCAL" ? { type } : {}) },
@@ -61,13 +69,7 @@ export const triageDocumentsService = {
   ): Promise<TriageDocumentsMonthly> {
     const response = await setupAPIClient().patch(
       CONTABIL_ENDPOINTS.triageMonthlyItem(monthlyId),
-      {
-        field,
-        ...(status ? { status } : {}),
-        ...(type === "FISCAL" ? { type } : {}),
-        ...(value !== undefined ? { value } : {}),
-        ...itemNotes,
-      },
+      buildTriageItemPayload(field, status, itemNotes, type, value),
     );
     return unwrapContabilEnvelope(response.data);
   },

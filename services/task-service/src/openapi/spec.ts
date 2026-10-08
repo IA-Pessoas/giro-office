@@ -55,14 +55,7 @@ const createTaskRequestBody = createObjectRequestBody({
     responsible_id: "user-uuid",
     prevision_date: "2026-04-10",
   },
-  required: [
-    "model_id",
-    "project_id",
-    "client_id",
-    "prospecting_status",
-    "urgency",
-    "department_id",
-  ],
+  required: ["model_id", "project_id", "client_id", "urgency", "department_id"],
   properties: {
     model_id: { type: "string" },
     project_id: { type: "string" },
@@ -102,6 +95,11 @@ const updateTaskRequestBody = createObjectRequestBody({
     billing: { type: "string" },
     urgency: { type: "string" },
     responsible_id: { type: ["string", "null"] },
+    prevision_date: {
+      type: "string",
+      format: "date",
+      description: "Só define a primeira previsão; depois, 409 e uso de prorrogação.",
+    },
   },
 });
 
@@ -721,6 +719,11 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
               in: "query",
               schema: { type: "string", enum: TASK_ASSIGNMENT_FILTER_VALUES },
             },
+            {
+              name: "unique_service_released",
+              in: "query",
+              schema: { type: "boolean" },
+            },
             { name: "page", in: "query", schema: { type: "integer" } },
             { name: "limit", in: "query", schema: { type: "integer" } },
           ],
@@ -742,9 +745,19 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
                             type: "array",
                             items: {
                               type: "object",
-                              required: ["id", "isOwn", "isUnassigned"],
+                              required: [
+                                "id",
+                                "client_name",
+                                "project_name",
+                                "responsible_name",
+                                "isOwn",
+                                "isUnassigned",
+                              ],
                               properties: {
                                 id: { type: "string" },
+                                client_name: { type: "string" },
+                                project_name: { type: "string" },
+                                responsible_name: { type: ["string", "null"] },
                                 isOwn: { type: "boolean" },
                                 isUnassigned: { type: "boolean" },
                               },
@@ -1049,7 +1062,7 @@ export function buildTaskServiceOpenApiSpec(env: TaskServiceEnv): OpenApiDocumen
           security: bearer,
           ...createConclusionRequestBody,
           responses: {
-            "200": { description: "Solicitação criada", ...successJson },
+            "201": { description: "Solicitação criada", ...successJson },
             "409": { description: "Já existe uma solicitação pendente" },
           },
         },

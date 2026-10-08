@@ -33,6 +33,7 @@ const { prismaMock, passwordHashMock, permissionServiceMock, userAuditMock } = v
   },
   passwordHashMock: {
     hashPassword: vi.fn(),
+    verifyPassword: vi.fn(),
   },
   permissionServiceMock: {
     create: vi.fn(),
@@ -48,6 +49,7 @@ vi.mock("../prisma/index.js", () => ({
 
 vi.mock("../security/passwordHashService.js", () => ({
   hashPassword: passwordHashMock.hashPassword,
+  verifyPassword: passwordHashMock.verifyPassword,
 }));
 
 vi.mock("../services/permissionService.js", () => ({
@@ -61,9 +63,54 @@ import { UserService } from "../services/userService.js";
 describe("UserService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.user.findFirst.mockResolvedValue(null);
     prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.permission.create.mockResolvedValue({ id: "permission-1" });
     prismaMock.permission.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  describe("assertOwnPasswordChange", () => {
+    const ORG = "org-1";
+
+    function withStoredPassword(valid: boolean) {
+      prismaMock.user.findFirst.mockResolvedValue({ password: "$argon2id$stored" });
+      passwordHashMock.verifyPassword.mockResolvedValue({ valid, needsRehash: false });
+    }
+
+    it("exige a senha atual", async () => {
+      await expect(
+        new UserService().assertOwnPasswordChange("user-1", ORG, undefined, "nova-senha-forte"),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it("recusa senha atual incorreta", async () => {
+      withStoredPassword(false);
+
+      await expect(
+        new UserService().assertOwnPasswordChange("user-1", ORG, "errada", "nova-senha-forte"),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      expect(passwordHashMock.verifyPassword).toHaveBeenCalledWith("errada", "$argon2id$stored");
+    });
+
+    it("aplica a política mínima", async () => {
+      withStoredPassword(true);
+      const service = new UserService();
+
+      await expect(
+        service.assertOwnPasswordChange("user-1", ORG, "senha-atual", "curta"),
+      ).rejects.toMatchObject({ statusCode: 400 });
+      await expect(
+        service.assertOwnPasswordChange("user-1", ORG, "senha-atual-123", "senha-atual-123"),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it("aceita a troca válida", async () => {
+      withStoredPassword(true);
+
+      await expect(
+        new UserService().assertOwnPasswordChange("user-1", ORG, "senha-atual", "nova-senha-forte"),
+      ).resolves.toBeUndefined();
+    });
   });
 
   it("getById aceita usuário legado vinculado pela organização do departamento", async () => {
@@ -452,6 +499,28 @@ describe("UserService", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
 
+    expect(prismaMock.user.create).not.toHaveBeenCalled();
+  });
+
+  it("create rejeita login que já existe com outra caixa", async () => {
+    prismaMock.department.findFirst.mockResolvedValue({ id: "dep-1", organization_id: "org-1" });
+    prismaMock.user.findFirst.mockResolvedValue({ id: "user-legacy" });
+    const service = new UserService();
+
+    await expect(
+      service.create({
+        name: "Ana",
+        login: "ana",
+        password: "secret",
+        department_id: "dep-1",
+        permission: 1,
+        organization_id: "org-1",
+      }),
+    ).rejects.toMatchObject({ statusCode: 409, message: "Login já cadastrado." });
+
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { login: { equals: "ana", mode: "insensitive" } } }),
+    );
     expect(prismaMock.user.create).not.toHaveBeenCalled();
   });
 

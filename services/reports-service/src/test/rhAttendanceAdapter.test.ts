@@ -1,6 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 
-import { rhAttendanceReportingCatalog } from "@workspace/shared";
+import { MAX_REPORTING_QUERY_LIMIT, rhAttendanceReportingCatalog } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { RhAttendanceAdapter } from "../integrations/rhAttendanceAdapter.js";
@@ -125,6 +125,8 @@ describe("RhAttendanceAdapter", () => {
         request_id: "request-851",
       }),
     ).resolves.toEqual({ rows: [{ minutes: 30 }], reachedLimit: true });
-    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)).limit).toBe(101);
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)).limit).toBe(
+      MAX_REPORTING_QUERY_LIMIT,
+    );
   });
 });

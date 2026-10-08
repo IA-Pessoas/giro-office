@@ -106,7 +106,13 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
             status: {
               type: "string",
-              enum: ["URGENT_OPEN", "ROUTINE_PENDING", "BANK_PENDING", "COMPLETE"],
+              enum: [
+                "URGENT_OPEN",
+                "ROUTINE_PENDING",
+                "BANK_PENDING",
+                "COMPLETE",
+                "NO_APPLICABLE_ITEMS",
+              ],
             },
           },
         },
@@ -117,6 +123,8 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
             success: { type: "boolean", enum: [true] },
             data: {
               type: "object",
+              nullable: true,
+              description: "null no GET quando ainda não há pendência mensal (estado vazio).",
               additionalProperties: true,
               properties: {
                 triagem_summary: {
@@ -832,6 +840,29 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                 "application/json": {
                   schema: { $ref: "#/components/schemas/SuccessEnvelope" },
                 },
+              },
+            },
+          },
+        },
+      },
+      "/triagem/fiscal-portfolio": {
+        get: {
+          tags: ["Triage Documents"],
+          summary: "Listar carteira mensal da Triagem Fiscal",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Empresas fiscais e status documentais da competência",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
               },
             },
           },

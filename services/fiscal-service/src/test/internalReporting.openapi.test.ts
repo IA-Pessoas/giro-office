@@ -38,5 +38,9 @@ describe("fiscal internal reporting OpenAPI", () => {
       spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
         ?.schema?.properties,
     ).not.toHaveProperty("id");
+    expect(
+      spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
+        ?.schema?.properties?.limit,
+    ).toMatchObject({ type: "integer", minimum: 1, maximum: 50_001 });
   });
 });

@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "../..",
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@workspace/runtime": ["../runtime/src/index.ts"],
+      "@workspace/shared": ["../../shared/src/index.ts"],
+      "@workspace/shared/*": ["../../shared/src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+}

@@ -62,6 +62,7 @@ async function startPlatformSessionServer() {
           email: "admin@example.com",
           auth_kind: "platform",
           platform_role: "super_admin",
+          can_impersonate: true,
         },
       }));
       return;
@@ -97,8 +98,16 @@ await runTest("platform session is derived from server identity without readable
   assert.doesNotMatch(platformGuardSource, /cw\.session|parseCookies/);
   assert.doesNotMatch(
     platformSources,
-    /cw\.token|jwtDecode|Authorization|Bearer|localStorage|sessionStorage/,
+    /cw\.token|jwtDecode|Authorization|Bearer|localStorage/,
   );
+  assert.match(
+    authContextSource,
+    /const IMPERSONATION_EXPIRY_STORAGE_KEY = "giro-office:impersonation-expires-at"/,
+  );
+  const allowedExpiryStorageCalls =
+    /\bsessionStorage\.(?:setItem|getItem|removeItem)\(\s*IMPERSONATION_EXPIRY_STORAGE_KEY(?:\s*,\s*expiresAt)?\s*\)/gu;
+  const executableSources = platformSources.replace(/^[ \t]*\/\/.*$/gm, "");
+  assert.doesNotMatch(executableSources.replace(allowedExpiryStorageCalls, ""), /\bsessionStorage\b/);
   assert.doesNotMatch(platformLoginSource, /setCookie|destroyCookie/);
 });
 
@@ -124,6 +133,7 @@ await runTest("platform client survives organizational 401 and platform refresh/
       email: "admin@example.com",
       auth_kind: "platform",
       platform_role: "super_admin",
+      can_impersonate: true,
     });
     await assert.rejects(platformApi.post("/platform/session/refresh"), { status: 401 });
     await assert.rejects(platformApi.delete("/platform/session"), { status: 401 });

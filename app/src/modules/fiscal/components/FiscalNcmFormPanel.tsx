@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { AlertCircle, ChevronDown, Loader2 } from "lucide-react";
+import { toast } from "@shared/services/toast";
 
 import {
   useCreateFiscalNcmMutation,
@@ -9,6 +9,7 @@ import {
 } from "../hooks";
 import type { CreateFiscalNcmPayload, FiscalNcm } from "../types";
 import {
+  FISCAL_TAX_REGIME_OPTIONS,
   getFiscalErrorMessage,
   toFiscalInputDate,
   toFiscalIsoDate,
@@ -20,6 +21,7 @@ interface FiscalNcmFormPanelProps {
   mode: FiscalNcmFormPanelMode;
   ncmId?: string;
   onClose: () => void;
+  onCreated?: (ncmCode: string) => void;
   showHeader?: boolean;
   bare?: boolean;
 }
@@ -60,7 +62,7 @@ function buildFormState(ncm: FiscalNcm | null | undefined): FiscalNcmFormState {
   }
 
   return {
-    tax_regime: ncm.tax_regime,
+    tax_regime: ncm.tax_regime.trim(),
     ncm_code: ncm.ncm_code,
     federal_taxation_type: ncm.federal_taxation_type,
     description: ncm.description,
@@ -88,6 +90,7 @@ export function FiscalNcmFormPanel({
   mode,
   ncmId,
   onClose,
+  onCreated,
   showHeader = true,
   bare = false,
 }: FiscalNcmFormPanelProps) {
@@ -175,6 +178,16 @@ export function FiscalNcmFormPanel({
       return;
     }
 
+    if (formState.ncm_code.trim().length !== 8) {
+      setValidationMessage("O código NCM deve ter 8 dígitos.");
+      return;
+    }
+
+    if (endDateIso && endDateIso < startDateIso) {
+      setValidationMessage("A vigência final não pode ser anterior à vigência inicial.");
+      return;
+    }
+
     setValidationMessage(null);
 
     const basePayload: CreateFiscalNcmPayload = {
@@ -202,6 +215,7 @@ export function FiscalNcmFormPanel({
       } else {
         await createMutation.mutateAsync(basePayload);
         toast.success("NCM cadastrado com sucesso.");
+        onCreated?.(basePayload.ncm_code);
       }
 
       setFormState(DEFAULT_FORM_STATE);
@@ -289,11 +303,11 @@ export function FiscalNcmFormPanel({
       ) : null}
 
       <div className={`${showHeader ? "mt-4" : ""} grid gap-4 xl:grid-cols-2`}>
-        <TextField
+        <SelectField
           label="Regime tributário"
           value={formState.tax_regime}
           onChange={(value) => handleChange("tax_regime", value)}
-          placeholder="Ex.: Simples Nacional"
+          options={FISCAL_TAX_REGIME_OPTIONS}
           required
         />
         <TextField
@@ -433,6 +447,51 @@ function TextField({
         placeholder={placeholder}
         className="h-9 rounded-lg border border-gray-300 px-3 text-[13px] text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
       />
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  onChange,
+  options,
+  required = false,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  required?: boolean;
+  value: string;
+}) {
+  const hasUnknownValue = Boolean(value) && !options.some((option) => option.value === value);
+
+  return (
+    <label className="flex flex-col gap-2 text-sm text-gray-700 dark:text-slate-300">
+      <span>
+        {label}
+        {required ? " *" : ""}
+      </span>
+      <span className="relative block">
+        <select
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          required={required}
+          className="h-9 w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 pr-9 text-[13px] text-gray-900 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+        >
+          <option value="">Selecione</option>
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+          {hasUnknownValue ? <option value={value}>{value}</option> : null}
+        </select>
+        <ChevronDown
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-slate-400"
+        />
+      </span>
     </label>
   );
 }

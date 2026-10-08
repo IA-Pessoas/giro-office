@@ -146,6 +146,57 @@ describe("TimeSheetService", () => {
     });
   });
 
+  it("create casa o feriado gravado a meia-noite UTC com o dia civil da folha", async () => {
+    prismaMock.timeSheets.findFirst.mockResolvedValue(null);
+    prismaMock.pointsConfig.findUnique.mockResolvedValue({
+      user_id: "user-1",
+      organization_id: "org-1",
+      start_time: new Date("1970-01-01T08:00:00.000Z"),
+      lunch_break: new Date("1970-01-01T12:00:00.000Z"),
+      lunch_return: new Date("1970-01-01T13:00:00.000Z"),
+      end_time: new Date("1970-01-01T17:00:00.000Z"),
+      work_days: "1,2,3,4,5",
+      bank_balance: 0,
+      signature: null,
+    });
+    prismaMock.point.findMany.mockResolvedValue([]);
+    prismaMock.holidays.findMany.mockResolvedValue([
+      { date: new Date("2026-04-21T00:00:00.000Z") },
+    ]);
+    prismaMock.organization.findUnique.mockResolvedValue({ timezone: "America/Sao_Paulo" });
+    prismaMock.timeSheets.create.mockImplementation(async ({ data }) => ({
+      id: "sheet-1",
+      ...data,
+      signature: null,
+    }));
+
+    await new TimeSheetService().create({
+      organization_id: "org-1",
+      user_id: "user-1",
+      start_time: new Date("2026-04-21T12:00:00.000Z"),
+      end_time: new Date("2026-04-21T20:00:00.000Z"),
+    });
+
+    expect(prismaMock.holidays.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organization_id: "org-1",
+          date: {
+            gte: new Date("2026-04-21T00:00:00.000Z"),
+            lte: new Date("2026-04-21T23:59:59.999Z"),
+          },
+        },
+      }),
+    );
+    expect(prismaMock.timeSheets.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          days: [expect.objectContaining({ date: "2026-04-21", expected_minutes: 0 })],
+        }),
+      }),
+    );
+  });
+
   it("getById retorna folha detalhada da organizacao", async () => {
     prismaMock.timeSheets.findFirst.mockResolvedValue({
       id: "sheet-1",

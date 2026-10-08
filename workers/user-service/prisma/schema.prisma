@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client"
+  runtime  = "workerd"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum enumType {
+  admin
+  owner
+  user
+}
+
+enum status {
+  trial
+  past_due
+  active
+  suspended
+  cancelled
+}
+
+enum PlatformRole {
+  super_admin
+}
+
+model Organization {
+  id          String       @id @default(uuid())
+  name        String
+  status      status       @default(active)
+  departments Department[]
+  users       User[]       @relation("UserOrganization")
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+
+  @@map("organizations")
+}
+
+model Department {
+  id              String @id @default(uuid())
+  name            String
+  organization_id String
+  users           User[]
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("departments")
+}
+
+model User {
+  id                String           @id @default(uuid())
+  name              String
+  login             String           @unique
+  password          String
+  permission        Int
+  status            String
+  organization_id   String?
+  type              enumType?
+  first_owner_flag  Boolean?         @default(false)
+  session_version   Int              @default(0)
+  version           Int              @default(1)
+  permission_id     String?
+  department_id     String
+  invited_by        String?
+  email             String?
+  joined_at         DateTime?        @default(now())
+  photo_url         String?
+  authSessions      AuthSession[]
+  passwordResetTokens PasswordResetToken[]
+  department        Department       @relation(fields: [department_id], references: [id])
+  organization      Organization?    @relation("UserOrganization", fields: [organization_id], references: [id])
+  permissions       Permission[]
+  permissionSpecific PermissionSpecific?
+
+  @@index([organization_id, name, id])
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid())
+  user_id    String
+  token_hash String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("password_reset_tokens")
+}
+
+model AuthSession {
+  id         String   @id @default(uuid())
+  user_id    String
+  impersonator_platform_user_id String?
+  csrf_hash  String
+  expires_at DateTime
+  revoked_at DateTime?
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  impersonatorPlatformUser PlatformUser? @relation("PlatformImpersonationSessions", fields: [impersonator_platform_user_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([user_id])
+  @@index([impersonator_platform_user_id], map: "idx_auth_sessions_impersonator_platform_user_id")
+  @@index([expires_at])
+  @@map("auth_sessions")
+}
+
+model Permission {
+  id              String @id @default(uuid())
+  user_id         String
+  certificado     Int    @default(0)
+  comercial       Int    @default(0)
+  contabil        Int    @default(0)
+  financeiro      Int    @default(0)
+  fiscal          Int    @default(0)
+  integracao      Int    @default(0)
+  marketing       Int    @default(0)
+  parcelamento    Int    @default(0)
+  pessoal         Int    @default(0)
+  regularize      Int    @default(0)
+  rh              Int    @default(0)
+  ti              Int    @default(0)
+  triagem         Int    @default(0)
+  organization_id String
+  user            User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, organization_id])
+  @@map("permissions")
+}
+
+model PermissionSpecific {
+  user_id         String @id
+  task_completion  Boolean?
+  organization_id String
+  user            User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("permissions.specific")
+}
+
+model PlatformUser {
+  id              String               @id @default(uuid())
+  name            String
+  email           String               @unique
+  password        String
+  platform_role   PlatformRole        @default(super_admin)
+  status          String              @default("active")
+  can_impersonate Boolean             @default(false)
+  session_version Int                  @default(0)
+  authSessions    PlatformAuthSession[]
+  impersonationSessions AuthSession[] @relation("PlatformImpersonationSessions")
+  created_at      DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
+
+  @@map("platform_users")
+}
+
+model PlatformAuthSession {
+  id               String       @id @default(uuid())
+  platform_user_id String
+  csrf_hash        String
+  expires_at       DateTime
+  revoked_at       DateTime?
+  platformUser     PlatformUser @relation(fields: [platform_user_id], references: [id], onDelete: Cascade)
+
+  @@index([platform_user_id, revoked_at, expires_at])
+  @@map("platform_auth_sessions")
+}

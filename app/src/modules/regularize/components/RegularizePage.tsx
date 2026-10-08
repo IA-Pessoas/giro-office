@@ -7,6 +7,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardList,
+  Download,
   Eye,
   FileKey2,
   Landmark,
@@ -23,17 +24,18 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { useModuleAccess } from "@modules/auth";
 import {
   ClientPickerModal,
   ClientSelectionField,
   type ClientPickerOption,
-  useClients,
+  useClient,
 } from "@modules/clients";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
 import { PaginationControls } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { useDebouncedValue } from "@shared/hooks";
 import { getLastPage } from "@shared/pagination/pagination";
@@ -49,6 +51,7 @@ import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
 import { RegularizePasswordForm } from "./RegularizePasswordForm";
+import { RegularizeProcessBoard } from "./RegularizeProcessBoard";
 import { RegularizeProcessForm } from "./RegularizeProcessForm";
 import { RegularizeSitePasswordForm } from "./RegularizeSitePasswordForm";
 import { useRegularizeDashboard } from "../hooks/useRegularizeDashboard";
@@ -101,6 +104,7 @@ import {
   useUploadRegularizeLicenseProtocolMutation,
 } from "../hooks/useRegularizeOperations";
 import { submitRegularizeLicense } from "../services/regularizeLicenseSubmission";
+import { regularizeService } from "../services/regularizeService";
 import type {
   AddRegularizeGuidanceActivityPayload,
   AddRegularizeGuidancePartnerPayload,
@@ -138,6 +142,12 @@ import type {
 } from "../types";
 import { getRegularizeRequestId } from "../utils/regularizeApiError";
 import {
+  buildRegularizeProcessStatusUpdatePayload,
+  groupRegularizeProcessesByStatus,
+} from "../utils/processBoard";
+import type { RegularizeProcessStatus } from "../utils/processBoard";
+import {
+  formatSiteSphere,
   getRegularizeErrorMessage,
   getRegularizeMutationErrorMessage,
 } from "../utils/regularizeForm";
@@ -324,6 +334,40 @@ function getGuidanceDescription(item: RegularizeGuidance): string {
   );
 }
 
+function GuidancePdfButton({ id }: { id: RegularizeId }) {
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  async function download() {
+    setIsGenerating(true);
+    try {
+      const blob = await regularizeService.downloadGuidancePdf(id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `orientacao-processual-${id}.pdf`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toast.error(
+        getRegularizeMutationErrorMessage(error, "Não foi possível gerar o PDF desta orientação."),
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  return (
+    <TableActionButton
+      icon={isGenerating ? Loader2 : Download}
+      title={isGenerating ? "Gerando PDF" : "Baixar PDF da orientação"}
+      disabled={isGenerating}
+      onClick={() => void download()}
+    />
+  );
+}
+
 function formatOptionLabel(label: string, description?: string | null): string {
   return description ? `${label}, ${description}` : label;
 }
@@ -472,35 +516,6 @@ function DashboardSectionCard({
       </div>
       <div className="flex-1">{children}</div>
     </section>
-  );
-}
-
-function DashboardHeroCard({
-  description,
-  icon: Icon,
-  label,
-  value,
-}: {
-  description: string;
-  icon: LucideIcon;
-  label: string;
-  value: number | string;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-violet-600 p-5 text-white shadow-sm">
-      <div className="flex min-h-[180px] items-start justify-between gap-5">
-        <div className="min-w-0">
-          <p className="text-base font-semibold uppercase tracking-[0.06em] text-white/85">
-            {label}
-          </p>
-          <p className="mt-3 text-4xl font-semibold tracking-tight">{value}</p>
-          <p className="mt-3 max-w-md text-sm leading-6 text-white/75">{description}</p>
-        </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -727,13 +742,13 @@ function MaskedValue() {
 }
 
 function getSiteCredentialDetailStatus(error: unknown): string {
-  const message = getRegularizeErrorMessage(error, "Credencial indisponivel para revelacao.");
+  const message = getRegularizeErrorMessage(error, "Credencial indisponível para revelação.");
 
   if (/403|forbidden|permission|permiss|acesso negado/i.test(message)) {
     return "Acesso negado para revelar credenciais.";
   }
 
-  return "Credencial indisponivel para revelacao.";
+  return "Credencial indisponível para revelação.";
 }
 
 function IndependentGuidanceSection({
@@ -781,13 +796,16 @@ function IndependentGuidanceSection({
                     <p className="font-medium">{getGuidanceTitle(item)}</p>
                     <p className="text-sm text-gray-500">{getGuidanceDescription(item)}</p>
                   </div>
-                  <TableActionButton
-                    icon={canManageRegularizeCore ? Pencil : Eye}
-                    title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
-                    onClick={() =>
-                      onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
-                    }
-                  />
+                  <div className="flex items-center gap-1">
+                    <GuidancePdfButton id={item.id} />
+                    <TableActionButton
+                      icon={canManageRegularizeCore ? Pencil : Eye}
+                      title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
+                      onClick={() =>
+                        onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                      }
+                    />
+                  </div>
                 </div>
                 <FieldLine
                   label="Alvo"
@@ -974,13 +992,16 @@ function ProcessDetailContent({
                         {getGuidanceDescription(item)}
                       </p>
                     </div>
-                    <TableActionButton
-                      icon={canManageRegularizeCore ? Pencil : Eye}
-                      title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
-                      onClick={() =>
-                        onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
-                      }
-                    />
+                    <div className="flex items-center gap-1">
+                      <GuidancePdfButton id={item.id} />
+                      <TableActionButton
+                        icon={canManageRegularizeCore ? Pencil : Eye}
+                        title={canManageRegularizeCore ? "Editar orientação" : "Consultar orientação"}
+                        onClick={() =>
+                          onSetActiveForm({ type: "guidance", mode: "edit", guidance: item })
+                        }
+                      />
+                    </div>
                   </div>
 
                   {canManageRegularizeCore ? (
@@ -1146,6 +1167,9 @@ export function RegularizePage() {
   const [licenseFormSessionKey, setLicenseFormSessionKey] = useState(0);
   const [processSearch, setProcessSearch] = useState("");
   const [processStatus, setProcessStatus] = useState("Todos");
+  const [processView, setProcessView] = useState<"table" | "board">("table");
+  const [movingProcessIds, setMovingProcessIds] = useState<Set<string>>(() => new Set());
+  const movingProcessIdsRef = useRef(new Set<string>());
   const [processPage, setProcessPage] = useState(1);
   const [siteSearch, setSiteSearch] = useState("");
   const [siteStatus, setSiteStatus] = useState(true);
@@ -1187,12 +1211,6 @@ export function RegularizePage() {
     },
     { enabled: queryPolicy.clientPfs },
   );
-  const clientQuery = useClients({
-    status: "Ativo",
-    legacyIntegrationStatusFilter: false,
-    page: 1,
-    limit: 50,
-  });
   const siteQuery = useRegularizeSitePasswords(
     { status: true },
     { enabled: queryPolicy.sitePasswords },
@@ -1210,7 +1228,14 @@ export function RegularizePage() {
   );
   const processQuery = useRegularizeProcesses(
     { status: "Todos" },
-    { enabled: queryPolicy.processes },
+    { enabled: activeForm?.type === "guidance" },
+  );
+  const processBoardQuery = useRegularizeProcesses(
+    { status: processStatus, search: debouncedProcessSearch },
+    {
+      enabled:
+        activeTab === "processes" && processView === "board" && !isProcessSearchPending,
+    },
   );
   const licensePageQuery = usePaginatedRegularizeLicenses(
     {
@@ -1227,7 +1252,7 @@ export function RegularizePage() {
       page: processPage,
       limit: REGULARIZE_PAGE_SIZE,
     },
-    { enabled: activeTab === "processes" },
+    { enabled: activeTab === "processes" && processView === "table" },
   );
   const sitePageQuery = usePaginatedRegularizeSitePasswords(
     {
@@ -1267,15 +1292,6 @@ export function RegularizePage() {
   const licenseProtocolAccessMutation = useRegularizeLicenseProtocolAccessMutation();
 
   const visiblePfRows = isPfSearchPending ? [] : pfPageQuery.data?.data ?? [];
-  const pfNameById = new Map(
-    (pfPageQuery.data?.data ?? []).map((client) => [client.id, client.name]),
-  );
-  const pjNameById = new Map(
-    (clientQuery.data?.items ?? []).map((client) => [
-      client.id,
-      client.name || client.company_name,
-    ]),
-  );
   const firstClientPfId = visiblePfRows[0]?.id;
   const visibleProcessRows = isProcessSearchPending ? [] : processPageQuery.data?.data ?? [];
   const automaticProcessId = visibleProcessRows[0]?.id;
@@ -1283,8 +1299,16 @@ export function RegularizePage() {
   const currentClientPfId = selectedClientPfId ?? firstClientPfId;
   const currentProcessId = selectedProcessId ?? automaticProcessId;
 
+  // Salvar senha de outro cliente limpa o objeto do topo e mantém só o id; o nome vem do cadastro.
+  const headerClientDetailQuery = useClient(
+    activeTab === "partners" && !selectedCredentialClient ? currentCredentialClientId : undefined,
+  );
+  const headerClientName =
+    selectedCredentialClient?.name ||
+    headerClientDetailQuery.data?.company_name ||
+    headerClientDetailQuery.data?.name;
   const partnerQuery = useRegularizePartners(
-    currentClientPfId ? { type: "pf", client_id: currentClientPfId } : undefined,
+    currentCredentialClientId ? { type: "pj", client_id: currentCredentialClientId } : undefined,
     { enabled: queryPolicy.partners },
   );
   const credentialQuery = useRegularizePasswords(
@@ -1371,6 +1395,10 @@ export function RegularizePage() {
     data: isProcessSearchPending ? undefined : visibleProcessRows,
     isLoading: isProcessSearchPending || processPageQuery.isLoading,
   };
+  const processBoardColumns = useMemo(
+    () => groupRegularizeProcessesByStatus(processBoardQuery.data ?? []),
+    [processBoardQuery.data],
+  );
   const siteTableQuery: ListQuery<RegularizeSitePasswordListItem> = {
     ...sitePageQuery,
     data: isSiteSearchPending ? undefined : sitePageQuery.data?.data,
@@ -1392,14 +1420,16 @@ export function RegularizePage() {
   };
 
   const dashboardRequestId = getRegularizeRequestId(dashboardQuery.error);
-  const hasProcessRows = visibleProcessRows.length > 0;
+  const hasProcessRows = processView === "board"
+    ? (processBoardQuery.data?.length ?? 0) > 0
+    : visibleProcessRows.length > 0;
 
   const siteOptions = useMemo<RegularizeFormOption[]>(
     () =>
       (siteQuery.data ?? []).map((site) => ({
         id: site.id,
         label: site.name,
-        description: site.sphere,
+        description: formatSiteSphere(site.sphere),
       })),
     [siteQuery.data],
   );
@@ -1482,6 +1512,39 @@ export function RegularizePage() {
     setIsProcessDetailDialogOpen(true);
   }
 
+  async function handleMoveProcessStatus(
+    processId: RegularizeId,
+    status: RegularizeProcessStatus,
+  ): Promise<void> {
+    if (!canManageRegularizeCore || movingProcessIdsRef.current.has(processId)) {
+      throw new Error("Sem permissão para alterar processos.");
+    }
+    movingProcessIdsRef.current.add(processId);
+    setMovingProcessIds((current) => new Set(current).add(processId));
+    try {
+      const process = await regularizeService.getProcess(processId);
+      await updateProcessMutation.mutateAsync(
+        buildRegularizeProcessStatusUpdatePayload(process, status),
+      );
+      toast.success("Status do processo atualizado.");
+    } catch (error) {
+      toast.error(
+        getRegularizeMutationErrorMessage(
+          error,
+          "Não foi possível atualizar o status do processo.",
+        ),
+      );
+      throw error;
+    } finally {
+      movingProcessIdsRef.current.delete(processId);
+      setMovingProcessIds((current) => {
+        const next = new Set(current);
+        next.delete(processId);
+        return next;
+      });
+    }
+  }
+
   function handleRefreshRegularize() {
     const refreshes: Promise<unknown>[] = [];
 
@@ -1489,7 +1552,9 @@ export function RegularizePage() {
     if (queryPolicy.clientPfs) refreshes.push(pfPageQuery.refetch());
     if (queryPolicy.sitePasswords) refreshes.push(siteQuery.refetch());
     if (queryPolicy.municipalTaxes) refreshes.push(taxQuery.refetch());
-    if (queryPolicy.processes) refreshes.push(processQuery.refetch());
+    if (activeTab === "processes") {
+      refreshes.push((processView === "board" ? processBoardQuery : processPageQuery).refetch());
+    }
     if (activeTab === "licenses") refreshes.push(licensePageQuery.refetch());
     if (queryPolicy.partners) refreshes.push(partnerQuery.refetch());
     if (queryPolicy.passwords) refreshes.push(credentialQuery.refetch());
@@ -1819,12 +1884,10 @@ export function RegularizePage() {
             : currentForm,
         );
       }
-      const message = getRegularizeMutationErrorMessage(
-        error,
-        savedLicenseId
-          ? "A licença foi salva, mas não foi possível armazenar o protocolo."
-          : "Não foi possível salvar a licença.",
-      );
+      const message =
+        savedLicenseId && protocolFile
+          ? `A licença foi salva, mas não foi possível armazenar o protocolo. ${getRegularizeMutationErrorMessage(error, "Tente novamente.")}`
+          : getRegularizeMutationErrorMessage(error, "Não foi possível salvar a licença.");
       toast.error(message);
       throw new Error(message);
     }
@@ -1967,45 +2030,38 @@ export function RegularizePage() {
 
       {activeTab === "dashboard" && dashboardQuery.data ? (
         <section className="space-y-5">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
-            <DashboardHeroCard
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <MetricTile
               icon={ClipboardList}
-              label={
-                dashboardQuery.data.metrics.openProcesses > 0
-                  ? "Processos em acompanhamento"
-                  : "Fluxo operacional em dia"
-              }
+              label="Processos abertos"
               value={dashboardQuery.data.metrics.openProcesses}
-              description={
+              supporting={
                 dashboardQuery.data.metrics.openProcesses > 0
-                  ? "Processos que ainda exigem acompanhamento, retorno ou conclusão dentro do Regularize."
-                  : "Nenhum processo aberto no momento. Novas demandas passam a aparecer aqui quando entrarem no fluxo."
+                  ? "Aguardando acompanhamento ou conclusão."
+                  : "Fluxo operacional em dia."
               }
             />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
-              <MetricTile
-                icon={BadgeCheck}
-                label="Licenças ativas"
-                value={dashboardQuery.data.metrics.activeLicenses}
-              />
-              <MetricTile
-                icon={UserRound}
-                label="PF ativos"
-                value={dashboardQuery.data.metrics.activeClientPfs}
-              />
-              <MetricTile
-                icon={Landmark}
-                label="Tributos pendentes"
-                value={dashboardQuery.data.metrics.municipalTaxesPending}
-                supporting={`${dashboardQuery.data.metrics.municipalTaxesCompleted}/${dashboardQuery.data.metrics.municipalTaxesTotal} criados em ${dashboardQuery.data.year}`}
-              />
-              <MetricTile
-                icon={ShieldCheck}
-                label="Sites ativos"
-                value={dashboardQuery.data.metrics.activeSites}
-              />
-            </div>
+            <MetricTile
+              icon={BadgeCheck}
+              label="Licenças ativas"
+              value={dashboardQuery.data.metrics.activeLicenses}
+            />
+            <MetricTile
+              icon={UserRound}
+              label="PF ativos"
+              value={dashboardQuery.data.metrics.activeClientPfs}
+            />
+            <MetricTile
+              icon={Landmark}
+              label="Tributos pendentes"
+              value={dashboardQuery.data.metrics.municipalTaxesPending}
+              supporting={`${dashboardQuery.data.metrics.municipalTaxesCompleted}/${dashboardQuery.data.metrics.municipalTaxesTotal} criados em ${dashboardQuery.data.year}`}
+            />
+            <MetricTile
+              icon={ShieldCheck}
+              label="Sites ativos"
+              value={dashboardQuery.data.metrics.activeSites}
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
@@ -2025,7 +2081,10 @@ export function RegularizePage() {
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
                       <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
+                      <td className="px-4 py-3">
+                        {formatDocument(item.cpf_cnpj)}
+                        <DocumentIssueBadge value={item.cpf_cnpj} />
+                      </td>
                       <td className="px-4 py-3">
                         <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
                       </td>
@@ -2116,94 +2175,154 @@ export function RegularizePage() {
                 )}
               </RegularizeNativeSelect>
             </label>
+            <div className="space-y-1.5 sm:col-span-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Visualização
+              </span>
+              <div
+                aria-label="Visualização dos processos"
+                className="inline-flex rounded-lg border border-gray-300 p-1 dark:border-gray-600"
+                role="group"
+              >
+                <button
+                  aria-pressed={processView === "table"}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    processView === "table"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
+                  )}
+                  onClick={() => setProcessView("table")}
+                  type="button"
+                >
+                  Tabela
+                </button>
+                <button
+                  aria-pressed={processView === "board"}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    processView === "board"
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
+                  )}
+                  onClick={() => setProcessView("board")}
+                  type="button"
+                >
+                  Quadro
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
-            <QueryStatePanel
-              query={processTableQuery}
-              emptyTitle="Nenhum processo encontrado."
-              emptyClassName="xl:col-span-2 min-h-[220px] items-center justify-center"
-            >
-              {(processRows) => (
-                <div>
-                  <DataTable
-                    headers={["Processo", "Cliente", "Documento", "Status", "Financeiro", ""]}
-                  >
-                    {processRows.map((item) => (
-                    <tr
-                      key={item.id}
-                      aria-selected={currentProcessId === item.id}
-                      className={cn(
-                        "text-gray-700 transition-colors dark:text-slate-200",
-                        currentProcessId === item.id && "bg-blue-50 dark:bg-blue-950/30",
-                      )}
+          {processView === "board" ? (
+            <RegularizeProcessBoard
+              columns={processBoardColumns}
+              errorMessage={
+                processBoardQuery.isError
+                  ? getRegularizeErrorMessage(
+                      processBoardQuery.error,
+                      "Não foi possível carregar os processos.",
+                    )
+                  : undefined
+              }
+              getClientName={getProcessClientName}
+              isLoading={isProcessSearchPending || processBoardQuery.isLoading}
+              canChangeStatus={canManageRegularizeCore}
+              movingProcessIds={movingProcessIds}
+              onMoveProcessStatus={handleMoveProcessStatus}
+              onOpenProcessDetail={openProcessDetail}
+            />
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)]">
+              <QueryStatePanel
+                query={processTableQuery}
+                emptyTitle="Nenhum processo encontrado."
+                emptyClassName="xl:col-span-2 min-h-[220px] items-center justify-center"
+              >
+                {(processRows) => (
+                  <div>
+                    <DataTable
+                      headers={["Processo", "Cliente", "Documento", "Status", "Financeiro", ""]}
                     >
-                      <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
-                      <td className="px-4 py-3">{getProcessClientName(item)}</td>
-                      <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
-                      </td>
-                      <td className="px-4 py-3 text-sm">{formatText(item.financial_status)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
-                          <TableActionButton
-                            icon={Eye}
-                            title="Ver detalhe"
-                            onClick={() => openProcessDetail(item.id)}
-                          />
-                          {canManageRegularizeCore ? (
-                            <TableActionButton
-                              icon={Pencil}
-                              title="Editar processo"
-                              onClick={() => {
-                                selectProcessManually(item.id);
-                                setActiveForm({ type: "process", mode: "edit", id: item.id });
-                              }}
-                            />
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                    ))}
-                  </DataTable>
-                  <PaginationControls
-                    page={processPage}
-                    limit={REGULARIZE_PAGE_SIZE}
-                    total={processPageQuery.data?.total ?? 0}
-                    count={processRows.length}
-                    hasMore={processPageQuery.data?.hasMore ?? false}
-                    isFetching={processPageQuery.isFetching || isProcessSearchPending}
-                    onPrevious={() => {
-                      resetProcessSelection();
-                      setProcessPage((current) => Math.max(1, current - 1));
-                    }}
-                    onNext={() => {
-                      resetProcessSelection();
-                      setProcessPage((current) => current + 1);
-                    }}
-                  />
-                </div>
-              )}
-            </QueryStatePanel>
+                      {processRows.map((item) => (
+                        <tr
+                          key={item.id}
+                          aria-selected={currentProcessId === item.id}
+                          className={cn(
+                            "text-gray-700 transition-colors dark:text-slate-200",
+                            currentProcessId === item.id && "bg-blue-50 dark:bg-blue-950/30",
+                          )}
+                        >
+                          <td className="px-4 py-3 font-medium">{formatText(item.process_type)}</td>
+                          <td className="px-4 py-3">{getProcessClientName(item)}</td>
+                          <td className="px-4 py-3">
+                            {formatDocument(item.cpf_cnpj)}
+                            <DocumentIssueBadge value={item.cpf_cnpj} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
+                          </td>
+                          <td className="px-4 py-3 text-sm">{formatText(item.financial_status)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-end gap-1">
+                              <TableActionButton
+                                icon={Eye}
+                                title="Ver detalhe"
+                                onClick={() => openProcessDetail(item.id)}
+                              />
+                              {canManageRegularizeCore ? (
+                                <TableActionButton
+                                  icon={Pencil}
+                                  title="Editar processo"
+                                  onClick={() => {
+                                    selectProcessManually(item.id);
+                                    setActiveForm({ type: "process", mode: "edit", id: item.id });
+                                  }}
+                                />
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </DataTable>
+                    <PaginationControls
+                      page={processPage}
+                      limit={REGULARIZE_PAGE_SIZE}
+                      total={processPageQuery.data?.total ?? 0}
+                      count={processRows.length}
+                      hasMore={processPageQuery.data?.hasMore ?? false}
+                      isFetching={processPageQuery.isFetching || isProcessSearchPending}
+                      onPrevious={() => {
+                        resetProcessSelection();
+                        setProcessPage((current) => Math.max(1, current - 1));
+                      }}
+                      onNext={() => {
+                        resetProcessSelection();
+                        setProcessPage((current) => current + 1);
+                      }}
+                    />
+                  </div>
+                )}
+              </QueryStatePanel>
 
-            {hasProcessRows ? (
-              <DetailPanel title="Processo selecionado" panelRef={selectedProcessDetailRef}>
-                <ProcessDetailContent
-                  canManageRegularizeCore={canManageRegularizeCore}
-                  currentProcessId={currentProcessId}
-                  guidanceQuery={guidanceQuery}
-                  onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
-                  onRemoveGuidancePartner={handleRemoveGuidancePartner}
-                  onReturnProcessFromFiscal={handleReturnProcessFromFiscal}
-                  onSendProcessToFiscal={handleSendProcessToFiscal}
-                  onSetActiveForm={setActiveForm}
-                  processDetailQuery={processDetailQuery}
-                  processSelectionOrigin={processSelectionOrigin}
-                />
-              </DetailPanel>
-            ) : null}
-          </div>
+              {hasProcessRows ? (
+                <DetailPanel title="Processo selecionado" panelRef={selectedProcessDetailRef}>
+                  <ProcessDetailContent
+                    canManageRegularizeCore={canManageRegularizeCore}
+                    currentProcessId={currentProcessId}
+                    guidanceQuery={guidanceQuery}
+                    onRemoveGuidanceActivity={handleRemoveGuidanceActivity}
+                    onRemoveGuidancePartner={handleRemoveGuidancePartner}
+                    onReturnProcessFromFiscal={handleReturnProcessFromFiscal}
+                    onSendProcessToFiscal={handleSendProcessToFiscal}
+                    onSetActiveForm={setActiveForm}
+                    processDetailQuery={processDetailQuery}
+                    processSelectionOrigin={processSelectionOrigin}
+                  />
+                </DetailPanel>
+              ) : null}
+            </div>
+          )}
 
           {regularizeAccess.canView ? (
             <IndependentGuidanceSection
@@ -2286,10 +2405,13 @@ export function RegularizePage() {
           >
             {(licenseRows) => (
               <div>
-                <DataTable headers={["Licença", "Protocolo", "Contato", "Status", "Vencimento", ""]}>
+                <DataTable
+                  headers={["Licença", "Cliente", "Protocolo", "Contato", "Status", "Vencimento", ""]}
+                >
                   {licenseRows.map((item: RegularizeLicenseListItem) => (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.type_license)}</td>
+                      <td className="px-4 py-3">{formatText(item.client_name)}</td>
                       <td className="px-4 py-3">{formatText(item.protocol)}</td>
                       <td className="px-4 py-3">{formatText(item.contact)}</td>
                       <td className="px-4 py-3">
@@ -2402,7 +2524,10 @@ export function RegularizePage() {
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3">{formatText(item.code)}</td>
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                      <td className="px-4 py-3">{formatDocument(item.cpf)}</td>
+                      <td className="px-4 py-3">
+                        {formatDocument(item.cpf)}
+                        <DocumentIssueBadge value={item.cpf} />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <TableActionButton
@@ -2451,7 +2576,15 @@ export function RegularizePage() {
               ) : clientPfDetailQuery.data ? (
                 <>
                   <FieldLine label="Nome" value={formatText(clientPfDetailQuery.data.name)} />
-                  <FieldLine label="CPF" value={formatDocument(clientPfDetailQuery.data.cpf)} />
+                  <FieldLine
+                    label="CPF"
+                    value={
+                      <>
+                        {formatDocument(clientPfDetailQuery.data.cpf)}
+                        <DocumentIssueBadge value={clientPfDetailQuery.data.cpf} />
+                      </>
+                    }
+                  />
                   <FieldLine label="Cidade" value={formatText(clientPfDetailQuery.data.city)} />
                   <FieldLine label="UF" value={formatText(clientPfDetailQuery.data.state)} />
                   <FieldLine label="Status" value={formatText(clientPfDetailQuery.data.status)} />
@@ -2481,16 +2614,23 @@ export function RegularizePage() {
             }
           />
 
-          <QueryStatePanel query={partnerQuery} emptyTitle="Nenhum sócio encontrado.">
+          <QueryStatePanel
+            query={partnerQuery}
+            emptyTitle={
+              currentCredentialClientId
+                ? "Nenhum sócio encontrado."
+                : "Selecione um cliente no topo para ver os sócios."
+            }
+          >
             {(partnerRows) => (
               <DataTable headers={["PF", "PJ", "Participação", "Entrada", "Saída", ""]}>
                 {partnerRows.map((item: RegularizePartner) => (
                   <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                     <td className="px-4 py-3 font-medium">
-                      {pfNameById.get(item.pf_id) || "PF não identificado"}
+                      {item.clientPF?.name || "PF não identificado"}
                     </td>
                     <td className="px-4 py-3">
-                      {pjNameById.get(item.pj_id) || "PJ não identificado"}
+                      {headerClientName || "PJ não identificado"}
                     </td>
                     <td className="px-4 py-3">{formatText(item.part)}</td>
                     <td className="px-4 py-3">{formatDate(item.entry)}</td>
@@ -2555,7 +2695,7 @@ export function RegularizePage() {
                     {credentialRows.map((item: RegularizePasswordListItem) => (
                       <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                         <td className="px-4 py-3 font-medium">{formatText(item.site?.name)}</td>
-                        <td className="px-4 py-3">{formatText(item.site?.sphere)}</td>
+                        <td className="px-4 py-3">{formatSiteSphere(item.site?.sphere)}</td>
                         <td className="px-4 py-3">{formatText(item.notes)}</td>
                         <td className="px-4 py-3">
                           <MaskedValue />
@@ -2675,7 +2815,7 @@ export function RegularizePage() {
                     {siteRows.map((item: RegularizeSitePasswordListItem) => (
                     <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                       <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                      <td className="px-4 py-3">{formatText(item.sphere)}</td>
+                      <td className="px-4 py-3">{formatSiteSphere(item.sphere)}</td>
                       <td className="px-4 py-3">{formatText(item.user)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge config={getStatusBadgeConfig(item.status)} size="sm" />
@@ -2877,7 +3017,10 @@ export function RegularizePage() {
                     return (
                       <tr key={item.id} className="text-gray-700 dark:text-slate-200">
                         <td className="px-4 py-3 font-medium">{formatText(item.name)}</td>
-                        <td className="px-4 py-3">{formatDocument(item.cpf_cnpj)}</td>
+                        <td className="px-4 py-3">
+                          {formatDocument(item.cpf_cnpj)}
+                          <DocumentIssueBadge value={item.cpf_cnpj} />
+                        </td>
                         <td className="px-4 py-3">
                           {item.city ? (
                             formatText(item.city)

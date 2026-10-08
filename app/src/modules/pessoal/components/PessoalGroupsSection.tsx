@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { AlertCircle, Archive, Boxes, Loader2, Pencil, Plus, RefreshCw, RotateCcw } from "lucide-react";
 
+import { ConfirmationDialog } from "@shared/components";
+
 import {
   useArchivePessoalGroupMutation,
   useCreatePessoalGroupMutation,
@@ -10,6 +12,7 @@ import {
 } from "../hooks/usePessoalGroups";
 import {
   PESSOAL_GROUP_POLICIES,
+  PESSOAL_GROUP_POLICY_LABELS,
   type PessoalGroup,
   type PessoalGroupPolicy,
 } from "../types/groups";
@@ -35,6 +38,8 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
   const [policy, setPolicy] = useState<PessoalGroupPolicy>("NORMAL");
   const [formError, setFormError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [pendingArchive, setPendingArchive] = useState<PessoalGroup | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   function openCreate() {
@@ -78,11 +83,15 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
     }
   }
 
-  async function archiveGroup(group: PessoalGroup) {
+  async function archiveGroup() {
+    if (!pendingArchive) return;
+    setArchiveError(null);
     try {
-      await archiveMutation.mutateAsync(group.id);
+      await archiveMutation.mutateAsync(pendingArchive.id);
     } catch (error) {
-      setFormError(getPessoalErrorMessage(error, "Não foi possível arquivar o grupo."));
+      setArchiveError(getPessoalErrorMessage(error, "Não foi possível arquivar o grupo."));
+      // Relança para o diálogo permanecer aberto exibindo o erro.
+      throw error;
     }
   }
 
@@ -151,7 +160,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
                 >
                   {PESSOAL_GROUP_POLICIES.map((option) => (
                     <option key={option} value={option}>
-                      {option === "NORMAL" ? "Normal" : "Sem obrigações"}
+                      {PESSOAL_GROUP_POLICY_LABELS[option]}
                     </option>
                   ))}
                 </select>
@@ -200,7 +209,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
                     return (
                       <tr key={group.id} className="border-t border-gray-100 dark:border-gray-700">
                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{group.name}</td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{group.policy ?? "Sem política"}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{PESSOAL_GROUP_POLICY_LABELS[group.policy] ?? group.policy}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                           {isArchived ? "Arquivado" : "Ativo"}
                         </td>
@@ -223,7 +232,7 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
                                   Reativar
                                 </button>
                               ) : (
-                                <button type="button" onClick={() => archiveGroup(group)} disabled={archiveMutation.isPending || isSystemGroup} title={isSystemGroup ? "Grupo sistêmico" : undefined} className={pessoalSecondaryButtonClassName}>
+                                <button type="button" onClick={() => setPendingArchive(group)} disabled={archiveMutation.isPending || isSystemGroup} title={isSystemGroup ? "Grupo sistêmico" : undefined} className={pessoalSecondaryButtonClassName}>
                                   <Archive className="h-4 w-4" />
                                   Arquivar
                                 </button>
@@ -241,6 +250,22 @@ export function PessoalGroupsSection({ canEdit }: PessoalGroupsSectionProps) {
           {!isFormOpen && formError ? <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-300">{formError}</p> : null}
         </div>
       </div>
+      <ConfirmationDialog
+        open={pendingArchive !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingArchive(null);
+            setArchiveError(null);
+          }
+        }}
+        title="Arquivar grupo"
+        description={`Arquivar o grupo "${pendingArchive?.name ?? ""}"? Ele poderá ser reativado depois.`}
+        onConfirm={archiveGroup}
+        isConfirming={archiveMutation.isPending}
+        errorMessage={archiveError}
+        confirmLabel="Arquivar"
+        cancelLabel="Cancelar"
+      />
     </section>
   );
 }

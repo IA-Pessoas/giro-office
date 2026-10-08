@@ -9,6 +9,7 @@ import {
 import prismaClient from "../integrations/prisma.js";
 
 const PROJECT_STATUS_TO_DO = new Set([
+  "a realizar",
   "análise/agendamento",
   "análise financeira",
   "envio de proposta",

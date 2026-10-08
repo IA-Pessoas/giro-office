@@ -1,5 +1,6 @@
 packages:
   - "packages/*"
+  - "workers/*"
   - "app"
   - "infra"
   - "services/gateway"
@@ -21,6 +22,7 @@ packages:
   - "services/parcelamento-service"
   - "services/reports-service"
   - "services/commercial-service"
+  - "services/marketing-service"
   - "services/triagem-service"
   - "services/src"
 

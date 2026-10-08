@@ -4,7 +4,7 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
-import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 import {
   type ClientListStatus,
   type CreateClientBody,
@@ -12,6 +12,10 @@ import {
   mapSimpleListStatusToDb,
   type UpdateClientBody,
 } from "../schemas/client.schemas.js";
+import {
+  assertValidClientDocument,
+  isClientDocumentUniqueConstraintError,
+} from "../utils/clientDocuments.js";
 import {
   buildLegacyListStatusWhere,
   mergeClientListSearchWhere,
@@ -47,6 +51,28 @@ export type ClientListPage = {
   page: number;
   pageSize: number;
   hasMore: boolean;
+};
+
+export type ClientInstagramProfile = {
+  id: string;
+  name: string;
+  status: string;
+  instagram: string | null;
+};
+
+export type ClientInstagramProfilePage = {
+  items: ClientInstagramProfile[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
+export type ListInstagramProfilesFilters = {
+  page: number;
+  pageSize: number;
+  profile: "all" | "with" | "without";
+  search?: string;
 };
 
 type ClientAuthorization = IntegracaoServiceAuthorization & {
@@ -113,6 +139,9 @@ const clientDetailSelect = {
   regime: true,
   size: true,
   segment: true,
+  coringa_status: true,
+  tecnologia: true,
+  licitacao: true,
   start_strike: true,
   end_strike: true,
   cnae: true,
@@ -160,6 +189,9 @@ const EXTENDED_CLIENT_KEYS = [
   "regime",
   "size",
   "segment",
+  "coringa_status",
+  "tecnologia",
+  "licitacao",
   "start_strike",
   "end_strike",
   "cnae",
@@ -270,6 +302,10 @@ export interface IClientService {
     filters: ListClientsFilters,
     authorization?: ClientAuthorization,
   ): Promise<ClientListPage>;
+  listInstagramProfiles(
+    organizationId: string,
+    filters: ListInstagramProfilesFilters,
+  ): Promise<ClientInstagramProfilePage>;
   getById(
     id: string,
     organizationId: string,
@@ -364,6 +400,52 @@ export class ClientService implements IClientService {
     };
   }
 
+  async listInstagramProfiles(
+    organizationId: string,
+    filters: ListInstagramProfilesFilters,
+  ): Promise<ClientInstagramProfilePage> {
+    const search = filters.search?.trim();
+    const profileCondition =
+      filters.profile === "with"
+        ? Prisma.sql`AND c.instagram ~ '[^[:space:]]'`
+        : filters.profile === "without"
+          ? Prisma.sql`AND (c.instagram IS NULL OR c.instagram ~ '^[[:space:]]*$')`
+          : Prisma.empty;
+    const searchCondition = search
+      ? Prisma.sql`AND (
+          c.name ILIKE ${`%${search}%`}
+          OR c.company_name ILIKE ${`%${search}%`}
+          OR c.fantasy_name ILIKE ${`%${search}%`}
+        )`
+      : Prisma.empty;
+    const where = Prisma.sql`WHERE c.organization_id = ${organizationId} ${profileCondition} ${searchCondition}`;
+    const skip = (filters.page - 1) * filters.pageSize;
+    const [rows, totals] = await Promise.all([
+      this.prisma.$queryRaw<ClientInstagramProfile[]>(Prisma.sql`
+        SELECT c.id, c.name, c.status, c.instagram
+        FROM clients c
+        ${where}
+        ORDER BY c.name ASC, c.id ASC
+        LIMIT ${filters.pageSize}
+        OFFSET ${skip}
+      `),
+      this.prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS total
+        FROM clients c
+        ${where}
+      `),
+    ]);
+    const total = Number(totals[0]?.total ?? 0);
+
+    return {
+      items: rows,
+      total,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      hasMore: filters.page * filters.pageSize < total,
+    };
+  }
+
   async getById(
     id: string,
     organizationId: string,
@@ -418,29 +500,44 @@ export class ClientService implements IClientService {
     if (!org) {
       throw new ServiceError(400, "Organização não encontrada.");
     }
+    const normalizedDocument = assertValidClientDocument(input.cpf_cnpj, input.type);
+    const duplicate = await this.prisma.client.findFirst({
+      where: { organization_id: input.organization_id, cpf_cnpj: normalizedDocument },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ServiceError(409, "Cliente já cadastrado.");
+    }
     const extended = takeExtendedFields(input);
 
-    const [organization, row] = await Promise.all([
-      this.getOrganizationPublic(input.organization_id),
-      this.prisma.client.create({
-        data: {
-          name: input.name,
-          organization_id: input.organization_id,
-          status: input.status,
-          cpf_cnpj: input.cpf_cnpj,
-          company_name: input.company_name ?? null,
-          fantasy_name: input.fantasy_name ?? null,
-          prospecting_status: input.prospecting_status,
-          type: input.type,
-          type_registration: input.type_registration,
-          service_unique: input.service_unique,
-          ...extended,
-        } as Prisma.ClientUncheckedCreateInput,
-        select: clientCreateSelect,
-      }),
-    ]);
+    try {
+      const [organization, row] = await Promise.all([
+        this.getOrganizationPublic(input.organization_id),
+        this.prisma.client.create({
+          data: {
+            name: input.name,
+            organization_id: input.organization_id,
+            status: input.status,
+            cpf_cnpj: normalizedDocument,
+            company_name: input.company_name ?? null,
+            fantasy_name: input.fantasy_name ?? null,
+            prospecting_status: input.prospecting_status,
+            type: input.type,
+            type_registration: input.type_registration,
+            service_unique: input.service_unique,
+            ...extended,
+          } as Prisma.ClientUncheckedCreateInput,
+          select: clientCreateSelect,
+        }),
+      ]);
 
-    return toPublic(row, organization);
+      return toPublic(row, organization);
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error)) {
+        throw new ServiceError(409, "Cliente já cadastrado.", error);
+      }
+      throw error;
+    }
   }
 
   async update(
@@ -455,7 +552,7 @@ export class ClientService implements IClientService {
   ): Promise<ClientPublic> {
     const existing = await this.prisma.client.findFirst({
       where: { id, organization_id: organizationId },
-      select: { id: true },
+      select: { id: true, type: true, cpf_cnpj: true },
     });
     if (!existing) {
       throw new ServiceError(404, "Cliente não encontrado.");
@@ -482,7 +579,22 @@ export class ClientService implements IClientService {
     }
 
     if (input.cpf_cnpj !== undefined) {
-      data.cpf_cnpj = input.cpf_cnpj;
+      const normalizedDocument = assertValidClientDocument(
+        input.cpf_cnpj,
+        input.type ?? existing.type,
+      );
+      const duplicate = await this.prisma.client.findFirst({
+        where: {
+          organization_id: organizationId,
+          cpf_cnpj: normalizedDocument,
+          id: { not: id },
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new ServiceError(409, "Cliente já cadastrado.");
+      }
+      data.cpf_cnpj = normalizedDocument;
     }
 
     if (input.company_name !== undefined) {
@@ -511,16 +623,23 @@ export class ClientService implements IClientService {
 
     Object.assign(data, extended);
 
-    const [organization, row] = await Promise.all([
-      this.getOrganizationPublic(organizationId),
-      this.prisma.client.update({
-        where: { id },
-        data: data as Prisma.ClientUncheckedUpdateInput,
-        select: clientSelect,
-      }),
-    ]);
+    try {
+      const [organization, row] = await Promise.all([
+        this.getOrganizationPublic(organizationId),
+        this.prisma.client.update({
+          where: { id },
+          data: data as Prisma.ClientUncheckedUpdateInput,
+          select: clientSelect,
+        }),
+      ]);
 
-    return toPublic(row, organization);
+      return toPublic(row, organization);
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error)) {
+        throw new ServiceError(409, "Cliente já cadastrado.", error);
+      }
+      throw error;
+    }
   }
 
   async deactivate(

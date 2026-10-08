@@ -1,3 +1,4 @@
+import { normalizeCpfCnpj } from "@workspace/shared";
 import type { Prisma } from "../generated/prisma/client.js";
 
 export type ListRefFilter = "integracao" | "deps" | undefined;
@@ -84,12 +85,13 @@ export function mergeClientListSearchWhere(
   if (!term) {
     return base;
   }
+  const documentTerm = /^[0-9./-]+$/u.test(term) ? normalizeCpfCnpj(term) || term : term;
   const searchClause: Prisma.ClientWhereInput = {
     OR: [
       { name: { contains: term, mode: "insensitive" } },
       { company_name: { contains: term, mode: "insensitive" } },
       { fantasy_name: { contains: term, mode: "insensitive" } },
-      { cpf_cnpj: { contains: term, mode: "insensitive" } },
+      { cpf_cnpj: { contains: documentTerm, mode: "insensitive" } },
     ],
   };
   return { AND: [base, searchClause] };

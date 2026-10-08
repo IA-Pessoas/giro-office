@@ -7,6 +7,7 @@ import { contabilResponsiblesReportingCatalog } from "./contabilResponsiblesRepo
 import { fiscalIcmsReportingCatalog } from "./fiscalIcmsReportingCatalog.js";
 import { fiscalIpiReportingCatalog } from "./fiscalIpiReportingCatalog.js";
 import { fiscalNcmReportingCatalog } from "./fiscalNcmReportingCatalog.js";
+import { marketingBudgetReportingCatalog } from "./marketingBudgetReportingCatalog.js";
 import { parcelamentoReportingCatalog } from "./parcelamentoReportingCatalog.js";
 import { pessoalLddReportingCatalog } from "./pessoalLddReportingCatalog.js";
 import { pessoalObligationsReportingCatalog } from "./pessoalObligationsReportingCatalog.js";
@@ -36,6 +37,7 @@ export const reportingSources = [
   ...fiscalIcmsReportingCatalog.sources,
   ...fiscalIpiReportingCatalog.sources,
   ...fiscalNcmReportingCatalog.sources,
+  ...marketingBudgetReportingCatalog.sources,
   ...parcelamentoReportingCatalog.sources,
   ...pessoalLddReportingCatalog.sources,
   ...pessoalObligationsReportingCatalog.sources,

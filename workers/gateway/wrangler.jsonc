@@ -1,0 +1,47 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "giro-gateway",
+  "main": "src/index.ts",
+  // O app chega por service binding; nada público além do domínio do app.
+  "workers_dev": false,
+  "preview_urls": false,
+  "compatibility_date": "2026-09-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "services": [
+    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" },
+    { "binding": "DEPARTMENT_SERVICE", "service": "giro-department-service" },
+    { "binding": "ORGANIZATION_SERVICE", "service": "giro-organization-service" },
+    { "binding": "USER_SERVICE", "service": "giro-user-service" },
+    { "binding": "CLIENT_SERVICE", "service": "giro-client-service" },
+    { "binding": "FISCAL_SERVICE", "service": "giro-fiscal-service" },
+    { "binding": "CERTIFICATE_SERVICE", "service": "giro-certificate-service" },
+    { "binding": "REPORTS_SERVICE", "service": "giro-reports-service" },
+    { "binding": "PARCELAMENTO_SERVICE", "service": "giro-parcelamento-service" },
+    { "binding": "CONTABIL_SERVICE", "service": "giro-contabil-service" },
+    { "binding": "PROJECT_SERVICE", "service": "giro-project-service" },
+    { "binding": "TASK_SERVICE", "service": "giro-task-service" },
+    { "binding": "TI_SERVICE", "service": "giro-ti-service" },
+    { "binding": "RH_SERVICE", "service": "giro-rh-service" },
+    { "binding": "COMMERCIAL_SERVICE", "service": "giro-commercial-service" },
+    { "binding": "TRIAGEM_SERVICE", "service": "giro-triagem-service" },
+    { "binding": "PESSOAL_SERVICE", "service": "giro-pessoal-service" },
+    { "binding": "REGULARIZE_SERVICE", "service": "giro-regularize-service" }
+  ],
+  // Só para GET /dashboard/stats, servido pelo próprio gateway como no Node.
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
+  // Login, login de plataforma e link de redefinição: 10 tentativas por minuto por IP e rota (#1344).
+  // namespace_id é escolhido por nós e precisa ser único na conta (ADR 0003).
+  "ratelimits": [
+    {
+      "name": "LOGIN_RATE_LIMITER",
+      "namespace_id": "1344",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
+  "vars": { "NODE_ENV": "production" },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": true }
+  }
+}

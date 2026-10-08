@@ -35,12 +35,22 @@ A ordem das áreas determina somente apresentação. Exige áreas/campos únicos
 até 32 áreas e 100 campos por área. Catálogo fornece `department_label` e `description` para
 apresentação, sem mapeamento de códigos no frontend.
 
-Este contrato de revisão prepara #1016; prévia, modelos e geração continuam recebendo o
-contrato legado até suas entregas específicas. Não há migração de banco nesta etapa.
+Prévia, modelos e geração aceitam a definição legada e as composições versões 2 e 3.
 
 `GET /reports/catalog` expõe somente fontes e campos de adapters internos habilitados para a
 organização e permissões atuais. `POST /reports/preview` valida a mesma definição e devolve uma
 amostra limitada; não cria job, snapshot, arquivo ou registro persistido.
+O catálogo também retorna `letterheads.personal` e `letterheads.shared` com ID, rótulo, tipo e
+SHA-256, sem bytes. A referência `{id, sha256}` pode ser fixada na definição e é revalidada na
+seleção e na exportação PDF. Sem ativos registrados, as listas ficam vazias e o PDF usa o padrão
+institucional. As imagens legadas reais ainda dependem de uma origem acessível.
+
+A composição versão 3 separa, por área, dimensões, detalhes, medidas, filtros, ordem e colunas
+visíveis. `grouped_list` exige dimensão ordenável e ao menos um detalhe visível; `summary`
+agrega por dimensão e aceita `count_rows`, que conta registros inclusive com campos nulos.
+Campos ocultos continuam autorizados e podem orientar grupos, ordem e gráficos. Cada área gera
+um bloco independente, sem junções entre áreas. Grupos ocultos são preservados como colunas
+`Grupo: ...` nos arquivos CSV, XLSX e PDF, para que a exportação mantenha o contexto da lista.
 
 `POST /reports/models` cria um modelo pessoal. `GET /reports/models/list`,
 `GET /reports/models/:id`, `PATCH /reports/models/:id` e `DELETE /reports/models/:id` atendem
@@ -70,6 +80,8 @@ Regularize. Os adapters de RH consultam exclusivamente
 Eles consultam somente rotas internas governadas dos serviços de origem e assinam grants HMAC de curta duração.
 Os adapters de Tecnologia, incluindo inventário, estoque, chamados e ramais, usam o contrato combinado
 do ti-service e publicam somente campos selecionáveis, sem as chaves internas do catálogo.
+Na execução, as origens de TI paginam internamente até os limites globais de 50.000 registros e
+20 MiB; exceder qualquer limite falha sem persistir um resultado parcial.
 
 O smoke de Projetos fica desativado por padrão; exija `PROJECT_REPORTING_SMOKE_ENABLED=true` e
 `REPORTS_GRANT_SECRET` apenas em ambiente isolado com os dois segredos configurados.

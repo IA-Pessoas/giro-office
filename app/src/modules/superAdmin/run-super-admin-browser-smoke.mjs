@@ -21,7 +21,24 @@ const identity = {
   email: "operador@example.test",
   auth_kind: "platform",
   platform_role: "super_admin",
+  can_impersonate: true,
 };
+const platformSuperAdmins = [
+  {
+    id: identity.id,
+    name: identity.name,
+    email: identity.email,
+    status: "active",
+    can_impersonate: true,
+  },
+  {
+    id: "b4bc983b-1c5c-43d8-80f0-dab220f0c501",
+    name: "Administradora sem permissão",
+    email: "sem-permissao@example.test",
+    status: "inactive",
+    can_impersonate: false,
+  },
+];
 const organization = {
   id: "fc70c08e-1907-4268-b303-f88c6f5c5c01",
   name: "Organização Aurora",
@@ -71,6 +88,7 @@ let forceConflict = false;
 let forceUserVersionConflict = false;
 let nextUserCreateError = null;
 let auditUnavailable = false;
+let impersonationStarted = false;
 let revision = 1;
 let delayedDetailId = null;
 let delayedDetail;
@@ -135,10 +153,70 @@ const upstream = createServer(async (request, response) => {
   let raw = "";
   for await (const chunk of request) raw += chunk;
   const body = raw ? JSON.parse(raw) : undefined;
-  requests.push({ method: request.method, path: url.pathname, query: url.searchParams, body });
+  requests.push({
+    method: request.method,
+    path: url.pathname,
+    query: url.searchParams,
+    body,
+    cookie: request.headers.cookie,
+    csrfHeader: request.headers["x-csrf-token"],
+    authorization: request.headers.authorization,
+  });
 
-  if (url.pathname === "/user/me") return reply(response, 401, "Sessão de plataforma.");
+  if (url.pathname === "/user/me") {
+    if (!impersonationStarted) return reply(response, 401, "Sessão de plataforma.");
+    return reply(response, 200, {
+      id: platformUser.id,
+      name: platformUser.name,
+      login: platformUser.login,
+      permission: 1,
+      organization_id: organization.id,
+      type: "admin",
+      modules: { rh: 1, fiscal: 2 },
+    });
+  }
   if (url.pathname === "/platform/me") return reply(response, 200, identity);
+  if (url.pathname === "/platform/super-admins" && request.method === "GET") {
+    assert.equal(request.headers.authorization, undefined);
+    platformSuperAdmins[0].can_impersonate = identity.can_impersonate;
+    return reply(response, 200, platformSuperAdmins);
+  }
+  const superAdminPermissionMatch = url.pathname.match(
+    /^\/platform\/super-admins\/([^/]+)\/impersonation-permission$/,
+  );
+  if (superAdminPermissionMatch && request.method === "PATCH") {
+    assert.equal(request.headers["x-csrf-token"], csrf);
+    assert.equal(request.headers.authorization, undefined);
+    if (typeof body?.can_impersonate !== "boolean") {
+      return reply(response, 400, "Permissão inválida.");
+    }
+    if (!identity.can_impersonate) return reply(response, 403, "Acesso negado.");
+    const target = platformSuperAdmins.find((admin) => admin.id === superAdminPermissionMatch[1]);
+    if (!target) return reply(response, 404, "Super admin não encontrado.");
+    if (target.id === identity.id) return reply(response, 409, "Autoalteração não permitida.");
+
+    const before = target.can_impersonate;
+    target.can_impersonate = body.can_impersonate;
+    if (before !== target.can_impersonate) {
+      auditEvents.unshift({
+        id: `audit-safe-${auditEvents.length + 2}`,
+        requestId: `request-safe-${auditEvents.length + 2}`,
+        organizationId: null,
+        method: "ENTITY_CHANGE",
+        path: "/platform_user",
+        outcome: "success",
+        serviceSource: "user-service",
+        createdAt: "2026-08-25T12:01:00.000Z",
+        action: "platform.super_admin.impersonation_permission.updated",
+        referring: "platform_user",
+        referringId: target.id,
+        actorPlatformUserId: identity.id,
+        actorPlatformUserName: identity.name,
+        changes: { can_impersonate: { from: before, to: target.can_impersonate } },
+      });
+    }
+    return reply(response, 200, target);
+  }
   if (url.pathname === "/platform/organizations" && request.method === "GET") {
     const search = (url.searchParams.get("search") ?? "").toLowerCase();
     const filtered = organizations.filter((item) =>
@@ -206,6 +284,77 @@ const upstream = createServer(async (request, response) => {
       total: 26,
       page: requestedPage,
       pageSize: 25,
+    });
+  }
+  const impersonationMatch = url.pathname.match(
+    /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)\/impersonate$/,
+  );
+  const impersonationOrganization =
+    impersonationMatch && organizations.find((item) => item.id === impersonationMatch[1]);
+  const impersonationTarget =
+    impersonationMatch &&
+    usersForOrganization(impersonationMatch[1]).find((item) => item.id === impersonationMatch[2]);
+  if (impersonationMatch && request.method === "POST") {
+    assert.equal(request.headers["x-csrf-token"], csrf);
+    assert.equal(request.headers.authorization, undefined);
+    if (!impersonationOrganization || !impersonationTarget) {
+      return reply(response, 404, "Usuário não encontrado no tenant.");
+    }
+    if (impersonationTarget.status !== "active") return reply(response, 403, "Usuário inativo.");
+    impersonationStarted = true;
+    recordAuditEvent(impersonationOrganization.id, "platform.impersonation.started", impersonationTarget.id, {
+      operator_platform_user_id: { from: null, to: identity.id },
+      target_user_id: { from: null, to: impersonationTarget.id },
+    });
+    response.writeHead(200, {
+      "content-type": "application/json",
+      "set-cookie": [
+        `cw.session=impersonated-session-${impersonationTarget.id}; Max-Age=3600; Path=/; HttpOnly; SameSite=Lax`,
+        `cw.csrf=${"B".repeat(43)}; Max-Age=3600; Path=/; SameSite=Lax`,
+      ],
+    });
+    response.end(JSON.stringify({
+      success: true,
+      data: {
+        id: impersonationTarget.id,
+        name: impersonationTarget.name,
+        login: impersonationTarget.login,
+        organization_id: impersonationOrganization.id,
+        permission: impersonationTarget.permission ?? 1,
+        modules: { rh: 1, fiscal: 2 },
+      },
+    }));
+    return;
+  }
+  if (url.pathname === "/dashboard/stats" && impersonationStarted) {
+    return reply(response, 200, {
+      updatedAt: null,
+      totalClients: 0,
+      clientsByService: {
+        contabil: 0,
+        fiscal: 0,
+        pessoal: 0,
+        infoproduto: 0,
+        consultoria: 0,
+        castelo_med: 0,
+      },
+      monthlyTrends: [],
+      financial: { paidCertificateReceipts: 0, unpaidCertificates: 0, monthlyPaidCertificateReceipts: [] },
+      commercial: {
+        activeProspects: 0,
+        closedThisMonth: 0,
+        byStatus: [],
+        billing: { pending: 0, contracted: 0, notContracted: 0 },
+      },
+      departments: [],
+      recentClients: [],
+      insights: [],
+      tasks: { today: 0, completedToday: 0, pending: 0, urgent: 0 },
+      notifications: { total: 0, urgent: 0, pending: 0 },
+      projects: { active: 0, completed: 0, inProgress: 0, delayed: 0, waiting: 0 },
+      performance: [],
+      pendingTasks: [],
+      activities: [],
     });
   }
   const permissionsMatch = url.pathname.match(
@@ -295,7 +444,7 @@ const upstream = createServer(async (request, response) => {
     return reply(response, 201, createdUser);
   }
   const userMatch = url.pathname.match(
-    /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)(?:\/(reactivate))?$/,
+    /^\/platform\/organizations\/([^/]+)\/users\/([^/]+)(?:\/(reactivate|password-reset))?$/,
   );
   const selectedUser = userMatch && organizations.find((item) => item.id === userMatch[1]);
   const managedUser =
@@ -307,11 +456,15 @@ const upstream = createServer(async (request, response) => {
       assert.equal(request.headers["x-csrf-token"], csrf);
       assert.equal(request.headers.authorization, undefined);
       assert.equal(body.expected_version, managedUser.version);
-      if (Object.hasOwn(body, "password")) assert.equal(typeof body.password, "string");
+      assert.equal(Object.hasOwn(body, "password"), false, "admin não envia senha");
       if (forceUserVersionConflict) {
         forceUserVersionConflict = false;
         managedUser.version += 1;
-        return reply(response, 409, "Conflito de edição.");
+        return reply(
+          response,
+          409,
+          "Usuário foi alterado por outra edição. Recarregue e tente novamente.",
+        );
       }
       const previousName = managedUser.name;
       const previousLogin = managedUser.login;
@@ -335,6 +488,12 @@ const upstream = createServer(async (request, response) => {
         status: { from: "active", to: "inactive" },
       });
       return reply(response, 200, managedUser);
+    }
+    if (request.method === "POST" && userMatch[3] === "password-reset") {
+      assert.equal(request.headers["x-csrf-token"], csrf);
+      assert.equal(request.headers.authorization, undefined);
+      assert.deepEqual(body, { password: "senha-definida-pelo-ti" });
+      return reply(response, 200, { reset: true });
     }
     if (request.method === "POST" && userMatch[3] === "reactivate") {
       assert.equal(request.headers["x-csrf-token"], csrf);
@@ -498,8 +657,21 @@ try {
     { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport);
+    await context.addCookies([
+      {
+        name: "cw.session",
+        value: "opaque-local-test-session",
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax",
+      },
+      { name: "cw.csrf", value: csrf, url: baseUrl, sameSite: "Lax" },
+    ]);
     organizations.splice(0, organizations.length, organization, secondOrganization);
     platformUser.status = "active";
+    identity.can_impersonate = true;
+    platformSuperAdmins[1].can_impersonate = false;
+    impersonationStarted = false;
     platformUserPermissions = { rh: 1, fiscal: 1 };
     createdUser = null;
     createdUserOrganizationId = null;
@@ -513,6 +685,129 @@ try {
     requests.length = 0;
     await page.goto("/super-admin", { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
+    await page.getByRole("tab", { name: "Super admins", exact: true }).click();
+    await page.getByRole("cell", { name: "operador@example.test", exact: true }).waitFor();
+    await page.getByText("Pode personificar", { exact: true }).waitFor();
+    await page.getByText("Não pode personificar", { exact: true }).waitFor();
+    const ownSuperAdminRow = page.getByRole("row", { name: /operador@example\.test/ });
+    assert.equal(await ownSuperAdminRow.getByRole("switch").isDisabled(), true);
+    const targetSuperAdminRow = page.getByRole("row", { name: /Administradora sem permissão/ });
+    const targetPermissionSwitch = targetSuperAdminRow.getByRole("switch");
+    assert.equal(await targetPermissionSwitch.getAttribute("aria-checked"), "false");
+    await targetPermissionSwitch.click();
+    const revokePermissionSwitch = targetSuperAdminRow.getByRole("switch", {
+      name: /Revogar permissão/,
+    });
+    await revokePermissionSwitch.waitFor();
+    assert.equal(await revokePermissionSwitch.getAttribute("aria-checked"), "true");
+    await revokePermissionSwitch.click();
+    const grantPermissionSwitch = targetSuperAdminRow.getByRole("switch", {
+      name: /Conceder permissão/,
+    });
+    await grantPermissionSwitch.waitFor();
+    assert.equal(await grantPermissionSwitch.getAttribute("aria-checked"), "false");
+    assert.ok(
+      requests.filter(
+        (request) =>
+          request.method === "PATCH" &&
+          request.path.endsWith("/impersonation-permission") &&
+          request.csrfHeader === csrf,
+      ).length >= 2,
+    );
+    assert.ok(
+      auditEvents.some(
+        (event) =>
+          event.action === "platform.super_admin.impersonation_permission.updated" &&
+          event.actorPlatformUserId === identity.id &&
+          event.referringId === platformSuperAdmins[1].id,
+      ),
+    );
+    auditEvents.length = 0;
+    assert.ok(
+      requests.some(
+        (request) => request.method === "GET" && request.path === "/platform/super-admins",
+      ),
+    );
+    await page.getByRole("tab", { name: "Super admins", exact: true }).focus();
+    await page.keyboard.press("ArrowRight");
+    assert.equal(
+      await page.getByRole("tab", { name: "Auditoria", exact: true }).getAttribute("aria-selected"),
+      "true",
+    );
+    await page.getByRole("tab", { name: "Auditoria", exact: true }).focus();
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(
+      await page
+        .getByRole("tab", { name: "Super admins", exact: true })
+        .getAttribute("aria-selected"),
+      "true",
+    );
+    if (screenshotDirectory) {
+      await mkdir(screenshotDirectory, { recursive: true });
+      await page.screenshot({
+        path: join(
+          screenshotDirectory,
+          viewport.width > 1000
+            ? "issue-1278-super-admins.png"
+            : "issue-1278-super-admins-mobile.png",
+        ),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const table = page.getByRole("table");
+    await table.waitFor();
+    const tableScroller = table.locator("..");
+    const tableDimensions = await tableScroller.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    assert.ok(
+      tableDimensions.scrollWidth > tableDimensions.clientWidth,
+      "Tabela deve manter rolagem horizontal local em telas estreitas",
+    );
+    await tableScroller.evaluate((element) => {
+      element.scrollLeft = 100;
+    });
+    assert.ok(await tableScroller.evaluate((element) => element.scrollLeft > 0));
+    await tableScroller.evaluate((element) => {
+      element.scrollLeft = 0;
+    });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      ),
+      false,
+    );
+    if (screenshotDirectory) {
+      await page.screenshot({
+        path: join(screenshotDirectory, "issue-1278-super-admins-mobile.png"),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
+    await page.setViewportSize(viewport);
+    await page.getByRole("tab", { name: "Usuários", exact: true }).click();
+    await page.getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ }).waitFor();
+    await page.getByRole("button", { name: "Personificar", exact: true }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Personificar", exact: true }).count(), 1);
+    identity.can_impersonate = false;
+    await page.reload({ waitUntil: "networkidle" });
+    await page.getByRole("tab", { name: "Super admins", exact: true }).click();
+    assert.equal(
+      await page
+        .getByRole("row", { name: /Administradora sem permissão/ })
+        .getByRole("switch")
+        .isDisabled(),
+      true,
+    );
+    await page.getByRole("tab", { name: "Usuários", exact: true }).click();
+    await page.getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Personificar", exact: true }).count(), 0);
+    identity.can_impersonate = true;
+    await page.reload({ waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
 
     if (process.env.SUPER_ADMIN_DETAIL_CASE !== "failed") {
       let releaseDetail;
@@ -524,7 +819,7 @@ try {
       try {
         await page.getByRole("button", { name: /Organização Horizonte/ }).click();
         await page.getByText("Carregando detalhes da organização...", { exact: true }).waitFor();
-        await page.getByRole("button", { name: "Auditoria", exact: true }).click();
+        await page.getByRole("tab", { name: "Auditoria", exact: true }).click();
         assert.equal(
           await page.getByText("Carregando detalhes da organização...", { exact: true }).count(),
           1,
@@ -559,7 +854,7 @@ try {
     await page
       .getByText("Não foi possível carregar os detalhes da organização.", { exact: true })
       .waitFor();
-    await page.getByRole("button", { name: "Auditoria", exact: true }).click();
+    await page.getByRole("tab", { name: "Auditoria", exact: true }).click();
     assert.equal(
       await page
         .getByText("Não foi possível carregar os detalhes da organização.", { exact: true })
@@ -579,7 +874,7 @@ try {
     failedDetailId = null;
     await page.getByRole("button", { name: "Tentar novamente", exact: true }).click();
     await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
-    await page.getByRole("button", { name: "Visão geral", exact: true }).click();
+    await page.getByRole("tab", { name: "Visão geral", exact: true }).click();
     await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
     console.log(`PASS ${viewport.width}px detalhe atrasado/falho não consulta auditoria global`);
     const directory = page
@@ -605,7 +900,7 @@ try {
       );
     }
     assert.equal(await page.getByRole("link", { name: "Super Admin", exact: true }).count(), 1);
-    await page.getByRole("button", { name: "Usuários", exact: true }).click();
+    await page.getByRole("tab", { name: "Usuários", exact: true }).click();
     await page
       .getByRole("button", { name: /Pessoa de teste pessoa@example\.test/ })
       .waitFor();
@@ -703,21 +998,32 @@ try {
     forceUserVersionConflict = true;
     await userDetails.getByRole("button", { name: "Salvar alterações", exact: true }).click();
     await userDetails
-      .getByText(
-        "Este usuário foi alterado por outra pessoa. Recarregue o estado atual antes de salvar.",
-      )
+      .getByText("Usuário foi alterado por outra edição. Recarregue e tente novamente.")
       .waitFor();
     await userDetails.getByRole("button", { name: "Recarregar", exact: true }).click();
     await page.getByRole("button", { name: "Editar dados", exact: true }).waitFor();
     await page.getByRole("button", { name: "Editar dados", exact: true }).click();
     await userDetails.getByLabel("Nome", { exact: true }).fill("Usuário homologado editado");
-    await userDetails.getByLabel("Nova senha", { exact: true }).fill("OutraSenha!2026");
+    assert.equal(await userDetails.getByLabel("Nova senha", { exact: true }).count(), 0);
+    await userDetails.getByRole("button", { name: "Redefinir senha", exact: true }).click();
+    const resetDialog = page.getByRole("dialog", { name: "Redefinir senha", exact: true });
+    await resetDialog.getByLabel("Nova senha", { exact: true }).fill("senha-definida-pelo-ti");
+    await resetDialog
+      .getByLabel("Confirmar nova senha", { exact: true })
+      .fill("senha-definida-pelo-ti");
+    await resetDialog.getByRole("button", { name: "Redefinir senha", exact: true }).click();
+    await page
+      .getByText("Senha redefinida. O usuário foi desconectado.", { exact: true })
+      .waitFor();
+    assert.ok(
+      requests.some(
+        (request) =>
+          request.method === "POST" &&
+          request.path ===
+            `/platform/organizations/${organization.id}/users/user-safe-created/password-reset`,
+      ),
+    );
     await userDetails.getByRole("button", { name: "Salvar alterações", exact: true }).click();
-    const passwordDialog = page.getByRole("dialog", {
-      name: "Confirmar alteração de senha",
-      exact: true,
-    });
-    await passwordDialog.getByRole("button", { name: "Alterar senha", exact: true }).click();
     await page.getByRole("heading", { name: "Usuário homologado editado", exact: true }).waitFor();
     assert.ok(
       requests.some(
@@ -865,6 +1171,10 @@ try {
     }
     await deactivateDialog.waitFor({ state: "hidden" });
     await page.getByText("Inativo", { exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "Personificar", exact: true }).isDisabled(),
+      true,
+    );
     await page.waitForFunction(
       () => document.activeElement?.textContent?.trim() === "Reativar usuário",
       null,
@@ -883,6 +1193,10 @@ try {
     await reactivateDialog.getByRole("button", { name: "Reativar usuário", exact: true }).click();
     await reactivateDialog.waitFor({ state: "hidden" });
     await page.getByRole("button", { name: "Desativar usuário", exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "Personificar", exact: true }).isEnabled(),
+      true,
+    );
     assert.ok(
       requests.some(
         (request) =>
@@ -898,7 +1212,7 @@ try {
             `/platform/organizations/${organization.id}/users/${platformUser.id}/reactivate`,
       ),
     );
-    await page.getByRole("button", { name: "Auditoria", exact: true }).click();
+    await page.getByRole("tab", { name: "Auditoria", exact: true }).click();
     await page.getByText("Plano: Trial → Pro", { exact: true }).waitFor();
     const auditContent = page.locator('[aria-labelledby="platform-audit-title"] [aria-busy]');
     const auditDimensions = await auditContent.evaluate((element) => ({
@@ -1330,6 +1644,50 @@ try {
       });
     }
     console.log(`PASS ${viewport.width}px fluxos completos, foco/Tab/Escape nos dois diálogos`);
+    if (viewport.width > 1000) {
+      await page.getByRole("button", { name: /Organização Aurora/ }).click();
+      await page.getByRole("heading", { name: organization.name, exact: true }).waitFor();
+      await page.getByRole("tab", { name: "Usuários", exact: true }).click();
+      await page.getByRole("button", { name: /pessoa@example\.test/ }).click();
+      await page.getByRole("button", { name: "Personificar", exact: true }).click();
+      const impersonationDialog = page.getByRole("dialog", {
+        name: "Confirmar personificação",
+        exact: true,
+      });
+      await impersonationDialog.getByText(platformUser.name, { exact: false }).last().waitFor();
+      await impersonationDialog.getByText(organization.name, { exact: false }).last().waitFor();
+      if (screenshotDirectory) {
+        await mkdir(screenshotDirectory, { recursive: true });
+        await settleLayout();
+        await page.screenshot({
+          path: join(screenshotDirectory, "issue-1282-impersonation-confirmation-desktop.png"),
+        });
+      }
+      const impersonationResponse = page.waitForResponse((response) =>
+        response.url().includes(
+          `/platform/organizations/${organization.id}/users/${platformUser.id}/impersonate`,
+        ),
+      );
+      await impersonationDialog
+        .getByRole("button", { name: "Iniciar personificação", exact: true })
+        .click();
+      assert.equal((await impersonationResponse).status(), 200);
+      await page.waitForURL((url) => url.pathname === "/dashboard");
+      await page.getByRole("link", { name: "RH", exact: true }).waitFor();
+      const impersonationRequest = requests.find(
+        (request) =>
+          request.path ===
+          `/platform/organizations/${organization.id}/users/${platformUser.id}/impersonate`,
+      );
+      assert.equal(impersonationRequest.method, "POST");
+      assert.equal(impersonationRequest.csrfHeader, csrf);
+      assert.equal(impersonationRequest.authorization, undefined);
+      const impersonatedMeRequest = requests.find(
+        (request) => request.path === "/user/me" && request.cookie?.includes("impersonated-session"),
+      );
+      assert.match(impersonatedMeRequest?.cookie ?? "", /cw\.session=impersonated-session/);
+      console.log("PASS personificação confirma usuário/organização e abre o dashboard com módulo RH");
+    }
   }
   await page.evaluate(() => {
     localStorage.setItem("workspace-theme", "dark");
@@ -1370,6 +1728,52 @@ try {
   );
   console.error("PAGE_ERRORS", pageErrors);
   console.error("CONSOLE_ERRORS", consoleErrors);
+  console.error(
+    "HORIZONTAL_OVERFLOW",
+    await page
+      ?.evaluate(() => {
+        const width = document.documentElement.clientWidth;
+        return {
+          width,
+          scrollWidth: document.documentElement.scrollWidth,
+          ancestors: (() => {
+            const elements = [];
+            let element = document.querySelector("table");
+            while (element && elements.length < 12) {
+              const style = getComputedStyle(element);
+              const rect = element.getBoundingClientRect();
+              elements.push({
+                tag: element.tagName,
+                className: typeof element.className === "string" ? element.className : "",
+                left: Math.round(rect.left),
+                right: Math.round(rect.right),
+                width: Math.round(rect.width),
+                minWidth: style.minWidth,
+                overflowX: style.overflowX,
+                display: style.display,
+                gridTemplateColumns: style.gridTemplateColumns,
+              });
+              element = element.parentElement;
+            }
+            return elements;
+          })(),
+          elements: Array.from(document.querySelectorAll("body *"))
+            .map((element) => {
+              const rect = element.getBoundingClientRect();
+              return {
+                tag: element.tagName,
+                className: typeof element.className === "string" ? element.className : "",
+                right: Math.round(rect.right),
+                width: Math.round(rect.width),
+                overflowX: getComputedStyle(element).overflowX,
+              };
+            })
+            .filter((element) => element.right > width + 1)
+            .slice(0, 12),
+        };
+      })
+      .catch(() => null),
+  );
   console.error(
     "API_REQUESTS",
     requests.map((request) => `${request.method} ${request.path}?${request.query}`),

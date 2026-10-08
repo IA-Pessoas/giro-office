@@ -84,6 +84,7 @@ export function buildIntegracaoTaskListParams(params: IntegracaoTaskListParams) 
     search: params.search ?? "",
     ...(params.clientId !== undefined ? { client_id: params.clientId } : {}),
     ...(params.assignment ? { assignment: params.assignment } : {}),
+    ...(params.uniqueServiceReleased ? { unique_service_released: true } : {}),
     page: params.page ?? 1,
     limit: params.limit ?? 20,
   };
@@ -94,7 +95,7 @@ export function buildCreateIntegracaoTaskPayload(payload: CreateIntegracaoTaskBo
     model_id: payload.model_id,
     project_id: payload.project_id,
     client_id: payload.client_id,
-    prospecting_status: payload.prospecting_status,
+    ...(payload.prospecting_status ? { prospecting_status: payload.prospecting_status } : {}),
     ...(payload.name ? { name: payload.name } : {}),
     ...(payload.status ? { status: payload.status } : {}),
     department_id: payload.department_id,

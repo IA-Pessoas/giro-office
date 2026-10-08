@@ -10,13 +10,18 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import { integracaoTaskCreateBodySchema } from "../schemas/integracaoTaskCreate.schema.js";
 import { integracaoTaskUpdateBodySchema } from "../schemas/integracaoTaskUpdate.schema.js";
 import { taskListQuerySchema } from "../schemas/taskList.schemas.js";
 import { TaskCrudService } from "../services/taskCrudService.js";
 
 const router: ReturnType<typeof Router> = Router();
-const taskCrudService = new TaskCrudService();
+const taskCrudService = new TaskCrudService(
+  nodeDeps.prisma,
+  nodeDeps.audit,
+  nodeDeps.projectProgress,
+);
 
 router.post("/", isAuthenticated, async (req: Request, res: Response, next: NextFunction) => {
   try {

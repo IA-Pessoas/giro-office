@@ -4,9 +4,11 @@ import type { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { createCertificateFileCrypto } from "../services/certificateFileCrypto.js";
+import { createCertificatePasswordCrypto } from "../services/certificatePasswordCrypto.js";
 import { CertificatePjService as CertificatePjServiceBase } from "../services/certificatePjService.js";
 import {
   certificateOrganizationId,
+  certificateTestFile,
   certificateUserId,
   createCertificatePasswordCryptoForTest,
 } from "./testUtils.js";
@@ -134,6 +136,7 @@ describe("CertificatePjService", () => {
       page: 2,
       page_size: 25,
       has_more: true,
+      summary: { expired: 51, expiring_30_days: 51, with_certificate: 51 },
     });
     expect(result.items[0]).not.toHaveProperty("password");
     expect(result.items[0]).not.toHaveProperty("file_path");
@@ -194,7 +197,32 @@ describe("CertificatePjService", () => {
     ).resolves.toMatchObject({ password: "senha-segura" });
   });
 
-  it("does not return an invalid persisted password envelope", async () => {
+  it("flags a password encrypted with an unknown key without exposing it", async () => {
+    const crypto = createCertificatePasswordCryptoForTest();
+    const otherCrypto = createCertificatePasswordCrypto({
+      keyBase64: Buffer.alloc(32, 5).toString("base64"),
+      keyVersion: "v1",
+    });
+    const prisma = {
+      certificatePJ: {
+        findFirst: vi.fn(async () =>
+          createCertificatePjRecord({ password: otherCrypto.encrypt("senha-legada") }),
+        ),
+      },
+    };
+    const service = new CertificatePjServiceBase(prisma as never, undefined, crypto);
+
+    const result = await service.getCertificatePj({
+      id: certificateId,
+      organizationId: certificateOrganizationId,
+      canViewPassword: true,
+    });
+
+    expect(result).toMatchObject({ id: certificateId, password_unavailable: true });
+    expect(result).not.toHaveProperty("password");
+  });
+
+  it("flags an undecryptable password instead of failing the detail read", async () => {
     const crypto = createCertificatePasswordCryptoForTest();
     const prisma = {
       certificatePJ: {
@@ -209,14 +237,14 @@ describe("CertificatePjService", () => {
         organizationId: certificateOrganizationId,
         canViewPassword: true,
       }),
-    ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
+    ).resolves.toMatchObject({ password_unavailable: true });
   });
 
   it.each([
     " []",
     ' "senha"',
     '  {"v":"v1"}',
-  ])("fails closed for persisted JSON that is not an envelope: %s", async (password) => {
+  ])("flags persisted JSON that is not an envelope as unavailable: %s", async (password) => {
     const crypto = createCertificatePasswordCryptoForTest();
     const prisma = {
       certificatePJ: {
@@ -232,7 +260,7 @@ describe("CertificatePjService", () => {
         organizationId: certificateOrganizationId,
         canViewPassword: true,
       }),
-    ).rejects.toMatchObject({ statusCode: 500 } satisfies Partial<ServiceError>);
+    ).resolves.toMatchObject({ password_unavailable: true });
     expect(prisma.certificatePJ.update).not.toHaveBeenCalled();
   });
 
@@ -652,7 +680,7 @@ describe("CertificatePjService", () => {
       storageProvider: "local",
       storageBucket: "Certificados",
     });
-    const originalBuffer = Buffer.from("certificate-pj-bytes");
+    const originalBuffer = certificateTestFile;
 
     try {
       const result = await service.uploadCertificatePjFile({
@@ -705,7 +733,7 @@ describe("CertificatePjService", () => {
 
   it("downloadCertificatePjFile decrypts original bytes from tenant-scoped metadata", async () => {
     const { storage, crypto } = createCertificateFileDeps();
-    const originalBuffer = Buffer.from("certificate-pj-bytes");
+    const originalBuffer = certificateTestFile;
     const encrypted = crypto.encrypt(originalBuffer);
     const objectPath =
       "organizations/10000000-0000-4000-8000-000000000001/certificate-pj/20000000-0000-4000-8000-000000000001/file.pfx.enc";

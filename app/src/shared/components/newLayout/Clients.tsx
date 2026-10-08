@@ -1,12 +1,15 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { Building2, Plus, Search } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
 import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal";
+import { ClientGroupsPanel } from "@modules/clients/components/ClientGroupsPanel";
 import { useClients } from "@modules/clients/hooks/useClients";
 import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
 import { PaginationControls } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { DEFAULT_PAGE_SIZE } from "@shared/pagination/pagination";
 
 const CLIENTS_GRADIENT_ICON_CLASSNAME =
@@ -51,6 +54,7 @@ function formatCpfCnpj(value: string): string {
 }
 
 export function Clients() {
+  const router = useRouter();
   const { access: integracaoAccess } = useModuleAccess("integracao");
   const canCreateClient = integracaoAccess.canEdit;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -64,6 +68,7 @@ export function Clients() {
     () => ({
       search: deferredSearch.trim() || undefined,
       status: status || undefined,
+      legacyIntegrationStatusFilter: false,
       page,
       limit,
     }),
@@ -81,7 +86,11 @@ export function Clients() {
   return (
     <div className="space-y-6">
       {canCreateClient ? (
-        <ClientCreateModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+        <ClientCreateModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onCreated={(client) => void router.push(`/clients/${client.id}`)}
+        />
       ) : null}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -98,6 +107,7 @@ export function Clients() {
         </div>
 
         <div className="flex flex-wrap justify-end gap-3">
+          <Link href="/clients/coringa" className="inline-flex w-fit items-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-white dark:hover:bg-slate-800">Lista Coringa</Link>
           {canCreateClient ? (
             <>
               <Link
@@ -221,6 +231,7 @@ export function Clients() {
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
                         {formatCpfCnpj(client.cpf_cnpj)}
+                        <DocumentIssueBadge value={client.cpf_cnpj} />
                       </td>
                       <td className="px-6 py-4">
                         <span
@@ -262,6 +273,8 @@ export function Clients() {
           onLast={() => setPage(pageCount)}
         />
       </section>
+
+      <ClientGroupsPanel canEdit={integracaoAccess.canEdit} />
     </div>
   );
 }

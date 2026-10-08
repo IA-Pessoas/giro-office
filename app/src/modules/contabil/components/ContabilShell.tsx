@@ -9,8 +9,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { useContabilControlPortfolio } from "../hooks";
 import { ContabilControlSection } from "./ContabilControlSection";
+import { CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
+import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilPortfolioSection } from "./ContabilPortfolioSection";
+import { ContabilResponsiblePortfolioSection } from "./ContabilResponsiblePortfolioSection";
 import { ContabilResponsibleSection } from "./ContabilResponsibleSection";
 import { ContabilRelationshipSection } from "./ContabilRelationshipSection";
 import { ContabilStateBox } from "./ContabilStateBox";
@@ -34,6 +38,8 @@ export function ContabilShell({
   headerAction,
 }: ContabilShellProps) {
   const [activeTab, setActiveTab] = useState<ContabilTabId>(defaultTab ?? "control");
+  // Sem cliente na rota, Relacionamento e Documentos usam a empresa escolhida aqui.
+  const [pickedClientId, setPickedClientId] = useState("");
   const hasClient = Boolean(clientId);
   const contabilTabs: Array<{
     icon: LucideIcon;
@@ -119,9 +125,50 @@ export function ContabilShell({
           activeTab={activeTab}
           clientId={clientId}
           canEdit={canEdit}
+          pickedClientId={pickedClientId}
+          onPickClient={setPickedClientId}
         />
       </div>
     </div>
+  );
+}
+
+function ContabilClientSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (clientId: string) => void;
+}) {
+  const [competence] = useState(getCurrentContabilCompetence);
+  const portfolioQuery = useContabilControlPortfolio(competence);
+  const companies = [...(portfolioQuery.data?.items ?? [])].sort((left, right) =>
+    left.legal_name.localeCompare(right.legal_name, "pt-BR"),
+  );
+
+  return (
+    <label className="flex flex-col gap-2 text-sm font-medium text-gray-700 dark:text-slate-300 sm:flex-row sm:items-center">
+      Empresa
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={portfolioQuery.isLoading}
+        className={`${CONTABIL_SELECT_CLASS} w-full sm:w-96`}
+      >
+        <option value="">
+          {portfolioQuery.isLoading
+            ? "Carregando empresas..."
+            : portfolioQuery.isError
+              ? "Não foi possível carregar as empresas"
+              : "Selecione uma empresa"}
+        </option>
+        {companies.map((company) => (
+          <option key={company.client_id} value={company.client_id}>
+            {company.legal_name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -129,16 +176,32 @@ function ContabilActiveTabPanel({
   activeTab,
   clientId,
   canEdit,
+  pickedClientId,
+  onPickClient,
 }: {
   activeTab: ContabilTabId;
   clientId?: string;
   canEdit: boolean;
+  pickedClientId: string;
+  onPickClient: (clientId: string) => void;
 }) {
   if (!clientId) {
     if (activeTab === "control") {
       return (
         <div role="tabpanel" id="contabil-panel-control" aria-labelledby="contabil-tab-control">
-          <ContabilPortfolioSection />
+          <ContabilPortfolioSection canEdit={canEdit} />
+        </div>
+      );
+    }
+
+    if (activeTab === "responsible") {
+      return (
+        <div
+          role="tabpanel"
+          id="contabil-panel-responsible"
+          aria-labelledby="contabil-tab-responsible"
+        >
+          <ContabilResponsiblePortfolioSection canEdit={canEdit} />
         </div>
       );
     }
@@ -149,9 +212,20 @@ function ContabilActiveTabPanel({
         id={`contabil-panel-${activeTab}`}
         aria-labelledby={`contabil-tab-${activeTab}`}
       >
-        <ContabilStateBox icon={Calculator} title="Selecione um cliente para começar">
-          Escolha um cliente na aba Cliente para abrir o controle mensal e os cadastros contábeis deste fluxo.
-        </ContabilStateBox>
+        <div className="space-y-4">
+          <ContabilClientSelect value={pickedClientId} onChange={onPickClient} />
+          {pickedClientId ? (
+            activeTab === "documents" ? (
+              <TriageDocumentsSection clientId={pickedClientId} canEdit={canEdit} canEditClosing={canEdit} />
+            ) : (
+              <ContabilRelationshipSection clientId={pickedClientId} canEdit={canEdit} />
+            )
+          ) : (
+            <ContabilStateBox icon={Calculator} title="Selecione uma empresa para começar">
+              Escolha a empresa acima para abrir o {activeTab === "documents" ? "controle de documentos" : "relacionamento contábil"}.
+            </ContabilStateBox>
+          )}
+        </div>
       </div>
     );
   }

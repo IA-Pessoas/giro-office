@@ -159,6 +159,7 @@ export interface UpdateProjectData {
   start_date: string;
   end_date: string;
   objective: string;
+  status?: string;
 }
 
 export interface DeleteProjectData {
@@ -198,4 +199,5 @@ export interface ProjectFormValues {
   start_date: string;
   end_date: string;
   objective: string;
+  status: string;
 }

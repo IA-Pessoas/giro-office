@@ -6,14 +6,14 @@ import type {
   UpdateClientPayload,
 } from "../types";
 
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+import { normalizeCnpjInput } from "../../../shared/utils/inputFormatting.ts";
+
 import { normalizeDocumentValue } from "./documentValidation.ts";
 import { mapClientStatusFromApi, mapClientStatusToApi } from "./statusMapper.ts";
 
-export const CLIENT_TAX_REGIME_OPTIONS = [
-  "Simples Nacional",
-  "Lucro Presumido",
-  "Lucro Real",
-] as const satisfies readonly ClientTaxRegime[];
+// Fonte única com Regularize e Fiscal (TAX_REGIME_OPTIONS em shared/src/regularize/guidance.ts).
+export const CLIENT_TAX_REGIME_OPTIONS = TAX_REGIME_OPTIONS satisfies readonly ClientTaxRegime[];
 
 function isClientTaxRegime(value: string | null | undefined): value is ClientTaxRegime {
   return CLIENT_TAX_REGIME_OPTIONS.includes(value as ClientTaxRegime);
@@ -23,8 +23,15 @@ function normalizeTaxRegime(value: ClientTaxRegime | ""): ClientTaxRegime | null
   return value || null;
 }
 
-function getClientTaxRegime(value: string | null | undefined): ClientTaxRegime | "" {
+export function getClientTaxRegime(value: string | null | undefined): ClientTaxRegime | "" {
   return isClientTaxRegime(value) ? value : "";
+}
+
+function normalizeClientDocumentValue(
+  value: string | null | undefined,
+  type: ClientFormValues["type"],
+): string {
+  return type === "PJ" ? normalizeCnpjInput(value) : normalizeDocumentValue(value);
 }
 
 export function createClientFormInitialValues(client?: Partial<Client>): ClientFormValues {
@@ -34,10 +41,30 @@ export function createClientFormInitialValues(client?: Partial<Client>): ClientF
     company_name: client?.company_name ?? "",
     fantasy_name: client?.fantasy_name ?? "",
     cpf_cnpj: client?.cpf_cnpj ?? "",
-    status: mapClientStatusFromApi(client?.status),
+    status: client?.status ? mapClientStatusFromApi(client.status) : "Ativo",
     regime: getClientTaxRegime(client?.regime),
     service_unique: client?.service_unique ?? false,
+    address: client?.address ?? "",
+    cep: client?.cep ?? "",
+    neighborhood: client?.neighborhood ?? "",
+    state: client?.state ?? "",
+    city: client?.city ?? "",
   };
+}
+
+export function getClientInternalName(values: {
+  type?: "PJ" | "PF";
+  name: string;
+  company_name: string;
+  fantasy_name: string;
+}): string {
+  const name = values.name.trim();
+
+  if (name || values.type !== "PJ") {
+    return name;
+  }
+
+  return values.company_name.trim() || values.fantasy_name.trim();
 }
 
 export function buildCreateClientPayload(
@@ -47,14 +74,23 @@ export function buildCreateClientPayload(
   return {
     organization_id: organizationId,
     type: values.type ?? "PJ",
-    name: values.name.trim(),
+    name: getClientInternalName(values),
     company_name: values.company_name.trim() || null,
     fantasy_name: values.fantasy_name.trim() || null,
-    cpf_cnpj: normalizeDocumentValue(values.cpf_cnpj),
+    cpf_cnpj: normalizeClientDocumentValue(values.cpf_cnpj, values.type),
     status: mapClientStatusToApi(values.status),
     regime: normalizeTaxRegime(values.regime),
     service_unique: values.service_unique,
+    address: normalizeOptionalAddress(values.address),
+    cep: normalizeOptionalAddress(values.cep),
+    neighborhood: normalizeOptionalAddress(values.neighborhood),
+    state: normalizeOptionalAddress(values.state),
+    city: normalizeOptionalAddress(values.city),
   };
+}
+
+function normalizeOptionalAddress(value: string): string | null {
+  return value.trim() || null;
 }
 
 export function buildUpdateClientPayload(
@@ -65,12 +101,17 @@ export function buildUpdateClientPayload(
   const preservesLegacyRegime = regime === null && currentRegime && !isClientTaxRegime(currentRegime);
 
   return {
-    name: values.name.trim(),
+    name: getClientInternalName(values),
     company_name: values.company_name.trim() || null,
     fantasy_name: values.fantasy_name.trim() || null,
-    cpf_cnpj: normalizeDocumentValue(values.cpf_cnpj),
+    cpf_cnpj: normalizeClientDocumentValue(values.cpf_cnpj, values.type),
     status: mapClientStatusToApi(values.status),
     ...(preservesLegacyRegime ? {} : { regime }),
     service_unique: values.service_unique,
+    address: normalizeOptionalAddress(values.address),
+    cep: normalizeOptionalAddress(values.cep),
+    neighborhood: normalizeOptionalAddress(values.neighborhood),
+    state: normalizeOptionalAddress(values.state),
+    city: normalizeOptionalAddress(values.city),
   };
 }

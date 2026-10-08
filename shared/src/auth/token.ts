@@ -56,6 +56,10 @@ function normalizeAuthIdentity(payload: string | JwtPayload): AuthIdentity {
       typeof payload.csrf_hash === "string" && /^[a-f0-9]{64}$/u.test(payload.csrf_hash)
         ? payload.csrf_hash
         : undefined,
+    impersonator_platform_user_id:
+      typeof payload.impersonator_platform_user_id === "string"
+        ? payload.impersonator_platform_user_id
+        : undefined,
     type: normalizeAuthUserType(payload.type),
     auth_kind: normalizeAuthKind(payload.auth_kind),
     platform_role: normalizePlatformRole(payload.platform_role),

@@ -3,11 +3,12 @@ import { Search, UserRound } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ConfirmationDialog } from "@shared/components";
+import { ConfirmationDialog, PasswordResetButton } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { PaginationControls } from "@shared/components/ui/PaginationControls";
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { Input } from "@shared/ui/newLayout/input";
+import { useAuth } from "@/context/AuthContext";
 import { CreateUserModal } from "@modules/users/components/CreateUserModal";
 import { AdminPermissionsEditor } from "@modules/users/components/AdminPermissionsEditor";
 import type { AdminUserPermissionsDataSource } from "@modules/users/types/adminUserContracts";
@@ -22,6 +23,7 @@ import {
   usePlatformUsers,
 } from "../hooks/usePlatformUsers";
 import { platformService } from "../services/platformService";
+import { getPlatformErrorMessage } from "../utils/platformManagement";
 import type { PlatformOrganization, PlatformOrganizationUser } from "../types";
 import { OwnershipTransferDialog } from "./OwnershipTransferDialog";
 
@@ -41,9 +43,12 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [isOwnershipTransferOpen, setIsOwnershipTransferOpen] = useState(false);
+  const [isImpersonationOpen, setIsImpersonationOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<"deactivate" | "reactivate" | null>(null);
   const lifecycleActionRef = useRef<HTMLButtonElement>(null);
   const permissionActionRef = useRef<HTMLButtonElement>(null);
+  const impersonationActionRef = useRef<HTMLButtonElement>(null);
+  const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const usersQuery = usePlatformUsers(organization.id, {
@@ -60,10 +65,13 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
   const userLifecycleMutation = usePlatformUserLifecycleMutation();
   const ownershipTransferMutation = usePlatformOwnershipTransferMutation();
   const userUpdateMutation = usePlatformUserUpdateMutation();
+  const impersonationMutation = useMutation({
+    mutationFn: (userId: string) => platformService.startImpersonation(organization.id, userId),
+    onSuccess: () => window.location.assign("/"),
+  });
   const [editMode, setEditMode] = useState(false);
-  const [passwordConfirmationOpen, setPasswordConfirmationOpen] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ name: "", login: "", department_id: "", password: "" });
+  const [draft, setDraft] = useState({ name: "", login: "", department_id: "" });
   const departmentName = departmentsQuery.data?.find(
     (department) => department.id === userDetailQuery.data?.department_id,
   )?.name;
@@ -115,7 +123,6 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
       name: selectedUser.name,
       login: selectedUser.login,
       department_id: selectedUser.department_id,
-      password: "",
     });
     setEditMode(false);
     setEditError(null);
@@ -132,19 +139,19 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
           name: draft.name,
           login: draft.login,
           department_id: draft.department_id,
-          ...(draft.password.trim() ? { password: draft.password } : {}),
           expected_version: selectedUser.version,
         },
       });
       setEditMode(false);
     } catch (error) {
-      if (isAxiosError(error) && error.response?.status === 409) {
-        setEditError(
-          "Este usuário foi alterado por outra pessoa. Recarregue o estado atual antes de salvar.",
-        );
-        return;
-      }
-      setEditError("Não foi possível salvar as alterações do usuário.");
+      setEditError(
+        getPlatformErrorMessage(
+          error,
+          isAxiosError(error) && error.response?.status === 409
+            ? "Este usuário foi alterado por outra pessoa. Recarregue o estado atual antes de salvar."
+            : "Não foi possível salvar as alterações do usuário.",
+        ),
+      );
     }
   };
 
@@ -311,17 +318,13 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                         ))}
                       </select>
                     </label>
-                    <label className="block text-sm font-medium">
-                      Nova senha
-                      <Input
-                        autoComplete="new-password"
-                        type="password"
-                        value={draft.password}
-                        onChange={(event) =>
-                          setDraft({ ...draft, password: event.target.value })
-                        }
-                      />
-                    </label>
+                    <PasswordResetButton
+                      onSubmit={(password) =>
+                        platformService.resetPassword(organization.id, selectedUser.id, password)
+                      }
+                      className="rounded-lg border px-3 py-2 text-sm font-semibold"
+                      disabled={userUpdateMutation.isPending}
+                    />
                     <div className="flex gap-2">
                       <button
                         className={
@@ -329,11 +332,7 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                           "disabled:opacity-60"
                         }
                         disabled={userUpdateMutation.isPending}
-                        onClick={() =>
-                          draft.password.trim()
-                            ? setPasswordConfirmationOpen(true)
-                            : void saveUser()
-                        }
+                        onClick={() => void saveUser()}
                         type="button"
                       >
                         Salvar alterações
@@ -387,6 +386,27 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
                 >
                   Editar permissões
                 </button>
+                {currentUser?.can_impersonate ? (
+                  <>
+                    <button
+                      ref={impersonationActionRef}
+                      aria-describedby={
+                        selectedUser.status !== "active" ? "impersonation-unavailable" : undefined
+                      }
+                      className="rounded-lg border border-amber-700 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-200 dark:hover:bg-amber-950/30"
+                      disabled={selectedUser.status !== "active"}
+                      onClick={() => setIsImpersonationOpen(true)}
+                      type="button"
+                    >
+                      Personificar
+                    </button>
+                    {selectedUser.status !== "active" ? (
+                      <p className="text-xs text-slate-500" id="impersonation-unavailable">
+                        Disponível somente para usuários ativos.
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
                 {selectedUser.status === "active" && selectedUser.type === "owner" ? (
                   <button
                     className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
@@ -493,18 +513,28 @@ export function PlatformUsersPanel({ organization }: { organization: PlatformOrg
       />
       <ConfirmationDialog
         cancelLabel="Cancelar"
-        confirmLabel="Alterar senha"
-        description="A nova senha revogará todas as sessões atuais deste usuário."
+        confirmLabel="Iniciar personificação"
+        description={`Você vai entrar como ${selectedUser?.name ?? "este usuário"} em ${organization.name}. Sua sessão de plataforma será encerrada e a sessão passará a usar as permissões dessa pessoa.`}
         errorMessage={null}
-        isConfirming={userUpdateMutation.isPending}
+        isConfirming={impersonationMutation.isPending}
         onConfirm={async () => {
-          setPasswordConfirmationOpen(false);
-          await saveUser();
+          if (
+            !currentUser?.can_impersonate ||
+            !selectedUser ||
+            selectedUser.status !== "active"
+          ) {
+            return;
+          }
+          await impersonationMutation.mutateAsync(selectedUser.id);
         }}
-        onOpenChange={setPasswordConfirmationOpen}
-        open={passwordConfirmationOpen}
-        title="Confirmar alteração de senha"
-        variant="destructive"
+        onOpenChange={setIsImpersonationOpen}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          impersonationActionRef.current?.focus();
+        }}
+        open={isImpersonationOpen}
+        title="Confirmar personificação"
+        variant="neutral"
       />
       <OwnershipTransferDialog
         currentOwner={selectedUser?.type === "owner" && selectedUser.status === "active" ? selectedUser : null}

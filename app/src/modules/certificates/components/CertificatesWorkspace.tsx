@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import {
   Bell,
   CalendarClock,
@@ -24,6 +24,7 @@ import {
 import { useModuleAccess } from "@modules/auth";
 import { ConfirmationDialog, PaginationControls } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 import { formatCnpjInput, formatCpfInput } from "@shared/utils/inputFormatting";
 import {
   DEFAULT_CERTIFICATE_PAGE,
@@ -43,6 +44,7 @@ import {
   useUpdateCertificatePfMutation,
 } from "@modules/certificates/hooks";
 import type {
+  CertificateListSummary,
   CertificateNotification,
   CertificatePj,
   CertificatePf,
@@ -93,6 +95,7 @@ import {
   CERTIFICATE_SUMMARY_BAR_CLASSNAME,
   CERTIFICATE_SUMMARY_ITEM_CLASSNAME,
   type CertificateSortDirection,
+  formatCertificateDocument,
   formatDateBR,
   getExpirationTone,
   resolveCertificateWorkspaceCapabilities,
@@ -172,7 +175,6 @@ const CERTIFICATE_STATUS_FILTER_OPTIONS = [
 const ZERO = 0;
 const FIRST_PAGE = DEFAULT_CERTIFICATE_PAGE;
 const PAGE_SIZE = DEFAULT_CERTIFICATE_PAGE_SIZE;
-const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
 function parseBooleanFilterValue(value: string): boolean | undefined {
   if (value === "") {
@@ -190,37 +192,22 @@ function trimValue(value: string): string {
   return value.trim();
 }
 
-function buildStats(total: number, expiringInDays: number, expired: number, withCertificate: number) {
+function buildStats(total: number, summary: CertificateListSummary | undefined) {
   return [
     { label: "Total", value: total },
     {
       label: "Vencidos",
-      value: expired,
+      value: summary?.expired ?? ZERO,
     },
     {
       label: "Vencem em 30 dias",
-      value: expiringInDays,
+      value: summary?.expiring_30_days ?? ZERO,
     },
     {
       label: "Com arquivo",
-      value: withCertificate,
+      value: summary?.with_certificate ?? ZERO,
     },
   ];
-}
-
-function calcDaysUntil(date: string | null | undefined): number | null {
-  if (!date) {
-    return null;
-  }
-
-  const normalized = new Date(`${date.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(normalized.getTime())) {
-    return null;
-  }
-
-  const today = new Date();
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((normalized.getTime() - startOfToday.getTime()) / MILLISECONDS_IN_DAY);
 }
 
 function paymentAmountText(value: number | null | undefined): string {
@@ -550,53 +537,25 @@ export function CertificatesWorkspace() {
   const pfTotalPages = Math.max(FIRST_PAGE, Math.ceil(pfTotal / PAGE_SIZE));
   const notificationTotalPages = Math.max(FIRST_PAGE, Math.ceil(notificationTotal / PAGE_SIZE));
 
-  const pjStats = useMemo(() => {
-    const expired = pjItems.filter((item) => {
-      const days = calcDaysUntil(item.expiration_date);
-      return days !== null && days < ZERO;
-    }).length;
-    const dueSoon = pjItems.filter((item) => {
-      const days = calcDaysUntil(item.expiration_date);
-      return days !== null && days >= ZERO && days <= 30;
-    }).length;
-    const withCertificate = pjItems.filter((item) => item.has_certificate).length;
+  const pjStats = useMemo(
+    () => buildStats(pjTotal, pjListQuery.data?.summary),
+    [pjTotal, pjListQuery.data?.summary],
+  );
 
-    return buildStats(pjTotal, dueSoon, expired, withCertificate);
-  }, [pjItems, pjTotal]);
+  const pfStats = useMemo(
+    () => buildStats(pfTotal, pfListQuery.data?.summary),
+    [pfTotal, pfListQuery.data?.summary],
+  );
 
-  const pfStats = useMemo(() => {
-    const expired = pfItems.filter((item) => {
-      const days = calcDaysUntil(item.expiration_date);
-      return days !== null && days < ZERO;
-    }).length;
-    const dueSoon = pfItems.filter((item) => {
-      const days = calcDaysUntil(item.expiration_date);
-      return days !== null && days >= ZERO && days <= 30;
-    }).length;
-    const withCertificate = pfItems.filter((item) => item.has_certificate).length;
-
-    return buildStats(pfTotal, dueSoon, expired, withCertificate);
-  }, [pfItems, pfTotal]);
-
-  const notificationsStats = useMemo(() => {
-    const pjCount = notificationItems.filter((item) => item.type === "PJ").length;
-    const pfCount = notificationItems.filter((item) => item.type === "PF").length;
-
-    return [
-      {
-        label: "Total",
-        value: notificationTotal,
-      },
-      {
-        label: "PJ",
-        value: pjCount,
-      },
-      {
-        label: "PF",
-        value: pfCount,
-      },
-    ];
-  }, [notificationItems, notificationTotal]);
+  const notificationSummary = notificationsQuery.data?.summary;
+  const notificationsStats = useMemo(
+    () => [
+      { label: "Total", value: notificationTotal },
+      { label: "PJ", value: notificationSummary?.pj ?? ZERO },
+      { label: "PF", value: notificationSummary?.pf ?? ZERO },
+    ],
+    [notificationTotal, notificationSummary],
+  );
 
   const activeStats = activeTab === "pf" ? pfStats : activeTab === "pj" ? pjStats : notificationsStats;
   const activePage = activeTab === "pf" ? pfPage : activeTab === "pj" ? pjPage : notificationPage;
@@ -993,13 +952,13 @@ export function CertificatesWorkspace() {
     }
   }
 
-  function renderPasswordBlock(value: string | null | undefined) {
+  function renderPasswordBlock(value: string | null | undefined, unavailable?: boolean) {
     if (!value) {
       return (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
           <p className="text-xs text-slate-500 dark:text-slate-400">Senha</p>
           <p className="mt-1 font-semibold text-slate-900 dark:text-white">
-            Senha indisponível para seu nível de acesso
+            {unavailable ? "Senha indisponível" : "Senha indisponível para seu nível de acesso"}
           </p>
         </div>
       );
@@ -1556,9 +1515,18 @@ export function CertificatesWorkspace() {
                       >
                         <td className={CERTIFICATE_TABLE_NAME_CELL_CLASSNAME}>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.cnpj}</p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {formatCertificateDocument(item.cnpj)}
+                          </p>
+                          <DocumentIssueBadge value={item.cnpj} />
                         </td>
-                        <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>{item.responsible}</td>
+                        <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>
+                          {item.responsible}
+                          {/* Responsavel e nome, nao documento: so a mascara vira pendencia. */}
+                          {item.responsible.includes("*") ? (
+                            <DocumentIssueBadge value={item.responsible} />
+                          ) : null}
+                        </td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>{item.model}</td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>
                           <div className="space-y-1">
@@ -1688,11 +1656,17 @@ export function CertificatesWorkspace() {
                       >
                         <td className={CERTIFICATE_TABLE_NAME_CELL_CLASSNAME}>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.cpf}</p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {formatCertificateDocument(item.cpf)}
+                          </p>
+                          <DocumentIssueBadge value={item.cpf} />
                         </td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>
                           <p>{item.enterprise || "-"}</p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.cnpj || "-"}</p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {formatCertificateDocument(item.cnpj)}
+                          </p>
+                          <DocumentIssueBadge value={item.cnpj} />
                         </td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>{item.model}</td>
                         <td className={CERTIFICATE_TABLE_CELL_CLASSNAME}>
@@ -2020,7 +1994,7 @@ export function CertificatesWorkspace() {
                 </div>
                 <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
                   <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>CNPJ</p>
-                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{pjDetail?.cnpj ?? "-"}</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{formatCertificateDocument(pjDetail?.cnpj)}</p>
                 </div>
                 <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
                   <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Modelo</p>
@@ -2055,7 +2029,7 @@ export function CertificatesWorkspace() {
                 </div>
               </div>
 
-              {renderPasswordBlock(pjDetail?.password)}
+              {renderPasswordBlock(pjDetail?.password, pjDetail?.password_unavailable)}
 
               {pjDetail ? (
                 <CertificateFileActions
@@ -2116,7 +2090,7 @@ export function CertificatesWorkspace() {
                 </div>
                 <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
                   <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>CPF</p>
-                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{pfDetail?.cpf ?? "-"}</p>
+                  <p className={CERTIFICATE_DETAIL_VALUE_CLASSNAME}>{formatCertificateDocument(pfDetail?.cpf)}</p>
                 </div>
                 <div className={CERTIFICATE_DETAIL_CARD_CLASSNAME}>
                   <p className={CERTIFICATE_DETAIL_LABEL_CLASSNAME}>Modelo</p>
@@ -2149,7 +2123,7 @@ export function CertificatesWorkspace() {
                 </div>
               </div>
 
-              {renderPasswordBlock(pfDetail?.password)}
+              {renderPasswordBlock(pfDetail?.password, pfDetail?.password_unavailable)}
 
               {pfDetail ? (
                 <CertificateFileActions
@@ -2193,7 +2167,7 @@ export function CertificatesWorkspace() {
                 <span
                   className="inline-flex w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
                 >
-                  CNPJ da empresa: {pfDetail?.cnpj ?? "-"}
+                  CNPJ da empresa: {formatCertificateDocument(pfDetail?.cnpj)}
                 </span>
               </div>
             </div>

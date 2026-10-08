@@ -12,6 +12,7 @@ export interface CreateAdminUserHandler {
 export interface AdminUserDetailsDataSource {
   loadUser: (userId: string) => Promise<UserItem>;
   saveUser: (userId: string, payload: UpdateUserData) => Promise<UserItem>;
+  resetPassword: (userId: string, password: string) => Promise<void>;
 }
 
 export interface AdminUserPermissionsDataSource {

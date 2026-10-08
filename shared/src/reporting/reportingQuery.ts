@@ -1,3 +1,5 @@
+import { Buffer } from "node:buffer";
+
 import { z } from "zod";
 import { ServiceError } from "../http/errors.js";
 import { reportingAggregations } from "./reportingCapabilities.js";
@@ -69,7 +71,7 @@ export const reportingQuerySchema = z
         z
           .object({
             field: nameSchema,
-            function: z.enum(["count", "sum", "avg", "min", "max"], queryError),
+            function: z.enum(["count_rows", "count", "sum", "avg", "min", "max"], queryError),
             alias: nameSchema,
           })
           .strict("O critério contém propriedades não permitidas."),
@@ -91,7 +93,7 @@ export interface ReportingQuery {
   group_by?: readonly string[];
   aggregations?: readonly {
     field: string;
-    function: "count" | "sum" | "avg" | "min" | "max";
+    function: "count_rows" | "count" | "sum" | "avg" | "min" | "max";
     alias: string;
   }[];
 }
@@ -101,17 +103,86 @@ type ReportingResult = {
   reachedLimit: boolean;
 };
 
+type ReportingQueryCursorPage = ReportingResult & { nextCursor?: string };
+type ReportingQueryCursorLoader = {
+  loadPage: (
+    fields: readonly string[],
+    limit: number,
+    cursor?: string,
+  ) => Promise<ReportingQueryCursorPage>;
+};
+
 export const MAX_REPORTING_QUERY_ROWS = 50_000;
 export const MAX_REPORTING_QUERY_LIMIT = MAX_REPORTING_QUERY_ROWS + 1;
+export const MAX_REPORTING_QUERY_BYTES = 20 * 1024 * 1024;
+export const REPORTING_QUERY_PAGE_SIZE = 100;
+export const REPORTING_QUERY_ROW_LIMIT_CODE = "REPORTING_QUERY_ROW_LIMIT_EXCEEDED";
+export const REPORTING_QUERY_BYTE_LIMIT_CODE = "REPORTING_QUERY_BYTE_LIMIT_EXCEEDED";
+export const REPORTING_QUERY_ROW_LIMIT_MESSAGE = `O conjunto excede o limite global de ${MAX_REPORTING_QUERY_ROWS.toLocaleString("pt-BR")} linhas do relatório. Aplique filtros mais específicos e tente novamente.`;
+export const REPORTING_QUERY_BYTE_LIMIT_MESSAGE =
+  "O conjunto excede o limite global de bytes do relatório. Reduza os filtros ou as colunas e tente novamente.";
+
+export async function collectReportingRows(
+  loadPage: (limit: number, cursor?: string) => Promise<ReportingQueryCursorPage>,
+  stopAfterRows?: number,
+): Promise<ReportingResult> {
+  const rows: Record<string, unknown>[] = [];
+  let cursor: string | undefined;
+  let reachedLimit = false;
+  let bytes = 2;
+
+  while (stopAfterRows === undefined || rows.length < stopAfterRows) {
+    const pageLimit =
+      stopAfterRows === undefined
+        ? REPORTING_QUERY_PAGE_SIZE
+        : Math.min(REPORTING_QUERY_PAGE_SIZE, stopAfterRows - rows.length);
+    const page = await loadPage(pageLimit, cursor);
+    if (!page.rows.length && page.reachedLimit) {
+      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
+    }
+    for (const row of page.rows) {
+      bytes += (rows.length ? 1 : 0) + Buffer.byteLength(JSON.stringify(row), "utf8");
+      if (bytes > MAX_REPORTING_QUERY_BYTES) {
+        throw new ServiceError(
+          422,
+          REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
+          undefined,
+          REPORTING_QUERY_BYTE_LIMIT_CODE,
+        );
+      }
+      if (rows.length >= MAX_REPORTING_QUERY_ROWS) {
+        throw new ServiceError(
+          422,
+          REPORTING_QUERY_ROW_LIMIT_MESSAGE,
+          undefined,
+          REPORTING_QUERY_ROW_LIMIT_CODE,
+        );
+      }
+      rows.push(row);
+    }
+
+    reachedLimit = page.reachedLimit;
+    if (!page.reachedLimit || (stopAfterRows !== undefined && rows.length >= stopAfterRows)) break;
+    if (!page.nextCursor || page.nextCursor === cursor) {
+      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
+    }
+    cursor = page.nextCursor;
+  }
+
+  return { rows, reachedLimit };
+}
 
 export function reportingQueryFields(fields: readonly string[], query?: ReportingQuery): string[] {
+  const aliases = new Set((query?.aggregations ?? []).map((aggregation) => aggregation.alias));
   return [
     ...new Set([
       ...fields,
       ...(query?.filters ?? []).map((filter) => filter.field),
       ...(query?.group_by ?? []),
       ...(query?.aggregations ?? []).map((aggregation) => aggregation.field),
-      ...(query?.order_by ?? []).map((order) => order.field),
+      ...(query?.order_by ?? [])
+        .filter((order) => !aliases.has(order.field))
+        .map((order) => order.field),
     ]),
   ];
 }
@@ -159,7 +230,9 @@ function matchesFilter(actual: Scalar, operator: string, expected: Scalar | Scal
 
 export async function executeReportingQuery(
   input: { source: string; fields: readonly string[]; limit: number; query: ReportingQuery },
-  load: (fields: readonly string[], limit: number, offset: number) => Promise<ReportingResult>,
+  load:
+    | ((fields: readonly string[], limit: number, offset: number) => Promise<ReportingResult>)
+    | ReportingQueryCursorLoader,
 ): Promise<ReportingResult> {
   const parsed = reportingQuerySchema.safeParse(input.query);
   if (!parsed.success) throw new ServiceError(400, "Critérios de relatório inválidos.");
@@ -217,6 +290,7 @@ export async function executeReportingQuery(
   }
   for (const aggregation of aggregations) {
     if (
+      aggregation.function !== "count_rows" &&
       !reportingAggregations(metadata.get(aggregation.field)?.value_type ?? "").includes(
         aggregation.function,
       )
@@ -226,24 +300,22 @@ export async function executeReportingQuery(
   }
   if (
     (groupBy.length || aggregations.length) &&
-    orderBy.some((order) => !groupBy.includes(order.field))
+    orderBy.some((order) => !groupBy.includes(order.field) && !aliases.has(order.field))
   ) {
     throw new ServiceError(400, "Ordene o resumo somente pelos campos agrupados.");
   }
-  const completeRows: Record<string, unknown>[] = [];
-  let bytes = 0;
-  for (let offset = 0; ; offset += 100) {
-    const page = await load(fields, 100, offset);
-    if (!page.rows.length && page.reachedLimit)
-      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
-    for (const row of page.rows) {
-      bytes += Buffer.byteLength(JSON.stringify(row));
-      if (bytes > 20 * 1024 * 1024 || completeRows.length >= MAX_REPORTING_QUERY_ROWS)
-        throw new ServiceError(422, "O conjunto excede a capacidade de consulta do relatório.");
-      completeRows.push(row);
+  let offset = 0;
+  const { rows: completeRows } = await collectReportingRows(async (limit, cursor) => {
+    if (typeof load === "function") {
+      const page = await load(fields, limit, offset);
+      if (page.reachedLimit) offset += REPORTING_QUERY_PAGE_SIZE;
+      return {
+        ...page,
+        ...(page.reachedLimit ? { nextCursor: String(offset) } : {}),
+      };
     }
-    if (!page.reachedLimit) break;
-  }
+    return load.loadPage(fields, limit, cursor);
+  });
   const groups = input.query.filter_groups ?? [];
   const grouped = new Set(groups.flatMap((group) => group.filters));
   let rows = completeRows.filter((row) => {
@@ -302,24 +374,33 @@ export async function executeReportingQuery(
               }, values[0])
             : null;
         row[aggregation.alias] =
-          aggregation.function === "count"
-            ? values.length
-            : !values.length
-              ? null
-              : aggregation.function === "sum"
-                ? sum
-                : aggregation.function === "avg"
-                  ? sum / values.length
-                  : extreme;
+          aggregation.function === "count_rows"
+            ? bucket.length
+            : aggregation.function === "count"
+              ? values.length
+              : !values.length
+                ? null
+                : aggregation.function === "sum"
+                  ? sum
+                  : aggregation.function === "avg"
+                    ? sum / values.length
+                    : extreme;
       }
       return row;
     });
   }
   rows.sort((left, right) => {
     for (const order of orderBy) {
-      const type = metadata.get(order.field)?.value_type ?? "string";
+      const aggregation = aggregations.find((item) => item.alias === order.field);
+      const type = aggregation
+        ? aggregation.function === "min" || aggregation.function === "max"
+          ? (metadata.get(aggregation.field)?.value_type ?? "string")
+          : "number"
+        : (metadata.get(order.field)?.value_type ?? "string");
       const a = scalar(left[order.field], type);
       const b = scalar(right[order.field], type);
+      if (a === null && b !== null) return 1;
+      if (b === null && a !== null) return -1;
       const comparison = compare(a, b);
       if (comparison) return order.direction === "asc" ? comparison : -comparison;
     }

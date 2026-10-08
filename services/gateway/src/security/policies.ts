@@ -43,6 +43,8 @@ const certificateModulePolicy = createModulePolicy("certificado", moduleAccessPe
 const certificateEditPolicy = createModulePolicy("certificado", moduleEditPermission);
 const commercialModulePolicy = createModulePolicy("comercial", moduleAccessPermission);
 const commercialEditPolicy = createModulePolicy("comercial", moduleEditPermission);
+const marketingModulePolicy = createModulePolicy("marketing", moduleAccessPermission);
+const marketingEditPolicy = createModulePolicy("marketing", moduleEditPermission);
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
@@ -129,12 +131,9 @@ const integracaoNotificationPolicy: AuthPolicy = createModulePolicy("integracao"
  */
 const integracaoResponsibleTaskPolicy: AuthPolicy = createModulePolicy("integracao", 0);
 
-const integracaoClientPolicy: AuthPolicy = {
-  modulePermission: {
-    module: "integracao",
-    minPermission: moduleAccessPermission,
-  },
-};
+const integracaoClientPolicy = createModulePolicy("integracao", moduleAccessPermission);
+/** Mutações do cadastro de clientes exigem edição; o client-service ainda cobra 3 para desativar. */
+const integracaoClientEditPolicy = createModulePolicy("integracao", moduleEditPermission);
 
 const clientListPolicy: AuthPolicy = {
   anyOf: [
@@ -149,11 +148,13 @@ const clientListPolicy: AuthPolicy = {
 };
 
 const integracaoClientPath =
-  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/[^/]+)?\/?$/;
+  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/groups(?:\/[^/]+(?:\/clients)?)?|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /dashboard/stats", authenticatedPolicy],
   ["GET /client/list", clientListPolicy],
+  ["GET /client/coringa/list", clientListPolicy],
+  ["GET /client/coringa/pdf", clientListPolicy],
   ["GET /user/me", authenticatedPolicy],
   ["GET /rh/notifications", rhModulePolicy],
   ["PUT /rh/notifications/read", rhModulePolicy],
@@ -166,7 +167,9 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["POST /user", userManagementPolicy],
   ["POST /platform/session/refresh", platformOnlyPolicy],
   ["DELETE /platform/session", platformOnlyPolicy],
+  ["POST /platform/impersonation/exit", { special: "impersonationOnly" }],
   ["GET /platform/me", platformOnlyPolicy],
+  ["GET /platform/super-admins", platformOnlyPolicy],
   ["GET /platform/organizations", platformOnlyPolicy],
   ["POST /platform/organizations", platformOnlyPolicy],
   ["GET /platform/audit/requests", platformOnlyPolicy],
@@ -177,7 +180,8 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
-  { method: "ANY", path: integracaoClientPath, policy: integracaoClientPolicy },
+  { method: "GET", path: integracaoClientPath, policy: integracaoClientPolicy },
+  { method: "ANY", path: integracaoClientPath, policy: integracaoClientEditPolicy },
   { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },
   { method: "ANY", path: /^\/client(?:\/|$)/, policy: clientEditPolicy },
   { method: "GET", path: /^\/project(?:\/|$)/, policy: integracaoProjectPolicy },
@@ -185,8 +189,12 @@ const routePolicyMatchers: Array<{
   { method: "GET", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoModulePolicy },
   { method: "ANY", path: /^\/parcelamento(?:\/|$)/, policy: parcelamentoEditPolicy },
   { method: "ANY", path: /^\/reports(?:\/|$)/, policy: authenticatedPolicy },
+  { method: "GET", path: /^\/marketing(?:\/|$)/, policy: marketingModulePolicy },
+  { method: "ANY", path: /^\/marketing(?:\/|$)/, policy: marketingEditPolicy },
   { method: "GET", path: /^\/commercial(?:\/|$)/, policy: commercialModulePolicy },
   { method: "ANY", path: /^\/commercial(?:\/|$)/, policy: commercialEditPolicy },
+  { method: "GET", path: /^\/marketing(?:\/|$)/, policy: marketingModulePolicy },
+  { method: "ANY", path: /^\/marketing(?:\/|$)/, policy: marketingEditPolicy },
   { method: "GET", path: /^\/pessoal(?:\/|$)/, policy: pessoalModulePolicy },
   { method: "ANY", path: /^\/pessoal(?:\/|$)/, policy: pessoalEditPolicy },
   { method: "ANY", path: /^\/rh\/profile(?:\/|$)/, policy: rhModulePolicy },
@@ -243,6 +251,16 @@ const routePolicyMatchers: Array<{
     policy: platformOnlyPolicy,
   },
   {
+    method: "POST",
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
+    method: "PATCH",
+    path: /^\/platform\/super-admins\/[^/]+\/impersonation-permission\/?$/,
+    policy: platformOnlyPolicy,
+  },
+  {
     method: "GET",
     path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
     policy: userManagementPolicy,
@@ -259,6 +277,7 @@ const routePolicyMatchers: Array<{
   },
   { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "POST", path: /^\/user\/[^/]+\/password-reset$/, policy: userManagementPolicy },
   { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
   { method: "GET", path: /^\/task\/financeiro\/queue$/, policy: financeiroTaskViewPolicy },
   {
@@ -328,7 +347,7 @@ const routePolicyMatchers: Array<{
   },
   {
     method: "POST",
-    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate\/?$/,
+    path: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/(?:reactivate|password-reset)\/?$/,
     policy: platformOnlyPolicy,
   },
   {

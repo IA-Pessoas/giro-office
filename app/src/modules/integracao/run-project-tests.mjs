@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as taskFormUi from "./components/taskFormModalUi.ts";
+import { isServerErrorAlreadyNotified } from "../../shared/services/serverErrorToast.ts";
 
 runTest("task edit accepts an unassigned task while retaining required operational fields", () => {
   assert.equal(typeof taskFormUi.getTaskEditValidationMessage, "function");
@@ -85,6 +86,27 @@ runTest("task attachment contract keeps private paths out of the UI", () => {
   assert.doesNotMatch(source, /object_path/);
 });
 
+runTest("task attachment calls skip the global 5xx toast", () => {
+  const service = readFileSync(
+    new URL("./services/integracaoTasksService.ts", import.meta.url),
+    "utf8",
+  );
+  for (const method of [
+    "uploadAttachment",
+    "listAttachments",
+    "getAttachmentAccessUrl",
+    "deleteAttachment",
+  ]) {
+    const body = service.slice(service.indexOf(`async ${method}(`)).split("\n  },")[0];
+    assert.match(body, /attachmentApi\(\)/, method);
+    assert.doesNotMatch(body, /setupAPIClient\(/, method);
+  }
+  assert.match(
+    service,
+    /function attachmentApi\(\) \{\n\s*return setupAPIClient\([^)]*notifyServerErrors: false/,
+  );
+});
+
 runTest("task postponement contract and panel retain justification and chronological history", () => {
   assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponement, "/task/postponement");
   assert.equal(INTEGRACAO_TASKS_ENDPOINTS.postponementList, "/task/postponement/list");
@@ -162,6 +184,8 @@ import {
   unwrapProjectWizardPreview,
   unwrapUpdatedProject,
   unwrapProjectTaskProposals,
+  getProjectStatusOptions,
+  mergeUpdatedProjectDetail,
 } from "./services/projectService.contract.ts";
 import {
   buildHireProjectPlanPayload,
@@ -172,11 +196,15 @@ import { unwrapServiceEnvelope } from "./services/envelope.contract.js";
 import {
   applyWizardTaskChange,
   getWizardTaskDateWarning,
+  createProjectWizardId,
   getWizardExtractionSourceValidationMessage,
   canAttemptWizardExtraction,
+  wizardExtractionConsumesAttempt,
   WIZARD_EXTRACTION_MAX_ATTEMPTS,
+  WIZARD_EXTRACTION_UNAVAILABLE_CODE,
   WIZARD_EXTRACTION_MAX_SOURCE_BYTES,
   WIZARD_TASK_DATE_OUTSIDE_PERIOD_WARNING,
+  getProjectWizardSuccessMessage,
 } from "./components/projectWizardUi.ts";
 import {
   TASK_MODEL_CONFIG_ENTRY,
@@ -194,6 +222,8 @@ import {
   TASK_TABLE_SCROLL_AREA_CLASSNAME,
   canEditIntegracaoTask,
   formatTasksFooterSummary,
+  getProjectTaskCardLabels,
+  getTaskDeleteErrorMessage,
 } from "./components/taskWorkspaceUi.ts";
 import {
   TASK_FORM_BODY_CLASSNAME,
@@ -613,6 +643,7 @@ runTest("task list contract maps client and assignment filters without cache col
   const filters = {
     clientId: "11111111-1111-4111-8111-111111111111",
     assignment: "unassigned",
+    uniqueServiceReleased: true,
   };
 
   assert.deepEqual(buildIntegracaoTaskListParams(filters), {
@@ -622,10 +653,22 @@ runTest("task list contract maps client and assignment filters without cache col
     search: "",
     client_id: filters.clientId,
     assignment: "unassigned",
+    unique_service_released: true,
     page: 1,
     limit: 20,
   });
   assert.notDeepEqual(integracaoTasksListQueryKey(filters), integracaoTasksListQueryKey({}));
+});
+
+runTest("task workspace oferece filtro de liberados e exibe empresa e projeto", () => {
+  const source = readFileSync(new URL("./components/TasksWorkspace.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /uniqueServiceReleased/);
+  assert.match(source, /Serviços únicos liberados/);
+  assert.match(source, />Empresa</);
+  assert.match(source, />Projeto</);
+  assert.match(source, /task\.client_name/);
+  assert.match(source, /task\.project_name/);
 });
 
 runTest("task list contract preserves an empty client filter for explicit rejection", () => {
@@ -796,7 +839,7 @@ runTest("task model modal uses contextual user selectors", () => {
   assert.deepEqual(unwrapTaskModelOptions({ success: true, data: options }), options);
   const source = readFileSync(new URL("./components/TaskModelModal.tsx", import.meta.url), "utf8");
   assert.match(source, /useAssignableUsers/);
-  assert.match(source, /module: "integracao"/);
+  assert.doesNotMatch(source, /module: "integracao"/);
   assert.match(source, /departmentId: formData\.department_id/);
   assert.match(source, /departmentService\.list\(\{ status: "Ativo" \}\)/);
   assert.doesNotMatch(source, /listAdminUsers/);
@@ -814,10 +857,10 @@ runTest("task form obtains legacy edit responsibles independently from project m
   assert.doesNotMatch(source, /listAdminUsers/);
 });
 
-runTest("task model deletion preserves actionable dependency conflicts", () => {
+runTest("task model mutations show the 4xx business message (dependency conflicts included)", () => {
   const source = readFileSync(new URL("./hooks/useTaskModels.tsx", import.meta.url), "utf8");
 
-  assert.match(source, /response\?\.status === 409/);
+  assert.match(source, /response\?\.status && response\.status < 500/);
   assert.match(source, /response\.data\?\.error \?\? response\.data\?\.message/);
 });
 
@@ -1119,7 +1162,7 @@ runTest("task form modal uses compact layout classes", () => {
   assert.equal(TASK_FORM_BODY_CLASSNAME.includes("max-h-[64vh]"), true);
   assert.equal(TASK_FORM_BODY_CLASSNAME.includes("!py-3"), true);
   assert.equal(TASK_FORM_FORM_CLASSNAME, "space-y-3");
-  assert.equal(TASK_FORM_GRID_CLASSNAME, "grid gap-3 md:grid-cols-2");
+  assert.equal(TASK_FORM_GRID_CLASSNAME, "grid grid-cols-1 gap-3 md:grid-cols-2");
   assert.equal(TASK_FORM_TEXTAREA_CLASSNAME.includes("min-h-20"), true);
 });
 
@@ -1142,9 +1185,9 @@ runTest("project select placeholder keeps empty state inside the control", () =>
   );
 });
 
-runTest("tasks table uses shorter width and the shared system scrollbar", () => {
+runTest("tasks table fits the additional associations and keeps the shared system scrollbar", () => {
   assert.equal(TASK_TABLE_CLASSNAME.includes("1320px"), false);
-  assert.equal(TASK_TABLE_CLASSNAME.includes("1120px"), true);
+  assert.equal(TASK_TABLE_CLASSNAME.includes("1440px"), true);
   assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("overflow-x-auto"), true);
   assert.equal(TASK_TABLE_SCROLL_AREA_CLASSNAME.includes("u-scrollbar-system"), true);
 });
@@ -1194,7 +1237,6 @@ runTest("task create validation accepts blank observations before submit", () =>
     projectId: "project-1",
     modelId: "model-1",
     departmentId: "department-1",
-    prospectingStatus: "Fechado",
     urgency: "Normal",
     observations: "Detalhes da tarefa",
     eligibleResponsibleCount: 0,
@@ -1203,6 +1245,29 @@ runTest("task create validation accepts blank observations before submit", () =>
 
   assert.equal(getTaskCreateValidationMessage(validValues), null);
   assert.equal(getTaskCreateValidationMessage({ ...validValues, observations: "   " }), null);
+});
+
+runTest("task create validation names only the missing fields and skips prospecting status", () => {
+  const validValues = {
+    clientId: "client-1",
+    projectId: "project-1",
+    modelId: "model-1",
+    departmentId: "department-1",
+    urgency: "Normal",
+    observations: "",
+    eligibleResponsibleCount: 0,
+    responsibleId: "",
+  };
+
+  assert.equal(getTaskCreateValidationMessage(validValues), null);
+  assert.equal(
+    getTaskCreateValidationMessage({ ...validValues, projectId: "" }),
+    "Preencha: projeto.",
+  );
+  assert.equal(
+    getTaskCreateValidationMessage({ ...validValues, departmentId: "", modelId: "" }),
+    "Preencha: departamento, modelo.",
+  );
 });
 
 runTest("task responsible selection follows default, sole, explicit and unassigned branches", () => {
@@ -1218,7 +1283,6 @@ runTest("task responsible selection follows default, sole, explicit and unassign
     projectId: "project-1",
     modelId: "model-1",
     departmentId: "department-1",
-    prospectingStatus: "Fechado",
     urgency: "Normal",
     observations: "",
   };
@@ -1238,6 +1302,15 @@ runTest("task responsible selection follows default, sole, explicit and unassign
     }),
     null,
   );
+});
+
+runTest("task create form offers inline project for client without projects", () => {
+  const source = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+
+  assert.match(source, /hasNoProjectsForSelectedClient \? \(\s*<button/);
+  assert.match(source, /createProjectMutation\.mutateAsync\(/);
+  assert.match(source, /<option value="">Não se aplica<\/option>/);
+  assert.match(source, /toastId: "task-create-validation"/);
 });
 
 runTest("task create form marks observations as optional", () => {
@@ -1419,6 +1492,23 @@ runTest("wizard extraction allows only three provider attempts per opening", () 
   assert.equal(canAttemptWizardExtraction(2), true);
   assert.equal(canAttemptWizardExtraction(3), false);
   assert.equal(canAttemptWizardExtraction(4), false);
+});
+
+runTest("wizard extraction only consumes attempts that reached the provider", () => {
+  assert.equal(wizardExtractionConsumesAttempt(400), false);
+  assert.equal(wizardExtractionConsumesAttempt(403), false);
+  assert.equal(wizardExtractionConsumesAttempt(500), false);
+  assert.equal(wizardExtractionConsumesAttempt(503), false);
+  assert.equal(wizardExtractionConsumesAttempt(422), true);
+  assert.equal(wizardExtractionConsumesAttempt(502), true);
+  assert.equal(WIZARD_EXTRACTION_UNAVAILABLE_CODE, "AI_EXTRACTION_UNAVAILABLE");
+  assert.equal(wizardExtractionConsumesAttempt(undefined), true);
+});
+
+runTest("wizard extraction skips the global 5xx toast (the modal shows the error)", () => {
+  const service = readFileSync(new URL("./services/projectService.ts", import.meta.url), "utf8");
+  const body = service.slice(service.indexOf("async extractTasks(")).split("\n  },")[0];
+  assert.match(body, /setupAPIClient\(undefined, undefined, undefined, \{ notifyServerErrors: false \}\)/);
 });
 
 runTest("wizard extraction validates text and file sources before sending", () => {
@@ -1672,6 +1762,27 @@ runTest("wizard task warns about an unusable AI deadline and about one outside t
   assert.equal(getWizardTaskDateWarning({}, start, end), null);
 });
 
+runTest("project wizard IDs still work when crypto.randomUUID is unavailable", () => {
+  let randomValuesCalls = 0;
+  const id = createProjectWizardId({
+    getRandomValues: (values) => {
+      randomValuesCalls += 1;
+      values.fill(0xab);
+      return values;
+    },
+  });
+
+  assert.equal(randomValuesCalls, 1);
+  assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+
+  const projectForm = readFileSync(
+    new URL("./components/ProjectFormModal.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.equal((projectForm.match(/createProjectWizardId\(\)/g) ?? []).length, 3);
+  assert.doesNotMatch(projectForm, /crypto\.randomUUID\(\)/);
+});
+
 runTest("AI proposals arrive with the automatic responsible of the proposed model", () => {
   const models = [
     { id: "model-1", department_id: "department-1", responsible_id: null, department: { users: [{ id: "user-1" }] } },
@@ -1693,4 +1804,120 @@ runTest("step 2 accepts DOCX and PDF meeting minutes alongside TXT and Markdown"
     /accept="[^"]*\.docx[^"]*application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/,
   );
   assert.match(projectForm, /accept="[^"]*\.pdf[^"]*application\/pdf"/);
+});
+
+runTest("project detail task card shows the task name, model only as secondary info", () => {
+  const model = { id: "model-1", name: "Teste" };
+
+  assert.deepEqual(getProjectTaskCardLabels({ id: "t1", name: "QA_Tarefa_Projeto", model }), {
+    title: "QA_Tarefa_Projeto",
+    modelName: "Teste",
+  });
+  assert.deepEqual(getProjectTaskCardLabels({ id: "t2", name: "Teste", model }), {
+    title: "Teste",
+    modelName: null,
+  });
+  assert.deepEqual(getProjectTaskCardLabels({ id: "t3", name: "  ", model }), {
+    title: "Teste",
+    modelName: null,
+  });
+  assert.deepEqual(getProjectTaskCardLabels({ id: "t4" }), {
+    title: "Tarefa sem nome",
+    modelName: null,
+  });
+
+  const detailView = readFileSync("src/modules/integracao/components/ProjectDetailView.tsx", "utf8");
+  assert.match(detailView, /getProjectTaskCardLabels\(task\)/);
+  assert.doesNotMatch(detailView, /task\.model\?\.name \|\| task\.name/);
+});
+
+runTest("task delete error surfaces the 409 reason from the API", () => {
+  const reason = "Não é possível excluir a tarefa: ela tem 1 anexo(s). Remova os anexos.";
+
+  assert.equal(
+    getTaskDeleteErrorMessage({ response: { status: 409, data: { error: reason } } }),
+    reason,
+  );
+  assert.match(
+    getTaskDeleteErrorMessage({ response: { status: 403, data: {} } }),
+    /permissão administrativa/,
+  );
+  assert.equal(getTaskDeleteErrorMessage(new Error("boom")), "Não foi possível excluir a tarefa.");
+
+  const workspace = readFileSync("src/modules/integracao/components/TasksWorkspace.tsx", "utf8");
+  assert.match(workspace, /getTaskDeleteErrorMessage\(error\)/);
+});
+
+runTest("task edit form only sets the first prevision directly", () => {
+  assert.deepEqual(taskFormUi.getInitialPrevisionPatch(null, "2026-10-15"), {
+    prevision_date: "2026-10-15",
+  });
+  assert.deepEqual(taskFormUi.getInitialPrevisionPatch(null, ""), {});
+  assert.deepEqual(taskFormUi.getInitialPrevisionPatch("2026-10-01T00:00:00.000Z", "2026-10-20"), {});
+
+  const source = readFileSync("src/modules/integracao/components/TaskFormModal.tsx", "utf8");
+  assert.match(source, /getInitialPrevisionPatch\(/);
+  assert.match(source, /readOnly=\{!canSetInitialPrevision\}/);
+});
+
+runTest("project edit keeps client and tasks after PUT and offers manual statuses", () => {
+  const previous = {
+    id: "p1",
+    name: "Antigo",
+    status: "Em andamento",
+    client: { id: "c1", name: "Cliente" },
+    tasks: [{ id: "t1", name: "Tarefa" }],
+  };
+  const merged = mergeUpdatedProjectDetail(previous, { id: "p1", name: "Novo", status: "Paralisado" });
+
+  assert.equal(merged.name, "Novo");
+  assert.equal(merged.status, "Paralisado");
+  assert.deepEqual(merged.client, previous.client);
+  assert.deepEqual(merged.tasks, previous.tasks);
+  assert.deepEqual(mergeUpdatedProjectDetail(undefined, { id: "p1" }), { id: "p1" });
+
+  assert.deepEqual(getProjectStatusOptions("Em andamento"), ["Em andamento", "Paralisado", "Concluído"]);
+  assert.deepEqual(getProjectStatusOptions("A realizar"), [
+    "A realizar",
+    "Em andamento",
+    "Paralisado",
+    "Concluído",
+  ]);
+
+  const hooks = readFileSync("src/modules/integracao/hooks/useProjects.ts", "utf8");
+  assert.match(hooks, /mergeUpdatedProjectDetail\(/);
+});
+
+runTest("wizard success toast speaks business language", () => {
+  assert.equal(
+    getProjectWizardSuccessMessage({ main: 2, dependencies: 1, unassigned: 0 }),
+    "Projeto criado com 3 tarefas.",
+  );
+  assert.equal(
+    getProjectWizardSuccessMessage({ main: 1, dependencies: 0, unassigned: 1 }),
+    "Projeto criado com 1 tarefa. 1 ainda sem responsável.",
+  );
+
+  const form = readFileSync("src/modules/integracao/components/ProjectFormModal.tsx", "utf8");
+  assert.doesNotMatch(form, /Dependências: \$\{/);
+  assert.doesNotMatch(form, /<CalendarDays className="pointer-events-none/);
+  assert.match(form, /formatProjectDate\(values\.start_date\)/);
+  assert.match(form, /<RequiredFieldLabel required=\{candidates\.length > 0\}>/);
+  assert.match(form, /\?\? models\[0\]\)\?\.department/);
+});
+
+runTest("task errors do not repeat the global 5xx toast", () => {
+  assert.equal(isServerErrorAlreadyNotified({ response: { status: 502 } }), true);
+  assert.equal(isServerErrorAlreadyNotified({ response: { status: 409 } }), false);
+  assert.equal(isServerErrorAlreadyNotified(new Error("network")), false);
+
+  for (const file of ["TaskFormModal.tsx", "TasksWorkspace.tsx"]) {
+    const source = readFileSync(`src/modules/integracao/components/${file}`, "utf8");
+    assert.match(source, /isServerErrorAlreadyNotified\(error\)/, file);
+    assert.doesNotMatch(source, /task-service/, file);
+  }
+  const workspace = readFileSync("src/modules/integracao/components/TasksWorkspace.tsx", "utf8");
+  assert.match(workspace, /task\.responsible_name/);
+  const page = readFileSync("src/pages/projects/index.tsx", "utf8");
+  assert.match(page, /<title>Projetos<\/title>/);
 });

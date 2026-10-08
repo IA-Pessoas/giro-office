@@ -4,10 +4,10 @@ import { ConfirmationDialog, Dialog } from "@shared/components";
 import { RequiredFieldLabel } from "@shared/components/RequiredFieldLabel";
 import { useFetch } from "@shared/hooks";
 import { isAxiosError } from "axios";
-import { CalendarDays, FileText, LoaderCircle, Save, Sparkles } from "lucide-react";
+import { FileText, LoaderCircle, Save, Sparkles } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import {
   TASK_FORM_DEPARTMENTS_QUERY_KEY,
@@ -21,7 +21,10 @@ import {
   useProjectWizardPreviewMutation,
   useUpdateProjectMutation,
 } from "../hooks/useProjects";
-import { PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE } from "../services/projectService.contract";
+import {
+  getProjectStatusOptions,
+  PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE,
+} from "../services/projectService.contract";
 import { taskModelService } from "../services/taskModelService";
 import type {
   ProjectDetail,
@@ -41,7 +44,12 @@ import {
 import {
   applyWizardTaskChange,
   canAttemptWizardExtraction,
+  WIZARD_EXTRACTION_UNAVAILABLE_CODE,
+  WIZARD_EXTRACTION_UNAVAILABLE_MESSAGE,
+  wizardExtractionConsumesAttempt,
+  createProjectWizardId,
   getWizardExtractionSourceValidationMessage,
+  getProjectWizardSuccessMessage,
   getWizardTaskDateWarning,
   WIZARD_EXTRACTION_MAX_ATTEMPTS,
 } from "./projectWizardUi";
@@ -125,6 +133,8 @@ export function ProjectFormModal({
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [extractionAttempts, setExtractionAttempts] = useState(0);
+  // Extração não configurada no servidor: o botão fica desabilitado até fechar o modal.
+  const [extractionUnavailable, setExtractionUnavailable] = useState(false);
   const [preview, setPreview] = useState<ProjectWizardPreview | null>(null);
   const [dependenciesChanged, setDependenciesChanged] = useState(false);
   const [previewErrorMessage, setPreviewErrorMessage] = useState<string | null>(null);
@@ -164,6 +174,7 @@ export function ProjectFormModal({
       setMeetingMinutesFile(null);
       setPendingConfirmation(null);
       setExtractionAttempts(0);
+      setExtractionUnavailable(false);
       if (meetingMinutesFileRef.current) meetingMinutesFileRef.current.value = "";
       setPreview(null);
       setDependenciesChanged(false);
@@ -174,7 +185,7 @@ export function ProjectFormModal({
       extractionRequestLockRef.current = false;
       previewRequestLockRef.current = false;
     } else if (!isEditing && !idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = crypto.randomUUID();
+      idempotencyKeyRef.current = createProjectWizardId();
     }
   }, [extractTasksMutation.reset, isEditing, open, previewMutation.reset, reset]);
 
@@ -274,7 +285,7 @@ export function ProjectFormModal({
         // responsável automático quando o departamento tiver um único elegível.
         ...proposals.map((proposal) =>
           applyWizardTaskChange(
-            { ...proposal, id: crypto.randomUUID(), source: "ai" as const },
+            { ...proposal, id: createProjectWizardId(), source: "ai" as const },
             "model_id",
             proposal.model_id,
             taskModels,
@@ -283,8 +294,16 @@ export function ProjectFormModal({
       ]);
       toast.success(`Tarefas propostas pela IA: ${proposals.length}. Revise antes de continuar.`);
     } catch (error) {
-      if (isAxiosError(error) && error.response?.status === 400) {
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      if (!wizardExtractionConsumesAttempt(status)) {
         setExtractionAttempts((current) => current - 1);
+      }
+      if (
+        isAxiosError(error) &&
+        error.response?.data?.code === WIZARD_EXTRACTION_UNAVAILABLE_CODE
+      ) {
+        setExtractionUnavailable(true);
+        return;
       }
       setExtractionError(getRequestErrorMessage(error, PROJECT_TASK_EXTRACTION_FAILURE_MESSAGE));
     } finally {
@@ -428,9 +447,7 @@ export function ProjectFormModal({
         tasks: tasks.map(toWizardTaskPayload),
         revision: preview.revision,
       });
-      toast.success(
-        `Projeto criado com sucesso. Tarefas principais: ${result.counts.main}. Dependências: ${result.counts.dependencies}. Sem responsável: ${result.counts.unassigned}.`,
-      );
+      toast.success(getProjectWizardSuccessMessage(result.counts));
       onSuccess?.(result.project);
       onOpenChange(false);
       await router.push(`/tasks?clientId=${clientId}`);
@@ -647,7 +664,6 @@ export function ProjectFormModal({
                     Data de início
                   </RequiredFieldLabel>
                   <div className="relative">
-                    <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       aria-invalid={hasValidated && Boolean(validationErrors.start_date)}
                       aria-describedby={
@@ -659,7 +675,7 @@ export function ProjectFormModal({
                       value={values.start_date}
                       onChange={(event) => updateValue("start_date", event.target.value)}
                       onInput={(event) => updateValue("start_date", event.currentTarget.value)}
-                      className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                      className={PROJECT_INPUT_CLASSNAME}
                       required
                     />
                   </div>
@@ -671,13 +687,12 @@ export function ProjectFormModal({
                   Data final prevista
                 </span>
                 <div className="relative">
-                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="date"
                     value={values.end_date}
                     onChange={(event) => updateValue("end_date", event.target.value)}
                     onInput={(event) => updateValue("end_date", event.currentTarget.value)}
-                    className={`${PROJECT_INPUT_CLASSNAME} pl-10`}
+                    className={PROJECT_INPUT_CLASSNAME}
                     aria-invalid={Boolean(dateRangeError)}
                     aria-describedby={dateRangeError ? "project-end-date-error" : undefined}
                   />
@@ -692,6 +707,26 @@ export function ProjectFormModal({
                   </p>
                 ) : null}
               </label>
+
+              {isEditing ? (
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-slate-700 dark:text-white">Status</span>
+                  <ProjectSelect
+                    value={values.status}
+                    onChange={(event) => updateValue("status", event.target.value)}
+                    disabled={values.status === "Aguardando liberação do Comercial"}
+                  >
+                    {getProjectStatusOptions(values.status).map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </ProjectSelect>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Concluir exige todas as tarefas concluídas e perfil administrador.
+                  </span>
+                </label>
+              ) : null}
 
               <label className="space-y-2">
                 <RequiredFieldLabel
@@ -809,7 +844,13 @@ export function ProjectFormModal({
                   className={PROJECT_SECONDARY_BUTTON_CLASSNAME}
                   onClick={() => void handleExtractTasks()}
                   disabled={
-                    (!hasMeetingMinutesText && !meetingMinutesFile) || !canExtractTasks || isBusy
+                    (!hasMeetingMinutesText && !meetingMinutesFile) ||
+                    !canExtractTasks ||
+                    extractionUnavailable ||
+                    isBusy
+                  }
+                  aria-describedby={
+                    extractionUnavailable ? "project-extraction-unavailable" : undefined
                   }
                 >
                   {extractTasksMutation.isPending ? (
@@ -827,6 +868,14 @@ export function ProjectFormModal({
                   >
                     {extractionError}
                   </p>
+                ) : null}
+                {extractionUnavailable ? (
+                  <output
+                    id="project-extraction-unavailable"
+                    className="block text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    {WIZARD_EXTRACTION_UNAVAILABLE_MESSAGE}
+                  </output>
                 ) : null}
                 {!canExtractTasks ? (
                   <output className="block text-sm text-slate-600 dark:text-slate-300">
@@ -864,8 +913,10 @@ export function ProjectFormModal({
                 const models = taskModels.filter(
                   ({ department_id }) => department_id === task.department_id,
                 );
+                // Candidatos vêm do departamento: já dá para marcar a obrigatoriedade antes do Modelo.
                 const candidates =
-                  models.find(({ id }) => id === task.model_id)?.department?.users ?? [];
+                  (models.find(({ id }) => id === task.model_id) ?? models[0])?.department
+                    ?.users ?? [];
                 const dateWarning = getWizardTaskDateWarning(
                   task,
                   values.start_date,
@@ -960,7 +1011,7 @@ export function ProjectFormModal({
                       htmlFor={`task-${task.id}-responsible`}
                       className={`block ${TASK_FORM_LABEL_CLASSNAME}`}
                     >
-                      <RequiredFieldLabel required={candidates.length > 1}>
+                      <RequiredFieldLabel required={candidates.length > 0}>
                         Responsável
                       </RequiredFieldLabel>
                       <ProjectSelect
@@ -975,7 +1026,7 @@ export function ProjectFormModal({
                           taskOptionsError ||
                           candidates.length <= 1
                         }
-                        aria-required={candidates.length > 1}
+                        aria-required={candidates.length > 0}
                       >
                         <option value="" disabled={candidates.length > 0}>
                           {candidates.length ? "Selecione um responsável" : "Sem responsável"}
@@ -1024,7 +1075,7 @@ export function ProjectFormModal({
                   setTasks((current) => [
                     ...current,
                     {
-                      id: crypto.randomUUID(),
+                      id: createProjectWizardId(),
                       name: "",
                       department_id: "",
                       model_id: "",
@@ -1046,11 +1097,11 @@ export function ProjectFormModal({
                 <span className="font-medium">Nome:</span> {values.name}
               </p>
               <p>
-                <span className="font-medium">Início:</span> {values.start_date}
+                <span className="font-medium">Início:</span> {formatProjectDate(values.start_date)}
               </p>
               {values.end_date ? (
                 <p>
-                  <span className="font-medium">Término:</span> {values.end_date}
+                  <span className="font-medium">Término:</span> {formatProjectDate(values.end_date)}
                 </p>
               ) : null}
               <p>

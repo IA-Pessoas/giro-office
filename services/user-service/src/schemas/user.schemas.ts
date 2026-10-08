@@ -12,15 +12,15 @@ export const listUsersQuerySchema = z
   .strict();
 
 export const userIdParamsSchema = z.object({
-  id: z.string().trim().min(1, "id e obrigatorio."),
+  id: z.string().trim().min(1, "id é obrigatório."),
 });
 
 export const createUserBodySchema = z
   .object({
-    name: z.string().trim().min(1, "name e obrigatorio."),
-    login: z.string().trim().min(1, "login e obrigatorio."),
-    password: z.string().min(1, "password e obrigatorio."),
-    department_id: z.string().trim().min(1, "department_id e obrigatorio."),
+    name: z.string().trim().min(1, "name é obrigatório."),
+    login: z.string().trim().toLowerCase().min(1, "login é obrigatório."),
+    password: z.string().min(1, "password é obrigatório."),
+    department_id: z.string().trim().min(1, "department_id é obrigatório."),
     permission: z.number().int(),
     status: z.string().trim().min(1).optional(),
     photo_url: z.string().trim().min(1).optional(),
@@ -56,16 +56,47 @@ export const createUserBodySchema = z
     if (body.first_owner_flag === true && body.type !== "owner") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "first_owner_flag so pode ser true quando type for owner.",
+        message: "first_owner_flag só pode ser true quando type for owner.",
       });
     }
   });
 
+export const MIN_PASSWORD_LENGTH = 10;
+
+/** Política da troca da própria senha (#1341); null quando a nova senha é aceita. */
+export function ownPasswordPolicyError(
+  currentPassword: string,
+  nextPassword: string,
+): string | null {
+  if (nextPassword.length < MIN_PASSWORD_LENGTH) {
+    return `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+  }
+  if (nextPassword === currentPassword) return "A nova senha deve ser diferente da atual.";
+  return null;
+}
+
+const newPasswordSchema = z
+  .string()
+  .min(MIN_PASSWORD_LENGTH, `A nova senha deve ter ao menos ${MIN_PASSWORD_LENGTH} caracteres.`)
+  .max(255);
+
+/** Link de redefinição (#1342): o token vem do e-mail. */
+export const confirmPasswordResetBodySchema = z
+  .object({
+    token: z.string().trim().min(1, "token é obrigatório.").max(256),
+    password: newPasswordSchema,
+  })
+  .strict();
+
+/** O TI define a nova senha de outro usuário, sem link por e-mail. */
+export const adminSetPasswordBodySchema = z.object({ password: newPasswordSchema }).strict();
+
 export const updateUserBodySchema = z
   .object({
     name: z.string().trim().min(1).optional(),
-    login: z.string().trim().min(1).optional(),
+    login: z.string().trim().toLowerCase().min(1).optional(),
     password: z.string().min(1).optional(),
+    current_password: z.string().min(1).optional(),
     department_id: z.string().trim().min(1).optional(),
     permission: z.number().int().optional(),
     status: z.string().trim().min(1).optional(),
@@ -81,7 +112,7 @@ export const updateUserBodySchema = z
     if (body.first_owner_flag === true && body.type !== "owner") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "first_owner_flag so pode ser true quando type for owner.",
+        message: "first_owner_flag só pode ser true quando type for owner.",
       });
     }
   });

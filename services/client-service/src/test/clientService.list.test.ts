@@ -6,6 +6,78 @@ const TEST_ORG_ID = "550e8400-e29b-41d4-a716-446655440000";
 const TEST_CLIENT_ID = "660e8400-e29b-41d4-a716-446655440001";
 
 describe("ClientService.listByOrganization", () => {
+  it.each([
+    "Ativo",
+    "Inativo",
+  ])("lista %s na consulta geral sem filtrar dominio_code", async (status) => {
+    const findUniqueOrg = vi.fn().mockResolvedValue({
+      id: TEST_ORG_ID,
+      name: "Org Test",
+      slug: "org-test",
+      logo_url: null,
+      status: "active",
+      subscription_plan: "trial",
+    });
+    const findManyClients = vi.fn().mockResolvedValue([
+      {
+        id: TEST_CLIENT_ID,
+        name: "Cliente sem dominio",
+        organization_id: TEST_ORG_ID,
+        status,
+        cpf_cnpj: "123",
+        company_name: null,
+        fantasy_name: null,
+        service_unique: false,
+        deletion_date: null,
+        dominio_code: null,
+      },
+      {
+        id: `${TEST_CLIENT_ID}-empty`,
+        name: "Cliente com dominio vazio",
+        organization_id: TEST_ORG_ID,
+        status,
+        cpf_cnpj: "456",
+        company_name: null,
+        fantasy_name: null,
+        service_unique: false,
+        deletion_date: null,
+        dominio_code: "",
+      },
+      {
+        id: `${TEST_CLIENT_ID}-filled`,
+        name: "Cliente com dominio preenchido",
+        organization_id: TEST_ORG_ID,
+        status,
+        cpf_cnpj: "789",
+        company_name: null,
+        fantasy_name: null,
+        service_unique: false,
+        deletion_date: null,
+        dominio_code: "DOM-1",
+      },
+    ]);
+    const countClients = vi.fn().mockResolvedValue(3);
+    const prisma = {
+      organization: { findUnique: findUniqueOrg },
+      client: { findMany: findManyClients, count: countClients },
+    } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+
+    const page = await service.listByOrganization(
+      TEST_ORG_ID,
+      { page: 1, pageSize: 20, status },
+      { userId: "user-1", level: 1, isOwner: false },
+    );
+
+    expect(page.total).toBe(3);
+    expect(findManyClients).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: TEST_ORG_ID, status } }),
+    );
+    expect(countClients).toHaveBeenCalledWith({
+      where: { organization_id: TEST_ORG_ID, status },
+    });
+  });
+
   it("permite lista generica para acesso de cliente fora da Integração", async () => {
     const prisma = {
       organization: {
@@ -195,6 +267,66 @@ describe("ClientService.listByOrganization", () => {
     expect(countClients).toHaveBeenCalledWith({
       where: { organization_id: TEST_ORG_ID },
     });
+  });
+});
+
+describe("ClientService.listInstagramProfiles", () => {
+  it("filtra perfis ausentes, incluindo valores antigos só com espaços, e mantém paginação", async () => {
+    const queryRaw = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: TEST_CLIENT_ID,
+          name: "Acme",
+          status: "Ativo",
+          instagram: null,
+        },
+      ])
+      .mockResolvedValueOnce([{ total: 13n }]);
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
+    const service = new ClientService(prisma);
+
+    const result = await service.listInstagramProfiles(TEST_ORG_ID, {
+      page: 2,
+      pageSize: 10,
+      search: " Acme ",
+      profile: "without",
+    });
+
+    expect(result).toEqual({
+      items: [{ id: TEST_CLIENT_ID, name: "Acme", status: "Ativo", instagram: null }],
+      total: 13,
+      page: 2,
+      pageSize: 10,
+      hasMore: false,
+    });
+    expect(queryRaw).toHaveBeenCalledTimes(2);
+    const pageQuery = queryRaw.mock.calls[0]?.[0] as { sql: string; values: unknown[] };
+    const countQuery = queryRaw.mock.calls[1]?.[0] as { sql: string; values: unknown[] };
+    expect(pageQuery.sql).toContain("c.instagram ~ '^[[:space:]]*$'");
+    expect(pageQuery.sql).toContain("ILIKE");
+    expect(pageQuery.values).toContain(TEST_ORG_ID);
+    expect(pageQuery.values).toContain("%Acme%");
+    expect(pageQuery.values).toContain(10);
+    expect(countQuery.sql).toContain("COUNT(*)");
+  });
+
+  it("filtra perfis preenchidos sem expor organization_id de outras organizações", async () => {
+    const queryRaw = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ total: 0n }]);
+    const service = new ClientService({ $queryRaw: queryRaw } as unknown as PrismaClient);
+
+    await service.listInstagramProfiles(TEST_ORG_ID, {
+      page: 1,
+      pageSize: 20,
+      profile: "with",
+    });
+
+    const pageQuery = queryRaw.mock.calls[0]?.[0] as { sql: string; values: unknown[] };
+    expect(pageQuery.sql).toContain("c.instagram ~ '[^[:space:]]'");
+    expect(pageQuery.values).toContain(TEST_ORG_ID);
   });
 });
 

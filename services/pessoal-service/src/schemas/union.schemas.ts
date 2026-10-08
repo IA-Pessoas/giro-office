@@ -1,9 +1,9 @@
-import { zIsoDate, zNonEmptyText } from "@workspace/shared";
+import { isValidCnpj, zIsoDate, zNonEmptyText } from "@workspace/shared";
 import { z } from "zod";
 
 export const unionIdParamsSchema = z
   .object({
-    id: z.string().uuid({ message: "id invalido." }),
+    id: z.string().uuid({ message: "id inválido." }),
   })
   .strict();
 
@@ -18,7 +18,8 @@ export const listUnionsQuerySchema = z
 export const createUnionBodySchema = z
   .object({
     name: zNonEmptyText("name"),
-    cnpj: zNonEmptyText("cnpj"),
+    // #1301: a edição só confere o CNPJ quando ele muda (cadastros antigos fora do padrão).
+    cnpj: zNonEmptyText("cnpj").refine(isValidCnpj, "CNPJ inválido."),
     base_date: zIsoDate("base_date").nullable().optional(),
   })
   .strict();

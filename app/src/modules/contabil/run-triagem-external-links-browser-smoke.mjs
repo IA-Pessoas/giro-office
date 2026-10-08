@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
-const port = process.env.TRIAGE_EXTERNAL_LINKS_SMOKE_PORT ?? "3127";
+const port = process.env.TRIAGE_EXTERNAL_LINKS_SMOKE_PORT ?? "3124";
 const baseUrl = configuredBaseUrl ?? `http://127.0.0.1:${port}`;
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const screenshotPath =
@@ -174,9 +174,12 @@ async function runBrowserProof() {
     await expect(page.getByText("https://links.example.test/revisado")).toBeVisible();
     assert.ok(requests.some((request) => request.method === "PUT" && request.path.includes("/triagem/external-links/")));
 
-    page.once("dialog", (dialog) => dialog.accept());
     await page
       .getByRole("list", { name: /Links externos da competência/ })
+      .getByRole("button", { name: "Arquivar", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Arquivar link externo" })
       .getByRole("button", { name: "Arquivar", exact: true })
       .click();
     await expect(page.getByText("Nenhum link externo registrado para esta competência.")).toBeVisible();

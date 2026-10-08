@@ -82,7 +82,8 @@ export const projectService = {
   },
 
   async extractTasks(payload: ExtractProjectTasksData): Promise<ProjectWizardTaskProposal[]> {
-    const api = setupAPIClient();
+    // O wizard mostra a falha no próprio modal; o toast genérico de 5xx duplicaria o aviso.
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     const response = await api.post(
       PROJECT_ENDPOINTS.wizardExtractTasks,
       buildExtractProjectTasksPayload(payload),

@@ -1,5 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
-
+import { REPORTING_QUERY_BYTE_LIMIT_CODE } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { FiscalIcmsAdapter } from "../integrations/fiscalIcmsAdapter.js";
@@ -16,6 +16,46 @@ function canonicalJson(value: unknown): string {
 }
 
 describe("FiscalIcmsAdapter", () => {
+  it("converte estouro de bytes fiscal em erro global acionável", async () => {
+    const responseJson = vi.fn().mockResolvedValue({ code: REPORTING_QUERY_BYTE_LIMIT_CODE });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: responseJson,
+      }),
+    );
+    const adapter = new FiscalIcmsAdapter({
+      fiscalServiceUrl: "http://fiscal.test",
+      reportsInternalToken: "internal-token",
+      reportsGrantSecret: "grant-secret",
+      sourceTimeoutMs: 100,
+    });
+
+    await expect(
+      adapter.preview({
+        definition: {
+          sources: ["fiscal.icms"],
+          columns: [{ source: "fiscal.icms", field: "state", alias: "state" }],
+          joins: [],
+          filters: [],
+          filter_groups: [],
+          parameters: [],
+          aggregations: [],
+          order_by: [],
+        },
+        organization_id: "a0000000-0000-4000-8000-000000000001",
+        limit: 10,
+        request_id: "request-840",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      message: expect.stringContaining("limite global (50.000 linhas"),
+    });
+    expect(responseJson).toHaveBeenCalledOnce();
+  });
+
   it("publica somente campos seguros e assina o extract interno", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -66,7 +106,7 @@ describe("FiscalIcmsAdapter", () => {
     ).resolves.toEqual([{ state: "SP" }]);
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "fiscal.icms", fields: ["state"], limit: 101 };
+    const body = { source: "fiscal.icms", fields: ["state"], limit: 50_001 };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://fiscal.test/internal/reporting/extract",
     );

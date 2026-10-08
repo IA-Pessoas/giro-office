@@ -29,6 +29,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [showPasswordHelp, setShowPasswordHelp] = useState(false);
 
   const features = [
     {
@@ -63,6 +64,8 @@ export default function Login() {
     } catch (error: any) {
       if (error?.response?.status === 400 || error?.response?.status === 401) {
         setError("Login ou senha inválidos");
+      } else if (error?.response?.status === 429) {
+        setError("Muitas tentativas. Aguarde um minuto e tente novamente.");
       } else {
         setError("Não foi possível entrar agora. Tente novamente.");
       }
@@ -133,21 +136,6 @@ export default function Login() {
                     </div>
                   );
                 })}
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
-                  <div className="mb-0.5 text-2xl font-bold">6</div>
-                  <div className="text-xs text-blue-100">Módulos</div>
-                </div>
-                <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
-                  <div className="mb-0.5 text-2xl font-bold">99.9%</div>
-                  <div className="text-xs text-blue-100">Uptime</div>
-                </div>
-                <div className="rounded-xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
-                  <div className="mb-0.5 text-2xl font-bold">24/7</div>
-                  <div className="text-xs text-blue-100">Suporte</div>
-                </div>
               </div>
             </div>
 
@@ -273,13 +261,26 @@ export default function Login() {
                           Lembrar-me
                         </span>
                       </label>
-                      <a
-                        href="#"
+                      {/* Nao ha recuperacao self-service: a senha e redefinida pelo administrador. */}
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordHelp(true)}
+                        aria-controls="password-help"
+                        aria-expanded={showPasswordHelp}
                         className="font-semibold text-blue-600 transition-all hover:text-blue-700 hover:underline"
                       >
                         Esqueceu a senha?
-                      </a>
+                      </button>
                     </div>
+
+                    <p
+                      id="password-help"
+                      role="status"
+                      className={`text-xs ${LOGIN_CARD_SECONDARY_TEXT_CLASSNAME}`}
+                      hidden={!showPasswordHelp}
+                    >
+                      Peça ao TI da sua empresa para redefinir a sua senha.
+                    </p>
 
                     <button
                       type="submit"

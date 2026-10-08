@@ -1,7 +1,9 @@
 import "./envBootstrap.js";
 
 import {
+  FORWARDED_AUTH_MODULES_HEADER,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
+  FORWARDED_AUTH_TYPE_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
   INTERNAL_SERVICE_TOKEN_HEADER,
   ServiceError,
@@ -13,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDepartmentApp } from "../app.js";
 import { getDepartmentServiceEnv } from "../config/env.js";
+import { buildDepartmentServiceOpenApiSpec } from "../openapi/spec.js";
 import type { DepartmentRouteDeps } from "../routes/department.routes.js";
 
 const ORGANIZATION_ID = "a0000000-0000-4000-8000-000000000001";
@@ -27,11 +30,16 @@ function createDepartmentServiceMock(): DepartmentRouteDeps {
   };
 }
 
-function gatewayHeaders(): Record<string, string> {
+function gatewayHeaders(
+  modules: Record<string, number> = { rh: 3 },
+  type: "owner" | "admin" | "user" = "user",
+): Record<string, string> {
   return {
     [INTERNAL_SERVICE_TOKEN_HEADER]: "audit-service-token",
     [FORWARDED_AUTH_USER_ID_HEADER]: USER_ID,
     [FORWARDED_AUTH_ORGANIZATION_ID_HEADER]: ORGANIZATION_ID,
+    [FORWARDED_AUTH_MODULES_HEADER]: JSON.stringify(modules),
+    [FORWARDED_AUTH_TYPE_HEADER]: type,
   };
 }
 
@@ -72,6 +80,17 @@ describe("department routes", () => {
     expect(res.body.data?.status).toBe("ok");
   });
 
+  it("documenta o filtro administrativo uma única vez no OpenAPI", () => {
+    const spec = buildDepartmentServiceOpenApiSpec(getDepartmentServiceEnv());
+    const route = spec.paths["/department/list"] as {
+      get?: { parameters?: Array<{ name?: string }> };
+    };
+
+    expect(
+      route.get?.parameters?.filter((parameter) => parameter.name === "administrative"),
+    ).toHaveLength(1);
+  });
+
   it("GET /department/list sem autenticacao retorna 401", async () => {
     const app = createTestApp(departmentServiceMock);
 
@@ -95,6 +114,43 @@ describe("department routes", () => {
     expect(departmentServiceMock.list).toHaveBeenCalledWith("Ativo", ORGANIZATION_ID);
   });
 
+  it("GET /department/list permite consultas operacionais autenticadas", async () => {
+    departmentServiceMock.list = vi.fn(async () => [{ id: "dep-1" }]);
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .get("/department/list")
+      .set(gatewayHeaders({ rh: 2, ti: 2 }));
+
+    expect(res.status).toBe(200);
+    expect(departmentServiceMock.list).toHaveBeenCalledWith(undefined, ORGANIZATION_ID);
+  });
+
+  it("GET /department/list para administracao exige permissao administrativa", async () => {
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .get("/department/list")
+      .set(gatewayHeaders({ rh: 2, ti: 2 }))
+      .query({ administrative: "true" });
+
+    expect(res.status).toBe(403);
+    expect(departmentServiceMock.list).not.toHaveBeenCalled();
+  });
+
+  it("GET /department/list para administracao lista para owner", async () => {
+    departmentServiceMock.list = vi.fn(async () => [{ id: "dep-1" }]);
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .get("/department/list")
+      .set(gatewayHeaders({}, "owner"))
+      .query({ administrative: "true" });
+
+    expect(res.status).toBe(200);
+    expect(departmentServiceMock.list).toHaveBeenCalledWith(undefined, ORGANIZATION_ID);
+  });
+
   it("GET /department sem dep_id retorna 400", async () => {
     const app = createTestApp(departmentServiceMock);
 
@@ -102,6 +158,31 @@ describe("department routes", () => {
 
     expect(res.status).toBe(400);
     expect(departmentServiceMock.detail).not.toHaveBeenCalled();
+  });
+
+  it("GET /department exige permissao administrativa antes de consultar", async () => {
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .get("/department")
+      .set(gatewayHeaders({ rh: 2, ti: 1 }))
+      .query({ dep_id: "dep-1" });
+
+    expect(res.status).toBe(403);
+    expect(departmentServiceMock.detail).not.toHaveBeenCalled();
+  });
+
+  it("GET /department permite owner sem nivel de modulo", async () => {
+    departmentServiceMock.detail = vi.fn(async () => ({ dep: { id: "dep-1" } }));
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .get("/department")
+      .set(gatewayHeaders({}, "owner"))
+      .query({ dep_id: "dep-1" });
+
+    expect(res.status).toBe(200);
+    expect(departmentServiceMock.detail).toHaveBeenCalledWith("dep-1", ORGANIZATION_ID);
   });
 
   it("POST /department invalido retorna 400", async () => {
@@ -166,5 +247,17 @@ describe("department routes", () => {
       status: undefined,
       solution: undefined,
     });
+  });
+
+  it("PUT /department recusa alteracao de cor sem permissao administrativa", async () => {
+    const app = createTestApp(departmentServiceMock);
+
+    const res = await request(app)
+      .put("/department")
+      .set(gatewayHeaders({ rh: 2, ti: 2 }))
+      .send({ dep_id: "dep-1", color: "#0F766E" });
+
+    expect(res.status).toBe(403);
+    expect(departmentServiceMock.update).not.toHaveBeenCalled();
   });
 });

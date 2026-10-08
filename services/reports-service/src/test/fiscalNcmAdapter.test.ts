@@ -67,7 +67,7 @@ describe("FiscalNcmAdapter", () => {
     ).resolves.toEqual([{ ncm_code: "84719012" }]);
 
     const [, request] = fetchMock.mock.calls[0] as [URL, RequestInit];
-    const body = { source: "fiscal.ncm", fields: ["ncm_code"], limit: 101 };
+    const body = { source: "fiscal.ncm", fields: ["ncm_code"], limit: 50_001 };
     expect(new URL(fetchMock.mock.calls[0]?.[0] as URL).toString()).toBe(
       "http://fiscal.test/internal/reporting/extract",
     );

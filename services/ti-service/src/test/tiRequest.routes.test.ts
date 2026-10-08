@@ -79,6 +79,7 @@ describe("ti request routes", () => {
         title: "Notebook nao liga",
         description: "Equipamento nao inicia.",
         category_id: categoryId,
+        anydesk_code: "123456789",
         urgency: "High",
       });
 
@@ -101,6 +102,7 @@ describe("ti request routes", () => {
         title: "Notebook nao liga",
         description: "Equipamento nao inicia.",
         category_id: categoryId,
+        anydesk_code: "123456789",
         urgency: "High",
       });
 
@@ -126,7 +128,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(401);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Token interno do ti-service invalido.",
+      error: "Token interno inválido.",
       code: "UNAUTHORIZED",
     });
   });
@@ -222,7 +224,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(409);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Chamado de TI foi transferido por outro usuario.",
+      error: "Chamado de TI foi transferido por outro usuário.",
       code: "CONFLICT",
     });
   });
@@ -236,7 +238,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Permissao insuficiente para acessar o ti-service.",
+      error: "Permissão insuficiente para acessar o módulo de TI.",
       code: "FORBIDDEN",
     });
   });
@@ -249,7 +251,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(401);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Token interno do ti-service invalido.",
+      error: "Token interno inválido.",
       code: "UNAUTHORIZED",
     });
   });
@@ -297,7 +299,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(403);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Permissao insuficiente para transferir chamado.",
+      error: "Permissão insuficiente para transferir chamado.",
       code: "FORBIDDEN",
     });
   });
@@ -338,6 +340,25 @@ describe("ti request routes", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("POST /ti/requests requires anydesk_code", async () => {
+    const response = await request(createTestApp())
+      .post("/ti/requests")
+      .set(gatewayHeaders(TI_ADMIN_PERMISSION))
+      .send({
+        title: "Notebook nao liga",
+        description: "Equipamento nao inicia.",
+        category_id: categoryId,
+        anydesk_code: "   ",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      error: "anydesk_code é obrigatório.",
       code: "BAD_REQUEST",
     });
   });
@@ -560,7 +581,7 @@ describe("ti request routes", () => {
     expect(response.status).toBe(404);
     expect(response.body).toMatchObject({
       success: false,
-      error: "Chamado de TI nao encontrado.",
+      error: "Chamado de TI não encontrado.",
       code: "NOT_FOUND",
     });
     expect(upload).not.toHaveBeenCalled();

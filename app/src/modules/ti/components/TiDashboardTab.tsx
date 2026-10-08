@@ -25,43 +25,16 @@ function formatMetric(value: unknown): string {
   return "-";
 }
 
-function DashboardHeroCard({
-  description,
-  icon: Icon,
-  label,
-  value,
-}: {
-  description: string;
-  icon: LucideIcon;
-  label: string;
-  value: number | string;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-violet-600 p-5 text-white shadow-sm">
-      <div className="flex min-h-[180px] items-start justify-between gap-5">
-        <div className="min-w-0">
-          <p className="text-base font-semibold uppercase tracking-[0.06em] text-white/85">
-            {label}
-          </p>
-          <p className="mt-3 text-4xl font-semibold tracking-tight">{value}</p>
-          <p className="mt-3 max-w-md text-sm leading-6 text-white/75">{description}</p>
-        </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MetricTile({
   icon: Icon,
   label,
+  onAction,
   supporting,
   value,
 }: {
   icon: LucideIcon;
   label: string;
+  onAction?: () => void;
   supporting?: string;
   value: number | string;
 }) {
@@ -82,6 +55,16 @@ function MetricTile({
           </p>
           {supporting ? (
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{supporting}</p>
+          ) : null}
+          {onAction ? (
+            <button
+              type="button"
+              onClick={onAction}
+              className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 transition hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+            >
+              <Ticket className="h-4 w-4" aria-hidden="true" />
+              Ver chamados
+            </button>
           ) : null}
         </div>
       </div>
@@ -155,7 +138,7 @@ function DashboardStatePanel({
   );
 }
 
-export function TiDashboardTab() {
+export function TiDashboardTab({ onOpenRequests }: { onOpenRequests?: () => void } = {}) {
   const dashboardQuery = useTiDashboard();
   const summary = dashboardQuery.data;
   const isLoading = dashboardQuery.isLoading || dashboardQuery.isFetching;
@@ -199,37 +182,30 @@ export function TiDashboardTab() {
   if (isSelfSummary) {
     return (
       <section className="space-y-5">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
-          <DashboardHeroCard
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricTile
             icon={ClipboardList}
-            label={openRequests > 0 ? "Meus chamados em acompanhamento" : "Meus chamados em dia"}
+            onAction={onOpenRequests}
+            label="Meus chamados abertos"
             value={formatMetric(openRequests)}
-            description={
-              openRequests > 0
-                ? "Chamados que ainda exigem acompanhamento, retorno ou conclusão."
-                : "Nenhum chamado aberto no momento. Novas demandas passam a aparecer aqui."
-            }
+            supporting={openRequests > 0 ? "Aguardando retorno ou conclusão." : "Meus chamados em dia."}
           />
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-1">
-            <MetricTile
-              icon={Ticket}
-              label="Críticos"
-              value={formatMetric(criticalRequests)}
-              supporting="Meus chamados em maior urgência"
-            />
-            <MetricTile
-              icon={BarChart3}
-              label="Resolvidos"
-              value={formatMetric(resolvedLastSevenDays)}
-              supporting="Nos últimos 7 dias"
-            />
-            <MetricTile
-              icon={ClipboardList}
-              label="Fechados"
-              value={formatMetric(closedRequests)}
-            />
-          </div>
+          <MetricTile
+            icon={Ticket}
+            label="Críticos"
+            value={formatMetric(criticalRequests)}
+            supporting="Meus chamados em maior urgência"
+          />
+          <MetricTile
+            icon={BarChart3}
+            label="Resolvidos em 7 dias"
+            value={formatMetric(resolvedLastSevenDays)}
+          />
+          <MetricTile
+            icon={ClipboardList}
+            label="Fechados"
+            value={formatMetric(closedRequests)}
+          />
         </div>
       </section>
     );
@@ -237,33 +213,27 @@ export function TiDashboardTab() {
 
   return (
     <section className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)] xl:items-stretch">
-        <DashboardHeroCard
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <MetricTile
           icon={ClipboardList}
-          label={openRequests > 0 ? "Chamados em acompanhamento" : "Fluxo operacional em dia"}
+          onAction={onOpenRequests}
+          label="Chamados abertos"
           value={formatMetric(openRequests)}
-          description={
-            openRequests > 0
-              ? "Chamados que ainda exigem acompanhamento, retorno ou conclusão dentro de Tecnologia."
-              : "Nenhum chamado aberto no momento. Novas demandas passam a aparecer aqui quando entrarem no fluxo."
-          }
+          supporting={openRequests > 0 ? "Aguardando retorno ou conclusão." : "Fluxo operacional em dia."}
         />
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          <MetricTile
-            icon={Ticket}
-            label="Críticos"
-            value={formatMetric(summary?.criticalRequests)}
-            supporting={`${resolvedLastSevenDays.toLocaleString("pt-BR")} resolvidos em 7 dias`}
-          />
-          <MetricTile icon={Boxes} label="Ativos" value={formatMetric(summary?.inventoryAssets)} />
-          <MetricTile
-            icon={PackageSearch}
-            label="Estoque crítico"
-            value={formatMetric(summary?.lowStockItems)}
-          />
-          <MetricTile icon={Bot} label="Robôs ativos" value={formatMetric(summary?.activeRobots)} />
-        </div>
+        <MetricTile
+          icon={Ticket}
+          label="Críticos"
+          value={formatMetric(summary?.criticalRequests)}
+          supporting={`${resolvedLastSevenDays.toLocaleString("pt-BR")} resolvidos em 7 dias`}
+        />
+        <MetricTile icon={Boxes} label="Ativos" value={formatMetric(summary?.inventoryAssets)} />
+        <MetricTile
+          icon={PackageSearch}
+          label="Estoque crítico"
+          value={formatMetric(summary?.lowStockItems)}
+        />
+        <MetricTile icon={Bot} label="Robôs ativos" value={formatMetric(summary?.activeRobots)} />
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
@@ -272,7 +242,11 @@ export function TiDashboardTab() {
           description="Leitura rápida do atendimento carregado no resumo operacional."
         >
           <div className="space-y-3">
-            <DashboardSummaryRow icon={Ticket} label="Abertos" value={formatMetric(openRequests)} />
+            <DashboardSummaryRow
+              icon={Ticket}
+              label="Em acompanhamento"
+              value={formatMetric(openRequests)}
+            />
             <DashboardSummaryRow
               icon={BarChart3}
               label="Críticos"
@@ -303,12 +277,12 @@ export function TiDashboardTab() {
             />
             <DashboardSummaryRow
               icon={PackageSearch}
-              label="Estoque"
+              label="Estoque crítico"
               value={formatMetric(summary?.lowStockItems)}
             />
             <DashboardSummaryRow
               icon={Bot}
-              label="Robôs"
+              label="Robôs ativos"
               value={formatMetric(summary?.activeRobots)}
             />
           </div>

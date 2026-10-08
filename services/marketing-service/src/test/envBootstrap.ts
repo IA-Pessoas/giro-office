@@ -1,0 +1,10 @@
+process.env.NODE_ENV = "test";
+process.env.MARKETING_SERVICE_PORT = "3047";
+process.env.DATABASE_URL = "postgresql://localhost/marketing_service_test";
+process.env.JWT_SECRET = "marketing-service-jwt-secret-test";
+process.env.MARKETING_SERVICE_INTERNAL_TOKEN = "marketing-service-internal-token-test";
+process.env.MTK_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+process.env.SERVICE_ALLOWED_ORIGINS = "*";
+process.env.ENABLE_API_DOCS = "false";
+process.env.LOG_LEVEL = "silent";
+process.env.LOG_PRETTY = "false";

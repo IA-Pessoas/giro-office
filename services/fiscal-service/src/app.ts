@@ -12,9 +12,11 @@ import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { FiscalServiceEnv } from "./config/env.js";
+import { createLog, logUpdateIfChanged } from "./integrations/audit.js";
 import prismaClient from "./integrations/prisma.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
+import { createFiscalRateRoutes, type FiscalRateRouteDeps } from "./routes/fiscalRate.routes.js";
 import {
   createFiscalSearchRoutes,
   type FiscalSearchRouteDeps,
@@ -22,11 +24,19 @@ import {
 import { createIcmsRoutes, type IcmsRouteDeps } from "./routes/icms.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createIpiRoutes, type IpiRouteDeps } from "./routes/ipi.routes.js";
+import {
+  createMonthlyRevenueRoutes,
+  type MonthlyRevenueRouteDeps,
+} from "./routes/monthlyRevenue.routes.js";
 import { createNcmRoutes, type NcmRouteDeps } from "./routes/ncm.routes.js";
+import { createSimplesRateRoutes, type SimplesRateRouteDeps } from "./routes/simplesRate.routes.js";
+import { FiscalRateService } from "./services/fiscalRateService.js";
 import { FiscalSearchService } from "./services/fiscalSearchService.js";
 import { IcmsService } from "./services/icmsService.js";
 import { IpiService } from "./services/ipiService.js";
+import { MonthlyRevenueService } from "./services/monthlyRevenueService.js";
 import { NcmService } from "./services/ncmService.js";
+import { SimplesRateService } from "./services/simplesRateService.js";
 
 function fiscalServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
   const userId = request.user_id;
@@ -49,6 +59,9 @@ export function createFiscalApp(options: {
   env: FiscalServiceEnv;
   logger: Logger;
   fiscalSearchRouteDeps?: FiscalSearchRouteDeps;
+  fiscalRateRouteDeps?: FiscalRateRouteDeps;
+  monthlyRevenueRouteDeps?: MonthlyRevenueRouteDeps;
+  simplesRateRouteDeps?: SimplesRateRouteDeps;
   icmsRouteDeps?: IcmsRouteDeps;
   ipiRouteDeps?: IpiRouteDeps;
   ncmRouteDeps?: NcmRouteDeps;
@@ -56,7 +69,13 @@ export function createFiscalApp(options: {
 }): express.Express {
   const { env, logger } = options;
   const fiscalSearchRouteDeps = options.fiscalSearchRouteDeps ?? new FiscalSearchService();
-  const icmsRouteDeps = options.icmsRouteDeps ?? new IcmsService();
+  const fiscalRateRouteDeps =
+    options.fiscalRateRouteDeps ?? new FiscalRateService(prismaClient, { createLog });
+  const monthlyRevenueRouteDeps =
+    options.monthlyRevenueRouteDeps ?? new MonthlyRevenueService(prismaClient, { createLog });
+  const simplesRateRouteDeps = options.simplesRateRouteDeps ?? new SimplesRateService(prismaClient);
+  const icmsRouteDeps =
+    options.icmsRouteDeps ?? new IcmsService(prismaClient, { createLog, logUpdateIfChanged });
   const ipiRouteDeps = options.ipiRouteDeps ?? new IpiService();
   const ncmRouteDeps = options.ncmRouteDeps ?? new NcmService();
   const internalReportingService =
@@ -84,6 +103,9 @@ export function createFiscalApp(options: {
   app.use("/fiscal", createIcmsRoutes(icmsRouteDeps));
   app.use("/fiscal", createIpiRoutes(ipiRouteDeps));
   app.use("/fiscal", createFiscalSearchRoutes(fiscalSearchRouteDeps));
+  app.use("/fiscal", createFiscalRateRoutes(fiscalRateRouteDeps));
+  app.use("/fiscal", createMonthlyRevenueRoutes(monthlyRevenueRouteDeps));
+  app.use("/fiscal", createSimplesRateRoutes(simplesRateRouteDeps));
   app.use(
     "/internal",
     createInternalReportingRouter({ env, reportingService: internalReportingService }),

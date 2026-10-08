@@ -29,7 +29,10 @@ export function getPlatformErrorMessage(error: unknown, fallback: string): strin
 
 export function getPlatformMutationErrorMessage(error: unknown, fallback: string): string {
   if (isPlatformConflict(error)) {
-    return "Esta organização foi alterada por outra pessoa. Os dados foram atualizados; revise e tente novamente.";
+    return getPlatformErrorMessage(
+      error,
+      "Esta organização foi alterada por outra pessoa. Os dados foram atualizados; revise e tente novamente.",
+    );
   }
   return getPlatformErrorMessage(error, fallback);
 }
@@ -92,6 +95,11 @@ export function formatAuditChanges(changes: PlatformAuditRecord["changes"]): str
       `Logo: ${formatAuditValue(changes.logo_url.from, "logo")} → ${formatAuditValue(changes.logo_url.to, "logo")}`,
     );
   }
+  if (changes.can_impersonate) {
+    lines.push(
+      `Permissão de personificação: ${formatImpersonationPermission(changes.can_impersonate.from)} → ${formatImpersonationPermission(changes.can_impersonate.to)}`,
+    );
+  }
   if (changes.modules) {
     const moduleKeys = new Set([
       ...Object.keys(changes.modules.before),
@@ -115,4 +123,8 @@ export function formatAuditChanges(changes: PlatformAuditRecord["changes"]): str
     lines.push(`Justificativa: ${justification}`);
   }
   return lines;
+}
+
+export function formatImpersonationPermission(canImpersonate: boolean): string {
+  return canImpersonate ? "Pode personificar" : "Não pode personificar";
 }

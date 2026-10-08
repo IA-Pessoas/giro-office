@@ -1,0 +1,341 @@
+generator client {
+  provider = "prisma-client"
+  runtime  = "workerd"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model License {
+  id                                String   @id @default(uuid())
+  client_id                         String?
+  has                               Boolean
+  type_license                      String
+  entry_date                        DateTime
+  protocol                          String
+  responsible_id                    String?
+  status                            String
+  date_last_consultation            DateTime?
+  current_situation                 String
+  contact                           String
+  observation                       String?
+  urgency                           String
+  type                              String
+  due_date                          DateTime?
+  task_id                           String?
+  organization_id                   String
+  protocol_file_path                String?
+  protocol_file_original_name       String?
+  protocol_file_mime_type           String?
+  protocol_file_size_bytes          Int?
+  protocol_file_uploaded_at         DateTime?
+  protocol_file_uploaded_by_user_id String?
+  client                            Client? @relation(fields: [client_id], references: [id])
+
+  @@map("regularize.license")
+}
+
+model Organization {
+  id        String    @id
+  clients   Client[]
+  clientsPF ClientPF[]
+  users     User[]
+  tasks     Task[]
+  processes Process[]
+  logs      Logs[]
+  municipalTaxes MunicipalTaxes[]
+  partners  Partners[]
+  permissions Permission[]
+  regularizeNotifications RegularizeNotification[]
+  sitePasswordsRegularize SitePasswordsRegularize[]
+  passwordsRegularize PasswordRegularize[]
+  proceduralGuidances ProceduralGuidance[]
+
+  @@map("organizations")
+}
+
+model Client {
+  id              String    @id
+  name            String
+  company_name    String?
+  dominio_code    String?
+  cpf_cnpj        String?
+  status          String
+  city            String?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  processes       Process[] @relation("processClientPJ")
+  municipalTaxes  MunicipalTaxes[]
+  partners        Partners[] @relation("partnerClientPJ")
+  passwordsRegularize PasswordRegularize[]
+  proceduralGuidances ProceduralGuidance[] @relation("proceduralGuidanceClientPJ")
+  licenses        License[]
+
+  @@map("clients")
+}
+
+model ClientPF {
+  id              String    @id @default(uuid())
+  code            String
+  name            String
+  sex             String
+  address         String
+  city            String
+  zip_code        String
+  state           String
+  profession      String
+  father          String
+  mother          String
+  marital_status  String
+  date_of_birth   DateTime
+  cpf             String?
+  rg              String
+  rg_expedition   DateTime?
+  rg_validity     DateTime?
+  military_certificate String
+  ctps            String
+  cnh             String
+  cnh_expedition  DateTime?
+  cnh_validity    DateTime?
+  spouse          String
+  status          String
+  notes           String
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  processes       Process[] @relation("processClientPF")
+  partners        Partners[]
+  proceduralGuidances ProceduralGuidance[] @relation("proceduralGuidanceClientPF")
+
+  @@map("clients.pf")
+}
+
+model User {
+  id              String    @id
+  name            String
+  status          String
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  responsible1    Process[] @relation("responsible1")
+  responsible2    Process[] @relation("responsible2")
+  responsible3    Process[] @relation("responsible3")
+  logs            Logs[]
+  permissions     Permission[]
+  regularizeNotifications RegularizeNotification[]
+
+  @@map("users")
+}
+
+model Task {
+  id              String    @id
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  processes       Process[]
+
+  @@map("integracao.tasks")
+}
+
+model Logs {
+  id              String    @id @default(uuid())
+  user_id         String
+  action          String
+  referring       String
+  referring_id    String
+  changes         Json
+  date            DateTime  @default(now())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User @relation(fields: [user_id], references: [id])
+
+  @@map("logs")
+}
+
+model Process {
+  id                String    @id @default(uuid())
+  client_pj_id      String?
+  client_pf_id      String?
+  cpf_cnpj          String
+  process_type      String
+  description       String
+  entry_date        DateTime?
+  completion_date   DateTime?
+  expected_date     DateTime?
+  client_notice_date DateTime?
+  status            String
+  financial_status  String @default("Pendente")
+  observation       String?
+  responsible1_id   String?
+  responsible2_id   String?
+  responsible3_id   String?
+  locking_type      String?
+  urgency           String?
+  task_id           String?
+  organization_id   String
+  clientPJ          Client? @relation("processClientPJ", fields: [client_pj_id], references: [id])
+  clientPF          ClientPF? @relation("processClientPF", fields: [client_pf_id], references: [id])
+  organization      Organization @relation(fields: [organization_id], references: [id])
+  responsible1      User? @relation("responsible1", fields: [responsible1_id], references: [id])
+  responsible2      User? @relation("responsible2", fields: [responsible2_id], references: [id])
+  responsible3      User? @relation("responsible3", fields: [responsible3_id], references: [id])
+  task              Task? @relation(fields: [task_id], references: [id])
+  guidances         ProceduralGuidance[]
+
+  @@map("regularize.process")
+}
+
+model Permission {
+  id              String @id @default(uuid())
+  user_id         String
+  regularize      Int @default(0)
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User @relation(fields: [user_id], references: [id])
+
+  @@map("permissions")
+}
+
+model ProceduralGuidance {
+  id                   String   @id @default(uuid())
+  process_id           String?
+  type                 String?
+  request              String?
+  framework_obs        String?
+  legal_nature         String?
+  company_name         String?
+  trade_name           String?
+  cpf_cnpj             String?
+  share_capital        Float?
+  iptu                 String?
+  address              String?
+  comporate_purpose    String?
+  carryng              String?
+  regime               String?
+  legal_representative String?
+  status               String
+  economic_activities  Json?
+  partners             Json?
+  target_type          String
+  client_pj_id         String?
+  client_pf_id         String?
+  target_snapshot      Json
+  branch_data          Json?
+  organization_id      String
+  checklist_items      ProceduralGuidanceChecklistItem[]
+  clientPJ             Client?      @relation("proceduralGuidanceClientPJ", fields: [client_pj_id], references: [id])
+  clientPF             ClientPF?     @relation("proceduralGuidanceClientPF", fields: [client_pf_id], references: [id])
+  organization         Organization @relation(fields: [organization_id], references: [id])
+  process              Process?     @relation(fields: [process_id], references: [id])
+
+  @@map("regularize.proceduralGuidances")
+}
+
+model ProceduralGuidanceChecklistItem {
+  id          String             @id @default(uuid())
+  guidance_id String
+  code        String
+  label       String
+  status      String
+  observation String?
+  created_at  DateTime           @default(now())
+  updated_at  DateTime           @updatedAt
+  guidance    ProceduralGuidance @relation(fields: [guidance_id], references: [id], onDelete: Cascade)
+
+  @@unique([guidance_id, code])
+  @@map("regularize.proceduralGuidanceChecklistItems")
+}
+
+model Partners {
+  id              String @id @default(uuid())
+  pj_id           String
+  pf_id           String
+  part            Float
+  entry           DateTime
+  exit            DateTime?
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  clientPF        ClientPF @relation(fields: [pf_id], references: [id])
+  clientPJ        Client @relation("partnerClientPJ", fields: [pj_id], references: [id])
+
+  @@map("regularize.partners")
+}
+
+model RegularizeNotification {
+  id              String @id @default(uuid())
+  user_id         String
+  regarding       String
+  regarding_id    String
+  title           String
+  message         String
+  reference_date  DateTime @default(now())
+  read            Boolean @default(false)
+  create_at       DateTime @default(now())
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  user            User @relation(fields: [user_id], references: [id])
+
+  @@map("notification.regularize")
+}
+
+model SitePasswordsRegularize {
+  id              String @id @default(uuid())
+  name            String
+  sphere          String
+  link            String?
+  user            String
+  password        String
+  status          Boolean @default(true)
+  organization_id String
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  passwords       PasswordRegularize[]
+
+  @@map("regularize.passowordsSites")
+}
+
+model PasswordRegularize {
+  id              String @id @default(uuid())
+  client_id       String
+  site_id         String
+  login           String
+  password        String
+  notes           String?
+  organization_id String
+  client          Client @relation(fields: [client_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  site            SitePasswordsRegularize @relation(fields: [site_id], references: [id])
+
+  @@map("regularize.passwordsRegularize")
+}
+
+model MunicipalTaxes {
+  id                   String   @id @default(uuid())
+  client_id            String
+  year                 Int
+  tff_is_applicable    Boolean
+  tff_amount           Float
+  tff_notes            String?
+  tff_analysis_is_done Boolean
+  tff_analysis_notes   String?
+  tff_sent_date        DateTime?
+  tff_due_date         DateTime?
+  tlp_is_applicable    Boolean
+  tlp_amount           Float
+  tlp_notes            String?
+  tlp_is_sent          String
+  tlp_sent_date        DateTime?
+  tlp_due_date         DateTime?
+  tlp_not_email        Boolean
+  tll_is_applicable    Boolean
+  tll_amount           Float
+  tll_notes            String?
+  tll_is_sent          String
+  tll_sent_date        DateTime?
+  tll_due_date         DateTime?
+  tll_analysis_is_done Boolean
+  tll_analysis_notes   String?
+  organization_id      String
+  client               Client @relation(fields: [client_id], references: [id])
+  organization         Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("regularize.municipalTaxes")
+}

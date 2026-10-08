@@ -13,7 +13,7 @@ export interface PessoalAuthContext {
 export function requireUserId(context: PessoalAuthContext): string {
   const userId = context.userId?.trim();
   if (!userId) {
-    throw new ServiceError(401, "Autenticacao obrigatoria.");
+    throw new ServiceError(401, "Autenticação obrigatória.");
   }
 
   return userId;
@@ -21,7 +21,7 @@ export function requireUserId(context: PessoalAuthContext): string {
 
 export function requireMinimumPermission(context: PessoalAuthContext, minPermission: number): void {
   if (typeof context.permission !== "number" || context.permission < minPermission) {
-    throw new ServiceError(403, "Permissao insuficiente para acessar o pessoal-service.");
+    throw new ServiceError(403, "Permissão insuficiente para acessar o Departamento Pessoal.");
   }
 }
 

@@ -1,7 +1,9 @@
+import { setupAPIClient } from "@shared/services/api";
 import { api } from "@shared/services/apiClient";
 
 import type {
   ReportComposition,
+  ReportCompositionV3,
   ReportCompositionPreview,
   ReportDownloadResult,
   ReportHistoryPage,
@@ -28,11 +30,11 @@ import {
 } from "./reportsService.contract";
 
 export const reportsService = {
-  async previewComposition(definition: ReportComposition): Promise<ReportCompositionPreview> {
+  async previewComposition(definition: ReportComposition | ReportCompositionV3): Promise<ReportCompositionPreview> {
     const response = await api.post(REPORTS_ENDPOINTS.preview, { definition });
     return unwrapReportCompositionPreview(response.data);
   },
-  async validateDefinition(definition: ReportComposition): Promise<void> {
+  async validateDefinition(definition: ReportComposition | ReportCompositionV3): Promise<void> {
     const response = await api.post("/reports/definitions/validate", { definition });
     unwrapReportsEnvelope(response.data);
   },
@@ -128,7 +130,11 @@ export const reportsService = {
     id: string,
     format: "pdf" | "csv" | "xlsx",
   ): Promise<ReportDownloadResult> {
-    const response = await api.get(REPORTS_ENDPOINTS.download(id), {
+    // O botão de download já mostra a falha; sem o toast global o erro não aparece duas vezes.
+    const downloadApi = setupAPIClient(undefined, undefined, undefined, {
+      notifyServerErrors: false,
+    });
+    const response = await downloadApi.get(REPORTS_ENDPOINTS.download(id), {
       params: { format },
       responseType: "blob",
     });

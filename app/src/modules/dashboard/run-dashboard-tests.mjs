@@ -76,6 +76,20 @@ runTest("dashboard distinguishes loading, retry and an empty activity feed", () 
   assert.match(dashboardComponent, /Nenhuma atividade recente/);
 });
 
+runTest("dashboard only renders recent activity for owners and platform super-admins", () => {
+  assert.match(dashboardComponent, /isOrganizationOwner\(user\)/);
+  assert.match(
+    dashboardComponent,
+    /user\?\.auth_kind === "platform" && user\.platform_role === "super_admin"/,
+  );
+  const cardStart = dashboardComponent.indexOf("{canViewRecentActivity ? (");
+  const cardEnd = dashboardComponent.indexOf("Ações Rápidas", cardStart);
+  assert.ok(cardStart >= 0 && cardEnd > cardStart);
+  const gatedCard = dashboardComponent.slice(cardStart, cardEnd);
+  assert.match(gatedCard, /Atividade Recente/);
+  assert.match(gatedCard, /\) : null\}/);
+});
+
 runTest("dashboard documents real financial, commercial and department indicators", () => {
   assert.match(dashboardTypes, /paidCertificateReceipts/);
   assert.match(dashboardTypes, /activeProspects/);
@@ -115,13 +129,75 @@ runTest("authenticated app shell does not mount legacy chat globally", () => {
 });
 
 
-runTest("dashboard last update uses the backend updatedAt timestamp", () => {
-  assert.match(dashboardComponent, /stats\?\.updatedAt/);
+runTest("dashboard last update shows when the data was fetched, in pt-BR 24h", () => {
+  // #1371: o updatedAt do servidor é o último dado alterado e parecia painel desatualizado.
+  assert.match(dashboardHook, /fetchedAt:\s*query\.dataUpdatedAt/);
+  assert.match(dashboardComponent, /formatDateTime\(fetchedAt \? new Date\(fetchedAt\) : null, "Sem atualização"\)/);
+  assert.doesNotMatch(dashboardComponent, /stats\?\.updatedAt/);
   assert.doesNotMatch(dashboardComponent, /const\s+now\s*=\s*new Date\(\)/);
 });
 
+runTest("dashboard charts render the loaded values without an entry animation", () => {
+  const series = dashboardComponent.match(/<(Area|Bar|Pie)\s[^>]*>/gs) ?? [];
+  assert.ok(series.length >= 4);
+  for (const element of series) {
+    assert.match(element, /isAnimationActive=\{false\}/, element.slice(0, 60));
+  }
+});
 
-runTest("dashboard last update rejects future timestamps", () => {
-  assert.match(dashboardComponent, /date\.getTime\(\) > Date\.now\(\)/);
-  assert.match(dashboardComponent, /Sem atualização/);
+runTest("dashboard charts show a message instead of an empty chart", () => {
+  assert.match(dashboardComponent, /Sem dados no período\./);
+  for (const flag of ["hasReceiptsData", "hasProjectsData", "hasPerformanceData"]) {
+    assert.match(dashboardComponent, new RegExp(`\\{${flag} \\? \\(`), flag);
+  }
+});
+
+runTest("dashboard hides the urgent notifications badge at zero", () => {
+  assert.match(dashboardComponent, /\{notificationSummary\.urgent > 0 \? \(/);
+});
+
+runTest("dashboard lists only departments with data behind a show-all toggle", () => {
+  assert.match(dashboardComponent, /departmentSummary\.filter\(hasTaskData\)/);
+  assert.match(dashboardComponent, /Mostrar todos \(\$\{departmentSummary\.length\}\)/);
+  assert.match(dashboardComponent, /visibleDepartments\.map/);
+});
+
+// #1369: resposta parcial ou fora do formato derrubava o dashboard; o erro remontava o app e
+// todo o shell era buscado de novo, multiplicando as requisições.
+const { normalizeDashboardStats } = await import("./services/dashboardStats.ts");
+
+runTest("dashboard stats are normalized so a partial response cannot crash the page", () => {
+  const fromArray = normalizeDashboardStats([]);
+  assert.equal(fromArray.totalClients, 0);
+  assert.deepEqual(fromArray.tasks, { today: 0, completedToday: 0, pending: 0, urgent: 0 });
+  assert.deepEqual(fromArray.notifications, { total: 0, urgent: 0, pending: 0 });
+  assert.deepEqual(fromArray.recentClients, []);
+  assert.equal(fromArray.updatedAt, null);
+
+  const partial = normalizeDashboardStats({ totalClients: 4, tasks: { today: 2 }, projects: null });
+  assert.equal(partial.totalClients, 4);
+  assert.deepEqual(partial.tasks, { today: 2, completedToday: 0, pending: 0, urgent: 0 });
+  assert.deepEqual(partial.projects, { active: 0, completed: 0, inProgress: 0, delayed: 0, waiting: 0 });
+  assert.deepEqual(partial.commercial.billing, { pending: 0, contracted: 0, notContracted: 0 });
+  assert.deepEqual(partial.departments, []);
+});
+
+runTest("dashboard stats drop activities that are raw API routes (#1371)", () => {
+  const activity = { user: "Ana", avatar: "A", tone: "blue", createdAt: null };
+  const stats = normalizeDashboardStats({
+    activities: [
+      { ...activity, action: "acessou", item: "/user/me" },
+      { ...activity, action: "/clients", item: "registro" },
+      { ...activity, action: "cadastrou", item: "um novo cliente" },
+      null,
+    ],
+  });
+  assert.deepEqual(
+    stats.activities.map((item) => `${item.action} ${item.item}`),
+    ["cadastrou um novo cliente"],
+  );
+});
+
+runTest("dashboard service normalizes the stats payload", () => {
+  assert.match(dashboardService, /normalizeDashboardStats\(/);
 });

@@ -1,6 +1,7 @@
 import { setupAPIClient } from "@shared/services/api";
 
 import type {
+  ClientGroup,
   Client,
   ClientCompanyLookup,
   ClientFinanceRecord,
@@ -10,6 +11,10 @@ import type {
   ClientHistoryPendingItem,
   ClientListFilters,
   ClientListPage,
+  ClientCoringaFilters,
+  ClientCoringaPage,
+  ClientInstagramProfileFilters,
+  ClientInstagramProfilePage,
   CreateClientPayload,
   CreateClientData,
   CreateClientIntegrationPayload,
@@ -26,13 +31,53 @@ import type {
   UpdateClientData,
 } from "../types";
 import {
+  CLIENT_GROUP_ENDPOINTS,
   buildClientListParams,
   CLIENT_ENDPOINTS,
   unwrapClientEnvelope,
   unwrapClientPaDetail,
 } from "./clientService.contract";
+import { toHistoryIsoDate } from "../utils/historyDate";
 
 export const clientService = {
+  async listGroups(): Promise<ClientGroup[]> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_GROUP_ENDPOINTS.list);
+    return unwrapClientEnvelope<ClientGroup[]>(response.data);
+  },
+
+  async createGroup(name: string): Promise<ClientGroup> {
+    const api = setupAPIClient();
+    const response = await api.post(CLIENT_GROUP_ENDPOINTS.create, { name });
+    return unwrapClientEnvelope<ClientGroup>(response.data);
+  },
+
+  async updateGroup(id: string, name: string): Promise<ClientGroup> {
+    const api = setupAPIClient();
+    const response = await api.patch(CLIENT_GROUP_ENDPOINTS.detail(id), { name });
+    return unwrapClientEnvelope<ClientGroup>(response.data);
+  },
+
+  async replaceGroupClients(id: string, client_ids: string[]): Promise<{ id: string; clients: { id: string }[] }> {
+    const api = setupAPIClient();
+    const response = await api.put(CLIENT_GROUP_ENDPOINTS.clients(id), { client_ids });
+    return unwrapClientEnvelope<{ id: string; clients: { id: string }[] }>(response.data);
+  },
+
+  async listCoringa(filters: ClientCoringaFilters): Promise<ClientCoringaPage> {
+    const response = await setupAPIClient().get(CLIENT_ENDPOINTS.coringaList, { params: filters });
+    return unwrapClientEnvelope<ClientCoringaPage>(response.data);
+  },
+
+  async downloadCoringaPdf(filters: ClientCoringaFilters): Promise<Blob> {
+    const { page: _page, limit: _limit, ...allFilteredRows } = filters;
+    const response = await setupAPIClient().get(CLIENT_ENDPOINTS.coringaPdf, {
+      params: allFilteredRows,
+      responseType: "blob",
+    });
+    return response.data as Blob;
+  },
+
   async list(filters: ClientListFilters = {}): Promise<ClientListPage> {
     const api = setupAPIClient();
     const response = await api.get(CLIENT_ENDPOINTS.list, {
@@ -40,6 +85,15 @@ export const clientService = {
     });
 
     return unwrapClientEnvelope<ClientListPage>(response.data);
+  },
+
+  async listInstagramProfiles(
+    filters: ClientInstagramProfileFilters,
+  ): Promise<ClientInstagramProfilePage> {
+    const api = setupAPIClient();
+    const response = await api.get(CLIENT_ENDPOINTS.instagramProfilesReport, { params: filters });
+
+    return unwrapClientEnvelope<ClientInstagramProfilePage>(response.data);
   },
 
   async getById(id: string): Promise<Client | null> {
@@ -71,7 +125,8 @@ export const clientService = {
   },
 
   async lookupCnpj(cnpj: string): Promise<ClientCompanyLookup> {
-    const api = setupAPIClient();
+    // Consulta opcional: a falha aparece no formulário, que continua salvando normalmente.
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     const response = await api.get(CLIENT_ENDPOINTS.lookupCnpj, { params: { cnpj } });
 
     return unwrapClientEnvelope<ClientCompanyLookup>(response.data);
@@ -158,7 +213,7 @@ export const clientService = {
   async createHistory(clientId: string, payload: CreateClientHistoryPayload): Promise<ClientHistoryItem> {
     const api = setupAPIClient();
     const formData = new FormData();
-    formData.append("date", new Date(payload.date).toISOString());
+    formData.append("date", toHistoryIsoDate(payload.date));
     formData.append("history", payload.history);
 
     if (payload.pending_id) {
@@ -182,7 +237,10 @@ export const clientService = {
     payload: UpdateClientHistoryPayload,
   ): Promise<ClientHistoryItem> {
     const api = setupAPIClient();
-    const response = await api.patch(CLIENT_ENDPOINTS.updateHistory(clientId, historyId), payload);
+    const response = await api.patch(CLIENT_ENDPOINTS.updateHistory(clientId, historyId), {
+      ...payload,
+      date: toHistoryIsoDate(payload.date),
+    });
 
     return unwrapClientEnvelope<ClientHistoryItem>(response.data);
   },
@@ -207,6 +265,13 @@ export const clientService = {
     }
 
     return data as ClientHistoryPendingItem[];
+  },
+
+  async deleteHistory(clientId: string, historyId: string): Promise<{ ok: boolean }> {
+    const api = setupAPIClient();
+    const response = await api.delete(CLIENT_ENDPOINTS.deleteHistory(clientId, historyId));
+
+    return unwrapClientEnvelope<{ ok: boolean }>(response.data);
   },
 
   async deleteHistoryPending(pendingId: string): Promise<{ ok: boolean }> {

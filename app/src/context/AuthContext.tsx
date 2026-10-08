@@ -1,13 +1,14 @@
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Router from "next/router";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import "react-toastify/dist/ReactToastify.css";
 
 import { MODULE_KEYS } from "@modules/auth/utils/moduleAccess";
 import { SessionTransitionScreen } from "@shared/components/SessionTransitionScreen";
 import { api } from "@shared/services/apiClient";
 import { platformApi } from "@shared/services/api";
+import { parseMeResponse } from "@workspace/api";
 import { ME_QUERY_KEY } from "@shared/hooks";
 import {
     createAuthInvalidationHandler,
@@ -15,6 +16,12 @@ import {
     registerAuthInvalidationHandler,
 } from "./authInvalidation";
 import { clearPlatformQueryCache } from "./platformQueryCache";
+
+interface ImpersonationSessionInfo {
+    operator: { id: string; name: string };
+    expires_at: string;
+    organization_name: string;
+}
 
 interface UserProps {
     id: string;
@@ -30,6 +37,8 @@ interface UserProps {
     task_completion?: boolean;
     auth_kind?: "organization" | "platform";
     platform_role?: "super_admin";
+    can_impersonate?: boolean;
+    impersonation?: ImpersonationSessionInfo;
 }
 
 interface SignInProps {
@@ -49,6 +58,8 @@ interface AuthContextData {
     signInPlatform: (credentials: PlatformSignInProps) => Promise<void>;
     logoutUser: () => Promise<void>;
     logoutPlatform: () => Promise<void>;
+    exitImpersonation: () => Promise<void>;
+    expireImpersonation: () => void;
     refreshSession: () => Promise<UserProps | null>;
     refreshPlatformSession: () => Promise<UserProps | null>;
     loading: boolean;
@@ -62,6 +73,50 @@ export const AuthContext = createContext({} as AuthContextData);
 const SESSION_TRANSITION_MIN_DURATION_MS = 380;
 const AUTH_DIAGNOSTIC_LOGS_ENABLED = process.env.NODE_ENV !== "production";
 const REGULARIZE_QUERY_ROOT = ["regularize"] as const;
+const IMPERSONATION_EXPIRY_STORAGE_KEY = "giro-office:impersonation-expires-at";
+
+function rememberImpersonationExpiry(expiresAt?: string) {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    try {
+        if (expiresAt) {
+            window.sessionStorage.setItem(IMPERSONATION_EXPIRY_STORAGE_KEY, expiresAt);
+        } else {
+            window.sessionStorage.removeItem(IMPERSONATION_EXPIRY_STORAGE_KEY);
+        }
+    } catch {
+        // A sessão continua segura mesmo se o navegador bloquear sessionStorage.
+    }
+}
+
+function consumeExpiredImpersonationExpiry(): boolean {
+    if (typeof window === "undefined") {
+        return false;
+    }
+
+    try {
+        const expiresAt = window.sessionStorage.getItem(IMPERSONATION_EXPIRY_STORAGE_KEY);
+        if (!expiresAt) {
+            return false;
+        }
+
+        const expiresAtMs = Date.parse(expiresAt);
+        if (!Number.isFinite(expiresAtMs)) {
+            window.sessionStorage.removeItem(IMPERSONATION_EXPIRY_STORAGE_KEY);
+            return false;
+        }
+        if (expiresAtMs > Date.now()) {
+            return false;
+        }
+
+        window.sessionStorage.removeItem(IMPERSONATION_EXPIRY_STORAGE_KEY);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 function clearRegularizeQueryCache(queryClient: ReturnType<typeof useQueryClient>) {
     queryClient.removeQueries({ queryKey: REGULARIZE_QUERY_ROOT });
@@ -95,6 +150,21 @@ function isValidAuthUser(data: unknown): data is UserProps {
         typeof (data as UserProps).permission === "number";
 }
 
+function isValidImpersonationSessionInfo(value: unknown): value is ImpersonationSessionInfo {
+    if (!value || typeof value !== "object") {
+        return false;
+    }
+
+    const info = value as ImpersonationSessionInfo;
+    return (
+        typeof info.operator?.id === "string" &&
+        typeof info.operator.name === "string" &&
+        typeof info.expires_at === "string" &&
+        Number.isFinite(Date.parse(info.expires_at)) &&
+        typeof info.organization_name === "string"
+    );
+}
+
 function isValidPlatformUser(data: unknown): data is UserProps {
     return !!data &&
         typeof data === "object" &&
@@ -102,7 +172,8 @@ function isValidPlatformUser(data: unknown): data is UserProps {
         typeof (data as UserProps).name === "string" &&
         typeof (data as UserProps).email === "string" &&
         (data as UserProps).auth_kind === "platform" &&
-        (data as UserProps).platform_role === "super_admin";
+        (data as UserProps).platform_role === "super_admin" &&
+        typeof (data as UserProps).can_impersonate === "boolean";
 }
 
 function buildCurrentUser(
@@ -129,6 +200,9 @@ function buildCurrentUser(
                 : null,
         modules,
         auth_kind: "organization",
+        impersonation: isValidImpersonationSessionInfo(data.impersonation)
+            ? data.impersonation
+            : undefined,
     };
 }
 
@@ -144,6 +218,7 @@ function buildPlatformUser(data: UserProps): UserProps {
         modules: {},
         auth_kind: "platform",
         platform_role: "super_admin",
+        can_impersonate: data.can_impersonate,
     };
 }
 
@@ -156,13 +231,23 @@ function isAccessDenied(error: unknown): boolean {
     return status === 401 || status === 403;
 }
 
-export function signOut(message = "Sessão expirada. Faça login novamente.") {
+export function signOut(
+    message = "Sessão expirada. Faça login novamente.",
+    destination = "/login",
+) {
     try {
+        const impersonationExpired = consumeExpiredImpersonationExpiry();
+        const showImpersonationExpiry =
+            impersonationExpired ||
+            (message === "Sua personificação expirou" && destination === "/super-admin/login");
+        rememberImpersonationExpiry();
         invalidateAuthSession();
-        toast.error(message, {
-            toastId: "auth-session-expired",
+        toast.error(showImpersonationExpiry ? "Sua personificação expirou" : message, {
+            toastId: showImpersonationExpiry
+                ? "impersonation-session-expired"
+                : "auth-session-expired",
         });
-        void Router.push("/login");
+        void Router.push(impersonationExpired ? "/super-admin/login" : destination);
     } catch (error) {
         logAuthError("Erro ao deslogar", error);
     }
@@ -225,6 +310,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             const currentUser = buildCurrentUser(userData);
+            rememberImpersonationExpiry(currentUser.impersonation?.expires_at);
             setUser(currentUser);
             await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
 
@@ -259,6 +345,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             const currentUser = buildPlatformUser(userData);
+            rememberImpersonationExpiry();
             setUser(currentUser);
             await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
             return currentUser;
@@ -286,7 +373,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 const userData = response.data?.data;
 
                 if (isCurrentAuthTransition(requestVersion) && isValidAuthUser(userData)) {
-                    setUser(buildCurrentUser(userData));
+                    // Semeia o cache do useMe com a mesma resposta: sem isso o shell pedia
+                    // /user/me de novo logo depois (#1369).
+                    try {
+                        queryClient.setQueryData(ME_QUERY_KEY, parseMeResponse(response.data));
+                    } catch {
+                        // Formato inesperado: o useMe busca por conta própria, como antes.
+                    }
+                    const currentUser = buildCurrentUser(userData);
+                    rememberImpersonationExpiry(currentUser.impersonation?.expires_at);
+                    setUser(currentUser);
                 }
             } catch (error) {
                 if (!isAccessDenied(error)) {
@@ -299,11 +395,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     const userData = response.data?.data;
 
                     if (isCurrentAuthTransition(requestVersion) && isValidPlatformUser(userData)) {
+                        rememberImpersonationExpiry();
                         setUser(buildPlatformUser(userData));
                     }
                 } catch (platformError) {
                     if (!isAccessDenied(platformError)) {
                         logAuthError("Erro ao verificar sessão da plataforma:", platformError);
+                    } else if (consumeExpiredImpersonationExpiry()) {
+                        toast.error("Sua personificação expirou", {
+                            toastId: "impersonation-session-expired",
+                        });
+                        void Router.replace("/super-admin/login");
                     }
                 }
             } finally {
@@ -337,6 +439,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             const currentUser = buildCurrentUser(sessionData);
+            rememberImpersonationExpiry(currentUser.impersonation?.expires_at);
             setUser(currentUser);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             clearRegularizeQueryCache(queryClient);
@@ -349,8 +452,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
 
             if (error.code === "ECONNREFUSED" || error.code === "ERR_NETWORK" || !error.response) {
-                const url = process.env.NEXT_PUBLIC_API_URL || "nao definida";
-                toast.error("Erro de conexao! Verifique se o servidor esta rodando.");
+                const url = process.env.NEXT_PUBLIC_API_URL || "não definida";
+                toast.error("Não foi possível conectar. Verifique sua internet e tente novamente.");
                 logAuthError("Erro de conexao no login:", {
                     code: error.code,
                     message: error.message,
@@ -365,12 +468,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 throw error;
             }
 
+            // Credencial invalida: a pagina de login ja mostra a mensagem no formulario.
             if (error.response?.status === 401 || error.response?.status === 400) {
-                const errorMessage =
-                    error.response?.data?.error ||
-                    error.response?.data?.message ||
-                    "Usuário e/ou senha incorretos!";
-                toast.error(errorMessage);
                 logAuthError("Erro de autenticacao:", error.response?.data);
                 throw error;
             }
@@ -396,6 +495,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         setUser(buildPlatformUser(userData));
+        rememberImpersonationExpiry();
         queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
         clearRegularizeQueryCache(queryClient);
         await clearPlatformQueryCache(queryClient);
@@ -417,6 +517,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             toast.error("Erro ao sair!");
             logAuthError("Erro ao sair:", err);
         } finally {
+            rememberImpersonationExpiry();
             setUser(null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             clearRegularizeQueryCache(queryClient);
@@ -436,6 +537,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             toast.error("Erro ao sair!");
             logAuthError("Erro ao sair da plataforma:", err);
         } finally {
+            rememberImpersonationExpiry();
             setUser(null);
             queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
             clearRegularizeQueryCache(queryClient);
@@ -443,6 +545,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
             await wait(SESSION_TRANSITION_MIN_DURATION_MS);
             await Router.push("/super-admin/login");
         }
+    }
+
+    async function exitImpersonation() {
+        const requestVersion = beginAuthTransition();
+        try {
+            const response = await platformApi.post("/platform/impersonation/exit");
+            if (!isCurrentAuthTransition(requestVersion)) {
+                return;
+            }
+
+            const identity = response.data?.data?.identity;
+            rememberImpersonationExpiry();
+            setUser(isValidPlatformUser(identity) ? buildPlatformUser(identity) : null);
+            queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+            clearRegularizeQueryCache(queryClient);
+            await clearPlatformQueryCache(queryClient);
+            await Router.push(isValidPlatformUser(identity) ? "/super-admin" : "/super-admin/login");
+        } catch (error) {
+            if (isCurrentAuthTransition(requestVersion)) {
+                toast.error("Não foi possível sair da personificação.");
+                logAuthError("Erro ao encerrar personificação:", error);
+            }
+            throw error;
+        }
+    }
+
+    function expireImpersonation() {
+        if (!user?.impersonation) {
+            return;
+        }
+        signOut("Sua personificação expirou", "/super-admin/login");
     }
 
     if (loading) {
@@ -462,6 +595,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             signInPlatform,
             logoutUser,
             logoutPlatform,
+            exitImpersonation,
+            expireImpersonation,
             refreshSession,
             refreshPlatformSession,
             loading,

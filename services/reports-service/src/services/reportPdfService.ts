@@ -1,6 +1,8 @@
-import { createRequire } from "node:module";
-
+/// <reference path="../pdfkitStandalone.d.ts" />
 import { ServiceError } from "@workspace/shared";
+// Build standalone do pdfkit (fontes AFM embutidas, sem fs): roda no Node e no workerd.
+// O `require("pdfkit")` em runtime nao entra no bundle do Worker e quebrava o export em PDF.
+import PdfDocument from "pdfkit/js/pdfkit.standalone.js";
 
 import type { ReportLetterheadService } from "./reportLetterheadService.js";
 
@@ -42,7 +44,12 @@ export interface PdfDocumentOptions {
 
 export interface PdfDocumentLike {
   on(event: string, listener: (value?: unknown) => void): this;
-  image(source: Buffer, x: number, y: number, options: { width: number; height: number }): this;
+  image(
+    source: Buffer | ArrayBuffer,
+    x: number,
+    y: number,
+    options: { width: number; height: number },
+  ): this;
   fillColor(color: string): this;
   rect(x: number, y: number, width: number, height: number): this;
   fill(): this;
@@ -69,6 +76,7 @@ export interface ReportPdfRenderInput {
   organizationId: string;
   departmentId?: string;
   scope: "personal" | "shared";
+  letterhead?: { id: string; sha256: string };
   presentation_json: unknown;
   rows: readonly Record<string, unknown>[];
   blocks?: readonly ReportPdfBlock[];
@@ -92,9 +100,9 @@ export interface ReportPdfRenderer {
 }
 
 function defaultDocumentFactory(options: PdfDocumentOptions): PdfDocumentLike {
-  const require = createRequire(import.meta.url);
-  const PdfDocument = require("pdfkit") as new (options: PdfDocumentOptions) => PdfDocumentLike;
-  return new PdfDocument(options);
+  return new (PdfDocument as unknown as new (options: PdfDocumentOptions) => PdfDocumentLike)(
+    options,
+  );
 }
 
 function presentationColumns(value: unknown): { title?: string; columns: PresentationColumn[] } {
@@ -197,6 +205,7 @@ export class ReportPdfService implements ReportPdfRenderer {
       organizationId: input.organizationId,
       departmentId: input.departmentId,
       scope: input.scope,
+      selected: input.letterhead,
     });
     const document = this.createDocument({
       size: "A4",
@@ -206,7 +215,7 @@ export class ReportPdfService implements ReportPdfRenderer {
 
     const chunks: Buffer[] = [];
     return new Promise<Buffer>((resolve, reject) => {
-      document.on("data", (chunk) => chunks.push(Buffer.from(chunk as Uint8Array)));
+      document.on("data", (chunk) => chunks.push(Buffer.from(new Uint8Array(chunk as Uint8Array))));
       document.on("end", () => resolve(Buffer.concat(chunks)));
       document.on("error", (error) => reject(error));
 
@@ -272,7 +281,12 @@ export class ReportPdfService implements ReportPdfRenderer {
     generatedAt: Date,
   ): void {
     if (background) {
-      document.image(background, 0, 0, { width: A4_WIDTH, height: A4_HEIGHT });
+      // O shim de Buffer do standalone nao reconhece o Buffer do runtime: passa ArrayBuffer exato.
+      const bytes = background.buffer.slice(
+        background.byteOffset,
+        background.byteOffset + background.byteLength,
+      ) as ArrayBuffer;
+      document.image(bytes, 0, 0, { width: A4_WIDTH, height: A4_HEIGHT });
     } else {
       document.fillColor(FALLBACK_COLOR).rect(0, 0, A4_WIDTH, A4_HEIGHT).fill();
       document

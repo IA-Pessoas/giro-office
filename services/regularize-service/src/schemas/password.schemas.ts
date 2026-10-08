@@ -4,23 +4,23 @@ import { booleanQuerySchema, idQuerySchema } from "./common.schemas.js";
 
 export const createPasswordBodySchema = z
   .object({
-    client_id: z.string().uuid("client_id invalido."),
-    site_id: z.string().uuid("site_id invalido."),
-    login: z.string().min(1, "login obrigatorio."),
-    password: z.string().min(1, "password obrigatorio."),
+    client_id: z.string().uuid("client_id inválido."),
+    site_id: z.string().uuid("site_id inválido."),
+    login: z.string().min(1, "login obrigatório."),
+    password: z.string().min(1, "password obrigatório."),
     notes: z.string().nullable().optional(),
   })
   .strict();
 
 export const updatePasswordBodySchema = createPasswordBodySchema
   .extend({
-    id: z.string().uuid("id invalido."),
+    id: z.string().uuid("id inválido."),
   })
   .strict();
 
 export const listPasswordsQuerySchema = z
   .object({
-    client_id: z.string().uuid("client_id invalido."),
+    client_id: z.string().uuid("client_id inválido."),
   })
   .strict();
 
@@ -28,17 +28,17 @@ export const passwordDetailQuerySchema = idQuerySchema;
 
 export const createSitePasswordBodySchema = z
   .object({
-    name: z.string().min(1, "name obrigatorio."),
-    sphere: z.string().min(1, "sphere obrigatorio."),
-    link: z.string().url("link invalido.").nullable().optional(),
-    user: z.string().min(1, "user obrigatorio."),
-    password: z.string().min(1, "password obrigatorio."),
+    name: z.string().min(1, "name obrigatório."),
+    sphere: z.string().min(1, "sphere obrigatório."),
+    link: z.string().url("link inválido.").nullable().optional(),
+    user: z.string().min(1, "user obrigatório."),
+    password: z.string().min(1, "password obrigatório."),
   })
   .strict();
 
 export const updateSitePasswordBodySchema = createSitePasswordBodySchema
   .extend({
-    id: z.string().uuid("id invalido."),
+    id: z.string().uuid("id inválido."),
     status: z.boolean(),
   })
   .strict();

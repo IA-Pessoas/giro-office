@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from "@shared/services/toast";
 import 'react-toastify/dist/ReactToastify.css';
 import { resolvePhotoUrl } from "@shared/utils";
 import { organizationService } from '../services/organizationService';

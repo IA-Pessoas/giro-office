@@ -1,0 +1,23 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "giro-commercial-service",
+  "main": "src/index.ts",
+  "workers_dev": false,
+  "compatibility_date": "2026-09-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "services": [
+    { "binding": "CLIENT_SERVICE", "service": "giro-client-service" },
+    { "binding": "TASK_SERVICE", "service": "giro-task-service" },
+    { "binding": "USER_SERVICE", "service": "giro-user-service" },
+    { "binding": "AUDIT_SERVICE", "service": "giro-audit-service" }
+  ],
+  "triggers": { "crons": ["*/1 * * * *"] },
+  // Base das URLs que o cron envia por Service Binding; o binding ignora o host.
+  "vars": { "NODE_ENV": "production", "INTERNAL_REQUEST_ORIGIN": "https://commercial.internal" },
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "d55eed5322d44499b96e8ab4163b50fe" }],
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": true },
+    "traces": { "enabled": true }
+  }
+}

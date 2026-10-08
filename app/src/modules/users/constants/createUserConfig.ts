@@ -1,8 +1,8 @@
 import type { PermissionLevel } from "./permissionConfig";
 
 export const TEMPORARY_DEPARTMENTS = [
-  { id: "default-department", name: "Administracao" },
-  { id: "dept-admin", name: "Administracao" },
+  { id: "default-department", name: "Administração" },
+  { id: "dept-admin", name: "Administração" },
   { id: "dept-comercial", name: "Comercial" },
   { id: "dept-contabil", name: "Contabil" },
   { id: "dept-financeiro", name: "Financeiro" },
@@ -25,7 +25,7 @@ export const CREATE_USER_MODULE_OPTIONS = [
   { key: "contabil", label: "Contábil" },
   { key: "financeiro", label: "Financeiro" },
   { key: "fiscal", label: "Fiscal" },
-  { key: "integracao", label: "Integracao" },
+  { key: "integracao", label: "Integração" },
   { key: "marketing", label: "Marketing" },
   { key: "parcelamento", label: "Parcelamento" },
   { key: "pessoal", label: "Pessoal" },

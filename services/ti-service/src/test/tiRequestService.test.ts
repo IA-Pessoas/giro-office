@@ -171,11 +171,13 @@ describe("TiRequestService", () => {
       title: "Notebook nao liga",
       description: "Equipamento nao inicia apos queda de energia.",
       category_id: categoryId,
+      anydesk_code: "123 456 789",
       urgency: "High",
     });
 
     expect(result).toMatchObject({
       id: "req-1",
+      anydesk_code: "123 456 789",
       requester_id: userId,
       status: "New",
       organization_id: organizationId,
@@ -192,13 +194,14 @@ describe("TiRequestService", () => {
           title: "Acesso",
           description: "Criar acesso.",
           category_id: categoryId,
+          anydesk_code: "123456789",
           requester_id: otherUserId,
           urgency: "Low",
         },
       ),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para criar chamado para outro usuario.",
+      message: "Permissão insuficiente para criar chamado para outro usuário.",
     });
   });
 
@@ -220,6 +223,7 @@ describe("TiRequestService", () => {
         title: "Acesso",
         description: "Criar acesso.",
         category_id: categoryId,
+        anydesk_code: "123456789",
         requester_id: otherUserId,
         urgency: "Low",
       },
@@ -283,7 +287,7 @@ describe("TiRequestService", () => {
       ),
     ).rejects.toMatchObject({
       statusCode: 404,
-      message: "Chamado de TI nao encontrado.",
+      message: "Chamado de TI não encontrado.",
     });
   });
 
@@ -301,7 +305,7 @@ describe("TiRequestService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para esta transicao.",
+      message: "Permissão insuficiente para esta transição.",
     });
   });
 
@@ -319,7 +323,7 @@ describe("TiRequestService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para esta transicao.",
+      message: "Permissão insuficiente para esta transição.",
     });
   });
 
@@ -422,7 +426,7 @@ describe("TiRequestService", () => {
       }),
     ).rejects.toMatchObject({
       statusCode: 409,
-      message: "Chamado de TI foi transferido por outro usuario.",
+      message: "Chamado de TI foi transferido por outro usuário.",
     });
 
     expect(prisma.tIRequest.updateMany).toHaveBeenCalledWith({
@@ -446,7 +450,7 @@ describe("TiRequestService", () => {
       ),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para transferir chamado.",
+      message: "Permissão insuficiente para transferir chamado.",
     });
   });
 
@@ -488,7 +492,7 @@ describe("TiRequestService", () => {
       ),
     ).rejects.toMatchObject({
       statusCode: 403,
-      message: "Permissao insuficiente para transferir chamado.",
+      message: "Permissão insuficiente para transferir chamado.",
     });
   });
 
@@ -526,7 +530,7 @@ describe("TiRequestService", () => {
       service.assign(context, requestId, { assigned_to_id: financeUserId }),
     ).rejects.toMatchObject({
       statusCode: 400,
-      message: "Responsavel deve pertencer ao departamento Tecnologia.",
+      message: "Responsável deve pertencer ao departamento Tecnologia.",
     });
   });
 
@@ -542,7 +546,7 @@ describe("TiRequestService", () => {
       service.assign(context, requestId, { assigned_to_id: inactiveTiUserId }),
     ).rejects.toMatchObject({
       statusCode: 400,
-      message: "Responsavel deve pertencer ao departamento Tecnologia.",
+      message: "Responsável deve pertencer ao departamento Tecnologia.",
     });
   });
 });

@@ -1,13 +1,11 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Boxes, Eye, Pencil, Plus, RotateCcw, Save, Tags, UserPlus, X } from "lucide-react";
+import { Boxes, Eye, Pencil, Plus, RotateCcw, Save, Tags, Trash2, UserPlus, X } from "lucide-react";
 
 import { useModuleAccess } from "@modules/auth";
-import { departmentService, type DepItem } from "@modules/departments";
 import { useAssignableUsers } from "@modules/rh";
 import { ConfirmationDialog } from "@shared/components";
 import { Dialog } from "@shared/components/ui/Dialog";
 import { StatusBadge, type StatusBadgeConfig } from "@shared/components/StatusBadge";
-import { useFetch } from "@shared/hooks";
 import { cn } from "@shared/ui/newLayout/utils";
 
 import {
@@ -18,6 +16,7 @@ import {
   useTiInventory,
   useTiInventoryAsset,
   useTiInventoryCategories,
+  useTiInventoryLocations,
   useUpdateTiInventoryAssetMutation,
   useUpdateTiInventoryCategoryMutation,
 } from "../hooks";
@@ -161,6 +160,11 @@ function getCatalogStatus(
   return item.status ?? item.active ?? item.is_active;
 }
 
+function isCatalogActive(item: Parameters<typeof getCatalogStatus>[0]): boolean {
+  const status = getCatalogStatus(item);
+  return status !== false && status !== "inactive" && status !== "Inativo";
+}
+
 function getRelatedUserName(value: unknown): string | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
@@ -240,6 +244,8 @@ export function TiInventoryTab() {
   const [pendingAction, setPendingAction] = useState<PendingInventoryAction | null>(null);
   const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<TiInventoryCategory | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<TiInventoryCategory | null>(null);
+  const [categoryDeleteError, setCategoryDeleteError] = useState<string | null>(null);
   const isUserSelectorEnabled =
     canManage && (dialogState?.type === "asset" || dialogState?.type === "assign");
   const assetUsersQuery = useAssignableUsers({ enabled: isUserSelectorEnabled });
@@ -260,11 +266,8 @@ export function TiInventoryTab() {
 
   const inventoryQuery = useTiInventory(filters);
   const categoriesQuery = useTiInventoryCategories();
-  const departmentsQuery = useFetch<DepItem[]>(
-    ["ti-inventory", "departments"],
-    () => departmentService.list(),
-    { retry: false },
-  );
+  // "Departamento" do ativo é um local de inventário: é a FK e o que o backend valida.
+  const departmentsQuery = useTiInventoryLocations();
   const selectedAssetQuery = useTiInventoryAsset(selectedAssetId, { enabled: Boolean(selectedAssetId) });
 
   const createAssetMutation = useCreateTiInventoryAssetMutation();
@@ -287,7 +290,7 @@ export function TiInventoryTab() {
   const categoryOptions = useMemo(
     () => [
       { value: "", label: "Todas" },
-      ...(categoriesQuery.data ?? []).map((category) => ({
+      ...(categoriesQuery.data ?? []).filter(isCatalogActive).map((category) => ({
         value: String(category.id),
         label: getText(category.name, "Categoria sem nome"),
       })),
@@ -297,7 +300,7 @@ export function TiInventoryTab() {
 
   const departmentOptions = useMemo(
     () =>
-      (departmentsQuery.data ?? []).map((department) => ({
+      (departmentsQuery.data ?? []).filter(isCatalogActive).map((department) => ({
         value: String(department.id),
         label: getText(department.name, "Departamento sem nome"),
       })),
@@ -316,7 +319,7 @@ export function TiInventoryTab() {
 
   const assetUserOptions = useMemo(
     () => [
-      { value: "", label: "NÃ£o atribuir" },
+      { value: "", label: "Não atribuir" },
       ...(assetUsersQuery.data ?? []).map((user) => ({
         value: user.id,
         label: user.name,
@@ -327,7 +330,7 @@ export function TiInventoryTab() {
 
   const technologyResponsibleOptions = useMemo(
     () => [
-      { value: "", label: "NÃ£o atribuir" },
+      { value: "", label: "Não atribuir" },
       ...(technologyResponsibleUsersQuery.data ?? []).map((user) => ({
         value: user.id,
         label: user.name,
@@ -735,6 +738,37 @@ export function TiInventoryTab() {
       </Dialog>
 
       <ConfirmationDialog
+        open={categoryToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCategoryToDelete(null);
+            setCategoryDeleteError(null);
+          }
+        }}
+        title="Excluir categoria"
+        description={`Deseja excluir a categoria "${getText(categoryToDelete?.name, "Categoria sem nome")}"? Ela deixa de aparecer nas listas e no cadastro de ativos.`}
+        onConfirm={async () => {
+          if (!categoryToDelete) return;
+          try {
+            // Exclusão lógica: o backend não apaga categoria, só desativa.
+            await updateCategoryMutation.mutateAsync({
+              id: categoryToDelete.id,
+              payload: { active: false },
+            });
+            setCategoryToDelete(null);
+            setCategoryDeleteError(null);
+          } catch {
+            setCategoryDeleteError("Não foi possível excluir a categoria. Tente novamente.");
+          }
+        }}
+        isConfirming={updateCategoryMutation.isPending}
+        errorMessage={categoryDeleteError}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+        variant="destructive"
+      />
+
+      <ConfirmationDialog
         open={pendingAction !== null}
         onOpenChange={(open) => {
           if (!open) {
@@ -1033,7 +1067,7 @@ export function TiInventoryTab() {
           >
             {(categories) => (
               <TiDataTable headers={["Categoria", "Descrição", "Status", ""]}>
-                {categories.map((category) => {
+                {categories.filter(isCatalogActive).map((category) => {
                   const isEditingCategory = String(editingCategory?.id) === String(category.id);
 
                   return (
@@ -1049,19 +1083,27 @@ export function TiInventoryTab() {
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
                           {isEditingCategory ? (
                             <StatusBadge
                               config={{ label: "Em edição", variant: "info" }}
                               className={tiStatusBadgeClassName}
                             />
                           ) : (
-                            <TiTableAction
-                              icon={Pencil}
-                              label="Editar"
-                              disabled={!canManage}
-                              onClick={() => startEditingCategory(category)}
-                            />
+                            <>
+                              <TiTableAction
+                                icon={Pencil}
+                                label="Editar"
+                                disabled={!canManage}
+                                onClick={() => startEditingCategory(category)}
+                              />
+                              <TiTableAction
+                                icon={Trash2}
+                                label="Excluir"
+                                disabled={!canManage}
+                                onClick={() => setCategoryToDelete(category)}
+                              />
+                            </>
                           )}
                         </div>
                       </td>

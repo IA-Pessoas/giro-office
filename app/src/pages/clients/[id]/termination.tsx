@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useMemo, useState, type ChangeEvent } from "react";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientTerminationForm } from "@modules/clients/components/ClientTerminationForm";
@@ -14,6 +14,10 @@ import {
   createTerminationInitialValues,
   isValidCompetenceOutput,
 } from "@modules/clients/utils/terminationForm";
+import {
+  getClientLifecycleActions,
+  mapClientStatusFromApi,
+} from "@modules/clients/utils/statusMapper";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -112,6 +116,10 @@ export default function ClientTerminationPage() {
         ) : !client ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-500 dark:text-slate-400`}>
             Cliente não encontrado.
+          </section>
+        ) : !getClientLifecycleActions(mapClientStatusFromApi(client.status)).canTerminate ? (
+          <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-600 dark:text-slate-300`}>
+            A inativação só está disponível para clientes ativos.
           </section>
         ) : !integracaoAccess.isAdmin ? (
           <section className={`${PANEL_CLASSNAME} p-6 text-sm text-slate-600 dark:text-slate-300`}>

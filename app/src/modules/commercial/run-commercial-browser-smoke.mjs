@@ -12,7 +12,7 @@ import { chromium } from "@playwright/test";
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
 
-const PORT = process.env.COMMERCIAL_SMOKE_PORT || "3127";
+const PORT = process.env.COMMERCIAL_SMOKE_PORT || "3123";
 const baseUrl = (process.env.COMMERCIAL_SMOKE_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
 const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
@@ -110,6 +110,13 @@ function createSessionToken(user) {
     .digest("base64url");
 
   return `${header}.${payload}.${signature}`;
+}
+
+async function confirmDialog(page, title, message, confirmLabel) {
+  const dialog = page.getByRole("dialog", { name: title });
+  await dialog.waitFor({ state: "visible" });
+  await dialog.getByText(message, { exact: true }).last().waitFor();
+  await dialog.getByRole("button", { name: confirmLabel, exact: true }).click();
 }
 
 function respondJson(response, data, status = 200) {
@@ -234,6 +241,16 @@ function createCommercialUpstream() {
     }
     if (pathname === "/commercial/prospecting/clients") {
       respondJson(response, state.archivedProspectingIds.has(prospecting.id) ? [] : [client]);
+      return;
+    }
+    if (pathname === "/client/list") {
+      respondJson(response, {
+        items: [{ ...client, cpf_cnpj: "12.345.678/0001-90" }],
+        total: 1,
+        page: 1,
+        pageSize: 50,
+        hasMore: false,
+      });
       return;
     }
     if (pathname === "/commercial/prospecting" && request.method === "GET") {
@@ -462,12 +479,8 @@ async function run() {
         response.request().method() === "DELETE" &&
         response.url().includes(`/commercial/proposal-configs/${proposalConfig.id}`),
     );
-    page.once("dialog", (dialog) => {
-      assert.equal(dialog.type(), "confirm");
-      assert.equal(dialog.message(), `Excluir a configuração "${proposalConfig.name}"?`);
-      void dialog.accept();
-    });
     await deleteConfigButton.click();
+    await confirmDialog(page, "Excluir configuração", `Excluir a configuração "${proposalConfig.name}"?`, "Excluir");
     const deleteResponse = await deleteResponsePromise;
     assert.equal(deleteResponse.status(), 200);
     assert.deepEqual(await deleteResponse.json(), {
@@ -485,12 +498,8 @@ async function run() {
         response.request().method() === "DELETE" &&
         response.url().includes("/commercial/proposal-configs/c0000000-0000-4000-8000-000000000002"),
     );
-    page.once("dialog", (dialog) => {
-      assert.equal(dialog.type(), "confirm");
-      assert.equal(dialog.message(), 'Excluir a configuração "Configuração criada"?');
-      void dialog.accept();
-    });
     await createdDeleteConfigButton.click();
+    await confirmDialog(page, "Excluir configuração", 'Excluir a configuração "Configuração criada"?', "Excluir");
     const createdDeleteResponse = await createdDeleteResponsePromise;
     assert.equal(createdDeleteResponse.status(), 200);
     assert.deepEqual(await createdDeleteResponse.json(), {
@@ -511,16 +520,16 @@ async function run() {
     );
 
     await page.getByRole("button", { name: "Nova prospecção" }).click();
+    const clientPicker = page.getByRole("dialog", { name: "Selecionar cliente" });
+    await clientPicker.waitFor({ state: "visible" });
+    await page.screenshot({ path: `${evidenceDir}/04-commercial-form-focus.png`, fullPage: true });
+    await clientPicker.getByRole("button", { name: new RegExp(client.company_name) }).click();
     const prospectingDialog = page.getByRole("dialog", { name: "Nova prospecção" });
     await prospectingDialog.waitFor({ state: "visible" });
     await prospectingDialog.screenshot({ path: `${evidenceDir}/09-commercial-prospecting-create-modal.png` });
     const prospectingForm = prospectingDialog.getByRole("form", { name: "Nova prospecção" });
-    const clientSelect = prospectingForm.locator("select").first();
-    await clientSelect.focus();
-    assert.equal(await page.evaluate(() => document.activeElement?.tagName), "SELECT");
-    await page.screenshot({ path: `${evidenceDir}/04-commercial-form-focus.png`, fullPage: true });
-    await clientSelect.selectOption(client.id);
-    await prospectingForm.getByLabel("Data do status").fill("2026-09-15");
+    await prospectingForm.getByText(client.company_name, { exact: true }).waitFor();
+    await prospectingForm.getByLabel("Data da etapa").fill("2026-09-15");
     await prospectingForm.getByLabel("Descrição").fill("Retorno na próxima semana");
     const prospectingSaveButton = prospectingForm.locator('button[type="submit"]');
     const createProspectingResponsePromise = page.waitForResponse(
@@ -541,7 +550,7 @@ async function run() {
     await page.screenshot({ path: `${evidenceDir}/05-commercial-saved-light.png`, fullPage: true });
 
     const archiveProspectingButton = page.getByRole("button", {
-      name: `Arquivar prospecção ${client.fantasy_name}`,
+      name: `Arquivar prospecção ${client.company_name}`,
       exact: true,
     });
     await archiveProspectingButton.waitFor();
@@ -550,15 +559,13 @@ async function run() {
         response.request().method() === "DELETE" &&
         response.url().includes(`/commercial/prospecting/${prospecting.id}`),
     );
-    page.once("dialog", (dialog) => {
-      assert.equal(dialog.type(), "confirm");
-      assert.equal(
-        dialog.message(),
-        `Arquivar a prospecção de "${client.fantasy_name}"? O histórico será preservado.`,
-      );
-      void dialog.accept();
-    });
     await archiveProspectingButton.click();
+    await confirmDialog(
+      page,
+      "Arquivar prospecção",
+      `Arquivar a prospecção de "${client.company_name}"? Ela sai da lista, e o histórico é preservado.`,
+      "Arquivar",
+    );
     const archiveResponse = await archiveResponsePromise;
     assert.equal(archiveResponse.status(), 200);
     assert.deepEqual(await archiveResponse.json(), {
@@ -581,7 +588,7 @@ async function run() {
 
     await page.getByRole("button", { name: "Editar cobrança" }).click();
     await page.getByLabel("Situação da contratação").selectOption("Contratado");
-    await page.getByLabel("Pagamento").fill("Pago");
+    await page.getByLabel("Forma de pagamento").fill("Pago");
     await page.getByLabel("Descrição", { exact: true }).last().fill("Cobrança confirmada");
     await page.getByRole("button", { name: "Salvar cobrança" }).click();
     await page.getByText("Cobrança confirmada", { exact: true }).waitFor();

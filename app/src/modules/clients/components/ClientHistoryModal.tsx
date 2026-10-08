@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 
 import { Dialog } from "@shared/components";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCreateClientHistoryMutation, useUpdateClientHistoryMutation } from "../hooks/useClientHistories";
 import { historyPendingQueryKey } from "../hooks/useClientHistoryPending";
 import type { ClientHistoryItem } from "../types";
+import { toDatetimeLocalValue } from "../utils/historyDate";
 
 type Mode = "create" | "edit";
 
@@ -24,18 +25,6 @@ interface HistoryFormState {
   date: string;
   history: string;
   file: File | null;
-}
-
-function toDatetimeLocalValue(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
-    date.getMinutes(),
-  )}`;
 }
 
 export function ClientHistoryModal({
@@ -61,11 +50,12 @@ export function ClientHistoryModal({
     }
 
     return {
-      date: "",
+      date: toDatetimeLocalValue(new Date().toISOString()),
       history: "",
       file: null,
     };
-  }, [history, mode]);
+    // isOpen recalcula o "agora" a cada abertura do modal de criação.
+  }, [history, mode, isOpen]);
 
   const [form, setForm] = useState<HistoryFormState>(initialState);
 
@@ -106,6 +96,7 @@ export function ClientHistoryModal({
           await queryClient.invalidateQueries({ queryKey: ["clients", clientId, "histories"] });
           await queryClient.invalidateQueries({ queryKey: historyPendingQueryKey(pendingUserId) });
         }
+        toast.dismiss();
         toast.success("Histórico criado com sucesso.");
         onClose();
         return;
@@ -116,10 +107,13 @@ export function ClientHistoryModal({
         return;
       }
 
+      // Data intocada volta como veio da API, sem perder segundos na conversão do input.
+      const dateUnchanged = form.date === toDatetimeLocalValue(history.date);
       await updateMutation.mutateAsync({
-        date: form.date,
+        date: dateUnchanged ? history.date : form.date,
         history: form.history.trim(),
       });
+      toast.dismiss();
       toast.success("Histórico atualizado com sucesso.");
       onClose();
     } catch (error) {
@@ -198,13 +192,19 @@ export function ClientHistoryModal({
             <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Arquivo (opcional)</span>
             <input
               type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx"
               onChange={handleFileChange}
               className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-100 dark:hover:file:bg-slate-700"
             />
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Atualização de arquivo não é suportada na edição.
+              Até 10 MB: PDF, imagem, texto, Word ou Excel.
             </p>
           </label>
+        ) : null}
+        {mode === "edit" ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Atualização de arquivo não é suportada na edição.
+          </p>
         ) : null}
       </div>
     </Dialog>

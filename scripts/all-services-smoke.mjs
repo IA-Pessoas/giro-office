@@ -104,6 +104,13 @@ const env = {
   password: process.env.PASSWORD ?? process.env.ADMIN_PASSWORD ?? "senha123",
   platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL?.trim() || "",
   platformAdminPassword: process.env.PLATFORM_ADMIN_PASSWORD ?? "",
+  // Opt in only when the platform smoke operator has can_impersonate.
+  platformImpersonationSmokeEnabled:
+    process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "true" ||
+    process.env.PLATFORM_IMPERSONATION_SMOKE_ENABLED === "1",
+  marketingEventsSmokeEnabled:
+    process.env.MARKETING_EVENTS_SMOKE_ENABLED === "true" ||
+    process.env.MARKETING_EVENTS_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -159,6 +166,11 @@ const env = {
   fixturePath:
     process.env.SMOKE_UPLOAD_FIXTURE?.trim() ||
     path.join(rootDir, "scripts", "fixtures", "smoke-upload.png"),
+  // PKCS#12 real (senha "secret-password"): o upload de certificado valida o arquivo.
+  certificateFixturePath: path.join(
+    rootDir,
+    "services/certificate-service/src/test/fixtures/certificado-teste-sha256.p12",
+  ),
 };
 
 env.gatewayUrl =
@@ -282,12 +294,17 @@ const state = {
   reportsSnapshotId: process.env.SMOKE_REPORT_SNAPSHOT_ID?.trim() || "",
   reportsJobId: "",
   commercialProposalConfigId: "",
+  marketingEventId: "",
 };
 
 const cleanupTasks = [];
 const executed = [];
 const skipped = [];
 const actionExecutionRank = {
+  marketingDashboard: 1050,
+  marketingEventsList: 1051,
+  marketingEventsCreate: 1052,
+  marketingEventsUpdate: 1053,
   // Adjustment lifecycle actions need a deterministic order because:
   // - completeRhPointLifecycle fails the min-interval check (runs too fast)
   // - Adjustment approval sets clock_out and runs calculateDailyHours automatically
@@ -1594,6 +1611,136 @@ async function platformHttpRequest(op, options = {}) {
 }
 
 const handlers = {
+  async marketingDashboard(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async marketingEventsList(op) {
+    await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async marketingEventsCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      json: {
+        name: `Smoke Marketing ${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+        logo: "",
+        priority: "Baixa",
+        objective: "Validação automatizada de integração.",
+        audience: "Smoke test",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.marketingEventId = response.body?.data?.id ?? "";
+    }
+  },
+
+  async marketingEventsUpdate(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}`,
+      json: { objective: "Smoke test atualizado." },
+    });
+  },
+
+  async marketingEventEditionsList(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions`,
+    });
+  },
+
+  async marketingEventEditionCreate(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    const response = await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions`,
+      json: {
+        name: `Smoke edição ${Date.now()}`,
+        date: "2030-11-12",
+        place: "Smoke test",
+        budgetItems: [{ name: "Espaço", amount: "100.00" }],
+        partnerships: [],
+        organizingTeam: [],
+        logistics: {
+          fornecedores: [],
+          cronograma: [],
+          registro: [],
+          transporte: [],
+          acomodacoes: [],
+        },
+        marketingCommunication: { abertura: [], divulgacao: [], acessoria: [], site: [] },
+        duringEvent: { recepcao: [], staff: [], programacao: [], feedback: [] },
+        afterEvent: { avaliacao: [], agradecimento: [], relatorio: [], followup: [] },
+        notes: "Smoke test",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.marketingEventEditionId = response.body?.data?.id ?? "";
+    }
+  },
+
+  async marketingEventEditionUpdate(op) {
+    const eventId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventId");
+    const editionId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventEditionId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions/${editionId}`,
+      json: {
+        name: `Smoke edição ${Date.now()}`,
+        date: "2030-11-12",
+        place: "Smoke test",
+        budgetItems: [{ name: "Espaço", amount: "125.00" }],
+        partnerships: [],
+        organizingTeam: [],
+        logistics: {
+          fornecedores: [],
+          cronograma: [],
+          registro: [],
+          transporte: [],
+          acomodacoes: [],
+        },
+        marketingCommunication: { abertura: [], divulgacao: [], acessoria: [], site: [] },
+        duringEvent: { recepcao: [], staff: [], programacao: [], feedback: [] },
+        afterEvent: { avaliacao: [], agradecimento: [], relatorio: [], followup: [] },
+        notes: "Smoke test atualizado",
+      },
+    });
+  },
+
+  async marketingEventEditionFeedbackCreate(op) {
+    const eventId = requireState("marketingEventId");
+    const editionId = requireState("marketingEventEditionId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions/${editionId}/feedback`,
+      json: isBadExpectation(op) ? { rating: 6 } : { rating: 5, observation: "Smoke test" },
+    });
+  },
+
+  async marketingEventEditionReport(op) {
+    const eventId = requireState("marketingEventId");
+    const editionId = isBadExpectation(op)
+      ? "00000000-0000-4000-8000-000000000003"
+      : requireState("marketingEventEditionId");
+    await httpRequest(op, {
+      expectedStatus: op.expectedStatus,
+      path: `/marketing/events/${eventId}/editions/${editionId}/report`,
+    });
+  },
+
   async gatewayHealth(op) {
     await httpRequest(op, { expectedStatus: [200] });
   },
@@ -1968,7 +2115,7 @@ const handlers = {
         responsible: uniqueText("Smoke Certificate Responsible"),
         model: "A1",
         legal_nature: "LTDA",
-        password: "smoke-secret",
+        password: "secret-password",
         expiration_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         notes: "Smoke certificate PJ.",
         was_paid: true,
@@ -2007,7 +2154,7 @@ const handlers = {
       form: {
         file: {
           fieldName: "file",
-          path: env.fixturePath,
+          path: env.certificateFixturePath,
           filename: "smoke-certificate.pfx",
           contentType: "application/octet-stream",
         },
@@ -2053,7 +2200,7 @@ const handlers = {
         name: uniqueText("Smoke Certificate PF"),
         cpf: uniqueDigits(11),
         model: "A1",
-        password: "smoke-secret",
+        password: "secret-password",
         expiration_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         notes: "Smoke certificate PF.",
         enterprise: uniqueText("Smoke Enterprise"),
@@ -2094,7 +2241,7 @@ const handlers = {
       form: {
         file: {
           fieldName: "file",
-          path: env.fixturePath,
+          path: env.certificateFixturePath,
           filename: "smoke-certificate.pfx",
           contentType: "application/octet-stream",
         },
@@ -2185,6 +2332,7 @@ const handlers = {
         title: uniqueText("Smoke TI Request"),
         description: "Smoke TI request created by the workspace harness.",
         category_id: requireState("tiRequestCategoryId"),
+        anydesk_code: "123456789",
         urgency: "Medium",
       },
     });
@@ -2823,12 +2971,110 @@ const handlers = {
     await platformHttpRequest(op, { expectedStatus: [200] });
   },
 
+  async platformSuperAdmins(op) {
+    const response = await platformHttpRequest(op, { expectedStatus: [200] });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data)) {
+      throw new Error("Platform super admin list did not return an array.");
+    }
+  },
+
+  async platformSuperAdminImpersonationPermission(op) {
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, {
+        path: "/platform/super-admins/smoke-missing/impersonation-permission",
+        json: { can_impersonate: true },
+        expectedStatus: op.expectedStatus,
+      });
+      return;
+    }
+
+    const identity = await platformHttpRequest(
+      { ...op, method: "GET" },
+      {
+        path: "/platform/me",
+        expectedStatus: [200],
+      },
+    );
+    const admins = await platformHttpRequest(
+      { ...op, method: "GET" },
+      {
+        path: "/platform/super-admins",
+        expectedStatus: [200],
+      },
+    );
+    const operatorId = pickFirst(identity.body, "data.id");
+    const target = admins.body?.data?.find((admin) => admin.id !== operatorId);
+    if (!operatorId || !target) {
+      throw new Error("Platform permission smoke requires another super admin as a target.");
+    }
+
+    // Reusing the current state exercises the authorized route without changing persistent data.
+    const updated = await platformHttpRequest(op, {
+      path: `/platform/super-admins/${target.id}/impersonation-permission`,
+      json: { can_impersonate: target.can_impersonate },
+      expectedStatus: [200],
+    });
+    if (updated.body?.data?.id !== target.id) {
+      throw new Error("Platform permission smoke did not return the selected super admin.");
+    }
+  },
+
   async platformUsers(op) {
     await platformHttpRequest(op, {
       path: `/platform/organizations/${requireState("session").organization_id}/users`,
       query: { skip: 0, take: 5 },
       expectedStatus: [200],
     });
+  },
+
+  async platformUserImpersonate(op) {
+    const session = requireState("session");
+    const path = `/platform/organizations/${session.organization_id}/users/${session.id}/impersonate`;
+    if (isBadExpectation(op)) {
+      await platformHttpRequest(op, { path, expectedStatus: [401] });
+      return;
+    }
+
+    const originalPlatformCookie = requireState("platformSessionCookies")["cw.session"];
+    const response = await platformHttpRequest(op, { path, expectedStatus: [200] });
+    if (response.body?.data?.id !== session.id) {
+      throw new Error("Platform impersonation did not return the requested organization user.");
+    }
+    if (response.body?.data?.token !== undefined || response.body?.data?.csrfToken !== undefined) {
+      throw new Error("Platform impersonation response exposed session credentials.");
+    }
+    if (
+      !state.platformSessionCookies?.["cw.session"] ||
+      state.platformSessionCookies["cw.session"] === originalPlatformCookie
+    ) {
+      throw new Error("Platform impersonation did not replace the platform session cookie.");
+    }
+  },
+
+  async platformImpersonationExit(op) {
+    const impersonationCookie = requireState("platformSessionCookies")["cw.session"];
+    const response = await platformHttpRequest(op, { expectedStatus: [200] });
+    if (isBadExpectation(op)) {
+      return;
+    }
+
+    const identity = response.body?.data?.identity;
+    if (identity?.auth_kind !== "platform" || identity?.platform_role !== "super_admin") {
+      throw new Error("Impersonation exit did not restore the platform identity.");
+    }
+    if (
+      !state.platformSessionCookies?.["cw.session"] ||
+      state.platformSessionCookies["cw.session"] === impersonationCookie
+    ) {
+      throw new Error("Impersonation exit did not replace the organization session cookies.");
+    }
+
+    await platformHttpRequest(
+      { ...op, method: "GET", path: "/platform/me" },
+      {
+        expectedStatus: [200],
+      },
+    );
   },
 
   async platformUserCreate(op) {
@@ -3651,16 +3897,18 @@ const handlers = {
       pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
   },
 
+  // /organizations só enxerga a organização da sessão: ler a própria dá 200 e alterar a
+  // organização temporária criada acima dá 404 (isolamento entre tenants, PR #1268).
   async organizationGet(op) {
     await httpRequest(op, {
       expectedStatus: [200],
-      path: `/organizations/${requireState("tempOrganizationId")}`,
+      path: `/organizations/${requireState("session").organization_id}`,
     });
   },
 
   async organizationPatchStatus(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [404],
       path: `/organizations/${requireState("tempOrganizationId")}/status`,
       json: { status: "active" },
     });
@@ -3668,7 +3916,7 @@ const handlers = {
 
   async organizationPatchSubscriptionPlan(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [404],
       path: `/organizations/${requireState("tempOrganizationId")}/subscription-plan`,
       json: { subscription_plan: "smoke-plan" },
     });
@@ -3676,7 +3924,7 @@ const handlers = {
 
   async organizationPatchLogoUrl(op) {
     await httpRequest(op, {
-      expectedStatus: [200],
+      expectedStatus: [404],
       path: `/organizations/${requireState("tempOrganizationId")}/logo-url`,
       json: { logo_url: "https://example.com/smoke-logo.png" },
     });
@@ -3872,6 +4120,45 @@ const handlers = {
     });
   },
 
+  async clientGroupsList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/groups" });
+  },
+
+  async clientGroupCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/client/groups",
+      json: { name: uniqueText("Smoke Client Group") },
+    });
+    if (!isBadExpectation(op)) {
+      state.clientGroupId = pickFirst(response.body, "data.id");
+    }
+  },
+
+  async clientGroupPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/groups/${requireState("clientGroupId")}`,
+      json: { name: uniqueText("Smoke Client Group Updated") },
+    });
+  },
+
+  async clientGroupClientsReplace(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/groups/${requireState("clientGroupId")}/clients`,
+      json: { client_ids: [requireState("primaryClientId")] },
+    });
+  },
+
+  async clientCoringaList(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { page: 1, limit: 5 } });
+  },
+
+  async clientCoringaPdf(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { regime: "Simples Nacional" } });
+  },
+
   async clientCnpjLookup(op) {
     await httpRequest(op, {
       expectedStatus: [200],
@@ -3912,6 +4199,9 @@ const handlers = {
         type: "PJ",
         type_registration: "Novo",
         service_unique: false,
+        // Elegível para as alíquotas do Simples (fiscalSimplesPdf).
+        fiscal: true,
+        regime: "Simples Nacional",
       },
     });
     if (isBadExpectation(op)) {
@@ -4088,6 +4378,14 @@ const handlers = {
         date: new Date().toISOString(),
         history: uniqueText("Smoke client history updated"),
       },
+    });
+  },
+
+  // Roda depois de Get/File/Patch no manifesto: o histórico do smoke some aqui.
+  async clientHistoriesDelete(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/${requireState("primaryClientId")}/histories/${requireState("clientHistoryId")}`,
     });
   },
 
@@ -4316,6 +4614,136 @@ const handlers = {
     state.fiscalIcmsCode = icmsCode;
   },
 
+  async fiscalRateCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: new Date().toISOString().slice(0, 7),
+        tax_type: "ISS",
+        rate: "5.25",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalRateId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    }
+  },
+
+  async fiscalRateCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: new Date().toISOString().slice(0, 7),
+        tax_type: "ISS",
+        rate: "101",
+      },
+    });
+  },
+
+  async fiscalRateList(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId") },
+    });
+  },
+
+  async fiscalRevenueCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-01",
+        amount: "12345.67",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalRevenueId =
+        pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    }
+  },
+
+  async fiscalRevenueCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { client_id: requireState("primaryClientId"), competence: "2026-02", amount: "-1" },
+    });
+  },
+
+  async fiscalRevenueList(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), from: "2025-02", to: "2026-01" },
+    });
+  },
+
+  async fiscalSimplesPreview(op) {
+    const response = await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02" },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.status !== "ok") {
+      throw new Error(`prévia do Simples sem base: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSimplesPdf(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02", annex: "III" },
+      expectEnvelope: false,
+    });
+  },
+
+  async fiscalSimplesPdfInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      query: { client_id: requireState("primaryClientId"), competence: "2026-02", annex: "VI" },
+    });
+  },
+
+  async fiscalSimplesCsv(op) {
+    const response = await httpRequest(op, {
+      json: { competence: "2026-02", annex: "III", documents: ["00000000000000"] },
+    });
+    if (!isBadExpectation(op) && typeof response.body?.data?.csv !== "string") {
+      throw new Error(`CSV do Simples sem conteúdo: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSimplesCsvInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { competence: "2026-02", annex: "III", documents: [] },
+    });
+  },
+
+  async fiscalSimplesZip(op) {
+    const response = await httpRequest(op, {
+      json: { competence: "2026-02", annex: "III", documents: ["00000000000000"] },
+    });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data?.skipped)) {
+      throw new Error(`ZIP do Simples sem resultado: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSimplesZipInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { competence: "2026-02", annex: "VI", documents: ["00000000000000"] },
+    });
+  },
+
+  async fiscalRevenueUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/revenues/${requireState("fiscalRevenueId")}`,
+      json: { amount: "12000.00" },
+    });
+  },
+
+  async fiscalRatePdf(op) {
+    await httpRequest(op, {
+      path: `/fiscal/rates/${requireState("fiscalRateId")}/pdf`,
+      expectEnvelope: false,
+    });
+  },
+
   async fiscalIcmsCreateInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],
@@ -4525,6 +4953,13 @@ const handlers = {
       expectedStatus: [404],
       path: "/contabil/controls/00000000-0000-0000-0000-000000000000",
       json: { field: "monthly_closing", value: false },
+    });
+  },
+
+  async triageFiscalPortfolioGet(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: { competence: "2026-09" },
     });
   },
 
@@ -5563,33 +5998,64 @@ const handlers = {
   },
 
   async taskCompleteRequestPut(op) {
-    await httpRequest(op, {
-      expectedStatus: [200],
+    if (isBadExpectation(op)) {
+      await httpRequest(op, { json: { task_id: requireState("taskId") } });
+      return;
+    }
+    const requested = await httpRequest(op, {
+      expectedStatus: [201],
       method: "POST",
       path: "/task/complete-request",
       json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
     });
-    await httpRequest(op, {
+    const requestId = requested.body?.data?.id;
+    if (!requestId) throw new Error("Smoke de conclusão não recebeu ID da solicitação.");
+    const approved = await httpRequest(op, {
       expectedStatus: [200],
       path: "/task/complete-request",
-      json: { task_id: requireState("taskId") },
+      json: { task_id: requireState("taskId"), request_id: requestId },
     });
+    if (approved.body?.data?.status !== "Concluída") {
+      throw new Error("Smoke de conclusão não atualizou o status da tarefa.");
+    }
+    const history = await httpRequest(op, {
+      expectedStatus: [200],
+      method: "GET",
+      path: "/task/complete-request/list",
+      query: { task_id: requireState("taskId") },
+    });
+    if (!history.body?.data?.some((item) => item.id === requestId && item.status === "approved")) {
+      throw new Error("Smoke de conclusão não encontrou a aprovação no histórico.");
+    }
   },
 
   async taskCompleteRequestPost(op) {
-    await httpRequest(op, {
-      expectedStatus: [200],
+    const requested = await httpRequest(op, {
+      expectedStatus: [201],
       path: "/task/complete-request",
       json: { task_id: requireState("taskId"), reason: "Solicitação criada pelo smoke." },
     });
+    if (isBadExpectation(op)) return;
+    if (!requested.body?.data?.id || requested.body?.data?.status !== "pending") {
+      throw new Error("Smoke de conclusão não recebeu solicitação pendente.");
+    }
+    state.taskCompletionRequestId = requested.body.data.id;
   },
 
   async taskCompleteRequestListGet(op) {
-    await httpRequest(op, {
+    const history = await httpRequest(op, {
       expectedStatus: [200],
       path: "/task/complete-request/list",
       query: { task_id: requireState("taskId") },
     });
+    if (isBadExpectation(op)) return;
+    if (
+      !history.body?.data?.some(
+        (item) => item.id === requireState("taskCompletionRequestId") && item.status === "pending",
+      )
+    ) {
+      throw new Error("Smoke de conclusão não encontrou a solicitação no histórico.");
+    }
   },
 
   async taskPostponementCreate(op) {
@@ -6839,6 +7305,28 @@ const handlers = {
     });
   },
 
+  async userPasswordResetNotFound(op) {
+    await httpRequest(op, {
+      expectedStatus: [404],
+      path: "/user/00000000-0000-0000-0000-000000000000/password-reset",
+    });
+  },
+
+  async userPasswordResetConfirmInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { token: "smoke-invalid-reset-token", password: "smoke-password-123" },
+    });
+  },
+
+  async platformUserPasswordResetNotFound(op) {
+    const organizationId = requireState("session").organization_id;
+    await platformHttpRequest(op, {
+      expectedStatus: [404],
+      path: `/platform/organizations/${organizationId}/users/00000000-0000-0000-0000-000000000000/password-reset`,
+    });
+  },
+
   async clientPatchNotFound(op) {
     await httpRequest(op, {
       expectedStatus: [404],
@@ -6941,6 +7429,14 @@ const handlers = {
   // -------------------------------------------------------------------------
   // Error-path handlers: 401 Unauthorized (invalid token → gateway rejects)
   // -------------------------------------------------------------------------
+
+  async marketingPasswordUnauthorized(op) {
+    await httpRequest(op, {
+      expectedStatus: [401],
+      auth: "public",
+      headers: { Authorization: "Bearer smoke_invalid_401_test_token" },
+    });
+  },
 
   async userListUnauthorized(op) {
     await httpRequest(op, {
@@ -7234,6 +7730,18 @@ function matchesFilter(op) {
 }
 
 function disabledConditionReason(condition) {
+  if (condition === "marketingEventsSmokeEnabled" && !env.marketingEventsSmokeEnabled) {
+    return "MARKETING_EVENTS_SMOKE_ENABLED is false";
+  }
+  if (condition === "platformImpersonationSmokeEnabled") {
+    if (!env.platformImpersonationSmokeEnabled) {
+      return "PLATFORM_IMPERSONATION_SMOKE_ENABLED is false";
+    }
+    if (!env.auditEnabled) {
+      return "AUDIT_ENABLED is false";
+    }
+  }
+
   if (condition === "auditEnabled" && !env.auditEnabled) {
     return "AUDIT_ENABLED is false";
   }

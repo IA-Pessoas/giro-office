@@ -141,7 +141,6 @@ export const userService = {
     const payload: Record<string, unknown> = {};
 
     if (data.name !== undefined) payload.name = data.name;
-    if (data.password !== undefined) payload.password = data.password;
     if (data.permission !== undefined) payload.permission = data.permission;
     if (data.department_id !== undefined) payload.department_id = data.department_id;
     if (data.status !== undefined) payload.status = data.status;
@@ -149,6 +148,11 @@ export const userService = {
 
     const response = await api.put(`/user/${id}`, payload);
     return extractUser(response.data);
+  },
+
+  resetPassword: async (id: string, password: string): Promise<void> => {
+    const api = setupAPIClient();
+    await api.post(`/user/${id}/password-reset`, { password });
   },
 };
 

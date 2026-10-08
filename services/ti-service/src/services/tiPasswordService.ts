@@ -215,7 +215,7 @@ export class TiPasswordService {
       });
 
       if (updateResult.count === 0) {
-        throw new ServiceError(409, "Senha de TI ja esta inativa.");
+        throw new ServiceError(409, "Senha de TI já está inativa.");
       }
 
       return withoutPassword(await this.findPasswordOrThrow(context, id));
@@ -233,7 +233,7 @@ export class TiPasswordService {
     });
 
     if (!password) {
-      throw new ServiceError(404, "Senha de TI nao encontrada.");
+      throw new ServiceError(404, "Senha de TI não encontrada.");
     }
 
     return withoutNestedUserPassword(password as PasswordRecord);
@@ -251,7 +251,7 @@ export class TiPasswordService {
     });
 
     if (!user) {
-      throw new ServiceError(404, "Usuario nao encontrado.");
+      throw new ServiceError(404, "Usuário não encontrado.");
     }
   }
 
@@ -267,8 +267,15 @@ export class TiPasswordService {
         ...record,
         password: this.encryption.decrypt(password),
       };
-    } catch (err: unknown) {
-      throw new ServiceError(500, "Erro ao descriptografar senha de TI.", err);
+    } catch {
+      logError("Erro ao descriptografar senha de TI");
+      throw new ServiceError(
+        500,
+        "Não foi possível revelar esta senha. Solicite à equipe de TI a revisão do cadastro.",
+        undefined,
+        undefined,
+        { expose: true },
+      );
     }
   }
 }

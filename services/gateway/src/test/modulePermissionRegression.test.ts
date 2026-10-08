@@ -1,4 +1,5 @@
 import { type AuthContext, type AuthPolicy, canAccessRoute } from "@workspace/shared";
+import { ACTIVE_MODULE_KEYS } from "@workspace/shared/auth";
 import { describe, expect, it } from "vitest";
 
 import { getRoutePolicy } from "../security/policies.js";
@@ -31,6 +32,57 @@ function requiredRoutePolicy(method: string, path: string): AuthPolicy {
 }
 
 describe("matriz de regressão das políticas modulares", () => {
+  // #1343 / ADR 0002: o papel Visualizador (nível 1) só lê; o owner escreve em tudo.
+  it("bloqueia escrita do Visualizador em cada módulo e libera o owner", () => {
+    const viewer = authContext({
+      permission: 1,
+      modules: Object.fromEntries(ACTIVE_MODULE_KEYS.map((module) => [module, 1])),
+    });
+    const owner = authContext({ type: "owner", permission: 2, modules: {} });
+    const writeRoutes = [
+      ["rh", "PUT", "/rh/requests"],
+      ["ti", "POST", "/ti/inventory"],
+      ["ti", "POST", "/department"],
+      ["integracao", "POST", "/project"],
+      ["integracao", "POST", "/task"],
+      ["comercial", "POST", "/commercial/prospects"],
+      ["integracao", "DELETE", "/client/client-1"],
+      ["financeiro", "PUT", "/task/financeiro/collectors"],
+      ["pessoal", "POST", "/pessoal/groups"],
+      ["parcelamento", "POST", "/parcelamento/panoramas"],
+      ["regularize", "POST", "/regularize/passwords"],
+      ["fiscal", "POST", "/fiscal/ncm"],
+      ["contabil", "POST", "/contabil/controls"],
+      ["certificado", "DELETE", "/certificate/cert-1"],
+      ["marketing", "POST", "/marketing/events"],
+      ["marketing", "PUT", "/marketing/events/event-1"],
+      ["marketing", "POST", "/marketing/events/event-1/editions"],
+      ["marketing", "PUT", "/marketing/events/event-1/editions/edition-1"],
+    ] as const;
+
+    for (const [module, method, path] of writeRoutes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(viewer, policy), `${module}: ${method} ${path}`).toBe(false);
+      expect(canAccessRoute(owner, policy), `owner: ${method} ${path}`).toBe(true);
+    }
+
+    // Exceções do ADR 0002: fluxos operacionais em que o nível 1 executa.
+    const covered = new Set<string>([
+      ...writeRoutes.map(([module]) => module),
+      "triagem",
+      "marketing",
+    ]);
+    expect(ACTIVE_MODULE_KEYS.filter((module) => !covered.has(module))).toEqual([]);
+    for (const [method, path] of [
+      ["POST", "/triagem/monthly"],
+      ["POST", "/task/financeiro/settle"],
+    ] as const) {
+      expect(canAccessRoute(viewer, requiredRoutePolicy(method, path)), `${method} ${path}`).toBe(
+        true,
+      );
+    }
+  });
+
   it("permite RH nível 1 no próprio perfil, sem liberar as demais mutações RH", () => {
     const profilePolicy = requiredRoutePolicy("PUT", "/rh/profile/colaborator");
     const createRequestPolicy = requiredRoutePolicy("POST", "/rh/requests");
@@ -181,6 +233,41 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
   });
 
+  it("restringe a gestão de grupos de empresas ao módulo Integração", () => {
+    const reader = authContext({ modules: { integracao: 1, comercial: 3 } });
+    const editor = authContext({ modules: { integracao: 2 } });
+    const otherModule = authContext({ modules: { comercial: 3, contabil: 3 } });
+    const routes = [
+      ["GET", "/client/groups", true, true],
+      ["POST", "/client/groups", false, true],
+      ["PATCH", "/client/groups/group-1", false, true],
+      ["PUT", "/client/groups/group-1/clients", false, true],
+    ] as const;
+
+    for (const [method, path, canRead, canWrite] of routes) {
+      const policy = requiredRoutePolicy(method, path);
+      expect(canAccessRoute(reader, policy), `Integração nível 1: ${method} ${path}`).toBe(canRead);
+      expect(canAccessRoute(editor, policy), `Integração nível 2: ${method} ${path}`).toBe(
+        canWrite,
+      );
+      expect(canAccessRoute(otherModule, policy), `outro módulo: ${method} ${path}`).toBe(false);
+    }
+  });
+
+  it.each([
+    "/client/coringa/list",
+    "/client/coringa/pdf",
+  ])("aplica a permissão da lista de clientes em %s", (path) => {
+    const listPolicy = requiredRoutePolicy("GET", "/client/list");
+    const policy = requiredRoutePolicy("GET", path);
+    expect(policy).toEqual(listPolicy);
+    for (const module of ["regularize", "pessoal", "integracao"]) {
+      expect(canAccessRoute(authContext({ modules: { [module]: 1 } }), policy)).toBe(true);
+    }
+    expect(canAccessRoute(authContext({ permission: 1, modules: {} }), policy)).toBe(true);
+    expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
+  });
+
   it("permite usuário autenticado consultar relatórios sem política modular do gateway", () => {
     const policy = requiredRoutePolicy("GET", "/reports/catalog");
 
@@ -262,6 +349,53 @@ describe("matriz de regressão das políticas modulares", () => {
         policy,
       ),
     ).toBe(true);
+  });
+
+  it("documenta os limiares atuais do gateway para leitura e escrita de PA", () => {
+    const path = "/client/client-1/pa";
+    const cases = [
+      { name: "Pessoal 0 isolado", modules: { pessoal: 0 }, canRead: false, canWrite: false },
+      { name: "Pessoal 1 isolado", modules: { pessoal: 1 }, canRead: false, canWrite: false },
+      { name: "Pessoal 2 isolado", modules: { pessoal: 2 }, canRead: false, canWrite: true },
+      {
+        name: "Comercial 1 e Pessoal 1",
+        modules: { comercial: 1, pessoal: 1 },
+        canRead: true,
+        canWrite: false,
+      },
+      {
+        name: "Comercial 1 e Pessoal 2",
+        modules: { comercial: 1, pessoal: 2 },
+        canRead: true,
+        canWrite: true,
+      },
+      {
+        name: "Comercial 2 e Pessoal 0",
+        modules: { comercial: 2, pessoal: 0 },
+        canRead: true,
+        canWrite: true,
+      },
+    ];
+
+    for (const { name, modules, canRead, canWrite } of cases) {
+      const context = authContext({ modules });
+      expect(canAccessRoute(context, requiredRoutePolicy("GET", path)), `${name}: GET`).toBe(
+        canRead,
+      );
+      for (const method of ["POST", "PATCH"]) {
+        expect(
+          canAccessRoute(context, requiredRoutePolicy(method, path)),
+          `${name}: ${method}`,
+        ).toBe(canWrite);
+      }
+    }
+
+    const owner = authContext({ type: "owner", modules: {} });
+    for (const method of ["GET", "POST", "PATCH"]) {
+      expect(canAccessRoute(owner, requiredRoutePolicy(method, path)), `owner: ${method}`).toBe(
+        true,
+      );
+    }
   });
 
   it.each([

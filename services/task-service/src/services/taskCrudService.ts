@@ -5,17 +5,31 @@ import {
   requireIntegracaoRouteAccess,
   ServiceError,
 } from "@workspace/shared";
+import { PROJECT_STATUS_WAITING_COMMERCIAL } from "@workspace/shared/database";
 import {
+  INTEGRACAO_TASK_STATUS_IN_PROGRESS,
+  INTEGRACAO_TASK_STATUS_TODO,
+  INTEGRACAO_TASK_STATUS_WAITING,
   type IntegracaoTaskStatus,
   TASK_ASSIGNMENT_FILTER,
+  TASK_BILLING_NOT_REALIZE,
+  TASK_BILLING_REALIZE,
+  TASK_HIRING_STATUS_CONTRACTED,
   type TaskAssignmentFilter,
   type TaskBilling,
 } from "../constants/integracaoTask.js";
 import type { ProspectingStatus } from "../constants/prospectingStatus.js";
 import type { Prisma } from "../generated/prisma/client.js";
 import type { TaskGetPayload } from "../generated/prisma/models/Task.js";
-import * as audit from "../integrations/audit.js";
-import prismaClient from "../prisma/index.js";
+import type { TaskAudit } from "../integrations/audit.js";
+import type { ProjectProgressIntegration } from "../integrations/projectProgress.js";
+import type prismaClient from "../prisma/index.js";
+import {
+  assertCommercialValidationReleased,
+  assertProjectCommercialValidationReleased,
+  assertTaskProjectCommercialValidationReleased,
+  isAwaitingCommercialValidation,
+} from "./commercialValidationGateService.js";
 import {
   assertResponsibleUsersInDepartment,
   listEligibleTaskResponsibles,
@@ -38,6 +52,7 @@ const TASK_DETAIL_SELECT = {
   department_id: true,
   observations: true,
   billing: true,
+  hiring_status: true,
   urgency: true,
   responsible_id: true,
   responsible2_id: true,
@@ -47,6 +62,7 @@ const TASK_DETAIL_SELECT = {
   end_date: true,
   date_created: true,
   date_updated: true,
+  project: { select: { status: true } },
 } as const;
 
 const TASK_CREATE_SELECT = {
@@ -78,6 +94,9 @@ const TASK_LIST_SELECT = {
   payment: true,
   billing_description: true,
   charge_financeiro: true,
+  client: { select: { name: true, company_name: true } },
+  project: { select: { name: true, status: true } },
+  responsible: { select: { name: true } },
   responsible_id: true,
   responsible2_id: true,
   responsible3_id: true,
@@ -105,14 +124,32 @@ const DEPENDENTS_FOR_CREATE_SELECT = {
 } as const;
 
 const ACTIVE_TASK_STATUSES = ["Em Andamento", "A Realizar", "Em Espera"];
+const TASKS_RELEASED_FOR_EXECUTION_WHERE: Prisma.TaskWhereInput = {
+  OR: [
+    { billing: { not: TASK_BILLING_REALIZE } },
+    { hiring_status: TASK_HIRING_STATUS_CONTRACTED },
+  ],
+};
+const TASKS_AWAITING_COMMERCIAL_VALIDATION_WHERE: Prisma.TaskWhereInput = {
+  billing: TASK_BILLING_REALIZE,
+  OR: [{ hiring_status: null }, { hiring_status: { not: TASK_HIRING_STATUS_CONTRACTED } }],
+};
 
-export type TaskDetailRow = TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }>;
+export type TaskDetailRow = Omit<
+  TaskGetPayload<{ select: typeof TASK_DETAIL_SELECT }>,
+  "project"
+> & {
+  commercial_validation_pending: boolean;
+};
 export type TaskCreateRow = TaskGetPayload<{ select: typeof TASK_CREATE_SELECT }>;
 type TaskListDatabaseRow = TaskGetPayload<{ select: typeof TASK_LIST_SELECT }>;
 export type TaskListRow = Omit<
   TaskListDatabaseRow,
-  "responsible_id" | "responsible2_id" | "responsible3_id"
+  "responsible_id" | "responsible2_id" | "responsible3_id" | "responsible" | "client" | "project"
 > & {
+  client_name: string;
+  project_name: string;
+  responsible_name: string | null;
   isOwn: boolean;
   isUnassigned: boolean;
 };
@@ -128,7 +165,7 @@ export interface CreateTaskCrudRequest {
   model_id: string;
   project_id: string;
   client_id: string;
-  prospecting_status: ProspectingStatus;
+  prospecting_status?: ProspectingStatus;
   name?: string;
   status?: IntegracaoTaskStatus;
   department_id?: string;
@@ -159,6 +196,7 @@ export interface UpdateTaskCrudRequest {
   responsible_id?: string | null;
   responsible2_id?: string | null;
   responsible3_id?: string | null;
+  prevision_date?: string;
   integracaoLevel?: IntegracaoPermissionLevel;
   isOwner?: boolean;
 }
@@ -180,6 +218,7 @@ export interface ListTaskCrudParams {
   search: string;
   client_id?: string;
   assignment?: TaskAssignmentFilter;
+  unique_service_released?: boolean;
   page: number;
   limit: number;
   integracaoLevel?: IntegracaoPermissionLevel;
@@ -269,15 +308,30 @@ export function resolveEligibleTaskResponsible(
   throw new ServiceError(422, "Selecione um responsável elegível para a tarefa.");
 }
 
+/** Anexos visíveis exigem ação do usuário: removê-los antes apaga o arquivo pelo fluxo próprio. */
+function getTaskDeleteBlockMessage(attachments: number): string | null {
+  return attachments > 0
+    ? `Não é possível excluir a tarefa: ela tem ${attachments} anexo(s). Remova os anexos.`
+    : null;
+}
+
 export class TaskCrudService {
-  readonly #workflow = new TaskWorkflowService();
+  readonly #workflow: TaskWorkflowService;
+
+  constructor(
+    private readonly prisma: typeof prismaClient,
+    private readonly audit: TaskAudit,
+    projectProgress: ProjectProgressIntegration,
+  ) {
+    this.#workflow = new TaskWorkflowService(projectProgress);
+  }
 
   async #runTransaction<T>(callback: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    if (typeof prismaClient.$transaction !== "function") {
-      return callback(prismaClient as unknown as Prisma.TransactionClient);
+    if (typeof this.prisma.$transaction !== "function") {
+      return callback(this.prisma as unknown as Prisma.TransactionClient);
     }
 
-    return prismaClient.$transaction(callback);
+    return this.prisma.$transaction(callback);
   }
 
   /**
@@ -322,13 +376,17 @@ export class TaskCrudService {
       [model.responsible_id, model.responsible2_id, model.responsible3_id],
     );
 
-    let charge_comercial = model.billing !== "Não Realizar";
-    let charge_financeiro = model.billing !== "Não Realizar";
+    let charge_comercial = model.billing !== TASK_BILLING_NOT_REALIZE;
+    let charge_financeiro = model.billing !== TASK_BILLING_NOT_REALIZE;
 
-    if (params.status === "Em Espera") {
+    if (
+      params.status === INTEGRACAO_TASK_STATUS_WAITING &&
+      model.billing !== TASK_BILLING_REALIZE
+    ) {
       charge_comercial = false;
       charge_financeiro = false;
     }
+    if (model.billing === TASK_BILLING_REALIZE) charge_financeiro = false;
 
     const create = await params.prisma.task.create({
       data: {
@@ -337,7 +395,8 @@ export class TaskCrudService {
         project_id: params.project_id,
         client_id: params.client_id,
         name: model.name,
-        status: params.status,
+        status:
+          model.billing === TASK_BILLING_REALIZE ? INTEGRACAO_TASK_STATUS_WAITING : params.status,
         department_id: model.department_id,
         observations: params.observations,
         billing: model.billing,
@@ -345,7 +404,11 @@ export class TaskCrudService {
         responsible_id: model.responsible_id,
         responsible2_id: model.responsible2_id,
         responsible3_id: model.responsible3_id,
-        start_date: params.status === "Em Andamento" ? new Date() : null,
+        start_date:
+          params.status === INTEGRACAO_TASK_STATUS_IN_PROGRESS &&
+          model.billing !== TASK_BILLING_REALIZE
+            ? new Date()
+            : null,
         pending_approval: false,
         charge_comercial,
         charge_financeiro,
@@ -360,20 +423,24 @@ export class TaskCrudService {
   async createTaskInTransaction(
     data: CreateTaskCrudRequest,
     tx: Prisma.TransactionClient,
+    options: { allowPendingCommercialProject?: boolean } = {},
   ): Promise<{ create: TaskCreateRow; dependentCreates: Array<{ create: TaskCreateRow }> }> {
     requireIntegracaoRouteAccess("POST", "/task", taskAuthorization(data));
 
     const project = await tx.project.findFirst({
       where: { id: data.project_id, organization_id: data.organization_id },
-      select: { client_id: true },
+      select: { client_id: true, status: true },
     });
 
     if (!project) {
-      throw new ServiceError(404, "Projeto nao encontrado.");
+      throw new ServiceError(404, "Projeto não encontrado.");
     }
 
     if (project.client_id !== data.client_id) {
-      throw new ServiceError(400, "Projeto nao pertence ao cliente informado.");
+      throw new ServiceError(400, "Projeto não pertence ao cliente informado.");
+    }
+    if (!options.allowPendingCommercialProject) {
+      assertProjectCommercialValidationReleased(project);
     }
 
     await assertNoActiveTaskForModel(tx, {
@@ -408,15 +475,15 @@ export class TaskCrudService {
     }
 
     const billing = data.billing ?? model.billing;
-    let defaultStatus = "A Realizar";
+    let defaultStatus: IntegracaoTaskStatus = INTEGRACAO_TASK_STATUS_TODO;
     if (data.prospecting_status === "Fechado") {
-      defaultStatus = "Em Andamento";
-    }
-    if (billing === "Realizar") {
-      defaultStatus = "A Realizar";
+      defaultStatus = INTEGRACAO_TASK_STATUS_IN_PROGRESS;
     }
 
-    const status = data.status ?? defaultStatus;
+    const status =
+      billing === TASK_BILLING_REALIZE
+        ? INTEGRACAO_TASK_STATUS_WAITING
+        : (data.status ?? defaultStatus);
     const departmentId = data.department_id ?? model.department_id;
     let responsibleId =
       data.responsible_id !== undefined ? data.responsible_id : model.responsible_id;
@@ -430,7 +497,9 @@ export class TaskCrudService {
       : data.responsible3_id !== undefined
         ? data.responsible3_id
         : model.responsible3_id;
-    const charge_comercial = billing !== "Não Realizar" && status !== "Em Espera";
+    const charge_comercial =
+      billing !== TASK_BILLING_NOT_REALIZE &&
+      (status !== INTEGRACAO_TASK_STATUS_WAITING || billing === TASK_BILLING_REALIZE);
     const previsionDate =
       data.prevision_date === undefined || data.prevision_date === null
         ? null
@@ -494,8 +563,11 @@ export class TaskCrudService {
 
     const dependentCreates = await Promise.all(
       dependents.map((dep: (typeof dependents)[number]) => {
-        let statusDependent = data.prospecting_status === "Fechado" ? "Em Andamento" : "A Realizar";
-        statusDependent = dep.wait === false ? statusDependent : "Em Espera";
+        let statusDependent: IntegracaoTaskStatus =
+          data.prospecting_status === "Fechado"
+            ? INTEGRACAO_TASK_STATUS_IN_PROGRESS
+            : INTEGRACAO_TASK_STATUS_TODO;
+        statusDependent = dep.wait === false ? statusDependent : INTEGRACAO_TASK_STATUS_WAITING;
 
         return this.#createDependentTaskInstance({
           prisma: tx,
@@ -519,7 +591,7 @@ export class TaskCrudService {
         this.createTaskInTransaction(data, tx),
       );
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Cadastro",
@@ -530,7 +602,7 @@ export class TaskCrudService {
 
       await Promise.all(
         dependentCreates.map(({ create: dependentCreate }) =>
-          audit.createLog({
+          this.audit.createLog({
             userId: data.user_id,
             organizationId: data.organization_id,
             action: "Cadastro",
@@ -566,7 +638,7 @@ export class TaskCrudService {
     } = { user_id: "" },
   ): Promise<{ detail: TaskDetailRow }> {
     try {
-      const detail = await prismaClient.task.findFirst({
+      const detail = await this.prisma.task.findFirst({
         where: { id: taskId, organization_id: organizationId },
         select: TASK_DETAIL_SELECT,
       });
@@ -586,7 +658,15 @@ export class TaskCrudService {
         isOwner: authorization.isOwner === true,
       });
 
-      return { detail };
+      const { project, ...taskDetail } = detail;
+      return {
+        detail: {
+          ...taskDetail,
+          commercial_validation_pending:
+            isAwaitingCommercialValidation(detail) ||
+            project?.status === PROJECT_STATUS_WAITING_COMMERCIAL,
+        },
+      };
     } catch (err: unknown) {
       logError("Erro ao buscar tarefa", { err });
       if (err instanceof ServiceError) throw err;
@@ -618,7 +698,7 @@ export class TaskCrudService {
       };
 
       if (params.client_id) {
-        const client = await prismaClient.client.findFirst({
+        const client = await this.prisma.client.findFirst({
           where: { id: params.client_id, organization_id: params.organization_id },
           select: { id: true },
         });
@@ -640,6 +720,9 @@ export class TaskCrudService {
 
       if (isBasicAccess) {
         andFilters.push({ status: { in: ACTIVE_TASK_STATUSES } });
+        andFilters.push({
+          project: { is: { status: { not: PROJECT_STATUS_WAITING_COMMERCIAL } } },
+        });
       }
 
       const responsibleFilter: Prisma.TaskWhereInput[] | undefined = isBasicAccess
@@ -651,10 +734,28 @@ export class TaskCrudService {
         : undefined;
 
       if (params.status !== "Todos") {
-        if (isBasicAccess) {
+        if (params.status === INTEGRACAO_TASK_STATUS_WAITING) {
+          andFilters.push({
+            OR: [
+              { status: INTEGRACAO_TASK_STATUS_WAITING },
+              {
+                AND: [
+                  { status: { in: ACTIVE_TASK_STATUSES } },
+                  TASKS_AWAITING_COMMERCIAL_VALIDATION_WHERE,
+                ],
+              },
+            ],
+          });
+        } else if (isBasicAccess) {
           andFilters.push({ status: params.status });
         } else {
           where.status = params.status;
+        }
+        if (
+          params.status === INTEGRACAO_TASK_STATUS_IN_PROGRESS ||
+          params.status === INTEGRACAO_TASK_STATUS_TODO
+        ) {
+          andFilters.push(TASKS_RELEASED_FOR_EXECUTION_WHERE);
         }
       }
 
@@ -662,6 +763,11 @@ export class TaskCrudService {
         where.charge_comercial = true;
       } else if (params.ref === "CobrançaFinanceiro") {
         where.charge_financeiro = true;
+      }
+
+      if (params.unique_service_released === true) {
+        where.hiring_status = "Contratado";
+        where.client = { is: { service_unique: true } };
       }
 
       if (params.search) {
@@ -682,20 +788,25 @@ export class TaskCrudService {
       }
 
       const [list, total, inProgress, billable] = await Promise.all([
-        prismaClient.task.findMany({
+        this.prisma.task.findMany({
           where,
           select: TASK_LIST_SELECT,
           skip,
           take: params.limit,
           orderBy: { name: "asc" },
         }),
-        prismaClient.task.count({ where }),
-        prismaClient.task.count({
+        this.prisma.task.count({ where }),
+        this.prisma.task.count({
           where: {
-            AND: [where, { status: { contains: "andamento", mode: "insensitive" } }],
+            AND: [
+              where,
+              { status: { contains: "andamento", mode: "insensitive" } },
+              TASKS_RELEASED_FOR_EXECUTION_WHERE,
+              { project: { is: { status: { not: PROJECT_STATUS_WAITING_COMMERCIAL } } } },
+            ],
           },
         }),
-        prismaClient.task.count({
+        this.prisma.task.count({
           where: {
             AND: [where, { NOT: { billing: { contains: "não", mode: "insensitive" } } }],
           },
@@ -703,11 +814,30 @@ export class TaskCrudService {
       ]);
 
       const hasMore = params.page * params.limit < total;
-      const data = list.map(({ responsible_id, responsible2_id, responsible3_id, ...task }) => ({
-        ...task,
-        isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
-        isUnassigned: responsible_id === null,
-      }));
+      const data = list.map(
+        ({
+          responsible_id,
+          responsible2_id,
+          responsible3_id,
+          responsible,
+          client,
+          project,
+          ...task
+        }) => {
+          const commercialValidationPending =
+            isAwaitingCommercialValidation(task) ||
+            project.status === PROJECT_STATUS_WAITING_COMMERCIAL;
+          return {
+            ...task,
+            status: commercialValidationPending ? INTEGRACAO_TASK_STATUS_WAITING : task.status,
+            client_name: client.company_name?.trim() || client.name,
+            project_name: project.name,
+            responsible_name: responsible?.name ?? null,
+            isOwn: [responsible_id, responsible2_id, responsible3_id].includes(params.user_id),
+            isUnassigned: responsible_id === null,
+          };
+        },
+      );
 
       return {
         data,
@@ -726,7 +856,7 @@ export class TaskCrudService {
     data: UpdateTaskCrudRequest,
   ): Promise<TaskGetPayload<{ select: typeof TASK_UPDATE_SELECT }>> {
     try {
-      const exists = await prismaClient.task.findFirst({
+      const exists = await this.prisma.task.findFirst({
         where: { id: data.task_id, organization_id: data.organization_id },
       });
 
@@ -750,6 +880,7 @@ export class TaskCrudService {
             ),
         ),
       });
+      await assertTaskProjectCommercialValidationReleased(this.prisma, exists);
 
       if (data.status === "Concluída") {
         throw new ServiceError(
@@ -761,6 +892,20 @@ export class TaskCrudService {
         throw new ServiceError(403, "A reabertura deve usar o fluxo de conclusão da tarefa.");
       }
 
+      let prevision_date = exists.prevision_date;
+      if (data.prevision_date !== undefined) {
+        const requested = new Date(`${data.prevision_date}T00:00:00.000Z`);
+        if (exists.prevision_date === null) {
+          const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
+          if (requested < today) {
+            throw new ServiceError(400, "A primeira previsão não pode ser uma data passada.");
+          }
+          prevision_date = requested;
+        } else if (exists.prevision_date.getTime() !== requested.getTime()) {
+          throw new ServiceError(409, "A tarefa já tem previsão. Use Prorrogações para alterá-la.");
+        }
+      }
+
       const name = data.name !== undefined ? data.name : exists.name;
       const status = data.status !== undefined ? data.status : exists.status;
       const model_id = data.model_id !== undefined ? data.model_id : exists.model_id;
@@ -769,6 +914,15 @@ export class TaskCrudService {
       const observations =
         data.observations !== undefined ? data.observations : exists.observations;
       const billing = data.billing !== undefined ? data.billing : exists.billing;
+      if (
+        isAwaitingCommercialValidation(exists) &&
+        ((data.status !== undefined && data.status !== exists.status) || billing !== exists.billing)
+      ) {
+        assertCommercialValidationReleased(exists);
+      }
+      if (billing !== exists.billing && billing === TASK_BILLING_REALIZE) {
+        assertCommercialValidationReleased({ billing, hiring_status: exists.hiring_status });
+      }
       const urgency = data.urgency !== undefined ? data.urgency : exists.urgency;
       const departmentChanged = department_id !== exists.department_id;
       const modelChanged = model_id !== exists.model_id;
@@ -778,7 +932,7 @@ export class TaskCrudService {
       let responsible3_id = exists.responsible3_id;
 
       if (modelChanged) {
-        await assertNoActiveTaskForModel(prismaClient, {
+        await assertNoActiveTaskForModel(this.prisma, {
           organizationId: data.organization_id,
           projectId: exists.project_id,
           modelId: model_id,
@@ -787,11 +941,11 @@ export class TaskCrudService {
       }
 
       if (departmentChanged) {
-        await assertTaskDepartmentInOrganization(prismaClient, data.organization_id, department_id);
+        await assertTaskDepartmentInOrganization(this.prisma, data.organization_id, department_id);
       }
 
       if (departmentChanged || modelChanged) {
-        const model = await prismaClient.taskModel.findFirst({
+        const model = await this.prisma.taskModel.findFirst({
           where: {
             id: model_id,
             organization_id: data.organization_id,
@@ -808,7 +962,7 @@ export class TaskCrudService {
           );
         }
         const candidates = await listEligibleTaskResponsibles(
-          prismaClient,
+          this.prisma,
           data.organization_id,
           department_id,
         );
@@ -821,14 +975,14 @@ export class TaskCrudService {
         responsible3_id = null;
       } else if (assignmentChanged) {
         const candidates = await listEligibleTaskResponsibles(
-          prismaClient,
+          this.prisma,
           data.organization_id,
           department_id,
         );
         responsible_id = resolveEligibleTaskResponsible(candidates, undefined, data.responsible_id);
       }
 
-      await assertResponsibleUsersInDepartment(prismaClient, data.organization_id, department_id, [
+      await assertResponsibleUsersInDepartment(this.prisma, data.organization_id, department_id, [
         departmentChanged || responsible2_id !== exists.responsible2_id
           ? responsible2_id
           : undefined,
@@ -837,8 +991,10 @@ export class TaskCrudService {
           : undefined,
       ]);
 
-      const updated = await prismaClient.task.update({
-        where: { id: data.task_id },
+      const settingInitialPrevision = exists.prevision_date === null && prevision_date !== null;
+      const updated = await this.prisma.task.update({
+        // Condição fecha a corrida de duas definições simultâneas da primeira previsão (P2025).
+        where: { id: data.task_id, ...(settingInitialPrevision ? { prevision_date: null } : {}) },
         data: {
           model_id,
           name,
@@ -850,19 +1006,9 @@ export class TaskCrudService {
           responsible_id,
           responsible2_id,
           responsible3_id,
-          prevision_date: exists.prevision_date,
+          prevision_date,
         },
         select: TASK_UPDATE_SELECT,
-      });
-
-      await audit.logUpdateIfChanged({
-        userId: data.user_id,
-        organizationId: data.organization_id,
-        action: "Atualização",
-        referring: "integracao.tasks",
-        referringId: data.task_id,
-        oldData: exists as Record<string, unknown>,
-        updatedData: updated as Record<string, unknown>,
       });
 
       const relevantChange =
@@ -871,46 +1017,61 @@ export class TaskCrudService {
         exists.responsible_id !== updated.responsible_id ||
         exists.responsible2_id !== updated.responsible2_id ||
         exists.responsible3_id !== updated.responsible3_id;
-      if (relevantChange) {
-        await publishTaskOperationalNotifications(prismaClient, {
-          organization_id: data.organization_id,
-          task_id: data.task_id,
-          event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
-          type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
-          title: "Tarefa atualizada",
-          message: "Há uma alteração relevante em uma tarefa acompanhada por você.",
-          responsible_ids: [
-            updated.responsible_id,
-            updated.responsible2_id,
-            updated.responsible3_id,
-          ],
-          include_administrators: true,
-          exclude_user_id: data.user_id,
-        });
-      }
 
-      await this.#workflow.afterTaskUpdated({
-        taskId: data.task_id,
-        projectId: exists.project_id,
-        userId: data.user_id,
-        organizationId: data.organization_id,
-        previousStatus: exists.status ?? "",
-        newStatus: status,
-        previousBilling: exists.billing ?? "",
-      });
+      // Efeitos pós-update são independentes; em paralelo tiram ~2 idas de rede do PUT.
+      await Promise.all([
+        this.audit.logUpdateIfChanged({
+          userId: data.user_id,
+          organizationId: data.organization_id,
+          action: "Atualização",
+          referring: "integracao.tasks",
+          referringId: data.task_id,
+          oldData: exists as Record<string, unknown>,
+          updatedData: updated as Record<string, unknown>,
+        }),
+        relevantChange
+          ? publishTaskOperationalNotifications(this.prisma, {
+              organization_id: data.organization_id,
+              task_id: data.task_id,
+              event_key: `task-change:${updated.date_updated?.toISOString() ?? data.task_id}`,
+              type: TASK_OPERATIONAL_NOTIFICATION_TYPE.TASK_CHANGED,
+              title: "Tarefa atualizada",
+              message: "Há uma alteração relevante em uma tarefa acompanhada por você.",
+              responsible_ids: [
+                updated.responsible_id,
+                updated.responsible2_id,
+                updated.responsible3_id,
+              ],
+              include_administrators: true,
+              exclude_user_id: data.user_id,
+            })
+          : undefined,
+        this.#workflow.afterTaskUpdated({
+          taskId: data.task_id,
+          projectId: exists.project_id,
+          userId: data.user_id,
+          organizationId: data.organization_id,
+          previousStatus: exists.status ?? "",
+          newStatus: status,
+          previousBilling: exists.billing ?? "",
+        }),
+      ]);
 
       return updated;
     } catch (err: unknown) {
       logError("Erro ao atualizar tarefa", { err });
       throwIfActiveTaskConflict(err);
       if (err instanceof ServiceError) throw err;
+      if (typeof err === "object" && err !== null && "code" in err && err.code === "P2025") {
+        throw new ServiceError(409, "A tarefa foi alterada simultaneamente. Tente novamente.", err);
+      }
       throw new ServiceError(500, "Não foi possível atualizar a tarefa.", err);
     }
   }
 
   async deleteTask(data: DeleteTaskCrudRequest): Promise<{ deleted: true }> {
     try {
-      const exists = await prismaClient.task.findFirst({
+      const exists = await this.prisma.task.findFirst({
         where: { id: data.task_id, organization_id: data.organization_id },
       });
 
@@ -926,12 +1087,46 @@ export class TaskCrudService {
         isOwner: data.isOwner === true,
       });
 
+      let removedDependencies: Record<string, unknown> = {};
       try {
-        await prismaClient.task.delete({
-          where: { id: data.task_id },
+        removedDependencies = await this.prisma.$transaction(async (tx) => {
+          const where = { task_id: data.task_id, organization_id: data.organization_id };
+          const attachments = await tx.taskAttachment.count({
+            where: { ...where, deleted_at: null },
+          });
+          const blockMessage = getTaskDeleteBlockMessage(attachments);
+          if (blockMessage) throw new ServiceError(409, blockMessage);
+
+          // Tudo abaixo pertence à tarefa e sai com ela; o que se perde vai para a auditoria.
+          // Anexos já removidos pelo usuário (soft delete) ainda seguram a FK.
+          // ponytail: objetos no storage não são apagados aqui; limpar se o bucket crescer.
+          const removedAttachments = await tx.taskAttachment.findMany({
+            where: { ...where, deleted_at: { not: null } },
+            select: { object_path: true },
+          });
+          const billing = await tx.commercialTaskBilling.findFirst({
+            where,
+            select: { hiring_status: true, payment: true, billing_description: true },
+          });
+          const completionRequests = await tx.taskCompletionRequest.deleteMany({ where });
+          const postponements = await tx.taskPostponement.deleteMany({ where });
+          await tx.taskAttachment.deleteMany({ where: { ...where, deleted_at: { not: null } } });
+          await tx.commercialTaskBilling.deleteMany({ where });
+          await tx.task.delete({ where: { id: data.task_id } });
+          return {
+            ...(removedAttachments.length > 0
+              ? { removed_attachment_paths: removedAttachments.map((a) => a.object_path) }
+              : {}),
+            ...(billing ? { commercial_billing: billing } : {}),
+            ...(completionRequests.count > 0
+              ? { completion_requests_removed: completionRequests.count }
+              : {}),
+            ...(postponements.count > 0 ? { postponements_removed: postponements.count } : {}),
+          };
         });
       } catch (err: unknown) {
         logError("Erro ao excluir tarefa no banco", { err });
+        if (err instanceof ServiceError) throw err;
         if (typeof err === "object" && err !== null && "code" in err && err.code === "P2003") {
           throw new ServiceError(
             409,
@@ -941,13 +1136,13 @@ export class TaskCrudService {
         throw err;
       }
 
-      await audit.createLog({
+      await this.audit.createLog({
         userId: data.user_id,
         organizationId: data.organization_id,
         action: "Exclusão",
         referring: "integracao.tasks",
         referringId: data.task_id,
-        changes: "{}",
+        changes: Object.keys(removedDependencies).length > 0 ? removedDependencies : "{}",
       });
 
       return { deleted: true };

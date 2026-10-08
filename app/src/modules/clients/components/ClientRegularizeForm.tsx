@@ -10,8 +10,9 @@ import { forwardFormattedInputChange } from "./formattedInputChange";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientRegularizeFormValues } from "../types";
+import { isRegularizeCompanyClient } from "../utils/regularizeForm";
 import {
-  REGULARIZE_REGIME_OPTIONS,
+  getRegularizeRegimeOptions,
   REGULARIZE_SEGMENT_OPTIONS,
   REGULARIZE_SIZE_OPTIONS,
 } from "../utils/regularizeForm";
@@ -100,6 +101,7 @@ export function ClientRegularizeForm({
   onSubmit,
   onCancel,
 }: ClientRegularizeFormProps) {
+  const isCompanyClient = isRegularizeCompanyClient(values);
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
     forwardFormattedInputChange(event, formatCpfCnpjInput, onChange);
   };
@@ -116,7 +118,9 @@ export function ClientRegularizeForm({
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Identificação</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <TextField label="Código Domínio" name="dominio_code" value={values.dominio_code} onChange={onChange} disabled={disabled} />
-          <TextField label="Nome / Apelido" name="name" value={values.name} onChange={onChange} disabled={disabled} />
+          {!isCompanyClient ? (
+            <TextField label="Nome" name="name" value={values.name} onChange={onChange} disabled={disabled} />
+          ) : null}
           <TextField label="Razão Social" name="company_name" value={values.company_name} onChange={onChange} disabled={disabled} />
           <TextField label="Nome Fantasia" name="fantasy_name" value={values.fantasy_name} onChange={onChange} disabled={disabled} />
           <TextField label="CPF/CNPJ" name="cpf_cnpj" value={values.cpf_cnpj} onChange={handleCpfCnpjChange} disabled={disabled} />
@@ -155,7 +159,7 @@ export function ClientRegularizeForm({
             <span className={labelClassName}>Regime</span>
             <ClientNativeSelect name="regime" value={values.regime} onChange={onChange} disabled={disabled}>
               <option value="">Selecione um regime</option>
-              {REGULARIZE_REGIME_OPTIONS.map((option) => (
+              {getRegularizeRegimeOptions(values.regime).map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
@@ -186,6 +190,7 @@ export function ClientRegularizeForm({
               ))}
             </ClientNativeSelect>
           </label>
+          <TextField label="Status Lista Coringa" name="coringa_status" value={values.coringa_status} onChange={onChange} disabled={disabled} />
         </div>
       </section>
 
@@ -197,6 +202,16 @@ export function ClientRegularizeForm({
           <ToggleField label="Pessoal" name="pessoal" checked={values.pessoal} onChange={onChange} disabled={disabled} />
           <ToggleField label="Infoproduto" name="infoproduto" checked={values.infoproduto} onChange={onChange} disabled={disabled} />
           <ToggleField label="Consultoria" name="consultoria" checked={values.consultoria} onChange={onChange} disabled={disabled} />
+          {(["tecnologia", "licitacao"] as const).map((field) => (
+            <label className="space-y-1.5" key={field}>
+              <span className={labelClassName}>{field === "tecnologia" ? "Tecnologia" : "Licitação"}</span>
+              <ClientNativeSelect name={field} value={values[field]} onChange={onChange} disabled={disabled}>
+                <option value="">Não informado</option>
+                <option value="true">Sim</option>
+                <option value="false">Não</option>
+              </ClientNativeSelect>
+            </label>
+          ))}
         </div>
       </section>
 

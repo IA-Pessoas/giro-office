@@ -54,6 +54,104 @@ const TECHNICAL_RULES = [
 
 const EXPLICIT_RULES: ExplicitRule[] = [
   {
+    methods: ["GET"],
+    pattern: /^\/client\/groups$/,
+    description: { action: "consultou", item: "a lista de grupos de empresas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/client\/groups$/,
+    description: { action: "cadastrou", item: "um novo grupo de empresas" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/client\/groups\/[^/]+$/,
+    description: { action: "atualizou", item: "um grupo de empresas" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/client\/groups\/[^/]+\/clients$/,
+    description: { action: "atualizou", item: "as empresas de um grupo" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/coringa\/list$/,
+    description: { action: "consultou", item: "a Lista Coringa de clientes" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/coringa\/pdf$/,
+    description: { action: "exportou", item: "a Lista Coringa de clientes em PDF" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/client\/instagram-profiles\/report$/,
+    description: { action: "consultou", item: "o relatório de perfis do Instagram" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/dashboard$/,
+    description: { action: "consultou", item: "o dashboard do Marketing" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/ai-usage-controls\/users$/,
+    description: { action: "consultou", item: "os usuários elegíveis para a pesquisa de IA" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/ai-usage-controls\/batch$/,
+    description: { action: "criou", item: "pesquisas mensais de uso de IA em lote" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/ai-usage-controls\/report$/,
+    description: { action: "consultou", item: "o relatório de pesquisas de uso de IA" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/ai-usage-controls\/import$/,
+    description: { action: "importou", item: "registros legados de uso de IA" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/ai-usage-controls\/reconciliation$/,
+    description: { action: "consultou", item: "a fila de reconciliação de pesquisas de IA" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/passwords\/[^/]+\/reveal$/,
+    description: { action: "revelou", item: "uma credencial de Marketing" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/passwords\/[^/]+\/export$/,
+    description: { action: "exportou", item: "uma credencial de Marketing" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/passwords\/import$/,
+    description: { action: "importou", item: "credenciais legadas de Marketing" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/passwords\/import\/reconciliation$/,
+    description: {
+      action: "consultou",
+      item: "a fila de reconciliação de credenciais de Marketing",
+    },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/marketing\/events\/[^/]+\/editions\/[^/]+\/report$/,
+    description: { action: "consultou", item: "o relatório de uma edição de evento" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/marketing\/events\/[^/]+\/editions\/[^/]+\/feedback$/,
+    description: { action: "registrou", item: "uma avaliação de edição de evento" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/task\/project-wizard$/,
     description: { action: "criou", item: "um projeto com tarefas" },
@@ -120,6 +218,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/platform\/super-admins$/,
+    description: { action: "consultou", item: "a lista de super admins da plataforma" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/platform\/super-admins\/[^/]+\/impersonation-permission$/,
+    description: { action: "alterou", item: "a permissão de personificação de um super admin" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/platform\/organizations$/,
     description: { action: "consultou", item: "a lista global de organizações" },
   },
@@ -175,8 +283,26 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/password-reset$/,
+    description: {
+      action: "enviou",
+      item: "um link de redefinição de senha a um usuário da organização",
+    },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/reactivate$/,
     description: { action: "reativou", item: "um usuário da organização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/organizations\/[^/]+\/users\/[^/]+\/impersonate$/,
+    description: { action: "iniciou", item: "uma personificação de usuário da organização" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/platform\/impersonation\/exit$/,
+    description: { action: "encerrou", item: "uma personificação de usuário da organização" },
   },
   {
     methods: ["POST"],
@@ -210,6 +336,31 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/fiscal\/rates\/[^/]+\/pdf$/,
+    description: { action: "baixou", item: "um PDF de alíquota fiscal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/simples\/preview$/,
+    description: { action: "consultou", item: "a prévia de alíquotas do Simples" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/simples\/pdf$/,
+    description: { action: "baixou", item: "um PDF de alíquota do Simples" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/simples\/csv$/,
+    description: { action: "exportou", item: "um CSV de alíquotas do Simples em lote" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/simples\/zip$/,
+    description: { action: "exportou", item: "os PDFs de alíquotas do Simples em lote" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
     description: { action: "consultou", item: "um job de relatório" },
   },
@@ -226,17 +377,17 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   {
     methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+\/snapshot$/,
-    description: { action: "consultou", item: "um snapshot de relatório" },
+    description: { action: "consultou", item: "um relatório gerado" },
   },
   {
     methods: ["GET"],
     pattern: /^\/reports\/snapshots\/[^/]+\/export$/,
-    description: { action: "exportou", item: "um snapshot de relatório" },
+    description: { action: "exportou", item: "um relatório gerado" },
   },
   {
     methods: ["POST"],
     pattern: /^\/reports\/snapshots\/[^/]+\/delete$/,
-    description: { action: "excluiu", item: "um snapshot de relatório" },
+    description: { action: "excluiu", item: "um relatório gerado" },
   },
   {
     methods: ["GET"],
@@ -292,6 +443,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["PATCH", "PUT", "POST", "DELETE"],
     pattern: /^\/user\/[^/]+\/photo$/,
     description: { action: "atualizou", item: "a foto de um usuário" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/user\/password-reset\/confirm$/,
+    description: { action: "redefiniu", item: "a própria senha pelo link enviado por e-mail" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/user\/[^/]+\/password-reset$/,
+    description: { action: "enviou", item: "um link de redefinição de senha a um usuário" },
   },
   {
     methods: ["PATCH", "PUT"],
@@ -778,6 +939,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/regularize\/guidance\/pdf$/,
+    description: { action: "visualizou", item: "o PDF de uma orientação processual" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/rh\/point\/me\/today$/,
     description: { action: "consultou", item: "o ponto do dia" },
   },
@@ -880,6 +1046,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     methods: ["GET"],
     pattern: /^\/triagem\/(?:monthly|statements)\/?.*$/,
     description: { action: "consultou", item: "as pendências documentais contábeis" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/triagem\/fiscal-portfolio\/?$/,
+    description: { action: "consultou", item: "a carteira fiscal mensal da Triagem" },
   },
   {
     methods: ["GET"],
@@ -1022,6 +1193,30 @@ const EXPLICIT_RULES: ExplicitRule[] = [
 ];
 
 const RESOURCE_RULES: ResourceRule[] = [
+  {
+    pattern: /^\/marketing\/events\/[^/]+\/editions(?:\/|$)/,
+    singular: "uma edição de evento",
+    newSingular: "uma nova edição de evento",
+    plural: "edições de evento",
+  },
+  {
+    pattern: /^\/marketing\/events(?:\/|$)/,
+    singular: "um evento de Marketing",
+    newSingular: "um novo evento de Marketing",
+    plural: "eventos de Marketing",
+  },
+  {
+    pattern: /^\/marketing\/ai-usage-controls(?:\/|$)/,
+    singular: "uma pesquisa mensal de uso de IA",
+    newSingular: "uma nova pesquisa mensal de uso de IA",
+    plural: "pesquisas mensais de uso de IA",
+  },
+  {
+    pattern: /^\/marketing\/passwords(?:\/|$)/,
+    singular: "uma credencial de Marketing",
+    newSingular: "uma nova credencial de Marketing",
+    plural: "credenciais de Marketing",
+  },
   {
     pattern: /^\/pessoal\/groups(?:\/|$)/,
     singular: "um grupo de pessoal",
@@ -1177,6 +1372,18 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "uma regra de IPI",
     newSingular: "uma nova regra de IPI",
     plural: "regras de IPI",
+  },
+  {
+    pattern: /^\/fiscal\/rates(?:\/|$)/,
+    singular: "um registro de alíquota fiscal",
+    newSingular: "um novo registro de alíquota fiscal",
+    plural: "registros de alíquotas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/revenues(?:\/|$)/,
+    singular: "uma receita mensal",
+    newSingular: "uma nova receita mensal",
+    plural: "receitas mensais",
   },
   {
     pattern: /^\/contabil\/controls(?:\/|$)/,

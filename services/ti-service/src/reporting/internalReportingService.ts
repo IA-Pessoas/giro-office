@@ -1,5 +1,12 @@
+import { Buffer } from "node:buffer";
 import {
   executeReportingQuery,
+  MAX_REPORTING_QUERY_BYTES,
+  MAX_REPORTING_QUERY_ROWS,
+  REPORTING_QUERY_BYTE_LIMIT_CODE,
+  REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
+  REPORTING_QUERY_ROW_LIMIT_CODE,
+  REPORTING_QUERY_ROW_LIMIT_MESSAGE,
   type ReportingQuery,
   ServiceError,
   type TiExtensionsReportingSource,
@@ -11,6 +18,7 @@ import {
   withReportingSnapshot,
 } from "@workspace/shared";
 import { TiDepartmentResolverService } from "../services/tiDepartmentResolverService.js";
+import { createReportingPage, cursorOptions, type ReportingPage } from "./reportingPagination.js";
 import { TiExtensionsReportingService } from "./tiExtensionsReportingService.js";
 import { TiInventoryReportingService } from "./tiInventoryReportingService.js";
 import { TiRequestsReportingService } from "./tiRequestsReportingService.js";
@@ -27,6 +35,7 @@ type ReportingSource =
   | TiStockReportingSource;
 
 type ReportingSelect = {
+  id?: true;
   name?: true;
   category?: { select: { name: true } };
   location?: { select: { name: true } };
@@ -47,8 +56,9 @@ type ReportingDelegate = {
     where: ReportingWhere;
     select: ReportingSelect;
     take: number;
+    cursor?: { id: string };
     skip?: number;
-    orderBy?: { id: "asc" };
+    orderBy: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -57,8 +67,9 @@ type InventoryReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, unknown>;
     take: number;
+    cursor?: { id: string };
     skip?: number;
-    orderBy?: { id: "asc" };
+    orderBy: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
 
@@ -67,10 +78,65 @@ type RequestsReportingDelegate = {
     where: { organization_id: string };
     select: Record<string, unknown>;
     take: number;
+    cursor?: { id: string };
     skip?: number;
-    orderBy?: { id: "asc" };
+    orderBy: { id: "asc" };
   }): Promise<readonly Record<string, unknown>[]>;
 };
+
+const REPORTING_DB_PAGE_SIZE = 100;
+
+function throwSnapshotByteLimit(): never {
+  throw new ServiceError(
+    422,
+    REPORTING_QUERY_BYTE_LIMIT_MESSAGE,
+    undefined,
+    REPORTING_QUERY_BYTE_LIMIT_CODE,
+  );
+}
+
+function throwSnapshotRowLimit(): never {
+  throw new ServiceError(
+    422,
+    REPORTING_QUERY_ROW_LIMIT_MESSAGE,
+    undefined,
+    REPORTING_QUERY_ROW_LIMIT_CODE,
+  );
+}
+
+async function readReportingRows(
+  limit: number,
+  loadPage: (limit: number, cursor?: string) => Promise<ReportingPage>,
+): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
+  const requested = limit + 1;
+  const rows: Record<string, unknown>[] = [];
+  let cursor: string | undefined;
+  let reachedLimit = false;
+  let bytes = 2;
+
+  while (rows.length < requested) {
+    const pageLimit = Math.min(REPORTING_DB_PAGE_SIZE, requested - rows.length);
+    const page = await loadPage(pageLimit, cursor);
+    if (!page.rows.length && page.reachedLimit) {
+      throw new ServiceError(422, "A origem não conseguiu completar a consulta.");
+    }
+    for (const row of page.rows) {
+      bytes += (rows.length ? 1 : 0) + Buffer.byteLength(JSON.stringify(row), "utf8");
+      if (bytes > MAX_REPORTING_QUERY_BYTES) throwSnapshotByteLimit();
+      if (rows.length >= MAX_REPORTING_QUERY_ROWS) throwSnapshotRowLimit();
+      rows.push(row);
+    }
+
+    reachedLimit = page.reachedLimit;
+    if (!page.reachedLimit || rows.length >= requested) break;
+    if (!page.nextCursor || page.nextCursor === cursor) {
+      throw new ServiceError(500, "Falha ao continuar a extração do relatório.");
+    }
+    cursor = page.nextCursor;
+  }
+
+  return { rows, reachedLimit };
+}
 
 type DepartmentReportingDelegate = {
   findFirst(input: {
@@ -147,66 +213,114 @@ export class InternalReportingService {
 
   async extract(input: {
     query?: ReportingQuery;
-    offset?: number;
     organizationId: string;
     source: ReportingSource;
     fields: readonly string[];
     limit: number;
   }): Promise<{ rows: readonly Record<string, unknown>[]; reachedLimit: boolean }> {
-    if (input.query && !this.inSnapshot) {
+    if ((input.query || input.limit + 1 > REPORTING_DB_PAGE_SIZE) && !this.inSnapshot) {
       return withReportingSnapshot(this.prisma, (transaction) =>
         new InternalReportingService(transaction, true).extract(input),
       );
     }
+
+    let departmentIdPromise: Promise<string> | undefined;
+    const loadPage = async (
+      fields: readonly string[],
+      limit: number,
+      cursor?: string,
+    ): Promise<ReportingPage> => {
+      let departmentId: string | undefined;
+      if (input.source === "ti.stock") {
+        if (!departmentIdPromise) {
+          departmentIdPromise = this.departmentResolver.resolveTechnologyDepartmentId(
+            input.organizationId,
+          );
+        }
+        departmentId = await departmentIdPromise;
+      }
+      return this.loadPage({
+        organizationId: input.organizationId,
+        source: input.source,
+        fields,
+        limit,
+        cursor,
+        ...(departmentId === undefined ? {} : { departmentId }),
+      });
+    };
+
     if (input.query) {
-      return executeReportingQuery({ ...input, query: input.query }, (fields, limit, offset) =>
-        this.extract({ ...input, query: undefined, fields, limit, offset }),
+      return executeReportingQuery(
+        { ...input, query: input.query },
+        { loadPage: (fields, limit, cursor) => loadPage(fields, limit, cursor) },
       );
     }
+
+    if (input.source === "ti.stock") {
+      const allowedFields = getTiStockReportingFields(input.source);
+      if (input.fields.some((field) => !allowedFields.includes(field))) {
+        throw new ServiceError(403, "Campo não publicado para relatórios.");
+      }
+    }
+
+    const result = await readReportingRows(input.limit, (limit, cursor) =>
+      loadPage(input.fields, limit, cursor),
+    );
+    return {
+      rows: result.rows.slice(0, input.limit),
+      reachedLimit: result.rows.length > input.limit || result.reachedLimit,
+    };
+  }
+
+  private async loadPage(input: {
+    organizationId: string;
+    source: ReportingSource;
+    fields: readonly string[];
+    limit: number;
+    cursor?: string;
+    departmentId?: string;
+  }): Promise<ReportingPage> {
     if (input.source === "ti.inventory") {
       return this.inventory.extract({
         organizationId: input.organizationId,
         source: input.source,
         fields: input.fields,
         limit: input.limit,
-        ...(input.offset !== undefined ? { offset: input.offset } : {}),
+        ...(input.cursor === undefined ? {} : { cursorId: input.cursor }),
       });
     }
-
     if (input.source === "ti.extensions") {
       return this.extensions.extract({
         organizationId: input.organizationId,
         source: input.source,
         fields: input.fields,
         limit: input.limit,
-        ...(input.offset !== undefined ? { offset: input.offset } : {}),
+        ...(input.cursor === undefined ? {} : { cursorId: input.cursor }),
       });
     }
-
     if (input.source === "ti.requests") {
       return this.requests.extract({
         organizationId: input.organizationId,
         source: input.source,
         fields: input.fields,
         limit: input.limit,
-        ...(input.offset !== undefined ? { offset: input.offset } : {}),
+        ...(input.cursor === undefined ? {} : { cursorId: input.cursor }),
       });
     }
 
+    const departmentId = input.departmentId;
+    if (!departmentId) throw new ServiceError(500, "Departamento de Tecnologia indisponível.");
     const allowedFields = getTiStockReportingFields(input.source);
     if (input.fields.some((field) => !allowedFields.includes(field))) {
       throw new ServiceError(403, "Campo não publicado para relatórios.");
     }
-
-    const departmentId = await this.departmentResolver.resolveTechnologyDepartmentId(
-      input.organizationId,
-    );
-    const select = Object.fromEntries(
-      input.fields.map((field) => [
+    const select = Object.fromEntries([
+      ["id", true],
+      ...input.fields.map((field) => [
         field,
         field === "category" || field === "location" ? { select: { name: true } } : true,
       ]),
-    ) as ReportingSelect;
+    ]) as ReportingSelect;
     const where: ReportingWhere = {
       organization_id: input.organizationId,
       department_id: departmentId,
@@ -224,15 +338,13 @@ export class InternalReportingService {
     const rows = await this.prisma.stock.findMany({
       where,
       select,
-      ...(input.offset !== undefined
-        ? { skip: input.offset, orderBy: { id: "asc" as const } }
-        : {}),
+      ...cursorOptions(input.cursor),
       take: input.limit + 1,
     });
-
+    const page = createReportingPage(rows, input.limit);
     return {
-      rows: projectStockRows(rows.slice(0, input.limit), input.fields),
-      reachedLimit: rows.length > input.limit,
+      ...page,
+      rows: projectStockRows(page.rows, input.fields),
     };
   }
 }

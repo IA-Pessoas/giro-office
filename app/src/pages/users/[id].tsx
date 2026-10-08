@@ -1,3 +1,4 @@
+import Head from "next/head";
 import React from "react";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -23,7 +24,14 @@ export default function User({
     return null;
   }
 
-  return <UserProfile userId={user.id} me={me} departments={deps} />;
+  return (
+    <>
+      <Head>
+        <title>{user.name ? `Usuário ${user.name} | Office` : "Usuário | Office"}</title>
+      </Head>
+      <UserProfile userId={user.id} me={me} departments={deps} />
+    </>
+  );
 }
 
 export const getServerSideProps = canSSRAdmin<UserDetailsPageProps>(
@@ -34,12 +42,13 @@ export const getServerSideProps = canSSRAdmin<UserDetailsPageProps>(
       const apiClient = setupAPIClient(ctx);
       const [meResponse, userResponse, deps] = await Promise.all([
         apiClient.get("/user/me"),
-        apiClient.get("/users-detail", { params: { user_id: id } }),
+        apiClient.get(`/user/${encodeURIComponent(id)}`),
         departmentService.list(undefined, ctx),
       ]);
 
-      const user = userResponse.data.user;
-      const me = meResponse.data.user;
+      // Envelope atual: { success, data }. /users-detail era do legacy-api.
+      const user = userResponse.data?.data;
+      const me = meResponse.data?.data;
 
       if (!user) {
         return { redirect: { destination: "/dashboard", permanent: false } };

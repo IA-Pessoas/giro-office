@@ -116,7 +116,48 @@ export const listClientsQuerySchema = z
     }
   });
 
+export const listInstagramProfilesQuerySchema = z
+  .object({
+    profile: z.enum(["all", "with", "without"]).default("all"),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    search: z.string().max(200).optional(),
+  })
+  .strict();
+
+export type ListInstagramProfilesQuery = z.infer<typeof listInstagramProfilesQuerySchema>;
+
 const optionalDateTime = z.coerce.date().optional();
+// z.coerce.date() transforma null em 1970-01-01; nas colunas DateTime? o null tem que passar.
+const nullableDateTime = z.coerce.date().nullable().optional();
+
+// "Hoje" no fuso de São Paulo: uma abertura datada de hoje à noite no Brasil já é amanhã em UTC.
+function todayInSaoPaulo(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+}
+
+export const openingDateSchema = z.coerce
+  .date()
+  .nullable()
+  .optional()
+  .refine(
+    (date) => !date || date.toISOString().slice(0, 10) <= todayInSaoPaulo(),
+    "Data de abertura não pode ser no futuro.",
+  );
+
+// CNAE: 7 dígitos, com ou sem máscara (6201-5/01).
+export const cnaeSchema = z
+  .preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+    z
+      .string()
+      .refine(
+        (value) => /^[\d.\-/\s]+$/.test(value) && value.replace(/\D/g, "").length === 7,
+        "CNAE deve ter 7 dígitos (ex.: 6201-5/01).",
+      )
+      .nullable(),
+  )
+  .optional();
 
 const extendedClientFields = {
   dominio_code: z.string().nullable().optional(),
@@ -125,21 +166,26 @@ const extendedClientFields = {
   neighborhood: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
-  customer_since: optionalDateTime,
+  customer_since: nullableDateTime,
   municipal_registration: z.string().nullable().optional(),
   state_registration: z.string().nullable().optional(),
   commercial_board_registration: z.string().nullable().optional(),
-  competence_entry: optionalDateTime,
-  competence_output: optionalDateTime,
-  opening_date: optionalDateTime,
-  instagram: z.string().nullable().optional(),
+  competence_entry: nullableDateTime,
+  competence_output: nullableDateTime,
+  opening_date: openingDateSchema,
+  instagram: z
+    .preprocess(
+      (value) => (typeof value === "string" ? value.trim() || null : value),
+      z.string().nullable(),
+    )
+    .optional(),
   indication: z.string().nullable().optional(),
   regime: z.string().nullable().optional(),
   size: z.string().nullable().optional(),
   segment: z.string().nullable().optional(),
-  start_strike: optionalDateTime,
-  end_strike: optionalDateTime,
-  cnae: z.string().nullable().optional(),
+  start_strike: nullableDateTime,
+  end_strike: nullableDateTime,
+  cnae: cnaeSchema,
   cnae_secondary: z.string().nullable().optional(),
   responsible: z.string().nullable().optional(),
   cpf_responsible: z.string().nullable().optional(),
@@ -154,7 +200,7 @@ const extendedClientFields = {
   consultoria: z.boolean().optional(),
   castelo_med: z.boolean().optional(),
   contract: z.boolean().optional(),
-  date_status: optionalDateTime,
+  date_status: nullableDateTime,
   description_prospecting: z.string().nullable().optional(),
   participants_meet: z.string().nullable().optional(),
   meet_type: z.string().nullable().optional(),
@@ -200,6 +246,9 @@ export type UpdateClientBody = z.output<typeof updateClientBodySchema>;
 
 /** Permissao minima de administrador no legado (`user.permission >= 2`). */
 export const ADMIN_PERMISSION = 2;
+
+/** Status de cliente ativo: único que pode entrar em inativação. */
+export const ACTIVE_CLIENT_STATUS = "Ativo";
 
 export function isAdminPermission(permission?: number): boolean {
   return typeof permission === "number" && permission >= ADMIN_PERMISSION;

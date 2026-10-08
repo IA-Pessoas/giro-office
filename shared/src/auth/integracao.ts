@@ -89,6 +89,11 @@ const CLIENT_CREATE_FIELDS = [
   "cpf_responsible",
   "number",
   "email",
+  "address",
+  "cep",
+  "neighborhood",
+  "state",
+  "city",
   "agent",
   "cpf_agent",
   "instagram",
@@ -128,6 +133,7 @@ const CLIENT_UPDATE_FIELDS = [
   "state",
   "city",
 ] as const;
+const CLIENT_INTEGRATION_UPDATE_FIELDS = [...CLIENT_UPDATE_FIELDS, "regime"] as const;
 
 const PROJECT_FIELDS = [
   "name",
@@ -137,6 +143,7 @@ const PROJECT_FIELDS = [
   "objective",
   "sponsor_id",
 ] as const;
+const PROJECT_UPDATE_FIELDS = [...PROJECT_FIELDS, "status"] as const;
 const TASK_CREATE_FIELDS = [
   "model_id",
   "project_id",
@@ -152,6 +159,7 @@ const TASK_UPDATE_FIELDS = [
   "department_id",
   "billing",
   "responsible_id",
+  "prevision_date",
 ] as const;
 const TASK_OWN_FIELDS = ["status", "observations"] as const;
 const TASK_MODEL_FIELDS = [
@@ -241,6 +249,25 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
   routePolicy("GET", "/client/list", "client", "read", [readRule(readOrganization)], {
     test: "client.list",
   }),
+  routePolicy("GET", "/client/groups", "client", "read", [readRule(readOrganization)], {
+    test: "client.groups.list",
+  }),
+  routePolicy("POST", "/client/groups", "client", "create", [writeRule(writeUser, ["name"])], {
+    audit: "required",
+    test: "client.groups.create",
+  }),
+  routePolicy("PATCH", "/client/groups/:id", "client", "update", [writeRule(writeUser, ["name"])], {
+    audit: "required",
+    test: "client.groups.update",
+  }),
+  routePolicy(
+    "PUT",
+    "/client/groups/:id/clients",
+    "client",
+    "update",
+    [writeRule(writeUser, ["client_ids"])],
+    { audit: "required", test: "client.groups.clients.replace" },
+  ),
   routePolicy("GET", "/client/integration", "client", "read", [readRule(readOrganization)], {
     test: "client.integration.lookup",
   }),
@@ -275,7 +302,7 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     "/client/:id/integration",
     "client",
     "update",
-    [writeRule(writeUser, CLIENT_UPDATE_FIELDS)],
+    [writeRule(writeUser, CLIENT_INTEGRATION_UPDATE_FIELDS)],
     { audit: "required", test: "client.integration.update" },
   ),
   routePolicy("DELETE", "/client/:id", "client", "deactivate", [writeRule(admin, [])], {
@@ -310,10 +337,17 @@ export const INTEGRACAO_ROUTE_POLICIES: readonly IntegracaoRoutePolicy[] = [
     audit: "required",
     test: "project.create",
   }),
-  routePolicy("PUT", "/project", "project", "update", [writeRule(writeUser, PROJECT_FIELDS)], {
-    audit: "required",
-    test: "project.update",
-  }),
+  routePolicy(
+    "PUT",
+    "/project",
+    "project",
+    "update",
+    [writeRule(writeUser, PROJECT_UPDATE_FIELDS)],
+    {
+      audit: "required",
+      test: "project.update",
+    },
+  ),
   routePolicy("DELETE", "/project", "project", "delete", [writeRule(admin, [])], {
     audit: "required",
     dependency: 409,

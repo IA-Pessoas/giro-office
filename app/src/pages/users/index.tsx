@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { isAxiosError } from "axios";
-import { toast } from "react-toastify";
+import { toast } from "@shared/services/toast";
 import { FaUsers } from "react-icons/fa";
 
 import {
@@ -85,7 +85,9 @@ export default function Users({
     }
   };
 
-  if (forbidden) {
+  // O SSR libera por canAccessAdministration; a tela exige canCreateUsers. Quem passa no
+  // primeiro e nao no segundo via uma pagina em branco.
+  if (forbidden || !hasAdminAccess) {
     return (
       <>
         <Head>
@@ -94,10 +96,6 @@ export default function Users({
         <AdminAccessDeniedState description="Você não possui permissão para acessar a área de usuários." />
       </>
     );
-  }
-
-  if (!hasAdminAccess) {
-    return null;
   }
 
   return (
@@ -166,7 +164,7 @@ export const getServerSideProps = canSSRAdmin<UsersIndexPageProps>(
 
       return {
         props: {
-          me: meResponse.data.user,
+          me: meResponse.data?.data ?? null,
           users: filterAdminUsersByStatus(extractUsersList(usersResponse.data), "active"),
           deps,
         },

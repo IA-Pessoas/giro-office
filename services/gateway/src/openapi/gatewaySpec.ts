@@ -7,6 +7,7 @@ import { buildCommercialServiceOpenApiSpec } from "../../../commercial-service/s
 import { buildContabilServiceOpenApiSpec } from "../../../contabil-service/src/openapi/spec.js";
 import { buildDepartmentServiceOpenApiSpec } from "../../../department-service/src/openapi/spec.js";
 import { buildFiscalServiceOpenApiSpec } from "../../../fiscal-service/src/openapi/spec.js";
+import { buildMarketingServiceOpenApiSpec } from "../../../marketing-service/src/openapi/spec.js";
 import { buildOrganizationServiceOpenApiSpec } from "../../../organization-service/src/openapi/spec.js";
 import { buildParcelamentoServiceOpenApiSpec } from "../../../parcelamento-service/src/openapi/spec.js";
 import { buildPessoalServiceOpenApiSpec } from "../../../pessoal-service/src/openapi/spec.js";
@@ -216,6 +217,16 @@ function getServiceDefinitions(env: GatewayEnv): ServiceSpecDefinition[] {
       includePath: (path) => path !== "/health",
     },
     {
+      key: "marketing-service",
+      label: "Marketing Service",
+      buildSpec: () =>
+        buildMarketingServiceOpenApiSpec({
+          port: getPortFromUrl(env.marketingServiceUrl),
+        } as never),
+      includePath: (path) =>
+        path !== "/health" && path !== "/ready" && !isGatewayOpenApiPathDisabled(path),
+    },
+    {
       key: "audit-service",
       label: "Audit Service",
       buildSpec: () =>
@@ -299,6 +310,10 @@ function getGatewayOperationSecurity(
 ): Array<Record<string, string[]>> | undefined {
   if (path === "/platform/session" && method.toLowerCase() === "post") {
     return undefined;
+  }
+
+  if (path === "/platform/impersonation/exit" && method.toLowerCase() === "post") {
+    return browserAuthentication;
   }
 
   if (path.startsWith("/platform/") && security) {

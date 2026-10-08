@@ -19,4 +19,14 @@ describe("client reporting extraction limit", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("accepts the client groups source", () => {
+    expect(
+      internalReportingExtractBodySchema.safeParse({
+        source: "integracao.client_groups",
+        fields: ["group_name"],
+        limit: 1,
+      }).success,
+    ).toBe(true);
+  });
 });

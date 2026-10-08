@@ -74,7 +74,7 @@ await runTest("fiscal viewer keeps NCM, ICMS and IPI sections read-only", () => 
 await runTest("fiscal admins can delete NCM, ICMS and IPI from the list", () => {
   for (const source of [fiscalSources.ncmSection, fiscalSources.icmsSection, fiscalSources.ipiSection]) {
     assert.match(source, /Trash2/);
-    assert.match(source, /Dialog/);
+    assert.match(source, /<ConfirmationDialog/);
     assert.match(source, /canDelete \? \(item\) => setDeleteTarget\(item\) : undefined/);
     assert.match(source, /onDelete=\{canDelete \?/);
     assert.match(source, /title="Excluir/);
@@ -195,9 +195,29 @@ await runTest("NCM create and edit keep codes numeric while search keeps eight-d
   assert.match(fiscalSources.ncmForm, /inputMode="numeric"/);
   assert.match(fiscalSources.ncmForm, /pattern="\[0-9\]\*"/);
   assert.match(fiscalSources.ncmForm, /Informe apenas números no código NCM\./);
+  assert.match(fiscalSources.ncmForm, /ncm_code\.trim\(\)\.length !== 8[\s\S]*O código NCM deve ter 8 dígitos\./);
+  assert.match(fiscalSources.ncmForm, /endDateIso && endDateIso < startDateIso[\s\S]*A vigência final não pode ser anterior à vigência inicial\./);
+  assert.match(fiscalSources.ncmSchema, /O código NCM deve ter 8 dígitos\./);
+  assert.doesNotMatch(fiscalSources.ncmSchema, /validity_end_date não pode/);
   assert.match(fiscalSources.ncmSchema, /\.regex\(\/\^\\d\+\$\//);
   assert.match(fiscalSources.searchSection, /\.replace\(\/\\D\/g, ""\)\s*\.slice\(0, NCM_CODE_LENGTH\)/);
   assert.match(fiscalSources.searchSection, /trimmedCode\.length !== NCM_CODE_LENGTH/);
+});
+
+await runTest("fiscal search keeps the typed code and clears stale results on invalid input", () => {
+  assert.doesNotMatch(fiscalSources.searchSection, /setInputValue\(""\)/);
+  assert.match(fiscalSources.searchSection, /function rejectSearch\(message: string\)[\s\S]*setSubmittedCode\(undefined\)[\s\S]*setStoredSearch\(null\)[\s\S]*removeItem\(LAST_FISCAL_SEARCH_STORAGE_KEY\)/);
+  assert.doesNotMatch(fiscalSources.searchSection, /setValidationMessage\("/);
+  assert.match(fiscalSources.searchSection, /!searchQuery\.isPlaceholderData/);
+  assert.match(fiscalSources.searchSection, /storedSearch\?\.code === submittedCode/);
+  assert.match(fiscalSources.searchSection, /setInputValue\(restoredSearch\.code\)/);
+});
+
+await runTest("NCM list filters by the code just created", () => {
+  assert.match(fiscalSources.ncmForm, /onCreated\?: \(ncmCode: string\) => void/);
+  assert.match(fiscalSources.ncmForm, /} else \{\s*await createMutation\.mutateAsync\(basePayload\);[^}]*onCreated\?\.\(basePayload\.ncm_code\);\s*}/);
+  assert.match(fiscalSources.ncmSection, /onCreated=\{showCreatedNcm\}/);
+  assert.match(fiscalSources.ncmSection, /function showCreatedNcm\(ncmCode: string\)[\s\S]*setFilterValue\(ncmCode\)[\s\S]*setSearchCodes\(\[ncmCode\]\)[\s\S]*setPage\(1\)/);
 });
 
 await runTest("fiscal-service list routes pass pagination and optional search terms", () => {
@@ -216,4 +236,111 @@ await runTest("fiscal-service lists use partial search and paginated result meta
     assert.match(source, /skip,\s*\n\s*take,/);
     assert.match(source, /hasMore:\s*page \* take < total/);
   }
+});
+
+await runTest("fiscal NCM shows tax regime name instead of legacy code", async () => {
+  const { formatFiscalTaxRegime } = await import("./utils/fiscalTaxRegime.ts");
+  assert.equal(formatFiscalTaxRegime("0"), "Simples Nacional");
+  assert.equal(formatFiscalTaxRegime("1"), "Lucro Presumido");
+  assert.equal(formatFiscalTaxRegime("2"), "Lucro Real");
+  assert.equal(formatFiscalTaxRegime("Simples Nacional"), "Simples Nacional");
+  assert.match(fiscalSources.ncmSection, /formatFiscalTaxRegime\(item\.tax_regime\)/);
+});
+
+await runTest("fiscal revenue amount distinguishes informed zero from invalid input", async () => {
+  const { formatCompetenceLabel, formatRevenueAmount, toRevenueAmount } = await import(
+    "./utils/fiscalRevenue.ts"
+  );
+  assert.equal(toRevenueAmount("R$ 1.234,5"), "1234.50");
+  assert.equal(toRevenueAmount("R$ 0"), "0.00");
+  assert.equal(toRevenueAmount(""), null);
+  assert.equal(toRevenueAmount("R$ "), null);
+  assert.equal(toRevenueAmount("-5"), null);
+  assert.equal(formatRevenueAmount("1234.5"), "R$ 1.234,50");
+  assert.equal(formatCompetenceLabel("2026-08"), "08/2026");
+});
+
+await runTest("fiscal revenues tab keeps loading, error, empty and validation states", async () => {
+  const section = await readSource("./components/FiscalRevenuesSection.tsx");
+  assert.match(fiscalSources.shell, /<FiscalRevenuesSection canEdit=\{canEdit\} \/>/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando receitas"/);
+  assert.match(section, /list\.error \? \(\s*<div role="alert">/);
+  assert.match(section, /Nenhuma receita registrada para este cliente/);
+  assert.match(section, /id="fiscal-revenue-amount-error" role="alert"/);
+  assert.match(section, /if \(value === null\) \{\s*setAmountError/);
+  // Visualizador só consulta: sem formulário nem ação de correção.
+  assert.match(section, /\{client && canEdit \? \(\s*<form/);
+  assert.match(section, /\{canEdit \? \(\s*<td/);
+});
+
+await runTest("fiscal Simples preview formats rates and shows base, states and taxes", async () => {
+  const { formatRatePercent } = await import("./utils/fiscalRevenue.ts");
+  assert.equal(formatRatePercent("1.3600"), "1,36%");
+  assert.equal(formatRatePercent("2.0025"), "2,0025%");
+  assert.equal(formatRatePercent("2.40865"), "2,4087%");
+
+  const preview = await readSource("./components/FiscalSimplesPreviewSection.tsx");
+  const revenues = await readSource("./components/FiscalRevenuesSection.tsx");
+  assert.match(revenues, /<FiscalSimplesPreviewSection clientId=\{client\.id\} \/>/);
+  // Corrigir receita invalida a prévia pelo mesmo prefixo de query.
+  const queryKeys = await readSource("./hooks/queryKeys.ts");
+  assert.match(preview, /fiscalSimplesPreviewQueryKey\(clientId, competence\)/);
+  assert.match(queryKeys, /\[\.\.\.fiscalRevenuesQueryKey\(clientId\), "simples-preview", competence\]/);
+  assert.match(revenues, /invalidateQueries\(\{ queryKey: fiscalRevenuesQueryKey\(/);
+  assert.match(preview, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Calculando prévia"/);
+  assert.match(preview, /preview\.error \? \(\s*<div role="alert">/);
+  // Meses sem receita entram como zero: a prévia avisa antes da emissão.
+  assert.match(preview, /meses sem receita registrada entram/);
+  assert.match(preview, /aria-invalid=\{isCompetence\(competence\) \? undefined : true\}/);
+  assert.match(preview, /\(média estimada\)/);
+  assert.match(preview, /\(sem registro\)/);
+  assert.match(preview, /RBT12/);
+  assert.match(preview, /Anexo \{item\.annex\} · \{item\.tax\}/);
+  // Sem base (RBT12 zero) ou acima do teto: mensagem, nenhum anexo.
+  assert.match(preview, /data\.status === "ok" \? \(/);
+  assert.match(preview, /\{data\.message\}/);
+});
+
+await runTest("fiscal Simples preview emits one PDF per annex with the limited rate", async () => {
+  const preview = await readSource("./components/FiscalSimplesPreviewSection.tsx");
+  const client = await readSource("./services/fiscalRevenueService.ts");
+  // Apuração do mês anterior; o PDF vale para o mês seguinte à apuração.
+  assert.match(preview, /Competência de apuração/);
+  assert.match(preview, /useState\(\(\) => competenceFromToday\(-1\)\)/);
+  assert.match(preview, /Alíquota emitida para \{formatCompetenceLabel\(data\.applies_to\)\}/);
+  // Botão só com alíquota válida; 6ª faixa explica por que não emite.
+  assert.match(preview, /\{item\.emission_rate \? \(\s*<button/);
+  assert.match(preview, /Emitir PDF · \{formatRatePercent\(item\.emission_rate\)\}/);
+  assert.match(preview, /na 6ª faixa o \{item\.tax\} é recolhido fora do Simples/);
+  // Erro de emissão vira toast com a mensagem do servidor, sem baixar arquivo.
+  assert.match(preview, /catch \(error\) \{\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
+  assert.match(client, /"\/fiscal\/simples\/pdf"/);
+  assert.match(client, /error\.response\?\.data instanceof Blob/);
+  assert.match(client, /error\.response\.data = JSON\.parse\(await error\.response\.data\.text\(\)\)/);
+});
+
+await runTest("fiscal Simples batch parses pasted documents and exports CSV for editors", async () => {
+  const { nextCompetence, parseBatchDocuments } = await import("./utils/fiscalRevenue.ts");
+  assert.deepEqual(parseBatchDocuments(" 12.345.678/0001-90\r\n\n44444444444; 99999999000199,\n"), [
+    "12.345.678/0001-90",
+    "44444444444",
+    "99999999000199",
+  ]);
+  assert.equal(nextCompetence("2026-12"), "2027-01");
+
+  const batch = await readSource("./components/FiscalSimplesBatchSection.tsx");
+  const client = await readSource("./services/fiscalRevenueService.ts");
+  assert.match(fiscalSources.shell, /\{canEdit \? <FiscalSimplesBatchSection \/> : null\}/);
+  assert.match(client, /api\.post\("\/fiscal\/simples\/csv", payload\)/);
+  // Validação local, ignorados com motivo e nenhum arquivo quando ninguém entra.
+  assert.match(batch, /Informe ao menos um CPF\/CNPJ, um por linha\./);
+  assert.match(batch, /\{item\.reason\}/);
+  assert.match(client, /const file = batch\.included\.length\s*\?\s*new Blob\(\[batch\.csv\]/);
+  // ZIP: só baixa quando o servidor devolveu arquivo; falha de geração vira toast, sem download.
+  assert.match(client, /api\.post\("\/fiscal\/simples\/zip", payload\)/);
+  assert.match(client, /const file = batch\.zip_base64\s*\?/);
+  assert.match(batch, /if \(file\) \{\s*downloadFile\(file, batch\.file_name\);/);
+  assert.match(batch, /Exportar PDFs \(ZIP\)/);
+  assert.match(batch, /nenhum arquivo gerado/);
+  assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });

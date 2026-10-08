@@ -11,6 +11,7 @@ import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 
 import { isAuthenticated } from "../middlewares/isAuthenticated.js";
+import { nodeDeps } from "../nodeDeps.js";
 import {
   financeiroCollectorsBodySchema,
   financeiroCollectorsQuerySchema,
@@ -22,7 +23,7 @@ import {
 import { TaskFinanceiroService } from "../services/taskFinanceiroService.js";
 
 const router: ReturnType<typeof Router> = Router();
-const taskFinanceiroService = new TaskFinanceiroService();
+const taskFinanceiroService = new TaskFinanceiroService(nodeDeps.prisma, nodeDeps.audit);
 
 function requestContext(req: Request) {
   const { user_id, organization_id } = requireAuthenticatedRequestContext(req);

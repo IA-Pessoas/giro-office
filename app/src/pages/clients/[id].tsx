@@ -1,7 +1,7 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import {
   ArrowLeft,
   Calculator,
@@ -14,7 +14,8 @@ import {
   Workflow,
   XCircle,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { isAxiosError } from "axios";
+import { toast } from "@shared/services/toast";
 
 import { canSSRAuth, useModuleAccess } from "@modules/auth";
 import { ClientForm } from "@modules/clients/components/ClientForm";
@@ -30,9 +31,15 @@ import type { ClientFormValues } from "@modules/clients/types";
 import {
   buildUpdateClientPayload,
   createClientFormInitialValues,
+  getClientInternalName,
 } from "@modules/clients/utils/clientForm";
 import { validateCpfCnpjDocument } from "@modules/clients/utils/documentValidation";
-import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
+import {
+  getClientLifecycleActions,
+  mapClientStatusFromApi,
+} from "@modules/clients/utils/statusMapper";
+import { ConfirmationDialog } from "@shared/components";
+import { DocumentIssueBadge } from "@shared/components/DocumentIssueBadge";
 
 const PANEL_CLASSNAME =
   "rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
@@ -74,6 +81,11 @@ export default function ClientDetailPage() {
   const client = clientQuery.data;
   const isCompanyClient = (client?.cpf_cnpj ?? "").replace(/\D/g, "").length === 14;
   const uiStatus = mapClientStatusFromApi(client?.status);
+  const lifecycle = getClientLifecycleActions(uiStatus);
+  const [pendingLifecycleAction, setPendingLifecycleAction] = useState<
+    "activate" | "deactivate" | null
+  >(null);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const contabilCardState = getContabilCardState(client?.contabil, canViewContabil);
   const organizationName =
     (client as { organization?: { name?: string } } | null)?.organization?.name ??
@@ -102,15 +114,8 @@ export default function ClientDetailPage() {
       return;
     }
 
-    if (!formValues.name.trim()) {
-      toast.error("Preencha o nome do cliente para continuar.");
-      return;
-    }
-
-    const documentError = validateCpfCnpjDocument(formValues.cpf_cnpj);
-
-    if (documentError) {
-      toast.error(documentError);
+    // O ClientForm mostra esses erros abaixo do campo (#1367).
+    if (!getClientInternalName(formValues) || validateCpfCnpjDocument(formValues.cpf_cnpj)) {
       return;
     }
 
@@ -133,50 +138,25 @@ export default function ClientDetailPage() {
     }
   };
 
-  const handleActivate = async () => {
-    if (!clientId) {
-      return;
-    }
-
+  // Erro fica no diálogo (mesmo padrão da exclusão de histórico): o usuário vê e tenta de novo.
+  const confirmLifecycleAction = async () => {
+    const isActivate = pendingLifecycleAction === "activate";
+    setLifecycleError(null);
     try {
-      await activateClientMutation.mutateAsync();
-      toast.success("Cliente reativado com sucesso.");
-      await clientQuery.refetch();
+      await (isActivate ? activateClientMutation : deactivateClientMutation).mutateAsync();
     } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
-          "string"
-          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Não foi possível reativar o cliente.";
-
-      toast.error(message);
+      const message = isAxiosError(error) ? error.response?.data?.error : undefined;
+      setLifecycleError(
+        typeof message === "string"
+          ? message
+          : isActivate
+            ? "Não foi possível reativar o cliente."
+            : "Não foi possível desativar o cliente.",
+      );
+      throw error;
     }
-  };
-
-  const handleDeactivate = async () => {
-    if (!clientId) {
-      return;
-    }
-
-    try {
-      await deactivateClientMutation.mutateAsync();
-      toast.success("Cliente desativado com sucesso.");
-      await clientQuery.refetch();
-    } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: { data?: { error?: string } } }).response?.data?.error ===
-          "string"
-          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
-          : "Não foi possível desativar o cliente.";
-
-      toast.error(message);
-    }
+    toast.success(isActivate ? "Cliente reativado com sucesso." : "Cliente desativado com sucesso.");
+    await clientQuery.refetch();
   };
 
   return (
@@ -233,7 +213,9 @@ export default function ClientDetailPage() {
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Resumo</h2>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <SummaryItem label="Nome" value={client.name} />
-                  <SummaryItem label="CPF/CNPJ" value={formatCpfCnpj(client.cpf_cnpj)} />
+                  <SummaryItem label="CPF/CNPJ" value={formatCpfCnpj(client.cpf_cnpj)}>
+                    <DocumentIssueBadge value={client.cpf_cnpj} />
+                  </SummaryItem>
                   <SummaryItem label="Regime" value={client.regime || "A definir"} />
                   <SummaryItem label="Organização" value={organizationName} />
                   <SummaryItem
@@ -260,8 +242,8 @@ export default function ClientDetailPage() {
                     <>
                       <button
                         type="button"
-                        onClick={() => void handleActivate()}
-                        disabled={activateClientMutation.isPending || uiStatus === "Ativo"}
+                        onClick={() => setPendingLifecycleAction("activate")}
+                        disabled={activateClientMutation.isPending || !lifecycle.canActivate}
                         className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                       >
                         <RotateCcw className="h-4 w-4" />
@@ -270,8 +252,8 @@ export default function ClientDetailPage() {
 
                       <button
                         type="button"
-                        onClick={() => void handleDeactivate()}
-                        disabled={deactivateClientMutation.isPending || uiStatus === "Inativo"}
+                        onClick={() => setPendingLifecycleAction("deactivate")}
+                        disabled={deactivateClientMutation.isPending || !lifecycle.canDeactivate}
                         className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30"
                       >
                         <Power className="h-4 w-4" />
@@ -281,6 +263,30 @@ export default function ClientDetailPage() {
                       </button>
                     </>
                   ) : null}
+
+                  <ConfirmationDialog
+                    open={pendingLifecycleAction !== null}
+                    onOpenChange={(open) => {
+                      if (!open) {
+                        setPendingLifecycleAction(null);
+                        setLifecycleError(null);
+                      }
+                    }}
+                    title={
+                      pendingLifecycleAction === "activate" ? "Reativar cliente" : "Desativar cliente"
+                    }
+                    description={
+                      pendingLifecycleAction === "activate"
+                        ? `Reativar ${client.name}? O cliente volta a ficar ativo.`
+                        : `Desativar ${client.name}? O cliente fica inativo até ser reativado.`
+                    }
+                    onConfirm={confirmLifecycleAction}
+                    isConfirming={activateClientMutation.isPending || deactivateClientMutation.isPending}
+                    errorMessage={lifecycleError}
+                    confirmLabel={pendingLifecycleAction === "activate" ? "Reativar" : "Desativar"}
+                    cancelLabel="Cancelar"
+                    variant={pendingLifecycleAction === "activate" ? "neutral" : "destructive"}
+                  />
 
                   <div className="mt-auto grid gap-4 pt-1">
                     <SummaryItem label="Situação" value={uiStatus} />
@@ -379,7 +385,7 @@ export default function ClientDetailPage() {
                   icon={ShieldCheck}
                 />
 
-                {canAdminClient ? (
+                {canAdminClient && lifecycle.canTerminate ? (
                   <ClientAccessCard
                     title="Inativação"
                     description="Inicie o processo de inativação do cliente."
@@ -418,13 +424,22 @@ export default function ClientDetailPage() {
   );
 }
 
-function SummaryItem({ label, value }: { label: string; value: string }) {
+function SummaryItem({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value: string;
+  children?: ReactNode;
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {label}
       </p>
       <p className="mt-2 text-sm text-slate-900 dark:text-white">{value}</p>
+      {children}
     </div>
   );
 }

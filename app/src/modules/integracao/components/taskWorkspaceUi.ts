@@ -1,6 +1,7 @@
 import type { ModuleAccess } from "@modules/auth";
 
-import type { IntegracaoTaskListItem } from "../types";
+import type { IntegracaoTaskListItem, ProjectTaskSummary } from "../types";
+import { getStringField } from "../services/projectService.contract.ts";
 import { SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME } from "../../../shared/ui/newLayout/scrollbar.ts";
 
 export const TASK_TABLE_HEAD_CELL_CLASSNAME =
@@ -15,7 +16,7 @@ export const TASK_TABLE_NAME_CELL_CLASSNAME = `${TASK_TABLE_CELL_CLASSNAME} pl-5
 export const TASK_TABLE_BADGE_CLASSNAME =
   "inline-flex min-h-6 items-center justify-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold";
 
-export const TASK_TABLE_CLASSNAME = "w-[1120px] min-w-full table-fixed";
+export const TASK_TABLE_CLASSNAME = "w-[1440px] min-w-full table-fixed";
 
 export const TASK_TABLE_SCROLL_AREA_CLASSNAME =
   SYSTEM_HORIZONTAL_SCROLL_AREA_CLASSNAME;
@@ -49,4 +50,31 @@ export function canEditIntegracaoTask(
   task: Pick<IntegracaoTaskListItem, "isOwn">,
 ): boolean {
   return access.level === "edit" || access.level === "admin" || task.isOwn;
+}
+
+/** Título do card é o nome da tarefa; o modelo só aparece quando o nome difere dele. */
+export function getProjectTaskCardLabels(
+  task: Pick<ProjectTaskSummary, "name" | "model">,
+): { title: string; modelName: string | null } {
+  const name = task.name?.trim();
+  const modelName = task.model?.name?.trim() || null;
+  return {
+    title: name || modelName || "Tarefa sem nome",
+    modelName: name && modelName && modelName !== name ? modelName : null,
+  };
+}
+
+const TASK_DELETE_ADMIN_MESSAGE =
+  "Somente usuários com permissão administrativa na Integração podem excluir tarefas.";
+
+/** 409 traz o motivo nominal do bloqueio (anexos, cobrança comercial). */
+export function getTaskDeleteErrorMessage(error: unknown): string {
+  const response = (error as { response?: { status?: number; data?: Record<string, unknown> } })
+    ?.response;
+  if (response?.status === 403) return TASK_DELETE_ADMIN_MESSAGE;
+  const fallback = "Não foi possível excluir a tarefa.";
+  if (response?.status !== 409) return fallback;
+  return (
+    getStringField(response.data, "error") ?? getStringField(response.data, "message") ?? fallback
+  );
 }

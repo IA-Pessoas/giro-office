@@ -1,6 +1,8 @@
 import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from "lucide-react";
 
+import { getPaginationRange } from "@shared/pagination/pagination";
+
 interface PaginationControlsProps {
   page: number;
   limit: number;
@@ -23,6 +25,7 @@ const pageInputClassName =
 
 export function PaginationControls({
   page,
+  limit,
   total,
   count,
   hasMore,
@@ -35,6 +38,7 @@ export function PaginationControls({
   onPageChange,
 }: PaginationControlsProps) {
   const safePage = totalPages ? Math.min(totalPages, Math.max(1, page)) : page;
+  const range = getPaginationRange(safePage, limit, count);
   const canSelectPage = Boolean(totalPages && onPageChange);
   const [pageInputValue, setPageInputValue] = useState(String(safePage));
 
@@ -79,7 +83,7 @@ export function PaginationControls({
   return (
     <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-700">
       <div className="flex flex-col gap-2 text-sm text-gray-500 sm:flex-row sm:items-center sm:gap-4 dark:text-gray-400">
-        <p>Exibindo {count} de {total}</p>
+        <p>Mostrando {range.start} a {range.end} de {total}</p>
         {totalPages ? (
           canSelectPage ? (
             <label className="flex items-center gap-2">

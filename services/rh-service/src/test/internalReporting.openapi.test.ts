@@ -1,3 +1,4 @@
+import { MAX_REPORTING_QUERY_LIMIT } from "@workspace/shared";
 import { describe, expect, it } from "vitest";
 
 import { buildRhServiceOpenApiSpec } from "../openapi/spec.js";
@@ -44,5 +45,9 @@ describe("rh internal reporting OpenAPI", () => {
       spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
         ?.schema?.properties,
     ).not.toHaveProperty("id");
+    expect(
+      spec.paths["/internal/reporting/extract"]?.post?.requestBody?.content?.["application/json"]
+        ?.schema?.properties?.limit,
+    ).toEqual({ type: "integer", minimum: 1, maximum: MAX_REPORTING_QUERY_LIMIT });
   });
 });

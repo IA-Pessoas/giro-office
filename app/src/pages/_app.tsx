@@ -22,7 +22,8 @@ function AppLayout({ children, isIframeView = false }) {
     router.pathname === "/login" ||
     router.pathname === "/super-admin/login" ||
     router.pathname === "/" ||
-    router.pathname === "/solicitar-acesso";
+    router.pathname === "/solicitar-acesso" ||
+    router.pathname === "/redefinir-senha";
 
   useEffect(() => {
     if (isPublicRoute || loading || user) {
@@ -42,7 +43,7 @@ function AppLayout({ children, isIframeView = false }) {
     return (
       <SessionTransitionScreen
         title="Trocando de ambiente"
-        description="Estamos concluindo a transicao da sua sessao para exibir os dados corretos da conta atual."
+        description="Estamos concluindo a transição da sua sessão para exibir os dados corretos da conta atual."
       />
     );
   }
@@ -116,8 +117,9 @@ function MyApp({ Component, pageProps }: AppProps) {
               <AppLayout isIframeView={isIframeView}>
                 <Component {...pageProps} />
               </AppLayout>
+              {/* No topo: embaixo à direita os toasts cobriam o "Salvar" de formulários e modais (#1364). */}
               <ToastContainer
-                position="bottom-right"
+                position="top-center"
                 autoClose={5000}
                 pauseOnHover
                 closeOnClick={false}

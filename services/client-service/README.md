@@ -28,6 +28,8 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | Metodo | Caminho | Descricao |
 |--------|---------|-----------|
 | `GET` | `/client/list` | Listagem paginada. Query: `page`, `limit`, `search`, `status`, `ref` (`integracao` \| `deps`), `organization_id` opcional. |
+| `GET` | `/client/coringa/list` | Lista Coringa paginada, com filtros de regime, Data Entrada, porte, segmento, status e indicadores. |
+| `GET` | `/client/coringa/pdf` | PDF de todos os clientes filtrados, com as 15 colunas da Lista Coringa. |
 | `GET` | `/client/:id` | Detalhe. |
 | `POST` | `/client` | Criar (campos estendidos alinhados ao Prisma: endereco, fiscal, modulos, datas, etc.). |
 | `PATCH` | `/client/:id` | Atualizar parcial. |
@@ -36,6 +38,7 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 | `POST` | `/client/integration` | Fluxo integracao (cadastro). |
 | `GET` | `/client/integration?cnpj=...` | Consulta oficial de dados da empresa para o autopreenchimento do cadastro PJ. |
 | `PATCH` | `/client/:id/integration` | Atualizacao integracao. |
+| `GET` | `/client/instagram-profiles/report` | Relatorio paginado de clientes com ou sem perfil Instagram; exige permissao de leitura de Integracao. |
 | `PATCH` | `/client/:id/termination` | Distrato. |
 | `PATCH` | `/client/:id/finance` | Contrato (`contract`). |
 | `PATCH` | `/client/:id/regularize` | Regularize (dados cadastrais estendidos). |
@@ -52,6 +55,27 @@ Todas as rotas abaixo exigem `Authorization: Bearer <jwt>` com `organization_id`
 Prospecção e cobrança públicas pertencem ao `commercial-service` (`/commercial/*`). Os antigos
 `GET /client/commercial/overview` e `PATCH /client/:id/commercial` foram removidos no corte; efeitos
 projetados continuam entrando por `POST /internal/commercial/prospecting-transition`.
+
+### Lista Coringa
+
+A Lista Coringa lê a mesma tabela `clients`, sempre limitada à organização autenticada. `status` filtra o status próprio da Lista Coringa. Os indicadores aceitam `true` e `false`. Campos desconhecidos continuam `null` no JSON e vazios na tela e no PDF.
+
+`created_at` é preenchido automaticamente apenas para novos clientes. A migração deixa `created_at` nulo nos registros existentes porque a data original de criação não é auditável. A Data Entrada não usa `register_date_prospecting`.
+
+O PDF aplica os mesmos filtros da lista ao conjunto completo, sem limite de página. A consulta e a resposta são processadas em lotes.
+
+### Relatorio de perfis Instagram (`GET /client/instagram-profiles/report`)
+
+Retorna clientes da organizacao autenticada com nome, status e perfil Instagram (`null` quando ausente), em envelope `createSuccessResponse`. Requer JWT e permissao de leitura de Integracao nivel 1 ou superior; a organizacao vem do contexto autenticado e nao pode ser escolhida pela query.
+
+Query opcional:
+
+- `profile`: `all` (padrao), `with` ou `without`.
+- `page`: pagina a partir de 1 (padrao `1`).
+- `limit`: itens por pagina entre 1 e 100 (padrao `20`).
+- `search`: busca por nome, razao social ou nome fantasia (ate 200 caracteres).
+
+O resultado contem `items` (`id`, `name`, `status`, `instagram`), `total`, `page`, `pageSize` e `hasMore`. Filtros invalidos retornam 400, chamadas sem autenticacao retornam 401 e permissao insuficiente retorna 403.
 
 ## Competencia via Supabase Edge Function
 

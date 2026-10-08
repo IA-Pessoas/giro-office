@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client"
+  runtime  = "workerd"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Icms {
+  id                   String   @id @default(uuid())
+  state                String
+  item_number          String?
+  cest_code            String?
+  description          String
+  interstate_agreement String?
+  applied_original_mva String?
+  adjusted_mva         String?
+  original_mva         String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  organization_id      String
+
+  @@map("fiscal.icms")
+}
+
+model Client {
+  id                String    @id
+  name              String
+  company_name      String?
+  cpf_cnpj          String
+  organization_id   String
+  type              String
+  status            String
+  competence_output DateTime?
+  regime            String?
+  fiscal            Boolean?
+
+  @@map("clients")
+}
+
+model FiscalRate {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  client_name     String
+  client_document String
+  competence      DateTime @db.Date
+  tax_type        String   @db.VarChar(4)
+  rate            Decimal  @db.Decimal(7, 4)
+  issued_by       String
+  createdAt       DateTime @default(now())
+
+  @@index([organization_id, client_id, competence, createdAt])
+  @@map("fiscal.rate_statements")
+}
+
+model FiscalMonthlyRevenue {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime @db.Date
+  amount          Decimal  @db.Decimal(15, 2)
+  created_by      String
+  updated_by      String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_revenues_org_client_competence")
+  @@map("fiscal.monthly_revenues")
+}
+
+model Ncm {
+  id                    String    @id @default(uuid())
+  tax_regime            String
+  ncm_code              String
+  federal_taxation_type String
+  ncm_notes             String?
+  cst_pis_outgoing      String?
+  cst_cofins_outgoing   String?
+  product_group         String?
+  description           String
+  validity_start_date   DateTime
+  information_source    String?
+  reference_legislation String?
+  validity_end_date     DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  organization_id       String
+
+  @@map("fiscal.ncm")
+}
+
+model Ipi {
+  id              String   @id @default(uuid())
+  ncm             String
+  ex              String?
+  description     String?
+  aliquot         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  organization_id String
+
+  @@map("fiscal.ipi")
+}
