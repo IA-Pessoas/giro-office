@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "prisma:generate": "prisma generate",
+    "prisma:generate": "node ../scripts/prisma-generate.mjs",
     "prisma:migrate": "prisma migrate dev",
     "prisma:preflight:global-login": "node prisma/scripts/global-login-collision-preflight.mjs",
     "prisma:seed": "tsx prisma/seed.ts",
