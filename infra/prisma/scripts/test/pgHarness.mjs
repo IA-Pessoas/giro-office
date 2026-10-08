@@ -13,8 +13,10 @@ export const hasDocker = spawnSync("docker", ["info"], { stdio: "ignore" }).stat
 export function usePostgres(prefix, { setup } = {}) {
   const container = `${prefix}-${process.pid}`;
 
+  // TCP, nao socket: durante o init a imagem sobe um servidor temporario so no socket e depois
+  // reinicia. Pelo socket o `SELECT 1` passava nessa janela e os testes caiam no restart.
   function psql(sql, vars = []) {
-    const args = ["exec", "-i", container, "psql", "-U", "postgres", "-X", "-q", "-t", "-A"];
+    const args = ["exec", "-i", container, "psql", "-h", "127.0.0.1", "-U", "postgres", "-X", "-q", "-t", "-A"];
     for (const v of vars) args.push("-v", v);
     return spawnSync("docker", [...args, "-f", "-"], { input: sql, encoding: "utf8" });
   }
