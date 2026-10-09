@@ -84,6 +84,7 @@ const routes: Route[] = [
   { prefix: "/ti", binding: "TI_SERVICE", module: "ti" },
   { prefix: "/rh", binding: "RH_SERVICE", module: "rh" },
   { prefix: "/commercial", binding: "COMMERCIAL_SERVICE", module: "comercial" },
+  { prefix: "/marketing", binding: "MARKETING_SERVICE", module: "marketing" },
   ...triagemServiceRoutes,
   // triagem-legacy-service do Node: sem permissionModule, encaminha a permissão global.
   { prefix: "/triagem", binding: "CONTABIL_SERVICE" },
