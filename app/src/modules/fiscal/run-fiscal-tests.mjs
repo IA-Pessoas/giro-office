@@ -381,3 +381,16 @@ await runTest("fiscal malhas tab gates edits, keeps states and refreshes history
   assert.match(client, /form\.append\("file", file\)/);
   assert.match(section, /window\.open\(await fiscalMalhaService\.attachmentUrl\(id\), "_blank", "noopener,noreferrer"\)/);
 });
+
+await runTest("fiscal wholesale tab shows current value and history, editing gated", async () => {
+  const section = await readSource("./components/FiscalWholesaleSection.tsx");
+  const client = await readSource("./services/fiscalWholesaleService.ts");
+  assert.match(fiscalSources.shell, /<FiscalWholesaleSection canEdit=\{canEdit\} \/>/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading"/);
+  assert.match(section, /state\.error \? \(\s*<div role="alert">/);
+  // Nível 1 vê valor atual e histórico; só edição Fiscal alterna a marcação.
+  assert.match(section, /\{canEdit \? \(\s*<button type="button" disabled=\{save\.isPending\}/);
+  assert.match(section, /\{wholesaleLabel\(entry\.previous_value\)\} → \{wholesaleLabel\(entry\.new_value\)\}/);
+  assert.match(section, /Não dispara nenhum cálculo/);
+  assert.match(client, /api\(\)\.put\(`\/fiscal\/clients\/\$\{clientId\}\/wholesale`, \{\s*is_wholesale: isWholesale,/);
+});
