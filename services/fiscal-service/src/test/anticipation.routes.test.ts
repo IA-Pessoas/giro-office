@@ -50,7 +50,10 @@ function deps() {
   return {
     importBatch: vi.fn(async () => ({ ...batch, items: [] })),
     list: vi.fn(async () => ({ data: [batch], total: 1, page: 1, limit: 50, hasMore: false })),
-    detail: vi.fn(async () => ({ ...batch, items: [] })),
+    detail: vi.fn(async () => ({ ...batch, items: [], history: [] })),
+    updateItem: vi.fn(async () => ({}) as never),
+    submit: vi.fn(async () => ({ ...batch, status: "awaiting_check" as const })),
+    check: vi.fn(async () => ({ ...batch, status: "checked" as const })),
   };
 }
 
@@ -121,5 +124,70 @@ describe("fiscal anticipation routes", () => {
 
     expect(response.status).toBe(400);
     expect(service.importBatch).not.toHaveBeenCalled();
+  });
+
+  it("revisa item, envia e conferente decide, com o ator autenticado", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, anticipationRouteDeps: service });
+    const itemId = "e0000000-0000-4000-8000-000000000001";
+    const reviewerId = "c0000000-0000-4000-8000-000000000002";
+
+    const item = await request(app)
+      .put(`/fiscal/anticipations/batches/${batchId}/items/${itemId}`)
+      .set(headers())
+      .send({ classification: "freight", corrections: { cfop: "6353" }, reason: "Frete" });
+    expect(item.status).toBe(200);
+    expect(service.updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        batchId,
+        itemId,
+        organizationId,
+        userId,
+        classification: "freight",
+        corrections: { cfop: "6353" },
+        reason: "Frete",
+      }),
+    );
+
+    const submitted = await request(app)
+      .post(`/fiscal/anticipations/batches/${batchId}/submit`)
+      .set(headers())
+      .send({ reviewer_id: reviewerId });
+    expect(submitted.status).toBe(200);
+    expect(service.submit).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId, reviewer_id: reviewerId, userId }),
+    );
+
+    const checked = await request(app)
+      .post(`/fiscal/anticipations/batches/${batchId}/check`)
+      .set(headers())
+      .send({ decision: "return", reason: "Rever item 2" });
+    expect(checked.status).toBe(200);
+    expect(service.check).toHaveBeenCalledWith(
+      expect.objectContaining({ batchId, decision: "return", reason: "Rever item 2" }),
+    );
+  });
+
+  it("recusa revisão sem motivo, devolução sem motivo e escrita de nível 1", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, anticipationRouteDeps: service });
+    const itemPath = `/fiscal/anticipations/batches/${batchId}/items/e0000000-0000-4000-8000-000000000001`;
+
+    const noReason = await request(app)
+      .put(itemPath)
+      .set(headers())
+      .send({ classification: "total" });
+    const badReturn = await request(app)
+      .post(`/fiscal/anticipations/batches/${batchId}/check`)
+      .set(headers())
+      .send({ decision: "return" });
+    const viewer = await request(app)
+      .put(itemPath)
+      .set(headers(1))
+      .send({ classification: "total", reason: "x" });
+
+    expect([noReason.status, badReturn.status, viewer.status]).toEqual([400, 400, 403]);
+    expect(service.updateItem).not.toHaveBeenCalled();
+    expect(service.check).not.toHaveBeenCalled();
   });
 });

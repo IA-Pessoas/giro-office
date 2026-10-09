@@ -2,7 +2,13 @@ import { setupAPIClient } from "@shared/services/api";
 import type { PaginatedResult } from "@shared/pagination/pagination";
 
 import { fileToBase64 } from "../utils/xmlSelection";
-import type { FiscalAnticipationIssueKind } from "../utils/fiscalAnticipation";
+import type {
+  FiscalAnticipationClassification,
+  FiscalAnticipationCorrectableField,
+  FiscalAnticipationIssueKind,
+  FiscalAnticipationItemChanges,
+  FiscalAnticipationStatus,
+} from "../utils/fiscalAnticipation";
 import { unwrapFiscalEnvelope } from "./fiscalService.contract";
 
 export interface FiscalAnticipationBatch {
@@ -10,7 +16,7 @@ export interface FiscalAnticipationBatch {
   client_id: string;
   competence: string;
   file_name: string;
-  status: "pending_review";
+  status: FiscalAnticipationStatus;
   responsible_id: string;
   reviewer_id: string | null;
   entry_count: number;
@@ -39,9 +45,30 @@ export interface FiscalAnticipationItem {
   value: string | null;
   ipi: string | null;
   icms_st: string | null;
+  classification: FiscalAnticipationClassification | null;
+  manual_value: string | null;
+  /** Correção por campo; o valor do XML continua no campo de mesmo nome. */
+  corrections: Partial<Record<FiscalAnticipationCorrectableField, string>>;
+}
+
+export interface FiscalAnticipationHistoryEntry {
+  id: string;
+  item_id: string | null;
+  field: string;
+  previous_value: string | null;
+  new_value: string | null;
+  reason: string | null;
+  actor_user_id: string;
+  created_at: string;
 }
 
 export type FiscalAnticipationBatchDetail = FiscalAnticipationBatch & {
+  items: FiscalAnticipationItem[];
+  history: FiscalAnticipationHistoryEntry[];
+};
+
+/** Resposta da importação: o lote recém-criado ainda não tem histórico. */
+export type FiscalAnticipationImportResult = FiscalAnticipationBatch & {
   items: FiscalAnticipationItem[];
 };
 
@@ -76,13 +103,45 @@ export const fiscalAnticipationService = {
     clientId: string;
     competence: string;
     file: File;
-  }): Promise<FiscalAnticipationBatchDetail> {
+  }): Promise<FiscalAnticipationImportResult> {
     const response = await api().post("/fiscal/anticipations/batches", {
       client_id: input.clientId,
       competence: input.competence,
       file_name: input.file.name,
       zip_base64: await fileToBase64(input.file),
     });
-    return unwrapFiscalEnvelope<FiscalAnticipationBatchDetail>(response.data);
+    return unwrapFiscalEnvelope<FiscalAnticipationImportResult>(response.data);
+  },
+
+  async updateItem(input: {
+    batchId: string;
+    itemId: string;
+    changes: FiscalAnticipationItemChanges;
+    reason: string;
+  }): Promise<FiscalAnticipationItem> {
+    const response = await api().put(
+      `/fiscal/anticipations/batches/${input.batchId}/items/${input.itemId}`,
+      { ...input.changes, reason: input.reason },
+    );
+    return unwrapFiscalEnvelope<FiscalAnticipationItem>(response.data);
+  },
+
+  async submit(input: { batchId: string; reviewerId: string }): Promise<FiscalAnticipationBatch> {
+    const response = await api().post(`/fiscal/anticipations/batches/${input.batchId}/submit`, {
+      reviewer_id: input.reviewerId,
+    });
+    return unwrapFiscalEnvelope<FiscalAnticipationBatch>(response.data);
+  },
+
+  async check(input: {
+    batchId: string;
+    decision: "approve" | "return";
+    reason?: string;
+  }): Promise<FiscalAnticipationBatch> {
+    const response = await api().post(`/fiscal/anticipations/batches/${input.batchId}/check`, {
+      decision: input.decision,
+      ...(input.reason ? { reason: input.reason } : {}),
+    });
+    return unwrapFiscalEnvelope<FiscalAnticipationBatch>(response.data);
   },
 };

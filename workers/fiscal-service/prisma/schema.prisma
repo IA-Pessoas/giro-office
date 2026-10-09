@@ -326,6 +326,7 @@ model FiscalAnticipationBatch {
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
   items           FiscalAnticipationItem[]
+  history         FiscalAnticipationHistory[]
 
   @@index([organization_id, client_id, competence], map: "idx_fiscal_anticipation_batches_org_client_comp")
   @@map("fiscal.anticipation_batches")
@@ -352,12 +353,35 @@ model FiscalAnticipationItem {
   value           Decimal?                @db.Decimal(15, 2)
   ipi             Decimal?                @db.Decimal(15, 2)
   icms_st         Decimal?                @db.Decimal(15, 2)
+  classification  String?
+  manual_value    Decimal?                @db.Decimal(15, 2)
+  corrections     Json                    @default("{}")
   created_at      DateTime                @default(now())
   batch           FiscalAnticipationBatch @relation(fields: [batch_id], references: [id], onDelete: Restrict)
+  history         FiscalAnticipationHistory[]
 
   @@unique([organization_id, access_key, item_number], map: "uq_fiscal_anticipation_items_org_key_item")
   @@index([organization_id, batch_id, access_key, item_number], map: "idx_fiscal_anticipation_items_org_batch")
   @@map("fiscal.anticipation_items")
+}
+
+// Trilha da revisão de antecipações: classificação, correção, valor manual e estado do lote.
+model FiscalAnticipationHistory {
+  id              String                  @id @default(uuid())
+  organization_id String
+  batch_id        String
+  item_id         String?
+  field           String
+  previous_value  String?
+  new_value       String?
+  reason          String?
+  actor_user_id   String
+  created_at      DateTime                @default(now())
+  batch           FiscalAnticipationBatch @relation(fields: [batch_id], references: [id], onDelete: Restrict)
+  item            FiscalAnticipationItem? @relation(fields: [item_id], references: [id], onDelete: Restrict)
+
+  @@index([organization_id, batch_id, created_at], map: "idx_fiscal_anticipation_history_org_batch_created")
+  @@map("fiscal.anticipation_history")
 }
 
 model TriageResponsible {

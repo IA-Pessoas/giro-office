@@ -969,6 +969,68 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       otherOrganization,
     );
     expect(foreign.status).not.toBe(200);
+
+    // FIS-17: classifica e corrige com histórico, envia, devolve e aprova.
+    const [firstItem, secondItem] = created.data.items as { id: string }[];
+    const itemPath = (itemId: string | undefined) =>
+      `/fiscal/anticipations/batches/${id}/items/${itemId}`;
+    const reviewed = expectOk(
+      await call("PUT", itemPath(firstItem?.id), {
+        classification: "partial",
+        manual_value: "7.5",
+        corrections: { ncm: "22029900", quantity: "1.25" },
+        reason: "Conferido com o pedido",
+      }),
+      "PUT item",
+    );
+    expect(reviewed.data).toMatchObject({
+      classification: "partial",
+      manual_value: "7.50",
+      corrections: { ncm: "22029900", quantity: "1.25" },
+      ncm: "22030000",
+    });
+    const reviewer = requireSmokeState().ownerId;
+    expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/submit`, { reviewer_id: reviewer }),
+      "submit com item sem classificação",
+      [400],
+    );
+    expectOk(
+      await call("PUT", itemPath(secondItem?.id), { classification: "freight", reason: "Frete" }),
+      "PUT segundo item",
+    );
+    const submitted = expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/submit`, { reviewer_id: reviewer }),
+      "POST submit",
+    );
+    expect(submitted.data).toMatchObject({ status: "awaiting_check", reviewer_id: reviewer });
+    expectOk(
+      await call("PUT", itemPath(firstItem?.id), { classification: "total", reason: "x" }),
+      "PUT com lote em conferência",
+      [409],
+    );
+    expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/check`, {
+        decision: "return",
+        reason: "Rever o frete",
+      }),
+      "POST check return",
+    );
+    expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/submit`, { reviewer_id: reviewer }),
+      "POST resubmit",
+    );
+    const checked = expectOk(
+      await call("POST", `/fiscal/anticipations/batches/${id}/check`, { decision: "approve" }),
+      "POST check approve",
+    );
+    expect(checked.data.status).toBe("checked");
+    const detail = expectOk(await call("GET", `/fiscal/anticipations/batches/${id}`), "GET detail");
+    const fields = (detail.data.history as { field: string }[]).map((row) => row.field);
+    expect(fields.filter((field) => field === "status")).toHaveLength(4);
+    expect(fields).toEqual(
+      expect.arrayContaining(["classification", "manual_value", "correction.ncm", "reviewer_id"]),
+    );
   });
 
   it("atacadista: marca, desmarca com trilha e isola por organização", async () => {

@@ -5136,6 +5136,7 @@ const handlers = {
         throw new Error(`Lote de antecipações inesperado: ${JSON.stringify(response.body?.data)}`);
       }
       state.fiscalAnticipationBatchId = pickFirst(response.body, "data.id");
+      state.fiscalAnticipationItemId = pickFirst(response.body, "data.items.0.id");
     }
   },
 
@@ -5163,6 +5164,41 @@ const handlers = {
     });
     if (!isBadExpectation(op) && !Array.isArray(response.body?.data?.items)) {
       throw new Error(`Lote sem itens: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalAnticipationItemUpdate(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/items/${requireState("fiscalAnticipationItemId")}`,
+      json: { classification: "total", reason: "Smoke: classificação manual" },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.classification !== "total") {
+      throw new Error(`Item não classificado: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalAnticipationItemUpdateInvalid(op) {
+    await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/items/${requireState("fiscalAnticipationItemId")}`,
+      expectedStatus: [400],
+      json: { classification: "total" },
+    });
+  },
+
+  async fiscalAnticipationSubmit(op) {
+    await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/submit`,
+      json: { reviewer_id: requireState("session").id },
+    });
+  },
+
+  async fiscalAnticipationCheck(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/check`,
+      json: { decision: "approve" },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.status !== "checked") {
+      throw new Error(`Lote não conferido: ${JSON.stringify(response.body?.data)}`);
     }
   },
 

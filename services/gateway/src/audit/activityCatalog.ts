@@ -382,6 +382,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "importou", item: "um lote de XML para antecipações" },
   },
   {
+    methods: ["PUT"],
+    pattern: /^\/fiscal\/anticipations\/batches\/[^/]+\/items\/[^/]+$/,
+    description: { action: "revisou", item: "um item de antecipação" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/anticipations\/batches\/[^/]+\/submit$/,
+    description: { action: "enviou à conferência", item: "um lote de antecipações" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/anticipations\/batches\/[^/]+\/check$/,
+    description: { action: "conferiu", item: "um lote de antecipações" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/fiscal\/malhas\/[^/]+\/attachment$/,
     description: { action: "anexou", item: "um arquivo a uma malha fiscal" },
