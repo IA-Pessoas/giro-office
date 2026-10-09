@@ -1,6 +1,9 @@
 import { buildFiscalServiceOpenApiSpec } from "@workspace/fiscal-service/src/openapi/spec.js";
 import { InternalReportingService } from "@workspace/fiscal-service/src/reporting/internalReportingService.js";
-import { documentConferenceBodySchema } from "@workspace/fiscal-service/src/schemas/documentConference.schemas.js";
+import {
+  documentConferenceBodySchema,
+  xmlSelectionBodySchema,
+} from "@workspace/fiscal-service/src/schemas/documentConference.schemas.js";
 import {
   createFiscalRateBodySchema,
   fiscalRateIdParamsSchema,
@@ -55,6 +58,7 @@ import {
 } from "@workspace/fiscal-service/src/services/simplesRatePdfService.js";
 import { SimplesRateService } from "@workspace/fiscal-service/src/services/simplesRateService.js";
 import { simplesRateZipExport } from "@workspace/fiscal-service/src/services/simplesRateZipService.js";
+import { selectXmlFromZip } from "@workspace/fiscal-service/src/services/xmlSelectionService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   fiscalIcmsReportingCatalog,
@@ -370,6 +374,11 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const body = parseWithZod(documentConferenceBodySchema, await readJson(c));
     const result = compareDocumentSpreadsheets(body);
     return c.json(createSuccessResponse({ ...result, ...documentConferenceCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/xml-selection", async (c) => {
+    const body = parseWithZod(xmlSelectionBodySchema, await readJson(c));
+    return c.json(createSuccessResponse(selectXmlFromZip(body)));
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {

@@ -105,6 +105,7 @@ describe("activityCatalog", () => {
     ["POST", "/fiscal/simples/csv", "exportou", "um CSV de alíquotas do Simples em lote"],
     ["POST", "/fiscal/simples/zip", "exportou", "os PDFs de alíquotas do Simples em lote"],
     ["POST", "/fiscal/conferences/documents", "conferiu", "planilhas Domínio e SEFAZ"],
+    ["POST", "/fiscal/conferences/xml-selection", "selecionou", "XML de notas em um ZIP"],
     ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
     [
       "PUT",

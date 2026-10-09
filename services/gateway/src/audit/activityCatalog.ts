@@ -365,6 +365,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "conferiu", item: "planilhas Domínio e SEFAZ" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/xml-selection$/,
+    description: { action: "selecionou", item: "XML de notas em um ZIP" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
     description: { action: "consultou", item: "um job de relatório" },

@@ -2,6 +2,7 @@ import "./envBootstrap.js";
 
 import {
   createLogger,
+  createZip,
   FORWARDED_AUTH_ORGANIZATION_ID_HEADER,
   FORWARDED_AUTH_PERMISSION_HEADER,
   FORWARDED_AUTH_USER_ID_HEADER,
@@ -83,6 +84,48 @@ describe("POST /fiscal/conferences/documents", () => {
       .post("/fiscal/conferences/documents")
       .set(headers(2))
       .send({ dominio: body.dominio })
+      .expect(400);
+  });
+});
+
+describe("POST /fiscal/conferences/xml-selection", () => {
+  const app = createFiscalApp({ env, logger });
+  const nfe = `<NFe><infNFe versao="4.00"><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit></infNFe></NFe>`;
+  const selection = {
+    file_name: "notas.zip",
+    zip_base64: createZip([{ fileName: "a.xml", body: Buffer.from(nfe) }]).toString("base64"),
+    requests: ["100"],
+  };
+
+  it("exige nível 2 e devolve o ZIP com o XML selecionado", async () => {
+    await request(app)
+      .post("/fiscal/conferences/xml-selection")
+      .set(headers(1))
+      .send(selection)
+      .expect(403);
+    const response = await request(app)
+      .post("/fiscal/conferences/xml-selection")
+      .set(headers(2))
+      .send(selection)
+      .expect(200);
+    expect(response.body.data).toMatchObject({
+      status: "complete",
+      file_name: "xml-selecionados.zip",
+      selected: [{ request: "100", entry: "a.xml" }],
+    });
+    expect(typeof response.body.data.zip_base64).toBe("string");
+  });
+
+  it("recusa base64 inválido e lista vazia", async () => {
+    await request(app)
+      .post("/fiscal/conferences/xml-selection")
+      .set(headers(2))
+      .send({ ...selection, zip_base64: "não é base64" })
+      .expect(400);
+    await request(app)
+      .post("/fiscal/conferences/xml-selection")
+      .set(headers(2))
+      .send({ ...selection, requests: [] })
       .expect(400);
   });
 });
