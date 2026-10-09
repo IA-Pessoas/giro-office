@@ -9,6 +9,9 @@ import type {
   TriageDocumentsMonthly,
   TriageClosing,
   TriageClosingStatus,
+  TriageDocumentField,
+  TriageMonthlyUpdate,
+  TriageMovementConfig,
   TriageRoutineType,
 } from "../types";
 import {
@@ -82,6 +85,29 @@ export const triageDocumentsService = {
       CONTABIL_ENDPOINTS.triageMonthlyItems(monthlyId),
       { status, ...(type === "FISCAL" ? { type } : {}) },
     );
+    return unwrapContabilEnvelope(response.data);
+  },
+  async updateMonthly(monthlyId: string, data: TriageMonthlyUpdate): Promise<TriageDocumentsMonthly> {
+    const response = await setupAPIClient().patch(
+      CONTABIL_ENDPOINTS.triageMonthlyById(monthlyId),
+      data,
+    );
+    return unwrapContabilEnvelope(response.data);
+  },
+  async getMovementConfig(clientId: string): Promise<TriageMovementConfig> {
+    const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.triageConfig, {
+      params: { client_id: clientId },
+    });
+    return unwrapContabilEnvelope(response.data);
+  },
+  async saveMovementConfig(
+    clientId: string,
+    activeItems: TriageDocumentField[],
+  ): Promise<TriageMovementConfig> {
+    const response = await setupAPIClient().put(CONTABIL_ENDPOINTS.triageConfig, {
+      client_id: clientId,
+      active_items: activeItems,
+    });
     return unwrapContabilEnvelope(response.data);
   },
   async getStatements(params: MonthlyParams): Promise<TriageBankStatement[]> {

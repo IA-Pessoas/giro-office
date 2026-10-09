@@ -34,6 +34,6 @@ export const STATUSES: Array<[TriageDocumentStatus, string]> = [
   ["COMPLETED", "Concluído"],
   ["ATTENTION", "Atenção"],
   ["UNDER_REVIEW", "Em revisão"],
-  ["NOT_PRESENT", "Não recebido"],
+  ["NOT_PRESENT", "Não possui"],
   ["NOT_APPLICABLE", "Não aplicável"],
 ];
