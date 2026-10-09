@@ -1293,6 +1293,54 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/conferences/invoice-pdfs": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Somar totais de faturas em PDF",
+          description:
+            "Recebe até 50 PDFs em base64 (files; até ~650 kB somados). Formato suportado (devolvido em supported_format): um total por PDF; PDF com camada de texto (gerado por sistema, não escaneado), sem senha, conteúdo sem filtro ou FlateDecode, fontes padrão ou com mapa ToUnicode, inclusive em Form XObject; até 500 páginas e 20 MB descompactados. Em cada PDF procura o total pelos rótulos Total a pagar, Total da fatura, Total da nota, Total geral, Total do documento, Valor total (exceto subtotais como dos produtos ou dos tributos), Valor a pagar, Valor da fatura, Valor cobrado e Valor do documento (valor na mesma linha ou na seguinte; negativo por sinal ou parênteses) e soma em centavos as faturas com um único valor. Rótulos em cabeçalho de tabela tornam a fatura ambígua; página sem texto legível ou fatura com o mesmo conteúdo de outra deixam o arquivo como não processado. Devolve invoices (valor, página, rótulo e linha de origem), ambiguous (totais diferentes na mesma fatura, fora da soma), not_processed (PDF ilegível, sem total ou repetido), totals, supported_format e o CSV (campo csv). status partial quando há fatura fora da soma. Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["files"],
+                  additionalProperties: false,
+                  properties: {
+                    files: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 50,
+                      items: {
+                        type: "object",
+                        required: ["file_name", "content_base64"],
+                        additionalProperties: false,
+                        properties: {
+                          file_name: { type: "string", minLength: 1, maxLength: 255 },
+                          content_base64: { type: "string", minLength: 1 },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description:
+                "Total das faturas com a origem de cada valor, ambiguidades e não processados",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
       "/fiscal/revenues/{id}": {
         put: {
           tags: ["Receitas"],

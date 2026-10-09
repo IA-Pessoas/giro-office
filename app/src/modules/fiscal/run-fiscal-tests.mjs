@@ -464,3 +464,17 @@ await runTest("fiscal IPI spreadsheet conference shows each source and the diffe
   assert.match(section, /uma linha por nota/);
   assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
 });
+
+await runTest("fiscal invoice PDF totals show origin, ambiguous and unprocessed files", async () => {
+  const section = await readSource("./components/FiscalInvoicePdfSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalInvoicePdfSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/invoice-pdfs", \{ files: payload \}\)/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  assert.match(section, /Formato suportado: \{result\.supported_format\}/);
+  assert.match(section, /\{invoice\.origin\.page\}/);
+  assert.match(section, /invoice\.occurrences > 1/);
+  assert.match(section, /result\.not_processed\.map/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});
