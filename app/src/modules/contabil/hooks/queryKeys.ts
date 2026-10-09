@@ -28,8 +28,19 @@ export function triageMovementConfigQueryKey(clientId: string) {
   return [...CONTABIL_QUERY_KEY, "triage", "movement-config", clientId] as const;
 }
 
+export function triageFiscalSettingsQueryKey(clientId: string) {
+  return [...CONTABIL_QUERY_KEY, "triage", "fiscal-settings", clientId] as const;
+}
+
+/** Prefixo de todas as competências da carteira fiscal (invalidação por cliente). */
+export const TRIAGE_FISCAL_PORTFOLIO_QUERY_KEY = [
+  ...CONTABIL_QUERY_KEY,
+  "triage",
+  "fiscal-portfolio",
+] as const;
+
 export function triageFiscalPortfolioQueryKey(competence: string) {
-  return [...CONTABIL_QUERY_KEY, "triage", "fiscal-portfolio", competence] as const;
+  return [...TRIAGE_FISCAL_PORTFOLIO_QUERY_KEY, competence] as const;
 }
 
 export function triageStatementsQueryKey(clientId: string, competence: string) {

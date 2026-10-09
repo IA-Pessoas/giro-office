@@ -118,6 +118,8 @@ export type DocumentsService = {
   updateMonthly(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   getConfig(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   saveConfig(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  getFiscalSettings(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  saveFiscalSettings(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   listStatements(input: JsonRecord, organizationId: string): Promise<unknown[]>;
   upsertStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   archiveStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
@@ -1169,6 +1171,17 @@ export function createDocumentsService(
           })
         : [];
       const userNames = new Map(users.map((user) => [user.id, user.name]));
+      const settings = clients.length
+        ? await prisma.triageConfig.findMany({
+            where: {
+              organization_id: auth.organizationId,
+              type: "FISCAL",
+              client_id: { in: clients.map((client) => String(client.id)) },
+            },
+            select: { client_id: true, priority: true, delivery_method: true },
+          })
+        : [];
+      const settingsByClient = new Map(settings.map((row) => [String(row.client_id), row]));
       const fiscalFields = triageFiscalFields.slice(0, -1);
 
       return {
@@ -1186,6 +1199,8 @@ export function createDocumentsService(
             regime: client.regime,
             responsible_id: responsibleId,
             responsible_name: responsibleId ? (userNames.get(responsibleId) ?? null) : null,
+            priority: settingsByClient.get(String(client.id))?.priority === true,
+            delivery_method: settingsByClient.get(String(client.id))?.delivery_method ?? null,
             can_edit: Number(auth.modules?.fiscal ?? 0) >= 2 || assignedId(client) === auth.userId,
             has_competence: Boolean(snapshot),
             planned_checklist: required
@@ -1627,6 +1642,81 @@ export function createDocumentsService(
         updatedData: { active_items: activeItems },
       });
       return { client_id: clientId, type, configured: true, active_items: activeItems };
+    },
+    async getFiscalSettings(input, auth) {
+      if (Number(auth.modules?.fiscal ?? auth.permission ?? 0) < 1)
+        throw new ServiceError(403, "Permissão insuficiente para consultar a Triagem Fiscal.");
+      await assertClientInOrganization(prisma, String(input.client_id), auth.organizationId);
+      const config = await prisma.triageConfig.findFirst({
+        where: { client_id: input.client_id, organization_id: auth.organizationId, type: "FISCAL" },
+        select: { priority: true, delivery_method: true },
+      });
+      return {
+        client_id: input.client_id,
+        priority: config?.priority === true,
+        delivery_method: config?.delivery_method ?? null,
+      };
+    },
+    async saveFiscalSettings(input, auth) {
+      const clientId = String(input.client_id);
+      const deliveryMethod = normalizeOptionalCatalogCode(input.delivery_method, "Meio de envio");
+      const identity = {
+        organization_id: auth.organizationId,
+        client_id: clientId,
+        type: "FISCAL",
+      };
+      const data = {
+        ...(typeof input.priority === "boolean" ? { priority: input.priority } : {}),
+        ...(deliveryMethod !== undefined ? { delivery_method: deliveryMethod } : {}),
+      };
+      const result = await prisma.$transaction(async (transaction) => {
+        await lock(transaction, `triagem.configs:${auth.organizationId}:${clientId}:FISCAL`);
+        await assertClientInOrganization(transaction, clientId, auth.organizationId);
+        await canEdit(transaction, clientId, auth, "FISCAL");
+        if (deliveryMethod) {
+          // Valor do cliente não tem competência: vale o catálogo ativo da organização.
+          const item = await transaction.triageCatalogItem.findFirst({
+            where: {
+              organization_id: auth.organizationId,
+              kind: "DELIVERY_METHOD",
+              code: deliveryMethod,
+              archived_at: null,
+            },
+            select: { code: true },
+          });
+          if (!item) throw new ServiceError(400, "Meio de envio não está disponível no catálogo.");
+        }
+        const current = await transaction.triageConfig.findFirst({
+          where: identity,
+          select: { priority: true, delivery_method: true },
+        });
+        const updated = await transaction.triageConfig.upsert({
+          where: { organization_id_client_id_type: identity },
+          // Só cria a linha fiscal; itens configurados vazios equivalem a "sem configuração".
+          create: { ...identity, active_items: [], ...data },
+          update: data,
+        });
+        return { current, updated };
+      });
+      const changed = result as { current: JsonRecord | null; updated: JsonRecord };
+      const saved = {
+        priority: changed.updated.priority === true,
+        delivery_method: (changed.updated.delivery_method as string | null | undefined) ?? null,
+      };
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Configurar prioridade e meio de envio fiscal",
+        referring: "triagem.configs",
+        referringId: clientId,
+        oldData: {
+          priority: changed.current?.priority === true,
+          delivery_method: (changed.current?.delivery_method as string | null | undefined) ?? null,
+        },
+        updatedData: saved,
+      });
+      return { client_id: clientId, ...saved };
     },
     async listStatements(input, organizationId) {
       return prisma.triageBankStatement.findMany({

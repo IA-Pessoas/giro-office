@@ -5,12 +5,15 @@ import { AlertCircle, CalendarDays, FileDown, Loader2, Printer, RotateCcw, Searc
 import {
   filterFiscalTriagePortfolio,
   fiscalTriagePortfolioItemStatus,
+  TRIAGE_PORTFOLIO_NO_DELIVERY_METHOD,
   TRIAGE_PORTFOLIO_NO_REGIME,
   TRIAGE_PORTFOLIO_NO_RESPONSIBLE,
   type TriagePortfolioDocumentStatus,
   type TriagePortfolioJustificationFilter,
+  type TriagePortfolioPriorityFilter,
 } from "@workspace/shared/triagem/portfolioFilters";
 
+import { useTriageCatalogs } from "@modules/triagem";
 import { triagemCompetenceService } from "@modules/triagem/services/triagemCompetenceService";
 import { PaginationControls } from "@shared/components";
 import { useFetch } from "@shared/hooks";
@@ -40,21 +43,37 @@ function csvCell(value: string) {
   return `"${safe.replaceAll('"', '""')}"`;
 }
 
-function exportTable(rows: FiscalTriagePortfolioItem[]) {
+type DeliveryLabel = (code: string | null) => string;
+
+function exportTable(rows: FiscalTriagePortfolioItem[], deliveryLabel: DeliveryLabel) {
   return [
-    ["Empresa", "CNPJ", "Regime", "Responsável", ...FISCAL_DOCUMENTS.map(([, label]) => label)],
+    [
+      "Empresa",
+      "CNPJ",
+      "Regime",
+      "Responsável",
+      "Prioridade",
+      "Meio de envio",
+      ...FISCAL_DOCUMENTS.map(([, label]) => label),
+    ],
     ...rows.map((row) => [
       row.legal_name,
       row.cpf_cnpj,
       row.regime ?? "",
       row.responsible_name ?? "",
+      row.priority ? "Sim" : "Não",
+      deliveryLabel(row.delivery_method),
       ...FISCAL_DOCUMENTS.map(([field]) => statusLabel(fiscalTriagePortfolioItemStatus(row, field))),
     ]),
   ];
 }
 
-function exportCsv(competence: string, rows: FiscalTriagePortfolioItem[]) {
-  const content = exportTable(rows)
+function exportCsv(
+  competence: string,
+  rows: FiscalTriagePortfolioItem[],
+  deliveryLabel: DeliveryLabel,
+) {
+  const content = exportTable(rows, deliveryLabel)
     .map((line) => line.map(csvCell).join(","))
     .join("\r\n");
   const url = URL.createObjectURL(
@@ -67,7 +86,11 @@ function exportCsv(competence: string, rows: FiscalTriagePortfolioItem[]) {
   URL.revokeObjectURL(url);
 }
 
-function printPortfolio(competence: string, rows: FiscalTriagePortfolioItem[]) {
+function printPortfolio(
+  competence: string,
+  rows: FiscalTriagePortfolioItem[],
+  deliveryLabel: DeliveryLabel,
+) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) return false;
   printWindow.document.open();
@@ -80,7 +103,7 @@ function printPortfolio(competence: string, rows: FiscalTriagePortfolioItem[]) {
   title.textContent = `Triagem Fiscal · ${competence}`;
   printWindow.document.body.append(title);
   const table = printWindow.document.createElement("table");
-  const [columns, ...bodyRows] = exportTable(rows);
+  const [columns, ...bodyRows] = exportTable(rows, deliveryLabel);
   const head = printWindow.document.createElement("tr");
   for (const column of columns) {
     const cell = printWindow.document.createElement("th");
@@ -117,6 +140,14 @@ export function FiscalTriagePortfolioSection({
   );
   const [documentStatus, setDocumentStatus] = useState<TriagePortfolioDocumentStatus | "">("");
   const [justification, setJustification] = useState<TriagePortfolioJustificationFilter | "">("");
+  const [priority, setPriority] = useState<TriagePortfolioPriorityFilter | "">("");
+  const [deliveryMethod, setDeliveryMethod] = useState("");
+  const deliveryMethods = useTriageCatalogs("DELIVERY_METHOD");
+  const deliveryLabels = new Map(
+    (deliveryMethods.data ?? []).map((item) => [item.code, item.label]),
+  );
+  const deliveryLabel = (code: string | null) =>
+    code ? (deliveryLabels.get(code) ?? code) : "Não informado";
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState("");
   const [actionError, setActionError] = useState("");
@@ -150,8 +181,20 @@ export function FiscalTriagePortfolioSection({
         documentField,
         documentStatus: documentStatus || undefined,
         justification: justification || undefined,
+        priority: priority || undefined,
+        deliveryMethod,
       }),
-    [items, search, responsible, regime, documentField, documentStatus, justification],
+    [
+      items,
+      search,
+      responsible,
+      regime,
+      documentField,
+      documentStatus,
+      justification,
+      priority,
+      deliveryMethod,
+    ],
   );
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visible = filtered.slice(
@@ -246,7 +289,7 @@ export function FiscalTriagePortfolioSection({
           </div>
           <button
             type="button"
-            onClick={() => exportCsv(competence, filtered)}
+            onClick={() => exportCsv(competence, filtered, deliveryLabel)}
             disabled={!filtered.length}
             className={CONTABIL_OUTLINE_ACTION_CLASS}
           >
@@ -255,7 +298,7 @@ export function FiscalTriagePortfolioSection({
           <button
             type="button"
             onClick={() => {
-              if (!printPortfolio(competence, filtered))
+              if (!printPortfolio(competence, filtered, deliveryLabel))
                 setActionError("Permita a abertura da janela para salvar o PDF.");
             }}
             disabled={!filtered.length}
@@ -395,6 +438,37 @@ export function FiscalTriagePortfolioSection({
                         {responsibles.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
                       </select>
                     </th>
+                    <th scope="col" className="min-w-28 px-3 py-3 font-semibold">
+                      Prioridade
+                      <select
+                        aria-label="Filtrar prioridade"
+                        value={priority}
+                        onChange={(event) => {
+                          setPriority(event.target.value as TriagePortfolioPriorityFilter | "");
+                          setPage(1);
+                        }}
+                        className={CONTABIL_TABLE_FILTER_CLASS}
+                      >
+                        <option value="">Todas</option>
+                        <option value="yes">Sim</option>
+                        <option value="no">Não</option>
+                      </select>
+                    </th>
+                    <th scope="col" className="min-w-36 px-3 py-3 font-semibold">
+                      Meio de envio
+                      <select
+                        aria-label="Filtrar meio de envio"
+                        value={deliveryMethod}
+                        onChange={(event) => updateFilter(setDeliveryMethod, event.target.value)}
+                        className={CONTABIL_TABLE_FILTER_CLASS}
+                      >
+                        <option value="">Todos</option>
+                        <option value={TRIAGE_PORTFOLIO_NO_DELIVERY_METHOD}>Não informado</option>
+                        {(deliveryMethods.data ?? []).map((item) => (
+                          <option key={item.id} value={item.code}>{item.label}</option>
+                        ))}
+                      </select>
+                    </th>
                     {FISCAL_DOCUMENTS.map(([field, label]) => (
                       <th key={field} scope="col" className="min-w-36 px-2 py-3 font-semibold">
                         {label}
@@ -404,7 +478,7 @@ export function FiscalTriagePortfolioSection({
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
                   {visible.length === 0 ? (
-                    <tr><td colSpan={5 + FISCAL_DOCUMENTS.length} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">{items.length === 0 ? "Nenhuma empresa nesta competência." : "Nenhuma empresa corresponde aos filtros."}</td></tr>
+                    <tr><td colSpan={7 + FISCAL_DOCUMENTS.length} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">{items.length === 0 ? "Nenhuma empresa nesta competência." : "Nenhuma empresa corresponde aos filtros."}</td></tr>
                   ) : null}
                   {visible.map((row, index) => (
                     <tr
@@ -433,6 +507,8 @@ export function FiscalTriagePortfolioSection({
                       <td className="sticky left-[17rem] z-10 min-w-40 whitespace-nowrap bg-white px-3 py-3 tabular-nums text-gray-700 shadow-[inset_-1px_0_0_rgb(229_231_235)] dark:bg-slate-900 dark:text-slate-300 dark:shadow-[inset_-1px_0_0_rgb(51_65_85)]">{formatCpfCnpjInput(row.cpf_cnpj)}</td>
                       <td className="px-3 py-3 text-gray-700 dark:text-slate-300">{row.regime ?? "—"}</td>
                       <td className="px-3 py-3 text-gray-700 dark:text-slate-300">{row.responsible_name ?? "Sem responsável"}</td>
+                      <td className="px-3 py-3 text-gray-700 dark:text-slate-300">{row.priority ? "Sim" : "Não"}</td>
+                      <td className="px-3 py-3 text-gray-700 dark:text-slate-300">{deliveryLabel(row.delivery_method)}</td>
                       {FISCAL_DOCUMENTS.map(([field, label]) => (
                         <td key={field} className="px-2 py-3 text-gray-700 dark:text-slate-300">
                           {row.monthly && row.can_edit ? (

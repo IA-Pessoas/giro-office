@@ -305,6 +305,11 @@ describe("contabil services tenant and catalog seams", () => {
         ]),
       },
       user: { findMany: vi.fn().mockResolvedValue([{ id: "u-snap", name: "Snap" }]) },
+      triageConfig: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ client_id: CLIENT, priority: true, delivery_method: "EMAIL" }]),
+      },
     };
     const service = createDocumentsService(database as never, audit());
 
@@ -317,8 +322,15 @@ describe("contabil services tenant and catalog seams", () => {
     expect(database.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { organization_id: ORG, id: { in: ["u-snap"] } } }),
     );
+    expect(database.triageConfig.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: ORG, type: "FISCAL", client_id: { in: [CLIENT, MONTHLY] } },
+      }),
+    );
     expect(result.items[0]).toMatchObject({
       legal_name: "Art",
+      priority: true,
+      delivery_method: "EMAIL",
       responsible_id: "u-snap",
       responsible_name: "Snap",
       can_edit: true,
@@ -330,6 +342,8 @@ describe("contabil services tenant and catalog seams", () => {
       monthly: null,
     });
     expect(result.items[1]).toMatchObject({
+      priority: false,
+      delivery_method: null,
       responsible_id: null,
       can_edit: false,
       has_competence: false,

@@ -92,6 +92,26 @@ test("justificativa vale para a empresa, qualquer que seja a coluna filtrada", (
   ]);
 });
 
+test("filtra por prioridade Sim/Não e meio de envio do cliente (#1692)", () => {
+  const clients = [
+    { ...rows[0], priority: true, delivery_method: "EMAIL" },
+    { ...rows[1], priority: false, delivery_method: null },
+    { ...rows[2] },
+  ];
+  assert.deepEqual(names(filterFiscalTriagePortfolio(clients, { priority: "yes" })), ["Alfa Ltda"]);
+  assert.deepEqual(names(filterFiscalTriagePortfolio(clients, { priority: "no" })), [
+    "Beta SA",
+    "Gama ME",
+  ]);
+  assert.deepEqual(names(filterFiscalTriagePortfolio(clients, { deliveryMethod: "EMAIL" })), [
+    "Alfa Ltda",
+  ]);
+  assert.deepEqual(names(filterFiscalTriagePortfolio(clients, { deliveryMethod: "none" })), [
+    "Beta SA",
+    "Gama ME",
+  ]);
+});
+
 test("converte a query validada nos filtros da tela", () => {
   assert.deepEqual(
     fiscalTriagePortfolioFiltersFromQuery({
@@ -99,6 +119,8 @@ test("converte a query validada nos filtros da tela", () => {
       document_field: "outbound_report",
       document_status: "PENDING",
       justification: "with",
+      priority: "yes",
+      delivery_method: "EMAIL",
     }),
     {
       search: undefined,
@@ -107,6 +129,8 @@ test("converte a query validada nos filtros da tela", () => {
       documentField: "outbound_report",
       documentStatus: "PENDING",
       justification: "with",
+      priority: "yes",
+      deliveryMethod: "EMAIL",
     },
   );
 });

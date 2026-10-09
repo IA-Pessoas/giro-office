@@ -19,6 +19,11 @@ export const TRIAGE_PORTFOLIO_DOCUMENT_STATUSES = [
 export type TriagePortfolioDocumentStatus = (typeof TRIAGE_PORTFOLIO_DOCUMENT_STATUSES)[number];
 
 export const TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS = ["with", "without"] as const;
+/** Prioridade Sim/Não do cliente (não é urgência de solicitação nem prioridade de item). */
+export const TRIAGE_PORTFOLIO_PRIORITY_FILTERS = ["yes", "no"] as const;
+export type TriagePortfolioPriorityFilter = (typeof TRIAGE_PORTFOLIO_PRIORITY_FILTERS)[number];
+/** Valor de `deliveryMethod` que seleciona clientes sem meio de envio. */
+export const TRIAGE_PORTFOLIO_NO_DELIVERY_METHOD = "none";
 export type TriagePortfolioJustificationFilter =
   (typeof TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS)[number];
 
@@ -30,6 +35,8 @@ export interface FiscalTriagePortfolioFilters {
   documentField?: TriageFiscalChecklistField;
   documentStatus?: TriagePortfolioDocumentStatus;
   justification?: TriagePortfolioJustificationFilter;
+  priority?: TriagePortfolioPriorityFilter;
+  deliveryMethod?: string;
 }
 
 /** Forma mínima de um item da carteira Fiscal que os filtros leem. */
@@ -38,6 +45,8 @@ export interface FiscalTriagePortfolioFilterable {
   cpf_cnpj: string | null;
   regime: string | null;
   responsible_id: string | null;
+  priority?: boolean;
+  delivery_method?: string | null;
   planned_checklist: Record<string, string> | null;
   monthly: {
     checklist: Record<string, string>;
@@ -85,6 +94,12 @@ export function filterFiscalTriagePortfolio<T extends FiscalTriagePortfolioFilte
       fiscalTriagePortfolioItemStatus(row, filters.documentField) !== filters.documentStatus
     )
       return false;
+    if (filters.priority && (row.priority === true) !== (filters.priority === "yes")) return false;
+    if (
+      filters.deliveryMethod &&
+      (row.delivery_method || TRIAGE_PORTFOLIO_NO_DELIVERY_METHOD) !== filters.deliveryMethod
+    )
+      return false;
     if (filters.justification) return hasJustification(row) === (filters.justification === "with");
     return true;
   });
@@ -98,6 +113,8 @@ export function fiscalTriagePortfolioFiltersFromQuery(query: {
   document_field?: TriageFiscalChecklistField;
   document_status?: TriagePortfolioDocumentStatus;
   justification?: TriagePortfolioJustificationFilter;
+  priority?: TriagePortfolioPriorityFilter;
+  delivery_method?: string;
 }): FiscalTriagePortfolioFilters {
   return {
     search: query.search,
@@ -106,6 +123,8 @@ export function fiscalTriagePortfolioFiltersFromQuery(query: {
     documentField: query.document_field,
     documentStatus: query.document_status,
     justification: query.justification,
+    priority: query.priority,
+    deliveryMethod: query.delivery_method,
   };
 }
 
