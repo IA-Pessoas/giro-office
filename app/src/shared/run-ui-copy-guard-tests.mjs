@@ -80,6 +80,11 @@ const ALLOWLIST = [
     reason: "nome de arquivo, não frase",
   },
   {
+    file: "services/fiscal-service/src/services/anticipationExportService.ts",
+    text: 'filename="antecipacoes-',
+    reason: "nome de arquivo em ASCII (Content-Disposition), não frase",
+  },
+  {
     file: "services/client-service/src/schemas/client.schemas.ts",
     text: "ref=integracao",
     reason: "valor literal do parâmetro ref aceito pela API",
