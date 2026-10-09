@@ -59,7 +59,27 @@ export const monthlySchema = z
     type: z.enum(["CONTABIL", "FISCAL"] as const).optional(),
   })
   .strict();
-export const fiscalPortfolioSchema = z.object({ competence }).strict();
+const optionalText = z.string().max(200).optional();
+// Valores semânticos (campo, status, justificativa) são validados por parseFiscalTriagePortfolioFilters.
+export const fiscalPortfolioSchema = z
+  .object({
+    competence,
+    search: optionalText,
+    responsible_id: optionalText,
+    regime: optionalText,
+    document_field: optionalText,
+    document_status: optionalText,
+    justification: optionalText,
+  })
+  .strict();
+export const contabilPortfolioSchema = z
+  .object({
+    competence,
+    responsible_id: optionalText,
+    regime: optionalText,
+    status: closingUpdateSchema.shape.status.optional(),
+  })
+  .strict();
 export const editabilitySchema = z
   .object({ client_id: uuid("client_id"), type: monthlySchema.shape.type })
   .strict();

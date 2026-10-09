@@ -1,5 +1,13 @@
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
-import { parseWithZod } from "@workspace/shared";
+import {
+  type FiscalTriagePortfolioFilterable,
+  type FiscalTriagePortfolioFilters,
+  filterFiscalTriagePortfolio,
+  parseFiscalTriagePortfolioFilters,
+  parseWithZod,
+  TRIAGE_PORTFOLIO_NO_REGIME,
+  TRIAGE_PORTFOLIO_NO_RESPONSIBLE,
+} from "@workspace/shared";
 import {
   createSuccessResponse,
   REQUEST_ID_HEADER,
@@ -15,7 +23,6 @@ import {
   createControlBodySchema,
   createYearControlsBodySchema,
   detailControlQuerySchema,
-  listControlQuerySchema,
   updateControlFieldBodySchema,
 } from "../../../services/contabil-service/src/schemas/control.schemas.js";
 import {
@@ -49,6 +56,7 @@ import {
 import {
   closingQuerySchema,
   closingUpdateSchema,
+  contabilPortfolioSchema,
   documentItemSchema,
   documentsBulkSchema,
   editabilitySchema,
@@ -142,6 +150,27 @@ function withPrisma<T>(
   );
 }
 
+/** Filtros da carteira contábil, com os mesmos sentinelas ("none", "Não informado") da Fiscal. */
+function filterContabilPortfolio(
+  data: Record<string, unknown>,
+  query: { responsible_id?: string; regime?: string; status?: string },
+) {
+  const items = Array.isArray(data.items) ? (data.items as Record<string, unknown>[]) : [];
+  const value = (item: Record<string, unknown>, key: string, fallback: string) =>
+    typeof item[key] === "string" && item[key] ? item[key] : fallback;
+  return {
+    ...data,
+    items: items.filter(
+      (item) =>
+        (!query.responsible_id ||
+          value(item, "person_responsible_id", TRIAGE_PORTFOLIO_NO_RESPONSIBLE) ===
+            query.responsible_id) &&
+        (!query.regime || value(item, "regime", TRIAGE_PORTFOLIO_NO_REGIME) === query.regime) &&
+        (!query.status || (item.closing as { status?: string } | null)?.status === query.status),
+    ),
+  };
+}
+
 function executeAuthWrite(c: Context): void {
   requireContabilWrite(c.get("auth"));
 }
@@ -233,7 +262,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
   });
 
   app.get("/contabil/controls/list", async (c) => {
-    const query = parseWithZod(listControlQuerySchema, c.req.query());
+    const query = parseWithZod(contabilPortfolioSchema, c.req.query());
     const auth = c.get("auth");
     const invoke = (service: ControlService) => service.list(query.competence, auth.organizationId);
     const data = options.controlService
@@ -241,7 +270,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       : await withPrisma(c, options, async (prisma) =>
           invoke(createControlService(prisma, createContabilAudit(options.env ?? c.env))),
         );
-    return c.json(createSuccessResponse(data));
+    return c.json(createSuccessResponse(filterContabilPortfolio(data, query)));
   });
 
   app.post("/contabil/controls/year", async (c) => {
@@ -526,10 +555,21 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
   };
   app.get("/triagem/fiscal-portfolio", async (c) => {
     const query = parseWithZod(fiscalPortfolioSchema, c.req.query());
+    let filters: FiscalTriagePortfolioFilters;
+    try {
+      filters = parseFiscalTriagePortfolioFilters(query);
+    } catch (error) {
+      throw new ServiceError(400, error instanceof Error ? error.message : "Filtro inválido.");
+    }
     const data = await withDocuments(c, (service) =>
       service.listFiscalPortfolio(query.competence, authContext(c.get("auth"))),
     );
-    return c.json(createSuccessResponse(data));
+    const items = Array.isArray(data.items)
+      ? (data.items as FiscalTriagePortfolioFilterable[])
+      : [];
+    return c.json(
+      createSuccessResponse({ ...data, items: filterFiscalTriagePortfolio(items, filters) }),
+    );
   });
   app.get("/triagem/editability", async (c) => {
     const query = parseWithZod(editabilitySchema, c.req.query());

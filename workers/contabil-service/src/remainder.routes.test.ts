@@ -224,6 +224,93 @@ describe("contabil Worker remainder routes", () => {
     );
   });
 
+  it("aplica na carteira fiscal os mesmos filtros da tela", async () => {
+    const deps = services();
+    const row = (legal_name: string, extra: Record<string, unknown>) => ({
+      legal_name,
+      cpf_cnpj: "",
+      regime: null,
+      responsible_id: null,
+      planned_checklist: null,
+      monthly: null,
+      ...extra,
+    });
+    deps.triageDocumentsService.listFiscalPortfolio.mockResolvedValue({
+      competence: "2026-09",
+      items: [
+        row("Alfa", {
+          regime: "Simples Nacional",
+          responsible_id: USER,
+          monthly: {
+            checklist: { inbound_report: "NOT_PRESENT" },
+            item_notes: { inbound_report: { note: null, justification: "Sem movimento" } },
+          },
+        }),
+        row("Beta", { regime: "Simples Nacional", responsible_id: USER }),
+        row("Gama", {}),
+      ],
+    });
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const get = (query: string) =>
+      app.request(`https://contabil.test/triagem/fiscal-portfolio?competence=2026-09&${query}`, {
+        headers: headers("2"),
+      });
+
+    const filtered = await get(
+      `responsible_id=${USER}&regime=Simples%20Nacional&document_field=inbound_report&justification=with`,
+    );
+    const byStatus = await get("document_field=inbound_report&document_status=NOT_STARTED");
+    const invalid = await get("justification=talvez");
+
+    expect(filtered.status).toBe(200);
+    expect(
+      (await filtered.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Alfa"]);
+    expect(
+      (await byStatus.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Beta", "Gama"]);
+    expect(invalid.status).toBe(400);
+  });
+
+  it("filtra a carteira contábil por regime, responsável e estado do fechamento", async () => {
+    const deps = services();
+    deps.controlService.list.mockResolvedValue({
+      competence: "2026-09",
+      items: [
+        {
+          legal_name: "Alfa",
+          regime: "Simples Nacional",
+          person_responsible_id: USER,
+          closing: { status: "CLOSED" },
+        },
+        {
+          legal_name: "Beta",
+          regime: null,
+          person_responsible_id: null,
+          closing: { status: "NOT_RECEIVED" },
+        },
+      ],
+    });
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const get = (query: string) =>
+      app.request(`https://contabil.test/contabil/controls/list?competence=2026-09&${query}`, {
+        headers: headers("2"),
+      });
+
+    const byOwner = await get(`responsible_id=${USER}&regime=Simples%20Nacional&status=CLOSED`);
+    const unassigned = await get("responsible_id=none&regime=N%C3%A3o%20informado");
+    const invalid = await get("status=QUALQUER");
+
+    expect(
+      (await byOwner.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Alfa"]);
+    expect(
+      (await unassigned.json()).data.items.map((item: { legal_name: string }) => item.legal_name),
+    ).toEqual(["Beta"]);
+    expect(invalid.status).toBe(400);
+    expect(deps.controlService.list).toHaveBeenCalledWith("2026-09", ORG);
+  });
+
   it("mantém reporting interno fechado sem token e grant válidos", async () => {
     const app = createContabilWorkerApp({ env: env(), ...services() });
     const response = await app.request("https://contabil.test/internal/reporting/catalog", {

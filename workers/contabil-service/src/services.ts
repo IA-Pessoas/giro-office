@@ -212,6 +212,20 @@ function competenceInterval(competence: string): { start: Date; end: Date } {
   };
 }
 
+/**
+ * Janela de elegibilidade da carteira na competência: entrada até o fim do mês, saída e
+ * inativação a partir do início. Inativo sem data de inativação não tem como ser datado e sai.
+ */
+function portfolioWindow(start: Date, end: Date) {
+  return [
+    { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
+    { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
+    {
+      OR: [{ deletion_date: { gte: start } }, { deletion_date: null, NOT: { status: "Inativo" } }],
+    },
+  ];
+}
+
 function auditCreate(
   audit: Audit,
   input: AuthContext,
@@ -238,11 +252,20 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         const clients = await prisma.client.findMany({
           where: {
             organization_id: organizationId,
-            // contabil nulo é elegível, como na tela e na criação de competências.
-            AND: [
-              { OR: [{ contabil: true }, { contabil: null }] },
-              { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
-              { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
+            OR: [
+              // contabil nulo é elegível, como na tela e na criação de competências.
+              {
+                AND: [
+                  { OR: [{ contabil: true }, { contabil: null }] },
+                  ...portfolioWindow(start, end),
+                ],
+              },
+              // Controle já aberto na competência mantém o histórico mesmo após saída ou inativação.
+              {
+                controlContabil: {
+                  some: { competence, organization_id: organizationId, archived_at: null },
+                },
+              },
             ],
           },
           select: {
@@ -1049,13 +1072,7 @@ export function createDocumentsService(
         where: {
           organization_id: auth.organizationId,
           OR: [
-            {
-              fiscal: true,
-              AND: [
-                { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
-                { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
-              ],
-            },
+            { fiscal: true, AND: portfolioWindow(start, end) },
             { triageMonthlys: { some: monthlyScope } },
           ],
         },

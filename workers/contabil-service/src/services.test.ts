@@ -99,6 +99,62 @@ describe("contabil services tenant and catalog seams", () => {
     });
   });
 
+  it("carteiras de competência passada respeitam entrada, saída e inativação (#1690)", async () => {
+    const start = new Date("2025-03-01T00:00:00.000Z");
+    const end = new Date("2025-03-31T23:59:59.999Z");
+    const window = [
+      { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
+      { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
+      {
+        OR: [
+          { deletion_date: { gte: start } },
+          { deletion_date: null, NOT: { status: "Inativo" } },
+        ],
+      },
+    ];
+    const database = {
+      client: { findMany: vi.fn().mockResolvedValue([]) },
+      responsibleContabil: { findMany: vi.fn().mockResolvedValue([]) },
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+
+    await createControlService(database as never, audit()).list("2025-03", ORG);
+    await createDocumentsService(database as never, audit()).listFiscalPortfolio("2025-03", {
+      userId: USER,
+      organizationId: ORG,
+      modules: { fiscal: 1 },
+    });
+
+    const [contabil, fiscal] = database.client.findMany.mock.calls.map(([args]) => args.where);
+    expect(contabil).toEqual({
+      organization_id: ORG,
+      OR: [
+        { AND: [{ OR: [{ contabil: true }, { contabil: null }] }, ...window] },
+        {
+          controlContabil: {
+            some: { competence: "2025-03", organization_id: ORG, archived_at: null },
+          },
+        },
+      ],
+    });
+    expect(fiscal).toEqual({
+      organization_id: ORG,
+      OR: [
+        { fiscal: true, AND: window },
+        {
+          triageMonthlys: {
+            some: {
+              organization_id: ORG,
+              competence: "2025-03",
+              archived_at: null,
+              type: "FISCAL",
+            },
+          },
+        },
+      ],
+    });
+  });
+
   describe("elegibilidade para criar competências (#1323)", () => {
     const base = { clientId: CLIENT, userId: USER, organizationId: ORG, permission: 2 };
     function controlDb(contabil: boolean | null | undefined) {
