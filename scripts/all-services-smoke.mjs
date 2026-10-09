@@ -4710,6 +4710,114 @@ const handlers = {
     });
   },
 
+  async fiscalMonthlyControlList(op) {
+    await httpRequest(op, { query: { competence: "2026-01" } });
+  },
+
+  async fiscalMonthlyControlOpen(op) {
+    // Motivo enviado sempre: o cliente do smoke pode não ter Fiscal ativo (abertura excepcional).
+    const response = await httpRequest(op, {
+      expectedStatus: [200, 201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-01",
+        reason: "Smoke de serviços",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalMonthlyControlId = pickFirst(response.body, "data.control.id");
+    }
+  },
+
+  async fiscalMonthlyControlUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}`,
+      json: { status: "IN_PROGRESS", no_movement: true },
+    });
+  },
+
+  async fiscalMonthlyObligationList(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations`,
+    });
+  },
+
+  async fiscalMonthlyControlResponsibles(op) {
+    const response = await httpRequest(op);
+    if (!isBadExpectation(op)) {
+      state.fiscalResponsibleId = pickFirst(response.body, "data.0.id") ?? null;
+    }
+  },
+
+  async fiscalMonthlyControlTransfer(op) {
+    // Sem candidato com acesso ao Fiscal no ambiente do smoke, o destino inválido dá 400.
+    const target = state.fiscalResponsibleId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      expectedStatus: state.fiscalResponsibleId ? [200] : [400],
+      json: {
+        control_ids: [requireState("fiscalMonthlyControlId")],
+        to_user_id: target,
+        reason: "Smoke de serviços",
+      },
+    });
+  },
+
+  async fiscalAnnualControlList(op) {
+    const response = await httpRequest(op, { query: { year: "2025" } });
+    if (!isBadExpectation(op)) {
+      state.fiscalAnnualControlId = pickFirst(response.body, "data.items.0.id") ?? null;
+    }
+  },
+
+  async fiscalAnnualControlItems(op) {
+    // Sem cliente com Fiscal ativo no ambiente do smoke, não há controle anual: 404 esperado.
+    const id = state.fiscalAnnualControlId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      path: `/fiscal/annual-controls/${id}/items`,
+      expectedStatus: state.fiscalAnnualControlId ? [200] : [404],
+    });
+  },
+
+  async fiscalAnnualControlItemAdd(op) {
+    const id = state.fiscalAnnualControlId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      path: `/fiscal/annual-controls/${id}/items`,
+      expectedStatus: state.fiscalAnnualControlId ? [201, 409] : [404],
+      json: { code: "DIMOB", reason: "Smoke de serviços" },
+    });
+  },
+
+  async fiscalAnnualControlItemUpdate(op) {
+    const id = state.fiscalAnnualControlId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      path: `/fiscal/annual-controls/${id}/items/DIMOB`,
+      expectedStatus: state.fiscalAnnualControlId ? [200] : [404],
+      json: { applicable: false, reason: "Smoke de serviços" },
+    });
+  },
+
+  async fiscalMonthlyControlTriage(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/triage`,
+    });
+  },
+
+  async fiscalMonthlyObligationAdd(op) {
+    // DCTFWeb é incluível em qualquer regime (no Simples, com folha). Repetir dá 409.
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations`,
+      expectedStatus: [201, 409],
+      json: { code: "DCTFWEB", reason: "Smoke de serviços" },
+    });
+  },
+
+  async fiscalMonthlyObligationUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations/DCTFWEB`,
+      json: { applicable: false, reason: "Smoke de serviços" },
+    });
+  },
+
   async fiscalSimplesPreview(op) {
     const response = await httpRequest(op, {
       query: { client_id: requireState("primaryClientId"), competence: "2026-02" },
