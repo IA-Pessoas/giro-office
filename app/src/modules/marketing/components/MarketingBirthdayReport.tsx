@@ -6,10 +6,15 @@ import { Dialog } from "@shared/components";
 import { useMarketingMonthlyBirthdays } from "../hooks/useMarketingDashboard";
 import type { MarketingMonthlyBirthdays } from "../types/marketingDashboard";
 import {
+  CLIENT_BIRTHDAY_COLUMNS,
+  clientBirthdayRows,
   createMonthlyClientBirthdayCsv,
   createMonthlyEmployeeBirthdayCsv,
-  formatBirthDate,
+  downloadCsvFile,
+  EMPLOYEE_BIRTHDAY_COLUMNS,
+  employeeBirthdayRows,
 } from "../utils/birthdayCsv";
+import { printMarketingReport } from "../utils/printMarketingReport";
 import { marketingPrimaryButtonClass, marketingSecondaryButtonClass } from "./marketingButtonStyles";
 import { marketingFormControlClass } from "./marketingFormStyles";
 
@@ -19,30 +24,16 @@ const MONTHS = Array.from({ length: 12 }, (_, index) =>
   ),
 );
 
-function downloadCsv(filename: string, csv: string): void {
-  const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }));
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-function printReport() {
-  const report = document.getElementById("marketing-birthday-report");
-  for (let element = report; element; element = element.parentElement) element.scrollTop = 0;
-  window.scrollTo(0, 0);
-  window.print();
-}
-
 function BirthdayTable({
   title,
   columns,
+  ids,
   rows,
 }: {
   title: string;
-  columns: [string, string, string];
-  rows: Array<{ id: string; cells: [string, string, string] }>;
+  columns: readonly string[];
+  ids: readonly string[];
+  rows: readonly (readonly string[])[];
 }) {
   return (
     <section aria-label={title} className="space-y-2">
@@ -62,9 +53,9 @@ function BirthdayTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-gray-800 dark:divide-slate-700 dark:text-slate-100">
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  {row.cells.map((cell, index) => (
+              {rows.map((row, rowIndex) => (
+                <tr key={ids[rowIndex]}>
+                  {row.map((cell, index) => (
                     <td className="py-2 pr-3" key={columns[index]}>{cell}</td>
                   ))}
                 </tr>
@@ -91,7 +82,7 @@ function BirthdayReportContent({ report }: { report: MarketingMonthlyBirthdays }
           className={marketingSecondaryButtonClass}
           disabled={report.employees.total === 0}
           onClick={() =>
-            downloadCsv(
+            downloadCsvFile(
               `aniversarios-colaboradores-${slug}.csv`,
               createMonthlyEmployeeBirthdayCsv(report.employees.items),
             )
@@ -105,7 +96,7 @@ function BirthdayReportContent({ report }: { report: MarketingMonthlyBirthdays }
           className={marketingSecondaryButtonClass}
           disabled={report.clients.total === 0}
           onClick={() =>
-            downloadCsv(
+            downloadCsvFile(
               `aniversarios-clientes-${slug}.csv`,
               createMonthlyClientBirthdayCsv(report.clients.items),
             )
@@ -115,7 +106,7 @@ function BirthdayReportContent({ report }: { report: MarketingMonthlyBirthdays }
           <Download aria-hidden="true" className="mr-1.5 inline h-4 w-4" />
           CSV clientes
         </button>
-        <button className={marketingPrimaryButtonClass} onClick={printReport} type="button">
+        <button className={marketingPrimaryButtonClass} onClick={() => printMarketingReport("marketing-birthday-report")} type="button">
           <Printer aria-hidden="true" className="h-4 w-4" />
           Imprimir relatório
         </button>
@@ -127,19 +118,15 @@ function BirthdayReportContent({ report }: { report: MarketingMonthlyBirthdays }
       </header>
 
       <BirthdayTable
-        columns={["Data", "Colaborador", "Departamento"]}
-        rows={report.employees.items.map((item) => ({
-          id: item.id,
-          cells: [formatBirthDate(item.birthDate), item.name, item.department ?? "Sem departamento"],
-        }))}
+        columns={EMPLOYEE_BIRTHDAY_COLUMNS}
+        ids={report.employees.items.map((item) => item.id)}
+        rows={employeeBirthdayRows(report.employees.items)}
         title="Colaboradores"
       />
       <BirthdayTable
-        columns={["Data", "Cliente", "Empresa"]}
-        rows={report.clients.items.map((item) => ({
-          id: item.id,
-          cells: [formatBirthDate(item.birthDate), item.name, item.companies],
-        }))}
+        columns={CLIENT_BIRTHDAY_COLUMNS}
+        ids={report.clients.items.map((item) => item.id)}
+        rows={clientBirthdayRows(report.clients.items)}
         title="Clientes PF vinculados a empresas ativas"
       />
     </article>

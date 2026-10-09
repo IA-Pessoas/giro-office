@@ -64,6 +64,7 @@ export function createMarketingDashboardRoutes(
         const report = await dashboardService.getMonthlyBirthdays(organizationId, month);
         response.json(createSuccessResponse(report));
       } catch (error: unknown) {
+        logError("Falha ao carregar aniversariantes do Marketing.", { err: error });
         next(
           error instanceof Error
             ? error

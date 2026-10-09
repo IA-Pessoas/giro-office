@@ -151,16 +151,9 @@ describe("MarketingDashboardService.getMonthlyBirthdays", () => {
     const clientSql = clientCall?.[0]?.join("?") ?? "";
     expect(clientSql).toContain('"regularize.partners"');
     expect(clientSql).toContain("partner.part > 0");
+    expect(clientSql).toContain("partner.exit IS NULL");
     expect(clientSql).toContain("company.status = 'Ativo'");
     expect(clientSql).not.toContain("calendar.day");
     expect(clientCall?.slice(1)).toEqual([organizationId, organizationId, organizationId, 5]);
-  });
-
-  it("rejeita mês fora de 1 a 12 antes de consultar o banco", async () => {
-    const prisma = { $queryRaw: vi.fn(), $transaction: vi.fn() };
-    const service = new MarketingDashboardService(prisma as never);
-
-    await expect(service.getMonthlyBirthdays(organizationId, 13)).rejects.toThrow();
-    expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
 });

@@ -2,7 +2,6 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import {
   type MarketingDashboardResponse,
   type MarketingMonthlyBirthdaysResponse,
-  marketingBirthdayMonthSchema,
   marketingDashboardResponseSchema,
   marketingMonthlyBirthdaysResponseSchema,
 } from "../schemas/marketingDashboard.schemas.js";
@@ -217,13 +216,13 @@ export class MarketingDashboardService {
 
   /**
    * Relatório legado de aniversariantes: o mês inteiro, sem cortar dias já passados.
-   * Clientes PF entram pelo vínculo do legado: participação > 0 em empresa ativa.
+   * Clientes PF entram pelo vínculo do legado: participação > 0 em empresa ativa,
+   * sem saída registrada. `month` chega validado (1-12) pela rota.
    */
   async getMonthlyBirthdays(
     organizationId: string,
     month: number,
   ): Promise<MarketingMonthlyBirthdaysResponse> {
-    const selectedMonth = marketingBirthdayMonthSchema.parse(month);
     const [employees, clients] = await this.prisma.$transaction([
       this.prisma.$queryRaw<MarketingMonthlyBirthdaysResponse["employees"]["items"]>`
         SELECT employee.id,
@@ -249,7 +248,7 @@ export class MarketingDashboardService {
           AND employee.status = 'active'
           AND employee.termination_date IS NULL
           AND employee.birth_date IS NOT NULL
-          AND EXTRACT(MONTH FROM employee.birth_date) = ${selectedMonth}
+          AND EXTRACT(MONTH FROM employee.birth_date) = ${month}
         ORDER BY day, name, employee.id
       `,
       this.prisma.$queryRaw<MarketingMonthlyBirthdaysResponse["clients"]["items"]>`
@@ -267,19 +266,20 @@ export class MarketingDashboardService {
           ON partner.pf_id = person.id
           AND partner.organization_id = ${organizationId}
           AND partner.part > 0
+          AND partner.exit IS NULL
         JOIN clients AS company
           ON company.id = partner.pj_id
           AND company.organization_id = ${organizationId}
           AND company.status = 'Ativo'
         WHERE person.organization_id = ${organizationId}
-          AND EXTRACT(MONTH FROM person.date_of_birth) = ${selectedMonth}
+          AND EXTRACT(MONTH FROM person.date_of_birth) = ${month}
         GROUP BY person.id, person.name, person.date_of_birth
         ORDER BY day, person.name, person.id
       `,
     ]);
 
     return marketingMonthlyBirthdaysResponseSchema.parse({
-      month: selectedMonth,
+      month,
       employees: { total: employees.length, items: employees },
       clients: { total: clients.length, items: clients },
     });

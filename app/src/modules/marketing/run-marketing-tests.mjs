@@ -141,7 +141,12 @@ assert.equal(
 );
 assert.match(birthdayReport, /useMarketingMonthlyBirthdays\(month/);
 assert.match(birthdayReport, /id="marketing-birthday-report"/);
-assert.match(birthdayReport, /window\.print\(\)/);
+assert.match(birthdayReport, /printMarketingReport\("marketing-birthday-report"\)/);
+assert.match(birthdayReport, /employeeBirthdayRows\(report\.employees\.items\)/);
+assert.match(
+  await readFile(new URL("./utils/printMarketingReport.ts", import.meta.url), "utf8"),
+  /window\.print\(\)/,
+);
 assert.match(styles, /#marketing-birthday-report \*/);
 assert.match(page, /MarketingBirthdayReport/);
 assert.match(service, /"\/marketing\/birthdays"/);
@@ -177,7 +182,7 @@ assert.match(editionsService, /createFeedback/);
 assert.match(editionsService, /getReport/);
 assert.match(editionsHooks, /useCreateMarketingEventEditionFeedback/);
 assert.match(editionsHooks, /invalidateQueries/);
-assert.match(editionReport, /window\.print\(\)/);
+assert.match(editionReport, /printMarketingReport\("marketing-event-edition-report"\)/);
 assert.match(editionReport, /budgetItems/);
 assert.match(editionReport, /logistics/);
 assert.match(editionReport, /marketingCommunication/);
