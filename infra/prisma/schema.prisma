@@ -1741,6 +1741,126 @@ model FiscalMonthlyRevenue {
   @@map("fiscal.monthly_revenues")
 }
 
+// Controle fiscal mensal por cliente e competência; regime registrado ao nascer.
+model FiscalMonthlyControl {
+  id              String                      @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime                    @db.Date
+  status          String                      @default("PENDING")
+  no_movement     Boolean                     @default(false)
+  regime          String?
+  opening_reason  String?
+  responsible_id  String?
+  created_by      String
+  updated_by      String
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  events          FiscalMonthlyControlEvent[]
+  obligations     FiscalMonthlyControlObligation[]
+
+  @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_controls_org_client_competence")
+  @@index([organization_id, competence], map: "idx_fiscal_monthly_controls_org_competence")
+  @@index([organization_id, responsible_id], map: "idx_fiscal_monthly_controls_org_responsible")
+  @@map("fiscal.monthly_controls")
+}
+
+// Trilha do controle mensal, gravada na mesma transação da mudança.
+model FiscalMonthlyControlEvent {
+  id              String               @id @default(uuid())
+  organization_id String
+  control_id      String
+  action          String
+  obligation_code String?
+  from_value      String?
+  to_value        String?
+  reason          String?
+  actor_id        String
+  createdAt       DateTime             @default(now())
+  control         FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@index([control_id, createdAt], map: "idx_fiscal_monthly_control_events_control_created")
+  @@map("fiscal.monthly_control_events")
+}
+
+// Obrigação mensal do controle: sugerida pelo catálogo ou incluída à mão.
+model FiscalMonthlyControlObligation {
+  id                    String               @id @default(uuid())
+  organization_id       String
+  control_id            String
+  code                  String
+  origin                String
+  applicable            Boolean              @default(true)
+  not_applicable_reason String?
+  completed_on          DateTime?            @db.Date
+  completed_by          String?
+  protocol              String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  control               FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@unique([control_id, code], map: "uq_fiscal_monthly_control_obligations_control_code")
+  @@index([organization_id, control_id], map: "idx_fiscal_monthly_control_obligations_org_control")
+  @@map("fiscal.monthly_control_obligations")
+}
+
+// Controle fiscal anual por cliente e ano-calendário, com uma linha por declaração.
+model FiscalAnnualControl {
+  id              String                     @id @default(uuid())
+  organization_id String
+  client_id       String
+  year            Int
+  regime          String?
+  responsible_id  String?
+  created_by      String
+  updated_by      String
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  items           FiscalAnnualControlItem[]
+  events          FiscalAnnualControlEvent[]
+
+  @@unique([organization_id, client_id, year], map: "uq_fiscal_annual_controls_org_client_year")
+  @@index([organization_id, year], map: "idx_fiscal_annual_controls_org_year")
+  @@map("fiscal.annual_controls")
+}
+
+model FiscalAnnualControlItem {
+  id                    String              @id @default(uuid())
+  organization_id       String
+  control_id            String
+  code                  String
+  origin                String
+  applicable            Boolean             @default(true)
+  not_applicable_reason String?
+  completed_on          DateTime?           @db.Date
+  completed_by          String?
+  protocol              String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  control               FiscalAnnualControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@unique([control_id, code], map: "uq_fiscal_annual_control_items_control_code")
+  @@index([organization_id, control_id], map: "idx_fiscal_annual_control_items_org_control")
+  @@map("fiscal.annual_control_items")
+}
+
+model FiscalAnnualControlEvent {
+  id              String              @id @default(uuid())
+  organization_id String
+  control_id      String
+  action          String
+  item_code       String?
+  from_value      String?
+  to_value        String?
+  reason          String?
+  actor_id        String
+  createdAt       DateTime            @default(now())
+  control         FiscalAnnualControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@index([control_id, createdAt], map: "idx_fiscal_annual_control_events_control_created")
+  @@map("fiscal.annual_control_events")
+}
+
 model Ipi {
   id              String       @id @default(uuid())
   ncm             String

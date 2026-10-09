@@ -22,6 +22,7 @@ const SERVICES = [
   "CERTIFICATE_SERVICE",
   "PESSOAL_SERVICE",
   "REGULARIZE_SERVICE",
+  "MARKETING_SERVICE",
 ] as const;
 type ServiceName = (typeof SERVICES)[number];
 
@@ -107,6 +108,8 @@ describe("gateway Worker: rotas de contabil, fiscal, triagem e parcelamento", ()
     ["GET", "/contabil/clients", "CONTABIL_SERVICE"],
     ["GET", "/fiscal/ncm", "FISCAL_SERVICE"],
     ["POST", "/parcelamento", "PARCELAMENTO_SERVICE"],
+    ["GET", "/marketing/dashboard", "MARKETING_SERVICE"],
+    ["PUT", "/marketing/events/e-1/editions/ed-1", "MARKETING_SERVICE"],
   ] as const)("%s %s vai para %s como no gateway Node", async (method, path, target) => {
     const { app, bindings, forwarded } = setup();
     const response = await app.request(
@@ -131,9 +134,10 @@ describe("gateway Worker: rotas de contabil, fiscal, triagem e parcelamento", ()
     ["/triagem/overview", "TRIAGEM_SERVICE", "1"],
     ["/triagem/monthly", "CONTABIL_SERVICE", "3"],
     ["/parcelamento", "PARCELAMENTO_SERVICE", "2"],
+    ["/marketing/dashboard", "MARKETING_SERVICE", "1"],
   ] as const)("GET %s encaminha a permissão do módulo e a identidade", async (path, target, permission) => {
     const { app, forwarded } = setup();
-    const token = member({ fiscal: 1, contabil: 2, triagem: 1, parcelamento: 2 });
+    const token = member({ fiscal: 1, contabil: 2, triagem: 1, parcelamento: 2, marketing: 1 });
     const response = await app.request(
       `https://gateway.test${path}`,
       await bearer(token, {

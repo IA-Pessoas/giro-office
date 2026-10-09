@@ -478,3 +478,144 @@ await runTest("fiscal invoice PDF totals show origin, ambiguous and unprocessed 
   assert.match(section, /result\.not_processed\.map/);
   assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
 });
+
+await runTest("fiscal control reopening needs level 3 and a reason", async () => {
+  const { fiscalControlStatusChange, FISCAL_CONTROL_STATUS_LABELS } = await import(
+    "./utils/fiscalControl.ts"
+  );
+  assert.equal(fiscalControlStatusChange("PENDING", "PENDING", false), "none");
+  assert.equal(fiscalControlStatusChange("PENDING", "COMPLETED", false), "direct");
+  assert.equal(fiscalControlStatusChange("AWAITING_CLIENT", "IN_PROGRESS", false), "direct");
+  assert.equal(fiscalControlStatusChange("COMPLETED", "IN_PROGRESS", false), "forbidden");
+  assert.equal(fiscalControlStatusChange("COMPLETED", "PENDING", true), "reason");
+  // Concluir com pendência (ou sem registro) na Triagem pede nível 3 e justificativa.
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", false, 0), "direct");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", false, 2), "forbidden");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", true, 2), "reason");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", true, null), "reason");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "AWAITING_CLIENT", false, 2), "direct");
+  assert.equal(FISCAL_CONTROL_STATUS_LABELS.AWAITING_CLIENT, "Aguardando cliente");
+});
+
+await runTest("fiscal monthly control tab keeps viewer read-only and reasons required", async () => {
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(
+    fiscalSources.shell,
+    /<FiscalControlsSection canEdit=\{canEdit\} canAuthorize=\{canDelete\} \/>/,
+  );
+  assert.match(client, /api\.get\("\/fiscal\/monthly-controls"/);
+  assert.match(client, /api\.post\("\/fiscal\/monthly-controls"/);
+  assert.match(client, /api\.patch\(`\/fiscal\/monthly-controls\/\$\{id\}`/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando controles"/);
+  assert.match(section, /list\.error \? \(\s*<div role="alert">/);
+  assert.match(section, /Nenhum cliente com Fiscal ativo nesta competência/);
+  // Visualizador: sem formulário de abertura, sem select de situação, checkbox desabilitado.
+  assert.match(section, /\{canEdit && openingForm \? \(/);
+  assert.match(section, /\{canEdit \? \(\s*<select/);
+  assert.match(section, /disabled=\{!canEdit \|\| item\.status === "COMPLETED" \|\| update\.isPending\}/);
+  assert.match(section, /id="fiscal-control-authorization-error" role="alert"/);
+  assert.match(section, /if \(reason\.length < 3\) \{\s*setAuthorizationError/);
+});
+
+await runTest("fiscal obligations: actions follow status and lock with the control", async () => {
+  const { fiscalObligationActions, todayInputDate } = await import("./utils/fiscalControl.ts");
+  assert.deepEqual(fiscalObligationActions("PENDING", true), ["complete", "dispense"]);
+  assert.deepEqual(fiscalObligationActions("COMPLETED", true), ["undo"]);
+  assert.deepEqual(fiscalObligationActions("NOT_APPLICABLE", true), ["restore"]);
+  assert.deepEqual(fiscalObligationActions("PENDING", false), []);
+  assert.equal(todayInputDate(new Date(2026, 0, 5)), "2026-01-05");
+
+  const panel = await readSource("./components/FiscalControlObligationsPanel.tsx");
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(client, /api\.get\(`\/fiscal\/monthly-controls\/\$\{controlId\}\/obligations`\)/);
+  assert.match(client, /api\.patch\(`\/fiscal\/monthly-controls\/\$\{controlId\}\/obligations\/\$\{code\}`/);
+  // Pendência só informa; a situação do controle não muda por ela.
+  assert.match(section, /item\.pending_obligations/);
+  assert.match(section, /locked=\{item\.status === "COMPLETED"\}/);
+  assert.match(panel, /const editable = canEdit && !locked;/);
+  // Dispensa sem motivo é barrada antes da API; condicional pede motivo na inclusão.
+  assert.match(panel, /action\.kind === "dispense" && trimmed\.length < 3/);
+  assert.match(panel, /definition\.conditional \|\| trimmed\) && trimmed\.length < 3/);
+  assert.match(panel, /max=\{todayInputDate\(\)\}/);
+  assert.match(panel, /queryKey: source\.portfolioKey/);
+});
+
+await runTest("fiscal control reads Triagem documents without editing them", async () => {
+  const { formatTriagePending } = await import("./utils/fiscalControl.ts");
+  assert.equal(formatTriagePending(null), "Sem registro");
+  assert.equal(formatTriagePending(0), "Em dia");
+  assert.equal(formatTriagePending(1), "1 pendente");
+
+  const panel = await readSource("./components/FiscalControlTriagePanel.tsx");
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(client, /api\.get\(`\/fiscal\/monthly-controls\/\$\{controlId\}\/triage`\)/);
+  // Só leitura: nenhum PATCH/POST para a Triagem a partir do Fiscal.
+  assert.doesNotMatch(panel, /useMutation|api\.(post|patch|put)/);
+  assert.match(section, /control\.triage_pending,/);
+  assert.match(section, /Concluir com pendência na Triagem/);
+  assert.match(section, /Há documentos pendentes na Triagem: concluir exige Fiscal nível 3 e justificativa\./);
+});
+
+await runTest("fiscal responsibles: portfolio by competence or current, transfer for level 3", async () => {
+  const { formatTransferResult, matchesResponsible } = await import("./utils/fiscalControl.ts");
+  const item = { responsible_id: "ana", default_responsible_id: "bruno" };
+  assert.equal(matchesResponsible(item, { userId: "", basis: "competence" }), true);
+  assert.equal(matchesResponsible(item, { userId: "ana", basis: "competence" }), true);
+  assert.equal(matchesResponsible(item, { userId: "ana", basis: "current" }), false);
+  assert.equal(matchesResponsible(item, { userId: "bruno", basis: "current" }), true);
+  assert.equal(
+    matchesResponsible(
+      { responsible_id: null, default_responsible_id: "bruno" },
+      { userId: "none", basis: "competence" },
+    ),
+    true,
+  );
+  assert.equal(formatTransferResult({ transferred: ["a"], skipped: [] }), "1 transferido.");
+  assert.equal(
+    formatTransferResult({
+      transferred: [],
+      skipped: [
+        { id: "b", reason: "Controle concluído." },
+        { id: "c", reason: "Controle concluído." },
+      ],
+    }),
+    "0 transferidos, 2 ignorados (Controle concluído.).",
+  );
+
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const dialog = await readSource("./components/FiscalControlTransferDialog.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(client, /api\.post\("\/fiscal\/monthly-controls\/transfer", payload\)/);
+  assert.match(client, /api\.get\("\/fiscal\/monthly-controls\/responsibles"\)/);
+  // Seleção e transferência só para nível 3; concluídos não são selecionáveis.
+  assert.match(section, /\{canAuthorize && selectedIds\.length \? \(/);
+  assert.match(section, /disabled=\{item\.status === "COMPLETED"\} title=\{item\.status === "COMPLETED" \? "Controle concluído não é transferido\." : undefined\}/);
+  assert.match(section, /Carteira atual: \{item\.default_responsible_name/);
+  assert.match(dialog, /if \(reason\.trim\(\)\.length < 3\) \{/);
+  assert.match(dialog, /enabled: open/);
+});
+
+await runTest("fiscal annual control shows each declaration and reuses the item rules", async () => {
+  const { formatAnnualDeclaration } = await import("./utils/fiscalControl.ts");
+  assert.equal(formatAnnualDeclaration(undefined), "—");
+  assert.equal(formatAnnualDeclaration({ status: "PENDING", completed_on: null }), "Pendente");
+  assert.equal(
+    formatAnnualDeclaration({ status: "COMPLETED", completed_on: "2026-03-20" }),
+    "Cumprida em 20/03/2026",
+  );
+  assert.equal(formatAnnualDeclaration({ status: "NOT_APPLICABLE", completed_on: null }), "Não aplicável");
+
+  const section = await readSource("./components/FiscalAnnualControlsSection.tsx");
+  const client = await readSource("./services/fiscalAnnualService.ts");
+  assert.match(fiscalSources.shell, /<FiscalAnnualControlsSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.get\("\/fiscal\/annual-controls", \{ params: \{ year \} \}\)/);
+  assert.match(client, /api\.patch\(`\/fiscal\/annual-controls\/\$\{controlId\}\/items\/\$\{code\}`/);
+  // Sem situação geral: só as colunas de cada declaração, sem DIRBI.
+  assert.doesNotMatch(section, /item\.status/);
+  assert.doesNotMatch(client, /DIRBI/);
+  assert.match(section, /<FiscalControlObligationsPanel source=\{annualItemSource\(item\.id\)\}/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando controles anuais"/);
+});
