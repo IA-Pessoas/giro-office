@@ -159,7 +159,6 @@ export const fiscalControlService = {
     return unwrapFiscalEnvelope<FiscalResponsibleReport>(response.data);
   },
 
-
   /** Lista a competência; o serviço gera antes os controles que faltam. */
   async list(competence: string): Promise<FiscalMonthlyControlPortfolio> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });

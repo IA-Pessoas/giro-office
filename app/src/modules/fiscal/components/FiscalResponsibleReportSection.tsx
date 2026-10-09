@@ -28,6 +28,13 @@ export function FiscalResponsibleReportSection() {
     { enabled: !byCompetence || Boolean(competence) },
   );
   const data = report.data;
+  // Responsáveis do relatório que perderam o acesso continuam filtráveis.
+  const options = new Map((users.data ?? []).map((user) => [user.id, user.name]));
+  for (const item of data?.items ?? []) {
+    if (item.responsible_id && !options.has(item.responsible_id)) {
+      options.set(item.responsible_id, item.responsible_name ?? "Usuário sem acesso atual");
+    }
+  }
 
   return (
     <section className="space-y-6">
@@ -57,9 +64,9 @@ export function FiscalResponsibleReportSection() {
           <select value={responsibleId} onChange={(event) => setResponsibleId(event.target.value)} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
             <option value="">Todos</option>
             <option value="none">Sem responsável</option>
-            {users.data?.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name}
+            {[...options].map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
               </option>
             ))}
           </select>

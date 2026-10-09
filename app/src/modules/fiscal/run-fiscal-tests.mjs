@@ -681,6 +681,7 @@ await runTest("fiscal responsibles report: screen and CSV share one response, co
   assert.match(section, /data\.items\.map\(\(item\) =>/);
   assert.match(section, /competence: byCompetence \? competence : undefined/);
   assert.match(section, /<option value="none">Sem responsável<\/option>/);
+  assert.match(section, /for \(const item of data\?\.items \?\? \[\]\) \{\s*if \(item\.responsible_id && !options\.has\(item\.responsible_id\)\)/);
   assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando relatório"/);
   assert.match(section, /report\.error \? \(\s*<div role="alert">/);
   // Transferências invalidam o prefixo das carteiras, que cobre o relatório.

@@ -506,6 +506,12 @@ describe("fiscal Worker", () => {
       { headers: reader },
     );
     expect(badReport.status).toBe(400);
+    const withoutFiscal = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/responsibles-report?basis=current",
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 0 }) }) },
+    );
+    expect(withoutFiscal.status).toBe(403);
+    expect(controls.responsibleReport).toHaveBeenCalledTimes(1);
 
     const triage = await app.request(
       `https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}/triage`,
