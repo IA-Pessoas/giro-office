@@ -5,12 +5,17 @@ import express, { Router } from "express";
 import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/isAuthenticated.js";
 import {
   documentConferenceBodySchema,
+  sefazXmlConferenceBodySchema,
   xmlSelectionBodySchema,
 } from "../schemas/documentConference.schemas.js";
 import {
   compareDocumentSpreadsheets,
   documentConferenceCsvExport,
 } from "../services/documentConferenceService.js";
+import {
+  compareSefazWithXml,
+  sefazXmlConferenceCsvExport,
+} from "../services/sefazXmlConferenceService.js";
 import { selectXmlFromZip } from "../services/xmlSelectionService.js";
 
 /**
@@ -50,6 +55,23 @@ export function createDocumentConferenceRoutes(): ReturnType<typeof Router> {
         res.json(createSuccessResponse(selectXmlFromZip(body)));
       } catch (err) {
         logError("Erro ao selecionar XML de notas no ZIP", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/conferences/sefaz-xml",
+    express.json({ limit: "1mb" }),
+    isAuthenticated,
+    requireFiscalWritePermission,
+    (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(sefazXmlConferenceBodySchema, req.body);
+        const result = compareSefazWithXml(body);
+        res.json(createSuccessResponse({ ...result, ...sefazXmlConferenceCsvExport(result) }));
+      } catch (err) {
+        logError("Erro ao conferir CSV SEFAZ contra XML", { err });
         next(err);
       }
     },

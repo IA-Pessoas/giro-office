@@ -44,6 +44,8 @@ describe("parseNfeXml", () => {
   it("extrai chave e identidade composta da NF-e", () => {
     expect(parseNfeXml(nfe(ISSUER_A, "1", "100"))).toEqual({
       content: expect.stringContaining("<nNF>100</nNF>"),
+      value: "10.00",
+      protocol_status: null,
       kind: "nfe",
       access_key: accessKey(ISSUER_A, "1", "100"),
       issuer: ISSUER_A,

@@ -25,10 +25,12 @@ export interface ConferenceDocumentRow {
   series: string;
   number: string;
   value: string | null;
+  /** Situação informada na planilha (ex.: Autorizada, Cancelada), quando há coluna. */
+  status: string | null;
 }
 
-export interface ConferenceLineIssue {
-  source: ConferenceSourceId;
+export interface ConferenceLineIssue<S extends string = ConferenceSourceId> {
+  source: S;
   line: number;
 }
 
@@ -41,16 +43,7 @@ export interface ConferencePair {
 export interface DocumentConferenceResult {
   status: "complete" | "partial";
   identity_rule: string;
-  sources: Record<
-    ConferenceSourceId,
-    {
-      file_name: string;
-      data_rows: number;
-      accepted_rows: number;
-      identity_columns: string[];
-      value_column: boolean;
-    }
-  >;
+  sources: Record<ConferenceSourceId, SpreadsheetInfo>;
   summary: {
     matched: number;
     divergent: number;
@@ -79,7 +72,7 @@ const SOURCE_LABEL: Record<ConferenceSourceId, string> = { dominio: "Domínio", 
 const IDENTITY_RULE =
   "Chave de acesso da NF-e quando informada; sem ela, emitente (CPF/CNPJ) + modelo + série + número.";
 
-type Column = "access_key" | "issuer" | "model" | "series" | "number" | "value";
+type Column = "access_key" | "issuer" | "model" | "series" | "number" | "value" | "status";
 
 // Cabeçalhos comparados sem acento, caixa ou pontuação. ponytail: aliases deduzidos dos nomes
 // usuais das exportações; sem amostras reais anonimizadas a compatibilidade não está validada.
@@ -99,6 +92,7 @@ const COLUMN_ALIASES: Record<Column, string[]> = {
     "vnf",
     "totalnota",
   ],
+  status: ["situacao", "status", "situacaonfe", "situacaodocumento", "situacaodanota"],
 };
 
 const IDENTITY_COLUMNS: Column[] = ["access_key", "issuer", "model", "series", "number"];
@@ -182,7 +176,7 @@ export function parseConferenceCsv(
  * Valor monetário em centavos: aceita `1.234,56`, `1234,56`, `1234.56`, `R$` e negativo com
  * sinal ou entre parênteses.
  */
-function parseCents(raw: string): number | null {
+export function parseCents(raw: string): number | null {
   let value = raw.replace(/R\$/gu, "").replace(/\s/g, "");
   const parenthesized = /^\(.*\)$/u.test(value);
   if (parenthesized) value = value.slice(1, -1);
@@ -193,7 +187,7 @@ function parseCents(raw: string): number | null {
   return match[1] || parenthesized ? -cents : cents;
 }
 
-function formatCents(cents: number): string {
+export function formatCents(cents: number): string {
   const sign = cents < 0 ? "-" : "";
   const abs = Math.abs(cents);
   return `${sign}${Math.trunc(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
@@ -201,16 +195,28 @@ function formatCents(cents: number): string {
 
 const digits = (value: string) => value.replace(/\D/g, "");
 
-interface ParsedSource {
+export interface SpreadsheetInfo {
+  file_name: string;
+  data_rows: number;
+  accepted_rows: number;
+  identity_columns: string[];
+  value_column: boolean;
+}
+
+export interface ParsedSpreadsheet<S extends string = ConferenceSourceId> {
   rows: (ConferenceDocumentRow & { cents: number | null })[];
-  discarded: DocumentConferenceResult["discarded"];
-  errors: DocumentConferenceResult["errors"];
-  info: DocumentConferenceResult["sources"][ConferenceSourceId];
+  discarded: (ConferenceLineIssue<S> & { reason: string })[];
+  errors: (ConferenceLineIssue<S> & { message: string })[];
+  info: SpreadsheetInfo;
   hasValue: boolean;
 }
 
-function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): ParsedSource {
-  const label = SOURCE_LABEL[source];
+/** Lê uma planilha CSV de notas: identidade por linha, descartes e erros com a linha de origem. */
+export function parseNoteSpreadsheet<S extends string>(
+  source: S,
+  label: string,
+  input: ConferenceSourceInput,
+): ParsedSpreadsheet<S> {
   const [header, ...data] = parseConferenceCsv(input.content, label);
   const columns = new Map<Column, number>();
   header?.cells.forEach((name, index) => {
@@ -233,7 +239,7 @@ function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): 
   }
 
   const width = header?.cells.length ?? 0;
-  const parsed: ParsedSource = {
+  const parsed: ParsedSpreadsheet<S> = {
     rows: [],
     discarded: [],
     errors: [],
@@ -263,7 +269,7 @@ function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): 
     };
 
     const rawKey = cell("access_key").replace(/\s/g, "");
-    let row: Omit<ConferenceDocumentRow, "line" | "identity" | "value">;
+    let row: Omit<ConferenceDocumentRow, "line" | "identity" | "value" | "status">;
     if (rawKey) {
       if (!isValidAccessKey(rawKey)) {
         fail("Chave de acesso inválida.");
@@ -308,6 +314,7 @@ function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): 
       identity: `${row.issuer}|${row.model}|${row.series}|${row.number}`,
       ...row,
       value: cents === null ? null : formatCents(cents),
+      status: cell("status") || null,
       cents,
     });
   }
@@ -315,26 +322,54 @@ function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): 
   return parsed;
 }
 
-const publicRow = ({ cents: _cents, ...row }: ParsedSource["rows"][number]) => row;
+export const publicRow = ({
+  cents: _cents,
+  ...row
+}: ConferenceDocumentRow & { cents: number | null }): ConferenceDocumentRow => row;
+
+export type IdentityPairing<L, R> =
+  | { kind: "duplicate"; identity: string; left: L[]; right: R[] }
+  | { kind: "pair"; identity: string; left: L; right: R }
+  | { kind: "left"; identity: string; left: L }
+  | { kind: "right"; identity: string; right: R };
+
+/**
+ * Pareia duas fontes pela identidade da nota, na ordem de aparição. Identidade repetida em
+ * qualquer lado vira duplicata: o sistema não escolhe qual linha corresponde.
+ */
+export function pairByIdentity<L extends { identity: string }, R extends { identity: string }>(
+  left: L[],
+  right: R[],
+): IdentityPairing<L, R>[] {
+  const group = <T extends { identity: string }>(rows: T[]) => {
+    const map = new Map<string, T[]>();
+    for (const row of rows) map.set(row.identity, [...(map.get(row.identity) ?? []), row]);
+    return map;
+  };
+  const leftById = group(left);
+  const rightById = group(right);
+  return [...new Set([...leftById.keys(), ...rightById.keys()])].map((identity) => {
+    const fromLeft = leftById.get(identity) ?? [];
+    const fromRight = rightById.get(identity) ?? [];
+    const [l, r] = [fromLeft[0], fromRight[0]];
+    if (fromLeft.length > 1 || fromRight.length > 1) {
+      return { kind: "duplicate", identity, left: fromLeft, right: fromRight };
+    }
+    if (l && r) return { kind: "pair", identity, left: l, right: r };
+    if (l) return { kind: "left", identity, left: l };
+    return { kind: "right", identity, right: r as R };
+  });
+}
+
+export const totalOf = (parsed: { hasValue: boolean; rows: { cents: number | null }[] }) =>
+  parsed.hasValue ? formatCents(parsed.rows.reduce((sum, row) => sum + (row.cents ?? 0), 0)) : null;
 
 export function compareDocumentSpreadsheets(input: {
   dominio: ConferenceSourceInput;
   sefaz: ConferenceSourceInput;
 }): DocumentConferenceResult {
-  const dominio = parseSource("dominio", input.dominio);
-  const sefaz = parseSource("sefaz", input.sefaz);
-
-  const group = (rows: ParsedSource["rows"]) => {
-    const map = new Map<string, ParsedSource["rows"]>();
-    for (const row of rows) map.set(row.identity, [...(map.get(row.identity) ?? []), row]);
-    return map;
-  };
-  const dominioById = group(dominio.rows);
-  const sefazById = group(sefaz.rows);
-  const total = (parsed: ParsedSource) =>
-    parsed.hasValue
-      ? formatCents(parsed.rows.reduce((sum, row) => sum + (row.cents ?? 0), 0))
-      : null;
+  const dominio = parseNoteSpreadsheet("dominio", SOURCE_LABEL.dominio, input.dominio);
+  const sefaz = parseNoteSpreadsheet("sefaz", SOURCE_LABEL.sefaz, input.sefaz);
 
   const buckets: Pick<
     DocumentConferenceResult,
@@ -349,18 +384,15 @@ export function compareDocumentSpreadsheets(input: {
     errors: [...dominio.errors, ...sefaz.errors],
   };
 
-  const identities = [...new Set([...dominioById.keys(), ...sefazById.keys()])];
-  for (const identity of identities) {
-    const fromDominio = dominioById.get(identity) ?? [];
-    const fromSefaz = sefazById.get(identity) ?? [];
-    const [d, s] = [fromDominio[0], fromSefaz[0]];
-    if (fromDominio.length > 1 || fromSefaz.length > 1) {
+  for (const item of pairByIdentity(dominio.rows, sefaz.rows)) {
+    if (item.kind === "duplicate") {
       buckets.duplicates.push({
-        identity,
-        dominio: fromDominio.map(publicRow),
-        sefaz: fromSefaz.map(publicRow),
+        identity: item.identity,
+        dominio: item.left.map(publicRow),
+        sefaz: item.right.map(publicRow),
       });
-    } else if (d && s) {
+    } else if (item.kind === "pair") {
+      const { left: d, right: s } = item;
       const differences: string[] = [];
       if (d.access_key && s.access_key && d.access_key !== s.access_key) {
         differences.push("Chave de acesso diferente");
@@ -368,13 +400,13 @@ export function compareDocumentSpreadsheets(input: {
       if (dominio.hasValue && sefaz.hasValue && d.value !== s.value) {
         differences.push(`Valor: Domínio ${d.value ?? "ausente"} × SEFAZ ${s.value ?? "ausente"}`);
       }
-      const pair = { identity, dominio: publicRow(d), sefaz: publicRow(s) };
+      const pair = { identity: item.identity, dominio: publicRow(d), sefaz: publicRow(s) };
       if (differences.length > 0) buckets.divergent.push({ ...pair, differences });
       else buckets.matched.push(pair);
-    } else if (d) {
-      buckets.only_dominio.push(publicRow(d));
-    } else if (s) {
-      buckets.only_sefaz.push(publicRow(s));
+    } else if (item.kind === "left") {
+      buckets.only_dominio.push(publicRow(item.left));
+    } else {
+      buckets.only_sefaz.push(publicRow(item.right));
     }
   }
 
@@ -388,7 +420,7 @@ export function compareDocumentSpreadsheets(input: {
     identity_rule: IDENTITY_RULE,
     sources: { dominio: dominio.info, sefaz: sefaz.info },
     summary,
-    totals: { dominio: total(dominio), sefaz: total(sefaz) },
+    totals: { dominio: totalOf(dominio), sefaz: totalOf(sefaz) },
     ...buckets,
   };
 }

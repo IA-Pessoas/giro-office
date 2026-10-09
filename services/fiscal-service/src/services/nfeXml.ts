@@ -1,4 +1,5 @@
 import { identityFromAccessKey, isValidAccessKey, stripZeros } from "./accessKey.js";
+import { readZipArchive } from "./safeZipReader.js";
 
 /**
  * Leitura mínima de XML de NF-e para as conferências: confere se o XML é bem formado e extrai
@@ -17,7 +18,13 @@ export interface NfeIdentity {
 
 export type NfeParseResult =
   // content: corpo da infNFe, para comparar cópias da mesma nota (com ou sem protocolo).
-  | ({ kind: "nfe"; content: string } & NfeIdentity)
+  // value: vNF do ICMSTot; protocol_status: cStat do protocolo (100 = autorizada), se houver.
+  | ({
+      kind: "nfe";
+      content: string;
+      value: string | null;
+      protocol_status: string | null;
+    } & NfeIdentity)
   | { kind: "invalid"; message: string }
   | { kind: "other"; message: string };
 
@@ -124,5 +131,47 @@ export function parseNfeXml(xml: string): NfeParseResult {
       };
     }
   }
-  return { kind: "nfe", content: block(text, "infNFe") ?? "", ...note };
+  const total = /<(?:\w+:)?vNF>\s*(\d+)(?:\.(\d{1,2}))?\s*<\/(?:\w+:)?vNF>/u.exec(
+    block(text, "ICMSTot") ?? "",
+  );
+  return {
+    kind: "nfe",
+    content: block(text, "infNFe") ?? "",
+    value: total ? `${stripZeros(total[1] ?? "0")}.${(total[2] ?? "").padEnd(2, "0")}` : null,
+    protocol_status: field(block(text, "infProt"), "cStat") ?? null,
+    ...note,
+  };
+}
+
+export type NfeFile = Extract<NfeParseResult, { kind: "nfe" }> & { entry: string; body: Buffer };
+
+export interface NfeArchive {
+  /** Arquivos do ZIP, inclusive os recusados (pastas não contam). */
+  entries: number;
+  notes: NfeFile[];
+  discarded: { entry: string; reason: string }[];
+  errors: { entry: string; message: string }[];
+}
+
+/** Lê um ZIP (base64) de XML: NF-e válidas, descartes (não XML ou não NF-e) e erros por arquivo. */
+export function readNfeArchive(zipBase64: string): NfeArchive {
+  const archive = readZipArchive(Buffer.from(zipBase64, "base64"));
+  const result: NfeArchive = {
+    entries: archive.entries.length + archive.errors.length,
+    notes: [],
+    discarded: [],
+    errors: [...archive.errors],
+  };
+  for (const { name, body } of archive.entries) {
+    if (!name.toLowerCase().endsWith(".xml")) {
+      result.discarded.push({ entry: name, reason: "Não é arquivo .xml." });
+      continue;
+    }
+    const parsed = parseNfeXml(body.toString("utf8"));
+    if (parsed.kind === "nfe") result.notes.push({ ...parsed, entry: name, body });
+    else if (parsed.kind === "other")
+      result.discarded.push({ entry: name, reason: parsed.message });
+    else result.errors.push({ entry: name, message: parsed.message });
+  }
+  return result;
 }

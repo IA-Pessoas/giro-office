@@ -255,6 +255,39 @@ describe("fiscal Worker", () => {
     expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
   });
 
+  it("confere CSV SEFAZ contra XML sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><total><ICMSTot><vNF>9.90</vNF></ICMSTot></total></infNFe></NFe>";
+    const body = {
+      sefaz: {
+        file_name: "s.csv",
+        content:
+          "CNPJ Emitente;Modelo;Série;Número;Valor\n11222333000181;55;1;7;9,90\n11222333000181;55;1;8;1,00",
+      },
+      xml: {
+        file_name: "x.zip",
+        zip_base64: createZip([{ fileName: "7.xml", body: Buffer.from(nfe) }]).toString("base64"),
+      },
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/sefaz-xml", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { summary: { matched: number; only_sefaz: number }; csv: string };
+    };
+    expect(payload.data.summary).toMatchObject({ matched: 1, only_sefaz: 1 });
+    expect(payload.data.csv).toContain("Só SEFAZ;11222333000181|55|1|8");
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
     const revenue = {
       id: ICMS_ID,
