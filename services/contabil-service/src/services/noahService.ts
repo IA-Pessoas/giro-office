@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { ServiceError } from "@workspace/shared";
+import { CONTABIL_READ_PERMISSION, CONTABIL_WRITE_PERMISSION } from "../constants/permissions.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { convertNoahZip } from "./noahConversionService.js";
 
@@ -22,7 +23,7 @@ export class NoahService {
   constructor(private readonly prisma: NoahServicePrisma) {}
 
   async create(bytes: Buffer, name: string, auth: NoahAuthContext): Promise<NoahReceipt> {
-    requireAccess(auth, 2);
+    requireAccess(auth, CONTABIL_WRITE_PERMISSION);
     const converted = await convertNoahZip(bytes);
     const record = await this.prisma.noahConversion.create({
       data: {
@@ -42,7 +43,7 @@ export class NoahService {
   }
 
   async download(id: string, auth: NoahAuthContext): Promise<string> {
-    requireAccess(auth, 1);
+    requireAccess(auth, CONTABIL_READ_PERMISSION);
     const result = await this.prisma.noahConversion.findFirst({
       where: { id, organization_id: auth.organizationId },
       select: { csv: true },

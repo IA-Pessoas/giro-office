@@ -6,6 +6,7 @@ import {
   ServiceError,
 } from "@workspace/shared";
 import { Router, raw } from "express";
+import { CONTABIL_READ_PERMISSION } from "../constants/permissions.js";
 import { isAuthenticated, requireContabilWritePermission } from "../middlewares/isAuthenticated.js";
 import { noahIdParamsSchema, noahUploadQuerySchema } from "../schemas/noah.schemas.js";
 import { NOAH_LIMITS } from "../services/noahConversionService.js";
@@ -18,7 +19,11 @@ export function createNoahRoutes(service: NoahRouteDeps): ReturnType<typeof Rout
   const upload = raw({ type: "application/zip", limit: NOAH_LIMITS.zipBytes });
 
   router.use(isAuthenticated, (req, _res, next) => {
-    next((req.permission ?? 0) < 1 ? new ServiceError(403, "Sem acesso ao Contábil.") : undefined);
+    next(
+      (req.permission ?? 0) < CONTABIL_READ_PERMISSION
+        ? new ServiceError(403, "Sem acesso ao Contábil.")
+        : undefined,
+    );
   });
   router.post(
     "/",

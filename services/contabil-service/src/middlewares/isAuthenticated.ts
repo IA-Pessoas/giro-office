@@ -14,8 +14,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 
 import { getContabilServiceEnv } from "../config/env.js";
-
-const CONTABIL_WRITE_PERMISSION = 2;
+import { CONTABIL_WRITE_PERMISSION } from "../constants/permissions.js";
 
 function parseForwardedPermission(headerValue: string | undefined): number | undefined {
   if (headerValue === undefined || headerValue === "") {
