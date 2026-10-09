@@ -121,6 +121,10 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
         name: "Receitas",
         description: "Receita bruta mensal por cliente, base do Simples Nacional",
       },
+      {
+        name: "Conferências",
+        description: "Comparação de arquivos e notas, sem gravar nem alterar dados operacionais",
+      },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
@@ -1015,6 +1019,52 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
             "400": { description: "Entrada inválida" },
             "403": { description: "Sem permissão de edição Fiscal" },
             "500": { description: "Falha ao gerar os PDFs; nenhum arquivo entregue" },
+          },
+        },
+      },
+      "/fiscal/conferences/documents": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Conferir planilhas Domínio e SEFAZ por documento",
+          description:
+            "Recebe duas planilhas CSV (separador ; , ou tab, primeira linha como cabeçalho) e compara as notas pela chave de acesso NF-e quando há; sem ela, por emitente (CPF/CNPJ) + modelo + série + número. Número isolado é descartado. Devolve coincidentes, divergentes (valor ou chave), exclusivos de cada fonte, duplicadas (sem correspondência automática), descartes e erros por linha, totais e o CSV do resultado (campo csv). status partial indica descartes ou erros; cabeçalho sem colunas de identidade ou arquivo sem linhas responde 400 sem relatório. Nada é gravado. Compatibilidade com exportações reais ainda não validada.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["dominio", "sefaz"],
+                  additionalProperties: false,
+                  properties: Object.fromEntries(
+                    ["dominio", "sefaz"].map((source) => [
+                      source,
+                      {
+                        type: "object",
+                        required: ["file_name", "content"],
+                        additionalProperties: false,
+                        properties: {
+                          file_name: { type: "string", minLength: 1, maxLength: 255 },
+                          content: { type: "string", minLength: 1, maxLength: 2_000_000 },
+                        },
+                      },
+                    ]),
+                  ),
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description:
+                "Resultado da conferência (status, summary, matched, divergent, only_dominio, only_sefaz, duplicates, discarded, errors, totals) com file_name e csv",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou planilha sem formato reconhecível" },
+            "403": { description: "Sem permissão de edição Fiscal" },
           },
         },
       },

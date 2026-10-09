@@ -1,5 +1,6 @@
 import { buildFiscalServiceOpenApiSpec } from "@workspace/fiscal-service/src/openapi/spec.js";
 import { InternalReportingService } from "@workspace/fiscal-service/src/reporting/internalReportingService.js";
+import { documentConferenceBodySchema } from "@workspace/fiscal-service/src/schemas/documentConference.schemas.js";
 import {
   createFiscalRateBodySchema,
   fiscalRateIdParamsSchema,
@@ -36,6 +37,10 @@ import {
   simplesPdfQuerySchema,
   simplesPreviewQuerySchema,
 } from "@workspace/fiscal-service/src/schemas/simplesRate.schemas.js";
+import {
+  compareDocumentSpreadsheets,
+  documentConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/documentConferenceService.js";
 import {
   fiscalRatePdfHeaders,
   renderFiscalRatePdf,
@@ -358,6 +363,13 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
       service.batch(body, c.get("auth").organizationId),
     );
     return c.json(createSuccessResponse(await simplesRateZipExport(batch)));
+  });
+
+  // Conferência de arquivos: processa só o que foi enviado, sem banco nem efeito em controles.
+  app.post("/fiscal/conferences/documents", async (c) => {
+    const body = parseWithZod(documentConferenceBodySchema, await readJson(c));
+    const result = compareDocumentSpreadsheets(body);
+    return c.json(createSuccessResponse({ ...result, ...documentConferenceCsvExport(result) }));
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {
