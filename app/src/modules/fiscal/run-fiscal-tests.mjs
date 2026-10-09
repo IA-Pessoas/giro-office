@@ -407,3 +407,17 @@ await runTest("fiscal SEFAZ × XML conference posts both files and separates sit
   assert.match(section, /return \[\s*\.\.\.result\.matched\.map/);
   assert.match(section, /Identidade: \{result\.identity_rule\}/);
 });
+
+await runTest("fiscal SPED × XML conference keeps items under their document", async () => {
+  const section = await readSource("./components/FiscalSpedXmlSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalSpedXmlSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/sped-xml", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Linha do documento seguida dos itens dele, na ordem do CSV.
+  assert.match(section, /list\.flatMap\(\(pair\) => \[\s*\{ level: "Documento"/);
+  assert.match(section, /\.\.\.pair\.items\.map\(\(item\) => \(\{ level: "Item"/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  assert.match(section, /const MAX_SPED_BYTES = 300_000;/);
+});

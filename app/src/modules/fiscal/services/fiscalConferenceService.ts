@@ -127,6 +127,87 @@ export interface FiscalSefazXmlConference {
   csv: string;
 }
 
+export interface FiscalSpedItem {
+  line: number;
+  number: string;
+  value: string | null;
+}
+
+export interface FiscalSpedDocument {
+  line: number;
+  identity: string;
+  value: string | null;
+  items: FiscalSpedItem[];
+}
+
+export interface FiscalXmlDocument {
+  entry: string;
+  identity: string;
+  value: string | null;
+  items: { number: string; value: string | null }[];
+}
+
+export interface FiscalSpedItemComparison {
+  situation: "Coincidente" | "Divergente" | "Só SPED" | "Só XML" | "Duplicado";
+  number: string;
+  sped: FiscalSpedItem | null;
+  xml: { number: string; value: string | null } | null;
+  differences: string[];
+  note: string;
+}
+
+type SpedDocumentPair = {
+  identity: string;
+  match_key: string;
+  sped: Omit<FiscalSpedDocument, "items">;
+  xml: Omit<FiscalXmlDocument, "items">;
+  differences: string[];
+  items: FiscalSpedItemComparison[];
+};
+
+type SpedIssue<T> = ({ source: "sped"; line: number } | { source: "xml"; entry: string }) & T;
+
+export interface FiscalSpedConference {
+  status: "complete" | "partial";
+  identity_rule: string;
+  sources: {
+    sped: { file_name: string; lines: number; documents: number; items: number; period: string };
+    xml: { file_name: string; entries: number; nfe_entries: number };
+  };
+  summary: Record<
+    | "matched"
+    | "divergent"
+    | "only_sped"
+    | "only_xml"
+    | "duplicates"
+    | "not_comparable"
+    | "discarded"
+    | "errors"
+    | "items_matched"
+    | "items_divergent"
+    | "items_only_sped"
+    | "items_only_xml"
+    | "items_duplicates",
+    number
+  >;
+  totals: { sped_documents: string; xml_documents: string; sped_items: string; xml_items: string };
+  matched: SpedDocumentPair[];
+  divergent: SpedDocumentPair[];
+  only_sped: FiscalSpedDocument[];
+  only_xml: FiscalXmlDocument[];
+  duplicates: { identity: string; sped: FiscalSpedDocument[]; xml: FiscalXmlDocument[] }[];
+  not_comparable: {
+    identity: string;
+    reason: string;
+    sped: FiscalSpedDocument[];
+    xml: FiscalXmlDocument[];
+  }[];
+  discarded: SpedIssue<{ reason: string }>[];
+  errors: SpedIssue<{ message: string }>[];
+  file_name: string;
+  csv: string;
+}
+
 export const fiscalConferenceService = {
   /** Conferência Domínio × SEFAZ: nada é gravado no servidor. */
   async compareDocuments(files: Record<FiscalConferenceSource, File>): Promise<FiscalDocumentConference> {
@@ -162,5 +243,16 @@ export const fiscalConferenceService = {
       xml: { file_name: xml.name, zip_base64: zipBase64 },
     });
     return unwrapFiscalEnvelope<FiscalSefazXmlConference>(response.data);
+  },
+
+  /** Conferência SPED C100/C170 × XML NF-e: nada é gravado no servidor. */
+  async compareSpedXml({ sped, xml }: { sped: File; xml: File }): Promise<FiscalSpedConference> {
+    const [content, zipBase64] = await Promise.all([readSpreadsheetText(sped), fileToBase64(xml)]);
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.post("/fiscal/conferences/sped-xml", {
+      sped: { file_name: sped.name, content },
+      xml: { file_name: xml.name, zip_base64: zipBase64 },
+    });
+    return unwrapFiscalEnvelope<FiscalSpedConference>(response.data);
   },
 };
