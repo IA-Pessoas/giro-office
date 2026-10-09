@@ -549,15 +549,22 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
       await call("GET", "/internal/reporting/catalog", undefined, grantHeaders({})),
       "GET catalog",
     );
-    for (const source of pessoalReportingCatalog.sources) {
-      const fields = source.fields.map((field) => field.key).slice(0, 25);
+    // O extract aceita até 25 campos; fontes maiores são extraídas em lotes.
+    const batches = pessoalReportingCatalog.sources.flatMap((source) => {
+      const keys = source.fields.map((field) => field.key);
+      return Array.from({ length: Math.ceil(keys.length / 25) }, (_, index) => ({
+        source,
+        fields: keys.slice(index * 25, index * 25 + 25),
+      }));
+    });
+    for (const { source, fields } of batches) {
       const body = { source: source.key, fields, limit: 50 };
       const data = expectOk(
         await call("POST", "/internal/reporting/extract", body, grantHeaders(body)),
         `extract ${source.key}`,
       ).data;
       expect(Array.isArray(data.rows), source.key).toBe(true);
-      if (source.key === "pessoal.payroll") {
+      if (source.key === "pessoal.payroll" && fields.includes("client_name")) {
         // client_name sai de client_id: Payroll não tem relação com Client no schema canônico.
         expect(data.rows.length).toBeGreaterThan(0);
         for (const row of data.rows) expect(typeof row.client_name).toBe("string");

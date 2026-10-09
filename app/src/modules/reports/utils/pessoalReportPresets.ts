@@ -8,7 +8,8 @@ export interface PessoalReportPreset {
     | "pessoal-folha-por-sindicato"
     | "pessoal-folha-por-responsavel"
     | "pessoal-folha-por-situacao"
-    | "pessoal-obrigacoes-competencia";
+    | "pessoal-obrigacoes-competencia"
+    | "pessoal-obrigacoes-responsavel";
   label: string;
   description: string;
   areas: Array<{
@@ -125,7 +126,9 @@ const presets: readonly PessoalReportPreset[] = [
         source: "pessoal.obligations",
         fields: [
           "competence",
+          "client_code",
           "client_name",
+          "client_status",
           "responsible_name",
           "group_snapshot_name",
           "group_snapshot_policy",
@@ -140,6 +143,36 @@ const presets: readonly PessoalReportPreset[] = [
           "vt",
         ],
         filters: [{ field: "competence", operator: "eq", value: "" }],
+      },
+    ],
+  },
+  {
+    id: "pessoal-obrigacoes-responsavel",
+    label: "Obrigações por responsável",
+    description:
+      "Estado de cada item (pendente, concluído ou não possui) na competência. Informe competência e responsável nos critérios.",
+    areas: [
+      {
+        source: "pessoal.obligations",
+        fields: [
+          "competence",
+          "client_code",
+          "client_name",
+          "responsible_name",
+          "group_snapshot_name",
+          "advance_state",
+          "payroll_state",
+          "charges_state",
+          "assistance_fee_state",
+          "bem_mais_state",
+          "bsf_state",
+          "va_state",
+          "vt_state",
+        ],
+        filters: [
+          { field: "competence", operator: "eq", value: "" },
+          { field: "responsible_name", operator: "eq", value: "" },
+        ],
       },
     ],
   },
