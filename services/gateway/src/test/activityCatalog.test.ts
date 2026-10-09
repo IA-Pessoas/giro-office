@@ -108,6 +108,24 @@ describe("activityCatalog", () => {
     ["GET", "/fiscal/monthly-controls", "consultou", "a lista de controles fiscais mensais"],
     ["POST", "/fiscal/monthly-controls", "cadastrou", "um novo controle fiscal mensal"],
     [
+      "GET",
+      "/fiscal/monthly-controls/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/obligations",
+      "consultou",
+      "a lista de obrigações fiscais mensais",
+    ],
+    [
+      "POST",
+      "/fiscal/monthly-controls/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/obligations",
+      "cadastrou",
+      "uma nova obrigação fiscal mensal",
+    ],
+    [
+      "PATCH",
+      "/fiscal/monthly-controls/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/obligations/PGDAS_D",
+      "atualizou",
+      "uma obrigação fiscal mensal",
+    ],
+    [
       "PATCH",
       "/fiscal/monthly-controls/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
       "atualizou",

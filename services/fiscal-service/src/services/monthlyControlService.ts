@@ -4,13 +4,21 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
 import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
 import type { MonthlyControlStatus } from "../schemas/monthlyControl.schemas.js";
+import { createSuggestedObligations } from "./monthlyObligationService.js";
 
 export type MonthlyControlPrisma = Pick<
   PrismaClient,
-  "client" | "fiscalMonthlyControl" | "fiscalMonthlyControlEvent" | "$transaction"
+  | "client"
+  | "fiscalMonthlyControl"
+  | "fiscalMonthlyControlEvent"
+  | "fiscalMonthlyControlObligation"
+  | "$transaction"
 >;
 
-type MonthlyControlTx = Pick<PrismaClient, "fiscalMonthlyControl" | "fiscalMonthlyControlEvent">;
+type MonthlyControlTx = Pick<
+  PrismaClient,
+  "fiscalMonthlyControl" | "fiscalMonthlyControlEvent" | "fiscalMonthlyControlObligation"
+>;
 
 const REFERRING = "fiscal.monthly_controls";
 const FISCAL_ADMIN_PERMISSION = 3;
@@ -48,6 +56,8 @@ export interface MonthlyControlDto {
 
 export interface MonthlyControlListItem extends MonthlyControlDto {
   client_name: string;
+  /** Obrigações aplicáveis ainda sem cumprimento; não mudam a situação do controle. */
+  pending_obligations: number;
 }
 
 type StoredControl = {
@@ -173,9 +183,10 @@ export class MonthlyControlService {
             updated_by: userId,
           })),
           skipDuplicates: true,
-          select: { id: true },
+          select: { id: true, regime: true },
         });
         if (!created.length) return;
+        await createSuggestedObligations(tx, organizationId, userId, created);
         await tx.fiscalMonthlyControlEvent.createMany({
           data: created.map((control) => ({
             organization_id: organizationId,
@@ -205,11 +216,25 @@ export class MonthlyControlService {
     const names = new Map(
       clients.map((client) => [client.id, client.company_name?.trim() || client.name]),
     );
+    const pending = controls.length
+      ? await this.prisma.fiscalMonthlyControlObligation.groupBy({
+          by: ["control_id"],
+          where: {
+            organization_id: organizationId,
+            control_id: { in: controls.map((control) => control.id) },
+            applicable: true,
+            completed_on: null,
+          },
+          _count: { _all: true },
+        })
+      : [];
+    const pendingByControl = new Map(pending.map((row) => [row.control_id, row._count._all]));
 
     const items = controls
       .map((control) => ({
         ...serialize(control),
         client_name: names.get(control.client_id) ?? "",
+        pending_obligations: pendingByControl.get(control.id) ?? 0,
       }))
       .sort((a, b) => a.client_name.localeCompare(b.client_name, "pt-BR", { sensitivity: "base" }));
     return { competence: input.competence, items };
@@ -263,6 +288,7 @@ export class MonthlyControlService {
             reason,
           },
         ]);
+        await createSuggestedObligations(tx, input.organizationId, input.userId, [control]);
         return control;
       });
     } catch (error) {

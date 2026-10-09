@@ -335,6 +335,12 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "o histórico de relatórios" },
   },
   {
+    // O último segmento é o código da obrigação (PGDAS_D), não um id.
+    methods: ["PATCH"],
+    pattern: /^\/fiscal\/monthly-controls\/[^/]+\/obligations\/[A-Z_]+$/,
+    description: { action: "atualizou", item: "uma obrigação fiscal mensal" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/fiscal\/rates\/[^/]+\/pdf$/,
     description: { action: "baixou", item: "um PDF de alíquota fiscal" },
@@ -1378,6 +1384,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um registro de alíquota fiscal",
     newSingular: "um novo registro de alíquota fiscal",
     plural: "registros de alíquotas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/monthly-controls\/[^/]+\/obligations(?:\/|$)/,
+    singular: "uma obrigação fiscal mensal",
+    newSingular: "uma nova obrigação fiscal mensal",
+    plural: "obrigações fiscais mensais",
   },
   {
     pattern: /^\/fiscal\/monthly-controls(?:\/|$)/,

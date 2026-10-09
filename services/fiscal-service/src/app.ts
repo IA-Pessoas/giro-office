@@ -29,6 +29,10 @@ import {
   type MonthlyControlRouteDeps,
 } from "./routes/monthlyControl.routes.js";
 import {
+  createMonthlyObligationRoutes,
+  type MonthlyObligationRouteDeps,
+} from "./routes/monthlyObligation.routes.js";
+import {
   createMonthlyRevenueRoutes,
   type MonthlyRevenueRouteDeps,
 } from "./routes/monthlyRevenue.routes.js";
@@ -39,6 +43,7 @@ import { FiscalSearchService } from "./services/fiscalSearchService.js";
 import { IcmsService } from "./services/icmsService.js";
 import { IpiService } from "./services/ipiService.js";
 import { MonthlyControlService } from "./services/monthlyControlService.js";
+import { MonthlyObligationService } from "./services/monthlyObligationService.js";
 import { MonthlyRevenueService } from "./services/monthlyRevenueService.js";
 import { NcmService } from "./services/ncmService.js";
 import { SimplesRateService } from "./services/simplesRateService.js";
@@ -67,6 +72,7 @@ export function createFiscalApp(options: {
   fiscalRateRouteDeps?: FiscalRateRouteDeps;
   monthlyRevenueRouteDeps?: MonthlyRevenueRouteDeps;
   monthlyControlRouteDeps?: MonthlyControlRouteDeps;
+  monthlyObligationRouteDeps?: MonthlyObligationRouteDeps;
   simplesRateRouteDeps?: SimplesRateRouteDeps;
   icmsRouteDeps?: IcmsRouteDeps;
   ipiRouteDeps?: IpiRouteDeps;
@@ -81,6 +87,8 @@ export function createFiscalApp(options: {
     options.monthlyRevenueRouteDeps ?? new MonthlyRevenueService(prismaClient, { createLog });
   const monthlyControlRouteDeps =
     options.monthlyControlRouteDeps ?? new MonthlyControlService(prismaClient, { createLog });
+  const monthlyObligationRouteDeps =
+    options.monthlyObligationRouteDeps ?? new MonthlyObligationService(prismaClient, { createLog });
   const simplesRateRouteDeps = options.simplesRateRouteDeps ?? new SimplesRateService(prismaClient);
   const icmsRouteDeps =
     options.icmsRouteDeps ?? new IcmsService(prismaClient, { createLog, logUpdateIfChanged });
@@ -114,6 +122,7 @@ export function createFiscalApp(options: {
   app.use("/fiscal", createFiscalRateRoutes(fiscalRateRouteDeps));
   app.use("/fiscal", createMonthlyRevenueRoutes(monthlyRevenueRouteDeps));
   app.use("/fiscal", createMonthlyControlRoutes(monthlyControlRouteDeps));
+  app.use("/fiscal", createMonthlyObligationRoutes(monthlyObligationRouteDeps));
   app.use("/fiscal", createSimplesRateRoutes(simplesRateRouteDeps));
   app.use(
     "/internal",
