@@ -1,7 +1,7 @@
 import { AlertCircle, Cake, Download, Loader2, Megaphone } from "lucide-react";
 
 import { useMarketingDashboard } from "../hooks/useMarketingDashboard";
-import { createBirthdayCsv, downloadCsvFile } from "../utils/birthdayCsv";
+import { createBirthdayCsv, downloadCsvFile } from "../utils/marketingCsv";
 
 function downloadBirthdays(
   filename: string,

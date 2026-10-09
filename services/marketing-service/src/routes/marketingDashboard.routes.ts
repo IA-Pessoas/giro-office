@@ -14,6 +14,7 @@ import {
 import {
   type MarketingDashboardResponse,
   type MarketingMonthlyBirthdaysResponse,
+  type MarketingStockResponse,
   marketingMonthlyBirthdaysQuerySchema,
 } from "../schemas/marketingDashboard.schemas.js";
 
@@ -23,6 +24,7 @@ export interface MarketingDashboardProvider {
     organizationId: string,
     month: number,
   ): Promise<MarketingMonthlyBirthdaysResponse>;
+  getMarketingStock(organizationId: string): Promise<MarketingStockResponse>;
 }
 
 export function createMarketingDashboardRoutes(
@@ -69,6 +71,27 @@ export function createMarketingDashboardRoutes(
           error instanceof Error
             ? error
             : new ServiceError(500, "Falha ao carregar os aniversariantes."),
+        );
+      }
+    },
+  );
+
+  router.get(
+    "/stock",
+    authenticate,
+    requireMarketingPermission(MarketingPermissionLevel.Viewer),
+    async (request: Request, response: Response, next: NextFunction) => {
+      try {
+        const { organization_id: organizationId } = requireAuthenticatedRequestContext(request, {
+          statusCode: 400,
+        });
+        response.json(
+          createSuccessResponse(await dashboardService.getMarketingStock(organizationId)),
+        );
+      } catch (error: unknown) {
+        logError("Falha ao carregar o estoque do Marketing.", { err: error });
+        next(
+          error instanceof Error ? error : new ServiceError(500, "Falha ao carregar o estoque."),
         );
       }
     },

@@ -135,6 +135,10 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
       return ok(c, await s.dashboard.getMonthlyBirthdays(org, month));
     }),
   );
+  app.get(
+    "/marketing/stock",
+    handle(VIEWER, async (c, s, org) => ok(c, await s.dashboard.getMarketingStock(org))),
+  );
 
   // Controle mensal de uso de IA.
   app.get(

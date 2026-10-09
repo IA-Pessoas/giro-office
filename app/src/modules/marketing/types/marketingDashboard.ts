@@ -37,6 +37,20 @@ export interface MarketingMonthlyBirthdays {
   };
 }
 
+export interface MarketingStockItem {
+  id: string;
+  name: string;
+  quantity: number;
+  lastEntryAt: string | null;
+  lastExitAt: string | null;
+}
+
+export interface MarketingStock {
+  department: { id: string; name: string };
+  totals: { items: number; quantity: number };
+  items: MarketingStockItem[];
+}
+
 export interface MarketingEnvelope<T> {
   success: boolean;
   data: T;

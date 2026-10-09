@@ -442,6 +442,16 @@ const baseManifest = [
   op({
     service: "marketing-service",
     method: "GET",
+    path: "/marketing/stock",
+    action: "marketingStock",
+    target: "gateway",
+    auth: "bearer",
+    // 404 quando a organização do smoke não cadastrou o departamento Marketing.
+    expectedStatus: [200, 404],
+  }),
+  op({
+    service: "marketing-service",
+    method: "GET",
     path: "/marketing/events/list",
     action: "marketingEventsList",
     target: "gateway",

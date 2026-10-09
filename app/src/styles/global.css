@@ -922,12 +922,15 @@ html.dark .ui-input,
     #marketing-event-edition-report,
     #marketing-event-edition-report *,
     #marketing-birthday-report,
-    #marketing-birthday-report * {
+    #marketing-birthday-report *,
+    #marketing-stock-report,
+    #marketing-stock-report * {
         visibility: visible !important;
     }
 
     #marketing-event-edition-report,
-    #marketing-birthday-report {
+    #marketing-birthday-report,
+    #marketing-stock-report {
         position: relative;
         inset: auto;
         width: 100%;
@@ -970,7 +973,8 @@ html.dark .ui-input,
     }
 
     #marketing-event-edition-report *,
-    #marketing-birthday-report * {
+    #marketing-birthday-report *,
+    #marketing-stock-report * {
         color: #111827 !important;
         background: transparent !important;
         border-color: #d1d5db !important;
@@ -983,7 +987,8 @@ html.dark .ui-input,
 
     #marketing-event-edition-report section,
     #marketing-event-edition-report tr,
-    #marketing-birthday-report tr {
+    #marketing-birthday-report tr,
+    #marketing-stock-report tr {
         break-inside: avoid;
     }
 }

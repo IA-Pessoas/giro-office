@@ -354,6 +354,7 @@ const skipped = [];
 const actionExecutionRank = {
   marketingDashboard: 1050,
   marketingBirthdays: 1050,
+  marketingStock: 1050,
   marketingEventsList: 1051,
   marketingEventsCreate: 1052,
   marketingEventsUpdate: 1053,
@@ -1665,6 +1666,10 @@ async function platformHttpRequest(op, options = {}) {
 const handlers = {
   async marketingDashboard(op) {
     await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async marketingStock(op) {
+    await httpRequest(op, { expectedStatus: op.expectedStatus });
   },
 
   async marketingBirthdays(op) {

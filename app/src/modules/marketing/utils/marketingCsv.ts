@@ -1,3 +1,5 @@
+import type { MarketingStockItem } from "../types/marketingDashboard";
+
 export interface BirthdayCsvItem {
   name: string;
   day: number;
@@ -64,4 +66,35 @@ export function createMonthlyClientBirthdayCsv(
   items: Parameters<typeof clientBirthdayRows>[0],
 ): string {
   return createCsv([CLIENT_BIRTHDAY_COLUMNS, ...clientBirthdayRows(items)]);
+}
+
+// Tela, impressão e CSV usam as mesmas colunas e linhas.
+export const MARKETING_STOCK_COLUMNS = ["Nome", "Quantidade", "Última entrada", "Última saída"];
+
+function formatMovement(value: string | null, timeZone?: string): string {
+  if (!value) return "Sem registro";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone,
+  }).format(new Date(value));
+}
+
+export function marketingStockRows(
+  items: readonly MarketingStockItem[],
+  timeZone?: string,
+): string[][] {
+  return items.map((item) => [
+    item.name,
+    String(item.quantity),
+    formatMovement(item.lastEntryAt, timeZone),
+    formatMovement(item.lastExitAt, timeZone),
+  ]);
+}
+
+export function createMarketingStockCsv(
+  items: readonly MarketingStockItem[],
+  timeZone?: string,
+): string {
+  return createCsv([MARKETING_STOCK_COLUMNS, ...marketingStockRows(items, timeZone)]);
 }
