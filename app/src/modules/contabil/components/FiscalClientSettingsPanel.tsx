@@ -59,7 +59,7 @@ export function FiscalClientSettingsPanel({
 
   return (
     <fieldset
-      disabled={!canEdit || settings.isLoading || saving}
+      disabled={!canEdit || !settings.data || saving}
       className="rounded-xl border border-gray-200 p-4 dark:border-slate-700"
     >
       <legend className="px-1 font-semibold text-gray-900 dark:text-white">
@@ -95,6 +95,11 @@ export function FiscalClientSettingsPanel({
           </select>
         </label>
       </div>
+      {settings.isError ? (
+        <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-300">
+          {getContabilErrorMessage(settings.error)}
+        </p>
+      ) : null}
       {canEdit ? (
         <button
           type="button"
