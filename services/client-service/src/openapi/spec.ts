@@ -327,6 +327,78 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/client/regimes": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar o catálogo de regimes da organização",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Regimes da organização autenticada",
+              ...successEnvelopeContent(),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+        post: {
+          tags: ["Clients"],
+          summary: "Cadastrar regime",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", minLength: 1, maxLength: 80 } },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Regime criado", ...successEnvelopeContent() },
+            "400": { description: "Nome inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "409": { description: "Já existe regime com o nome" },
+          },
+        },
+      },
+      "/client/regimes/{id}": {
+        patch: {
+          tags: ["Clients"],
+          summary: "Renomear regime",
+          description: "Clientes guardam o nome do regime; renomear não altera fichas já gravadas.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", minLength: 1, maxLength: 80 } },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Regime atualizado", ...successEnvelopeContent() },
+            "400": { description: "Nome inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Regime não encontrado" },
+            "409": { description: "Já existe regime com o nome" },
+          },
+        },
+      },
       "/client/groups/{id}/clients": {
         put: {
           tags: ["Clients"],

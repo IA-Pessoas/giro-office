@@ -8,6 +8,7 @@ const CLIENT_ID = "b0000000-0000-4000-8000-000000000001";
 const HISTORY_ID = "d0000000-0000-4000-8000-000000000001";
 const PENDING_ID = "e0000000-0000-4000-8000-000000000001";
 const INTERNAL_TOKEN = "client-gateway-internal-token";
+const REGIME_ID = "f0000000-0000-4000-8000-000000000001";
 
 function env(): ClientWorkerEnv {
   return {
@@ -90,6 +91,9 @@ function service(): ClientWorkerService {
     applyCommercialProjection: vi.fn(async () => ({ applied: true })),
     reportingCatalog: vi.fn(async () => ({ sources: [], relations: [] })),
     extractReporting: vi.fn(async () => ({ rows: [], reachedLimit: false })),
+    listRegimes: vi.fn(async () => [{ id: REGIME_ID, name: "MEI" }]),
+    createRegime: vi.fn(async () => ({ id: REGIME_ID, name: "MEI" })),
+    updateRegime: vi.fn(async () => ({ id: REGIME_ID, name: "Imune" })),
   };
 }
 
@@ -145,6 +149,47 @@ describe("client Worker", () => {
     );
     expect(create.status).toBe(403);
     expect(clientService.create).not.toHaveBeenCalled();
+  });
+
+  it("serves the regime catalog of the authenticated organization before /client/:id", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const json = { ...headers(), "content-type": "application/json" };
+
+    const list = await app.request("https://client.test/client/regimes", { headers: headers() });
+    const create = await app.request("https://client.test/client/regimes", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: " MEI " }),
+    });
+    const update = await app.request(`https://client.test/client/regimes/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({ name: "Imune" }),
+    });
+    const blank = await app.request("https://client.test/client/regimes", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: "  " }),
+    });
+
+    expect(list.status).toBe(200);
+    expect(clientService.listRegimes).toHaveBeenCalledWith(ORGANIZATION_ID, expect.anything());
+    expect(create.status).toBe(201);
+    expect(clientService.createRegime).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      "MEI",
+      expect.anything(),
+    );
+    expect(update.status).toBe(200);
+    expect(clientService.updateRegime).toHaveBeenCalledWith(
+      REGIME_ID,
+      ORGANIZATION_ID,
+      "Imune",
+      expect.anything(),
+    );
+    expect(blank.status).toBe(400);
+    expect(clientService.getById).not.toHaveBeenCalled();
   });
 
   it("preserves representative CRUD and validation behavior", async () => {

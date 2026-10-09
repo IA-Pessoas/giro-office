@@ -148,7 +148,7 @@ const clientListPolicy: AuthPolicy = {
 };
 
 const integracaoClientPath =
-  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/groups(?:\/[^/]+(?:\/clients)?)?|\/[^/]+)?\/?$/;
+  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/groups(?:\/[^/]+(?:\/clients)?)?|\/regimes(?:\/[^/]+)?|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /dashboard/stats", authenticatedPolicy],

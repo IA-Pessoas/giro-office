@@ -21,6 +21,7 @@ model Organization {
   pas               PA[]
   terminations      ClientTermination[]
   tasks             Task[]
+  clientRegimes     ClientRegime[]
 
   @@map("organizations")
 }
@@ -205,4 +206,17 @@ model ClientCommercialProjectionEvent {
 
   @@index([organization_id, client_id, applied_at], map: "idx_client_commercial_projection_client")
   @@map("client.commercial_projection_events")
+}
+
+model ClientRegime {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name String
+  organization_id String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, normalized_name], map: "uq_client_regime_org_normalized_name")
+  @@map("clients.regimes")
 }

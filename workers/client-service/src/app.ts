@@ -20,6 +20,10 @@ import {
   updateClientBodySchema,
 } from "../../../services/client-service/src/schemas/client.schemas.js";
 import {
+  clientRegimeBodySchema,
+  clientRegimeParamsSchema,
+} from "../../../services/client-service/src/schemas/clientRegime.schemas.js";
+import {
   cnpjLookupQuerySchema,
   createClientPABodySchema,
   createHistoryBodySchema,
@@ -37,6 +41,7 @@ import {
 } from "../../../services/client-service/src/schemas/clientVerticals.schemas.js";
 import { commercialProspectingTransitionEventSchema } from "../../../services/client-service/src/schemas/commercialProjection.schemas.js";
 import { internalReportingExtractBodySchema } from "../../../services/client-service/src/schemas/internalReporting.schemas.js";
+import { createClientAudit } from "./audit.js";
 import { authenticateClientRequest, clientAuthorization, requireOrganization } from "./auth.js";
 import { ClientService, type ClientWorkerService } from "./clientService.js";
 import type { ClientWorkerEnv } from "./env.js";
@@ -206,6 +211,8 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
           env.CNPJ_LOOKUP_API_URL,
           env.CNPJ_LOOKUP_API_TOKEN,
           historyStorage,
+          false,
+          createClientAudit(env),
         ),
       ),
     );
@@ -261,6 +268,33 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
           await service.createIntegration({ ...body, organization_id: organization }, authz(c)),
         ),
         201,
+      );
+    }),
+  );
+
+  // Antes de /client/:id, que exige uuid e responderia 400 para "regimes".
+  app.get("/client/regimes", async (c) =>
+    withService(c, async (service) =>
+      c.json(createSuccessResponse(await service.listRegimes(organizationId(c), authz(c)))),
+    ),
+  );
+
+  app.post("/client/regimes", async (c) =>
+    withService(c, async (service) => {
+      const { name } = parse(clientRegimeBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.createRegime(organizationId(c), name, authz(c))),
+        201,
+      );
+    }),
+  );
+
+  app.patch("/client/regimes/:id", async (c) =>
+    withService(c, async (service) => {
+      const id = pathParam(c, clientRegimeParamsSchema);
+      const { name } = parse(clientRegimeBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.updateRegime(id, organizationId(c), name, authz(c))),
       );
     }),
   );

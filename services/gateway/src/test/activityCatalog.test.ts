@@ -6,6 +6,9 @@ describe("activityCatalog", () => {
   it.each([
     ["GET", "/client/groups", "consultou", "a lista de grupos de empresas"],
     ["POST", "/client/groups", "cadastrou", "um novo grupo de empresas"],
+    ["GET", "/client/regimes", "consultou", "a lista de regimes"],
+    ["POST", "/client/regimes", "cadastrou", "um novo regime"],
+    ["PATCH", "/client/regimes/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e", "atualizou", "um regime"],
     [
       "PATCH",
       "/client/groups/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",

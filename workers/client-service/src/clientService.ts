@@ -5,6 +5,7 @@ import {
   isValidCpfCnpj,
   normalizeCpfCnpj,
   ServiceError,
+  TAX_REGIME_OPTIONS,
   withReportingSnapshot,
 } from "@workspace/shared";
 import { ACTIVE_CLIENT_STATUS } from "../../../services/client-service/src/schemas/client.schemas.js";
@@ -19,6 +20,18 @@ export type ClientAuthorization = {
   permission?: number;
   isOwner: boolean;
 };
+
+export type ClientAuditEvent = {
+  organizationId: string;
+  userId: string;
+  permission: number | null;
+  action: "create" | "update";
+  referring: "clients" | "clients.regimes";
+  referringId: string;
+  changes: Record<string, { from: unknown; to: unknown }>;
+};
+
+export type ClientAuditSink = (event: ClientAuditEvent) => Promise<void>;
 
 export type ClientFilters = {
   page: number;
@@ -125,6 +138,18 @@ export type ClientWorkerService = {
     userId: string,
     input: Record<string, unknown>,
   ) => Promise<unknown>;
+  listRegimes: (organizationId: string, authorization: ClientAuthorization) => Promise<unknown>;
+  createRegime: (
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  updateRegime: (
+    id: string,
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
   runCompetenceOutputUpdate: () => Promise<unknown>;
   applyCommercialProjection: (event: Record<string, unknown>) => Promise<unknown>;
   reportingCatalog: () => Promise<unknown>;
@@ -148,7 +173,8 @@ type WorkerModelName =
   | "clientHistory"
   | "clientHistoryPending"
   | "pA"
-  | "clientCommercialProjectionEvent";
+  | "clientCommercialProjectionEvent"
+  | "clientRegime";
 
 type WorkerModelDelegate = {
   findUnique: (args: unknown) => Promise<ClientRow | null>;
@@ -389,6 +415,17 @@ function isClientDocumentUniqueConstraintError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
+const regimeSelect = { id: true, name: true, created_at: true, updated_at: true } as const;
+
+function normalizeRegimeName(name: string): string {
+  return name
+    .trim()
+    .replace(/\s+/g, " ")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
 function serialize(value: unknown): unknown {
   return value instanceof Date ? value.toISOString() : value;
 }
@@ -414,6 +451,7 @@ export class ClientService implements ClientWorkerService {
     private readonly cnpjLookupApiToken?: string,
     private readonly historyStorage?: WorkerHistoryStorageLike,
     private readonly inReportingSnapshot = false,
+    private readonly audit?: ClientAuditSink,
   ) {
     this.prisma = prisma;
     this.db = prisma as unknown as WorkerPrismaClient;
@@ -425,6 +463,148 @@ export class ClientService implements ClientWorkerService {
       select: organizationSelect,
     });
     if (!row) throw new ServiceError(404, "Organização não encontrada.");
+    return row;
+  }
+
+  /**
+   * Regime aceito na ficha: regimes compartilhados (TAX_REGIME_OPTIONS), catálogo da organização
+   * ou o próprio valor já gravado, que nunca é convertido em silêncio.
+   */
+  private async resolveRegime(
+    organizationId: string,
+    value: unknown,
+    current: unknown,
+  ): Promise<string | null | undefined> {
+    if (value === undefined) return undefined;
+    const name = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+    if (!name) return null;
+    if (name === current) return name;
+    const normalized = normalizeRegimeName(name);
+    const shared = TAX_REGIME_OPTIONS.find((option) => normalizeRegimeName(option) === normalized);
+    if (shared) return shared;
+    const row = await this.db.clientRegime.findFirst({
+      where: { organization_id: organizationId, normalized_name: normalized },
+      select: { name: true },
+    });
+    if (!row) throw new ServiceError(400, "Regime não cadastrado na organização.");
+    return String(row.name);
+  }
+
+  private async auditRegimeChange(
+    clientId: string,
+    organizationId: string,
+    authorization: Pick<ClientAuthorization, "userId" | "permission">,
+    from: unknown,
+    to: unknown,
+  ): Promise<void> {
+    if (to === undefined || (from ?? null) === to) return;
+    await this.audit?.({
+      organizationId,
+      userId: authorization.userId,
+      permission: authorization.permission ?? null,
+      action: "update",
+      referring: "clients",
+      referringId: clientId,
+      changes: { regime: { from: from ?? null, to } },
+    });
+  }
+
+  async listRegimes(organizationId: string, authorization: ClientAuthorization): Promise<unknown> {
+    requireClientListPermission(authorization);
+    return this.db.clientRegime.findMany({
+      where: { organization_id: organizationId },
+      orderBy: { name: "asc" },
+      select: regimeSelect,
+    });
+  }
+
+  private async assertRegimeNameFree(
+    organizationId: string,
+    normalized: string,
+    exceptId?: string,
+  ): Promise<void> {
+    const duplicate = await this.db.clientRegime.findFirst({
+      where: {
+        organization_id: organizationId,
+        normalized_name: normalized,
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (duplicate) throw new ServiceError(409, "Regime já cadastrado.");
+  }
+
+  async createRegime(
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requirePermission(authorization, 2);
+    const trimmed = name.trim().replace(/\s+/g, " ");
+    const normalized = normalizeRegimeName(trimmed);
+    await this.assertRegimeNameFree(organizationId, normalized);
+    let row: ClientRow;
+    try {
+      row = await this.db.clientRegime.create({
+        data: { organization_id: organizationId, name: trimmed, normalized_name: normalized },
+        select: regimeSelect,
+      });
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error))
+        throw new ServiceError(409, "Regime já cadastrado.", error);
+      throw error;
+    }
+    await this.audit?.({
+      organizationId,
+      userId: authorization.userId,
+      permission: authorization.permission ?? null,
+      action: "create",
+      referring: "clients.regimes",
+      referringId: String(row.id),
+      changes: { name: { from: null, to: trimmed } },
+    });
+    return row;
+  }
+
+  async updateRegime(
+    id: string,
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requirePermission(authorization, 2);
+    const existing = await this.db.clientRegime.findFirst({
+      where: { id, organization_id: organizationId },
+      select: regimeSelect,
+    });
+    if (!existing) throw new ServiceError(404, "Regime não encontrado.");
+    const trimmed = name.trim().replace(/\s+/g, " ");
+    const normalized = normalizeRegimeName(trimmed);
+    await this.assertRegimeNameFree(organizationId, normalized, id);
+    let row: ClientRow;
+    try {
+      // Clientes guardam o nome: renomear o catálogo não reescreve fichas já gravadas.
+      row = await this.db.clientRegime.update({
+        where: { id },
+        data: { name: trimmed, normalized_name: normalized },
+        select: regimeSelect,
+      });
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error))
+        throw new ServiceError(409, "Regime já cadastrado.", error);
+      throw error;
+    }
+    if (existing.name !== trimmed) {
+      await this.audit?.({
+        organizationId,
+        userId: authorization.userId,
+        permission: authorization.permission ?? null,
+        action: "update",
+        referring: "clients.regimes",
+        referringId: id,
+        changes: { name: { from: existing.name, to: trimmed } },
+      });
+    }
     return row;
   }
 
@@ -508,9 +688,15 @@ export class ClientService implements ClientWorkerService {
       select: { id: true },
     });
     if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
+    const regime = await this.resolveRegime(organizationId, input.regime, undefined);
     try {
       const row = await this.db.client.create({
-        data: { ...input, organization_id: organizationId, cpf_cnpj: normalizedDocument },
+        data: {
+          ...input,
+          ...(regime !== undefined ? { regime } : {}),
+          organization_id: organizationId,
+          cpf_cnpj: normalizedDocument,
+        },
         select: clientSelect,
       });
       return toPublic(row, organization);
@@ -543,12 +729,15 @@ export class ClientService implements ClientWorkerService {
       if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
       data.cpf_cnpj = normalizedDocument;
     }
+    const regime = await this.resolveRegime(organizationId, data.regime, existing.regime);
+    if (regime !== undefined) data.regime = regime;
     try {
       const row = await this.db.client.update({
         where: { id },
         data,
         select: clientSelect,
       });
+      await this.auditRegimeChange(id, organizationId, authorization, existing.regime, regime);
       return toPublic(row, await this.organization(organizationId));
     } catch (error) {
       if (isClientDocumentUniqueConstraintError(error)) {
@@ -970,11 +1159,13 @@ export class ClientService implements ClientWorkerService {
   async updateRegularize(
     clientId: string,
     organizationId: string,
-    _userId: string,
+    userId: string,
     input: Record<string, unknown>,
   ): Promise<unknown> {
     const existing = await this.client(clientId, organizationId);
     const data = { ...input };
+    const regime = await this.resolveRegime(organizationId, data.regime, existing.regime);
+    if (regime !== undefined) data.regime = regime;
     if (data.cpf_cnpj !== undefined) {
       const normalizedDocument = assertValidClientDocument(data.cpf_cnpj, existing.type);
       const duplicate = await this.db.client.findFirst({
@@ -991,7 +1182,7 @@ export class ClientService implements ClientWorkerService {
     if (data.cpf_responsible !== undefined)
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
     try {
-      return await this.db.client.update({
+      const row = await this.db.client.update({
         where: { id: clientId },
         data,
         select: {
@@ -1031,6 +1222,8 @@ export class ClientService implements ClientWorkerService {
           deletion_date: true,
         },
       });
+      await this.auditRegimeChange(clientId, organizationId, { userId }, existing.regime, regime);
+      return row;
     } catch (error) {
       if (isClientDocumentUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);

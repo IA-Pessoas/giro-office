@@ -4202,6 +4202,29 @@ const handlers = {
     });
   },
 
+  async clientRegimesList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/regimes" });
+  },
+
+  async clientRegimeCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/client/regimes",
+      json: { name: uniqueText("Smoke Regime") },
+    });
+    if (!isBadExpectation(op)) {
+      state.clientRegimeId = pickFirst(response.body, "data.id");
+    }
+  },
+
+  async clientRegimePatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/regimes/${requireState("clientRegimeId")}`,
+      json: { name: uniqueText("Smoke Regime Updated") },
+    });
+  },
+
   async clientCoringaList(op) {
     await httpRequest(op, { expectedStatus: [200], query: { page: 1, limit: 5 } });
   },

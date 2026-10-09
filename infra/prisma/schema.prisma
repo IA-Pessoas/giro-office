@@ -160,6 +160,7 @@ model Organization {
   clientsGroups                 ClientsGroup[]
   documentsTermination          DocumentClientTermination[]
   groups                        Group[]
+  clientRegimes                 ClientRegime[]
   clientHistorys                ClientHistory[]
   clientHistorysPending         ClientHistoryPending[]
   pas                           PA[]
@@ -890,6 +891,21 @@ model Group {
   organization    Organization   @relation(fields: [organization_id], references: [id])
 
   @@map("clients.group")
+}
+
+// Catálogo de regimes do cadastro de clientes por organização (tb_regularize.regimes no legado).
+// Client.regime guarda o nome; renomear aqui não reescreve clientes já gravados.
+model ClientRegime {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name String
+  organization_id String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, normalized_name], map: "uq_client_regime_org_normalized_name")
+  @@map("clients.regimes")
 }
 
 model ClientsGroup {
