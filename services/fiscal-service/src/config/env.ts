@@ -9,6 +9,8 @@ import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
 
+import { MALHA_ATTACHMENT_DEFAULT_BUCKET } from "../services/malhaService.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const serviceEnvPath = path.resolve(__dirname, "../../.env");
@@ -52,7 +54,7 @@ const envSchema = z
     enableApiDocsEnv: z.string().optional(),
     supabaseUrl: z.string().url("SUPABASE_URL inválida para o fiscal-service.").optional(),
     supabaseServiceRoleKey: z.string().min(1).optional(),
-    malhaAttachmentBucket: z.string().min(1).optional().default("fiscal-malha-attachments"),
+    malhaAttachmentBucket: z.string().min(1).optional().default(MALHA_ATTACHMENT_DEFAULT_BUCKET),
     allowedOrigins: z
       .string()
       .optional()

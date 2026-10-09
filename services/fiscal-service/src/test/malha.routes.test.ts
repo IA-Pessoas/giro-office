@@ -36,7 +36,7 @@ const malha = {
   period_end: "2025-12",
   reason: "Divergência",
   deadline: "2026-11-10",
-  status: "aberta",
+  status: "aberta" as const,
   responsible_id: null,
   task_id: null,
   attachment: null,
@@ -49,7 +49,7 @@ const malha = {
 function deps() {
   return {
     create: vi.fn(async () => malha),
-    update: vi.fn(async () => ({ ...malha, status: "respondida" })),
+    update: vi.fn(async () => ({ ...malha, status: "respondida" as const })),
     list: vi.fn(async () => ({ data: [malha], total: 1, page: 1, limit: 50, hasMore: false })),
     detail: vi.fn(async () => ({ ...malha, history: [] })),
     replaceAttachment: vi.fn(async () => malha),
@@ -140,10 +140,18 @@ describe("fiscal malha routes", () => {
       .put(`/fiscal/malhas/${malhaId}`)
       .set(headers())
       .send({ organization_id: "x" });
+    const impossibleDate = await request(app)
+      .put(`/fiscal/malhas/${malhaId}`)
+      .set(headers())
+      .send({ deadline: "2026-02-31" });
 
-    expect([inverted.status, badStatus.status, empty.status, extra.status]).toEqual([
-      400, 400, 400, 400,
-    ]);
+    expect([
+      inverted.status,
+      badStatus.status,
+      empty.status,
+      extra.status,
+      impossibleDate.status,
+    ]).toEqual([400, 400, 400, 400, 400]);
     expect(service.create).not.toHaveBeenCalled();
     expect(service.update).not.toHaveBeenCalled();
   });

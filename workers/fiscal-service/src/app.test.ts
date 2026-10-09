@@ -296,7 +296,11 @@ describe("fiscal Worker", () => {
     });
     expect(created.status).toBe(201);
     expect(malhas.create).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID, status: "aberta" }),
+      expect.objectContaining({
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        status: "aberta",
+      }),
     );
 
     const listed = await app.request(
@@ -322,7 +326,11 @@ describe("fiscal Worker", () => {
     });
     expect(updated.status).toBe(200);
     expect(malhas.update).toHaveBeenCalledWith(
-      expect.objectContaining({ id: ICMS_ID, status: "respondida", organizationId: ORGANIZATION_ID }),
+      expect.objectContaining({
+        id: ICMS_ID,
+        status: "respondida",
+        organizationId: ORGANIZATION_ID,
+      }),
     );
 
     const form = new FormData();

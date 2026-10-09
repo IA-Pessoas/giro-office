@@ -41,11 +41,30 @@ function stored(overrides: Record<string, unknown> = {}) {
 }
 
 function dependencies(current = stored()) {
+  let row = current;
   const fiscalMalha = {
     create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => stored(data)),
-    update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ ...current, ...data })),
+    // Simula a trava otimista: só grava se organização e updatedAt baterem.
+    updateMany: vi.fn(
+      async ({
+        where,
+        data,
+      }: {
+        where: { organization_id: string; updatedAt: Date };
+        data: Record<string, unknown>;
+      }) => {
+        if (
+          where.organization_id !== row.organization_id ||
+          where.updatedAt.getTime() !== row.updatedAt.getTime()
+        ) {
+          return { count: 0 };
+        }
+        row = { ...row, ...data, updatedAt: new Date(row.updatedAt.getTime() + 1000) };
+        return { count: 1 };
+      },
+    ),
     findFirst: vi.fn(async ({ where }: { where: { organization_id: string } }) =>
-      where.organization_id === current.organization_id ? current : null,
+      where.organization_id === row.organization_id ? row : null,
     ),
     findMany: vi.fn(async () => [current]),
     count: vi.fn(async () => 1),
@@ -214,7 +233,47 @@ describe("MalhaService", () => {
     await expect(service.attachmentAccess(malhaId, organizationId)).rejects.toMatchObject({
       statusCode: 404,
     });
-    expect(prisma.fiscalMalha.update).not.toHaveBeenCalled();
+    expect(prisma.fiscalMalha.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("edição concorrente perde com 409 e não grava histórico", async () => {
+    const { prisma, service } = dependencies();
+    // Outra pessoa salvou entre a leitura e a gravação.
+    prisma.fiscalMalha.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.update({ ...actor, id: malhaId, status: "encerrada" }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.fiscalMalhaHistory.createMany).not.toHaveBeenCalled();
+  });
+
+  it("transferir responsável já atribuído exige nível 3; o primeiro responsável não", async () => {
+    const assigned = dependencies(stored({ responsible_id: userId }));
+    await expect(
+      assigned.service.update({ ...actor, id: malhaId, responsible_id: responsibleId }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(assigned.prisma.fiscalMalha.updateMany).not.toHaveBeenCalled();
+
+    const admin = dependencies(stored({ responsible_id: userId }));
+    await admin.service.update({
+      ...actor,
+      permission: 3,
+      id: malhaId,
+      responsible_id: responsibleId,
+    });
+    expect(admin.prisma.fiscalMalhaHistory.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          field: "responsible_id",
+          previous_value: userId,
+          new_value: responsibleId,
+        }),
+      ],
+    });
+
+    const first = dependencies();
+    await first.service.update({ ...actor, id: malhaId, responsible_id: responsibleId });
+    expect(first.prisma.fiscalMalha.updateMany).toHaveBeenCalledOnce();
   });
 
   it("recusa período invertido considerando o valor já gravado", async () => {
@@ -274,7 +333,7 @@ describe("MalhaService", () => {
     expect(objectPath).toMatch(
       new RegExp(`^fiscal/organizations/${organizationId}/malhas/${malhaId}/[0-9a-f-]{36}\\.pdf$`),
     );
-    expect(prisma.fiscalMalha.update).toHaveBeenCalledWith(
+    expect(prisma.fiscalMalha.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           attachment_path: objectPath,
@@ -291,7 +350,7 @@ describe("MalhaService", () => {
 
   it("remove o objeto enviado se a gravação falhar", async () => {
     const { storage, service, prisma } = dependencies();
-    prisma.fiscalMalha.update.mockRejectedValueOnce(new Error("db down"));
+    prisma.fiscalMalha.updateMany.mockRejectedValueOnce(new Error("db down"));
     await expect(
       service.replaceAttachment({
         ...actor,

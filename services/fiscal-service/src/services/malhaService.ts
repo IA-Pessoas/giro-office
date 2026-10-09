@@ -6,6 +6,7 @@ import { competenceDate, competenceKey } from "../schemas/competence.schemas.js"
 import type {
   CreateMalhaBody,
   ListMalhasQuery,
+  MalhaStatus,
   UpdateMalhaBody,
 } from "../schemas/malha.schemas.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
@@ -28,6 +29,7 @@ export interface MalhaAttachmentStorage {
   createSignedUrl(objectPath: string, expiresInSeconds: number): Promise<string>;
 }
 
+export const MALHA_ATTACHMENT_DEFAULT_BUCKET = "fiscal-malha-attachments";
 export const MALHA_ATTACHMENT_MAX_SIZE_BYTES = 10 * 1024 * 1024;
 export const MALHA_ATTACHMENT_SIGNED_URL_EXPIRES_IN_SECONDS = 300;
 export const MALHA_ATTACHMENT_MIME_TYPES = [
@@ -54,6 +56,8 @@ export interface MalhaAttachmentFile {
 }
 
 const REFERRING = "fiscal.malhas";
+const CONFLICT_MESSAGE = "A malha foi alterada por outra pessoa. Recarregue e tente de novo.";
+const FISCAL_TRANSFER_PERMISSION = 3;
 const TRACKED_FIELDS = ["deadline", "status", "responsible_id"] as const;
 type TrackedField = (typeof TRACKED_FIELDS)[number];
 
@@ -91,7 +95,7 @@ export interface MalhaDto {
   period_end: string;
   reason: string;
   deadline: string | null;
-  status: string;
+  status: MalhaStatus;
   responsible_id: string | null;
   task_id: string | null;
   attachment: {
@@ -127,7 +131,7 @@ function serialize(record: MalhaRecord): MalhaDto {
     period_end: competenceKey(record.period_end),
     reason: record.reason,
     deadline: dateKey(record.deadline),
-    status: record.status,
+    status: record.status as MalhaStatus,
     responsible_id: record.responsible_id,
     task_id: record.task_id,
     attachment:
@@ -202,14 +206,8 @@ export function validateMalhaAttachment(
   return { ...file, mimetype };
 }
 
-function attachmentObjectPath(
-  organizationId: string,
-  malhaId: string,
-  mimetype: MalhaAttachmentMimeType,
-): string {
-  const extension = EXTENSIONS_BY_MIME_TYPE[mimetype][0];
-  return `fiscal/organizations/${organizationId}/malhas/${malhaId}/${crypto.randomUUID()}${extension}`;
-}
+const attachmentPrefix = (organizationId: string, malhaId: string) =>
+  `fiscal/organizations/${organizationId}/malhas/${malhaId}/`;
 
 /** Malhas fiscais por cliente: prazo, situação e responsável com histórico na mesma transação. */
 export class MalhaService {
@@ -322,17 +320,28 @@ export class MalhaService {
     if (input.task_id && input.task_id !== current.task_id) {
       await this.requireTask(input.task_id, input.organizationId);
     }
-    if (input.responsible_id && input.responsible_id !== current.responsible_id) {
+    const changesResponsible =
+      input.responsible_id !== undefined && input.responsible_id !== current.responsible_id;
+    // RT-02: atribuir o primeiro responsável é edição comum; transferir exige Fiscal nível 3.
+    if (
+      changesResponsible &&
+      current.responsible_id &&
+      (input.permission ?? 0) < FISCAL_TRANSFER_PERMISSION
+    ) {
+      throw new ServiceError(403, "Transferir o responsável da malha exige Fiscal nível 3.");
+    }
+    if (changesResponsible && input.responsible_id) {
       await this.requireResponsible(input.responsible_id, input.organizationId);
     }
 
     const { updated, changes } = await this.prisma.$transaction(async (transaction) => {
-      const before = await transaction.fiscalMalha.findFirst({
-        where: { id: current.id, organization_id: input.organizationId },
-      });
-      if (!before) throw new ServiceError(404, "Malha não encontrada.");
-      const record = await transaction.fiscalMalha.update({
-        where: { id: before.id },
+      // Trava otimista: o "anterior" do histórico é exatamente o estado que foi substituído.
+      const result = await transaction.fiscalMalha.updateMany({
+        where: {
+          id: current.id,
+          organization_id: input.organizationId,
+          updatedAt: current.updatedAt,
+        },
         data: {
           ...(input.period_start ? { period_start: competenceDate(input.period_start) } : {}),
           ...(input.period_end ? { period_end: competenceDate(input.period_end) } : {}),
@@ -344,7 +353,17 @@ export class MalhaService {
           updated_by: input.userId,
         },
       });
-      const rows = this.historyRows(record.id, input, trackedValues(before), trackedValues(record));
+      if (result.count !== 1) throw new ServiceError(409, CONFLICT_MESSAGE);
+      const record = await transaction.fiscalMalha.findFirst({
+        where: { id: current.id, organization_id: input.organizationId },
+      });
+      if (!record) throw new ServiceError(404, "Malha não encontrada.");
+      const rows = this.historyRows(
+        record.id,
+        input,
+        trackedValues(current),
+        trackedValues(record),
+      );
       if (rows.length > 0) await transaction.fiscalMalhaHistory.createMany({ data: rows });
       return {
         updated: record,
@@ -429,13 +448,19 @@ export class MalhaService {
     const storage = this.requireStorage();
     const file = validateMalhaAttachment(input.file);
     const current = await this.findOwned(input.id, input.organizationId);
-    const objectPath = attachmentObjectPath(input.organizationId, current.id, file.mimetype);
+    const extension = EXTENSIONS_BY_MIME_TYPE[file.mimetype][0];
+    const objectPath = `${attachmentPrefix(input.organizationId, current.id)}${crypto.randomUUID()}${extension}`;
     await storage.upload(objectPath, file.bytes, file.mimetype);
 
-    let updated: MalhaRecord;
+    let updated: MalhaRecord | null;
     try {
-      updated = await this.prisma.fiscalMalha.update({
-        where: { id: current.id },
+      // Mesma trava otimista do update: dois envios simultâneos não deixam objeto órfão.
+      const result = await this.prisma.fiscalMalha.updateMany({
+        where: {
+          id: current.id,
+          organization_id: input.organizationId,
+          updatedAt: current.updatedAt,
+        },
         data: {
           attachment_path: objectPath,
           attachment_original_name: file.originalname,
@@ -446,10 +471,15 @@ export class MalhaService {
           updated_by: input.userId,
         },
       });
+      if (result.count !== 1) throw new ServiceError(409, CONFLICT_MESSAGE);
+      updated = await this.prisma.fiscalMalha.findFirst({
+        where: { id: current.id, organization_id: input.organizationId },
+      });
     } catch (error) {
       await storage.remove(objectPath).catch(() => undefined);
       throw error;
     }
+    if (!updated) throw new ServiceError(404, "Malha não encontrada.");
     if (current.attachment_path)
       await storage.remove(current.attachment_path).catch(() => undefined);
 
@@ -471,7 +501,7 @@ export class MalhaService {
   ): Promise<{ url: string; expires_in_seconds: number }> {
     const storage = this.requireStorage();
     const record = await this.findOwned(id, organizationId);
-    const prefix = `fiscal/organizations/${organizationId}/malhas/${record.id}/`;
+    const prefix = attachmentPrefix(organizationId, record.id);
     if (!record.attachment_path) throw new ServiceError(404, "Malha sem anexo.");
     if (!record.attachment_path.startsWith(prefix)) {
       throw new ServiceError(500, "Chave armazenada do anexo é inválida.");

@@ -365,7 +365,8 @@ await runTest("fiscal malhas tab gates edits, keeps states and refreshes history
   const section = await readSource("./components/FiscalMalhasSection.tsx");
   const client = await readSource("./services/fiscalMalhaService.ts");
   const queryKeys = await readSource("./hooks/queryKeys.ts");
-  assert.match(fiscalSources.shell, /<FiscalMalhasSection canEdit=\{canEdit\} \/>/);
+  assert.match(fiscalSources.shell, /<FiscalMalhasSection canEdit=\{canEdit\} canTransfer=\{canDelete\} \/>/);
+  assert.match(section, /disabled=\{Boolean\(editing\?\.responsible_id\) && !canTransfer\}/);
   assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando malhas"/);
   assert.match(section, /list\.error \? \(\s*<div role="alert">/);
   assert.match(section, /Nenhuma malha encontrada/);

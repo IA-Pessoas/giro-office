@@ -1,4 +1,7 @@
-import type { MalhaAttachmentStorage } from "@workspace/fiscal-service/src/services/malhaService.js";
+import {
+  MALHA_ATTACHMENT_DEFAULT_BUCKET,
+  type MalhaAttachmentStorage,
+} from "@workspace/fiscal-service/src/services/malhaService.js";
 import { createSupabaseStorageClient, type SupabaseStorageClient } from "@workspace/runtime";
 import { ServiceError } from "@workspace/shared/http";
 
@@ -18,7 +21,7 @@ export class WorkerMalhaAttachmentStorage implements MalhaAttachmentStorage {
         SUPABASE_URL: env.SUPABASE_URL,
         SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
       }),
-      env.FISCAL_MALHA_ATTACHMENT_BUCKET ?? "fiscal-malha-attachments",
+      env.FISCAL_MALHA_ATTACHMENT_BUCKET ?? MALHA_ATTACHMENT_DEFAULT_BUCKET,
     );
   }
 

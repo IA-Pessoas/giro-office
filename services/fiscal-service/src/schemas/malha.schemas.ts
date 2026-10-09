@@ -17,10 +17,14 @@ const statusSchema = z.enum(MALHA_STATUSES, {
   errorMap: () => ({ message: "Situação inválida." }),
 });
 
-const dateSchema = z
+// Ida e volta pela data: 2026-02-31 não vira 2026-03-03 em silêncio.
+const deadlineSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Prazo inválido: use AAAA-MM-DD.")
-  .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)), "Prazo inválido.");
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Prazo inválido.");
 
 const reasonSchema = z
   .string({ required_error: "Informe o motivo." })
@@ -40,7 +44,7 @@ export const createMalhaBodySchema = z
     period_start: competenceSchema,
     period_end: competenceSchema,
     reason: reasonSchema,
-    deadline: dateSchema.nullable().optional(),
+    deadline: deadlineSchema.nullable().optional(),
     status: statusSchema.default("aberta"),
     responsible_id: optionalId("Responsável inválido."),
     task_id: optionalId("Tarefa inválida."),
@@ -53,7 +57,7 @@ export const updateMalhaBodySchema = z
     period_start: competenceSchema.optional(),
     period_end: competenceSchema.optional(),
     reason: reasonSchema.optional(),
-    deadline: dateSchema.nullable().optional(),
+    deadline: deadlineSchema.nullable().optional(),
     status: statusSchema.optional(),
     responsible_id: optionalId("Responsável inválido."),
     task_id: optionalId("Tarefa inválida."),

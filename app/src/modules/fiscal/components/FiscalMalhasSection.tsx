@@ -27,6 +27,8 @@ import {
   FISCAL_FIELD_CONTROL_CLASSNAME,
   FISCAL_FIELD_ERROR_CLASSNAME,
   FISCAL_PRIMARY_BUTTON_CLASSNAME,
+  FISCAL_SECONDARY_BUTTON_CLASSNAME,
+  FISCAL_TEXTAREA_CLASSNAME,
 } from "./fiscalFieldStyles";
 import { FiscalStateBox } from "./FiscalStateBox";
 
@@ -48,7 +50,13 @@ function emptyForm(): FiscalMalhaPayload {
   };
 }
 
-export function FiscalMalhasSection({ canEdit }: { canEdit: boolean }) {
+export function FiscalMalhasSection({
+  canEdit,
+  canTransfer,
+}: {
+  canEdit: boolean;
+  canTransfer: boolean;
+}) {
   const [client, setClient] = useState<ClientPickerOption | null>(null);
   const [statusFilter, setStatusFilter] = useState<FiscalMalhaStatus | "">("");
   const [responsibleFilter, setResponsibleFilter] = useState("");
@@ -214,7 +222,12 @@ export function FiscalMalhasSection({ canEdit }: { canEdit: boolean }) {
           </label>
           <label className={LABEL_CLASSNAME}>
             Responsável
-            <select value={form.responsible_id ?? ""} onChange={(event) => set("responsible_id", event.target.value || null)} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
+            <select
+              value={form.responsible_id ?? ""}
+              // Transferir responsável já atribuído é Fiscal nível 3 (o serviço também recusa).
+              disabled={Boolean(editing?.responsible_id) && !canTransfer}
+              title={editing?.responsible_id && !canTransfer ? "Transferir o responsável exige Fiscal nível 3." : undefined}
+              onChange={(event) => set("responsible_id", event.target.value || null)} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
               <option value="">Sem responsável</option>
               {users.data?.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
             </select>
@@ -225,7 +238,7 @@ export function FiscalMalhasSection({ canEdit }: { canEdit: boolean }) {
           </label>
           <label className={`${LABEL_CLASSNAME} md:col-span-3`}>
             Motivo
-            <textarea required rows={3} maxLength={2000} value={form.reason} onChange={(event) => set("reason", event.target.value)} className={`py-2 ${FISCAL_FIELD_CONTROL_CLASSNAME.replace("h-10 ", "")}`} />
+            <textarea required rows={3} maxLength={2000} value={form.reason} onChange={(event) => set("reason", event.target.value)} className={FISCAL_TEXTAREA_CLASSNAME} />
           </label>
           {formError ? <p id="fiscal-malha-form-error" role="alert" className={`${FISCAL_FIELD_ERROR_CLASSNAME} md:col-span-3`}>{formError}</p> : null}
           <div className="flex gap-2 md:col-span-3">
@@ -233,7 +246,7 @@ export function FiscalMalhasSection({ canEdit }: { canEdit: boolean }) {
               {save.isPending ? "Salvando..." : editing ? "Salvar alterações" : "Cadastrar malha"}
             </button>
             {editing ? (
-              <button type="button" onClick={resetForm} className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-800">
+              <button type="button" onClick={resetForm} className={FISCAL_SECONDARY_BUTTON_CLASSNAME}>
                 Cancelar
               </button>
             ) : null}
