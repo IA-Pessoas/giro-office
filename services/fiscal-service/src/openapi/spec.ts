@@ -2,6 +2,10 @@ import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspa
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { FiscalServiceEnv } from "../config/env.js";
+import {
+  ANTICIPATION_CLASSIFICATIONS,
+  ANTICIPATION_CORRECTABLE_FIELDS,
+} from "../schemas/anticipation.schemas.js";
 import { MALHA_STATUSES } from "../schemas/malha.schemas.js";
 
 const competencePattern = "^[0-9]{4}-(0[1-9]|1[0-2])$";
@@ -14,7 +18,7 @@ const clientIdParameter = {
   required: true,
   schema: { type: "string", format: "uuid" },
 };
-const malhaIdParameter = {
+const idPathParameter = {
   name: "id",
   in: "path",
   required: true,
@@ -147,6 +151,11 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       {
         name: "Receitas",
         description: "Receita bruta mensal por cliente, base do Simples Nacional",
+      },
+      {
+        name: "Antecipações",
+        description:
+          "Lotes de XML NF-e para revisão manual de antecipações, sem cálculo automático de imposto",
       },
       {
         name: "Malhas",
@@ -1853,6 +1862,205 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/anticipations/batches": {
+        post: {
+          tags: ["Antecipações"],
+          summary: "Importar ZIP de XML NF-e em lote de antecipações",
+          description:
+            "Cria um lote pendente de revisão (status pending_review) para cliente e competência, com um item por det das NF-e e a origem (arquivo, chave de acesso, número do item). Duplicata de chave de acesso + item no próprio ZIP (versões diferentes da mesma nota) ou já importada em qualquer lote da organização (qualquer cliente) não entra: a nota inteira fica de fora e aparece em issues (kind duplicate); XML inválido, NF-e sem chave, cancelada ou não autorizada aparece como error; arquivo que não é NF-e, como discarded. ZIP sem nenhum item importável devolve 400 e não cria lote. Não calcula imposto nem emite guia.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "file_name", "zip_base64"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: {
+                      type: "string",
+                      pattern: competencePattern,
+                      description: "AAAA-MM",
+                    },
+                    file_name: { type: "string", minLength: 1, maxLength: 255 },
+                    zip_base64: { type: "string", minLength: 1, maxLength: 900_000 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Lote criado com itens e issues", content: successContent },
+            "400": { description: "Entrada inválida, ZIP ilegível ou nenhum item importável" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+            "409": { description: "Importação concorrente gravou as mesmas notas" },
+          },
+        },
+      },
+      "/fiscal/anticipations/batches/list": {
+        get: {
+          tags: ["Antecipações"],
+          summary: "Listar lotes de antecipações",
+          description: "Mais recentes primeiro; sem os itens.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: false,
+              schema: { type: "string", pattern: competencePattern },
+            },
+            ...paginationParameters,
+          ],
+          responses: {
+            "200": {
+              description: "Lotes paginados da organização",
+              content: { "application/json": { schema: paginatedListEnvelopeSchema } },
+            },
+            "400": { description: "Filtro inválido" },
+          },
+        },
+      },
+      "/fiscal/anticipations/batches/{id}": {
+        get: {
+          tags: ["Antecipações"],
+          summary: "Detalhar lote de antecipações com itens, issues e histórico da revisão",
+          security: [{ bearerAuth: [] }],
+          parameters: [idPathParameter],
+          responses: {
+            "200": {
+              description:
+                "Lote, itens (valores do XML, classificação, valor manual e correções) e histórico (mais recente primeiro)",
+              content: successContent,
+            },
+            "404": { description: "Lote não encontrado nesta organização" },
+          },
+        },
+      },
+      "/fiscal/anticipations/batches/{id}/items/{item_id}": {
+        put: {
+          tags: ["Antecipações"],
+          summary: "Classificar, corrigir ou informar valor manual de um item",
+          description:
+            "Só com o lote em classificação (pending_review). Cada campo alterado vira uma linha de histórico com anterior, novo, motivo, ator e instante. Correções ficam em corrections; os valores do XML não mudam. null desfaz. Nenhum imposto é calculado.",
+          security: [{ bearerAuth: [] }],
+          parameters: [idPathParameter, { ...idPathParameter, name: "item_id" }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["reason"],
+                  additionalProperties: false,
+                  properties: {
+                    classification: {
+                      type: "string",
+                      enum: [...ANTICIPATION_CLASSIFICATIONS],
+                      nullable: true,
+                    },
+                    manual_value: {
+                      type: "string",
+                      pattern: "^[0-9]{1,13}(\\.[0-9]{1,2})?$",
+                      nullable: true,
+                    },
+                    corrections: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: Object.fromEntries(
+                        ANTICIPATION_CORRECTABLE_FIELDS.map((field) => [
+                          field,
+                          { type: "string", nullable: true },
+                        ]),
+                      ),
+                    },
+                    reason: { type: "string", minLength: 1, maxLength: 2000 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Item revisado", content: successContent },
+            "400": { description: "Entrada inválida ou sem alteração" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Lote ou item não encontrado nesta organização" },
+            "409": { description: "Lote fora da classificação" },
+          },
+        },
+      },
+      "/fiscal/anticipations/batches/{id}/submit": {
+        post: {
+          tags: ["Antecipações"],
+          summary: "Enviar lote à conferência",
+          description:
+            "Exige todos os itens classificados e conferente ativo com acesso ao Fiscal na organização. pending_review → awaiting_check, com histórico do estado e do conferente.",
+          security: [{ bearerAuth: [] }],
+          parameters: [idPathParameter],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["reviewer_id"],
+                  additionalProperties: false,
+                  properties: { reviewer_id: { type: "string", format: "uuid" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Lote aguardando conferência", content: successContent },
+            "400": { description: "Entrada inválida ou item sem classificação" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Lote ou conferente não encontrado nesta organização" },
+            "409": { description: "Lote fora da classificação" },
+          },
+        },
+      },
+      "/fiscal/anticipations/batches/{id}/check": {
+        post: {
+          tags: ["Antecipações"],
+          summary: "Conferir lote: aprovar ou devolver",
+          description:
+            "Só o conferente designado decide. approve: awaiting_check → checked. return (motivo obrigatório): awaiting_check → pending_review.",
+          security: [{ bearerAuth: [] }],
+          parameters: [idPathParameter],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["decision"],
+                  additionalProperties: false,
+                  properties: {
+                    decision: { type: "string", enum: ["approve", "return"] },
+                    reason: { type: "string", minLength: 1, maxLength: 2000 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Lote conferido ou devolvido", content: successContent },
+            "400": { description: "Decisão inválida ou devolução sem motivo" },
+            "403": { description: "Sem permissão de edição Fiscal ou não é o conferente" },
+            "404": { description: "Lote não encontrado nesta organização" },
+            "409": { description: "Lote não está aguardando conferência" },
+          },
+        },
+      },
       "/fiscal/malhas": {
         post: {
           tags: ["Malhas"],
@@ -1927,7 +2135,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Malhas"],
           summary: "Detalhar malha com histórico de prazo, situação e responsável",
           security: [{ bearerAuth: [] }],
-          parameters: [malhaIdParameter],
+          parameters: [idPathParameter],
           responses: {
             "200": {
               description: "Malha e histórico (mais recente primeiro)",
@@ -1942,7 +2150,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           description:
             "Mudanças de prazo, situação e responsável gravam histórico com ator e momento na mesma transação.",
           security: [{ bearerAuth: [] }],
-          parameters: [malhaIdParameter],
+          parameters: [idPathParameter],
           requestBody: {
             required: true,
             content: {
@@ -1969,7 +2177,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Malhas"],
           summary: "Enviar ou substituir o anexo da malha",
           security: [{ bearerAuth: [] }],
-          parameters: [malhaIdParameter],
+          parameters: [idPathParameter],
           requestBody: {
             required: true,
             content: {
@@ -2000,7 +2208,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Malhas"],
           summary: "Gerar URL assinada temporária do anexo",
           security: [{ bearerAuth: [] }],
-          parameters: [malhaIdParameter],
+          parameters: [idPathParameter],
           responses: {
             "200": {
               description: "URL assinada (url, expires_in_seconds)",

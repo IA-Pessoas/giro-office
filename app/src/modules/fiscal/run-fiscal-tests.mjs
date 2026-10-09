@@ -345,6 +345,67 @@ await runTest("fiscal Simples batch parses pasted documents and exports CSV for 
   assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });
 
+await runTest("fiscal anticipations summary shows imported items and what stayed outside", async () => {
+  const { formatAnticipationSummary } = await import("./utils/fiscalAnticipation.ts");
+  assert.equal(
+    formatAnticipationSummary({ entry_count: 2, note_count: 1, item_count: 3, issues: [] }),
+    "3 item(ns) de 1 nota(s), 2 arquivo(s) no ZIP",
+  );
+  assert.equal(
+    formatAnticipationSummary({
+      entry_count: 4,
+      note_count: 1,
+      item_count: 1,
+      issues: [{ kind: "duplicate" }, { kind: "duplicate" }, { kind: "error" }],
+    }),
+    "1 item(ns) de 1 nota(s), 4 arquivo(s) no ZIP; fora do lote: 2 duplicata(s), 1 erro(s)",
+  );
+});
+
+await runTest("fiscal anticipation review sends only changed fields and labels history", async () => {
+  const {
+    buildAnticipationItemChanges,
+    formatAnticipationHistoryField,
+    formatAnticipationHistoryValue,
+  } = await import("./utils/fiscalAnticipation.ts");
+  const item = { classification: "total", manual_value: "7.50", corrections: { cfop: "6403" } };
+  assert.equal(
+    buildAnticipationItemChanges(item, {
+      classification: "total",
+      manual_value: "7.50",
+      corrections: { cfop: "6403", ncm: "" },
+    }),
+    null,
+  );
+  assert.deepEqual(
+    buildAnticipationItemChanges(item, {
+      classification: "freight",
+      manual_value: "",
+      corrections: { cfop: "", value: "9,90" },
+    }),
+    { classification: "freight", manual_value: null, corrections: { cfop: null, value: "9.90" } },
+  );
+  assert.equal(
+    buildAnticipationItemChanges(item, {
+      classification: "total",
+      manual_value: "7,5",
+      corrections: { cfop: "6403", value: "1.234,5", quantity: "2,500" },
+    })?.corrections?.value,
+    "1234.50",
+  );
+  assert.deepEqual(
+    buildAnticipationItemChanges(item, {
+      classification: "total",
+      manual_value: "7,5",
+      corrections: { cfop: "6403", quantity: "2,500" },
+    }),
+    { corrections: { quantity: "2.5" } },
+  );
+  assert.equal(formatAnticipationHistoryField("correction.icms_st"), "Correção de ICMS ST");
+  assert.equal(formatAnticipationHistoryValue("status", "awaiting_check", () => undefined), "Aguardando conferência");
+  assert.equal(formatAnticipationHistoryValue("reviewer_id", "u1", () => "Ana"), "Ana");
+});
+
 await runTest("fiscal malhas formats dates, periods and history values", async () => {
   const { formatMalhaDate, formatMalhaHistoryValue, formatMalhaPeriod } = await import(
     "./utils/fiscalMalha.ts"

@@ -27,3 +27,13 @@ export {
 } from "./fiscalRevenue";
 export { fileToBase64, parseNoteRequests } from "./xmlSelection";
 export { formatMoney } from "./formatMoney";
+export {
+  buildAnticipationItemChanges,
+  FISCAL_ANTICIPATION_CLASSIFICATION_LABELS,
+  FISCAL_ANTICIPATION_FIELD_LABELS,
+  FISCAL_ANTICIPATION_ISSUE_LABELS,
+  FISCAL_ANTICIPATION_STATUS_LABELS,
+  formatAnticipationHistoryField,
+  formatAnticipationHistoryValue,
+  formatAnticipationSummary,
+} from "./fiscalAnticipation";
