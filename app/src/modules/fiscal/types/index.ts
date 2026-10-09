@@ -2,6 +2,8 @@ import type { PaginatedResult } from "@shared/pagination/pagination";
 
 export type FiscalTabId =
   | "search"
+  | "controls"
+  | "annual"
   | "ncm"
   | "icms"
   | "ipi"

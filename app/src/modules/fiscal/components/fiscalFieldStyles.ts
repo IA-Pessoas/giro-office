@@ -13,6 +13,9 @@ export const FISCAL_PRIMARY_BUTTON_CLASSNAME =
 export const FISCAL_SECONDARY_BUTTON_CLASSNAME =
   "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-600 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-400 dark:text-blue-300 dark:hover:bg-blue-900/20";
 
+export const FISCAL_CANCEL_BUTTON_CLASSNAME =
+  "h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-800";
+
 /** Competência AAAA-MM válida (mês 01–12). */
 export function isCompetence(value: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);

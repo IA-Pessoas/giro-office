@@ -33,6 +33,7 @@ model Client {
   organization_id   String
   type              String
   status            String
+  competence_entry  DateTime?
   competence_output DateTime?
   regime            String?
   fiscal            Boolean?
@@ -71,6 +72,122 @@ model FiscalMonthlyRevenue {
   @@map("fiscal.monthly_revenues")
 }
 
+model FiscalMonthlyControl {
+  id              String                      @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime                    @db.Date
+  status          String                      @default("PENDING")
+  no_movement     Boolean                     @default(false)
+  regime          String?
+  opening_reason  String?
+  responsible_id  String?
+  created_by      String
+  updated_by      String
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  events          FiscalMonthlyControlEvent[]
+  obligations     FiscalMonthlyControlObligation[]
+
+  @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_controls_org_client_competence")
+  @@index([organization_id, competence], map: "idx_fiscal_monthly_controls_org_competence")
+  @@index([organization_id, responsible_id], map: "idx_fiscal_monthly_controls_org_responsible")
+  @@map("fiscal.monthly_controls")
+}
+
+model FiscalMonthlyControlEvent {
+  id              String               @id @default(uuid())
+  organization_id String
+  control_id      String
+  action          String
+  obligation_code String?
+  from_value      String?
+  to_value        String?
+  reason          String?
+  actor_id        String
+  createdAt       DateTime             @default(now())
+  control         FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@index([control_id, createdAt], map: "idx_fiscal_monthly_control_events_control_created")
+  @@map("fiscal.monthly_control_events")
+}
+
+model FiscalMonthlyControlObligation {
+  id                    String               @id @default(uuid())
+  organization_id       String
+  control_id            String
+  code                  String
+  origin                String
+  applicable            Boolean              @default(true)
+  not_applicable_reason String?
+  completed_on          DateTime?            @db.Date
+  completed_by          String?
+  protocol              String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  control               FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@unique([control_id, code], map: "uq_fiscal_monthly_control_obligations_control_code")
+  @@index([organization_id, control_id], map: "idx_fiscal_monthly_control_obligations_org_control")
+  @@map("fiscal.monthly_control_obligations")
+}
+
+model FiscalAnnualControl {
+  id              String                     @id @default(uuid())
+  organization_id String
+  client_id       String
+  year            Int
+  regime          String?
+  responsible_id  String?
+  created_by      String
+  updated_by      String
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  items           FiscalAnnualControlItem[]
+  events          FiscalAnnualControlEvent[]
+
+  @@unique([organization_id, client_id, year], map: "uq_fiscal_annual_controls_org_client_year")
+  @@index([organization_id, year], map: "idx_fiscal_annual_controls_org_year")
+  @@map("fiscal.annual_controls")
+}
+
+model FiscalAnnualControlItem {
+  id                    String              @id @default(uuid())
+  organization_id       String
+  control_id            String
+  code                  String
+  origin                String
+  applicable            Boolean             @default(true)
+  not_applicable_reason String?
+  completed_on          DateTime?           @db.Date
+  completed_by          String?
+  protocol              String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  control               FiscalAnnualControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@unique([control_id, code], map: "uq_fiscal_annual_control_items_control_code")
+  @@index([organization_id, control_id], map: "idx_fiscal_annual_control_items_org_control")
+  @@map("fiscal.annual_control_items")
+}
+
+model FiscalAnnualControlEvent {
+  id              String              @id @default(uuid())
+  organization_id String
+  control_id      String
+  action          String
+  item_code       String?
+  from_value      String?
+  to_value        String?
+  reason          String?
+  actor_id        String
+  createdAt       DateTime            @default(now())
+  control         FiscalAnnualControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@index([control_id, createdAt], map: "idx_fiscal_annual_control_events_control_created")
+  @@map("fiscal.annual_control_events")
+}
+
 model Ncm {
   id                    String    @id @default(uuid())
   tax_regime            String
@@ -103,4 +220,64 @@ model Ipi {
   organization_id String
 
   @@map("fiscal.ipi")
+}
+
+// Só leitura: o Fiscal consulta o checklist documental da Triagem, nunca edita.
+model TriageMonthly {
+  id              String    @id @default(uuid())
+  client_id       String
+  competence      String
+  type            String
+  checklist       Json
+  archived_at     DateTime?
+  organization_id String
+
+  @@unique([organization_id, client_id, competence, type])
+  @@map("triagem.monthly")
+}
+
+model TriageCompetence {
+  id                     String    @id @default(uuid())
+  organization_id        String
+  client_id              String
+  competence             String
+  configuration_snapshot Json
+  archived_at            DateTime?
+
+  @@unique([organization_id, client_id, competence])
+  @@map("triagem.competences")
+}
+
+// Só leitura: responsável fiscal padrão do cliente, mantido pela Triagem.
+model TriageResponsible {
+  id              String @id @default(uuid())
+  client_id       String
+  user_id         String
+  type            String
+  organization_id String
+
+  @@unique([organization_id, client_id, type])
+  @@map("triagem.responsibles")
+}
+
+// Só leitura: nome do responsável e candidatos à transferência (acesso Fiscal na organização).
+model User {
+  id              String       @id @default(uuid())
+  name            String
+  status          String
+  organization_id String?
+  permissions     Permission[]
+
+  @@map("users")
+}
+
+model Permission {
+  id              String @id @default(uuid())
+  user_id         String
+  fiscal          Int    @default(0)
+  organization_id String
+  user            User   @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, organization_id], map: "uq_permissions_user_org")
+  @@map("permissions")
 }

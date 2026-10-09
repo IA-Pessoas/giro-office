@@ -24,6 +24,7 @@ export interface GatewayWorkerEnv extends WorkerEnv {
   TI_SERVICE?: ServiceBinding;
   RH_SERVICE?: ServiceBinding;
   COMMERCIAL_SERVICE?: ServiceBinding;
+  MARKETING_SERVICE?: ServiceBinding;
   TRIAGEM_SERVICE?: ServiceBinding;
   PESSOAL_SERVICE?: ServiceBinding;
   REGULARIZE_SERVICE?: ServiceBinding;
