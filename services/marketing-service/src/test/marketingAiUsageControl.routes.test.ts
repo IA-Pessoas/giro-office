@@ -34,7 +34,7 @@ function createControlProvider() {
     createForActiveUsers: vi.fn(async () => ({ created: 2, alreadyExisted: 1 })),
     listControls: vi.fn(async () => []),
     updateAnswers: vi.fn(async () => ({ id: controlId })),
-    getReport: vi.fn(async () => ({ pending: [], withoutIntegration: [] })),
+    getReport: vi.fn(async () => ({ pending: [], unanswered: [], withoutIntegration: [] })),
     importLegacyRecords: vi.fn(async () => ({ imported: 1, alreadyExisted: 0, reconciliation: 1 })),
     listImportReconciliation: vi.fn(async () => []),
   };

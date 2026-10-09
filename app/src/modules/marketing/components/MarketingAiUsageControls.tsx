@@ -5,9 +5,16 @@ import { useFetch } from "@shared/hooks";
 import { useModuleAccess } from "@modules/auth";
 import { useMarketingDashboard } from "../hooks/useMarketingDashboard";
 import { marketingQueryKey } from "../utils/marketingQueryKeys";
-import { MarketingAiUsageReport } from "./MarketingAiUsageReport";
+import { aiUsageUserName } from "../utils/marketingCsv";
+import { AI_USAGE_REPORT_SECTIONS, MarketingAiUsageReport } from "./MarketingAiUsageReport";
 
 import { marketingAiUsageService, type AiUsageAnswers, type AiUsageControl } from "../services/marketingAiUsageService";
+
+// Tela: pendências (qualquer resposta ausente) mais as duas listas legadas do relatório.
+const AI_USAGE_SCREEN_LISTS = [
+  { key: "pending", title: "Respostas pendentes" },
+  ...AI_USAGE_REPORT_SECTIONS,
+] as const;
 
 function currentCompetence(): string {
   const now = new Date();
@@ -183,7 +190,7 @@ export function MarketingAiUsageControls() {
       <div className="space-y-4">
         {(controlsQuery.data ?? []).map((control) => (
           <article className="rounded-lg border border-gray-200 p-4 dark:border-slate-700" key={control.id}>
-            <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">{control.user.full_name || control.user.name}</h3>
+            <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">{aiUsageUserName(control)}</h3>
             <AnswerForm control={control} saving={update.isPending} editable={canEdit} onSave={(answers) => update.mutate({ id: control.id, answers })} />
           </article>
         ))}
@@ -193,19 +200,15 @@ export function MarketingAiUsageControls() {
       <div className="flex justify-end border-t border-gray-100 pt-4 dark:border-slate-700">
         <MarketingAiUsageReport competence={competence} report={reportQuery.data} />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <h3 className="font-semibold text-gray-900 dark:text-white">Respostas pendentes ({reportQuery.data?.pending.length ?? 0})</h3>
-          <ul className="mt-2 list-inside list-disc text-sm text-gray-600 dark:text-slate-300">
-            {(reportQuery.data?.pending ?? []).map((control) => <li key={control.id}>{control.user.full_name || control.user.name}</li>)}
-          </ul>
-        </div>
-        <div>
-          <h3 className="font-semibold text-gray-900 dark:text-white">Sem integração ({reportQuery.data?.withoutIntegration.length ?? 0})</h3>
-          <ul className="mt-2 list-inside list-disc text-sm text-gray-600 dark:text-slate-300">
-            {(reportQuery.data?.withoutIntegration ?? []).map((control) => <li key={control.id}>{control.user.full_name || control.user.name}</li>)}
-          </ul>
-        </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {AI_USAGE_SCREEN_LISTS.map((list) => (
+          <div key={list.key}>
+            <h3 className="font-semibold text-gray-900 dark:text-white">{list.title} ({reportQuery.data?.[list.key].length ?? 0})</h3>
+            <ul className="mt-2 list-inside list-disc text-sm text-gray-600 dark:text-slate-300">
+              {(reportQuery.data?.[list.key] ?? []).map((control) => <li key={control.id}>{aiUsageUserName(control)}</li>)}
+            </ul>
+          </div>
+        ))}
       </div>
       <div className="border-t border-gray-100 pt-4 dark:border-slate-700">
         <h3 className="font-semibold text-gray-900 dark:text-white">Importações pendentes de reconciliação ({reconciliationQuery.data?.length ?? 0})</h3>

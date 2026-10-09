@@ -16,7 +16,7 @@ import { marketingPrimaryButtonClass, marketingSecondaryButtonClass } from "./ma
 import { MarketingReportTable } from "./MarketingReportTable";
 
 // Os dois relatórios do legado: `conhecimento=0` e `integracao=1`.
-const REPORT_SECTIONS = [
+export const AI_USAGE_REPORT_SECTIONS = [
   { key: "unanswered", title: "Sem resposta de conhecimento", file: "sem-resposta" },
   { key: "withoutIntegration", title: "Sem integração", file: "sem-integracao" },
 ] as const satisfies ReadonlyArray<{ key: keyof AiUsageReport; title: string; file: string }>;
@@ -76,7 +76,7 @@ export function MarketingAiUsageReport({
             id="marketing-ai-usage-report"
           >
             <div className="hide-on-print flex flex-wrap justify-end gap-2">
-              {REPORT_SECTIONS.map((section) => (
+              {AI_USAGE_REPORT_SECTIONS.map((section) => (
                 <CsvButton
                   competence={competence}
                   controls={report[section.key]}
@@ -100,7 +100,7 @@ export function MarketingAiUsageReport({
               <h2 className="text-xl font-semibold">Competência {formatCompetence(competence)}</h2>
             </header>
 
-            {REPORT_SECTIONS.map((section) => (
+            {AI_USAGE_REPORT_SECTIONS.map((section) => (
               <MarketingReportTable
                 columns={AI_USAGE_REPORT_COLUMNS}
                 emptyMessage="Nenhum usuário nesta situação."

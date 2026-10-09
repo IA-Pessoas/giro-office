@@ -121,14 +121,15 @@ export function formatCompetence(competence: string): string {
   return `${month}/${year}`;
 }
 
+export function aiUsageUserName(control: { user: { name: string; full_name: string | null } }): string {
+  return control.user.full_name || control.user.name;
+}
+
 export function aiUsageReportRows(
   controls: readonly { user: { name: string; full_name: string | null } }[],
   competence: string,
 ): string[][] {
-  return controls.map((control) => [
-    control.user.full_name || control.user.name,
-    formatCompetence(competence),
-  ]);
+  return controls.map((control) => [aiUsageUserName(control), formatCompetence(competence)]);
 }
 
 export function createAiUsageReportCsv(
