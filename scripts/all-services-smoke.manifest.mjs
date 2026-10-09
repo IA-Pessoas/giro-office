@@ -446,8 +446,21 @@ const baseManifest = [
     action: "marketingStock",
     target: "gateway",
     auth: "bearer",
-    // 404 quando a organização do smoke não cadastrou o departamento Marketing.
-    expectedStatus: [200, 404],
+    // Exige departamento Marketing cadastrado na organização do smoke.
+    condition: "marketingStockSmokeEnabled",
+    expectedStatus: [200],
+  }),
+  op({
+    service: "marketing-service",
+    method: "GET",
+    path: "/marketing/stock",
+    action: "marketingStockUnauthorized",
+    handlerAction: "marketingStock",
+    target: "gateway",
+    auth: "bearer",
+    specOperation: false,
+    expectationKind: "bad",
+    negativeCase: "unauthorized401",
   }),
   op({
     service: "marketing-service",

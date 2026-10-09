@@ -194,9 +194,9 @@ describe("MarketingDashboardService.getMarketingStock", () => {
     });
     const [departmentCall, stockCall] = prisma.$queryRaw.mock.calls;
     const departmentSql = departmentCall?.[0]?.join("?") ?? "";
-    expect(departmentSql).toContain("lower(btrim(department.name)) = 'marketing'");
+    expect(departmentSql).toContain("lower(btrim(department.name)) = ?");
     expect(departmentSql).not.toMatch(/\b22\b/);
-    expect(departmentCall?.slice(1)).toEqual([organizationId]);
+    expect(departmentCall?.slice(1)).toEqual([organizationId, "marketing"]);
 
     const stockSql = stockCall?.[0]?.join("?") ?? "";
     expect(stockSql).toContain("max(entry.entry_date)");

@@ -77,7 +77,7 @@ export function MarketingEventEditionReport({
   return (
     <article
       aria-label={`Relatório da edição ${edition.name}`}
-      className="marketing-event-edition-report space-y-6 text-gray-900 dark:text-slate-100"
+      className="marketing-event-edition-report marketing-print-report space-y-6 text-gray-900 dark:text-slate-100"
       id="marketing-event-edition-report"
     >
       <div className="hide-on-print flex flex-wrap justify-between gap-2">

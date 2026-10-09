@@ -162,6 +162,10 @@ const env = {
   marketingEventsSmokeEnabled:
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "true" ||
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "1",
+  // Opt in only when the smoke organization has a "Marketing" department.
+  marketingStockSmokeEnabled:
+    process.env.MARKETING_STOCK_SMOKE_ENABLED === "true" ||
+    process.env.MARKETING_STOCK_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -8300,6 +8304,9 @@ function matchesFilter(op) {
 function disabledConditionReason(condition) {
   if (condition === "marketingEventsSmokeEnabled" && !env.marketingEventsSmokeEnabled) {
     return "MARKETING_EVENTS_SMOKE_ENABLED is false";
+  }
+  if (condition === "marketingStockSmokeEnabled" && !env.marketingStockSmokeEnabled) {
+    return "MARKETING_STOCK_SMOKE_ENABLED is false";
   }
   if (condition === "platformImpersonationSmokeEnabled") {
     if (!env.platformImpersonationSmokeEnabled) {

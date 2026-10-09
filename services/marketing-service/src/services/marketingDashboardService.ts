@@ -15,6 +15,8 @@ interface BirthdayAggregate {
 }
 
 const EMPTY_BIRTHDAYS: BirthdayAggregate = { total: 0, items: [] };
+/** Substitui o `departamento_id = 22` fixo do PHP: o departamento vem do cadastro pelo nome. */
+const MARKETING_DEPARTMENT_NAME = "marketing";
 const CLOSED_REQUEST_STATUSES = ["Resolved", "Closed"] as const;
 
 export function getCurrentMarketingCompetence(now: Date, timeZone: string): Date {
@@ -297,7 +299,7 @@ export class MarketingDashboardService {
       SELECT department.id, btrim(department.name) AS name
       FROM departments AS department
       WHERE department.organization_id = ${organizationId}
-        AND lower(btrim(department.name)) = 'marketing'
+        AND lower(btrim(department.name)) = ${MARKETING_DEPARTMENT_NAME}
       ORDER BY department.name, department.id
       LIMIT 1
     `;
