@@ -11,6 +11,7 @@ export type FiscalTabId =
   | "revenues"
   | "malhas"
   | "wholesale"
+  | "responsibles"
   | "conferences";
 
 export interface FiscalNcm {

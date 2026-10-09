@@ -669,3 +669,20 @@ await runTest("fiscal annual control shows each declaration and reuses the item 
   assert.match(section, /<FiscalControlObligationsPanel source=\{annualItemSource\(item\.id\)\}/);
   assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando controles anuais"/);
 });
+
+await runTest("fiscal responsibles report: screen and CSV share one response, competence uses the control", async () => {
+  const section = await readSource("./components/FiscalResponsibleReportSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  const queryKeys = await readSource("./hooks/queryKeys.ts");
+  assert.match(fiscalSources.shell, /<FiscalResponsibleReportSection \/>/);
+  assert.match(client, /api\.get\("\/fiscal\/monthly-controls\/responsibles-report", \{ params \}\)/);
+  // O CSV baixado é o do mesmo retorno que preenche a tabela.
+  assert.match(section, /downloadFile\(new Blob\(\[data\.csv\]/);
+  assert.match(section, /data\.items\.map\(\(item\) =>/);
+  assert.match(section, /competence: byCompetence \? competence : undefined/);
+  assert.match(section, /<option value="none">Sem responsável<\/option>/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando relatório"/);
+  assert.match(section, /report\.error \? \(\s*<div role="alert">/);
+  // Transferências invalidam o prefixo das carteiras, que cobre o relatório.
+  assert.match(queryKeys, /\[\.\.\.FISCAL_MONTHLY_CONTROLS_QUERY_KEY, "responsibles-report", basis, competence, responsibleId\]/);
+});
