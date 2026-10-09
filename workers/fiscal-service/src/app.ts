@@ -12,6 +12,15 @@ import {
   updateClientWholesaleBodySchema,
 } from "@workspace/fiscal-service/src/schemas/clientWholesale.schemas.js";
 import {
+  documentConferenceBodySchema,
+  invoicePdfTotalsBodySchema,
+  ipiSpreadsheetConferenceBodySchema,
+  sefazXmlConferenceBodySchema,
+  spedConferenceBodySchema,
+  xmlSelectionBodySchema,
+  xmlTaxTotalsBodySchema,
+} from "@workspace/fiscal-service/src/schemas/documentConference.schemas.js";
+import {
   createFiscalRateBodySchema,
   fiscalRateIdParamsSchema,
   listFiscalRatesQuerySchema,
@@ -66,15 +75,31 @@ import {
 import { AnnualControlService } from "@workspace/fiscal-service/src/services/annualControlService.js";
 import { ClientWholesaleService } from "@workspace/fiscal-service/src/services/clientWholesaleService.js";
 import {
+  compareDocumentSpreadsheets,
+  documentConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/documentConferenceService.js";
+import {
   fiscalRatePdfHeaders,
   renderFiscalRatePdf,
 } from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
+import {
+  invoicePdfTotalsCsvExport,
+  sumInvoicePdfs,
+} from "@workspace/fiscal-service/src/services/invoicePdfTotalsService.js";
+import {
+  compareIpiSpreadsheets,
+  ipiSpreadsheetConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/ipiSpreadsheetConferenceService.js";
 import { MalhaService } from "@workspace/fiscal-service/src/services/malhaService.js";
 import { MonthlyControlService } from "@workspace/fiscal-service/src/services/monthlyControlService.js";
 import { MonthlyObligationService } from "@workspace/fiscal-service/src/services/monthlyObligationService.js";
 import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
+import {
+  compareSefazWithXml,
+  sefazXmlConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/sefazXmlConferenceService.js";
 import { simplesRateCsvExport } from "@workspace/fiscal-service/src/services/simplesRateCsvService.js";
 import {
   renderSimplesRatePdf,
@@ -82,6 +107,15 @@ import {
 } from "@workspace/fiscal-service/src/services/simplesRatePdfService.js";
 import { SimplesRateService } from "@workspace/fiscal-service/src/services/simplesRateService.js";
 import { simplesRateZipExport } from "@workspace/fiscal-service/src/services/simplesRateZipService.js";
+import {
+  compareSpedWithXml,
+  spedConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/spedConferenceService.js";
+import { selectXmlFromZip } from "@workspace/fiscal-service/src/services/xmlSelectionService.js";
+import {
+  sumXmlTaxes,
+  xmlTaxTotalsCsvExport,
+} from "@workspace/fiscal-service/src/services/xmlTaxTotalsService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   fiscalIcmsReportingCatalog,
@@ -624,6 +658,50 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
       service.batch(body, c.get("auth").organizationId),
     );
     return c.json(createSuccessResponse(await simplesRateZipExport(batch)));
+  });
+
+  // Conferência de arquivos: processa só o que foi enviado, sem banco nem efeito em controles.
+  app.post("/fiscal/conferences/documents", async (c) => {
+    const body = parseWithZod(documentConferenceBodySchema, await readJson(c));
+    const result = compareDocumentSpreadsheets(body);
+    return c.json(createSuccessResponse({ ...result, ...documentConferenceCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/xml-selection", async (c) => {
+    const body = parseWithZod(xmlSelectionBodySchema, await readJson(c));
+    return c.json(createSuccessResponse(selectXmlFromZip(body)));
+  });
+
+  app.post("/fiscal/conferences/sefaz-xml", async (c) => {
+    const body = parseWithZod(sefazXmlConferenceBodySchema, await readJson(c));
+    const result = compareSefazWithXml(body);
+    return c.json(createSuccessResponse({ ...result, ...sefazXmlConferenceCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/sped-xml", async (c) => {
+    const body = parseWithZod(spedConferenceBodySchema, await readJson(c));
+    const result = compareSpedWithXml(body);
+    return c.json(createSuccessResponse({ ...result, ...spedConferenceCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/xml-taxes", async (c) => {
+    const body = parseWithZod(xmlTaxTotalsBodySchema, await readJson(c));
+    const result = sumXmlTaxes(body);
+    return c.json(createSuccessResponse({ ...result, ...xmlTaxTotalsCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/ipi-spreadsheets", async (c) => {
+    const body = parseWithZod(ipiSpreadsheetConferenceBodySchema, await readJson(c));
+    const result = compareIpiSpreadsheets(body);
+    return c.json(
+      createSuccessResponse({ ...result, ...ipiSpreadsheetConferenceCsvExport(result) }),
+    );
+  });
+
+  app.post("/fiscal/conferences/invoice-pdfs", async (c) => {
+    const body = parseWithZod(invoicePdfTotalsBodySchema, await readJson(c));
+    const result = sumInvoicePdfs(body);
+    return c.json(createSuccessResponse({ ...result, ...invoicePdfTotalsCsvExport(result) }));
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {

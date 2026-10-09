@@ -407,6 +407,41 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "exportou", item: "os PDFs de alíquotas do Simples em lote" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/documents$/,
+    description: { action: "conferiu", item: "planilhas Domínio e SEFAZ" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/xml-selection$/,
+    description: { action: "selecionou", item: "XML de notas em um ZIP" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/sefaz-xml$/,
+    description: { action: "conferiu", item: "o CSV da SEFAZ contra XML de notas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/sped-xml$/,
+    description: { action: "conferiu", item: "o SPED (C100/C170) contra XML de notas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/xml-taxes$/,
+    description: { action: "somou", item: "IPI e ICMS ST de XML de notas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/ipi-spreadsheets$/,
+    description: { action: "conferiu", item: "o IPI entre duas planilhas" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/invoice-pdfs$/,
+    description: { action: "somou", item: "totais de faturas em PDF" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
     description: { action: "consultou", item: "um job de relatório" },
