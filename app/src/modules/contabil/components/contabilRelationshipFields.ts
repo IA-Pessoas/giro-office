@@ -5,7 +5,7 @@ type ContabilRelationshipField = Exclude<keyof ContabilRelationship, "id" | "cli
 interface ContabilRelationshipFieldDefinition {
   field: ContabilRelationshipField;
   label: string;
-  kind: "boolean" | "text" | "textarea";
+  kind: "state" | "text" | "textarea";
   requiredOnCreate: boolean;
   order: number;
 }
@@ -14,8 +14,8 @@ export const CONTABIL_RELATIONSHIP_FIELDS: ContabilRelationshipFieldDefinition[]
   {
     field: "chart_accounts",
     label: "Plano de contas",
-    kind: "text",
-    requiredOnCreate: true,
+    kind: "state",
+    requiredOnCreate: false,
     order: 1,
   },
   {
@@ -35,8 +35,8 @@ export const CONTABIL_RELATIONSHIP_FIELDS: ContabilRelationshipFieldDefinition[]
   {
     field: "bidding",
     label: "Participa de licitação",
-    kind: "boolean",
-    requiredOnCreate: true,
+    kind: "state",
+    requiredOnCreate: false,
     order: 4,
   },
   {
@@ -47,20 +47,6 @@ export const CONTABIL_RELATIONSHIP_FIELDS: ContabilRelationshipFieldDefinition[]
     order: 5,
   },
 ];
-
-export const CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS = CONTABIL_RELATIONSHIP_FIELDS.filter(
-  (field): field is ContabilRelationshipFieldDefinition & { field: "bidding"; kind: "boolean" } =>
-    field.kind === "boolean",
-);
-
-export const CONTABIL_RELATIONSHIP_TEXT_FIELDS = CONTABIL_RELATIONSHIP_FIELDS.filter(
-  (
-    field,
-  ): field is ContabilRelationshipFieldDefinition & {
-    field: "chart_accounts" | "tool" | "system";
-    kind: "text";
-  } => field.kind === "text",
-);
 
 export const CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS = CONTABIL_RELATIONSHIP_FIELDS.filter(
   (field): field is ContabilRelationshipFieldDefinition & { field: "note"; kind: "textarea" } =>

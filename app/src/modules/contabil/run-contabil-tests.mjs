@@ -42,7 +42,11 @@ import {
 } from "./components/contabilControlSection.helpers.ts";
 import {
   buildContabilRelationshipFormValues,
+  buildContabilRelationshipPayload,
   buildContabilResponsibleFormValues,
+  formatContabilBidding,
+  formatContabilChartAccounts,
+  getContabilChartAccountsOptions,
   getContabilSelectLabel,
   isContabilTextValueFilled,
   mapAssignableUsersToContabilOptions,
@@ -537,32 +541,30 @@ await (async () => {
       CONTABIL_RELATIONSHIP_FIELDS.map((field) => field.field),
       ["chart_accounts", "tool", "system", "bidding", "note"],
     );
-    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.field, "bidding");
-    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.requiredOnCreate, true);
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.kind, "state");
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[3]?.requiredOnCreate, false);
+    assert.equal(CONTABIL_RELATIONSHIP_FIELDS[0]?.requiredOnCreate, false);
   });
 
-  await runTest("relationship bidding checkbox uses compact form proportions", () => {
-    const source = readFileSync(
-      new URL("./components/ContabilRelationshipSection.tsx", import.meta.url),
-      "utf8",
-    );
-    const textFieldsStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXT_FIELDS.map");
-    const textareaStart = source.indexOf("{CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS.map");
-    const checkboxStart = source.indexOf("{CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map");
-    const checkboxSource = source.slice(
-      checkboxStart,
-      source.indexOf("{submitError", checkboxStart),
-    );
-
-    assert.ok(textFieldsStart < textareaStart);
-    assert.ok(textFieldsStart < checkboxStart);
-    assert.ok(checkboxStart < textareaStart);
-    assert.match(checkboxSource, /className="flex h-11 items-center gap-3/);
-    assert.match(checkboxSource, /className="h-4 w-4/);
-    assert.doesNotMatch(
-      checkboxSource,
-      /rounded-xl border border-gray-200 bg-gray-50\/70 px-4 py-3/,
-    );
+  await runTest("relationship states render every legacy option, including no answer (#1721)", () => {
+    assert.equal(formatContabilBidding(null), "Não selecionado");
+    assert.equal(formatContabilBidding(true), "Sim");
+    assert.equal(formatContabilBidding(false), "Não");
+    assert.equal(formatContabilChartAccounts(null), "Não selecionado");
+    assert.equal(formatContabilChartAccounts(""), "Não selecionado");
+    assert.equal(formatContabilChartAccounts("Não — Jonrick"), "Não — Jonrick");
+    assert.equal(formatContabilChartAccounts("Plano próprio"), "Plano próprio (texto legado)");
+    assert.deepEqual(getContabilChartAccountsOptions(null), [
+      { value: "", label: "Não selecionado" },
+      { value: "Sim", label: "Sim" },
+      { value: "Não", label: "Não" },
+      { value: "Sim — Jonrick", label: "Sim — Jonrick" },
+      { value: "Não — Jonrick", label: "Não — Jonrick" },
+    ]);
+    assert.deepEqual(getContabilChartAccountsOptions("Plano próprio").at(-1), {
+      value: "Plano próprio",
+      label: "Plano próprio (texto legado)",
+    });
   });
 
   await runTest("responsible and relationship form helpers normalize nullable backend values", () => {
@@ -573,8 +575,32 @@ await (async () => {
     });
 
     assert.deepEqual(buildContabilRelationshipFormValues(null), {
-      bidding: false,
+      bidding: "",
       chart_accounts: "",
+      tool: "",
+      system: "",
+      note: "",
+    });
+    const legacy = buildContabilRelationshipFormValues({
+      id: "rel-1",
+      client_id: "client-1",
+      bidding: false,
+      chart_accounts: "Plano próprio",
+      tool: "ERP",
+      system: "Sistema",
+      note: "",
+    });
+    assert.equal(legacy.bidding, "false");
+    assert.deepEqual(buildContabilRelationshipPayload(legacy), {
+      bidding: false,
+      chart_accounts: "Plano próprio",
+      tool: "ERP",
+      system: "Sistema",
+      note: "",
+    });
+    assert.deepEqual(buildContabilRelationshipPayload(buildContabilRelationshipFormValues(null)), {
+      bidding: null,
+      chart_accounts: null,
       tool: "",
       system: "",
       note: "",
