@@ -144,6 +144,7 @@ describe("renderAnticipationPdf", () => {
     expect(text).toContain("Valor informado R$ 7,50 (informado manualmente)");
     expect(text).toContain("NF 101 série 1 item 1");
     expect(text).toContain("Sem classificação");
+    expect(text).toContain(`Arquivo: 100.xml · chave ${key}`);
   });
 
   it("baixa com nome identificável e sem cache", () => {

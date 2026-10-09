@@ -7,6 +7,7 @@ import { type FormEvent, useState } from "react";
 
 import { fiscalAnticipationsQueryKey } from "../hooks/queryKeys";
 import {
+  type FiscalAnticipationExportFormat,
   type FiscalAnticipationItem,
   fiscalAnticipationService,
 } from "../services/fiscalAnticipationService";
@@ -171,7 +172,7 @@ export function FiscalAnticipationBatchPanel({
   const [reviewerId, setReviewerId] = useState("");
   const [returnReason, setReturnReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<"csv" | "pdf" | null>(null);
+  const [downloading, setDownloading] = useState<FiscalAnticipationExportFormat | null>(null);
 
   const detail = useFetch(
     [...fiscalAnticipationsQueryKey(clientId), "detail", batchId],
@@ -193,7 +194,7 @@ export function FiscalAnticipationBatchPanel({
     }
   }
 
-  async function download(format: "csv" | "pdf") {
+  async function download(format: FiscalAnticipationExportFormat) {
     setActionError(null);
     setDownloading(format);
     try {

@@ -21,6 +21,8 @@ export interface AnticipationDemonstrative {
   people: Record<string, string>;
 }
 
+export type AnticipationExportFormat = "csv" | "pdf";
+
 export const ANTICIPATION_DECLARATION =
   "Demonstrativo manual: não houve apuração automática de imposto nem emissão de guia oficial.";
 
@@ -63,7 +65,7 @@ function fieldValue(item: AnticipationItemDto, field: AnticipationCorrectableFie
 
 export function anticipationDemonstrativeHeaders(
   demonstrative: AnticipationDemonstrative,
-  format: "csv" | "pdf",
+  format: AnticipationExportFormat,
 ): Record<string, string> {
   const { batch } = demonstrative;
   return {
@@ -188,9 +190,23 @@ export function renderAnticipationPdf(demonstrative: AnticipationDemonstrative):
       if (item.manual_value !== null) {
         doc.text(`Valor informado ${money(item.manual_value)} (informado manualmente)`);
       }
-      doc.text(`Origem: ${item.entry} · chave ${item.access_key}`);
+      doc.text(`Arquivo: ${item.entry} · chave ${item.access_key}`);
       doc.moveDown(0.5);
     }
     doc.end();
   });
+}
+
+/** Corpo e cabeçalhos do arquivo no formato pedido; Express e Worker respondem com isto. */
+export async function renderAnticipationDemonstrative(
+  demonstrative: AnticipationDemonstrative,
+  format: AnticipationExportFormat,
+): Promise<{ body: Uint8Array | string; headers: Record<string, string> }> {
+  return {
+    body:
+      format === "pdf"
+        ? new Uint8Array(await renderAnticipationPdf(demonstrative))
+        : renderAnticipationCsv(demonstrative),
+    headers: anticipationDemonstrativeHeaders(demonstrative, format),
+  };
 }

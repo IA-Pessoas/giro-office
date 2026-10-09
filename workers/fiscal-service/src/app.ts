@@ -82,11 +82,7 @@ import {
   simplesPreviewQuerySchema,
 } from "@workspace/fiscal-service/src/schemas/simplesRate.schemas.js";
 import { AnnualControlService } from "@workspace/fiscal-service/src/services/annualControlService.js";
-import {
-  anticipationDemonstrativeHeaders,
-  renderAnticipationCsv,
-  renderAnticipationPdf,
-} from "@workspace/fiscal-service/src/services/anticipationExportService.js";
+import { renderAnticipationDemonstrative } from "@workspace/fiscal-service/src/services/anticipationExportService.js";
 import { AnticipationService } from "@workspace/fiscal-service/src/services/anticipationService.js";
 import { ClientWholesaleService } from "@workspace/fiscal-service/src/services/clientWholesaleService.js";
 import {
@@ -532,13 +528,8 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
       const demonstrative = await withService("anticipationService", (service) =>
         service.demonstrative(id, c.get("auth").organizationId),
       );
-      const body =
-        format === "pdf"
-          ? new Uint8Array(await renderAnticipationPdf(demonstrative))
-          : renderAnticipationCsv(demonstrative);
-      return new Response(body, {
-        headers: anticipationDemonstrativeHeaders(demonstrative, format),
-      });
+      const file = await renderAnticipationDemonstrative(demonstrative, format);
+      return new Response(file.body, { headers: file.headers });
     });
   }
 

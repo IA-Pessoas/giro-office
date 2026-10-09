@@ -489,7 +489,10 @@ export class AnticipationService {
         where: { id: batch.client_id, organization_id: organizationId },
         select: { name: true, company_name: true, cpf_cnpj: true },
       }),
-      this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }),
+      this.prisma.user.findMany({
+        where: { id: { in: ids }, permissions: { some: { organization_id: organizationId } } },
+        select: { id: true, name: true },
+      }),
     ]);
     if (!client) throw new ServiceError(404, "Cliente não encontrado.");
     return {
