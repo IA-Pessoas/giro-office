@@ -31,7 +31,7 @@ DATABASE_URL=<postgres> pnpm --dir services/fiscal-service exec tsx src/history/
       "legacy_id": 1,
       "codigo_empresa": 101,
       "competencia": "2025-08",
-      "tipo": "SN",
+      "tipo": "Completo",
       "responsavel": "7",
       "obligations": { "das": "2025-09-18", "efd_reinf": "0001-01-01", "dirbi": "" }
     }
@@ -56,13 +56,16 @@ DATABASE_URL=<postgres> pnpm --dir services/fiscal-service exec tsx src/history/
   do detalhe do regime (`controle_impostos_sn`, `_normal` ou `_mei`, ligadas por `id_comp`)
   em `obligations`, com os nomes e valores brutos das colunas.
 - `annual`: uma linha de `tb_fiscal.controle_impostos_anual`.
+- `tipo` é o valor do PHP: no mensal, `Completo` ou `Sublimite` para o Simples (`tb_fiscal.clientes_sn`), `Normal` ou `MEI`; no anual, `SN`, `Normal` ou `MEI`.
+- O arquivo é validado ao entrar. Formato ou organização inválidos impedem a simulação; uma linha malformada sai como **ignorada**, com o campo e o motivo, e as demais seguem.
 - `responsavel` vai como veio (id de usuário legado) e não é mapeado: o responsável no
   Office segue a regra do controle (padrão vigente ao nascer).
 
 ## Cliente
 
 1. Entrada em `client_map` para o `codigo_empresa`: usada se o cliente for da organização de
-   destino; senão, a linha é **ignorada**.
+   destino; senão, a linha é **ignorada**. O mesmo código apontando para clientes diferentes
+   deixa a linha **ambígua**.
 2. Sem entrada no mapa: aceita o cliente cujo `dominio_code` é o mesmo código, **só se houver
    exatamente um**. Dois ou mais deixam a linha **ambígua** (o sistema não escolhe); nenhum a
    deixa **ignorada**.
@@ -84,7 +87,7 @@ DATABASE_URL=<postgres> pnpm --dir services/fiscal-service exec tsx src/history/
 - **DIRB anual** é só dado bruto. A DIRBI vigente é mensal e condicional, e fica no controle
   mensal.
 - **Correspondência com o catálogo:**
-  - SN: `das` → PGDAS-D.
+  - Simples (`Completo`/`Sublimite`): `das` → PGDAS-D.
   - Normal: `sped_contribuicoes` → EFD-Contribuições; `dctf` → DCTFWeb só de 2025-01 em
     diante (antes era a DCTF PGD).
   - Todos os regimes: `dirbi` → DIRBI.

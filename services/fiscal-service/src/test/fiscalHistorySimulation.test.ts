@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-
 import {
   type FiscalHistoryExport,
   type FiscalHistoryReader,
   simulateFiscalHistoryImport,
 } from "../history/fiscalHistorySimulation.js";
+import { createPgHistoryReader } from "../history/pgHistoryReader.js";
 
 const org = "a0000000-0000-4000-8000-000000000001";
 const otherOrg = "a0000000-0000-4000-8000-000000000002";
@@ -57,7 +57,7 @@ function exportFile(overrides: Partial<FiscalHistoryExport> = {}): FiscalHistory
         legacy_id: 1,
         codigo_empresa: 101,
         competencia: "2025-08",
-        tipo: "SN",
+        tipo: "Completo",
         responsavel: "7",
         obligations: {
           das: "2025-09-18",
@@ -78,7 +78,7 @@ function exportFile(overrides: Partial<FiscalHistoryExport> = {}): FiscalHistory
         legacy_id: 3,
         codigo_empresa: 103,
         competencia: "2025-08",
-        tipo: "SN",
+        tipo: "Completo",
         responsavel: "",
         obligations: { das: "2025-09-18" },
       },
@@ -86,7 +86,7 @@ function exportFile(overrides: Partial<FiscalHistoryExport> = {}): FiscalHistory
         legacy_id: 4,
         codigo_empresa: 999,
         competencia: "2025-08",
-        tipo: "SN",
+        tipo: "Completo",
         responsavel: "",
         obligations: {},
       },
@@ -94,7 +94,7 @@ function exportFile(overrides: Partial<FiscalHistoryExport> = {}): FiscalHistory
         legacy_id: 5,
         codigo_empresa: 101,
         competencia: "2025-08",
-        tipo: "SN",
+        tipo: "Completo",
         responsavel: "",
         obligations: {},
       },
@@ -102,7 +102,7 @@ function exportFile(overrides: Partial<FiscalHistoryExport> = {}): FiscalHistory
         legacy_id: 6,
         codigo_empresa: 101,
         competencia: "2025-07",
-        tipo: "SN",
+        tipo: "Sublimite",
         responsavel: "",
         obligations: {},
       },
@@ -110,7 +110,7 @@ function exportFile(overrides: Partial<FiscalHistoryExport> = {}): FiscalHistory
         legacy_id: 7,
         codigo_empresa: 101,
         competencia: "08/2025",
-        tipo: "SN",
+        tipo: "Completo",
         responsavel: "",
         obligations: {},
       },
@@ -287,5 +287,58 @@ describe("simulateFiscalHistoryImport", () => {
         "existingAnnualControls",
       ]),
     );
+  });
+
+  it("linha malformada vira ignorada com motivo e não derruba as demais", async () => {
+    const report = await simulateFiscalHistoryImport(
+      {
+        ...exportFile(),
+        monthly: [
+          { legacy_id: 50, codigo_empresa: 102, competencia: null },
+          exportFile().monthly[1],
+        ],
+        annual: ["lixo"],
+      },
+      { organizationId: org },
+      reader(),
+    );
+    expect(report.monthly[0]).toMatchObject({ legacy_id: 50, result: "IGNORED" });
+    expect(report.monthly[0].reason).toMatch(/Linha malformada: competencia/);
+    expect(report.monthly[1]).toMatchObject({ legacy_id: 2, result: "ACCEPTED" });
+    expect(report.annual[0]).toMatchObject({ legacy_id: null, result: "IGNORED" });
+  });
+
+  it("mesmo código no mapa explícito com clientes diferentes fica ambíguo", async () => {
+    const report = await simulateFiscalHistoryImport(
+      exportFile({
+        client_map: [
+          { legacy_code: 102, client_id: beta },
+          { legacy_code: 102, client_id: alfa },
+        ],
+        monthly: [exportFile().monthly[1]],
+        annual: [],
+      }),
+      { organizationId: org },
+      reader(),
+    );
+    expect(report.monthly[0]).toMatchObject({ result: "AMBIGUOUS", client_id: null });
+    expect(report.monthly[0].reason).toMatch(/2 clientes para o código 102/);
+  });
+
+  it("o leitor do Postgres só emite SELECT", async () => {
+    const statements: string[] = [];
+    const db = {
+      query: vi.fn(async (text: string) => {
+        statements.push(text.trim().toLowerCase());
+        return { rows: [] };
+      }),
+    };
+    await simulateFiscalHistoryImport(
+      exportFile(),
+      { organizationId: org },
+      createPgHistoryReader(db),
+    );
+    expect(statements.length).toBeGreaterThan(0);
+    for (const statement of statements) expect(statement.startsWith("select")).toBe(true);
   });
 });

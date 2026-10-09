@@ -11,10 +11,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
 
-import {
-  type FiscalHistoryExport,
-  simulateFiscalHistoryImport,
-} from "./fiscalHistorySimulation.js";
+import { simulateFiscalHistoryImport } from "./fiscalHistorySimulation.js";
 import { createPgHistoryReader, type HistoryQueryable } from "./pgHistoryReader.js";
 
 type PgClient = HistoryQueryable & { connect(): Promise<void>; end(): Promise<void> };
@@ -36,7 +33,8 @@ if (!databaseUrl) {
   process.exit(2);
 }
 
-const file = JSON.parse(readFileSync(values.file, "utf8")) as FiscalHistoryExport;
+// Estrutura validada pela simulação (Zod); linha malformada sai como ignorada.
+const file: unknown = JSON.parse(readFileSync(values.file, "utf8"));
 const require = createRequire(import.meta.url);
 const { Client } = require("pg") as { Client: new (options: object) => PgClient };
 const client = new Client({ connectionString: databaseUrl });
