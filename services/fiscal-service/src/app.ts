@@ -18,6 +18,10 @@ import { SupabaseMalhaAttachmentStorage } from "./integrations/malhaAttachmentSt
 import prismaClient from "./integrations/prisma.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
+import {
+  type ClientWholesaleRouteDeps,
+  createClientWholesaleRoutes,
+} from "./routes/clientWholesale.routes.js";
 import { createFiscalRateRoutes, type FiscalRateRouteDeps } from "./routes/fiscalRate.routes.js";
 import {
   createFiscalSearchRoutes,
@@ -33,6 +37,7 @@ import {
 } from "./routes/monthlyRevenue.routes.js";
 import { createNcmRoutes, type NcmRouteDeps } from "./routes/ncm.routes.js";
 import { createSimplesRateRoutes, type SimplesRateRouteDeps } from "./routes/simplesRate.routes.js";
+import { ClientWholesaleService } from "./services/clientWholesaleService.js";
 import { FiscalRateService } from "./services/fiscalRateService.js";
 import { FiscalSearchService } from "./services/fiscalSearchService.js";
 import { IcmsService } from "./services/icmsService.js";
@@ -66,6 +71,7 @@ export function createFiscalApp(options: {
   fiscalRateRouteDeps?: FiscalRateRouteDeps;
   monthlyRevenueRouteDeps?: MonthlyRevenueRouteDeps;
   malhaRouteDeps?: MalhaRouteDeps;
+  clientWholesaleRouteDeps?: ClientWholesaleRouteDeps;
   simplesRateRouteDeps?: SimplesRateRouteDeps;
   icmsRouteDeps?: IcmsRouteDeps;
   ipiRouteDeps?: IpiRouteDeps;
@@ -90,6 +96,8 @@ export function createFiscalApp(options: {
           )
         : undefined,
     );
+  const clientWholesaleRouteDeps =
+    options.clientWholesaleRouteDeps ?? new ClientWholesaleService(prismaClient, { createLog });
   const simplesRateRouteDeps = options.simplesRateRouteDeps ?? new SimplesRateService(prismaClient);
   const icmsRouteDeps =
     options.icmsRouteDeps ?? new IcmsService(prismaClient, { createLog, logUpdateIfChanged });
@@ -123,6 +131,7 @@ export function createFiscalApp(options: {
   app.use("/fiscal", createFiscalRateRoutes(fiscalRateRouteDeps));
   app.use("/fiscal", createMonthlyRevenueRoutes(monthlyRevenueRouteDeps));
   app.use("/fiscal", createMalhaRoutes(malhaRouteDeps));
+  app.use("/fiscal", createClientWholesaleRoutes(clientWholesaleRouteDeps));
   app.use("/fiscal", createSimplesRateRoutes(simplesRateRouteDeps));
   app.use(
     "/internal",

@@ -1784,6 +1784,21 @@ model FiscalMalhaHistory {
   @@map("fiscal.malha_history")
 }
 
+model FiscalClientWholesaleHistory {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  sequence        Int
+  previous_value  Boolean
+  new_value       Boolean
+  actor_user_id   String
+  created_at      DateTime @default(now())
+
+  @@unique([client_id, sequence], map: "uq_fiscal_client_wholesale_history_client_sequence")
+  @@index([organization_id, client_id, sequence], map: "idx_fiscal_client_wholesale_history_org_client_seq")
+  @@map("fiscal.client_wholesale_history")
+}
+
 model Ipi {
   id              String       @id @default(uuid())
   ncm             String

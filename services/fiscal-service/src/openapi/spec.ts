@@ -8,6 +8,12 @@ const competencePattern = "^[0-9]{4}-(0[1-9]|1[0-2])$";
 const successContent = {
   "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
 };
+const clientIdParameter = {
+  name: "client_id",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+};
 const malhaIdParameter = {
   name: "id",
   in: "path",
@@ -146,6 +152,10 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
         name: "Malhas",
         description:
           "Malhas fiscais por cliente com prazo, situação, responsável, anexo e histórico",
+      },
+      {
+        name: "Atacadista",
+        description: "Condição de atacadista do cliente com histórico; uso informativo",
       },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
@@ -1233,6 +1243,49 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
             },
             "404": { description: "Malha ou anexo não encontrado nesta organização" },
             "503": { description: "Storage de anexos não configurado" },
+          },
+        },
+      },
+      "/fiscal/clients/{client_id}/wholesale": {
+        get: {
+          tags: ["Atacadista"],
+          summary: "Consultar condição de atacadista do cliente e histórico",
+          description:
+            "Sem histórico o cliente não é atacadista. Histórico do mais recente para o mais antigo, com ator, momento, anterior e novo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [clientIdParameter],
+          responses: {
+            "200": { description: "Valor atual e histórico", content: successContent },
+            "400": { description: "Cliente inválido" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+          },
+        },
+        put: {
+          tags: ["Atacadista"],
+          summary: "Marcar ou desmarcar o cliente como atacadista",
+          description:
+            "Grava uma linha de histórico só quando o valor muda. A marcação é informativa e não dispara cálculo de antecipação.",
+          security: [{ bearerAuth: [] }],
+          parameters: [clientIdParameter],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["is_wholesale"],
+                  additionalProperties: false,
+                  properties: { is_wholesale: { type: "boolean" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Valor atual e histórico", content: successContent },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+            "409": { description: "Alteração simultânea; recarregue e tente de novo" },
           },
         },
       },
