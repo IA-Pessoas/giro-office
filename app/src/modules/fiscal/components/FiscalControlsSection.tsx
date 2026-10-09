@@ -38,7 +38,22 @@ const STATUSES = Object.keys(FISCAL_CONTROL_STATUS_LABELS) as FiscalControlStatu
 const REASON_MESSAGE = "Informe o motivo com pelo menos 3 caracteres.";
 
 /** Mudança que pede motivo e nível 3: reabrir ou concluir com pendência na Triagem. */
-type Reopen = {
+const AUTHORIZATION_COPY = {
+  reopen: {
+    title: "Reabrir controle concluído",
+    label: "Motivo da reabertura",
+    submit: "Reabrir",
+    forbidden: "Reabrir controle concluído exige Fiscal nível 3.",
+  },
+  complete: {
+    title: "Concluir com pendência na Triagem",
+    label: "Justificativa da conclusão",
+    submit: "Concluir",
+    forbidden: "Há documentos pendentes na Triagem: concluir exige Fiscal nível 3 e justificativa.",
+  },
+} as const;
+
+type Authorization = {
   control: FiscalMonthlyControl;
   status: FiscalControlStatus;
   kind: "reopen" | "complete";
@@ -56,11 +71,11 @@ export function FiscalControlsSection({
   const [openingForm, setOpeningForm] = useState(false);
   const [client, setClient] = useState<ClientPickerOption | null>(null);
   const [openingReason, setOpeningReason] = useState("");
-  const [reopen, setReopen] = useState<Reopen | null>(null);
-  const [reopenReason, setReopenReason] = useState("");
+  const [authorization, setAuthorization] = useState<Authorization | null>(null);
+  const [authorizationReason, setAuthorizationReason] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [openingError, setOpeningError] = useState<string | null>(null);
-  const [reopenError, setReopenError] = useState<string | null>(null);
+  const [authorizationError, setAuthorizationError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const validCompetence = isCompetence(competence);
   const list = useFetch(
@@ -102,30 +117,26 @@ export function FiscalControlsSection({
     const kind = control.status === "COMPLETED" ? "reopen" : "complete";
     if (change === "direct") update.mutate({ id: control.id, payload: { status } });
     if (change === "forbidden") {
-      toast.error(
-        kind === "reopen"
-          ? "Reabrir controle concluído exige Fiscal nível 3."
-          : "Há documentos pendentes na Triagem: concluir exige Fiscal nível 3 e justificativa.",
-      );
+      toast.error(AUTHORIZATION_COPY[kind].forbidden);
     }
     if (change === "reason") {
-      setReopen({ control, status, kind });
-      setReopenReason("");
-      setReopenError(null);
+      setAuthorization({ control, status, kind });
+      setAuthorizationReason("");
+      setAuthorizationError(null);
     }
   }
 
-  async function confirmReopen(event: FormEvent<HTMLFormElement>) {
+  async function confirmAuthorization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!reopen) return;
-    const reason = reopenReason.trim();
+    if (!authorization) return;
+    const reason = authorizationReason.trim();
     if (reason.length < 3) {
-      setReopenError(REASON_MESSAGE);
+      setAuthorizationError(REASON_MESSAGE);
       return;
     }
     try {
-      await update.mutateAsync({ id: reopen.control.id, payload: { status: reopen.status, reason } });
-      setReopen(null);
+      await update.mutateAsync({ id: authorization.control.id, payload: { status: authorization.status, reason } });
+      setAuthorization(null);
     } catch {
       // Toast já mostrou o motivo; o diálogo fica aberto para nova tentativa.
     }
@@ -279,28 +290,28 @@ export function FiscalControlsSection({
       ) : null}
 
       <Dialog
-        open={Boolean(reopen)}
-        onOpenChange={(value) => { if (!value) setReopen(null); }}
-        title={reopen?.kind === "complete" ? "Concluir com pendência na Triagem" : "Reabrir controle concluído"}
+        open={Boolean(authorization)}
+        onOpenChange={(value) => { if (!value) setAuthorization(null); }}
+        title={AUTHORIZATION_COPY[authorization?.kind ?? "reopen"].title}
         description={
-          reopen?.kind === "complete"
-            ? `${reopen.control.client_name}: ${formatTriagePending(reopen.control.triage_pending).toLowerCase()} na Triagem. A conclusão fica registrada como excepcional, com a sua justificativa; a Triagem não muda.`
-            : reopen
-              ? `${reopen.control.client_name}: Concluído → ${FISCAL_CONTROL_STATUS_LABELS[reopen.status]}. O motivo fica registrado na trilha.`
+          authorization?.kind === "complete"
+            ? `${authorization.control.client_name}: ${formatTriagePending(authorization.control.triage_pending).toLowerCase()} na Triagem. A conclusão fica registrada como excepcional, com a sua justificativa; a Triagem não muda.`
+            : authorization
+              ? `${authorization.control.client_name}: Concluído → ${FISCAL_CONTROL_STATUS_LABELS[authorization.status]}. O motivo fica registrado na trilha.`
               : ""
         }
         preventClose={update.isPending}
         contentClassName="!w-[min(92vw,440px)]"
       >
-        <form noValidate onSubmit={(event) => void confirmReopen(event)} className="grid gap-3">
+        <form noValidate onSubmit={(event) => void confirmAuthorization(event)} className="grid gap-3">
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-            {reopen?.kind === "complete" ? "Justificativa da conclusão" : "Motivo da reabertura"}
-            <textarea rows={3} maxLength={500} autoFocus value={reopenReason} onChange={(event) => setReopenReason(event.target.value)} aria-invalid={reopenError ? true : undefined} aria-describedby={reopenError ? "fiscal-control-reopen-error" : undefined} className={FISCAL_TEXTAREA_CLASSNAME} />
-            {reopenError ? <span id="fiscal-control-reopen-error" role="alert" className={FISCAL_FIELD_ERROR_CLASSNAME}>{reopenError}</span> : null}
+            {AUTHORIZATION_COPY[authorization?.kind ?? "reopen"].label}
+            <textarea rows={3} maxLength={500} autoFocus value={authorizationReason} onChange={(event) => setAuthorizationReason(event.target.value)} aria-invalid={authorizationError ? true : undefined} aria-describedby={authorizationError ? "fiscal-control-authorization-error" : undefined} className={FISCAL_TEXTAREA_CLASSNAME} />
+            {authorizationError ? <span id="fiscal-control-authorization-error" role="alert" className={FISCAL_FIELD_ERROR_CLASSNAME}>{authorizationError}</span> : null}
           </label>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setReopen(null)} disabled={update.isPending} className={FISCAL_CANCEL_BUTTON_CLASSNAME}>Cancelar</button>
-            <button type="submit" disabled={update.isPending} className={FISCAL_PRIMARY_BUTTON_CLASSNAME}>{update.isPending ? "Salvando..." : reopen?.kind === "complete" ? "Concluir" : "Reabrir"}</button>
+            <button type="button" onClick={() => setAuthorization(null)} disabled={update.isPending} className={FISCAL_CANCEL_BUTTON_CLASSNAME}>Cancelar</button>
+            <button type="submit" disabled={update.isPending} className={FISCAL_PRIMARY_BUTTON_CLASSNAME}>{update.isPending ? "Salvando..." : AUTHORIZATION_COPY[authorization?.kind ?? "reopen"].submit}</button>
           </div>
         </form>
       </Dialog>

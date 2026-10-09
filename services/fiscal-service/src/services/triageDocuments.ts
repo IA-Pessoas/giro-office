@@ -1,17 +1,19 @@
+import {
+  TRIAGE_DOCUMENT_STATUSES,
+  TRIAGE_FISCAL_CHECKLIST_FIELDS,
+  TRIAGE_PENDING_DOCUMENT_STATUSES,
+} from "@workspace/shared";
+
 /**
  * Leitura do estado documental da Triagem Fiscal para o controle mensal. Só lê: o
  * recebimento continua sendo da Triagem (contabil-service) e concluir o Fiscal não o altera.
  *
- * Mesma noção de pendência do resumo da Triagem: PENDING aguarda o documento e
- * ATTENTION/UNDER_REVIEW aguardam conferência. NOT_PRESENT e NOT_APPLICABLE não pendem.
+ * Pendência e campos vêm do shared, os mesmos da Triagem (TRIAGE_PENDING_DOCUMENT_STATUSES).
  */
-const TRIAGE_PENDING_STATUSES = new Set(["PENDING", "ATTENTION", "UNDER_REVIEW"]);
-const TRIAGE_STATUSES = new Set([
-  ...TRIAGE_PENDING_STATUSES,
-  "COMPLETED",
-  "NOT_PRESENT",
-  "NOT_APPLICABLE",
-]);
+const PENDING = new Set<string>(TRIAGE_PENDING_DOCUMENT_STATUSES);
+const STATUSES = new Set<string>(TRIAGE_DOCUMENT_STATUSES);
+// Só os itens da rotina fiscal, como a própria Triagem lê o checklist.
+const FISCAL_FIELDS = new Set<string>(TRIAGE_FISCAL_CHECKLIST_FIELDS);
 
 export type TriageDocumentsSource = "MONTHLY" | "PLANNED" | "NONE";
 
@@ -38,9 +40,13 @@ function plannedFields(configurationSnapshot: unknown): string[] {
   const activeItems = asRecord(fiscal).active_items;
   if (!Array.isArray(activeItems)) return [];
   return activeItems.flatMap((item) => {
-    if (typeof item === "string") return [item];
+    if (typeof item === "string") return FISCAL_FIELDS.has(item) ? [item] : [];
     const record = asRecord(item);
-    return typeof record.field === "string" && record.required !== false ? [record.field] : [];
+    return typeof record.field === "string" &&
+      FISCAL_FIELDS.has(record.field) &&
+      record.required !== false
+      ? [record.field]
+      : [];
   });
 }
 
@@ -50,11 +56,13 @@ export function triageDocumentsView(
 ): TriageDocumentsView {
   if (monthly) {
     const items = Object.entries(asRecord(monthly.checklist)).flatMap(([field, status]) =>
-      typeof status === "string" && TRIAGE_STATUSES.has(status) ? [{ field, status }] : [],
+      FISCAL_FIELDS.has(field) && typeof status === "string" && STATUSES.has(status)
+        ? [{ field, status }]
+        : [],
     );
     return {
       source: "MONTHLY",
-      pending: items.filter((item) => TRIAGE_PENDING_STATUSES.has(item.status)).length,
+      pending: items.filter((item) => PENDING.has(item.status)).length,
       items,
     };
   }
