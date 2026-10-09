@@ -344,3 +344,39 @@ await runTest("fiscal Simples batch parses pasted documents and exports CSV for 
   assert.match(batch, /nenhum arquivo gerado/);
   assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });
+
+await runTest("fiscal malhas formats dates, periods and history values", async () => {
+  const { formatMalhaDate, formatMalhaHistoryValue, formatMalhaPeriod } = await import(
+    "./utils/fiscalMalha.ts"
+  );
+  assert.equal(formatMalhaDate("2026-11-10"), "10/11/2026");
+  assert.equal(formatMalhaDate(null), "Sem prazo");
+  assert.equal(formatMalhaPeriod("2025-01", "2025-12"), "01/2025 a 12/2025");
+  assert.equal(formatMalhaPeriod("2025-03", "2025-03"), "03/2025");
+  const names = (id) => (id === "u1" ? "Ana" : undefined);
+  assert.equal(formatMalhaHistoryValue("status", "aguardando_cliente", names), "Aguardando cliente");
+  assert.equal(formatMalhaHistoryValue("responsible_id", "u1", names), "Ana");
+  assert.equal(formatMalhaHistoryValue("responsible_id", "u2", names), "Usuário sem acesso atual");
+  assert.equal(formatMalhaHistoryValue("responsible_id", null, names), "Nenhum");
+  assert.equal(formatMalhaHistoryValue("deadline", null, names), "Sem prazo");
+});
+
+await runTest("fiscal malhas tab gates edits, keeps states and refreshes history", async () => {
+  const section = await readSource("./components/FiscalMalhasSection.tsx");
+  const client = await readSource("./services/fiscalMalhaService.ts");
+  const queryKeys = await readSource("./hooks/queryKeys.ts");
+  assert.match(fiscalSources.shell, /<FiscalMalhasSection canEdit=\{canEdit\} \/>/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando malhas"/);
+  assert.match(section, /list\.error \? \(\s*<div role="alert">/);
+  assert.match(section, /Nenhuma malha encontrada/);
+  assert.match(section, /id="fiscal-malha-form-error" role="alert"/);
+  // Nível 1 consulta e vê histórico; formulário, edição e anexo só com edição Fiscal.
+  assert.match(section, /\{client && canEdit \? \(\s*<form/);
+  assert.match(section, /\{canEdit \? \(\s*<>\s*<button type="button" onClick=\{\(\) => startEditing\(item\)\}/);
+  assert.match(section, /useAssignableUsers\(\{ enabled: Boolean\(client\), module: "fiscal" \}\)/);
+  // Salvar ou anexar invalida o prefixo que também cobre o histórico aberto.
+  assert.match(queryKeys, /\[\.\.\.fiscalMalhasQueryKey\(clientId\), "detail", malhaId\]/);
+  assert.match(section, /invalidateQueries\(\{ queryKey: fiscalMalhasQueryKey\(clientId\) \}\)/);
+  assert.match(client, /form\.append\("file", file\)/);
+  assert.match(section, /window\.open\(await fiscalMalhaService\.attachmentUrl\(id\), "_blank", "noopener,noreferrer"\)/);
+});
