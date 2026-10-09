@@ -168,3 +168,46 @@ describe("POST /fiscal/conferences/sefaz-xml", () => {
       .expect(400);
   });
 });
+
+describe("POST /fiscal/conferences/sped-xml", () => {
+  const app = createFiscalApp({ env, logger });
+  const nfe = `<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd><CFOP>5102</CFOP><qCom>1</qCom><vProd>10.00</vProd></prod></det><total><ICMSTot><vNF>10.00</vNF></ICMSTot></total></infNFe></NFe>`;
+  const sped = [
+    "|0000|017|0|01082026|31082026|EMPRESA|11222333000181||SP|",
+    "|C100|0|0||55|00|1|100||01082026|01082026|10,00|",
+    "|C170|1|A||1|UN|10,00|0|0|000|5102|",
+  ].join("\n");
+  const conference = {
+    sped: { file_name: "sped.txt", content: sped },
+    xml: {
+      file_name: "xml.zip",
+      zip_base64: createZip([{ fileName: "a.xml", body: Buffer.from(nfe) }]).toString("base64"),
+    },
+  };
+
+  it("exige nível 2 e devolve documentos e itens conferidos", async () => {
+    await request(app)
+      .post("/fiscal/conferences/sped-xml")
+      .set(headers(1))
+      .send(conference)
+      .expect(403);
+    const response = await request(app)
+      .post("/fiscal/conferences/sped-xml")
+      .set(headers(2))
+      .send(conference)
+      .expect(200);
+    expect(response.body.data).toMatchObject({
+      status: "complete",
+      summary: { matched: 1, items_matched: 1 },
+      file_name: "conferencia-sped-xml.csv",
+    });
+  });
+
+  it("recusa arquivo sem C100", async () => {
+    await request(app)
+      .post("/fiscal/conferences/sped-xml")
+      .set(headers(2))
+      .send({ ...conference, sped: { file_name: "x.txt", content: "|0000|017|" } })
+      .expect(400);
+  });
+});

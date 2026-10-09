@@ -6,6 +6,7 @@ import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/is
 import {
   documentConferenceBodySchema,
   sefazXmlConferenceBodySchema,
+  spedConferenceBodySchema,
   xmlSelectionBodySchema,
 } from "../schemas/documentConference.schemas.js";
 import {
@@ -16,6 +17,7 @@ import {
   compareSefazWithXml,
   sefazXmlConferenceCsvExport,
 } from "../services/sefazXmlConferenceService.js";
+import { compareSpedWithXml, spedConferenceCsvExport } from "../services/spedConferenceService.js";
 import { selectXmlFromZip } from "../services/xmlSelectionService.js";
 
 /**
@@ -72,6 +74,23 @@ export function createDocumentConferenceRoutes(): ReturnType<typeof Router> {
         res.json(createSuccessResponse({ ...result, ...sefazXmlConferenceCsvExport(result) }));
       } catch (err) {
         logError("Erro ao conferir CSV SEFAZ contra XML", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/conferences/sped-xml",
+    express.json({ limit: "1mb" }),
+    isAuthenticated,
+    requireFiscalWritePermission,
+    (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(spedConferenceBodySchema, req.body);
+        const result = compareSpedWithXml(body);
+        res.json(createSuccessResponse({ ...result, ...spedConferenceCsvExport(result) }));
+      } catch (err) {
+        logError("Erro ao conferir SPED C100/C170 contra XML", { err });
         next(err);
       }
     },

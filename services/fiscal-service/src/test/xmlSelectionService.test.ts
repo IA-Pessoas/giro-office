@@ -46,6 +46,7 @@ describe("parseNfeXml", () => {
       content: expect.stringContaining("<nNF>100</nNF>"),
       value: "10.00",
       protocol_status: null,
+      items: [],
       kind: "nfe",
       access_key: accessKey(ISSUER_A, "1", "100"),
       issuer: ISSUER_A,

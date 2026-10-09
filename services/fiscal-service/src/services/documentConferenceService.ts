@@ -426,7 +426,7 @@ export function compareDocumentSpreadsheets(input: {
 }
 
 const DELIMITER = ";";
-const brl = (value: string | null | undefined) => (value ? value.replace(".", ",") : "");
+export const brl = (value: string | null | undefined) => (value ? value.replace(".", ",") : "");
 
 /** CSV do resultado: uma linha por item conferido, descarte ou erro, com a situação. */
 export function documentConferenceCsvExport(result: DocumentConferenceResult) {

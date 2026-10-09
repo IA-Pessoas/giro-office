@@ -1162,6 +1162,57 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/conferences/sped-xml": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Conferir SPED C100/C170 contra XML NF-e",
+          description:
+            "Recebe o arquivo SPED EFD ICMS/IPI (texto |REG|...|, até 300 mil caracteres; usa 0000, 0150, C100 e C170) e um ZIP de XML NF-e (base64, até ~450 kB). Cada C170 pertence ao C100 anterior; C170 fora de um C100 é erro e nunca vai para outro documento. C100 × NF-e pela chave de acesso ou por emitente (0000/0150) + modelo + série + número; itens C170 × det pelo número do item dentro da mesma nota (código e CFOP só na emissão própria). Devolve documentos matched/divergent (com a comparação de itens), only_sped, only_xml, duplicates, not_comparable (COD_SIT cancelado/denegado/inutilizado, modelo sem NF-e ou protocolo não autorizado), errors de leiaute por linha e descartes, totais e o CSV (campo csv). Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["sped", "xml"],
+                  additionalProperties: false,
+                  properties: {
+                    sped: {
+                      type: "object",
+                      required: ["file_name", "content"],
+                      additionalProperties: false,
+                      properties: {
+                        file_name: { type: "string", minLength: 1, maxLength: 255 },
+                        content: { type: "string", minLength: 1, maxLength: 300_000 },
+                      },
+                    },
+                    xml: {
+                      type: "object",
+                      required: ["file_name", "zip_base64"],
+                      additionalProperties: false,
+                      properties: {
+                        file_name: { type: "string", minLength: 1, maxLength: 255 },
+                        zip_base64: { type: "string", minLength: 1, maxLength: 600_000 },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Resultado da conferência SPED × XML com file_name e csv",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida, arquivo sem C100 ou ZIP ilegível" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
       "/fiscal/revenues/{id}": {
         put: {
           tags: ["Receitas"],

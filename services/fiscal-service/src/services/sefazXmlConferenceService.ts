@@ -1,6 +1,7 @@
 import { csvLine } from "@workspace/shared";
 
 import {
+  brl,
   type ConferenceDocumentRow,
   type ConferenceSourceInput,
   formatCents,
@@ -11,7 +12,7 @@ import {
   type SpreadsheetInfo,
   totalOf,
 } from "./documentConferenceService.js";
-import { type NfeFile, readNfeArchive } from "./nfeXml.js";
+import { dropIdenticalCopies, type NfeFile, readNfeArchive } from "./nfeXml.js";
 
 /**
  * Conferência CSV SEFAZ × XML NF-e (FIS-10): confronta a planilha da SEFAZ com os XML de um ZIP,
@@ -111,19 +112,7 @@ export function compareSefazWithXml(input: {
 }): SefazXmlConferenceResult {
   const sefaz = parseNoteSpreadsheet("sefaz", "SEFAZ", input.sefaz);
   const archive = readNfeArchive(input.xml.zip_base64);
-  // Cópia idêntica da mesma nota (mesma infNFe, com ou sem protocolo) não é duplicata: fica a
-  // primeira e as demais são relatadas como descarte.
-  const copies: { entry: string; reason: string }[] = [];
-  const notes = archive.notes.filter((note, index) => {
-    const first = archive.notes.find(
-      (other) => other.identity === note.identity && other.content === note.content,
-    );
-    if (first && archive.notes.indexOf(first) !== index) {
-      copies.push({ entry: note.entry, reason: `Cópia idêntica de ${first.entry}.` });
-      return false;
-    }
-    return true;
-  });
+  const { notes, copies } = dropIdenticalCopies(archive.notes);
   const xmlRows = notes.map(xmlRow);
   const xmlCents = notes.map((note) => (note.value ? parseCents(note.value) : null));
 
@@ -240,7 +229,6 @@ export function compareSefazWithXml(input: {
   };
 }
 
-const brl = (value: string | null | undefined) => (value ? value.replace(".", ",") : "");
 const joined = (values: (string | number)[]) => values.join(" | ");
 
 /** CSV do resultado: uma linha por identidade conferida, descarte ou erro, com a situação. */
