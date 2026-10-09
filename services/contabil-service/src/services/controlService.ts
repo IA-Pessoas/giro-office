@@ -46,6 +46,8 @@ export interface ControlPortfolio {
   items: Array<{
     client_id: string;
     legal_name: string;
+    cpf_cnpj: string;
+    regime: string | null;
     control: ControlContabilEntity | null;
     closing: Record<string, unknown>;
   }>;
@@ -163,6 +165,8 @@ export class ControlService {
           id: true,
           name: true,
           company_name: true,
+          cpf_cnpj: true,
+          regime: true,
           controlContabil: {
             where: { competence, organization_id: organizationId, archived_at: null },
             orderBy: { id: "asc" },
@@ -180,6 +184,8 @@ export class ControlService {
         .map((client) => ({
           client_id: client.id,
           legal_name: client.company_name?.trim() || client.name,
+          cpf_cnpj: client.cpf_cnpj,
+          regime: client.regime,
           control: client.controlContabil[0] ?? null,
           closing: client.triageClosings?.[0] ?? {
             client_id: client.id,
