@@ -10,7 +10,8 @@ export type FiscalTabId =
   | "rates"
   | "revenues"
   | "malhas"
-  | "wholesale";
+  | "wholesale"
+  | "conferences";
 
 export interface FiscalNcm {
   id: string;

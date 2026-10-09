@@ -26,6 +26,7 @@ import {
   type ClientWholesaleRouteDeps,
   createClientWholesaleRoutes,
 } from "./routes/clientWholesale.routes.js";
+import { createDocumentConferenceRoutes } from "./routes/documentConference.routes.js";
 import { createFiscalRateRoutes, type FiscalRateRouteDeps } from "./routes/fiscalRate.routes.js";
 import {
   createFiscalSearchRoutes,
@@ -134,8 +135,10 @@ export function createFiscalApp(options: {
 
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "fiscal-service")));
-  app.use(express.json());
   app.use(requestContext);
+  // Antes do parser global: a conferência recebe planilhas maiores que o limite padrão.
+  app.use("/fiscal", createDocumentConferenceRoutes());
+  app.use(express.json());
 
   app.get("/health", (_req, res) => {
     res.status(200).json(createSuccessResponse({ status: "ok", service: "fiscal-service" }));
