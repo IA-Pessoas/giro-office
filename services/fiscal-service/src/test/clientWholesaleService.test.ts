@@ -106,11 +106,30 @@ describe("ClientWholesaleService", () => {
     expect(prisma.fiscalClientWholesaleHistory.create).not.toHaveBeenCalled();
   });
 
-  it("alteração simultânea vira 409 pela sequência única", async () => {
-    const { prisma, service } = dependencies();
-    prisma.fiscalClientWholesaleHistory.create.mockRejectedValueOnce({ code: "P2002" });
-    await expect(service.set({ ...actor, clientId, isWholesale: true })).rejects.toMatchObject({
-      statusCode: 409,
+  it("alteração simultânea em sentido oposto vira 409; no mesmo sentido devolve o estado", async () => {
+    const opposite = dependencies();
+    opposite.prisma.fiscalClientWholesaleHistory.create.mockRejectedValueOnce({ code: "P2002" });
+    await expect(
+      opposite.service.set({ ...actor, clientId, isWholesale: true }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    // A outra requisição gravou true primeiro; este pedido também queria true.
+    const rows: Row[] = [];
+    const same = dependencies(rows);
+    same.prisma.fiscalClientWholesaleHistory.create.mockImplementationOnce(async () => {
+      rows.push({
+        organization_id: organizationId,
+        client_id: clientId,
+        sequence: 1,
+        previous_value: false,
+        new_value: true,
+        actor_user_id: "outro",
+        created_at: new Date("2026-10-09T12:00:00.000Z"),
+      });
+      throw { code: "P2002" };
     });
+    const result = await same.service.set({ ...actor, clientId, isWholesale: true });
+    expect(result).toMatchObject({ is_wholesale: true, updated_by: "outro" });
+    expect(same.audit.createLog).not.toHaveBeenCalled();
   });
 });

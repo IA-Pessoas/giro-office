@@ -8,6 +8,7 @@ export interface FiscalClientWholesale {
   updated_at: string | null;
   updated_by: string | null;
   history: Array<{
+    sequence: number;
     previous_value: boolean;
     new_value: boolean;
     actor_user_id: string;

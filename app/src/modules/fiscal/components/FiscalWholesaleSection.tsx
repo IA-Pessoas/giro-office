@@ -19,7 +19,7 @@ export function FiscalWholesaleSection({ canEdit }: { canEdit: boolean }) {
   const queryClient = useQueryClient();
   const clientId = client?.id ?? "";
   const users = useAssignableUsers({ enabled: Boolean(client), module: "fiscal" });
-  const userName = (id: string) => users.data?.find((user) => user.id === id)?.name ?? "Usuário";
+  const userName = (id: string) => users.data?.find((user) => user.id === id)?.name ?? "Usuário sem acesso atual";
   const state = useFetch(fiscalWholesaleQueryKey(clientId), () => fiscalWholesaleService.get(clientId), {
     enabled: Boolean(client),
   });
@@ -88,7 +88,7 @@ export function FiscalWholesaleSection({ canEdit }: { canEdit: boolean }) {
                 ) : (
                   <ul className="space-y-1 text-sm text-gray-800 dark:text-gray-200">
                     {state.data.history.map((entry) => (
-                      <li key={`${entry.created_at}-${entry.new_value}`}>
+                      <li key={entry.sequence}>
                         {new Date(entry.created_at).toLocaleString("pt-BR")} · {userName(entry.actor_user_id)}: {wholesaleLabel(entry.previous_value)} → {wholesaleLabel(entry.new_value)}
                       </li>
                     ))}

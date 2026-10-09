@@ -2,6 +2,7 @@ import { ServiceError } from "@workspace/shared/http";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
+import { isUniqueViolation } from "./monthlyRevenueService.js";
 
 // Sem imports Node no topo: o Worker fiscal reaproveita este serviço como está.
 
@@ -17,6 +18,7 @@ export interface ClientWholesaleDto {
   updated_at: string | null;
   updated_by: string | null;
   history: Array<{
+    sequence: number;
     previous_value: boolean;
     new_value: boolean;
     actor_user_id: string;
@@ -56,6 +58,7 @@ export class ClientWholesaleService {
       updated_at: last?.created_at.toISOString() ?? null,
       updated_by: last?.actor_user_id ?? null,
       history: history.map((row) => ({
+        sequence: row.sequence,
         previous_value: row.previous_value,
         new_value: row.new_value,
         actor_user_id: row.actor_user_id,
@@ -93,11 +96,12 @@ export class ClientWholesaleService {
         },
       });
     } catch (error) {
-      // Sequência única por cliente: outra alteração gravou primeiro.
-      if ((error as { code?: unknown } | null)?.code === "P2002") {
-        throw new ServiceError(409, CONFLICT_MESSAGE);
-      }
-      throw error;
+      if (!isUniqueViolation(error)) throw error;
+      // Sequência única por cliente: outra alteração gravou primeiro. Se ela deixou o valor
+      // que este pedido queria, não há conflito real.
+      const latest = await this.get(input.clientId, input.organizationId);
+      if (latest.is_wholesale === input.isWholesale) return latest;
+      throw new ServiceError(409, CONFLICT_MESSAGE);
     }
 
     await this.audit.createLog({
