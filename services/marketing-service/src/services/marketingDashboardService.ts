@@ -12,6 +12,11 @@ interface BirthdayAggregate {
 const EMPTY_BIRTHDAYS: BirthdayAggregate = { total: 0, items: [] };
 const CLOSED_REQUEST_STATUSES = ["Resolved", "Closed"] as const;
 
+function startOfTodayUtc(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
 export function getCurrentMarketingCompetence(now: Date, timeZone: string): Date {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -88,7 +93,7 @@ export class MarketingDashboardService {
           INNER JOIN "regularize.partners" AS partner
             ON partner.pf_id = person.id
             AND partner.organization_id = ${organizationId}
-            AND partner.exit IS NULL
+            AND (partner.exit IS NULL OR partner.exit >= ${startOfTodayUtc()})
           INNER JOIN clients AS company
             ON company.id = partner.pj_id
             AND company.organization_id = ${organizationId}

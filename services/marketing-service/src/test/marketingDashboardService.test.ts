@@ -129,18 +129,25 @@ describe("MarketingDashboardService", () => {
       $transaction: vi.fn(async (operations: Promise<unknown>[]) => Promise.all(operations)),
     };
 
-    await new MarketingDashboardService(prisma as never).getDashboard(organizationId, "2024-02");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-24T12:00:00.000Z"));
+    try {
+      await new MarketingDashboardService(prisma as never).getDashboard(organizationId, "2024-02");
+    } finally {
+      vi.useRealTimers();
+    }
 
     const clientQuery = prisma.$queryRaw.mock.calls[0]?.[0]?.join("?") ?? "";
     const employeeQuery = prisma.$queryRaw.mock.calls[1]?.[0]?.join("?") ?? "";
     expect(clientQuery).toContain('"regularize.partners"');
-    expect(clientQuery).toContain("partner.exit IS NULL");
+    expect(clientQuery).toContain("(partner.exit IS NULL OR partner.exit >= ?)");
     expect(clientQuery).toContain("company.status = 'Ativo'");
     expect(clientQuery).toContain("EXTRACT(MONTH FROM person.date_of_birth) = ?");
     expect(clientQuery).not.toContain("EXTRACT(DAY FROM person.date_of_birth) >=");
     expect(employeeQuery).toContain("department.name");
     expect(employeeQuery).not.toContain("EXTRACT(DAY FROM employee.birth_date) >=");
     expect(prisma.$queryRaw.mock.calls[0]?.slice(1)).toContain(2);
+    expect(prisma.$queryRaw.mock.calls[0]?.slice(1)).toContainEqual(new Date("2026-09-24T00:00:00.000Z"));
     expect(prisma.$queryRaw.mock.calls[1]?.slice(1)).toContain(2);
   });
 });
