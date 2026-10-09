@@ -865,6 +865,121 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/monthly-controls/{id}/obligations": {
+        get: {
+          tags: ["Controle mensal"],
+          summary: "Listar obrigações do controle",
+          description:
+            "Garante antes as obrigações sugeridas pelo catálogo para o regime registrado no controle (sem duplicar) e devolve também as que podem ser incluídas. Pendências não alteram a situação do controle.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Obrigações com situação, fonte oficial e catálogo incluível",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "404": { description: "Controle não encontrado nesta organização" },
+          },
+        },
+        post: {
+          tags: ["Controle mensal"],
+          summary: "Incluir obrigação do catálogo no controle",
+          description:
+            "Obrigação condicional (ex.: DIRBI) exige motivo. Controle concluído não muda.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["code"],
+                  additionalProperties: false,
+                  properties: {
+                    code: {
+                      type: "string",
+                      enum: ["PGDAS_D", "DCTFWEB", "EFD_CONTRIBUICOES", "DIRBI"],
+                    },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Obrigação incluída",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou condicional sem motivo" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Controle não encontrado nesta organização" },
+            "409": { description: "Obrigação já incluída ou controle concluído" },
+          },
+        },
+      },
+      "/fiscal/monthly-controls/{id}/obligations/{code}": {
+        patch: {
+          tags: ["Controle mensal"],
+          summary: "Alterar aplicabilidade ou cumprimento da obrigação",
+          description:
+            "Não aplicável exige motivo; cumprir grava data (não futura) e ator, com protocolo opcional; completed_on null desfaz. Cada mudança entra na trilha do controle.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "code",
+              in: "path",
+              required: true,
+              schema: {
+                type: "string",
+                enum: ["PGDAS_D", "DCTFWEB", "EFD_CONTRIBUICOES", "DIRBI"],
+              },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  minProperties: 1,
+                  properties: {
+                    applicable: { type: "boolean" },
+                    completed_on: { type: "string", format: "date", nullable: true },
+                    protocol: { type: "string", maxLength: 200 },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Obrigação atualizada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida, sem motivo ou data futura" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Controle ou obrigação não encontrados" },
+            "409": {
+              description: "Controle concluído, regra de cumprimento ou alteração concorrente",
+            },
+          },
+        },
+      },
       "/fiscal/monthly-controls/{id}": {
         patch: {
           tags: ["Controle mensal"],

@@ -47,7 +47,7 @@ function deps() {
   return {
     list: vi.fn(async () => ({
       competence: "2026-08",
-      items: [{ ...control(), client_name: "Alfa" }],
+      items: [{ ...control(), client_name: "Alfa", pending_obligations: 0 }],
     })),
     open: vi.fn(async () => ({ control: control(), created: true })),
     update: vi.fn(async () => control()),

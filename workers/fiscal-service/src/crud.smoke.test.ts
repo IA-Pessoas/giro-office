@@ -350,6 +350,75 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     );
   });
 
+  it("obrigações mensais: sugestão por regime, pendências, cumprimento, dispensa e isolamento por competência", async () => {
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Obrigações ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+    });
+    const clientId = String(client.id);
+    const mineIn = async (competence: string) => {
+      const list = expectOk(
+        await call("GET", `/fiscal/monthly-controls?competence=${competence}`),
+        `GET ${competence}`,
+      );
+      return list.data.items.find((item: { client_id: string }) => item.client_id === clientId);
+    };
+
+    const august = await mineIn("2026-08");
+    const september = await mineIn("2026-09");
+    expect(september.pending_obligations).toBe(1);
+    const base = `/fiscal/monthly-controls/${september.id}/obligations`;
+    const listed = expectOk(await call("GET", base), "GET obrigações");
+    expect(listed.data.items.map((item: { code: string }) => item.code)).toEqual(["PGDAS_D"]);
+    expect(listed.data.addable.map((item: { code: string }) => item.code)).toContain("DIRBI");
+
+    expectOk(
+      await call("PATCH", `${base}/PGDAS_D`, { applicable: false }),
+      "não aplicável sem motivo",
+      [400],
+    );
+    const completed = expectOk(
+      await call("PATCH", `${base}/PGDAS_D`, { completed_on: "2026-09-10", protocol: "REC-1" }),
+      "cumprir PGDAS-D",
+    );
+    expect(completed.data).toMatchObject({
+      status: "COMPLETED",
+      completed_on: "2026-09-10",
+      protocol: "REC-1",
+    });
+    expectOk(await call("POST", base, { code: "DIRBI" }), "DIRBI sem motivo", [400]);
+    expectOk(
+      await call("POST", base, { code: "DIRBI", reason: "Benefício fiscal declarado" }),
+      "incluir DIRBI",
+      [201],
+    );
+    const dispensed = expectOk(
+      await call("PATCH", `${base}/DIRBI`, { applicable: false, reason: "Benefício encerrado" }),
+      "dispensar DIRBI",
+    );
+    expect(dispensed.data).toMatchObject({
+      status: "NOT_APPLICABLE",
+      not_applicable_reason: "Benefício encerrado",
+    });
+
+    const after = await mineIn("2026-09");
+    expect(after).toMatchObject({ pending_obligations: 0, status: "PENDING" });
+    expect((await mineIn("2026-08")).pending_obligations).toBe(august.pending_obligations);
+
+    expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${september.id}`, { status: "COMPLETED" }),
+      "concluir controle",
+    );
+    expectOk(
+      await call("PATCH", `${base}/PGDAS_D`, { completed_on: null }),
+      "obrigação com controle concluído",
+      [409],
+    );
+  });
+
   it("receitas mensais: cria, recusa duplicada, lista por período e corrige", async () => {
     const client = await smokeInsert("clients", {
       id: randomUUID(),

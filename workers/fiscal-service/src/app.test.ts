@@ -204,7 +204,7 @@ describe("fiscal Worker", () => {
     const controls = {
       list: vi.fn(async () => ({
         competence: "2026-08",
-        items: [{ ...control, client_name: "Alfa" }],
+        items: [{ ...control, client_name: "Alfa", pending_obligations: 0 }],
       })),
       open: vi.fn(async () => ({ control, created: true })),
       update: vi.fn(async () => ({ ...control, status: "IN_PROGRESS" as const })),
@@ -269,6 +269,74 @@ describe("fiscal Worker", () => {
     });
     expect(invalid.status).toBe(400);
     expect(controls.update).toHaveBeenCalledOnce();
+  });
+
+  it("obrigações do controle: leitura nível 1, inclusão e cumprimento nível 2, contrato validado", async () => {
+    const item = {
+      code: "PGDAS_D" as const,
+      name: "PGDAS-D",
+      note: "",
+      source: "https://www.gov.br/",
+      origin: "SUGGESTED",
+      status: "PENDING" as const,
+      not_applicable_reason: null,
+      completed_on: null,
+      completed_by: null,
+      protocol: null,
+      updatedAt: "2026-09-10T12:00:00.000Z",
+    };
+    const obligations = {
+      list: vi.fn(async () => ({ control_id: ICMS_ID, items: [item], addable: [] })),
+      add: vi.fn(async () => item),
+      update: vi.fn(async () => ({ ...item, status: "COMPLETED" as const })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), obligationService: obligations });
+    const reader = gatewayHeaders({
+      "x-auth-permission": "1",
+      "x-auth-modules": JSON.stringify({ fiscal: 1 }),
+    });
+    const base = `https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}/obligations`;
+
+    const listed = await app.request(base, { headers: reader });
+    expect(listed.status).toBe(200);
+    expect(obligations.list).toHaveBeenCalledWith(
+      ICMS_ID,
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+
+    const added = await app.request(base, {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ code: "DIRBI", reason: "Benefício fiscal" }),
+    });
+    expect(added.status).toBe(201);
+
+    const completed = await app.request(`${base}/PGDAS_D`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-09-10" }),
+    });
+    expect(completed.status).toBe(200);
+    expect(obligations.update).toHaveBeenCalledWith(
+      ICMS_ID,
+      "PGDAS_D",
+      { completed_on: "2026-09-10" },
+      expect.objectContaining({ userId: USER_ID }),
+    );
+
+    const readerWrite = await app.request(`${base}/PGDAS_D`, {
+      method: "PATCH",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-09-10" }),
+    });
+    expect(readerWrite.status).toBe(403);
+    const unknownCode = await app.request(`${base}/XPTO`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-09-10" }),
+    });
+    expect(unknownCode.status).toBe(400);
+    expect(obligations.update).toHaveBeenCalledOnce();
   });
 
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {

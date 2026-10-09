@@ -86,6 +86,7 @@ model FiscalMonthlyControl {
   createdAt       DateTime                    @default(now())
   updatedAt       DateTime                    @updatedAt
   events          FiscalMonthlyControlEvent[]
+  obligations     FiscalMonthlyControlObligation[]
 
   @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_controls_org_client_competence")
   @@index([organization_id, competence], map: "idx_fiscal_monthly_controls_org_competence")
@@ -97,6 +98,7 @@ model FiscalMonthlyControlEvent {
   organization_id String
   control_id      String
   action          String
+  obligation_code String?
   from_value      String?
   to_value        String?
   reason          String?
@@ -106,6 +108,26 @@ model FiscalMonthlyControlEvent {
 
   @@index([control_id, createdAt], map: "idx_fiscal_monthly_control_events_control_created")
   @@map("fiscal.monthly_control_events")
+}
+
+model FiscalMonthlyControlObligation {
+  id                    String               @id @default(uuid())
+  organization_id       String
+  control_id            String
+  code                  String
+  origin                String
+  applicable            Boolean              @default(true)
+  not_applicable_reason String?
+  completed_on          DateTime?            @db.Date
+  completed_by          String?
+  protocol              String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  control               FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@unique([control_id, code], map: "uq_fiscal_monthly_control_obligations_control_code")
+  @@index([organization_id, control_id], map: "idx_fiscal_monthly_control_obligations_org_control")
+  @@map("fiscal.monthly_control_obligations")
 }
 
 model Ncm {

@@ -4701,6 +4701,28 @@ const handlers = {
     });
   },
 
+  async fiscalMonthlyObligationList(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations`,
+    });
+  },
+
+  async fiscalMonthlyObligationAdd(op) {
+    // DIRBI é condicional: entra só por inclusão manual com motivo. Repetir o smoke dá 409.
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations`,
+      expectedStatus: [201, 409],
+      json: { code: "DIRBI", reason: "Smoke de serviços" },
+    });
+  },
+
+  async fiscalMonthlyObligationUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations/DIRBI`,
+      json: { applicable: false, reason: "Smoke de serviços" },
+    });
+  },
+
   async fiscalSimplesPreview(op) {
     const response = await httpRequest(op, {
       query: { client_id: requireState("primaryClientId"), competence: "2026-02" },

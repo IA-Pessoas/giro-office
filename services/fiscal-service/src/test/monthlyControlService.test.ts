@@ -34,12 +34,20 @@ function dependencies() {
     findMany: vi.fn(async () => [] as ReturnType<typeof stored>[]),
     findFirst: vi.fn(async () => null as ReturnType<typeof stored> | null),
     createManyAndReturn: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) =>
-      data.map((row, index) => ({ id: `generated-${index}`, client_id: row.client_id })),
+      data.map((row, index) => ({
+        id: `generated-${index}`,
+        client_id: row.client_id,
+        regime: row.regime,
+      })),
     ),
     create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => stored(data)),
     updateMany: vi.fn(async () => ({ count: 1 })),
   };
   const event = { createMany: vi.fn(async () => ({ count: 1 })) };
+  const obligation = {
+    createMany: vi.fn(async () => ({ count: 1 })),
+    groupBy: vi.fn(async () => [] as Array<{ control_id: string; _count: { _all: number } }>),
+  };
   const prisma = {
     client: {
       findMany: vi.fn(async () => [] as Array<Record<string, unknown>>),
@@ -48,8 +56,13 @@ function dependencies() {
     },
     fiscalMonthlyControl: control,
     fiscalMonthlyControlEvent: event,
+    fiscalMonthlyControlObligation: obligation,
     $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
-      callback({ fiscalMonthlyControl: control, fiscalMonthlyControlEvent: event }),
+      callback({
+        fiscalMonthlyControl: control,
+        fiscalMonthlyControlEvent: event,
+        fiscalMonthlyControlObligation: obligation,
+      }),
     ),
   };
   const audit = { createLog: vi.fn(async () => {}) };
@@ -108,7 +121,7 @@ describe("MonthlyControlService.list", () => {
         },
       ],
       skipDuplicates: true,
-      select: { id: true },
+      select: { id: true, regime: true },
     });
     expect(prisma.fiscalMonthlyControlEvent.createMany).toHaveBeenCalledWith({
       data: [
@@ -132,6 +145,54 @@ describe("MonthlyControlService.list", () => {
       no_movement: false,
       regime: "Simples Nacional",
     });
+  });
+
+  it("sugere as obrigações do regime registrado ao nascer, nunca a DIRBI, e conta pendências", async () => {
+    const { prisma, service } = dependencies();
+    prisma.client.findMany.mockResolvedValueOnce([
+      { id: clientA, regime: " simples NACIONAL " },
+      { id: clientB, regime: "Lucro Presumido" },
+    ]);
+    prisma.fiscalMonthlyControl.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([stored()]);
+    prisma.fiscalMonthlyControlObligation.groupBy.mockResolvedValueOnce([
+      { control_id: controlId, _count: { _all: 2 } },
+    ]);
+
+    const result = await service.list({ competence: "2026-08" }, actor);
+
+    expect(prisma.fiscalMonthlyControlObligation.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          organization_id: organizationId,
+          control_id: "generated-0",
+          code: "PGDAS_D",
+          origin: "SUGGESTED",
+        },
+        {
+          organization_id: organizationId,
+          control_id: "generated-1",
+          code: "DCTFWEB",
+          origin: "SUGGESTED",
+        },
+        {
+          organization_id: organizationId,
+          control_id: "generated-1",
+          code: "EFD_CONTRIBUICOES",
+          origin: "SUGGESTED",
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(prisma.fiscalMonthlyControlObligation.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ applicable: true, completed_on: null }),
+      }),
+    );
+    expect(result.items[0].pending_obligations).toBe(2);
+    // Pendência não altera a situação do controle.
+    expect(result.items[0].status).toBe("PENDING");
   });
 
   it("não escreve nada quando todos os elegíveis já têm controle", async () => {
