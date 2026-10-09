@@ -366,3 +366,25 @@ await runTest("fiscal Domínio × SEFAZ conference reads files and shows partial
   assert.match(section, /size \?\? 0\) > MAX_FILE_BYTES/);
   assert.match(section, /catch \(error\) \{\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });
+
+await runTest("fiscal XML selection parses requests, encodes the ZIP and shows ambiguous items", async () => {
+  const { fileToBase64, parseNoteRequests } = await import("./utils/xmlSelection.ts");
+  assert.deepEqual(parseNoteRequests(" 100\r\n\n11.222.333/0001-81;1;101, 2;7 \n"), [
+    "100",
+    "11.222.333/0001-81;1;101",
+    "2;7",
+  ]);
+  const bytes = Uint8Array.from({ length: 70_000 }, (_, index) => index % 256);
+  assert.equal(await fileToBase64(new Blob([bytes])), Buffer.from(bytes).toString("base64"));
+
+  const section = await readSource("./components/FiscalXmlSelectionSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalXmlSelectionSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/xml-selection", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Só oferece o ZIP quando o servidor selecionou algo; o relatório sempre pode ser baixado.
+  assert.match(section, /\{result\.zip_base64 \? \(/);
+  assert.match(section, /Baixar relatório CSV/);
+  assert.match(section, /const MAX_ZIP_BYTES = 650_000;/);
+});

@@ -1,6 +1,7 @@
 import { setupAPIClient } from "@shared/services/api";
 
 import { readSpreadsheetText } from "../utils/readSpreadsheetText";
+import { fileToBase64 } from "../utils/xmlSelection";
 import { unwrapFiscalEnvelope } from "./fiscalService.contract";
 
 export type FiscalConferenceSource = "dominio" | "sefaz";
@@ -52,6 +53,25 @@ export interface FiscalDocumentConference {
   csv: string;
 }
 
+export interface FiscalXmlSelection {
+  status: "complete" | "partial";
+  file_name: string;
+  zip_base64: string | null;
+  csv: string;
+  selected: { request: string; entry: string; identity: string; access_key: string | null }[];
+  ambiguous: { request: string; reason: string; candidates: { entry: string; identity: string }[] }[];
+  not_found: { request: string }[];
+  invalid_requests: { request: string; reason: string }[];
+  archive: {
+    file_name: string;
+    entries: number;
+    nfe_entries: number;
+    discarded: { entry: string; reason: string }[];
+    errors: { entry: string; message: string }[];
+    duplicates: { identity: string; entries: string[]; identical: boolean }[];
+  };
+}
+
 export const fiscalConferenceService = {
   /** Conferência Domínio × SEFAZ: nada é gravado no servidor. */
   async compareDocuments(files: Record<FiscalConferenceSource, File>): Promise<FiscalDocumentConference> {
@@ -65,5 +85,16 @@ export const fiscalConferenceService = {
       sefaz: { file_name: files.sefaz.name, content: sefaz },
     });
     return unwrapFiscalEnvelope<FiscalDocumentConference>(response.data);
+  },
+
+  /** Seleção de XML em ZIP: devolve o ZIP só com as notas pedidas e o relatório. */
+  async selectXml({ file, requests }: { file: File; requests: string[] }): Promise<FiscalXmlSelection> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.post("/fiscal/conferences/xml-selection", {
+      file_name: file.name,
+      zip_base64: await fileToBase64(file),
+      requests,
+    });
+    return unwrapFiscalEnvelope<FiscalXmlSelection>(response.data);
   },
 };

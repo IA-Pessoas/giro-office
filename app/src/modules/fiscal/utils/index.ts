@@ -15,3 +15,4 @@ export {
   parseBatchDocuments,
   toRevenueAmount,
 } from "./fiscalRevenue";
+export { fileToBase64, parseNoteRequests } from "./xmlSelection";
