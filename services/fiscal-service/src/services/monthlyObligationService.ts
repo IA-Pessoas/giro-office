@@ -4,11 +4,13 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
 import {
   FISCAL_OBLIGATION_CATALOG,
+  FISCAL_OBLIGATION_ORIGIN,
   type FiscalObligationCode,
   type FiscalObligationDefinition,
   findObligation,
+  isObligationAllowed,
+  suggestedObligations,
 } from "./fiscalObligationCatalog.js";
-import { createSuggestedObligations } from "./monthlyControlService.js";
 
 export type MonthlyObligationPrisma = Pick<
   PrismaClient,
@@ -72,6 +74,7 @@ type StoredObligation = {
 
 type EventInput = {
   action:
+    | "OBLIGATION_SUGGESTED"
     | "OBLIGATION_ADDED"
     | "OBLIGATION_NOT_APPLICABLE"
     | "OBLIGATION_APPLICABLE"
@@ -115,6 +118,41 @@ function serialize(value: StoredObligation): MonthlyObligationDto {
 
 function catalogOrder(code: string): number {
   return FISCAL_OBLIGATION_CATALOG.findIndex((item) => item.code === code);
+}
+
+/**
+ * Sugestões do catálogo para controles recém-criados, pelo regime registrado neles, com o
+ * evento de cada uma. Só roda ao nascer o controle: ampliar o catálogo não muda competências
+ * já abertas nem concluídas.
+ */
+export async function createSuggestedObligations(
+  tx: Pick<PrismaClient, "fiscalMonthlyControlObligation" | "fiscalMonthlyControlEvent">,
+  organizationId: string,
+  actorId: string,
+  controls: Array<{ id: string; regime: string | null }>,
+): Promise<void> {
+  const data = controls.flatMap((control) =>
+    suggestedObligations(control.regime).map((obligation) => ({
+      organization_id: organizationId,
+      control_id: control.id,
+      code: obligation.code,
+      origin: FISCAL_OBLIGATION_ORIGIN.suggested,
+    })),
+  );
+  if (!data.length) return;
+  await tx.fiscalMonthlyControlObligation.createMany({ data });
+  await tx.fiscalMonthlyControlEvent.createMany({
+    data: data.map((row) => ({
+      organization_id: organizationId,
+      control_id: row.control_id,
+      obligation_code: row.code,
+      action: "OBLIGATION_SUGGESTED",
+      from_value: null,
+      to_value: "applicable",
+      reason: null,
+      actor_id: actorId,
+    })),
+  });
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -171,7 +209,7 @@ export class MonthlyObligationService {
     });
   }
 
-  /** Garante as sugestões do regime registrado no controle e lista as obrigações. */
+  /** Lista as obrigações do controle (só leitura) e as que ainda podem ser incluídas. */
   async list(
     controlId: string,
     actor: Actor,
@@ -181,16 +219,14 @@ export class MonthlyObligationService {
     addable: MonthlyObligationCatalogItem[];
   }> {
     const control = await this.requireControl(controlId, actor.organizationId);
-    // Controle anterior ao catálogo (ou catálogo ampliado): completa sem duplicar.
-    await createSuggestedObligations(this.prisma, actor.organizationId, [control]);
     const stored = await this.prisma.fiscalMonthlyControlObligation.findMany({
       where: { control_id: control.id, organization_id: actor.organizationId },
     });
     const items = stored.map(serialize).sort((a, b) => catalogOrder(a.code) - catalogOrder(b.code));
     const present = new Set(items.map((item) => item.code));
-    const addable = FISCAL_OBLIGATION_CATALOG.filter((item) => !present.has(item.code)).map(
-      catalogItem,
-    );
+    const addable = FISCAL_OBLIGATION_CATALOG.filter(
+      (item) => !present.has(item.code) && isObligationAllowed(item, control.regime),
+    ).map(catalogItem);
     return { control_id: control.id, items, addable };
   }
 
@@ -203,6 +239,9 @@ export class MonthlyObligationService {
     const control = await this.requireOpenControl(controlId, actor.organizationId);
     const definition = findObligation(input.code);
     if (!definition) throw new ServiceError(400, "Obrigação fora do catálogo.");
+    if (!isObligationAllowed(definition, control.regime)) {
+      throw new ServiceError(400, `${definition.name} não se aplica ao regime ${control.regime}.`);
+    }
     const reason = input.reason ?? null;
     if (definition.conditional && !reason) {
       throw new ServiceError(400, `${definition.name} é condicional: informe por que se aplica.`);
@@ -218,7 +257,7 @@ export class MonthlyObligationService {
             organization_id: actor.organizationId,
             control_id: control.id,
             code: input.code,
-            origin: "MANUAL",
+            origin: FISCAL_OBLIGATION_ORIGIN.manual,
           },
         });
         await this.writeEvents(tx, actor, control.id, input.code, [
@@ -312,7 +351,9 @@ export class MonthlyObligationService {
       const protocol = input.protocol === undefined ? current.protocol : input.protocol || null;
       if (input.completed_on !== previousDate || protocol !== current.protocol) {
         data.completed_on = new Date(`${input.completed_on}T00:00:00.000Z`);
-        data.completed_by = actor.userId;
+        // Só o protocolo mudou: quem cumpriu continua sendo quem cumpriu.
+        data.completed_by =
+          input.completed_on === previousDate ? current.completed_by : actor.userId;
         data.protocol = protocol;
         events.push({
           action: "OBLIGATION_COMPLETED",

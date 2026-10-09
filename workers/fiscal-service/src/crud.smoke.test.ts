@@ -373,7 +373,8 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     const base = `/fiscal/monthly-controls/${september.id}/obligations`;
     const listed = expectOk(await call("GET", base), "GET obrigações");
     expect(listed.data.items.map((item: { code: string }) => item.code)).toEqual(["PGDAS_D"]);
-    expect(listed.data.addable.map((item: { code: string }) => item.code)).toContain("DIRBI");
+    // Optante do Simples é dispensada da DIRBI.
+    expect(listed.data.addable.map((item: { code: string }) => item.code)).not.toContain("DIRBI");
 
     expectOk(
       await call("PATCH", `${base}/PGDAS_D`, { applicable: false }),
@@ -389,19 +390,23 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       completed_on: "2026-09-10",
       protocol: "REC-1",
     });
-    expectOk(await call("POST", base, { code: "DIRBI" }), "DIRBI sem motivo", [400]);
     expectOk(
       await call("POST", base, { code: "DIRBI", reason: "Benefício fiscal declarado" }),
-      "incluir DIRBI",
+      "DIRBI no Simples",
+      [400],
+    );
+    expectOk(
+      await call("POST", base, { code: "DCTFWEB", reason: "Empresa com folha no mês" }),
+      "incluir DCTFWeb",
       [201],
     );
     const dispensed = expectOk(
-      await call("PATCH", `${base}/DIRBI`, { applicable: false, reason: "Benefício encerrado" }),
-      "dispensar DIRBI",
+      await call("PATCH", `${base}/DCTFWEB`, { applicable: false, reason: "Folha zerada" }),
+      "dispensar DCTFWeb",
     );
     expect(dispensed.data).toMatchObject({
       status: "NOT_APPLICABLE",
-      not_applicable_reason: "Benefício encerrado",
+      not_applicable_reason: "Folha zerada",
     });
 
     const after = await mineIn("2026-09");

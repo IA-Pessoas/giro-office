@@ -4,7 +4,7 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
 import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
 import type { MonthlyControlStatus } from "../schemas/monthlyControl.schemas.js";
-import { suggestedObligations } from "./fiscalObligationCatalog.js";
+import { createSuggestedObligations } from "./monthlyObligationService.js";
 
 export type MonthlyControlPrisma = Pick<
   PrismaClient,
@@ -114,25 +114,6 @@ function isGenerable(competence: Date, now: Date): boolean {
   return competence <= new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 }
 
-/** Sugestões do catálogo para o regime registrado em cada controle; repetir não duplica. */
-export async function createSuggestedObligations(
-  tx: Pick<PrismaClient, "fiscalMonthlyControlObligation">,
-  organizationId: string,
-  controls: Array<{ id: string; regime: string | null }>,
-): Promise<void> {
-  const data = controls.flatMap((control) =>
-    suggestedObligations(control.regime).map((obligation) => ({
-      organization_id: organizationId,
-      control_id: control.id,
-      code: obligation.code,
-      origin: "SUGGESTED",
-    })),
-  );
-  if (data.length) {
-    await tx.fiscalMonthlyControlObligation.createMany({ data, skipDuplicates: true });
-  }
-}
-
 function isUniqueViolation(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === "P2002";
 }
@@ -205,7 +186,7 @@ export class MonthlyControlService {
           select: { id: true, regime: true },
         });
         if (!created.length) return;
-        await createSuggestedObligations(tx, organizationId, created);
+        await createSuggestedObligations(tx, organizationId, userId, created);
         await tx.fiscalMonthlyControlEvent.createMany({
           data: created.map((control) => ({
             organization_id: organizationId,
@@ -307,7 +288,7 @@ export class MonthlyControlService {
             reason,
           },
         ]);
-        await createSuggestedObligations(tx, input.organizationId, [control]);
+        await createSuggestedObligations(tx, input.organizationId, input.userId, [control]);
         return control;
       });
     } catch (error) {

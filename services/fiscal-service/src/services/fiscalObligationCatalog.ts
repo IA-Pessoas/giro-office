@@ -19,13 +19,17 @@ export const FISCAL_OBLIGATION_CODES = [
 
 export type FiscalObligationCode = (typeof FISCAL_OBLIGATION_CODES)[number];
 
+/** Como a obrigação entrou no controle (CHECK em monthly_control_obligations.origin). */
+export const FISCAL_OBLIGATION_ORIGIN = { suggested: "SUGGESTED", manual: "MANUAL" } as const;
+
 export interface FiscalObligationDefinition {
   code: FiscalObligationCode;
   name: string;
-  periodicity: "MONTHLY";
   /** Regimes (rótulo normalizado) em que a obrigação é sugerida. Vazio em condicionais. */
   regimes: readonly string[];
   conditional: boolean;
+  /** Regimes em que nem a inclusão manual é aceita (dispensa legal). */
+  excludedRegimes: readonly string[];
   source: string;
   checkedOn: string;
   note: string;
@@ -39,9 +43,9 @@ export const FISCAL_OBLIGATION_CATALOG: readonly FiscalObligationDefinition[] = 
   {
     code: "PGDAS_D",
     name: "PGDAS-D",
-    periodicity: "MONTHLY",
     regimes: [SIMPLES],
     conditional: false,
+    excludedRegimes: [],
     source: "https://www.gov.br/pt-br/servicos/declarar-apuracoes-mensais-do-simples-nacional",
     checkedOn: "2026-10-09",
     note: "Mensal, até o dia 20 do mês seguinte, ainda que sem receita no período.",
@@ -49,19 +53,19 @@ export const FISCAL_OBLIGATION_CATALOG: readonly FiscalObligationDefinition[] = 
   {
     code: "DCTFWEB",
     name: "DCTFWeb",
-    periodicity: "MONTHLY",
     regimes: [PRESUMIDO, REAL],
     conditional: false,
+    excludedRegimes: [],
     source: "https://normas.receita.fazenda.gov.br/sijut2consulta/link.action?idAto=141910",
     checkedOn: "2026-10-09",
-    note: "IN RFB 2.237/2024: substitui a DCTF desde 01/2025; entrega até o último dia útil do mês seguinte (IN RFB 2.248/2025).",
+    note: "IN RFB 2.237/2024: substitui a DCTF desde 01/2025; entrega até o último dia útil do mês seguinte (IN RFB 2.248/2025). Depende de fato gerador: mês sem débito vira não aplicável com motivo; Simples com folha ou retenção inclui à mão.",
   },
   {
     code: "EFD_CONTRIBUICOES",
     name: "EFD-Contribuições",
-    periodicity: "MONTHLY",
     regimes: [PRESUMIDO, REAL],
     conditional: false,
+    excludedRegimes: [],
     source:
       "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/perguntas-frequentes/sped/efd-contribuicoes/efdc",
     checkedOn: "2026-10-09",
@@ -70,9 +74,9 @@ export const FISCAL_OBLIGATION_CATALOG: readonly FiscalObligationDefinition[] = 
   {
     code: "DIRBI",
     name: "DIRBI",
-    periodicity: "MONTHLY",
     regimes: [],
     conditional: true,
+    excludedRegimes: [SIMPLES],
     source:
       "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/perguntas-frequentes/beneficios-fiscais/beneficios-fiscais/declaracao-de-incentivos-renuncias-beneficios-e-imunidades-de-natureza-tributaria-dirbi/tenho-que-declarar-todos-os",
     checkedOn: "2026-10-09",
@@ -80,7 +84,7 @@ export const FISCAL_OBLIGATION_CATALOG: readonly FiscalObligationDefinition[] = 
   },
 ];
 
-export function normalizeRegime(regime: string | null | undefined): string {
+function normalizeRegime(regime: string | null | undefined): string {
   return (regime ?? "")
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
@@ -90,6 +94,14 @@ export function normalizeRegime(regime: string | null | undefined): string {
 
 export function findObligation(code: string): FiscalObligationDefinition | undefined {
   return FISCAL_OBLIGATION_CATALOG.find((item) => item.code === code);
+}
+
+/** Inclusão manual permitida para o regime registrado no controle. */
+export function isObligationAllowed(
+  definition: FiscalObligationDefinition,
+  regime: string | null,
+): boolean {
+  return !definition.excludedRegimes.includes(normalizeRegime(regime));
 }
 
 /** Obrigações sugeridas para o regime registrado no controle. */

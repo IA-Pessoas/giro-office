@@ -54,7 +54,10 @@ export const addMonthlyObligationBodySchema = z
   .object({ code: obligationCodeSchema, reason: reasonSchema.optional() })
   .strict();
 
-/** AAAA-MM-DD de calendário real (recusa 2026-02-31). */
+/**
+ * AAAA-MM-DD de calendário real (recusa 2026-02-31). Não usa `zIsoDate` do shared porque
+ * ele transforma em Date e aceita dia inexistente; aqui o serviço precisa da string.
+ */
 const isoDateSchema = z.string().refine((value) => {
   const date = new Date(`${value}T00:00:00.000Z`);
   return (

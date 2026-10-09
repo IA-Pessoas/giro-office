@@ -4708,17 +4708,17 @@ const handlers = {
   },
 
   async fiscalMonthlyObligationAdd(op) {
-    // DIRBI é condicional: entra só por inclusão manual com motivo. Repetir o smoke dá 409.
+    // DCTFWeb é incluível em qualquer regime (no Simples, com folha). Repetir dá 409.
     await httpRequest(op, {
       path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations`,
       expectedStatus: [201, 409],
-      json: { code: "DIRBI", reason: "Smoke de serviços" },
+      json: { code: "DCTFWEB", reason: "Smoke de serviços" },
     });
   },
 
   async fiscalMonthlyObligationUpdate(op) {
     await httpRequest(op, {
-      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations/DIRBI`,
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/obligations/DCTFWEB`,
       json: { applicable: false, reason: "Smoke de serviços" },
     });
   },
