@@ -309,7 +309,7 @@ export function FiscalAnticipationBatchPanel({
       {editable ? (
         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 p-3 dark:border-slate-700">
           <label className={LABEL_CLASSNAME}>
-            Conferente
+            Conferente (Fiscal nível 2 ou superior)
             <select value={reviewerId} onChange={(event) => setReviewerId(event.target.value)} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
               <option value="">{batch.reviewer_id ? `Manter ${displayName(batch.reviewer_id)}` : "Selecione"}</option>
               {users.data?.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
