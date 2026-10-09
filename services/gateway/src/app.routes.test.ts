@@ -2313,6 +2313,7 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/fiscal/ncm"]).toBeTruthy();
     expect(body.paths["/contabil/controls"]).toBeTruthy();
     expect(body.paths["/contabil/controls/list"]).toBeTruthy();
+    expect(body.paths["/contabil/contingency"]).toBeTruthy();
     expect(body.paths["/ti/requests/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/{id}/file"]).toBeTruthy();
@@ -5359,6 +5360,46 @@ it("returns bad request for malformed JSON before proxying", async () => {
     expect(body.code).toBe("BAD_REQUEST");
     expect(body.requestId).toBeTruthy();
     expect(upstreamHits).toBe(0);
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("preserves Contingency XLS bytes, query and organization through the gateway", async () => {
+  const token = createToken({
+    user_id: "actor",
+    organization_id: "organization-a",
+    permission: 3,
+    modules: { contabil: 3 },
+  });
+  const bytes = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 255]);
+  let received = Buffer.alloc(0);
+  let seenPath = "";
+  let organization: string | undefined;
+  const upstream = createServer(async (request, response) => {
+    seenPath = request.url ?? "";
+    organization = request.headers[FORWARDED_AUTH_ORGANIZATION_ID_HEADER] as string | undefined;
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    received = Buffer.concat(chunks);
+    response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    response.end(JSON.stringify({ success: true, data: { classification: "legacy_hypothesis" } }));
+  });
+  const contabilServiceUrl = await startServer(upstream);
+  const gateway = createServer(createApp(createEnv({ contabilServiceUrl }), createTestLogger()));
+  const url = await startServer(gateway);
+  try {
+    const response = await fetch(`${url}/contabil/contingency?filename=balancete.xls`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/vnd.ms-excel" },
+      body: bytes,
+    });
+    expect(response.status).toBe(200);
+    expect(received).toEqual(bytes);
+    expect(seenPath).toBe("/contabil/contingency?filename=balancete.xls");
+    expect(organization).toBe("organization-a");
+    expect(response.headers.get("cache-control")).toBe("no-store");
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

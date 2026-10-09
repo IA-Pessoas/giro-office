@@ -9,6 +9,7 @@ import type {
 } from "../types";
 
 export const CONTABIL_ENDPOINTS = {
+  contingency: "/contabil/contingency",
   controls: "/contabil/controls",
   controlsList: "/contabil/controls/list",
   controlById: (controlId: string) => `/contabil/controls/${controlId}`,

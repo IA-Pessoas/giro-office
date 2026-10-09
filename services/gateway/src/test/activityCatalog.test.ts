@@ -4,6 +4,12 @@ import { classifyActivity, describeActivity } from "../audit/activityCatalog.js"
 
 describe("activityCatalog", () => {
   it.each([
+    [
+      "POST",
+      "/contabil/contingency?filename=balancete.xls",
+      "simulou",
+      "uma contingência contábil",
+    ],
     ["GET", "/client/groups", "consultou", "a lista de grupos de empresas"],
     ["POST", "/client/groups", "cadastrou", "um novo grupo de empresas"],
     [

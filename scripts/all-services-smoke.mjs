@@ -774,6 +774,7 @@ async function httpRequest(op, options) {
     query,
     json,
     form,
+    raw,
     headers: optionHeaders = {},
     expectedStatus: optionExpectedStatus,
     expectEnvelope: optionExpectEnvelope,
@@ -807,7 +808,9 @@ async function httpRequest(op, options) {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   };
 
-  if (json !== undefined) {
+  if (raw !== undefined) {
+    fetchOptions.body = raw;
+  } else if (json !== undefined) {
     requestHeaders.set("content-type", "application/json");
     fetchOptions.body = JSON.stringify(json);
   } else if (form) {
@@ -4245,7 +4248,7 @@ const handlers = {
         name: uniqueText("Smoke Client"),
         organization_id: requireState("session").organization_id,
         status: "Ativo",
-        cpf_cnpj: uniqueDigits(14),
+        cpf_cnpj: uniqueCnpj("primary-client"),
         prospecting_status: "Lead",
         type: "PJ",
         type_registration: "Novo",
@@ -5408,6 +5411,38 @@ const handlers = {
       expectedStatus: [200],
       query: { ipi_id: requireState("fiscalIpiId") },
     });
+  },
+
+  async contabilContingencySimulate(op) {
+    let company = { name: "Smoke Client", cpf_cnpj: uniqueCnpj("primary-client") };
+    if (!isBadExpectation(op)) {
+      const response = await httpRequest(op, {
+        method: "GET",
+        path: `/client/${requireState("primaryClientId")}`,
+        expectedStatus: [200],
+      });
+      company = response.body.data;
+    }
+    const response = await httpRequest(op, {
+      query: {
+        client_id: requireState("primaryClientId"),
+        company_name: company.company_name?.trim() || company.name,
+        cnpj: company.cpf_cnpj,
+        period_start: "2026-01",
+        period_end: "2026-06",
+        regime: "Simples Nacional",
+        annex: "III",
+        filename: "synthetic.xls",
+      },
+      headers: { "content-type": "application/vnd.ms-excel" },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/contingency/synthetic.xls")),
+    });
+    if (
+      !isBadExpectation(op) &&
+      (response.body?.data?.minimum?.totalCents !== 398200 ||
+        response.body?.data?.maximum?.totalCents !== 955680)
+    )
+      throw new Error("Simulação de Contingência diverge do XLS sintético.");
   },
 
   async contabilControlCreate(op) {
