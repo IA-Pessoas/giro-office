@@ -104,3 +104,64 @@ model Ipi {
 
   @@map("fiscal.ipi")
 }
+
+model FiscalMalha {
+  id                       String    @id @default(uuid())
+  organization_id          String
+  client_id                String
+  period_start             DateTime  @db.Date
+  period_end               DateTime  @db.Date
+  reason                   String
+  deadline                 DateTime? @db.Date
+  status                   String
+  responsible_id           String?
+  task_id                  String?
+  attachment_path          String?
+  attachment_original_name String?
+  attachment_mime_type     String?
+  attachment_size_bytes    Int?
+  attachment_uploaded_at   DateTime?
+  attachment_uploaded_by   String?
+  created_by               String
+  updated_by               String
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@map("fiscal.malhas")
+}
+
+model FiscalMalhaHistory {
+  id              String   @id @default(uuid())
+  organization_id String
+  malha_id        String
+  field           String
+  previous_value  String?
+  new_value       String?
+  actor_user_id   String
+  created_at      DateTime @default(now())
+
+  @@map("fiscal.malha_history")
+}
+
+model Task {
+  id              String @id
+  organization_id String
+
+  @@map("integracao.tasks")
+}
+
+model User {
+  id     String @id
+  status String
+
+  @@map("users")
+}
+
+model Permission {
+  id              String @id
+  user_id         String
+  organization_id String
+  fiscal          Int
+
+  @@map("permissions")
+}
