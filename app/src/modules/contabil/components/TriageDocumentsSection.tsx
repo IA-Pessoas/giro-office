@@ -29,6 +29,7 @@ import type {
 import { getCurrentContabilCompetence } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
 import { ContabilStateBox } from "./ContabilStateBox";
+import { FiscalClientSettingsPanel } from "./FiscalClientSettingsPanel";
 import { TriageMovementPanel } from "./TriageMovementPanel";
 import { CONTABIL_DOCUMENTS, FISCAL_DOCUMENTS, STATUSES } from "./triageDocumentLabels";
 
@@ -241,6 +242,9 @@ export function TriageDocumentsSection({
             </p>
           )}
         </div>
+      ) : null}
+      {documentType === "FISCAL" ? (
+        <FiscalClientSettingsPanel clientId={clientId} canEdit={canEdit} />
       ) : null}
       {documentType === "CONTABIL" ? (
         <TriageMovementPanel

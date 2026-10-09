@@ -229,6 +229,13 @@ export type TriageMonthlyUpdate = Partial<{
   settlement_date: string | null;
 }>;
 
+/** Prioridade e meio de envio do cliente lidos pelo Fiscal. */
+export interface TriageFiscalSettings {
+  client_id: string;
+  priority: boolean;
+  delivery_method: string | null;
+}
+
 /** Movimento padrão do cliente: itens contábeis que entram em cada competência. */
 export interface TriageMovementConfig {
   client_id: string;
@@ -245,6 +252,10 @@ export interface FiscalTriagePortfolioItem {
   regime: string | null;
   responsible_id: string | null;
   responsible_name: string | null;
+  /** Prioridade Sim/Não do cliente no Fiscal (não é urgência nem prioridade de item). */
+  priority: boolean;
+  /** Código DELIVERY_METHOD do catálogo da triagem. */
+  delivery_method: string | null;
   can_edit: boolean;
   has_competence: boolean;
   planned_checklist: Record<TriageFiscalChecklistField, TriageDocumentStatus> | null;

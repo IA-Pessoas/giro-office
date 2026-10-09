@@ -27,6 +27,7 @@ export const CONTABIL_ENDPOINTS = {
   triageMonthlyItems: (monthlyId: string) => `/triagem/monthly/${monthlyId}/items`,
   triageMonthlyById: (monthlyId: string) => `/triagem/monthly/${monthlyId}`,
   triageConfig: "/triagem/config",
+  triageFiscalSettings: "/triagem/fiscal-settings",
   triageStatements: "/triagem/statements",
   triageClosing: "/triagem/closing",
 } as const;
