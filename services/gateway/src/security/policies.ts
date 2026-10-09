@@ -45,6 +45,15 @@ const commercialModulePolicy = createModulePolicy("comercial", moduleAccessPermi
 const commercialEditPolicy = createModulePolicy("comercial", moduleEditPermission);
 const marketingModulePolicy = createModulePolicy("marketing", moduleAccessPermission);
 const marketingEditPolicy = createModulePolicy("marketing", moduleEditPermission);
+const departmentAdminPolicy: AuthPolicy = {
+  anyOf: [createModulePolicy("rh", 3), createModulePolicy("ti", 3)],
+};
+const departmentMarketingReadPolicy: AuthPolicy = {
+  anyOf: [tiModulePolicy, marketingModulePolicy],
+};
+const departmentMarketingColorEditPolicy: AuthPolicy = {
+  anyOf: [departmentAdminPolicy, createModulePolicy("marketing", 3)],
+};
 const userListPolicy: AuthPolicy = {
   anyOf: [userManagementPolicy, marketingModulePolicy],
 };
@@ -163,6 +172,8 @@ const integracaoClientPath =
   /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/groups(?:\/[^/]+(?:\/clients)?)?|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
+  ["GET /department/list", departmentMarketingReadPolicy],
+  ["PUT /department", departmentMarketingColorEditPolicy],
   ["GET /dashboard/stats", authenticatedPolicy],
   ["GET /client/list", clientListPolicy],
   ["GET /client/coringa/list", clientListPolicy],

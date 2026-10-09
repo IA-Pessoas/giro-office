@@ -22,6 +22,8 @@ const passwordService = await readFile(new URL("./services/marketingPasswordServ
 const aiUsage = await readFile(new URL("./components/MarketingAiUsageControls.tsx", import.meta.url), "utf8");
 const dashboardHook = await readFile(new URL("./hooks/useMarketingDashboard.ts", import.meta.url), "utf8");
 const canonicalQueries = await readFile(new URL("./components/MarketingCanonicalQueries.tsx", import.meta.url), "utf8");
+const marketingDepartments = await readFile(new URL("./components/MarketingDepartments.tsx", import.meta.url), "utf8");
+const departmentService = await readFile(new URL("../../modules/departments/services/departmentService.ts", import.meta.url), "utf8");
 const marketingQueryKeys = await import("./utils/marketingQueryKeys.ts").catch(() => null);
 
 assert.equal(
@@ -85,6 +87,14 @@ assert.match(page, /MarketingInstagramProfiles/);
 assert.match(page, /MarketingUsers/);
 assert.match(page, /MarketingPasswords/);
 assert.match(page, /MarketingCanonicalQueries/);
+assert.match(page, /MarketingDepartments/);
+assert.match(marketingDepartments, /useModuleAccess\("marketing"\)/);
+assert.match(marketingDepartments, /access\.canView/);
+assert.match(marketingDepartments, /access\.isAdmin/);
+assert.match(marketingDepartments, /\(\) => departmentService\.listForMarketing\(\)/);
+assert.match(marketingDepartments, /departmentService\.update\(department\.id, \{ color: nextColor \}\)/);
+assert.doesNotMatch(marketingDepartments, /\{\s*(name|status|solution)\s*:/);
+assert.match(departmentService, /params: \{ marketing: 'true' \}/);
 assert.match(canonicalQueries, /href: "\/clients"/);
 assert.match(canonicalQueries, /href: "\/users"/);
 assert.match(canonicalQueries, /href: "\/departments"/);
