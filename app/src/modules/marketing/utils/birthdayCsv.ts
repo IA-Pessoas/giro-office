@@ -3,18 +3,29 @@ export interface BirthdayCsvItem {
   day: number;
 }
 
+type BirthdayRow = [string, string, string];
+
 function csvCell(value: string | number): string {
   const text = String(value);
   const safeText = /^[\s]*[=+\-@]/u.test(text) ? `'${text}` : text;
   return `"${safeText.replaceAll('"', '""')}"`;
 }
 
-export function createCsv(rows: readonly (readonly (string | number)[])[]): string {
+function createCsv(rows: readonly (readonly (string | number)[])[]): string {
   return rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
 }
 
 export function createBirthdayCsv(items: readonly BirthdayCsvItem[]): string {
   return createCsv([["Nome", "Dia"], ...items.map((item) => [item.name, item.day])]);
+}
+
+export function downloadCsvFile(filename: string, csv: string): void {
+  const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** `1990-05-31` → `31/05/1990`, como o relatório legado. */
@@ -23,20 +34,34 @@ export function formatBirthDate(birthDate: string): string {
   return `${day}/${month}/${year}`;
 }
 
-export function createMonthlyEmployeeBirthdayCsv(
+// Tela, impressão e CSV usam as mesmas colunas e linhas.
+export const EMPLOYEE_BIRTHDAY_COLUMNS: BirthdayRow = ["Data", "Colaborador", "Departamento"];
+export const CLIENT_BIRTHDAY_COLUMNS: BirthdayRow = ["Data", "Cliente", "Empresa"];
+
+export function employeeBirthdayRows(
   items: readonly { name: string; birthDate: string; department: string | null }[],
-): string {
-  return createCsv([
-    ["Data", "Colaborador", "Departamento"],
-    ...items.map((item) => [formatBirthDate(item.birthDate), item.name, item.department ?? "Sem departamento"]),
+): BirthdayRow[] {
+  return items.map((item) => [
+    formatBirthDate(item.birthDate),
+    item.name,
+    item.department ?? "Sem departamento",
   ]);
 }
 
-export function createMonthlyClientBirthdayCsv(
+export function clientBirthdayRows(
   items: readonly { name: string; birthDate: string; companies: string }[],
+): BirthdayRow[] {
+  return items.map((item) => [formatBirthDate(item.birthDate), item.name, item.companies]);
+}
+
+export function createMonthlyEmployeeBirthdayCsv(
+  items: Parameters<typeof employeeBirthdayRows>[0],
 ): string {
-  return createCsv([
-    ["Data", "Cliente", "Empresa"],
-    ...items.map((item) => [formatBirthDate(item.birthDate), item.name, item.companies]),
-  ]);
+  return createCsv([EMPLOYEE_BIRTHDAY_COLUMNS, ...employeeBirthdayRows(items)]);
+}
+
+export function createMonthlyClientBirthdayCsv(
+  items: Parameters<typeof clientBirthdayRows>[0],
+): string {
+  return createCsv([CLIENT_BIRTHDAY_COLUMNS, ...clientBirthdayRows(items)]);
 }
