@@ -8,6 +8,7 @@ import {
   TAX_REGIME_OPTIONS,
   withReportingSnapshot,
 } from "@workspace/shared";
+import type { ClientSegmentType } from "@workspace/shared/regularize";
 import { ACTIVE_CLIENT_STATUS } from "../../../services/client-service/src/schemas/client.schemas.js";
 import { lookupOfficialCnpj } from "./cnpjLookup.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
@@ -153,13 +154,13 @@ export type ClientWorkerService = {
   listSegments: (organizationId: string, authorization: ClientAuthorization) => Promise<unknown>;
   createSegment: (
     organizationId: string,
-    input: { name: string; type: string },
+    input: { name: string; type: ClientSegmentType },
     authorization: ClientAuthorization,
   ) => Promise<unknown>;
   updateSegment: (
     id: string,
     organizationId: string,
-    input: { name?: string; type?: string },
+    input: CatalogItemInput,
     authorization: ClientAuthorization,
   ) => Promise<unknown>;
   runCompetenceOutputUpdate: () => Promise<unknown>;
@@ -453,7 +454,7 @@ const CATALOGS = {
   },
 } as const;
 
-export type CatalogItemInput = { name?: string; type?: string };
+type CatalogItemInput = { name?: string; type?: ClientSegmentType };
 
 function catalogDisplayName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
@@ -697,7 +698,11 @@ export class ClientService implements ClientWorkerService {
     return this.listCatalog("regime", organizationId, authorization);
   }
 
-  createRegime(organizationId: string, name: string, authorization: ClientAuthorization) {
+  createRegime(
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
     return this.createCatalogItem("regime", organizationId, { name }, authorization);
   }
 
@@ -706,7 +711,7 @@ export class ClientService implements ClientWorkerService {
     organizationId: string,
     name: string,
     authorization: ClientAuthorization,
-  ) {
+  ): Promise<unknown> {
     return this.updateCatalogItem("regime", id, organizationId, { name }, authorization);
   }
 
@@ -716,9 +721,9 @@ export class ClientService implements ClientWorkerService {
 
   createSegment(
     organizationId: string,
-    input: { name: string; type: string },
+    input: { name: string; type: ClientSegmentType },
     authorization: ClientAuthorization,
-  ) {
+  ): Promise<unknown> {
     return this.createCatalogItem("segment", organizationId, input, authorization);
   }
 
@@ -727,7 +732,7 @@ export class ClientService implements ClientWorkerService {
     organizationId: string,
     input: CatalogItemInput,
     authorization: ClientAuthorization,
-  ) {
+  ): Promise<unknown> {
     return this.updateCatalogItem("segment", id, organizationId, input, authorization);
   }
 

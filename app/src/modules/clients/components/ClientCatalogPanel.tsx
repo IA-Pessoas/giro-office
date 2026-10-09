@@ -29,9 +29,16 @@ interface ClientCatalogPanelProps {
   canEdit: boolean;
 }
 
+type CatalogWrite = { name: string; type: ClientSegmentType };
+
 // Catálogos da ficha (tb_regularize.regimes e tb_integracao.segmentos no legado, #1740 e #1741).
-const CATALOG_COPY = {
+const CATALOGS = {
   regime: {
+    useItems: useClientRegimes,
+    queryKey: CLIENT_REGIMES_QUERY_KEY,
+    hasType: false,
+    create: ({ name }: CatalogWrite) => clientService.createRegime(name),
+    update: (id: string, { name }: CatalogWrite) => clientService.updateRegime(id, name),
     title: "Regimes",
     description:
       "Regimes da organização disponíveis na ficha do cliente. Renomear não altera clientes já cadastrados.",
@@ -44,6 +51,11 @@ const CATALOG_COPY = {
     saveError: "Não foi possível salvar o regime. Confira o nome e tente novamente.",
   },
   segment: {
+    useItems: useClientSegments,
+    queryKey: CLIENT_SEGMENTS_QUERY_KEY,
+    hasType: true,
+    create: (input: CatalogWrite) => clientService.createSegment(input),
+    update: (id: string, input: CatalogWrite) => clientService.updateSegment(id, input),
     title: "Segmentos",
     description:
       "Segmentos de serviço, comércio e indústria usados na ficha e no Regularize. Renomear não altera clientes já cadastrados.",
@@ -55,6 +67,12 @@ const CATALOG_COPY = {
     saveError: "Não foi possível salvar o segmento. Confira o nome e tente novamente.",
   },
 } as const;
+
+const DEFAULT_SEGMENT_TYPE: ClientSegmentType = CLIENT_SEGMENT_TYPES[0];
+const primaryButtonClassName =
+  "rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50";
+const secondaryButtonClassName =
+  "rounded-xl border border-slate-200 font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
 
 function apiErrorMessage(error: unknown, fallback: string): string {
   const message = (error as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
@@ -89,18 +107,16 @@ function SegmentTypeSelect({
 }
 
 export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
-  const copy = CATALOG_COPY[kind];
-  const isSegment = kind === "segment";
+  // `kind` não muda durante a vida do painel, então o hook escolhido é sempre o mesmo.
+  const catalog = CATALOGS[kind];
   const queryClient = useQueryClient();
-  const regimesQuery = useClientRegimes();
-  const segmentsQuery = useClientSegments();
-  const query = isSegment ? segmentsQuery : regimesQuery;
+  const query = catalog.useItems();
   const items: CatalogItem[] = query.data ?? [];
   const [newName, setNewName] = useState("");
-  const [newType, setNewType] = useState<ClientSegmentType>("servico");
+  const [newType, setNewType] = useState(DEFAULT_SEGMENT_TYPE);
   const [editingId, setEditingId] = useState("");
   const [editingName, setEditingName] = useState("");
-  const [editingType, setEditingType] = useState<ClientSegmentType>("servico");
+  const [editingType, setEditingType] = useState(DEFAULT_SEGMENT_TYPE);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const editing = items.find((item) => item.id === editingId);
@@ -110,12 +126,10 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
     setError("");
     try {
       await action();
-      await queryClient.invalidateQueries({
-        queryKey: isSegment ? CLIENT_SEGMENTS_QUERY_KEY : CLIENT_REGIMES_QUERY_KEY,
-      });
+      await queryClient.invalidateQueries({ queryKey: catalog.queryKey });
       return true;
     } catch (caught) {
-      setError(apiErrorMessage(caught, copy.saveError));
+      setError(apiErrorMessage(caught, catalog.saveError));
       return false;
     } finally {
       setIsSaving(false);
@@ -125,34 +139,26 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
   async function createItem() {
     const name = newName.trim();
     if (!canEdit || !name) return;
-    const saved = await save(() =>
-      isSegment
-        ? clientService.createSegment({ name, type: newType })
-        : clientService.createRegime(name),
-    );
+    const saved = await save(() => catalog.create({ name, type: newType }));
     if (saved) setNewName("");
   }
 
   async function updateItem() {
     const name = editingName.trim();
     if (!canEdit || !editing || !name) return;
-    const saved = await save(() =>
-      isSegment
-        ? clientService.updateSegment(editing.id, { name, type: editingType })
-        : clientService.updateRegime(editing.id, name),
-    );
+    const saved = await save(() => catalog.update(editing.id, { name, type: editingType }));
     if (saved) setEditingId("");
   }
 
   const unchanged =
     !editing ||
-    (editingName.trim() === editing.name && (!isSegment || editingType === editing.type));
+    (editingName.trim() === editing.name && (!catalog.hasType || editingType === editing.type));
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{copy.title}</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">{copy.description}</p>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{catalog.title}</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400">{catalog.description}</p>
       </div>
 
       {canEdit ? (
@@ -164,7 +170,7 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
           }}
         >
           <label className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {copy.newLabel}
+            {catalog.newLabel}
             <input
               className={`${clientTextFieldClassName} mt-1.5`}
               value={newName}
@@ -174,7 +180,7 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
               disabled={isSaving}
             />
           </label>
-          {isSegment ? (
+          {catalog.hasType ? (
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
               Tipo
               <div className="mt-1.5">
@@ -190,9 +196,9 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
           <button
             type="submit"
             disabled={isSaving || !newName.trim()}
-            className="rounded-xl bg-gradient-to-r from-[var(--colors-brand-gradient-start)] to-[var(--colors-brand-gradient-end)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className={primaryButtonClassName}
           >
-            {copy.createLabel}
+            {catalog.createLabel}
           </button>
         </form>
       ) : null}
@@ -212,14 +218,14 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
             role="status"
             className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500 dark:bg-slate-950/40 dark:text-slate-400"
           >
-            {copy.loading}
+            {catalog.loading}
           </p>
         ) : query.error ? (
           <p
             role="alert"
             className="rounded-xl bg-rose-50 px-3 py-4 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
           >
-            {copy.loadError}
+            {catalog.loadError}
           </p>
         ) : items.length ? (
           <ul className="divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
@@ -244,7 +250,7 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
                       maxLength={80}
                       disabled={isSaving}
                     />
-                    {isSegment ? (
+                    {catalog.hasType ? (
                       <SegmentTypeSelect
                         label={`Tipo de ${item.name}`}
                         value={editingType}
@@ -255,7 +261,7 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
                     <button
                       type="submit"
                       disabled={isSaving || !editingName.trim() || unchanged}
-                      className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                      className={`${secondaryButtonClassName} px-4 py-2 text-sm`}
                     >
                       Salvar
                     </button>
@@ -284,11 +290,11 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
                         onClick={() => {
                           setEditingId(item.id);
                           setEditingName(item.name);
-                          setEditingType(item.type ?? "servico");
+                          setEditingType(item.type ?? DEFAULT_SEGMENT_TYPE);
                           setError("");
                         }}
                         disabled={isSaving}
-                        className="self-start rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        className={`${secondaryButtonClassName} self-start px-3 py-1.5 text-xs`}
                       >
                         Editar
                       </button>
@@ -300,7 +306,7 @@ export function ClientCatalogPanel({ kind, canEdit }: ClientCatalogPanelProps) {
           </ul>
         ) : (
           <p className="rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-600 dark:bg-slate-950/40 dark:text-slate-400">
-            {copy.empty}
+            {catalog.empty}
           </p>
         )}
       </div>
