@@ -278,7 +278,13 @@ export interface FiscalInvoicePdfTotals {
   status: "complete" | "partial";
   supported_format: string;
   totals: { value: string; invoices: number };
-  invoices: { file_name: string; pages: number; value: string; origin: { page: number; label: string; line: string } }[];
+  invoices: {
+    file_name: string;
+    pages: number;
+    value: string;
+    origin: { page: number; label: string; line: string };
+    occurrences: number;
+  }[];
   ambiguous: { file_name: string; reason: string; candidates: FiscalInvoiceCandidate[] }[];
   not_processed: { file_name: string; reason: string }[];
   file_name: string;

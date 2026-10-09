@@ -41,7 +41,7 @@ export function FiscalInvoicePdfSection({ canEdit }: { canEdit: boolean }) {
           Totais de faturas em PDF
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Envie os PDFs das faturas. Cada PDF precisa ter camada de texto (gerado por sistema, não escaneado) e sem senha. O total é procurado por rótulos como Total a pagar e Valor total; fatura com mais de um total diferente, PDF ilegível ou repetido fica fora da soma e aparece abaixo. Nada é gravado.
+          Envie os PDFs das faturas, um total por PDF. Cada PDF precisa ter camada de texto (gerado por sistema, não escaneado) e sem senha. O total é procurado por rótulos como Total a pagar e Valor total; fatura com mais de um total diferente, PDF ilegível ou repetido fica fora da soma e aparece abaixo. Nada é gravado.
         </p>
         <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
           Compatibilidade com faturas reais ainda não validada: confira o resultado antes de usá-lo como definitivo.
@@ -107,7 +107,7 @@ export function FiscalInvoicePdfSection({ canEdit }: { canEdit: boolean }) {
                     <td className="px-4 py-2">{invoice.origin.label}</td>
                     <td className="px-4 py-2">{formatMoney(invoice.value)}</td>
                     <td className="px-4 py-2 font-mono text-xs">{invoice.origin.line}</td>
-                    <td className="px-4 py-2" />
+                    <td className="px-4 py-2">{invoice.occurrences > 1 ? `Mesmo valor em ${invoice.occurrences} pontos, somado uma vez` : ""}</td>
                   </tr>
                 ))}
                 {result.ambiguous.flatMap((item) =>

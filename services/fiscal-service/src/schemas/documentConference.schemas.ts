@@ -22,7 +22,7 @@ export const documentConferenceBodySchema = z
   .strict();
 
 // 900 mil caracteres em base64 (~650 kB de ZIP) mais a lista de notas ficam dentro do 1 MB.
-export const XML_SELECTION_MAX_BASE64_LENGTH = 900_000;
+export const CONFERENCE_MAX_BASE64_LENGTH = 900_000;
 
 export const xmlSelectionBodySchema = z
   .object({
@@ -30,7 +30,7 @@ export const xmlSelectionBodySchema = z
     zip_base64: z
       .string({ message: "Envie o ZIP." })
       .min(1, "Envie o ZIP.")
-      .max(XML_SELECTION_MAX_BASE64_LENGTH, "ZIP excede o limite de 650 kB.")
+      .max(CONFERENCE_MAX_BASE64_LENGTH, "ZIP excede o limite de 650 kB.")
       .regex(/^[A-Za-z0-9+/]+={0,2}$/u, "ZIP em base64 inválido."),
     requests: z
       .array(z.string().trim().min(1).max(80, "Pedido longo demais."), {
@@ -105,7 +105,7 @@ export const invoicePdfTotalsBodySchema = z
       .refine(
         (files) =>
           files.reduce((total, file) => total + file.content_base64.length, 0) <=
-          XML_SELECTION_MAX_BASE64_LENGTH,
+          CONFERENCE_MAX_BASE64_LENGTH,
         "PDFs excedem o limite de 650 kB somados.",
       ),
   })

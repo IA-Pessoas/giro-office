@@ -474,6 +474,7 @@ await runTest("fiscal invoice PDF totals show origin, ambiguous and unprocessed 
   assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
   assert.match(section, /Formato suportado: \{result\.supported_format\}/);
   assert.match(section, /\{invoice\.origin\.page\}/);
+  assert.match(section, /invoice\.occurrences > 1/);
   assert.match(section, /result\.not_processed\.map/);
   assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
 });
