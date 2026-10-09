@@ -344,3 +344,22 @@ await runTest("fiscal Simples batch parses pasted documents and exports CSV for 
   assert.match(batch, /nenhum arquivo gerado/);
   assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });
+
+await runTest("fiscal Domínio × SEFAZ conference reads files and shows partial results", async () => {
+  const { readSpreadsheetText } = await import("./utils/readSpreadsheetText.ts");
+  assert.equal(await readSpreadsheetText(new File(["Série;Número"], "a.csv")), "Série;Número");
+  // Exportação em Windows-1252: "é" é o byte 0xE9, inválido em UTF-8.
+  assert.equal(await readSpreadsheetText(new File([Uint8Array.of(0x53, 0xe9, 0x72)], "b.csv")), "Sér");
+
+  const section = await readSource("./components/FiscalConferencesSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /id: "conferences",\s*label: "Conferências"/);
+  assert.match(fiscalSources.shell, /<FiscalConferencesSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/documents", \{/);
+  // Viewer não executa; resultado parcial vira alerta, nunca "completo".
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /exige permissão de edição no Fiscal/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  assert.match(section, /catch \(error\) \{\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
+});
