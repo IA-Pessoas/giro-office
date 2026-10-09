@@ -134,6 +134,12 @@ const integracaoResponsibleTaskPolicy: AuthPolicy = createModulePolicy("integrac
 const integracaoClientPolicy = createModulePolicy("integracao", moduleAccessPermission);
 /** Mutações do cadastro de clientes exigem edição; o client-service ainda cobra 3 para desativar. */
 const integracaoClientEditPolicy = createModulePolicy("integracao", moduleEditPermission);
+const clientInstagramProfileReadPolicy: AuthPolicy = {
+  anyOf: [integracaoClientPolicy, marketingModulePolicy],
+};
+const clientInstagramProfileEditPolicy: AuthPolicy = {
+  anyOf: [integracaoClientEditPolicy, marketingEditPolicy],
+};
 
 const clientListPolicy: AuthPolicy = {
   anyOf: [
@@ -180,6 +186,16 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
+  {
+    method: "GET",
+    path: /^\/client\/instagram-profiles\/report\/?$/,
+    policy: clientInstagramProfileReadPolicy,
+  },
+  {
+    method: "PATCH",
+    path: /^\/client\/[^/]+\/integration\/?$/,
+    policy: clientInstagramProfileEditPolicy,
+  },
   { method: "GET", path: integracaoClientPath, policy: integracaoClientPolicy },
   { method: "ANY", path: integracaoClientPath, policy: integracaoClientEditPolicy },
   { method: "GET", path: /^\/client(?:\/|$)/, policy: clientModulePolicy },

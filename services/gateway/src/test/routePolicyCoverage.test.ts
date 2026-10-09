@@ -1,6 +1,9 @@
+import type { AuthContext } from "@workspace/shared";
+import type { NextFunction, Request, Response } from "express";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayEnv } from "../config/env.js";
+import { buildAuthorizeMiddleware } from "../middlewares/authorize.js";
 import { buildGatewayOpenApiSpec } from "../openapi/gatewaySpec.js";
 import { getRoutePolicy } from "../security/policies.js";
 import { isPublicRoute } from "../security/publicRoutes.js";
@@ -52,8 +55,97 @@ function createCoverageEnv(): GatewayEnv {
   };
 }
 
+function authorizeClientRequest(
+  method: string,
+  originalUrl: string,
+  modules: Record<string, number>,
+  body: unknown = {},
+): unknown {
+  let error: unknown;
+  const request = {
+    method,
+    originalUrl,
+    body,
+    auth: {
+      token: "test-token",
+      userId: "user-1",
+      organizationId: "org-1",
+      actorKind: "organization",
+      isPlatformAdmin: false,
+      claims: { user_id: "user-1", organization_id: "org-1", type: "user", modules },
+    } as AuthContext,
+  } as Request;
+  buildAuthorizeMiddleware("enforce")(
+    request,
+    {} as Response,
+    ((reason?: unknown) => {
+      error = reason;
+    }) as NextFunction,
+  );
+  return error;
+}
+
 it("classifies every documented gateway operation as public or policy-protected", () => {
   expect(getUnclassifiedGatewayOperations(createCoverageEnv())).toEqual([]);
+});
+
+describe("Marketing access to canonical Instagram profiles", () => {
+  it("allows Marketing viewers to query only the scoped profile report", () => {
+    expect(
+      authorizeClientRequest("GET", "/client/instagram-profiles/report", { marketing: 1 }),
+    ).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/client/client-1", { marketing: 1 })).toMatchObject({
+      statusCode: 403,
+    });
+    expect(authorizeClientRequest("GET", "/client/list", { marketing: 1 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+
+  it("allows Marketing editors to change only Instagram while Integration editors keep existing access", () => {
+    expect(
+      authorizeClientRequest(
+        "PATCH",
+        "/client/client-1/integration",
+        { marketing: 2 },
+        {
+          instagram: "@acme",
+        },
+      ),
+    ).toBeUndefined();
+    expect(
+      authorizeClientRequest(
+        "PATCH",
+        "/client/client-1/integration",
+        { marketing: 2 },
+        {
+          instagram: "@acme",
+          email: "contact@acme.com",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+    expect(
+      authorizeClientRequest(
+        "PATCH",
+        "/client/client-1/integration",
+        { integracao: 2 },
+        {
+          instagram: "@acme",
+          email: "contact@acme.com",
+        },
+      ),
+    ).toBeUndefined();
+    expect(
+      authorizeClientRequest(
+        "PATCH",
+        "/client/client-1/integration",
+        { marketing: 1 },
+        {
+          instagram: "@acme",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+  });
 });
 
 describe("platform default deny", () => {
