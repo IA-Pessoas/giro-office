@@ -260,6 +260,110 @@ describe("fiscal Worker", () => {
     expect(revenues.list).toHaveBeenCalledOnce();
   });
 
+  it("acompanha malhas no tenant autenticado, com anexo e leitura para nível 1", async () => {
+    const malha = {
+      id: ICMS_ID,
+      client_id: "d0000000-0000-4000-8000-000000000001",
+      period_start: "2025-01",
+      period_end: "2025-12",
+      reason: "Divergência",
+      deadline: null,
+      status: "aberta",
+      responsible_id: null,
+      task_id: null,
+      attachment: null,
+    };
+    const malhas = {
+      create: vi.fn(async () => malha),
+      update: vi.fn(async () => ({ ...malha, status: "respondida" })),
+      list: vi.fn(async () => ({ data: [malha], total: 1, page: 1, limit: 50, hasMore: false })),
+      detail: vi.fn(async () => ({ ...malha, history: [] })),
+      replaceAttachment: vi.fn(async () => malha),
+      attachmentAccess: vi.fn(async () => ({ url: "https://signed", expires_in_seconds: 300 })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), malhaService: malhas as never });
+    const viewer = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
+
+    const created = await app.request("https://fiscal.test/fiscal/malhas", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: malha.client_id,
+        period_start: "2025-01",
+        period_end: "2025-12",
+        reason: "Divergência",
+      }),
+    });
+    expect(created.status).toBe(201);
+    expect(malhas.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        status: "aberta",
+      }),
+    );
+
+    const listed = await app.request(
+      `https://fiscal.test/fiscal/malhas/list?status=aberta&client_id=${malha.client_id}`,
+      { headers: viewer },
+    );
+    expect(listed.status).toBe(200);
+    expect(malhas.list).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "aberta", client_id: malha.client_id }),
+      ORGANIZATION_ID,
+    );
+
+    const detail = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}`, {
+      headers: viewer,
+    });
+    expect(detail.status).toBe(200);
+    expect(malhas.detail).toHaveBeenCalledWith(ICMS_ID, ORGANIZATION_ID);
+
+    const updated = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}`, {
+      method: "PUT",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ status: "respondida" }),
+    });
+    expect(updated.status).toBe(200);
+    expect(malhas.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: ICMS_ID,
+        status: "respondida",
+        organizationId: ORGANIZATION_ID,
+      }),
+    );
+
+    const form = new FormData();
+    form.append("file", new File(["%PDF-1.7"], "intimacao.pdf", { type: "application/pdf" }));
+    const attached = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}/attachment`, {
+      method: "POST",
+      headers: gatewayHeaders(),
+      body: form,
+    });
+    expect(attached.status).toBe(201);
+    expect(malhas.replaceAttachment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: ICMS_ID,
+        organizationId: ORGANIZATION_ID,
+        file: expect.objectContaining({ originalname: "intimacao.pdf", size: 8 }),
+      }),
+    );
+
+    const access = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}/attachment`, {
+      headers: viewer,
+    });
+    expect(access.status).toBe(200);
+    expect(access.headers.get("cache-control")).toBe("no-store");
+
+    const viewerWrite = await app.request(`https://fiscal.test/fiscal/malhas/${ICMS_ID}`, {
+      method: "PUT",
+      headers: { ...viewer, "content-type": "application/json" },
+      body: JSON.stringify({ status: "encerrada" }),
+    });
+    expect(viewerWrite.status).toBe(403);
+    expect(malhas.update).toHaveBeenCalledOnce();
+  });
+
   it("registra alíquota manual e entrega PDF no tenant autenticado", async () => {
     const rate = {
       id: ICMS_ID,

@@ -9,6 +9,8 @@ import { loggerLevelSchema } from "@workspace/shared/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
 
+import { MALHA_ATTACHMENT_DEFAULT_BUCKET } from "../services/malhaService.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const serviceEnvPath = path.resolve(__dirname, "../../.env");
@@ -50,6 +52,9 @@ const envSchema = z
     reportsInternalToken: z.string().optional().default("reports-service-token"),
     reportsGrantSecret: z.string().optional().default("reports-grant-secret"),
     enableApiDocsEnv: z.string().optional(),
+    supabaseUrl: z.string().url("SUPABASE_URL inválida para o fiscal-service.").optional(),
+    supabaseServiceRoleKey: z.string().min(1).optional(),
+    malhaAttachmentBucket: z.string().min(1).optional().default(MALHA_ATTACHMENT_DEFAULT_BUCKET),
     allowedOrigins: z
       .string()
       .optional()
@@ -109,6 +114,9 @@ export function getFiscalServiceEnv(): FiscalServiceEnv {
     reportsInternalToken: process.env.REPORTS_INTERNAL_TOKEN,
     reportsGrantSecret: process.env.REPORTS_GRANT_SECRET,
     enableApiDocsEnv: process.env.ENABLE_API_DOCS,
+    supabaseUrl: process.env.SUPABASE_URL || undefined,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || undefined,
+    malhaAttachmentBucket: process.env.FISCAL_MALHA_ATTACHMENT_BUCKET || undefined,
     allowedOrigins: process.env.SERVICE_ALLOWED_ORIGINS,
   });
 }

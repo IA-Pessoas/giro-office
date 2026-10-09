@@ -2,6 +2,27 @@ import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspa
 import type { OpenApiDocument } from "@workspace/shared/http";
 
 import type { FiscalServiceEnv } from "../config/env.js";
+import { MALHA_STATUSES } from "../schemas/malha.schemas.js";
+
+const competencePattern = "^[0-9]{4}-(0[1-9]|1[0-2])$";
+const successContent = {
+  "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+};
+const malhaIdParameter = {
+  name: "id",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+};
+const malhaWritableProperties = {
+  period_start: { type: "string", pattern: competencePattern, description: "AAAA-MM" },
+  period_end: { type: "string", pattern: competencePattern, description: "AAAA-MM" },
+  reason: { type: "string", minLength: 1, maxLength: 2000 },
+  deadline: { type: "string", format: "date", nullable: true },
+  status: { type: "string", enum: [...MALHA_STATUSES], default: "aberta" },
+  responsible_id: { type: "string", format: "uuid", nullable: true },
+  task_id: { type: "string", format: "uuid", nullable: true },
+};
 
 export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDocument {
   const baseUrl = `http://localhost:${env.port}`;
@@ -120,6 +141,11 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       {
         name: "Receitas",
         description: "Receita bruta mensal por cliente, base do Simples Nacional",
+      },
+      {
+        name: "Malhas",
+        description:
+          "Malhas fiscais por cliente com prazo, situação, responsável, anexo e histórico",
       },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
@@ -1049,6 +1075,164 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
             "400": { description: "Entrada inválida" },
             "403": { description: "Sem permissão de edição Fiscal" },
             "404": { description: "Receita não encontrada nesta organização" },
+          },
+        },
+      },
+      "/fiscal/malhas": {
+        post: {
+          tags: ["Malhas"],
+          summary: "Cadastrar malha fiscal do cliente",
+          description:
+            "Prazo, situação e responsável iniciais entram no histórico. task_id é opcional e precisa ser tarefa da organização; responsible_id precisa ser usuário ativo com acesso ao Fiscal.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "period_start", "period_end", "reason"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    ...malhaWritableProperties,
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Malha cadastrada", content: successContent },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": {
+              description: "Cliente, tarefa ou responsável não encontrado nesta organização",
+            },
+          },
+        },
+      },
+      "/fiscal/malhas/list": {
+        get: {
+          tags: ["Malhas"],
+          summary: "Listar malhas fiscais com filtros",
+          description: "Ordena por prazo (sem prazo por último) e depois pelas mais recentes.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "status",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: [...MALHA_STATUSES] },
+            },
+            {
+              name: "responsible_id",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+            },
+            ...paginationParameters,
+          ],
+          responses: {
+            "200": {
+              description: "Malhas paginadas da organização",
+              content: { "application/json": { schema: paginatedListEnvelopeSchema } },
+            },
+            "400": { description: "Filtro inválido" },
+          },
+        },
+      },
+      "/fiscal/malhas/{id}": {
+        get: {
+          tags: ["Malhas"],
+          summary: "Detalhar malha com histórico de prazo, situação e responsável",
+          security: [{ bearerAuth: [] }],
+          parameters: [malhaIdParameter],
+          responses: {
+            "200": {
+              description: "Malha e histórico (mais recente primeiro)",
+              content: successContent,
+            },
+            "404": { description: "Malha não encontrada nesta organização" },
+          },
+        },
+        put: {
+          tags: ["Malhas"],
+          summary: "Atualizar malha fiscal",
+          description:
+            "Mudanças de prazo, situação e responsável gravam histórico com ator e momento na mesma transação.",
+          security: [{ bearerAuth: [] }],
+          parameters: [malhaIdParameter],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  minProperties: 1,
+                  additionalProperties: false,
+                  properties: malhaWritableProperties,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Malha atualizada", content: successContent },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Malha, tarefa ou responsável não encontrado nesta organização" },
+          },
+        },
+      },
+      "/fiscal/malhas/{id}/attachment": {
+        post: {
+          tags: ["Malhas"],
+          summary: "Enviar ou substituir o anexo da malha",
+          security: [{ bearerAuth: [] }],
+          parameters: [malhaIdParameter],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["file"],
+                  properties: {
+                    file: {
+                      type: "string",
+                      format: "binary",
+                      description: "PDF, JPEG, PNG ou WEBP de até 10 MB",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Anexo gravado; devolve a malha", content: successContent },
+            "400": { description: "Arquivo ausente, grande demais ou de formato inválido" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Malha não encontrada nesta organização" },
+            "503": { description: "Storage de anexos não configurado" },
+          },
+        },
+        get: {
+          tags: ["Malhas"],
+          summary: "Gerar URL assinada temporária do anexo",
+          security: [{ bearerAuth: [] }],
+          parameters: [malhaIdParameter],
+          responses: {
+            "200": {
+              description: "URL assinada (url, expires_in_seconds)",
+              content: successContent,
+            },
+            "404": { description: "Malha ou anexo não encontrado nesta organização" },
+            "503": { description: "Storage de anexos não configurado" },
           },
         },
       },

@@ -20,6 +20,12 @@ import {
   updateIpiBodySchema,
 } from "@workspace/fiscal-service/src/schemas/ipi.schemas.js";
 import {
+  createMalhaBodySchema,
+  listMalhasQuerySchema,
+  malhaIdParamsSchema,
+  updateMalhaBodySchema,
+} from "@workspace/fiscal-service/src/schemas/malha.schemas.js";
+import {
   createMonthlyRevenueBodySchema,
   listMonthlyRevenuesQuerySchema,
   monthlyRevenueIdParamsSchema,
@@ -42,6 +48,7 @@ import {
 } from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
+import { MalhaService } from "@workspace/fiscal-service/src/services/malhaService.js";
 import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
 import { simplesRateCsvExport } from "@workspace/fiscal-service/src/services/simplesRateCsvService.js";
 import {
@@ -72,6 +79,7 @@ import { createFiscalAudit, requireAuditConfigured } from "./audit.js";
 import { authenticateFiscalRequest, authorizeFiscalRequest } from "./auth.js";
 import type { FiscalWorkerEnv } from "./env.js";
 import { FiscalSearchService, IpiService, NcmService } from "./fiscalServices.js";
+import { WorkerMalhaAttachmentStorage } from "./malhaAttachmentStorage.js";
 import { PrismaClient } from "./prisma.js";
 import { verifyReportingGrant } from "./reporting.js";
 
@@ -90,6 +98,10 @@ type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
 type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
+type MalhaServiceLike = Pick<
+  MalhaService,
+  "create" | "update" | "list" | "detail" | "replaceAttachment" | "attachmentAccess"
+>;
 type SimplesServiceLike = Pick<SimplesRateService, "preview" | "emission" | "batch">;
 
 interface FiscalWorkerOptions {
@@ -101,6 +113,7 @@ interface FiscalWorkerOptions {
   reportingService?: ReportingServiceLike;
   rateService?: RateServiceLike;
   revenueService?: RevenueServiceLike;
+  malhaService?: MalhaServiceLike;
   simplesService?: SimplesServiceLike;
 }
 
@@ -117,6 +130,7 @@ type WorkerServices = {
   reportingService: ReportingServiceLike;
   rateService: RateServiceLike;
   revenueService: RevenueServiceLike;
+  malhaService: MalhaServiceLike;
   simplesService: SimplesServiceLike;
 };
 
@@ -240,6 +254,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         ConstructorParameters<typeof FiscalSearchService>[0] &
         ConstructorParameters<typeof FiscalRateService>[0] &
         ConstructorParameters<typeof MonthlyRevenueService>[0] &
+        ConstructorParameters<typeof MalhaService>[0] &
         ConstructorParameters<typeof SimplesRateService>[0] &
         ConstructorParameters<typeof InternalReportingService>[0];
       const factories: { [S in keyof WorkerServices]: () => WorkerServices[S] } = {
@@ -250,6 +265,12 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         reportingService: () => new InternalReportingService(prisma),
         rateService: () => new FiscalRateService(prisma, createFiscalAudit(env)),
         revenueService: () => new MonthlyRevenueService(prisma, createFiscalAudit(env)),
+        malhaService: () =>
+          new MalhaService(
+            prisma,
+            createFiscalAudit(env),
+            WorkerMalhaAttachmentStorage.fromEnv(env),
+          ),
         simplesService: () => new SimplesRateService(prisma),
       };
       return callback(factories[key]());
@@ -317,6 +338,78 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const data = await withService("revenueService", (service) =>
       service.list(query, c.get("auth").organizationId),
     );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/malhas", async (c) => {
+    const body = parseWithZod(createMalhaBodySchema, await readJson(c));
+    const data = await withService("malhaService", (service) =>
+      service.create({ ...actor(c), ...body }),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.get("/fiscal/malhas/list", async (c) => {
+    const query = parseWithZod(listMalhasQuerySchema, {
+      client_id: c.req.query("client_id"),
+      status: c.req.query("status"),
+      responsible_id: c.req.query("responsible_id"),
+      page: c.req.query("page"),
+      page_size: c.req.query("page_size"),
+    });
+    const data = await withService("malhaService", (service) =>
+      service.list(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/malhas/:id", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("malhaService", (service) =>
+      service.detail(id, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.put("/fiscal/malhas/:id", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(updateMalhaBodySchema, await readJson(c));
+    const data = await withService("malhaService", (service) =>
+      service.update({ ...actor(c), ...body, id }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/malhas/:id/attachment", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    let form: FormData;
+    try {
+      form = await c.req.raw.formData();
+    } catch {
+      throw new ServiceError(400, "Upload inválido.");
+    }
+    const entry = form.get("file");
+    const file =
+      entry instanceof File
+        ? {
+            bytes: new Uint8Array(await entry.arrayBuffer()),
+            mimetype: entry.type,
+            originalname: entry.name,
+            size: entry.size,
+          }
+        : undefined;
+    const data = await withService("malhaService", (service) =>
+      service.replaceAttachment({ ...actor(c), id, file }),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.get("/fiscal/malhas/:id/attachment", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("malhaService", (service) =>
+      service.attachmentAccess(id, c.get("auth").organizationId),
+    );
+    c.header("Cache-Control", "no-store");
     return c.json(createSuccessResponse(data));
   });
 
