@@ -127,6 +127,8 @@ function services() {
       updateMonthly: vi.fn(async () => ({ id: ID })),
       getConfig: vi.fn(async () => ({ active_items: [] })),
       saveConfig: vi.fn(async () => ({ active_items: [] })),
+      getFiscalSettings: vi.fn(async () => ({ priority: false, delivery_method: null })),
+      saveFiscalSettings: vi.fn(async () => ({ priority: true, delivery_method: null })),
       listStatements: vi.fn(async () => []),
       upsertStatement: vi.fn(async () => ({ id: ID })),
       archiveStatement: vi.fn(async () => ({ id: ID })),
@@ -389,6 +391,38 @@ describe("contabil Worker remainder routes", () => {
     );
     expect(deps.triageDocumentsService.getConfig).toHaveBeenCalledExactlyOnceWith(
       { client_id: CLIENT, type: "CONTABIL" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("prioridade e meio de envio fiscal validam corpo e usam a organização do token (#1692)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, body?: unknown, query = "", auth = true) =>
+      app.request(`https://contabil.test/triagem/fiscal-settings${query}`, {
+        method,
+        headers: auth ? { ...headers("2"), "content-type": "application/json" } : {},
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    const saved = await send("PUT", {
+      client_id: CLIENT,
+      priority: true,
+      delivery_method: "EMAIL",
+    });
+    const empty = await send("PUT", { client_id: CLIENT });
+    const textPriority = await send("PUT", { client_id: CLIENT, priority: "Sim" });
+    const read = await send("GET", undefined, `?client_id=${CLIENT}`);
+    const anonymous = await send("GET", undefined, `?client_id=${CLIENT}`, false);
+
+    expect([saved.status, read.status]).toEqual([200, 200]);
+    expect([empty.status, textPriority.status, anonymous.status]).toEqual([400, 400, 401]);
+    expect(deps.triageDocumentsService.saveFiscalSettings).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, priority: true, delivery_method: "EMAIL" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+    expect(deps.triageDocumentsService.getFiscalSettings).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT },
       expect.objectContaining({ organizationId: ORG }),
     );
   });

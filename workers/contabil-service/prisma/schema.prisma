@@ -113,6 +113,8 @@ model TriageConfig {
   client_id       String
   type            String
   active_items    Json
+  priority        Boolean  @default(false)
+  delivery_method String?  @db.VarChar(100)
   updated_at      DateTime @updatedAt
   organization_id String
 

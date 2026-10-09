@@ -2,6 +2,7 @@ import {
   TRIAGE_FISCAL_CHECKLIST_FIELDS,
   TRIAGE_PORTFOLIO_DOCUMENT_STATUSES,
   TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS,
+  TRIAGE_PORTFOLIO_PRIORITY_FILTERS,
 } from "@workspace/shared/triagem";
 import { z } from "zod";
 
@@ -82,6 +83,10 @@ export const fiscalPortfolioSchema = z
         message: "justification deve ser with ou without.",
       })
       .optional(),
+    priority: z
+      .enum(TRIAGE_PORTFOLIO_PRIORITY_FILTERS, { message: "priority deve ser yes ou no." })
+      .optional(),
+    delivery_method: optionalText,
   })
   .strict();
 export const contabilPortfolioSchema = z
@@ -122,6 +127,16 @@ const configType = z.enum(["CONTABIL"] as const).default("CONTABIL");
 export const triageConfigQuerySchema = z
   .object({ client_id: uuid("client_id"), type: configType })
   .strict();
+export const fiscalSettingsQuerySchema = z.object({ client_id: uuid("client_id") }).strict();
+export const fiscalSettingsBodySchema = fiscalSettingsQuerySchema
+  .extend({
+    priority: z.boolean().optional(),
+    delivery_method: z.string().trim().min(1).max(100).nullable().optional(),
+  })
+  .strict()
+  .refine((body) => body.priority !== undefined || body.delivery_method !== undefined, {
+    message: "Informe a prioridade ou o meio de envio.",
+  });
 export const triageConfigBodySchema = triageConfigQuerySchema
   .extend({ active_items: z.array(z.enum(documentFields)).max(documentFields.length) })
   .strict();

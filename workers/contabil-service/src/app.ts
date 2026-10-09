@@ -60,6 +60,8 @@ import {
   documentsBulkSchema,
   editabilitySchema,
   fiscalPortfolioSchema,
+  fiscalSettingsBodySchema,
+  fiscalSettingsQuerySchema,
   monthlyIdSchema,
   monthlySchema,
   monthlyUpdateSchema,
@@ -596,6 +598,20 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const body = parseWithZod(monthlyUpdateSchema, await readJson(c));
     const data = await withDocuments(c, (service) =>
       service.updateMonthly(params.id, body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/fiscal-settings", async (c) => {
+    const query = parseWithZod(fiscalSettingsQuerySchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.getFiscalSettings(query, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.put("/triagem/fiscal-settings", async (c) => {
+    const body = parseWithZod(fiscalSettingsBodySchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.saveFiscalSettings(body, authContext(c.get("auth"))),
     );
     return c.json(createSuccessResponse(data));
   });
