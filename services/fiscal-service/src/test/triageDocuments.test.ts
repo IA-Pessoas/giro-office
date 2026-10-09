@@ -14,6 +14,7 @@ describe("triageDocumentsView", () => {
           cte_documents: "NOT_PRESENT",
           mei_documents: "NOT_APPLICABLE",
           billing_amount: "123,00",
+          bank_statement: "PENDING",
         },
       },
       undefined,

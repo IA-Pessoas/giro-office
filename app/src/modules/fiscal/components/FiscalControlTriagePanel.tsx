@@ -1,4 +1,4 @@
-import { FISCAL_DOCUMENTS, STATUSES } from "@modules/contabil/components/TriageDocumentsSection";
+import { FISCAL_DOCUMENTS, STATUSES } from "@modules/contabil/components/triageDocumentLabels";
 import { useFetch } from "@shared/hooks";
 import { AlertCircle, Loader2 } from "lucide-react";
 
