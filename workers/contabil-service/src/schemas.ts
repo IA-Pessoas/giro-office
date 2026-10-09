@@ -96,6 +96,34 @@ export const editabilitySchema = z
   .object({ client_id: uuid("client_id"), type: monthlySchema.shape.type })
   .strict();
 export const monthlyIdSchema = z.object({ id: uuid("id") }).strict();
+const dateOnly = z
+  .string()
+  .regex(
+    /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u,
+    "data deve estar no formato YYYY-MM-DD.",
+  );
+export const monthlyUpdateSchema = z
+  .object({
+    type: monthlySchema.shape.type,
+    triad_moviment: z.boolean().optional(),
+    notes: z.string().trim().max(2_000).nullable().optional(),
+    justification: z.string().trim().max(100).nullable().optional(),
+    responsible_id: uuid("responsible_id").nullable().optional(),
+    download_date: dateOnly.nullable().optional(),
+    settlement_date: dateOnly.nullable().optional(),
+  })
+  .strict()
+  .refine((body) => Object.keys(body).some((key) => key !== "type"), {
+    message: "Informe ao menos um campo do movimento mensal.",
+  });
+// Movimento padrão: por ora só a rotina contábil é configurável por aqui.
+const configType = z.enum(["CONTABIL"] as const).default("CONTABIL");
+export const triageConfigQuerySchema = z
+  .object({ client_id: uuid("client_id"), type: configType })
+  .strict();
+export const triageConfigBodySchema = triageConfigQuerySchema
+  .extend({ active_items: z.array(z.enum(documentFields)).max(documentFields.length) })
+  .strict();
 export const documentItemSchema = z
   .object({
     type: monthlySchema.shape.type,
