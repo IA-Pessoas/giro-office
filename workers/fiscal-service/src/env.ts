@@ -12,4 +12,7 @@ export interface FiscalWorkerEnv extends WorkerEnv {
   ENABLE_API_DOCS?: string;
   NODE_ENV?: string;
   SERVICE_ALLOWED_ORIGINS?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  FISCAL_MALHA_ATTACHMENT_BUCKET?: string;
 }
