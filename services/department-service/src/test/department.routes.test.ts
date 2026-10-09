@@ -89,7 +89,9 @@ describe("department routes", () => {
     expect(
       route.get?.parameters?.filter((parameter) => parameter.name === "administrative"),
     ).toHaveLength(1);
-    expect(route.get?.parameters?.filter((parameter) => parameter.name === "marketing")).toHaveLength(1);
+    expect(
+      route.get?.parameters?.filter((parameter) => parameter.name === "marketing"),
+    ).toHaveLength(1);
   });
 
   it("GET /department/list sem autenticacao retorna 401", async () => {
