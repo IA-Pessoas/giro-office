@@ -19,6 +19,20 @@ DATABASE_URL=<postgres> pnpm --dir services/fiscal-service exec tsx src/history/
   aceita e, com `--out`, o relatório completo em JSON.
 - O relatório é determinístico: o mesmo arquivo sobre o mesmo banco gera o mesmo resultado.
 
+## Gerar o arquivo a partir do dump do `cbse`
+
+O dump phpMyAdmin de 12/09/2026 (um `.sql` por tabela) já contém as tabelas
+`tb_fiscal.controle_impostos*`. Extraia-as numa pasta fora do repositório e gere o export:
+
+```bash
+pnpm --dir services/fiscal-service exec tsx src/history/dumpToExportCli.ts \
+  --dump <pasta> --organization <uuid-da-organização> --out export.json
+```
+
+O detalhe do regime (`_sn`, `_normal`, `_mei`) é escolhido pelo `tipo` e ligado por `id_comp`.
+`controle_impostos_npossui` não entra: o PHP já grava `0001-01-01` no detalhe ao gerar o
+controle. O arquivo gerado contém dados reais e não deve ser versionado.
+
 ## Contrato do arquivo (`giro-fiscal-history/v1`)
 
 ```json
