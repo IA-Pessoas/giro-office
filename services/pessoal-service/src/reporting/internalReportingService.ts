@@ -277,10 +277,31 @@ export class InternalReportingService {
   constructor(
     private readonly prisma: Pick<
       PrismaClient,
-      "lddPessoal" | "payroll" | "situationsPessoal" | "obrigationsPessoal" | "unionPessoal"
+      | "lddPessoal"
+      | "payroll"
+      | "situationsPessoal"
+      | "obrigationsPessoal"
+      | "unionPessoal"
+      | "client"
     >,
     private readonly inSnapshot = false,
   ) {}
+
+  private async withClientNames(
+    rows: readonly Record<string, unknown>[],
+    organizationId: string,
+  ): Promise<readonly Record<string, unknown>[]> {
+    const ids = [
+      ...new Set(rows.map((row) => row.client_id).filter((id) => typeof id === "string")),
+    ] as string[];
+    if (!ids.length) return rows;
+    const clients = await this.prisma.client.findMany({
+      where: { organization_id: organizationId, id: { in: ids } },
+      select: { id: true, name: true },
+    });
+    const byId = new Map(clients.map((client) => [client.id, client]));
+    return rows.map((row) => ({ ...row, client: byId.get(row.client_id as string) ?? null }));
+  }
 
   async extract(input: {
     query?: ReportingQuery;
@@ -331,15 +352,14 @@ export class InternalReportingService {
       const rows = await readReportingRows(
         input.limit,
         { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
-        (page) =>
-          this.prisma.payroll.findMany({
+        async (page) => {
+          const rows = await this.prisma.payroll.findMany({
             where: { organization_id: input.organizationId },
             select: {
               ...selectScalars(input.fields, PAYROLL_SCALAR_FIELDS),
               ...(page.includeCursor ? { id: true } : {}),
-              ...(input.fields.includes("client_name")
-                ? { client: { select: { name: true } } }
-                : {}),
+              // Payroll não declara relação com Client no schema canônico (nem FK no banco).
+              ...(input.fields.includes("client_name") ? { client_id: true } : {}),
               ...(input.fields.includes("responsible_name")
                 ? { responsible: { select: { name: true } } }
                 : {}),
@@ -351,7 +371,11 @@ export class InternalReportingService {
                 : {}),
             },
             ...reportingPageOptions(page),
-          }),
+          });
+          return input.fields.includes("client_name")
+            ? this.withClientNames(rows, input.organizationId)
+            : rows;
+        },
         projectRow,
       );
       return projectRows(rows, input.limit, projectRow, input.cursorPage);

@@ -325,6 +325,64 @@ describe("pessoal internal reporting service", () => {
     );
   });
 
+  it("resolve client_name de payroll por client_id, sem relação Prisma inexistente", async () => {
+    const payrollFindMany = vi.fn().mockResolvedValue([
+      { advance: true, client_id: "client-a" },
+      { advance: false, client_id: "client-b" },
+      { advance: false, client_id: "client-a" },
+    ]);
+    const clientFindMany = vi.fn().mockResolvedValue([
+      { id: "client-a", name: "Cliente A" },
+      { id: "client-b", name: "Cliente B" },
+    ]);
+    const service = new InternalReportingService({
+      payroll: { findMany: payrollFindMany },
+      client: { findMany: clientFindMany },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.payroll",
+        fields: ["client_name", "advance"],
+        limit: 3,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        { client_name: "Cliente A", advance: true },
+        { client_name: "Cliente B", advance: false },
+        { client_name: "Cliente A", advance: false },
+      ],
+      reachedLimit: false,
+    });
+    expect(payrollFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+      select: { advance: true, client_id: true },
+      take: 4,
+    });
+    expect(clientFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId, id: { in: ["client-a", "client-b"] } },
+      select: { id: true, name: true },
+    });
+  });
+
+  it("não consulta clientes quando client_name não foi pedido", async () => {
+    const payrollFindMany = vi.fn().mockResolvedValue([{ advance: true }]);
+    const clientFindMany = vi.fn();
+    const service = new InternalReportingService({
+      payroll: { findMany: payrollFindMany },
+      client: { findMany: clientFindMany },
+    } as never);
+
+    await service.extract({
+      organizationId,
+      source: "pessoal.payroll",
+      fields: ["advance"],
+      limit: 1,
+    });
+    expect(clientFindMany).not.toHaveBeenCalled();
+  });
+
   it("rejeita campo sensível de payroll antes de consultar o banco", async () => {
     const findMany = vi.fn();
     const service = new InternalReportingService({ payroll: { findMany } } as never);

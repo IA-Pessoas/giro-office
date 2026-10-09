@@ -63,8 +63,6 @@ model Payroll {
   group           PessoalGroup @relation(fields: [group_id], references: [id], onDelete: Restrict)
   responsible     User?         @relation(fields: [responsible_id], references: [id])
   union           UnionPessoal? @relation(fields: [union_id], references: [id], onDelete: Restrict)
-  // Ausente no canônico (lá o select de client_name falha): o extract seleciona client.name.
-  client          Client?       @relation(fields: [client_id], references: [id])
   groupAssignmentPreviewDetails PessoalGroupAssignmentPreviewDetail[]
 
   @@map("pessoal.payroll")
@@ -76,7 +74,6 @@ model Client {
   status          String
   pessoal         Boolean
   organization_id String
-  payroll         Payroll?
   obrigationsPessoal ObrigationsPessoal[]
 
   @@map("clients")
