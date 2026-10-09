@@ -53,7 +53,7 @@ export function todayInputDate(now = new Date()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
-/** "none" filtra quem está sem responsável. */
+/** userId: "" = todos; "none" = sem responsável; senão, o id do usuário. */
 export type FiscalResponsibleFilter = { userId: string; basis: "competence" | "current" };
 
 /**
