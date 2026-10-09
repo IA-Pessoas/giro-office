@@ -335,6 +335,33 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "o histórico de relatórios" },
   },
   {
+    // O último segmento é o código da declaração (DEFIS), não um id.
+    methods: ["PATCH"],
+    pattern: /^\/fiscal\/annual-controls\/[^/]+\/items\/[A-Z_]+$/,
+    description: { action: "atualizou", item: "uma declaração fiscal anual" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/monthly-controls\/responsibles$/,
+    description: { action: "consultou", item: "os responsáveis fiscais disponíveis" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/monthly-controls\/transfer$/,
+    description: { action: "transferiu", item: "controles fiscais para outro responsável" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/monthly-controls\/[^/]+\/triage$/,
+    description: { action: "consultou", item: "os documentos da Triagem de um controle fiscal" },
+  },
+  {
+    // O último segmento é o código da obrigação (PGDAS_D), não um id.
+    methods: ["PATCH"],
+    pattern: /^\/fiscal\/monthly-controls\/[^/]+\/obligations\/[A-Z_]+$/,
+    description: { action: "atualizou", item: "uma obrigação fiscal mensal" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/fiscal\/rates\/[^/]+\/pdf$/,
     description: { action: "baixou", item: "um PDF de alíquota fiscal" },
@@ -1404,6 +1431,30 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "uma malha fiscal",
     newSingular: "uma nova malha fiscal",
     plural: "malhas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/monthly-controls\/[^/]+\/obligations(?:\/|$)/,
+    singular: "uma obrigação fiscal mensal",
+    newSingular: "uma nova obrigação fiscal mensal",
+    plural: "obrigações fiscais mensais",
+  },
+  {
+    pattern: /^\/fiscal\/annual-controls\/[^/]+\/items(?:\/|$)/,
+    singular: "uma declaração fiscal anual",
+    newSingular: "uma nova declaração fiscal anual",
+    plural: "declarações fiscais anuais",
+  },
+  {
+    pattern: /^\/fiscal\/annual-controls(?:\/|$)/,
+    singular: "um controle fiscal anual",
+    newSingular: "um novo controle fiscal anual",
+    plural: "controles fiscais anuais",
+  },
+  {
+    pattern: /^\/fiscal\/monthly-controls(?:\/|$)/,
+    singular: "um controle fiscal mensal",
+    newSingular: "um novo controle fiscal mensal",
+    plural: "controles fiscais mensais",
   },
   {
     pattern: /^\/fiscal\/revenues(?:\/|$)/,

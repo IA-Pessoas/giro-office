@@ -1,4 +1,12 @@
-import { error as logError, warn as logWarn, ServiceError } from "@workspace/shared";
+import {
+  error as logError,
+  warn as logWarn,
+  ServiceError,
+  TRIAGE_DOCUMENT_STATUSES,
+  TRIAGE_FISCAL_CHECKLIST_FIELDS,
+  type TriageDocumentStatus,
+  type TriageFiscalChecklistField,
+} from "@workspace/shared";
 import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "../constants/triageDocuments.js";
 import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 
@@ -22,44 +30,22 @@ export const TRIAGE_DOCUMENT_FIELDS = [
   "card_sales_report",
 ] as const;
 
-export const TRIAGE_FISCAL_CHECKLIST_FIELDS = [
-  "inbound_report",
-  "outbound_report",
-  "nfse_provided",
-  "nfse_received",
-  "cte_documents",
-  "mei_documents",
-  "nfce_documents",
-  "sped_fiscal",
-  "sped_contributions",
-  "nfce_received",
-  "model_21_invoice",
-  "cte_as_issuer",
-  "services_provided_as_mei",
-] as const;
+// Definidos no shared: o Fiscal lê o mesmo checklist (controle mensal).
+export { TRIAGE_DOCUMENT_STATUSES, TRIAGE_FISCAL_CHECKLIST_FIELDS };
+export type { TriageDocumentStatus, TriageFiscalChecklistField };
 
 export const TRIAGE_FISCAL_FIELDS = [...TRIAGE_FISCAL_CHECKLIST_FIELDS, "billing_amount"] as const;
 
 export const TRIAGE_ITEM_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
 
-export const TRIAGE_DOCUMENT_STATUSES = [
-  "PENDING",
-  "COMPLETED",
-  "ATTENTION",
-  "UNDER_REVIEW",
-  "NOT_PRESENT",
-  "NOT_APPLICABLE",
-] as const;
 export const TRIAGE_DOCUMENT_NOTE_MAX_LENGTH = 2_000;
 export { TRIAGE_CATALOG_CODE_MAX_LENGTH };
 
 export type TriageDocumentField = (typeof TRIAGE_DOCUMENT_FIELDS)[number];
-export type TriageFiscalChecklistField = (typeof TRIAGE_FISCAL_CHECKLIST_FIELDS)[number];
 export type TriageFiscalField = (typeof TRIAGE_FISCAL_FIELDS)[number];
 export type TriageRoutineType = "CONTABIL" | "FISCAL";
 export type TriageDeliveryMethod = string;
 export type TriageItemPriority = (typeof TRIAGE_ITEM_PRIORITIES)[number];
-export type TriageDocumentStatus = (typeof TRIAGE_DOCUMENT_STATUSES)[number];
 export type TriageDocumentsServicePrisma = typeof prismaClient;
 type TriageOverviewSummaryClient = Pick<TriagemOverviewClient, "getSummary">;
 type TriageCatalogLookupClient = Pick<
