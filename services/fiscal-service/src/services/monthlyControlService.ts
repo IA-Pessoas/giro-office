@@ -31,6 +31,7 @@ type MonthlyControlTx = Pick<
 
 const REFERRING = "fiscal.monthly_controls";
 const FISCAL_ADMIN_PERMISSION = 3;
+const COMPLETED: MonthlyControlStatus = "COMPLETED";
 
 interface Actor {
   organizationId: string;
@@ -159,6 +160,16 @@ function eligibleClientsWhere(organizationId: string, start: Date) {
 /** Geração automática vai até o mês seguinte ao corrente; além disso só abertura explícita. */
 function isGenerable(competence: Date, now: Date): boolean {
   return competence <= new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
+
+function defaultResponsible(
+  id: string | undefined,
+  names: Map<string, string>,
+): { default_responsible_id: string | null; default_responsible_name: string | null } {
+  return {
+    default_responsible_id: id ?? null,
+    default_responsible_name: id ? (names.get(id) ?? null) : null,
+  };
 }
 
 /** Usuário ativo com acesso ao Fiscal na organização: quem pode ser responsável. */
@@ -306,8 +317,7 @@ export class MonthlyControlService {
         responsible_name: control.responsible_id
           ? (userNames.get(control.responsible_id) ?? null)
           : null,
-        default_responsible_id: defaults.get(control.client_id) ?? null,
-        default_responsible_name: userNames.get(defaults.get(control.client_id) ?? "") ?? null,
+        ...defaultResponsible(defaults.get(control.client_id), userNames),
         pending_obligations: pendingByControl.get(control.id) ?? 0,
         triage_pending: triage(control.client_id).pending,
       }))
@@ -379,7 +389,7 @@ export class MonthlyControlService {
     if (ids.length === 1) {
       const only = byId.get(ids[0]);
       if (!only) throw new ServiceError(404, "Controle fiscal não encontrado.");
-      if (only.status === "COMPLETED") {
+      if (only.status === COMPLETED) {
         throw new ServiceError(409, "Controle concluído não é transferido. Reabra antes.");
       }
     }
@@ -388,7 +398,7 @@ export class MonthlyControlService {
     const candidates = ids.flatMap((id) => {
       const control = byId.get(id);
       if (!control) skipped.push({ id, reason: "Controle não encontrado." });
-      else if (control.status === "COMPLETED") skipped.push({ id, reason: "Controle concluído." });
+      else if (control.status === COMPLETED) skipped.push({ id, reason: "Controle concluído." });
       else if (control.responsible_id === target.id) {
         skipped.push({ id, reason: "Já é o responsável." });
       } else return [control];
@@ -404,7 +414,7 @@ export class MonthlyControlService {
             id: control.id,
             organization_id: input.organizationId,
             responsible_id: control.responsible_id,
-            status: { not: "COMPLETED" },
+            status: { not: COMPLETED },
           },
           data: { responsible_id: target.id, updated_by: input.userId },
         });
