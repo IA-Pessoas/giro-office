@@ -4,6 +4,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { clientService } from "../services/clientService";
 import type { ClientGroup } from "../types";
 import { useClients } from "../hooks/useClients";
+import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 
 interface ClientGroupsPanelProps {
@@ -13,7 +14,11 @@ interface ClientGroupsPanelProps {
 export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
   const queryClient = useQueryClient();
   const groupsQuery = useQuery({ queryKey: ["client-groups"], queryFn: clientService.listGroups });
-  const groups = groupsQuery.data ?? [];
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const allGroups = groupsQuery.data ?? [];
+  const groups = allGroups.filter(
+    (group) => statusFilter === "all" || group.status === (statusFilter === "active"),
+  );
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
@@ -29,7 +34,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
     limit: 100,
     legacyIntegrationStatusFilter: false,
   });
-  const selectedGroup = groups.find((group) => group.id === selectedGroupId);
+  const selectedGroup = allGroups.find((group) => group.id === selectedGroupId);
   const selectedMemberSet = useMemo(() => new Set(selectedClientIds), [selectedClientIds]);
 
   function selectGroup(group: ClientGroup) {
@@ -60,10 +65,24 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
     setIsSaving(true);
     setError("");
     try {
-      await clientService.updateGroup(selectedGroup.id, groupName.trim());
+      await clientService.updateGroup(selectedGroup.id, { name: groupName.trim() });
       await queryClient.invalidateQueries({ queryKey: ["client-groups"] });
     } catch {
       setError("Não foi possível renomear o grupo. Confira o nome e tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function toggleStatus() {
+    if (!canEdit || !selectedGroup) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      await clientService.updateGroup(selectedGroup.id, { status: !selectedGroup.status });
+      await queryClient.invalidateQueries({ queryKey: ["client-groups"] });
+    } catch {
+      setError("Não foi possível alterar o status do grupo. Tente novamente.");
     } finally {
       setIsSaving(false);
     }
@@ -132,9 +151,20 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.2fr)]">
         <div>
-          <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Grupos cadastrados
-          </h3>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Grupos cadastrados
+            </h3>
+            <ClientNativeSelect
+              aria-label="Filtrar grupos por status"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+            >
+              <option value="all">Todos</option>
+              <option value="active">Ativos</option>
+              <option value="inactive">Inativos</option>
+            </ClientNativeSelect>
+          </div>
           {groupsQuery.isLoading ? (
             <p
               role="status"
@@ -159,7 +189,14 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                     aria-pressed={selectedGroupId === group.id}
                     className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-600 ${selectedGroupId === group.id ? "bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100" : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"}`}
                   >
-                    <span className="font-medium">{group.name}</span>
+                    <span className="font-medium">
+                      {group.name}
+                      {group.status ? null : (
+                        <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-normal text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          Inativo
+                        </span>
+                      )}
+                    </span>
                     <span className="text-xs text-slate-500 dark:text-slate-400">
                       {group.clients.length} {group.clients.length === 1 ? "empresa" : "empresas"}
                     </span>
@@ -198,6 +235,16 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                     className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     Salvar nome
+                  </button>
+                ) : null}
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => void toggleStatus()}
+                    disabled={isSaving}
+                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    {selectedGroup.status ? "Inativar grupo" : "Reativar grupo"}
                   </button>
                 ) : null}
               </div>

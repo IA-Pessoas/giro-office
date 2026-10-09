@@ -1313,4 +1313,10 @@ runTest("client groups let users manage names and multiple client memberships", 
   assert.match(service, /async listGroups/);
   assert.match(service, /async createGroup/);
   assert.match(service, /async updateGroup/);
+  // Status ativo/inativo e a mesma origem canônica no Regularize (#1742).
+  assert.match(panel, /updateGroup\(selectedGroup\.id, \{ status: !selectedGroup\.status \}\)/);
+  assert.match(panel, /Filtrar grupos por status/);
+  const regularize = readFileSync("src/modules/regularize/components/RegularizePage.tsx", "utf8");
+  assert.match(regularize, /\{ id: "groups", label: "Grupos"/);
+  assert.match(regularize, /<ClientGroupsPanel canEdit=\{regularizeAccess\.canEdit\} \/>/);
 });
