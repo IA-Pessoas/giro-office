@@ -288,7 +288,7 @@ describe("AnticipationService conferência do lote", () => {
       }),
     ).rejects.toMatchObject({ statusCode: 409 });
     await expect(service.check({ ...responsible, batchId, decision: "approve" })).rejects.toEqual(
-      new ServiceError(403, "Só o conferente designado conclui a conferência."),
+      new ServiceError(403, "Só o conferente designado ou Fiscal nível 3 conclui a conferência."),
     );
 
     await service.check({ ...reviewer, batchId, decision: "return", reason: "Item 2 é frete" });
@@ -319,7 +319,9 @@ describe("AnticipationService conferência do lote", () => {
 
     await expect(
       service.submit({ ...responsible, batchId, reviewer_id: reviewerId }),
-    ).rejects.toEqual(new ServiceError(404, "Conferente não encontrado ou sem acesso ao Fiscal."));
+    ).rejects.toEqual(
+      new ServiceError(404, "Conferente não encontrado ou sem Fiscal nível 2 ou superior."),
+    );
   });
 
   it("detalhe traz itens e histórico do lote", async () => {
@@ -339,5 +341,30 @@ describe("AnticipationService conferência do lote", () => {
       new_value: "total",
       reason: "ok",
     });
+  });
+
+  it("Fiscal nível 3 conclui no lugar do conferente e a decisão fica no nome dele", async () => {
+    const { service, history } = fakeDatabase("awaiting_check");
+    const supervisor = {
+      organizationId,
+      userId: "c0000000-0000-4000-8000-000000000003",
+      permission: 3,
+    };
+
+    const returned = await service.check({
+      ...supervisor,
+      batchId,
+      decision: "return",
+      reason: "Conferente de férias; rever item 1",
+    });
+
+    expect(returned.status).toBe("pending_review");
+    expect(history).toEqual([
+      expect.objectContaining({
+        field: "status",
+        new_value: "pending_review",
+        actor_user_id: supervisor.userId,
+      }),
+    ]);
   });
 });

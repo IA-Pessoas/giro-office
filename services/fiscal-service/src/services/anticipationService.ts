@@ -103,6 +103,12 @@ type ItemRecord = {
 
 type Corrections = Partial<Record<AnticipationCorrectableField, string>>;
 
+/** Uma linha do histórico da revisão antes de receber lote, item, motivo e ator. */
+type HistoryChange = { field: string; previous_value: string | null; new_value: string | null };
+
+const FISCAL_WRITE_PERMISSION = 2;
+const FISCAL_AUTHORIZE_PERMISSION = 3;
+
 export interface AnticipationBatchDto {
   id: string;
   client_id: string;
@@ -518,8 +524,7 @@ export class AnticipationService {
       });
       if (!current) throw new ServiceError(404, "Item não encontrado no lote.");
 
-      const changes: { field: string; previous_value: string | null; new_value: string | null }[] =
-        [];
+      const changes: HistoryChange[] = [];
       const change = (field: string, previous: string | null, next: string | null) => {
         if (previous !== next) changes.push({ field, previous_value: previous, new_value: next });
       };
@@ -581,13 +586,18 @@ export class AnticipationService {
   private async requireReviewer(userId: string, organizationId: string): Promise<void> {
     const [permission, user] = await Promise.all([
       this.prisma.permission.findFirst({
-        where: { user_id: userId, organization_id: organizationId, fiscal: { gt: 0 } },
+        // Conferir é operação de escrita: conferente nível 1 receberia um lote que não conclui.
+        where: {
+          user_id: userId,
+          organization_id: organizationId,
+          fiscal: { gte: FISCAL_WRITE_PERMISSION },
+        },
         select: { id: true },
       }),
       this.prisma.user.findFirst({ where: { id: userId, status: "active" }, select: { id: true } }),
     ]);
     if (!permission || !user) {
-      throw new ServiceError(404, "Conferente não encontrado ou sem acesso ao Fiscal.");
+      throw new ServiceError(404, "Conferente não encontrado ou sem Fiscal nível 2 ou superior.");
     }
   }
 
@@ -604,8 +614,14 @@ export class AnticipationService {
   ): Promise<AnticipationBatchDto> {
     const batch = await this.prisma.$transaction(async (transaction) => {
       const current = await this.findBatch(input.batchId, input.organizationId, transaction);
-      if (options.onlyReviewer && current.status === from && current.reviewer_id !== input.userId) {
-        throw new ServiceError(403, "Só o conferente designado conclui a conferência.");
+      // RT-02: Fiscal nível 3 autoriza no lugar do conferente (ex.: conferente ausente).
+      const reviewerOnly =
+        options.onlyReviewer && (input.permission ?? 0) < FISCAL_AUTHORIZE_PERMISSION;
+      if (reviewerOnly && current.status === from && current.reviewer_id !== input.userId) {
+        throw new ServiceError(
+          403,
+          "Só o conferente designado ou Fiscal nível 3 conclui a conferência.",
+        );
       }
       // Trava o lote no estado de origem, valida e só então muda o estado.
       await this.moveBatch(
@@ -613,19 +629,19 @@ export class AnticipationService {
         input,
         from,
         {},
-        options.onlyReviewer ? { reviewer_id: input.userId } : {},
+        reviewerOnly ? { reviewer_id: input.userId } : {},
       );
       await options.validate?.(transaction);
       await transaction.fiscalAnticipationBatch.updateMany({
         where: { id: input.batchId, organization_id: input.organizationId },
         data: { status: to, ...(options.reviewerId ? { reviewer_id: options.reviewerId } : {}) },
       });
-      const history = [{ field: "status", previous_value: from, new_value: to }];
+      const history: HistoryChange[] = [{ field: "status", previous_value: from, new_value: to }];
       if (options.reviewerId && options.reviewerId !== current.reviewer_id) {
         history.push({
           field: "reviewer_id",
-          previous_value: current.reviewer_id as AnticipationBatchStatus,
-          new_value: options.reviewerId as AnticipationBatchStatus,
+          previous_value: current.reviewer_id,
+          new_value: options.reviewerId,
         });
       }
       await transaction.fiscalAnticipationHistory.createMany({
@@ -678,7 +694,7 @@ export class AnticipationService {
     });
   }
 
-  /** O conferente designado aprova o lote ou o devolve à classificação com motivo. */
+  /** O conferente designado (ou Fiscal nível 3) aprova o lote ou o devolve com motivo. */
   async check(
     input: CheckAnticipationBatchBody & Actor & { batchId: string },
   ): Promise<AnticipationBatchDto> {

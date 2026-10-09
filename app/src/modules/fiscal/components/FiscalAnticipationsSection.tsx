@@ -9,7 +9,7 @@ import { type FormEvent, useState } from "react";
 import { fiscalAnticipationsQueryKey } from "../hooks/queryKeys";
 import {
   ANTICIPATION_PAGE_SIZE,
-  type FiscalAnticipationBatchDetail,
+  type FiscalAnticipationImportResult,
   fiscalAnticipationService,
 } from "../services/fiscalAnticipationService";
 import {
@@ -32,7 +32,13 @@ const MAX_ZIP_BYTES = 650_000;
 const LABEL_CLASSNAME = "grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300";
 const LINK_BUTTON_CLASSNAME = "text-blue-700 hover:underline dark:text-blue-300";
 
-export function FiscalAnticipationsSection({ canEdit }: { canEdit: boolean }) {
+export function FiscalAnticipationsSection({
+  canEdit,
+  canAuthorize,
+}: {
+  canEdit: boolean;
+  canAuthorize: boolean;
+}) {
   const [client, setClient] = useState<ClientPickerOption | null>(null);
   const [competence, setCompetence] = useState(() => competenceFromToday(-1));
   const [file, setFile] = useState<File | null>(null);
@@ -49,7 +55,7 @@ export function FiscalAnticipationsSection({ canEdit }: { canEdit: boolean }) {
   );
   const importBatch = useMutation({
     mutationFn: fiscalAnticipationService.importBatch,
-    onSuccess: async (batch: FiscalAnticipationBatchDetail) => {
+    onSuccess: async (batch: FiscalAnticipationImportResult) => {
       toast.success(
         batch.issues.length
           ? "Lote importado com itens fora do lote; confira abaixo."
@@ -197,7 +203,7 @@ export function FiscalAnticipationsSection({ canEdit }: { canEdit: boolean }) {
             </div>
           ) : null}
 
-          {openId ? <FiscalAnticipationBatchPanel batchId={openId} clientId={clientId} canEdit={canEdit} /> : null}
+          {openId ? <FiscalAnticipationBatchPanel batchId={openId} clientId={clientId} canEdit={canEdit} canAuthorize={canAuthorize} /> : null}
         </div>
       ) : <p className="text-sm text-gray-600 dark:text-gray-400">Selecione um cliente para consultar ou importar lotes de antecipações.</p>}
     </section>

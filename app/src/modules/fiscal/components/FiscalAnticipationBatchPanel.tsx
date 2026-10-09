@@ -26,6 +26,7 @@ import {
 import type {
   FiscalAnticipationClassification,
   FiscalAnticipationCorrectableField,
+  FiscalAnticipationItemChanges,
 } from "../utils/fiscalAnticipation";
 import {
   FISCAL_FIELD_CONTROL_CLASSNAME,
@@ -74,10 +75,7 @@ function ItemReviewForm({
   item: FiscalAnticipationItem;
   pending: boolean;
   onCancel: () => void;
-  onSave: (
-    changes: NonNullable<ReturnType<typeof buildAnticipationItemChanges>>,
-    reason: string,
-  ) => Promise<void>;
+  onSave: (changes: FiscalAnticipationItemChanges, reason: string) => Promise<void>;
 }) {
   const [classification, setClassification] = useState<FiscalAnticipationClassification | "">(
     item.classification ?? "",
@@ -128,7 +126,7 @@ function ItemReviewForm({
       </label>
       <label className={LABEL_CLASSNAME}>
         Valor informado manualmente
-        <input type="text" inputMode="decimal" value={manualValue} onChange={(event) => setManualValue(event.target.value)} placeholder="Ex.: 150.00" className={FISCAL_FIELD_CONTROL_CLASSNAME} />
+        <input type="text" inputMode="decimal" value={manualValue} onChange={(event) => setManualValue(event.target.value)} placeholder="Ex.: 1.234,56" className={FISCAL_FIELD_CONTROL_CLASSNAME} />
       </label>
       {FIELDS.map(([field, label]) => (
         <label key={field} className={LABEL_CLASSNAME}>
@@ -154,15 +152,20 @@ export function FiscalAnticipationBatchPanel({
   batchId,
   clientId,
   canEdit,
+  canAuthorize,
 }: {
   batchId: string;
   clientId: string;
   canEdit: boolean;
+  /** Fiscal nível 3: conclui a conferência no lugar do conferente. */
+  canAuthorize: boolean;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const users = useAssignableUsers({ module: "fiscal" });
   const userName = (id: string) => users.data?.find((candidate) => candidate.id === id)?.name;
+  const displayName = (id: string) =>
+    users.isLoading ? "carregando..." : (userName(id) ?? "Usuário sem acesso atual");
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [reviewerId, setReviewerId] = useState("");
   const [returnReason, setReturnReason] = useState("");
@@ -195,8 +198,8 @@ export function FiscalAnticipationBatchPanel({
 
   const editable = canEdit && batch.status === "pending_review";
   const unclassified = batch.items.filter((item) => item.classification === null).length;
-  const isReviewer = Boolean(user?.id) && user?.id === batch.reviewer_id;
-  const history = batch.history ?? [];
+  const canCheck = canAuthorize || (Boolean(user?.id) && user?.id === batch.reviewer_id);
+  const history = batch.history;
 
   return (
     <div className="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-slate-700">
@@ -206,7 +209,7 @@ export function FiscalAnticipationBatchPanel({
         </h4>
         <p className="text-sm text-gray-700 dark:text-gray-300">{formatAnticipationSummary(batch)}</p>
         <p className="text-sm text-gray-700 dark:text-gray-300">
-          Responsável: {userName(batch.responsible_id) ?? "Usuário sem acesso atual"} · Conferente: {batch.reviewer_id ? (userName(batch.reviewer_id) ?? "Usuário sem acesso atual") : "não designado"}
+          Responsável: {displayName(batch.responsible_id)} · Conferente: {batch.reviewer_id ? displayName(batch.reviewer_id) : "não designado"}
         </p>
         <p className="text-xs text-amber-700 dark:text-amber-300">Classificação e valores são manuais: nenhum imposto é calculado.</p>
       </div>
@@ -241,7 +244,7 @@ export function FiscalAnticipationBatchPanel({
                 <td className="px-3 py-2 whitespace-nowrap">NF {item.note_number} · item {item.item_number}</td>
                 <td className="px-3 py-2">{item.description || item.code}</td>
                 <td className="px-3 py-2">{item.classification ? FISCAL_ANTICIPATION_CLASSIFICATION_LABELS[item.classification] : <span className="text-amber-700 dark:text-amber-300">Pendente</span>}</td>
-                {(["ncm", "cfop", "quantity", "value", "ipi", "icms_st"] as const).map((field) => (
+                {FIELDS.map(([field]) => (
                   <td key={field} className="px-3 py-2"><CorrectedValue item={item} field={field} /></td>
                 ))}
                 <td className="px-3 py-2">{formatMoney(item.manual_value)}</td>
@@ -279,8 +282,8 @@ export function FiscalAnticipationBatchPanel({
         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 p-3 dark:border-slate-700">
           <label className={LABEL_CLASSNAME}>
             Conferente
-            <select value={reviewerId || batch.reviewer_id || ""} onChange={(event) => setReviewerId(event.target.value)} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
-              <option value="">Selecione</option>
+            <select value={reviewerId} onChange={(event) => setReviewerId(event.target.value)} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
+              <option value="">{batch.reviewer_id ? `Manter ${displayName(batch.reviewer_id)}` : "Selecione"}</option>
               {users.data?.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
             </select>
           </label>
@@ -297,7 +300,7 @@ export function FiscalAnticipationBatchPanel({
       ) : null}
 
       {canEdit && batch.status === "awaiting_check" ? (
-        isReviewer ? (
+        canCheck ? (
           <div className="grid gap-3 rounded-lg border border-gray-200 p-3 dark:border-slate-700">
             <label className={LABEL_CLASSNAME}>
               Motivo da devolução (obrigatório para devolver)
@@ -318,7 +321,7 @@ export function FiscalAnticipationBatchPanel({
             </div>
           </div>
         ) : (
-          <p className="text-sm text-gray-600 dark:text-gray-400">Aguardando a conferência de {batch.reviewer_id ? (userName(batch.reviewer_id) ?? "conferente sem acesso atual") : "conferente"}.</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Aguardando a conferência de {batch.reviewer_id ? displayName(batch.reviewer_id) : "conferente"}.</p>
         )
       ) : null}
 
