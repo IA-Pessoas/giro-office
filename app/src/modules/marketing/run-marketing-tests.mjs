@@ -73,7 +73,10 @@ assert.notDeepEqual(
 assert.match(dashboard, /if \(query\.isLoading\)/);
 assert.match(dashboard, /if \(query\.isError\)/);
 assert.match(dashboard, /if \(!summary\)/);
-assert.match(dashboard, /if \(noData\)/);
+assert.match(dashboard, /type="month"/);
+assert.match(dashboard, /window\.print\(\)/);
+assert.match(dashboard, /item\.department/);
+assert.doesNotMatch(dashboard, /items\.slice\(0,\s*8\)/);
 assert.match(dashboard, /query\.refetch\(\)/);
 assert.match(service, /"\/marketing\/dashboard"/);
 assert.doesNotMatch(dashboard, /campaigns|mockData|fakeData/i);
@@ -100,6 +103,7 @@ assert.match(canonicalQueries, /href: "\/users"/);
 assert.match(canonicalQueries, /href: "\/departments"/);
 assert.match(canonicalQueries, /canAccessAdministration/);
 assert.match(dashboard, /Exportar CSV/);
+assert.match(service, /params: \{ month \}/);
 assert.match(profiles, /useModuleAccess\("marketing"\)/);
 assert.match(users, /useModuleAccess\("marketing"\)/);
 assert.match(users, /userService\.uploadPhoto/);
@@ -135,10 +139,10 @@ assert.equal(
 assert.equal(toInstagramProfileUrl("https://example.com/giro.office"), null);
 assert.equal(toInstagramProfileUrl("javascript:alert(1)"), null);
 assert.equal(
-  createBirthdayCsv([{ name: 'Ana "Nina"', day: 12 }]),
-  '"Nome","Dia"\r\n"Ana ""Nina""","12"',
+  createBirthdayCsv([{ type: "Colaborador", name: 'Ana "Nina"', date: "12/10", department: "RH" }]),
+  '"Tipo","Nome","Data","Departamento"\r\n"Colaborador","Ana ""Nina""","12/10","RH"',
 );
-assert.match(createBirthdayCsv([{ name: "=HYPERLINK(1)", day: 8 }]), /'=HYPERLINK/);
+assert.match(createBirthdayCsv([{ type: "Cliente PF", name: "=HYPERLINK(1)", date: "08/10", department: "" }]), /'=HYPERLINK/);
 assert.match(events, /query\.isLoading/);
 assert.match(events, /query\.isError/);
 assert.match(events, /query\.data\?\.length\s*===\s*0/);

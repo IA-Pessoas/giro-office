@@ -26,18 +26,26 @@ describe("MarketingDashboardService", () => {
       },
       $queryRaw: vi
         .fn()
-        .mockResolvedValueOnce([{ total: 2, items: [{ id: "client", name: "Cliente", day: 29 }] }])
         .mockResolvedValueOnce([
-          { total: 1, items: [{ id: "employee", name: "Colaboradora", day: 30 }] },
+          { total: 2, items: [{ id: "client", name: "Cliente", date: "29/02", day: 29 }] },
         ])
         .mockResolvedValueOnce([
-          { total: 1, items: [{ id: "company", name: "Empresa", day: 31 }] },
+          {
+            total: 1,
+            items: [
+              { id: "employee", name: "Colaboradora", date: "30/02", day: 30, department: "RH" },
+            ],
+          },
+        ])
+        .mockResolvedValueOnce([
+          { total: 1, items: [{ id: "company", name: "Empresa", date: "31/02", day: 31 }] },
         ]),
       $transaction: vi.fn(async (operations: Promise<unknown>[]) => Promise.all(operations)),
     };
 
     const dashboard = await new MarketingDashboardService(prisma as never).getDashboard(
       organizationId,
+      "2026-02",
     );
 
     expect(dashboard.requests).toEqual({
@@ -46,10 +54,14 @@ describe("MarketingDashboardService", () => {
       urgent: { total: 2, rh: 1, ti: 1 },
     });
     expect(dashboard.birthdays).toEqual({
-      clients: { total: 2, items: [{ id: "client", name: "Cliente", day: 29 }] },
-      employees: { total: 1, items: [{ id: "employee", name: "Colaboradora", day: 30 }] },
-      companies: { total: 1, items: [{ id: "company", name: "Empresa", day: 31 }] },
+      clients: { total: 2, items: [{ id: "client", name: "Cliente", date: "29/02", day: 29 }] },
+      employees: {
+        total: 1,
+        items: [{ id: "employee", name: "Colaboradora", date: "30/02", day: 30, department: "RH" }],
+      },
+      companies: { total: 1, items: [{ id: "company", name: "Empresa", date: "31/02", day: 31 }] },
     });
+    expect(dashboard.birthdayMonth).toBe("2026-02");
     expect(dashboard.alerts).toEqual([
       { code: "new-requests", count: 2, label: "Solicitações novas" },
       { code: "urgent-requests", count: 2, label: "Solicitações urgentes em aberto" },
@@ -102,15 +114,33 @@ describe("MarketingDashboardService", () => {
     const employeeBirthdaysQuery = prisma.$queryRaw.mock.calls[1]?.[0];
     expect(employeeBirthdaysQuery?.join("?")).toContain("employee.status = 'active'");
     expect(employeeBirthdaysQuery?.join("?")).toContain("department.organization_id = ?");
-    expect(prisma.$queryRaw.mock.calls[1]?.slice(1)).toEqual([
-      organizationId,
-      organizationId,
-      organizationId,
-    ]);
     for (const queryCall of prisma.$queryRaw.mock.calls) {
-      for (const queryOrganizationId of queryCall.slice(1)) {
-        expect(queryOrganizationId).toBe(organizationId);
-      }
+      expect(queryCall.slice(1)).toContain(organizationId);
     }
+  });
+
+  it("includes every day of the selected month and follows active PF-to-active-PJ links", async () => {
+    const prisma = {
+      organization: { findUnique: vi.fn().mockResolvedValue({ timezone: "UTC" }) },
+      marketingAiUsageControl: { count: vi.fn().mockResolvedValue(0) },
+      rhRequest: { count: vi.fn().mockResolvedValue(0) },
+      tIRequest: { count: vi.fn().mockResolvedValue(0) },
+      $queryRaw: vi.fn().mockResolvedValue([{ total: 0, items: [] }]),
+      $transaction: vi.fn(async (operations: Promise<unknown>[]) => Promise.all(operations)),
+    };
+
+    await new MarketingDashboardService(prisma as never).getDashboard(organizationId, "2024-02");
+
+    const clientQuery = prisma.$queryRaw.mock.calls[0]?.[0]?.join("?") ?? "";
+    const employeeQuery = prisma.$queryRaw.mock.calls[1]?.[0]?.join("?") ?? "";
+    expect(clientQuery).toContain('"regularize.partners"');
+    expect(clientQuery).toContain("partner.exit IS NULL");
+    expect(clientQuery).toContain("company.status = 'Ativo'");
+    expect(clientQuery).toContain("EXTRACT(MONTH FROM person.date_of_birth) = ?");
+    expect(clientQuery).not.toContain("EXTRACT(DAY FROM person.date_of_birth) >=");
+    expect(employeeQuery).toContain("department.name");
+    expect(employeeQuery).not.toContain("EXTRACT(DAY FROM employee.birth_date) >=");
+    expect(prisma.$queryRaw.mock.calls[0]?.slice(1)).toContain(2);
+    expect(prisma.$queryRaw.mock.calls[1]?.slice(1)).toContain(2);
   });
 });

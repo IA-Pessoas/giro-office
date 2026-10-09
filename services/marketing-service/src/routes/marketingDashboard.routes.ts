@@ -1,6 +1,7 @@
 import {
   createSuccessResponse,
   error as logError,
+  parseWithZod,
   requireAuthenticatedRequestContext,
   ServiceError,
 } from "@workspace/shared";
@@ -10,10 +11,14 @@ import {
   MarketingPermissionLevel,
   requireMarketingPermission,
 } from "../middlewares/requireMarketingPermission.js";
-import type { MarketingDashboardResponse } from "../schemas/marketingDashboard.schemas.js";
+import {
+  type MarketingDashboardQuery,
+  type MarketingDashboardResponse,
+  marketingDashboardQuerySchema,
+} from "../schemas/marketingDashboard.schemas.js";
 
 export interface MarketingDashboardProvider {
-  getDashboard(organizationId: string): Promise<MarketingDashboardResponse>;
+  getDashboard(organizationId: string, month?: string): Promise<MarketingDashboardResponse>;
 }
 
 export function createMarketingDashboardRoutes(
@@ -31,7 +36,12 @@ export function createMarketingDashboardRoutes(
         const { organization_id: organizationId } = requireAuthenticatedRequestContext(request, {
           statusCode: 400,
         });
-        const dashboard = await dashboardService.getDashboard(organizationId);
+        const query: MarketingDashboardQuery = parseWithZod(
+          marketingDashboardQuerySchema,
+          request.query,
+        );
+        const dashboard = await dashboardService.getDashboard(organizationId, query.month);
+        response.setHeader("Cache-Control", "no-store");
         response.json(createSuccessResponse(dashboard));
       } catch (error: unknown) {
         logError("Falha ao carregar dashboard do Marketing.", { err: error });

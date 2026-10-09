@@ -21,14 +21,18 @@ const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
 
 const dashboard: MarketingDashboardResponse = {
+  birthdayMonth: "2026-09",
   requests: {
     active: { total: 4, rh: 1, ti: 3 },
     new: { total: 2, rh: 1, ti: 1 },
     urgent: { total: 1, rh: 0, ti: 1 },
   },
   birthdays: {
-    clients: { total: 1, items: [{ id: "client-1", name: "Cliente", day: 29 }] },
-    employees: { total: 1, items: [{ id: "employee-1", name: "Colaboradora", day: 30 }] },
+    clients: { total: 1, items: [{ id: "client-1", name: "Cliente", date: "29/09", day: 29 }] },
+    employees: {
+      total: 1,
+      items: [{ id: "employee-1", name: "Colaboradora", date: "30/09", day: 30, department: "RH" }],
+    },
     companies: { total: 0, items: [] },
   },
   aiUsage: { competence: "2026-09", pendingKnowledge: 0 },
@@ -76,8 +80,9 @@ describe("GET /marketing/dashboard", () => {
       .set(gatewayHeaders());
 
     expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.body).toEqual({ success: true, data: dashboard });
-    expect(service.getDashboard).toHaveBeenCalledWith(organizationId);
+    expect(service.getDashboard).toHaveBeenCalledWith(organizationId, undefined);
   });
 
   it("requires authentication", async () => {
@@ -86,6 +91,22 @@ describe("GET /marketing/dashboard", () => {
 
     expect(response.status).toBe(401);
     expect(service.getDashboard).not.toHaveBeenCalled();
+  });
+
+  it("passes the selected month and rejects an invalid month", async () => {
+    const service = createDashboardProvider();
+    const response = await request(createTestApp(service))
+      .get("/marketing/dashboard?month=2024-02")
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(service.getDashboard).toHaveBeenCalledWith(organizationId, "2024-02");
+
+    const invalid = await request(createTestApp(service))
+      .get("/marketing/dashboard?month=2024-13")
+      .set(gatewayHeaders());
+    expect(invalid.status).toBe(400);
+    expect(service.getDashboard).toHaveBeenCalledTimes(1);
   });
 
   it("rejects users without Marketing permission", async () => {
@@ -107,7 +128,7 @@ describe("GET /marketing/dashboard", () => {
     const response = await request(createTestApp(service)).get("/marketing/dashboard").set(headers);
 
     expect(response.status).toBe(200);
-    expect(service.getDashboard).toHaveBeenCalledWith(organizationId);
+    expect(service.getDashboard).toHaveBeenCalledWith(organizationId, undefined);
   });
 
   it("does not let global permission override disabled Marketing module access", async () => {

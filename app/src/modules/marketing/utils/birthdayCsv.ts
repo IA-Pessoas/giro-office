@@ -1,6 +1,8 @@
 export interface BirthdayCsvItem {
+  type: string;
   name: string;
-  day: number;
+  date: string;
+  department: string;
 }
 
 function csvCell(value: string | number): string {
@@ -11,7 +13,9 @@ function csvCell(value: string | number): string {
 
 export function createBirthdayCsv(items: readonly BirthdayCsvItem[]): string {
   return [
-    ["Nome", "Dia"].map(csvCell).join(","),
-    ...items.map((item) => [csvCell(item.name), csvCell(item.day)].join(",")),
+    ["Tipo", "Nome", "Data", "Departamento"].map(csvCell).join(","),
+    ...items.map((item) =>
+      [csvCell(item.type), csvCell(item.name), csvCell(item.date), csvCell(item.department)].join(","),
+    ),
   ].join("\r\n");
 }

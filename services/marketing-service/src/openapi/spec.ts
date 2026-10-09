@@ -223,7 +223,16 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
         get: {
           summary: "Consultar dashboard inicial de Marketing",
           description:
-            "Retorna contagens de solicitações existentes e aniversários da organização autenticada.",
+            "Retorna contagens e aniversários da organização autenticada para o mês selecionado (AAAA-MM); sem mês, usa o atual.",
+          parameters: [
+            {
+              name: "month",
+              in: "query",
+              required: false,
+              description: "Mês completo dos aniversários, no formato AAAA-MM.",
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$", example: "2026-10" },
+            },
+          ],
           security: [{ bearerAuth: [] }],
           responses: {
             "200": {

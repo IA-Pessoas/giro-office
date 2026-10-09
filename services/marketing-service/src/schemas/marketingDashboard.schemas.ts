@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const marketingDashboardResponseSchema = z.object({
+  birthdayMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
   requests: z.object({
     active: z.object({
       total: z.number().int().nonnegative(),
@@ -22,19 +23,35 @@ export const marketingDashboardResponseSchema = z.object({
     clients: z.object({
       total: z.number().int().nonnegative(),
       items: z.array(
-        z.object({ id: z.string(), name: z.string(), day: z.number().int().min(1).max(31) }),
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          date: z.string(),
+          day: z.number().int().min(1).max(31),
+        }),
       ),
     }),
     employees: z.object({
       total: z.number().int().nonnegative(),
       items: z.array(
-        z.object({ id: z.string(), name: z.string(), day: z.number().int().min(1).max(31) }),
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          date: z.string(),
+          day: z.number().int().min(1).max(31),
+          department: z.string().nullable(),
+        }),
       ),
     }),
     companies: z.object({
       total: z.number().int().nonnegative(),
       items: z.array(
-        z.object({ id: z.string(), name: z.string(), day: z.number().int().min(1).max(31) }),
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          date: z.string(),
+          day: z.number().int().min(1).max(31),
+        }),
       ),
     }),
   }),
@@ -50,5 +67,14 @@ export const marketingDashboardResponseSchema = z.object({
     }),
   ),
 });
+
+export const marketingDashboardQuerySchema = z
+  .object({
+    month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Mês inválido. Use o formato AAAA-MM."),
+  })
+  .partial()
+  .strict();
+
+export type MarketingDashboardQuery = z.infer<typeof marketingDashboardQuerySchema>;
 
 export type MarketingDashboardResponse = z.infer<typeof marketingDashboardResponseSchema>;

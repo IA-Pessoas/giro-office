@@ -1,4 +1,5 @@
 export interface MarketingDashboardSummary {
+  birthdayMonth: string;
   requests: {
     active: { total: number; rh: number; ti: number };
     new: { total: number; rh: number; ti: number };
@@ -15,7 +16,15 @@ export interface MarketingDashboardSummary {
 
 interface BirthdayAggregate {
   total: number;
-  items: Array<{ id: string; name: string; day: number }>;
+  items: BirthdayItem[];
+}
+
+export interface BirthdayItem {
+  id: string;
+  name: string;
+  date: string;
+  day: number;
+  department?: string | null;
 }
 
 export interface MarketingEnvelope<T> {

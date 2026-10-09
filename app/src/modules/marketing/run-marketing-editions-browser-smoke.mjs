@@ -41,10 +41,20 @@ let edition = {
   feedback: null,
 };
 const dashboard = {
+  birthdayMonth: "2026-10",
   requests: { active: { total: 0, rh: 0, ti: 0 }, new: { total: 0, rh: 0, ti: 0 }, urgent: { total: 0, rh: 0, ti: 0 } },
   birthdays: {
-    clients: { total: 0, items: [] },
-    employees: { total: 0, items: [] },
+    clients: { total: 1, items: [{ id: "birthday-client", name: "Cliente PF", date: "01/10", day: 1 }] },
+    employees: {
+      total: 10,
+      items: Array.from({ length: 10 }, (_, index) => ({
+        id: `birthday-employee-${index + 1}`,
+        name: `Colaborador ${String(index + 1).padStart(2, "0")}`,
+        date: `${String(index + 1).padStart(2, "0")}/10`,
+        day: index + 1,
+        department: "RH",
+      })),
+    },
     companies: { total: 0, items: [] },
   },
   aiUsage: { competence: "2026-10", pendingKnowledge: 0 },
@@ -60,6 +70,7 @@ const user = {
   department_id: "marketing-editions-department",
   modules: { marketing: process.env.MARKETING_DEPARTMENTS_ONLY === "1" ? 3 : 2 },
 };
+const dashboardMonthRequests = [];
 let department = {
   id: "marketing-departments-dep",
   name: "Operações",
@@ -102,7 +113,21 @@ async function run() {
       assert.equal(request.headers()["x-csrf-token"], "M".repeat(43));
       department = { ...department, color: payload.color };
       data = department;
-    } else if (pathname.endsWith("/marketing/dashboard")) data = dashboard;
+    } else if (pathname.endsWith("/marketing/dashboard")) {
+      const month = url.searchParams.get("month");
+      dashboardMonthRequests.push(month);
+      const monthNumber = month?.slice(5) ?? dashboard.birthdayMonth.slice(5);
+      const formatDate = (item) => `${String(item.day).padStart(2, "0")}/${monthNumber}`;
+      data = {
+        ...dashboard,
+        birthdayMonth: month ?? dashboard.birthdayMonth,
+        birthdays: {
+          ...dashboard.birthdays,
+          clients: { ...dashboard.birthdays.clients, items: dashboard.birthdays.clients.items.map((item) => ({ ...item, date: formatDate(item) })) },
+          employees: { ...dashboard.birthdays.employees, items: dashboard.birthdays.employees.items.map((item) => ({ ...item, date: formatDate(item) })) },
+        },
+      };
+    }
     else if (pathname.endsWith("/marketing/events/list")) data = [event];
     else if (pathname.endsWith(`/marketing/events/${event.id}/editions`) && method === "GET") data = [edition];
     else if (pathname.endsWith(`/marketing/events/${event.id}/editions/${edition.id}`) && method === "PUT") {
@@ -139,6 +164,22 @@ async function run() {
   try {
     const response = await page.goto("/marketing", { waitUntil: "networkidle", timeout: 120_000 });
     assert.equal(response?.status(), 200, "/marketing should render successfully");
+    const birthdaySection = page.locator("#marketing-birthday-report");
+    await expect(page.getByText("Cliente PF", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Colaborador 10/)).toBeVisible();
+    await expect(birthdaySection.getByRole("listitem")).toHaveCount(11);
+    await page.getByLabel("Mês dos aniversários").fill("2024-02");
+    await expect.poll(() => dashboardMonthRequests.at(-1)).toBe("2024-02");
+    await expect(page.getByText("fevereiro de 2024", { exact: true })).toBeVisible();
+    await expect(birthdaySection.getByText("01/02", { exact: true })).toHaveCount(2);
+    const csvDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Exportar CSV" }).click();
+    assert.equal((await csvDownload).suggestedFilename(), "aniversarios-2024-02.csv");
+    await birthdaySection.screenshot({ path: path.join(outputDirectory, "issue-1676-marketing-birthdays.png") });
+    await page.emulateMedia({ media: "print" });
+    await expect(page.getByRole("heading", { name: "Solicitações existentes" })).not.toBeVisible();
+    await birthdaySection.screenshot({ path: path.join(outputDirectory, "issue-1676-marketing-birthdays-print.png") });
+    await page.emulateMedia({ media: "screen" });
     const departments = page.getByRole("region", { name: "Departamentos da organização" });
     await expect(departments.getByText("Operações", { exact: true })).toBeVisible();
     if (process.env.MARKETING_DEPARTMENTS_ONLY === "1") {

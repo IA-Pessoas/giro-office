@@ -6,7 +6,7 @@ import {
 
 interface BirthdayAggregate {
   total: number;
-  items: Array<{ id: string; name: string; day: number }>;
+  items: Array<{ id: string; name: string; date: string; day: number; department?: string | null }>;
 }
 
 const EMPTY_BIRTHDAYS: BirthdayAggregate = { total: 0, items: [] };
@@ -26,12 +26,15 @@ export function getCurrentMarketingCompetence(now: Date, timeZone: string): Date
 export class MarketingDashboardService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async getDashboard(organizationId: string): Promise<MarketingDashboardResponse> {
+  async getDashboard(organizationId: string, month?: string): Promise<MarketingDashboardResponse> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { timezone: true },
     });
     const competence = getCurrentMarketingCompetence(new Date(), organization?.timezone ?? "UTC");
+    const birthdayMonth = month ? new Date(`${month}-01T00:00:00.000Z`) : competence;
+    const selectedBirthdayMonth = birthdayMonth.getUTCMonth() + 1;
+    const selectedBirthdayYear = birthdayMonth.getUTCFullYear();
     const [
       rhActive,
       tiActive,
@@ -77,41 +80,41 @@ export class MarketingDashboardService {
         },
       }),
       this.prisma.$queryRaw<BirthdayAggregate[]>`
-        WITH calendar AS (
-          SELECT
-            EXTRACT(MONTH FROM CURRENT_TIMESTAMP AT TIME ZONE organization.timezone)::int AS month,
-            EXTRACT(DAY FROM CURRENT_TIMESTAMP AT TIME ZONE organization.timezone)::int AS day
-          FROM organizations AS organization
-          WHERE organization.id = ${organizationId}
-        ), matches AS (
-          SELECT person.id, person.name,
+        WITH matches AS (
+          SELECT DISTINCT person.id, person.name,
+            to_char(person.date_of_birth, 'DD/MM') AS date,
             EXTRACT(DAY FROM person.date_of_birth)::int AS day
           FROM "clients.pf" AS person
-          CROSS JOIN calendar
+          INNER JOIN "regularize.partners" AS partner
+            ON partner.pf_id = person.id
+            AND partner.organization_id = ${organizationId}
+            AND partner.exit IS NULL
+          INNER JOIN clients AS company
+            ON company.id = partner.pj_id
+            AND company.organization_id = ${organizationId}
+            AND company.status = 'Ativo'
+            AND company.type = 'PJ'
           WHERE person.organization_id = ${organizationId}
             AND person.status = 'Ativo'
-            AND EXTRACT(MONTH FROM person.date_of_birth) = calendar.month
-            AND EXTRACT(DAY FROM person.date_of_birth) >= calendar.day
+            AND EXTRACT(MONTH FROM person.date_of_birth) = ${selectedBirthdayMonth}
         )
         SELECT COUNT(*)::int AS total,
           COALESCE(
-            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id),
+            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'date', date, 'day', day) ORDER BY day, name, id),
             '[]'::jsonb
           ) AS items
         FROM matches
       `,
       this.prisma.$queryRaw<BirthdayAggregate[]>`
-        WITH calendar AS (
-          SELECT
-            EXTRACT(MONTH FROM CURRENT_TIMESTAMP AT TIME ZONE organization.timezone)::int AS month,
-            EXTRACT(DAY FROM CURRENT_TIMESTAMP AT TIME ZONE organization.timezone)::int AS day
-          FROM organizations AS organization
-          WHERE organization.id = ${organizationId}
-        ), matches AS (
+        WITH matches AS (
           SELECT employee.id, COALESCE(NULLIF(employee.full_name, ''), employee.name) AS name,
-            EXTRACT(DAY FROM employee.birth_date)::int AS day
+            to_char(employee.birth_date, 'DD/MM') AS date,
+            EXTRACT(DAY FROM employee.birth_date)::int AS day,
+            department.name AS department
           FROM users AS employee
-          CROSS JOIN calendar
+          LEFT JOIN departments AS department
+            ON department.id = employee.department_id
+            AND department.organization_id = ${organizationId}
           WHERE (
             employee.organization_id = ${organizationId}
             OR (
@@ -126,39 +129,31 @@ export class MarketingDashboardService {
             AND employee.status = 'active'
             AND employee.termination_date IS NULL
             AND employee.birth_date IS NOT NULL
-            AND EXTRACT(MONTH FROM employee.birth_date) = calendar.month
-            AND EXTRACT(DAY FROM employee.birth_date) >= calendar.day
+            AND EXTRACT(MONTH FROM employee.birth_date) = ${selectedBirthdayMonth}
         )
         SELECT COUNT(*)::int AS total,
           COALESCE(
-            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id),
+            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'date', date, 'day', day, 'department', department) ORDER BY day, name, id),
             '[]'::jsonb
           ) AS items
         FROM matches
       `,
       this.prisma.$queryRaw<BirthdayAggregate[]>`
-        WITH calendar AS (
-          SELECT
-            EXTRACT(MONTH FROM CURRENT_TIMESTAMP AT TIME ZONE organization.timezone)::int AS month,
-            EXTRACT(DAY FROM CURRENT_TIMESTAMP AT TIME ZONE organization.timezone)::int AS day
-          FROM organizations AS organization
-          WHERE organization.id = ${organizationId}
-        ), matches AS (
+        WITH matches AS (
           SELECT company.id,
             COALESCE(NULLIF(company.fantasy_name, ''), NULLIF(company.company_name, ''), company.name) AS name,
+            to_char(company.opening_date, 'DD/MM') AS date,
             EXTRACT(DAY FROM company.opening_date)::int AS day
           FROM clients AS company
-          CROSS JOIN calendar
           WHERE company.organization_id = ${organizationId}
             AND company.status = 'Ativo'
             AND company.type = 'PJ'
             AND company.opening_date IS NOT NULL
-            AND EXTRACT(MONTH FROM company.opening_date) = calendar.month
-            AND EXTRACT(DAY FROM company.opening_date) >= calendar.day
+            AND EXTRACT(MONTH FROM company.opening_date) = ${selectedBirthdayMonth}
         )
         SELECT COUNT(*)::int AS total,
           COALESCE(
-            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'day', day) ORDER BY day, name, id),
+            jsonb_agg(jsonb_build_object('id', id, 'name', name, 'date', date, 'day', day) ORDER BY day, name, id),
             '[]'::jsonb
           ) AS items
         FROM matches
@@ -204,6 +199,7 @@ export class MarketingDashboardService {
         employees: employeeBirthdaySummary,
         companies: companyAnniversarySummary,
       },
+      birthdayMonth: `${selectedBirthdayYear}-${String(selectedBirthdayMonth).padStart(2, "0")}`,
       aiUsage: {
         competence: `${competence.getUTCFullYear()}-${String(competence.getUTCMonth() + 1).padStart(2, "0")}`,
         pendingKnowledge,
