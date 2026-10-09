@@ -1,5 +1,7 @@
 import { csvLine, ServiceError } from "@workspace/shared";
 
+import { accessKeyParts, isValidAccessKey, stripZeros } from "./accessKey.js";
+
 /**
  * Conferência Domínio × SEFAZ (FIS-08): compara duas planilhas CSV de notas por documento, sem
  * gravar nada. A identidade da NF-e vem da chave de acesso quando há; sem ela, de emitente,
@@ -176,19 +178,6 @@ export function parseConferenceCsv(
   return rows;
 }
 
-/** Chave NF-e: 44 dígitos com dígito verificador módulo 11. */
-export function isValidAccessKey(key: string): boolean {
-  if (!/^\d{44}$/u.test(key)) return false;
-  let weight = 2;
-  let sum = 0;
-  for (let i = 42; i >= 0; i -= 1) {
-    sum += Number(key[i]) * weight;
-    weight = weight === 9 ? 2 : weight + 1;
-  }
-  const rest = sum % 11;
-  return Number(key[43]) === (rest < 2 ? 0 : 11 - rest);
-}
-
 /**
  * Valor monetário em centavos: aceita `1.234,56`, `1234,56`, `1234.56`, `R$` e negativo com
  * sinal ou entre parênteses.
@@ -211,7 +200,6 @@ function formatCents(cents: number): string {
 }
 
 const digits = (value: string) => value.replace(/\D/g, "");
-const stripZeros = (value: string) => value.replace(/^0+(?=\d)/u, "");
 
 interface ParsedSource {
   rows: (ConferenceDocumentRow & { cents: number | null })[];
@@ -282,13 +270,7 @@ function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): 
         continue;
       }
       // Na chave o emitente tem sempre 14 posições: CPF vem com zeros à esquerda.
-      row = {
-        access_key: rawKey,
-        issuer: rawKey.slice(6, 20),
-        model: rawKey.slice(20, 22),
-        series: stripZeros(rawKey.slice(22, 25)),
-        number: stripZeros(rawKey.slice(25, 34)),
-      };
+      row = { access_key: rawKey, ...accessKeyParts(rawKey) };
     } else {
       const [issuer, model, series, number] = (
         ["issuer", "model", "series", "number"] as Column[]

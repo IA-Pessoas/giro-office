@@ -1,4 +1,4 @@
-import { isValidAccessKey } from "./documentConferenceService.js";
+import { identityFromAccessKey, isValidAccessKey, stripZeros } from "./accessKey.js";
 
 /**
  * Leitura mínima de XML de NF-e para as conferências: confere se o XML é bem formado e extrai
@@ -16,20 +16,45 @@ export interface NfeIdentity {
 }
 
 export type NfeParseResult =
-  | ({ kind: "nfe" } & NfeIdentity)
+  // content: corpo da infNFe, para comparar cópias da mesma nota (com ou sem protocolo).
+  | ({ kind: "nfe"; content: string } & NfeIdentity)
   | { kind: "invalid"; message: string }
   | { kind: "other"; message: string };
 
 const TAG = /<(\/?)([A-Za-z_][\w.:-]*)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>/g;
 const BAD_ENTITY = /&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);)/iu;
 
-function stripMarkup(xml: string): string {
-  return xml
-    .replace(/^﻿/u, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, "")
-    .replace(/<\?[\s\S]*?\?>/g, "")
-    .trim();
+/**
+ * Remove comentários, CDATA e instruções de processamento numa varredura linear (regex lazy fica
+ * quadrática quando o delimitador nunca fecha). Delimitador aberto até o fim: XML inválido.
+ */
+function stripMarkup(xml: string): string | null {
+  const text = xml.replace(/^\uFEFF/u, "");
+  const sections: [string, string][] = [
+    ["<!--", "-->"],
+    ["<![CDATA[", "]]>"],
+    ["<?", "?>"],
+  ];
+  let out = "";
+  let cursor = 0;
+  while (cursor < text.length) {
+    const next = text.indexOf("<", cursor);
+    if (next === -1) {
+      out += text.slice(cursor);
+      break;
+    }
+    out += text.slice(cursor, next);
+    const section = sections.find(([open]) => text.startsWith(open, next));
+    if (!section) {
+      out += "<";
+      cursor = next + 1;
+      continue;
+    }
+    const close = text.indexOf(section[1], next + section[0].length);
+    if (close === -1) return null;
+    cursor = close + section[1].length;
+  }
+  return out.trim();
 }
 
 function isWellFormed(text: string): boolean {
@@ -52,8 +77,6 @@ function isWellFormed(text: string): boolean {
   return stack.length === 0 && roots === 1 && !text.slice(last).includes("<");
 }
 
-const stripZeros = (value: string) => value.replace(/^0+(?=\d)/u, "");
-
 function block(text: string, tag: string): string | undefined {
   return new RegExp(`<(?:\\w+:)?${tag}\\b[^>]*>([\\s\\S]*?)</(?:\\w+:)?${tag}>`, "u").exec(
     text,
@@ -71,7 +94,7 @@ export function nfeIdentity(parts: Omit<NfeIdentity, "identity">): NfeIdentity {
 
 export function parseNfeXml(xml: string): NfeParseResult {
   const text = stripMarkup(xml);
-  if (!isWellFormed(text)) return { kind: "invalid", message: "XML inválido." };
+  if (text === null || !isWellFormed(text)) return { kind: "invalid", message: "XML inválido." };
 
   const infNFe = /<(?:\w+:)?infNFe\b([^>]*)>/u.exec(text);
   if (!infNFe) return { kind: "other", message: "XML não é uma NF-e (sem infNFe)." };
@@ -101,15 +124,5 @@ export function parseNfeXml(xml: string): NfeParseResult {
       };
     }
   }
-  return { kind: "nfe", ...note };
-}
-
-/** Identidade composta embutida na chave: CNPJ/CPF (14), modelo, série e número. */
-export function identityFromAccessKey(key: string): string {
-  return [
-    key.slice(6, 20),
-    key.slice(20, 22),
-    stripZeros(key.slice(22, 25)),
-    stripZeros(key.slice(25, 34)),
-  ].join("|");
+  return { kind: "nfe", content: block(text, "infNFe") ?? "", ...note };
 }

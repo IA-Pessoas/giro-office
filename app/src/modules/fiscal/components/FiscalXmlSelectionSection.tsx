@@ -29,6 +29,7 @@ function selectionLines(result: FiscalXmlSelection): SelectionLine[] {
     ...result.ambiguous.map((item) => ({ situation: "Ambígua", request: item.request, files: item.candidates.map((candidate) => candidate.entry).join(", "), note: item.reason })),
     ...result.not_found.map((item) => ({ situation: "Não encontrada", request: item.request, files: "", note: "" })),
     ...result.invalid_requests.map((item) => ({ situation: "Pedido inválido", request: item.request, files: "", note: item.reason })),
+    ...result.repeated_requests.map((request) => ({ situation: "Pedido repetido", request, files: "", note: "Já atendido por um pedido anterior" })),
     ...result.archive.errors.map((item) => ({ situation: "Erro no ZIP", request: "", files: item.entry, note: item.message })),
     ...result.archive.discarded.map((item) => ({ situation: "Descartado", request: "", files: item.entry, note: item.reason })),
     ...result.archive.duplicates.map((item) => ({ situation: "XML repetido", request: "", files: item.entries.join(", "), note: item.identical ? "Cópias idênticas" : "Cópias com conteúdo diferente" })),
@@ -73,6 +74,9 @@ export function FiscalXmlSelectionSection({ canEdit }: { canEdit: boolean }) {
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
           Envie um ZIP de XML de NF-e e liste as notas: chave de acesso, ou número, série;número, emitente;série;número ou emitente;modelo;série;número. Número repetido entre emitentes ou séries fica ambíguo e não entra no ZIP. Nada é gravado.
+        </p>
+        <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+          Compatibilidade com exportações reais ainda não validada: confira o resultado antes de usá-lo como definitivo.
         </p>
       </div>
 

@@ -1,7 +1,7 @@
 import { createZip, csvLine } from "@workspace/shared";
 
-import { isValidAccessKey } from "./documentConferenceService.js";
-import { identityFromAccessKey, type NfeIdentity, parseNfeXml } from "./nfeXml.js";
+import { identityFromAccessKey, isValidAccessKey, stripZeros } from "./accessKey.js";
+import { type NfeIdentity, parseNfeXml } from "./nfeXml.js";
 import { readZipArchive } from "./safeZipReader.js";
 
 /**
@@ -19,6 +19,7 @@ export interface XmlSelectionInput {
 interface NoteFile extends NfeIdentity {
   entry: string;
   body: Buffer;
+  content: string;
 }
 
 type Criteria =
@@ -38,6 +39,7 @@ export interface XmlSelectionResult {
   }[];
   not_found: { request: string }[];
   invalid_requests: { request: string; reason: string }[];
+  repeated_requests: string[];
   archive: {
     file_name: string;
     entries: number;
@@ -50,8 +52,6 @@ export interface XmlSelectionResult {
 
 const FORMAT_HINT =
   "Use a chave de acesso (44 dígitos) ou número, série;número, emitente;série;número ou emitente;modelo;série;número.";
-
-const stripZeros = (value: string) => value.replace(/^0+(?=\d)/u, "");
 
 function parseRequest(request: string): Criteria | string {
   const compact = request.replace(/\s/g, "");
@@ -120,7 +120,8 @@ export function selectXmlFromZip(input: XmlSelectionInput): XmlSelectionResult {
     .map(([identity, copies]) => ({
       identity,
       entries: copies.map((note) => note.entry),
-      identical: copies.every((note) => note.body.equals(copies[0]?.body ?? Buffer.alloc(0))),
+      // Mesma infNFe = mesma nota, ainda que uma cópia traga o protocolo (nfeProc) e a outra não.
+      identical: copies.every((note) => note.content === copies[0]?.content),
     }));
   const identicalCopies = new Map(duplicates.map((item) => [item.identity, item.identical]));
 
@@ -130,6 +131,7 @@ export function selectXmlFromZip(input: XmlSelectionInput): XmlSelectionResult {
     ambiguous: [],
     not_found: [],
     invalid_requests: [],
+    repeated_requests: [],
     archive: {
       file_name: input.file_name,
       entries: archive.entries.length + archive.errors.length,
@@ -152,7 +154,7 @@ export function selectXmlFromZip(input: XmlSelectionInput): XmlSelectionResult {
     }
     const signature = JSON.stringify(criteria);
     if (seenRequests.has(signature)) {
-      result.invalid_requests.push({ request, reason: "Pedido repetido." });
+      result.repeated_requests.push(request);
       continue;
     }
     seenRequests.add(signature);
@@ -172,7 +174,7 @@ export function selectXmlFromZip(input: XmlSelectionInput): XmlSelectionResult {
     } else if (identicalCopies.get(note.identity) === false) {
       result.ambiguous.push({
         request,
-        reason: "XML repetido no ZIP com conteúdo diferente.",
+        reason: "XML repetido no ZIP com dados da nota (infNFe) diferentes.",
         candidates,
       });
     } else {
@@ -220,6 +222,14 @@ function renderSelectionCsv(
       "",
     ]);
   }
+  lines.push([
+    "Totais",
+    "",
+    "",
+    "",
+    "",
+    `${result.selected.length} selecionada(s), ${result.ambiguous.length} ambígua(s), ${result.not_found.length} não encontrada(s), ${result.invalid_requests.length} pedido(s) inválido(s), ${result.archive.errors.length} erro(s) e ${result.archive.discarded.length} descarte(s) no ZIP`,
+  ]);
   for (const item of result.selected) {
     lines.push(["Selecionada", item.request, item.entry, item.identity, item.access_key, ""]);
   }
@@ -236,6 +246,9 @@ function renderSelectionCsv(
   for (const item of result.not_found) lines.push(["Não encontrada", item.request, "", "", "", ""]);
   for (const item of result.invalid_requests) {
     lines.push(["Pedido inválido", item.request, "", "", "", item.reason]);
+  }
+  for (const request of result.repeated_requests) {
+    lines.push(["Pedido repetido", request, "", "", "", "Já atendido por um pedido anterior"]);
   }
   for (const item of result.archive.errors)
     lines.push(["Erro no ZIP", "", item.entry, "", "", item.message]);

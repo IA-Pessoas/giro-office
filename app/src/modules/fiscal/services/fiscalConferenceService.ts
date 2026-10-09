@@ -62,6 +62,7 @@ export interface FiscalXmlSelection {
   ambiguous: { request: string; reason: string; candidates: { entry: string; identity: string }[] }[];
   not_found: { request: string }[];
   invalid_requests: { request: string; reason: string }[];
+  repeated_requests: string[];
   archive: {
     file_name: string;
     entries: number;

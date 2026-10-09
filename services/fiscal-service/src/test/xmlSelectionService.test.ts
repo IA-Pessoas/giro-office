@@ -43,6 +43,7 @@ const zipOf = (files: Record<string, string>) =>
 describe("parseNfeXml", () => {
   it("extrai chave e identidade composta da NF-e", () => {
     expect(parseNfeXml(nfe(ISSUER_A, "1", "100"))).toEqual({
+      content: expect.stringContaining("<nNF>100</nNF>"),
       kind: "nfe",
       access_key: accessKey(ISSUER_A, "1", "100"),
       issuer: ISSUER_A,
@@ -76,6 +77,25 @@ describe("parseNfeXml", () => {
       kind: "invalid",
       message: "Chave de acesso não confere com emitente, modelo, série e número do XML.",
     });
+  });
+});
+
+describe("parseNfeXml — variações", () => {
+  it("aceita prefixo de namespace, NFC-e modelo 65 e XML em ISO-8859-1", () => {
+    const key = accessKey(ISSUER_A, "3", "9", "65");
+    const prefixed = `<nfe:NFe xmlns:nfe="http://www.portalfiscal.inf.br/nfe"><nfe:infNFe Id="NFe${key}"><nfe:ide><nfe:mod>65</nfe:mod><nfe:serie>3</nfe:serie><nfe:nNF>9</nfe:nNF></nfe:ide><nfe:emit><nfe:CNPJ>${ISSUER_A}</nfe:CNPJ></nfe:emit></nfe:infNFe></nfe:NFe>`;
+    expect(parseNfeXml(prefixed)).toMatchObject({ kind: "nfe", identity: `${ISSUER_A}|65|3|9` });
+    const latin1 = Buffer.from(nfe(ISSUER_A, "1", "5").replace("Cia", "Ação"), "latin1");
+    expect(parseNfeXml(latin1.toString("utf8"))).toMatchObject({ kind: "nfe", number: "5" });
+  });
+
+  it("recusa comentário sem fechamento em tempo linear", () => {
+    const started = Date.now();
+    expect(parseNfeXml(`<NFe>${"<!--".repeat(200_000)}`)).toEqual({
+      kind: "invalid",
+      message: "XML inválido.",
+    });
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 });
 
@@ -125,13 +145,14 @@ describe("selectXmlFromZip", () => {
     ]);
     expect(result.not_found).toEqual([{ request: "999" }]);
     expect(result.invalid_requests).toEqual([
-      { request: "000101", reason: "Pedido repetido." },
       {
         request: "abc",
         reason:
           "Use a chave de acesso (44 dígitos) ou número, série;número, emitente;série;número ou emitente;modelo;série;número.",
       },
     ]);
+    // Pedido repetido é relatado à parte e não torna a seleção parcial por si só.
+    expect(result.repeated_requests).toEqual(["000101"]);
     expect(result.archive).toMatchObject({
       file_name: "notas.zip",
       entries: 7,
@@ -161,6 +182,8 @@ describe("selectXmlFromZip", () => {
     expect(csv).toBe(result.csv);
     expect(csv).toContain("Selecionada;101;a-101.xml;");
     expect(csv).toContain("Ambígua;100;a-100.xml, b-100.xml;");
+    expect(csv).toContain("Totais;;;;;4 selecionada(s), 1 ambígua(s), 1 não encontrada(s)");
+    expect(csv).toContain("Pedido repetido;000101;");
   });
 
   it("não escolhe entre cópias diferentes da mesma nota, mas aceita cópia idêntica", () => {
@@ -178,13 +201,26 @@ describe("selectXmlFromZip", () => {
     expect(result.selected.map((item) => item.entry)).toEqual(["x.xml"]);
     expect(result.ambiguous[0]).toMatchObject({
       request: "101",
-      reason: "XML repetido no ZIP com conteúdo diferente.",
+      reason: "XML repetido no ZIP com dados da nota (infNFe) diferentes.",
     });
     expect(result.archive.duplicates).toEqual([
       { identity: `${ISSUER_A}|55|1|100`, entries: ["x.xml", "copia.xml"], identical: true },
       { identity: `${ISSUER_A}|55|1|101`, entries: ["y.xml", "y-alterado.xml"], identical: false },
     ]);
     expect(result.status).toBe("partial");
+  });
+
+  it("trata NF-e com e sem protocolo como a mesma nota", () => {
+    const bare = nfe(ISSUER_A, "1", "100");
+    const withoutProtocol = bare.replace(/<\/?nfeProc[^>]*>/gu, "");
+    const result = selectXmlFromZip({
+      file_name: "n.zip",
+      zip_base64: zipOf({ "proc.xml": bare, "nfe.xml": withoutProtocol }),
+      requests: ["100", "100"],
+    });
+    expect(result.selected.map((item) => item.entry)).toEqual(["proc.xml"]);
+    expect(result.archive.duplicates[0]?.identical).toBe(true);
+    expect(result.status).toBe("complete");
   });
 
   it("fica completo quando todo pedido foi selecionado e o ZIP não tem problemas", () => {

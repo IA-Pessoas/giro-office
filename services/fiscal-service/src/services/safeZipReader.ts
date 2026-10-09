@@ -141,6 +141,8 @@ export function readZipArchive(zip: Buffer, limits: Partial<ZipLimits> = {}): Zi
       fail("Arquivo corrompido no ZIP.");
       continue;
     }
+    // ponytail: confere tamanho, não CRC32; corpo adulterado com o mesmo tamanho passa e cai no
+    // parse do XML. Verificar CRC se o ZIP passar a ser entregue sem reprocessar o conteúdo.
     if (data.length !== compressedSize || body.length !== size) {
       fail("Arquivo corrompido no ZIP.");
       continue;
