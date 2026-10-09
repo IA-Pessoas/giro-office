@@ -263,6 +263,42 @@ describe("contabil Worker remainder routes", () => {
     );
   });
 
+  it("histórico do relacionamento lê a auditoria da organização e exige módulo Contábil (#1723)", async () => {
+    const prisma = {
+      relationshipContabil: { findFirst: vi.fn(async () => ({ id: ID })) },
+      auditRequest: {
+        findMany: vi.fn(async () => [
+          {
+            id: "audit-1",
+            user_id: USER,
+            created_at: new Date("2026-10-01T10:00:00.000Z"),
+            action: "Atualização",
+            changes_json: { bidding: { from: true, to: null } },
+          },
+        ]),
+        count: vi.fn(async () => 1),
+      },
+      user: { findMany: vi.fn(async () => [{ id: USER, name: "Ana" }]) },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const url = `https://contabil.test/contabil/relationships/client/${CLIENT}/history`;
+
+    const denied = await app.request(url, { headers: headers("0") });
+    const ok = await app.request(url, { headers: headers("1") });
+
+    expect(denied.status).toBe(403);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({
+      data: { total: 1, items: [{ changes: [{ field: "bidding", from: true, to: null }] }] },
+    });
+    expect(prisma.relationshipContabil.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organization_id: ORG, client_id: CLIENT } }),
+    );
+    expect(prisma.auditRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
   it("expõe triagem documental com validação de entrada", async () => {
     const deps = services();
     const app = createContabilWorkerApp({ env: env(), ...deps });

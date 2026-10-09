@@ -7,6 +7,13 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import { AUDIT_UPDATE_ACTION } from "./auditHistoryService.js";
+import {
+  listRelationshipHistory,
+  RELATIONSHIP_AUDIT_REFERRING,
+  type RelationshipHistoryInput,
+  type RelationshipHistoryPrisma,
+} from "./relationshipHistoryService.js";
 import { assertChartAccountsState } from "./relationshipStates.js";
 
 export type RelationshipServicePrisma = typeof prismaClient;
@@ -151,8 +158,8 @@ export class RelationshipService {
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Atualização",
-        referring: "contabil.relationship",
+        action: AUDIT_UPDATE_ACTION,
+        referring: RELATIONSHIP_AUDIT_REFERRING,
         referringId: id,
         oldData: exists as unknown as Record<string, unknown>,
         updatedData: updated as unknown as Record<string, unknown>,
@@ -166,6 +173,10 @@ export class RelationshipService {
       }
       throw new ServiceError(500, "Erro ao atualizar relacionamento contábil.", err);
     }
+  }
+
+  history(input: RelationshipHistoryInput) {
+    return listRelationshipHistory(this.prisma as unknown as RelationshipHistoryPrisma, input);
   }
 
   async getByClientId(

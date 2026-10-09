@@ -911,6 +911,47 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           },
         },
       },
+      "/contabil/relationships/client/{clientId}/history": {
+        get: {
+          tags: ["Relationships"],
+          summary: "Histórico de alterações do relacionamento contábil do cliente",
+          description:
+            "Lido da auditoria, do mais recente para o mais antigo. Cada item traz ator, instante e os campos alterados (licitação, plano de contas, ferramenta, sistema, observação) com valor anterior e novo; null = não selecionado.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "clientId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "page",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Página do histórico; sem relacionamento devolve lista vazia",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "400": { description: "Parâmetros inválidos" },
+            "401": { description: "Não autenticado" },
+          },
+        },
+      },
       "/triagem/fiscal-portfolio": {
         get: {
           tags: ["Triage Documents"],

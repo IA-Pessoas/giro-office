@@ -6,6 +6,7 @@ import {
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
+import { AUDIT_UPDATE_ACTION } from "../../../services/contabil-service/src/services/auditHistoryService.js";
 import { CONTROL_AUDIT_ACTIONS } from "../../../services/contabil-service/src/services/controlHistoryService.js";
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
@@ -602,7 +603,7 @@ function createSimpleEntityService(
           userId: auth.userId,
           organizationId: auth.organizationId,
           permission: auth.permission ?? null,
-          action: "Atualização",
+          action: AUDIT_UPDATE_ACTION,
           referring,
           referringId: id,
           oldData: current,
