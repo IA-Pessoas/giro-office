@@ -144,4 +144,12 @@ export const fiscalAnticipationService = {
     });
     return unwrapFiscalEnvelope<FiscalAnticipationBatch>(response.data);
   },
+
+  /** Demonstrativo manual do lote (CSV ou PDF) como arquivo para download. */
+  async download(batchId: string, format: "csv" | "pdf"): Promise<Blob> {
+    const response = await api().get(`/fiscal/anticipations/batches/${batchId}/${format}`, {
+      responseType: "blob",
+    });
+    return response.data as Blob;
+  },
 };
