@@ -1,9 +1,12 @@
-import { ServiceError } from "@workspace/shared";
+import { csvLine, ServiceError } from "@workspace/shared";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
 import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
-import type { MonthlyControlStatus } from "../schemas/monthlyControl.schemas.js";
+import type {
+  MonthlyControlStatus,
+  ResponsibleReportQuery,
+} from "../schemas/monthlyControl.schemas.js";
 import { fiscalUserWhere, loadDefaultResponsibles, loadUserNames } from "./fiscalResponsibles.js";
 import { createSuggestedObligations } from "./monthlyObligationService.js";
 import {
@@ -93,6 +96,22 @@ export interface MonthlyControlListItem extends MonthlyControlDto {
   /** Responsável padrão atual do cliente (carteira vigente), que vale para novas competências. */
   default_responsible_id: string | null;
   default_responsible_name: string | null;
+}
+
+export interface ResponsibleReportItem {
+  client_id: string;
+  client_name: string;
+  responsible_id: string | null;
+  /** null sem responsável ou quando o usuário perdeu o vínculo com a organização. */
+  responsible_name: string | null;
+}
+
+export interface ResponsibleReport {
+  basis: ResponsibleReportQuery["basis"];
+  competence: string | null;
+  items: ResponsibleReportItem[];
+  file_name: string;
+  csv: string;
 }
 
 export interface MonthlyControlTriage extends TriageDocumentsView {
@@ -316,6 +335,91 @@ export class MonthlyControlService {
       }))
       .sort((a, b) => a.client_name.localeCompare(b.client_name, "pt-BR", { sensitivity: "base" }));
     return { competence: input.competence, items };
+  }
+
+  /**
+   * Responsáveis × Empresas. Por competência lê o responsável gravado em cada controle (o
+   * passado não muda com transferências da carteira) e não gera controles; a visão atual usa
+   * a carteira da Triagem dos clientes com Fiscal neste mês. Tela e CSV saem dos mesmos itens.
+   */
+  async responsibleReport(query: ResponsibleReportQuery, actor: Actor): Promise<ResponsibleReport> {
+    const { organizationId } = actor;
+    const competence = query.basis === "competence" ? (query.competence ?? null) : null;
+    let rows: Array<{ client_id: string; responsible_id: string | null }>;
+    if (competence) {
+      rows = await this.prisma.fiscalMonthlyControl.findMany({
+        where: { organization_id: organizationId, competence: competenceDate(competence) },
+        select: { client_id: true, responsible_id: true },
+      });
+    } else {
+      const now = this.now();
+      const clients = await this.prisma.client.findMany({
+        where: eligibleClientsWhere(
+          organizationId,
+          new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
+        ),
+        select: { id: true },
+      });
+      const defaults = await loadDefaultResponsibles(
+        this.prisma,
+        organizationId,
+        clients.map((client) => client.id),
+      );
+      rows = clients.map((client) => ({
+        client_id: client.id,
+        responsible_id: defaults.get(client.id) ?? null,
+      }));
+    }
+    if (query.responsible_id) {
+      const wanted = query.responsible_id === "none" ? null : query.responsible_id;
+      rows = rows.filter((row) => row.responsible_id === wanted);
+    }
+
+    const clients = rows.length
+      ? await this.prisma.client.findMany({
+          where: { organization_id: organizationId, id: { in: rows.map((row) => row.client_id) } },
+          select: { id: true, name: true, company_name: true },
+        })
+      : [];
+    const clientNames = new Map(
+      clients.map((client) => [client.id, client.company_name?.trim() || client.name]),
+    );
+    const userNames = await loadUserNames(
+      this.prisma,
+      organizationId,
+      rows.flatMap((row) => (row.responsible_id ? [row.responsible_id] : [])),
+    );
+    const byName = (a: string, b: string) => a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+    const items = rows
+      .map((row) => ({
+        client_id: row.client_id,
+        client_name: clientNames.get(row.client_id) ?? "",
+        responsible_id: row.responsible_id,
+        responsible_name: row.responsible_id ? (userNames.get(row.responsible_id) ?? null) : null,
+      }))
+      .sort(
+        (a, b) =>
+          Number(a.responsible_id === null) - Number(b.responsible_id === null) ||
+          byName(a.responsible_name ?? "", b.responsible_name ?? "") ||
+          byName(a.client_name, b.client_name),
+      );
+
+    const lines = [
+      ["Responsável", "Empresa"],
+      ...items.map((item) => [
+        item.responsible_id
+          ? (item.responsible_name ?? "Usuário sem acesso atual")
+          : "Sem responsável",
+        item.client_name,
+      ]),
+    ];
+    return {
+      basis: query.basis,
+      competence,
+      items,
+      file_name: `responsaveis-empresas-${competence ?? "atual"}.csv`,
+      csv: `\uFEFF${lines.map((line) => csvLine(line, ";")).join("\r\n")}\r\n`,
+    };
   }
 
   /** Quem pode receber controles: usuários ativos com acesso ao Fiscal. Só nível 3 consulta. */

@@ -64,6 +64,20 @@ function deps() {
     update: vi.fn(async () => control()),
     transfer: vi.fn(async () => ({ transferred: [controlId], skipped: [] })),
     responsibles: vi.fn(async () => [{ id: userId, name: "Ana" }]),
+    responsibleReport: vi.fn(async () => ({
+      basis: "competence" as const,
+      competence: "2026-08",
+      items: [
+        {
+          client_id: clientId,
+          client_name: "Alfa",
+          responsible_id: userId,
+          responsible_name: "Ana",
+        },
+      ],
+      file_name: "responsaveis-empresas-2026-08.csv",
+      csv: "\uFEFFResponsável;Empresa\r\nAna;Alfa\r\n",
+    })),
     triage: vi.fn(async () => ({
       control_id: controlId,
       competence: "2026-08",
@@ -210,5 +224,35 @@ describe("fiscal monthly control routes", () => {
       .set(headers());
     expect(badCompetence.status).toBe(400);
     expect(service.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("Fiscal nível 1 consulta Responsáveis × Empresas; filtros inválidos são 400", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, monthlyControlRouteDeps: service });
+
+    const report = await request(app)
+      .get(
+        `/fiscal/monthly-controls/responsibles-report?basis=competence&competence=2026-08&responsible_id=${userId}`,
+      )
+      .set(headers(1));
+    expect(report.status).toBe(200);
+    expect(report.body.data.items[0].responsible_name).toBe("Ana");
+    expect(service.responsibleReport).toHaveBeenCalledWith(
+      { basis: "competence", competence: "2026-08", responsible_id: userId },
+      { userId, organizationId, permission: 1 },
+    );
+
+    for (const query of [
+      "basis=competence",
+      "basis=other",
+      "basis=current&responsible_id=x",
+      "basis=current&extra=1",
+    ]) {
+      const response = await request(app)
+        .get(`/fiscal/monthly-controls/responsibles-report?${query}`)
+        .set(headers(1));
+      expect(response.status).toBe(400);
+    }
+    expect(service.responsibleReport).toHaveBeenCalledTimes(1);
   });
 });

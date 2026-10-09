@@ -437,6 +437,13 @@ describe("fiscal Worker", () => {
       update: vi.fn(async () => ({ ...control, status: "IN_PROGRESS" as const })),
       transfer: vi.fn(async () => ({ transferred: [ICMS_ID], skipped: [] })),
       responsibles: vi.fn(async () => [{ id: USER_ID, name: "Ana" }]),
+      responsibleReport: vi.fn(async () => ({
+        basis: "current" as const,
+        competence: null,
+        items: [],
+        file_name: "responsaveis-empresas-atual.csv",
+        csv: "\uFEFFResponsável;Empresa\r\n",
+      })),
       triage: vi.fn(async () => ({
         control_id: ICMS_ID,
         competence: "2026-08",
@@ -484,6 +491,27 @@ describe("fiscal Worker", () => {
       { headers: gatewayHeaders() },
     );
     expect(candidates.status).toBe(200);
+
+    const report = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/responsibles-report?basis=current&responsible_id=none",
+      { headers: reader },
+    );
+    expect(report.status).toBe(200);
+    expect(controls.responsibleReport).toHaveBeenCalledWith(
+      { basis: "current", responsible_id: "none" },
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+    const badReport = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/responsibles-report?basis=competence",
+      { headers: reader },
+    );
+    expect(badReport.status).toBe(400);
+    const withoutFiscal = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/responsibles-report?basis=current",
+      { headers: gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 0 }) }) },
+    );
+    expect(withoutFiscal.status).toBe(403);
+    expect(controls.responsibleReport).toHaveBeenCalledTimes(1);
 
     const triage = await app.request(
       `https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}/triage`,

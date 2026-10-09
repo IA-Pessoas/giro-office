@@ -91,3 +91,23 @@ export const updateMonthlyObligationBodySchema = z
     message: "Informe a aplicabilidade ou o cumprimento.",
     path: ["applicable"],
   });
+
+/**
+ * Responsáveis × Empresas: carteira vigente (`current`) ou responsável gravado no controle
+ * da competência. `responsible_id: "none"` filtra clientes sem responsável.
+ */
+export const responsibleReportQuerySchema = z
+  .object({
+    basis: z.enum(["current", "competence"], { message: "Visão inválida." }),
+    competence: competenceSchema.optional(),
+    responsible_id: z
+      .union([z.string().uuid("Responsável inválido."), z.literal("none")])
+      .optional(),
+  })
+  .strict()
+  .refine((query) => query.basis === "current" || query.competence !== undefined, {
+    message: "Informe a competência.",
+    path: ["competence"],
+  });
+
+export type ResponsibleReportQuery = z.infer<typeof responsibleReportQuerySchema>;

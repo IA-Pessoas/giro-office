@@ -632,6 +632,27 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       skipped: [{ id: august.id, reason: "Controle concluído." }],
     });
     expect(await mineIn("2026-08")).toMatchObject({ responsible_id: ownerId });
+
+    // Responsáveis × Empresas: agosto mantém o responsável do controle; a visão atual segue a carteira.
+    const report = async (query: string) =>
+      expectOk(
+        await call("GET", `/fiscal/monthly-controls/responsibles-report?${query}`),
+        `relatório ${query}`,
+      ).data as { items: Array<{ client_id: string }>; csv: string };
+    const clientIds = (data: { items: Array<{ client_id: string }> }) =>
+      data.items.map((item) => item.client_id);
+    const augustOwner = await report(
+      `basis=competence&competence=2026-08&responsible_id=${ownerId}`,
+    );
+    expect(clientIds(augustOwner)).toContain(clientId);
+    expect(augustOwner.csv).toContain(`Smoke Responsável ${suffix}`);
+    expect(
+      clientIds(await report(`basis=competence&competence=2026-08&responsible_id=${userId}`)),
+    ).not.toContain(clientId);
+    expect(clientIds(await report(`basis=current&responsible_id=${userId}`))).toContain(clientId);
+    expect(clientIds(await report(`basis=current&responsible_id=${ownerId}`))).not.toContain(
+      clientId,
+    );
   });
 
   it("controle anual: um por cliente e ano sob concorrência, DEFIS no Simples, declarações e trilha", async () => {

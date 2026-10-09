@@ -754,3 +754,105 @@ describe("MonthlyControlService.update", () => {
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 });
+
+describe("MonthlyControlService.responsibleReport", () => {
+  it("por competência usa o responsável gravado no controle, sem gerar controles", async () => {
+    const { prisma, service } = dependencies();
+    // clientA nasceu com responsibleA e a carteira passou para responsibleB depois.
+    prisma.fiscalMonthlyControl.findMany.mockResolvedValueOnce([
+      stored({ responsible_id: responsibleA }),
+      stored({ id: "c2", client_id: clientB, responsible_id: null }),
+    ]);
+    prisma.triageResponsible.findMany.mockResolvedValue([
+      { client_id: clientA, user_id: responsibleB },
+    ]);
+    prisma.client.findMany.mockResolvedValueOnce([
+      { id: clientA, name: "Alfa", company_name: null },
+      { id: clientB, name: "beta", company_name: "Beta Ltda" },
+    ]);
+    prisma.user.findMany.mockResolvedValueOnce([{ id: responsibleA, name: "Ana" }]);
+
+    const report = await service.responsibleReport(
+      { basis: "competence", competence: "2026-08" },
+      actor,
+    );
+
+    expect(prisma.fiscalMonthlyControl.findMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId, competence },
+      select: { client_id: true, responsible_id: true },
+    });
+    expect(prisma.triageResponsible.findMany).not.toHaveBeenCalled();
+    expect(prisma.fiscalMonthlyControl.createManyAndReturn).not.toHaveBeenCalled();
+    expect(report.items).toEqual([
+      {
+        client_id: clientA,
+        client_name: "Alfa",
+        responsible_id: responsibleA,
+        responsible_name: "Ana",
+      },
+      {
+        client_id: clientB,
+        client_name: "Beta Ltda",
+        responsible_id: null,
+        responsible_name: null,
+      },
+    ]);
+    expect(report.csv).toBe("﻿Responsável;Empresa\r\nAna;Alfa\r\nSem responsável;Beta Ltda\r\n");
+    expect(report.file_name).toBe("responsaveis-empresas-2026-08.csv");
+  });
+
+  it("atual usa a carteira vigente dos clientes Fiscal e filtra tela e CSV juntos", async () => {
+    const { prisma, service } = dependencies();
+    prisma.client.findMany
+      .mockResolvedValueOnce([{ id: clientA }, { id: clientB }])
+      .mockResolvedValueOnce([{ id: clientB, name: "Beta", company_name: null }]);
+    prisma.triageResponsible.findMany.mockResolvedValueOnce([
+      { client_id: clientA, user_id: responsibleA },
+      { client_id: clientB, user_id: responsibleB },
+    ]);
+    prisma.user.findMany.mockResolvedValueOnce([]);
+
+    const report = await service.responsibleReport(
+      { basis: "current", responsible_id: responsibleB },
+      actor,
+    );
+
+    expect(prisma.client.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: expect.objectContaining({ organization_id: organizationId, fiscal: true }),
+        select: { id: true },
+      }),
+    );
+    expect(prisma.fiscalMonthlyControl.findMany).not.toHaveBeenCalled();
+    // Responsável sem acesso atual continua aparecendo, com rótulo próprio.
+    expect(report.items).toEqual([
+      {
+        client_id: clientB,
+        client_name: "Beta",
+        responsible_id: responsibleB,
+        responsible_name: null,
+      },
+    ]);
+    expect(report.csv).toBe("﻿Responsável;Empresa\r\nUsuário sem acesso atual;Beta\r\n");
+    expect(report.file_name).toBe("responsaveis-empresas-atual.csv");
+  });
+
+  it("filtro 'none' devolve só clientes sem responsável", async () => {
+    const { prisma, service } = dependencies();
+    prisma.fiscalMonthlyControl.findMany.mockResolvedValueOnce([
+      stored({ responsible_id: responsibleA }),
+      stored({ id: "c2", client_id: clientB, responsible_id: null }),
+    ]);
+    prisma.client.findMany.mockResolvedValueOnce([
+      { id: clientB, name: "Beta", company_name: null },
+    ]);
+
+    const report = await service.responsibleReport(
+      { basis: "competence", competence: "2026-08", responsible_id: "none" },
+      actor,
+    );
+
+    expect(report.items.map((item) => item.client_id)).toEqual([clientB]);
+  });
+});

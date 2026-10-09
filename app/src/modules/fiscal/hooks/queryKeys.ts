@@ -19,6 +19,11 @@ export function fiscalMonthlyControlsQueryKey(competence: string) {
   return [...FISCAL_MONTHLY_CONTROLS_QUERY_KEY, competence] as const;
 }
 
+/** Sob o prefixo das carteiras: transferências também atualizam o relatório. */
+export function fiscalResponsibleReportQueryKey(basis: string, competence: string, responsibleId: string) {
+  return [...FISCAL_MONTHLY_CONTROLS_QUERY_KEY, "responsibles-report", basis, competence, responsibleId] as const;
+}
+
 export const FISCAL_RESPONSIBLES_QUERY_KEY = [...FISCAL_QUERY_KEY, "responsibles"] as const;
 
 /** Prefixo das carteiras anuais; invalidá-lo atualiza o andamento de todas. */

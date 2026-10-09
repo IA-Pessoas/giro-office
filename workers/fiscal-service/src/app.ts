@@ -51,6 +51,7 @@ import {
   monthlyControlIdParamsSchema,
   monthlyObligationParamsSchema,
   openMonthlyControlBodySchema,
+  responsibleReportQuerySchema,
   transferMonthlyControlsBodySchema,
   updateMonthlyControlBodySchema,
   updateMonthlyObligationBodySchema,
@@ -164,7 +165,7 @@ type MalhaServiceLike = Pick<
 >;
 type ControlServiceLike = Pick<
   MonthlyControlService,
-  "list" | "open" | "update" | "triage" | "transfer" | "responsibles"
+  "list" | "open" | "update" | "triage" | "transfer" | "responsibles" | "responsibleReport"
 >;
 type ObligationServiceLike = Pick<MonthlyObligationService, "list" | "add" | "update">;
 type AnnualServiceLike = Pick<AnnualControlService, "list" | "items" | "addItem" | "updateItem">;
@@ -526,6 +527,14 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
 
   app.get("/fiscal/monthly-controls/responsibles", async (c) => {
     const data = await withService("controlService", (service) => service.responsibles(actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/monthly-controls/responsibles-report", async (c) => {
+    const query = parseWithZod(responsibleReportQuerySchema, c.req.query());
+    const data = await withService("controlService", (service) =>
+      service.responsibleReport(query, actor(c)),
+    );
     return c.json(createSuccessResponse(data));
   });
 

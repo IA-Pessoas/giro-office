@@ -10,6 +10,7 @@ import {
   Receipt,
   Search,
   ScrollText,
+  Users,
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { FiscalMalhasSection } from "./FiscalMalhasSection";
 import { FiscalIpiSpreadsheetSection } from "./FiscalIpiSpreadsheetSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
 import { FiscalRatesSection } from "./FiscalRatesSection";
+import { FiscalResponsibleReportSection } from "./FiscalResponsibleReportSection";
 import { FiscalRevenuesSection } from "./FiscalRevenuesSection";
 import { FiscalSimplesBatchSection } from "./FiscalSimplesBatchSection";
 import { FiscalSearchSection } from "./FiscalSearchSection";
@@ -90,6 +92,11 @@ const fiscalTabs: Array<{
     id: "wholesale",
     label: "Atacadista",
     icon: Warehouse,
+  },
+  {
+    id: "responsibles",
+    label: "Responsáveis × Empresas",
+    icon: Users,
   },
   {
     id: "conferences",
@@ -196,6 +203,10 @@ function FiscalActiveTabPanel({
 
   if (activeTab === "revenues") {
     return <div role="tabpanel" id="fiscal-panel-revenues" aria-labelledby="fiscal-tab-revenues">{canEdit ? <FiscalSimplesBatchSection /> : null}<FiscalRevenuesSection canEdit={canEdit} /></div>;
+  }
+
+  if (activeTab === "responsibles") {
+    return <div role="tabpanel" id="fiscal-panel-responsibles" aria-labelledby="fiscal-tab-responsibles"><FiscalResponsibleReportSection /></div>;
   }
 
   if (activeTab === "wholesale") {
