@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Banknote,
+  ClipboardList,
   Percent,
   Landmark,
   Receipt,
@@ -12,6 +13,7 @@ import {
 import { useModuleAccess } from "@modules/auth";
 
 import type { FiscalTabId } from "../types";
+import { FiscalControlsSection } from "./FiscalControlsSection";
 import { FiscalIcmsSection } from "./FiscalIcmsSection";
 import { FiscalIpiSection } from "./FiscalIpiSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
@@ -29,6 +31,11 @@ const fiscalTabs: Array<{
     id: "search",
     label: "Busca Fiscal",
     icon: Search,
+  },
+  {
+    id: "controls",
+    label: "Controle mensal",
+    icon: ClipboardList,
   },
   {
     id: "ncm",
@@ -131,6 +138,10 @@ function FiscalActiveTabPanel({
 }) {
   if (activeTab === "search") {
     return <FiscalSearchTab />;
+  }
+
+  if (activeTab === "controls") {
+    return <div role="tabpanel" id="fiscal-panel-controls" aria-labelledby="fiscal-tab-controls"><FiscalControlsSection canEdit={canEdit} canReopen={canDelete} /></div>;
   }
 
   if (activeTab === "ncm") {

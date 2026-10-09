@@ -344,3 +344,36 @@ await runTest("fiscal Simples batch parses pasted documents and exports CSV for 
   assert.match(batch, /nenhum arquivo gerado/);
   assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });
+
+await runTest("fiscal control reopening needs level 3 and a reason", async () => {
+  const { fiscalControlStatusChange, FISCAL_CONTROL_STATUS_LABELS } = await import(
+    "./utils/fiscalControl.ts"
+  );
+  assert.equal(fiscalControlStatusChange("PENDING", "PENDING", false), "none");
+  assert.equal(fiscalControlStatusChange("PENDING", "COMPLETED", false), "direct");
+  assert.equal(fiscalControlStatusChange("AWAITING_CLIENT", "IN_PROGRESS", false), "direct");
+  assert.equal(fiscalControlStatusChange("COMPLETED", "IN_PROGRESS", false), "forbidden");
+  assert.equal(fiscalControlStatusChange("COMPLETED", "PENDING", true), "reason");
+  assert.equal(FISCAL_CONTROL_STATUS_LABELS.AWAITING_CLIENT, "Aguardando cliente");
+});
+
+await runTest("fiscal monthly control tab keeps viewer read-only and reasons required", async () => {
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(
+    fiscalSources.shell,
+    /<FiscalControlsSection canEdit=\{canEdit\} canReopen=\{canDelete\} \/>/,
+  );
+  assert.match(client, /api\.get\("\/fiscal\/monthly-controls"/);
+  assert.match(client, /api\.post\("\/fiscal\/monthly-controls"/);
+  assert.match(client, /api\.patch\(`\/fiscal\/monthly-controls\/\$\{id\}`/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando controles"/);
+  assert.match(section, /list\.error \? \(\s*<div role="alert">/);
+  assert.match(section, /Nenhum cliente com Fiscal ativo nesta competência/);
+  // Visualizador: sem formulário de abertura, sem select de situação, checkbox desabilitado.
+  assert.match(section, /\{canEdit && openingForm \? \(/);
+  assert.match(section, /\{canEdit \? \(\s*<select/);
+  assert.match(section, /disabled=\{!canEdit \|\| update\.isPending\}/);
+  assert.match(section, /id="fiscal-control-reopen-error" role="alert"/);
+  assert.match(section, /if \(reason\.length < 3\) \{\s*setReopenError/);
+});
