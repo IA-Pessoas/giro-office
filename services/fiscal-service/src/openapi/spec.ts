@@ -922,6 +922,47 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/monthly-controls/responsibles-report": {
+        get: {
+          tags: ["Controle mensal"],
+          summary: "Relatório Responsáveis × Empresas",
+          description:
+            "Fiscal nível 1. basis=current usa a carteira vigente (responsável padrão na Triagem) dos clientes com Fiscal no mês; basis=competence usa o responsável gravado no controle da competência, sem gerar controles. Devolve os itens e o CSV dos mesmos itens.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "basis",
+              in: "query",
+              required: true,
+              schema: { type: "string", enum: ["current", "competence"] },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: false,
+              description: "AAAA-MM; obrigatória com basis=competence",
+              schema: { type: "string", pattern: competencePattern },
+            },
+            {
+              name: "responsible_id",
+              in: "query",
+              required: false,
+              description: "UUID do responsável ou none para clientes sem responsável",
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": {
+              description:
+                "{ basis, competence, items[{ client_id, client_name, responsible_id, responsible_name }], file_name, csv }",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Filtro inválido" },
+          },
+        },
+      },
       "/fiscal/monthly-controls/transfer": {
         post: {
           tags: ["Controle mensal"],

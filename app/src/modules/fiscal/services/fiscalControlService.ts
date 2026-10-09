@@ -131,7 +131,34 @@ export function monthlyItemSource(controlId: string): FiscalItemSource<FiscalObl
   };
 }
 
+export type FiscalResponsibleReportBasis = "current" | "competence";
+
+export interface FiscalResponsibleReport {
+  basis: FiscalResponsibleReportBasis;
+  competence: string | null;
+  items: Array<{
+    client_id: string;
+    client_name: string;
+    responsible_id: string | null;
+    responsible_name: string | null;
+  }>;
+  file_name: string;
+  /** CSV dos mesmos itens devolvidos para a tela. */
+  csv: string;
+}
+
 export const fiscalControlService = {
+  /** Responsáveis × Empresas: carteira atual ou responsável gravado na competência. */
+  async responsibleReport(params: {
+    basis: FiscalResponsibleReportBasis;
+    competence?: string;
+    responsible_id?: string;
+  }): Promise<FiscalResponsibleReport> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.get("/fiscal/monthly-controls/responsibles-report", { params });
+    return unwrapFiscalEnvelope<FiscalResponsibleReport>(response.data);
+  },
+
   /** Lista a competência; o serviço gera antes os controles que faltam. */
   async list(competence: string): Promise<FiscalMonthlyControlPortfolio> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
