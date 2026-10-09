@@ -269,7 +269,9 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
         get: protectedOperation("Consultar respostas da competência selecionada."),
       },
       "/marketing/ai-usage-controls/report": {
-        get: protectedOperation("Consultar respostas pendentes e usuários sem integração."),
+        get: protectedOperation(
+          "Consultar, na competência, controles pendentes (qualquer resposta ausente), sem resposta de conhecimento e com integração respondida como Não.",
+        ),
       },
       "/marketing/ai-usage-controls/{id}": {
         patch: protectedOperation("Salvar respostas da pesquisa mensal."),

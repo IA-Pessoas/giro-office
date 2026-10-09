@@ -5,6 +5,7 @@ import { useFetch } from "@shared/hooks";
 import { useModuleAccess } from "@modules/auth";
 import { useMarketingDashboard } from "../hooks/useMarketingDashboard";
 import { marketingQueryKey } from "../utils/marketingQueryKeys";
+import { MarketingAiUsageReport } from "./MarketingAiUsageReport";
 
 import { marketingAiUsageService, type AiUsageAnswers, type AiUsageControl } from "../services/marketingAiUsageService";
 
@@ -189,7 +190,10 @@ export function MarketingAiUsageControls() {
         {!controlsQuery.isLoading && controlsQuery.data?.length === 0 ? <p className="text-sm text-gray-500 dark:text-slate-400">Nenhuma pesquisa criada para esta competência.</p> : null}
       </div>
 
-      <div className="grid gap-4 border-t border-gray-100 pt-4 dark:border-slate-700 md:grid-cols-2">
+      <div className="flex justify-end border-t border-gray-100 pt-4 dark:border-slate-700">
+        <MarketingAiUsageReport competence={competence} report={reportQuery.data} />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
         <div>
           <h3 className="font-semibold text-gray-900 dark:text-white">Respostas pendentes ({reportQuery.data?.pending.length ?? 0})</h3>
           <ul className="mt-2 list-inside list-disc text-sm text-gray-600 dark:text-slate-300">

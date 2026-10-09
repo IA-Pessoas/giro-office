@@ -108,13 +108,16 @@ describe("MarketingAiUsageControlService", () => {
 
   it("marca controles com qualquer resposta ausente e separa integração explicitamente negativa", async () => {
     const pending = [{ id: "pending-1", user: { id: userId, name: "Ana" } }];
+    const unanswered = [{ id: "unanswered-1", user: { id: userId, name: "Ana" } }];
     const withoutIntegration = [{ id: "no-integration", user: { id: "user-2", name: "Bia" } }];
     prisma.marketingAiUsageControl.findMany
       .mockResolvedValueOnce(pending)
+      .mockResolvedValueOnce(unanswered)
       .mockResolvedValueOnce(withoutIntegration);
 
     await expect(service.getReport(organizationId, competence)).resolves.toEqual({
       pending,
+      unanswered,
       withoutIntegration,
     });
 
@@ -133,16 +136,25 @@ describe("MarketingAiUsageControlService", () => {
       include: { user: { select: { id: true, name: true, full_name: true } } },
       orderBy: [{ user: { name: "asc" } }, { id: "asc" }],
     });
-    expect(prisma.marketingAiUsageControl.findMany).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        where: {
-          organization_id: organizationId,
-          competence: new Date("2026-04-01T00:00:00.000Z"),
-          integration: false,
-        },
-      }),
-    );
+    // Legado: "sem resposta" é conhecimento=0 (nulo aqui); "sem integração" é integracao=1 ("Não").
+    expect(prisma.marketingAiUsageControl.findMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        organization_id: organizationId,
+        competence: new Date("2026-04-01T00:00:00.000Z"),
+        knowledge: null,
+      },
+      include: { user: { select: { id: true, name: true, full_name: true } } },
+      orderBy: [{ user: { name: "asc" } }, { id: "asc" }],
+    });
+    expect(prisma.marketingAiUsageControl.findMany).toHaveBeenNthCalledWith(3, {
+      where: {
+        organization_id: organizationId,
+        competence: new Date("2026-04-01T00:00:00.000Z"),
+        integration: false,
+      },
+      include: { user: { select: { id: true, name: true, full_name: true } } },
+      orderBy: [{ user: { name: "asc" } }, { id: "asc" }],
+    });
   });
 
   it("atualiza respostas dentro da organização autenticada", async () => {

@@ -5,10 +5,12 @@ import {
   createBirthdayCsv,
   createMonthlyClientBirthdayCsv,
   createMonthlyEmployeeBirthdayCsv,
+  createAiUsageReportCsv,
   createMarketingStockCsv,
 } from "./utils/marketingCsv.ts";
 
 const dashboard = await readFile(new URL("./components/MarketingDashboard.tsx", import.meta.url), "utf8");
+const aiUsageReport = await readFile(new URL("./components/MarketingAiUsageReport.tsx", import.meta.url), "utf8");
 const stockReport = await readFile(new URL("./components/MarketingStockReport.tsx", import.meta.url), "utf8");
 const birthdayReport = await readFile(new URL("./components/MarketingBirthdayReport.tsx", import.meta.url), "utf8");
 const events = await readFile(new URL("./components/MarketingEvents.tsx", import.meta.url), "utf8");
@@ -173,6 +175,22 @@ assert.match(stockReport, /marketingStockRows\(stock\.items\)/);
 assert.match(stockReport, /printMarketingReport\("marketing-stock-report"\)/);
 assert.match(stockReport, /marketing-print-report/);
 assert.match(page, /MarketingStockReport/);
+assert.equal(
+  createAiUsageReportCsv(
+    [
+      { user: { name: "ana", full_name: "Ana Souza" } },
+      { user: { name: "=bia", full_name: null } },
+    ],
+    "2026-04",
+  ),
+  '"Nome","Competência"\r\n"Ana Souza","04/2026"\r\n"\'=bia","04/2026"',
+);
+assert.match(aiUsageReport, /key: "unanswered"/);
+assert.match(aiUsageReport, /key: "withoutIntegration"/);
+assert.match(aiUsageReport, /aiUsageReportRows\(report\[section\.key\], competence\)/);
+assert.match(aiUsageReport, /printMarketingReport\("marketing-ai-usage-report"\)/);
+assert.match(aiUsageReport, /marketing-print-report/);
+assert.match(aiUsage, /<MarketingAiUsageReport competence=\{competence\} report=\{reportQuery\.data\} \/>/);
 assert.match(service, /"\/marketing\/stock"/);
 assert.match(service, /"\/marketing\/birthdays"/);
 assert.match(events, /query\.isLoading/);
