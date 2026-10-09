@@ -214,7 +214,7 @@ function FiscalActiveTabPanel({
   }
 
   if (activeTab === "anticipations") {
-    return <div role="tabpanel" id="fiscal-panel-anticipations" aria-labelledby="fiscal-tab-anticipations"><FiscalAnticipationsSection canEdit={canEdit} /></div>;
+    return <div role="tabpanel" id="fiscal-panel-anticipations" aria-labelledby="fiscal-tab-anticipations"><FiscalAnticipationsSection canEdit={canEdit} canAuthorize={canDelete} /></div>;
   }
 
   if (activeTab === "conferences") {

@@ -385,6 +385,22 @@ await runTest("fiscal anticipation review sends only changed fields and labels h
     }),
     { classification: "freight", manual_value: null, corrections: { cfop: null, value: "9.90" } },
   );
+  assert.equal(
+    buildAnticipationItemChanges(item, {
+      classification: "total",
+      manual_value: "7,5",
+      corrections: { cfop: "6403", value: "1.234,5", quantity: "2,500" },
+    })?.corrections?.value,
+    "1234.50",
+  );
+  assert.deepEqual(
+    buildAnticipationItemChanges(item, {
+      classification: "total",
+      manual_value: "7,5",
+      corrections: { cfop: "6403", quantity: "2,500" },
+    }),
+    { corrections: { quantity: "2.5" } },
+  );
   assert.equal(formatAnticipationHistoryField("correction.icms_st"), "Correção de ICMS ST");
   assert.equal(formatAnticipationHistoryValue("status", "awaiting_check", () => undefined), "Aguardando conferência");
   assert.equal(formatAnticipationHistoryValue("reviewer_id", "u1", () => "Ana"), "Ana");

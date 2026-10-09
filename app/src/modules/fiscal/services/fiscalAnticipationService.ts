@@ -6,6 +6,7 @@ import type {
   FiscalAnticipationClassification,
   FiscalAnticipationCorrectableField,
   FiscalAnticipationIssueKind,
+  FiscalAnticipationItemChanges,
   FiscalAnticipationStatus,
 } from "../utils/fiscalAnticipation";
 import { unwrapFiscalEnvelope } from "./fiscalService.contract";
@@ -63,13 +64,12 @@ export interface FiscalAnticipationHistoryEntry {
 
 export type FiscalAnticipationBatchDetail = FiscalAnticipationBatch & {
   items: FiscalAnticipationItem[];
-  history?: FiscalAnticipationHistoryEntry[];
+  history: FiscalAnticipationHistoryEntry[];
 };
 
-export type FiscalAnticipationItemChanges = {
-  classification?: FiscalAnticipationClassification | null;
-  manual_value?: string | null;
-  corrections?: Partial<Record<FiscalAnticipationCorrectableField, string | null>>;
+/** Resposta da importação: o lote recém-criado ainda não tem histórico. */
+export type FiscalAnticipationImportResult = FiscalAnticipationBatch & {
+  items: FiscalAnticipationItem[];
 };
 
 export const ANTICIPATION_PAGE_SIZE = 20;
@@ -103,14 +103,14 @@ export const fiscalAnticipationService = {
     clientId: string;
     competence: string;
     file: File;
-  }): Promise<FiscalAnticipationBatchDetail> {
+  }): Promise<FiscalAnticipationImportResult> {
     const response = await api().post("/fiscal/anticipations/batches", {
       client_id: input.clientId,
       competence: input.competence,
       file_name: input.file.name,
       zip_base64: await fileToBase64(input.file),
     });
-    return unwrapFiscalEnvelope<FiscalAnticipationBatchDetail>(response.data);
+    return unwrapFiscalEnvelope<FiscalAnticipationImportResult>(response.data);
   },
 
   async updateItem(input: {

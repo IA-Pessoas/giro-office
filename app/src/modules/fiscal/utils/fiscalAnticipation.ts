@@ -74,6 +74,32 @@ export function formatAnticipationHistoryValue(
   return value;
 }
 
+export type FiscalAnticipationItemChanges = {
+  classification?: FiscalAnticipationClassification | null;
+  manual_value?: string | null;
+  corrections?: Partial<Record<FiscalAnticipationCorrectableField, string | null>>;
+};
+
+/**
+ * Número digitado ("1.234,5", "150", "9,90") no formato canônico do serviço: ponto decimal,
+ * dinheiro com 2 casas e quantidade sem zeros à direita. Texto que não é número volta como está,
+ * para o serviço recusar com a mensagem de validação.
+ */
+function canonicalNumber(raw: string, kind: "money" | "quantity"): string {
+  const text = raw.includes(",") ? raw.replace(/\./gu, "").replace(",", ".") : raw;
+  if (!/^\d+(\.\d+)?$/u.test(text)) return raw;
+  const [integer = "0", fraction = ""] = text.split(".");
+  const digits = integer.replace(/^0+(?=\d)/u, "");
+  if (kind === "money") return `${digits}.${fraction.padEnd(2, "0")}`;
+  const trimmed = fraction.replace(/0+$/u, "");
+  return trimmed ? `${digits}.${trimmed}` : digits;
+}
+
+function canonicalField(field: FiscalAnticipationCorrectableField, raw: string): string {
+  if (field === "ncm" || field === "cfop") return raw;
+  return canonicalNumber(raw, field === "quantity" ? "quantity" : "money");
+}
+
 /**
  * Alterações do formulário de revisão em relação ao item: só os campos mudados vão ao serviço,
  * texto vazio desfaz (null). Devolve null quando nada mudou.
@@ -89,22 +115,20 @@ export function buildAnticipationItemChanges(
     manual_value: string;
     corrections: Partial<Record<FiscalAnticipationCorrectableField, string>>;
   },
-): {
-  classification?: FiscalAnticipationClassification | null;
-  manual_value?: string | null;
-  corrections?: Partial<Record<FiscalAnticipationCorrectableField, string | null>>;
-} | null {
-  const changes: ReturnType<typeof buildAnticipationItemChanges> & object = {};
+): FiscalAnticipationItemChanges | null {
+  const changes: FiscalAnticipationItemChanges = {};
   const classification = form.classification || null;
   if (classification !== item.classification) changes.classification = classification;
-  const manualValue = form.manual_value.trim().replace(",", ".") || null;
+  const manualText = form.manual_value.trim();
+  const manualValue = manualText ? canonicalNumber(manualText, "money") : null;
   if (manualValue !== item.manual_value) changes.manual_value = manualValue;
-  const corrections: Partial<Record<FiscalAnticipationCorrectableField, string | null>> = {};
+  const corrections: NonNullable<FiscalAnticipationItemChanges["corrections"]> = {};
   for (const [field, raw] of Object.entries(form.corrections) as [
     FiscalAnticipationCorrectableField,
     string,
   ][]) {
-    const next = raw.trim().replace(",", ".") || null;
+    const text = raw.trim();
+    const next = text ? canonicalField(field, text) : null;
     if (next !== (item.corrections[field] ?? null)) corrections[field] = next;
   }
   if (Object.keys(corrections).length) changes.corrections = corrections;
