@@ -340,6 +340,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "baixou", item: "um PDF de alíquota fiscal" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/clients\/[^/]+\/wholesale$/,
+    description: { action: "consultou", item: "a condição de atacadista de um cliente" },
+  },
+  {
+    methods: ["PUT"],
+    pattern: /^\/fiscal\/clients\/[^/]+\/wholesale$/,
+    description: { action: "alterou", item: "a condição de atacadista de um cliente" },
+  },
+  {
     methods: ["POST"],
     pattern: /^\/fiscal\/malhas\/[^/]+\/attachment$/,
     description: { action: "anexou", item: "um arquivo a uma malha fiscal" },

@@ -106,6 +106,18 @@ describe("activityCatalog", () => {
     ["POST", "/fiscal/simples/zip", "exportou", "os PDFs de alíquotas do Simples em lote"],
     ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
     ["POST", "/fiscal/malhas", "cadastrou", "uma nova malha fiscal"],
+    [
+      "GET",
+      "/fiscal/clients/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/wholesale",
+      "consultou",
+      "a condição de atacadista de um cliente",
+    ],
+    [
+      "PUT",
+      "/fiscal/clients/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/wholesale",
+      "alterou",
+      "a condição de atacadista de um cliente",
+    ],
     ["GET", "/fiscal/malhas/list", "consultou", "a lista de malhas fiscais"],
     ["GET", "/fiscal/malhas/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e", "consultou", "uma malha fiscal"],
     ["PUT", "/fiscal/malhas/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e", "atualizou", "uma malha fiscal"],

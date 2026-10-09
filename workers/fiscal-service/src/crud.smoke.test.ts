@@ -384,6 +384,42 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     expect(foreignUpdate.status).not.toBe(200);
   });
 
+  it("atacadista: marca, desmarca com trilha e isola por organização", async () => {
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Atacadista ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+    });
+    const clientId = String(client.id);
+    const path = `/fiscal/clients/${clientId}/wholesale`;
+    const initial = expectOk(await call("GET", path), "GET wholesale inicial");
+    expect(initial.data).toMatchObject({ is_wholesale: false, history: [] });
+
+    expectOk(await call("PUT", path, { is_wholesale: true }), "PUT wholesale true");
+    expectOk(await call("PUT", path, { is_wholesale: true }), "PUT wholesale repetido");
+    const final = expectOk(await call("PUT", path, { is_wholesale: false }), "PUT wholesale false");
+    expect(final.data.is_wholesale).toBe(false);
+    expect(
+      final.data.history.map((row: { previous_value: boolean; new_value: boolean }) => [
+        row.previous_value,
+        row.new_value,
+      ]),
+    ).toEqual([
+      [true, false],
+      [false, true],
+    ]);
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    const foreign = await call("PUT", path, { is_wholesale: true }, otherOrganization);
+    expect(foreign.status).not.toBe(200);
+    const after = expectOk(await call("GET", path), "GET após outra organização");
+    expect(after.data.is_wholesale).toBe(false);
+  });
+
   it("lote do Simples: CSV com elegíveis e motivo dos ignorados", async () => {
     const document = `91${suffix}0001`;
     const eligible = await smokeInsert("clients", {

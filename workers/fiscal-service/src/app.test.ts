@@ -364,6 +364,47 @@ describe("fiscal Worker", () => {
     expect(malhas.update).toHaveBeenCalledOnce();
   });
 
+  it("consulta e altera a condição de atacadista no tenant autenticado", async () => {
+    const clientId = "d0000000-0000-4000-8000-000000000001";
+    const state = {
+      client_id: clientId,
+      is_wholesale: true,
+      updated_at: null,
+      updated_by: null,
+      history: [],
+    };
+    const wholesale = { get: vi.fn(async () => state), set: vi.fn(async () => state) };
+    const app = createFiscalWorkerApp({ env: env(), wholesaleService: wholesale });
+    const viewer = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
+
+    const read = await app.request(`https://fiscal.test/fiscal/clients/${clientId}/wholesale`, {
+      headers: viewer,
+    });
+    expect(read.status).toBe(200);
+    expect(wholesale.get).toHaveBeenCalledWith(clientId, ORGANIZATION_ID);
+
+    const updated = await app.request(`https://fiscal.test/fiscal/clients/${clientId}/wholesale`, {
+      method: "PUT",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ is_wholesale: true }),
+    });
+    expect(updated.status).toBe(200);
+    expect(wholesale.set).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId, isWholesale: true, organizationId: ORGANIZATION_ID }),
+    );
+
+    const viewerWrite = await app.request(
+      `https://fiscal.test/fiscal/clients/${clientId}/wholesale`,
+      {
+        method: "PUT",
+        headers: { ...viewer, "content-type": "application/json" },
+        body: JSON.stringify({ is_wholesale: false }),
+      },
+    );
+    expect(viewerWrite.status).toBe(403);
+    expect(wholesale.set).toHaveBeenCalledOnce();
+  });
+
   it("registra alíquota manual e entrega PDF no tenant autenticado", async () => {
     const rate = {
       id: ICMS_ID,

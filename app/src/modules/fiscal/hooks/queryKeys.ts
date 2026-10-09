@@ -25,6 +25,10 @@ export function fiscalMalhaDetailQueryKey(clientId: string, malhaId: string) {
   return [...fiscalMalhasQueryKey(clientId), "detail", malhaId] as const;
 }
 
+export function fiscalWholesaleQueryKey(clientId: string) {
+  return [...FISCAL_QUERY_KEY, "wholesale", clientId] as const;
+}
+
 export function fiscalNcmSearchQueryKey(ncmCode: string) {
   return [...FISCAL_QUERY_KEY, "search", ncmCode] as const;
 }

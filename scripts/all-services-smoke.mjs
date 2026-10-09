@@ -4737,6 +4737,30 @@ const handlers = {
     });
   },
 
+  async fiscalClientWholesaleGet(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/clients/${requireState("primaryClientId")}/wholesale`,
+    });
+    if (!isBadExpectation(op) && typeof response.body?.data?.is_wholesale !== "boolean") {
+      throw new Error(`atacadista sem valor atual: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalClientWholesaleUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/clients/${requireState("primaryClientId")}/wholesale`,
+      json: { is_wholesale: true },
+    });
+  },
+
+  async fiscalClientWholesaleUpdateInvalid(op) {
+    await httpRequest(op, {
+      path: `/fiscal/clients/${requireState("primaryClientId")}/wholesale`,
+      expectedStatus: [400],
+      json: { is_wholesale: "sim" },
+    });
+  },
+
   async fiscalMalhaCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

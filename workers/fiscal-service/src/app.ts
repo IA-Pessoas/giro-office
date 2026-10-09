@@ -1,6 +1,10 @@
 import { buildFiscalServiceOpenApiSpec } from "@workspace/fiscal-service/src/openapi/spec.js";
 import { InternalReportingService } from "@workspace/fiscal-service/src/reporting/internalReportingService.js";
 import {
+  clientWholesaleParamsSchema,
+  updateClientWholesaleBodySchema,
+} from "@workspace/fiscal-service/src/schemas/clientWholesale.schemas.js";
+import {
   createFiscalRateBodySchema,
   fiscalRateIdParamsSchema,
   listFiscalRatesQuerySchema,
@@ -42,6 +46,7 @@ import {
   simplesPdfQuerySchema,
   simplesPreviewQuerySchema,
 } from "@workspace/fiscal-service/src/schemas/simplesRate.schemas.js";
+import { ClientWholesaleService } from "@workspace/fiscal-service/src/services/clientWholesaleService.js";
 import {
   fiscalRatePdfHeaders,
   renderFiscalRatePdf,
@@ -98,6 +103,7 @@ type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
 type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
+type WholesaleServiceLike = Pick<ClientWholesaleService, "get" | "set">;
 type MalhaServiceLike = Pick<
   MalhaService,
   "create" | "update" | "list" | "detail" | "replaceAttachment" | "attachmentAccess"
@@ -114,6 +120,7 @@ interface FiscalWorkerOptions {
   rateService?: RateServiceLike;
   revenueService?: RevenueServiceLike;
   malhaService?: MalhaServiceLike;
+  wholesaleService?: WholesaleServiceLike;
   simplesService?: SimplesServiceLike;
 }
 
@@ -131,6 +138,7 @@ type WorkerServices = {
   rateService: RateServiceLike;
   revenueService: RevenueServiceLike;
   malhaService: MalhaServiceLike;
+  wholesaleService: WholesaleServiceLike;
   simplesService: SimplesServiceLike;
 };
 
@@ -255,6 +263,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         ConstructorParameters<typeof FiscalRateService>[0] &
         ConstructorParameters<typeof MonthlyRevenueService>[0] &
         ConstructorParameters<typeof MalhaService>[0] &
+        ConstructorParameters<typeof ClientWholesaleService>[0] &
         ConstructorParameters<typeof SimplesRateService>[0] &
         ConstructorParameters<typeof InternalReportingService>[0];
       const factories: { [S in keyof WorkerServices]: () => WorkerServices[S] } = {
@@ -271,6 +280,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
             createFiscalAudit(env),
             WorkerMalhaAttachmentStorage.fromEnv(env),
           ),
+        wholesaleService: () => new ClientWholesaleService(prisma, createFiscalAudit(env)),
         simplesService: () => new SimplesRateService(prisma),
       };
       return callback(factories[key]());
@@ -337,6 +347,27 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     });
     const data = await withService("revenueService", (service) =>
       service.list(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/clients/:client_id/wholesale", async (c) => {
+    const { client_id } = parseWithZod(clientWholesaleParamsSchema, {
+      client_id: c.req.param("client_id"),
+    });
+    const data = await withService("wholesaleService", (service) =>
+      service.get(client_id, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.put("/fiscal/clients/:client_id/wholesale", async (c) => {
+    const { client_id } = parseWithZod(clientWholesaleParamsSchema, {
+      client_id: c.req.param("client_id"),
+    });
+    const { is_wholesale } = parseWithZod(updateClientWholesaleBodySchema, await readJson(c));
+    const data = await withService("wholesaleService", (service) =>
+      service.set({ ...actor(c), clientId: client_id, isWholesale: is_wholesale }),
     );
     return c.json(createSuccessResponse(data));
   });
