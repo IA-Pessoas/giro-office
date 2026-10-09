@@ -148,6 +148,37 @@ describe("Marketing access to canonical Instagram profiles", () => {
   });
 });
 
+describe("Marketing access to organization user profiles", () => {
+  it("allows Marketing viewer to read only the user list and profile photo", () => {
+    expect(authorizeClientRequest("GET", "/user", { marketing: 1 })).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/user/user-1/photo", { marketing: 1 })).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/user/user-1", { marketing: 1 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+
+  it("allows Marketing editor to mutate only a user photo", () => {
+    expect(authorizeClientRequest("POST", "/user/user-1/photo", { marketing: 2 })).toBeUndefined();
+    expect(
+      authorizeClientRequest("DELETE", "/user/user-1/photo", { marketing: 2 }),
+    ).toBeUndefined();
+    expect(
+      authorizeClientRequest("PUT", "/user/user-2", { marketing: 2 }, { name: "New name" }),
+    ).toMatchObject({
+      statusCode: 403,
+    });
+    expect(
+      authorizeClientRequest("PUT", "/user/user-1", { marketing: 2 }, { name: "New name" }),
+    ).toMatchObject({ statusCode: 403 });
+    expect(
+      authorizeClientRequest("PUT", "/user/user-1", { marketing: 2 }, { password: "secret" }),
+    ).toBeUndefined();
+    expect(authorizeClientRequest("DELETE", "/user/user-1/photo", { marketing: 1 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+});
+
 describe("platform default deny", () => {
   it("deixa público somente o login e exige platformOnly nas demais rotas", () => {
     expect(isPublicRoute("POST", "/platform/session")).toBe(true);

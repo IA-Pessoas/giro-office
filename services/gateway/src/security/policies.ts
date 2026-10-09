@@ -45,6 +45,12 @@ const commercialModulePolicy = createModulePolicy("comercial", moduleAccessPermi
 const commercialEditPolicy = createModulePolicy("comercial", moduleEditPermission);
 const marketingModulePolicy = createModulePolicy("marketing", moduleAccessPermission);
 const marketingEditPolicy = createModulePolicy("marketing", moduleEditPermission);
+const userListPolicy: AuthPolicy = {
+  anyOf: [userManagementPolicy, marketingModulePolicy],
+};
+const userPhotoEditPolicy: AuthPolicy = {
+  anyOf: [userManagementPolicy, marketingEditPolicy],
+};
 
 const operationalUsersCatalogPolicy: AuthPolicy = {
   anyModulePermission: {
@@ -168,7 +174,7 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["POST /rh/messages", rhModulePolicy],
   ["POST /user/session/refresh", authenticatedPolicy],
   ["DELETE /user/session", authenticatedPolicy],
-  ["GET /user", userManagementPolicy],
+  ["GET /user", userListPolicy],
   ["GET /rh/operational-users", operationalUsersCatalogPolicy],
   ["POST /user", userManagementPolicy],
   ["POST /platform/session/refresh", platformOnlyPolicy],
@@ -291,10 +297,10 @@ const routePolicyMatchers: Array<{
     path: /^\/user\/(?!me$|session$|start-config$|permission\/)[^/]+$/,
     policy: userManagementPolicy,
   },
-  { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
-  { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "GET", path: /^\/user\/[^/]+\/photo$/, policy: userListPolicy },
+  { method: "POST", path: /^\/user\/[^/]+\/photo$/, policy: userPhotoEditPolicy },
   { method: "POST", path: /^\/user\/[^/]+\/password-reset$/, policy: userManagementPolicy },
-  { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userManagementPolicy },
+  { method: "DELETE", path: /^\/user\/[^/]+\/photo$/, policy: userPhotoEditPolicy },
   { method: "GET", path: /^\/task\/financeiro\/queue$/, policy: financeiroTaskViewPolicy },
   {
     method: "GET",
