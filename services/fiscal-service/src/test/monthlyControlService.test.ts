@@ -44,6 +44,7 @@ function dependencies() {
     client: {
       findMany: vi.fn(async () => [] as Array<Record<string, unknown>>),
       findFirst: vi.fn(async () => null as Record<string, unknown> | null),
+      count: vi.fn(async () => 1),
     },
     fiscalMonthlyControl: control,
     fiscalMonthlyControlEvent: event,
@@ -52,7 +53,8 @@ function dependencies() {
     ),
   };
   const audit = { createLog: vi.fn(async () => {}) };
-  return { prisma, audit, service: new MonthlyControlService(prisma as never, audit) };
+  const now = () => new Date("2026-09-15T12:00:00.000Z");
+  return { prisma, audit, service: new MonthlyControlService(prisma as never, audit, now) };
 }
 
 const actor = { organizationId, userId, permission: 2 };
@@ -143,6 +145,18 @@ describe("MonthlyControlService.list", () => {
     expect(prisma.fiscalMonthlyControl.createManyAndReturn).not.toHaveBeenCalled();
   });
 
+  it("não gera controles além do mês seguinte ao corrente", async () => {
+    const { prisma, service } = dependencies();
+
+    await service.list({ competence: "2026-11" }, actor);
+    await service.list({ competence: "2026-10" }, actor);
+
+    expect(prisma.client.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.client.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ select: { id: true, regime: true } }),
+    );
+  });
+
   it("sob concorrência registra criação só para as linhas que este processo inseriu", async () => {
     const { prisma, service } = dependencies();
     prisma.client.findMany.mockResolvedValueOnce([{ id: clientA, regime: null }]);
@@ -160,10 +174,8 @@ describe("MonthlyControlService.open", () => {
     prisma.client.findFirst.mockResolvedValue({
       id: clientA,
       regime: "Lucro Presumido",
-      fiscal: false,
-      competence_entry: null,
-      competence_output: null,
     });
+    prisma.client.count.mockResolvedValue(0);
 
     await expect(
       service.open({ ...actor, client_id: clientA, competence: "2026-08" }),
@@ -205,15 +217,13 @@ describe("MonthlyControlService.open", () => {
     );
   });
 
-  it("cliente fora da competência pela data de saída também é abertura excepcional", async () => {
+  it("cliente sem Fiscal ativo na competência (consulta com a mesma regra da geração) exige motivo", async () => {
     const { prisma, service } = dependencies();
     prisma.client.findFirst.mockResolvedValue({
       id: clientA,
       regime: null,
-      fiscal: true,
-      competence_entry: null,
-      competence_output: new Date("2026-07-31T00:00:00.000Z"),
     });
+    prisma.client.count.mockResolvedValue(0);
 
     await expect(
       service.open({ ...actor, client_id: clientA, competence: "2026-08" }),
@@ -339,6 +349,16 @@ describe("MonthlyControlService.update", () => {
         }),
       ],
     });
+  });
+
+  it("controle concluído não muda o movimento sem reabrir", async () => {
+    const { prisma, service } = dependencies();
+    prisma.fiscalMonthlyControl.findFirst.mockResolvedValue(stored({ status: "COMPLETED" }));
+
+    await expect(
+      service.update({ ...actor, permission: 3, id: controlId, no_movement: true }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(prisma.fiscalMonthlyControl.updateMany).not.toHaveBeenCalled();
   });
 
   it("controle de outra organização é 404", async () => {

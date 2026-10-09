@@ -235,7 +235,7 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       fiscal: true,
       regime: "Simples Nacional",
       // Meio do mês: o pg grava Date em hora local e 01/01 00:00Z viraria 31/12.
-      competence_entry: new Date("2031-01-15T12:00:00.000Z"),
+      competence_entry: new Date("2026-08-15T12:00:00.000Z"),
     });
     const withoutFiscal = await smokeInsert("clients", {
       id: randomUUID(),
@@ -247,7 +247,7 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     const withoutFiscalId = String(withoutFiscal.id);
 
     const before = expectOk(
-      await call("GET", "/fiscal/monthly-controls?competence=2030-12"),
+      await call("GET", "/fiscal/monthly-controls?competence=2026-07"),
       "GET antes da entrada",
     );
     expect(before.data.items.map((item: { client_id: string }) => item.client_id)).not.toContain(
@@ -255,11 +255,11 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     );
 
     const lists = await Promise.all(
-      Array.from({ length: 5 }, () => call("GET", "/fiscal/monthly-controls?competence=2031-03")),
+      Array.from({ length: 5 }, () => call("GET", "/fiscal/monthly-controls?competence=2026-09")),
     );
     for (const list of lists) expectOk(list, "GET concorrente");
     const listed = expectOk(
-      await call("GET", "/fiscal/monthly-controls?competence=2031-03"),
+      await call("GET", "/fiscal/monthly-controls?competence=2026-09"),
       "GET /fiscal/monthly-controls",
     );
     const mine = listed.data.items.filter(
@@ -267,7 +267,7 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     );
     expect(mine).toHaveLength(1);
     expect(mine[0]).toMatchObject({
-      competence: "2031-03",
+      competence: "2026-09",
       status: "PENDING",
       no_movement: false,
       regime: "Simples Nacional",
@@ -280,7 +280,7 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     expectOk(
       await call("POST", "/fiscal/monthly-controls", {
         client_id: withoutFiscalId,
-        competence: "2031-03",
+        competence: "2026-09",
       }),
       "POST excepcional sem motivo",
       [400],
@@ -288,7 +288,7 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     const opened = expectOk(
       await call("POST", "/fiscal/monthly-controls", {
         client_id: withoutFiscalId,
-        competence: "2031-03",
+        competence: "2026-09",
         reason: "Apuração avulsa pedida pelo cliente",
       }),
       "POST excepcional",
@@ -298,7 +298,7 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     const again = expectOk(
       await call("POST", "/fiscal/monthly-controls", {
         client_id: withoutFiscalId,
-        competence: "2031-03",
+        competence: "2026-09",
         reason: "De novo",
       }),
       "POST repetido",

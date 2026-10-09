@@ -373,7 +373,7 @@ await runTest("fiscal monthly control tab keeps viewer read-only and reasons req
   // Visualizador: sem formulário de abertura, sem select de situação, checkbox desabilitado.
   assert.match(section, /\{canEdit && openingForm \? \(/);
   assert.match(section, /\{canEdit \? \(\s*<select/);
-  assert.match(section, /disabled=\{!canEdit \|\| update\.isPending\}/);
+  assert.match(section, /disabled=\{!canEdit \|\| item\.status === "COMPLETED" \|\| update\.isPending\}/);
   assert.match(section, /id="fiscal-control-reopen-error" role="alert"/);
   assert.match(section, /if \(reason\.length < 3\) \{\s*setReopenError/);
 });
