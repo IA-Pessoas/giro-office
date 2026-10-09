@@ -39,6 +39,9 @@ describe("PessoalObligationsAdapter", () => {
     expect(adapter.sources[0]?.fields.map((field) => field.key)).toEqual([
       "competence",
       "client_name",
+      "client_code",
+      "client_document",
+      "client_status",
       "responsible_name",
       "group_snapshot_name",
       "group_snapshot_policy",
@@ -51,6 +54,14 @@ describe("PessoalObligationsAdapter", () => {
       "bsf",
       "va",
       "vt",
+      "advance_state",
+      "payroll_state",
+      "charges_state",
+      "assistance_fee_state",
+      "bem_mais_state",
+      "bsf_state",
+      "va_state",
+      "vt_state",
     ]);
     expect(adapter.sources[0]?.fields.map((field) => field.key)).not.toContain("id");
     expect(
