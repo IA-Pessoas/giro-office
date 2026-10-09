@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAssignableUsers } from "@modules/rh";
 import { useFetch } from "@shared/hooks";
 
-import { triageMonthlyQueryKey } from "../hooks/queryKeys";
+import { triageMonthlyQueryKey, triageMovementConfigQueryKey } from "../hooks/queryKeys";
 import { getContabilErrorMessage, triageDocumentsService } from "../services";
 import type {
   ContabilCompetence,
@@ -12,12 +12,9 @@ import type {
   TriageDocumentsMonthly,
   TriageMonthlyUpdate,
 } from "../types";
+import { CONTABIL_SELECT_CLASS } from "./ContabilCompetenceSelect";
+import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
 import { CONTABIL_DOCUMENTS } from "./triageDocumentLabels";
-
-const FIELD_CLASS =
-  "mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800";
-const BUTTON_CLASS =
-  "rounded-lg border border-blue-200 px-3 py-1.5 text-sm font-semibold text-blue-700 disabled:opacity-60 dark:border-blue-800 dark:text-blue-200";
 
 type MonthlyDraft = {
   triad_moviment: boolean;
@@ -58,7 +55,7 @@ export function TriageMovementPanel({
   justifications: { id: string; code: string; label: string }[];
 }) {
   const queryClient = useQueryClient();
-  const config = useFetch(["triagem", "movement-config", clientId], () =>
+  const config = useFetch(triageMovementConfigQueryKey(clientId), () =>
     triageDocumentsService.getMovementConfig(clientId),
   );
   const users = useAssignableUsers({ module: "contabil", enabled: Boolean(record) });
@@ -132,6 +129,11 @@ export function TriageMovementPanel({
         <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
           Itens marcados entram pendentes em cada nova competência; os demais ficam desativados.
         </p>
+        {config.data && !config.data.configured ? (
+          <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
+            Cliente sem movimento padrão: as competências iniciam sem itens desativados.
+          </p>
+        ) : null}
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {CONTABIL_DOCUMENTS.map(([field, label]) => (
             <label key={field} className="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300">
@@ -152,7 +154,7 @@ export function TriageMovementPanel({
           ))}
         </div>
         {canEdit ? (
-          <button type="button" onClick={() => void saveConfig()} className={`mt-3 ${BUTTON_CLASS}`}>
+          <button type="button" onClick={() => void saveConfig()} className={`mt-3 ${CONTABIL_OUTLINE_ACTION_CLASS}`}>
             Salvar movimento padrão
           </button>
         ) : null}
@@ -178,7 +180,7 @@ export function TriageMovementPanel({
               <select
                 value={draft.responsible_id}
                 onChange={(event) => update("responsible_id", event.target.value)}
-                className={FIELD_CLASS}
+                className={`mt-1 w-full ${CONTABIL_SELECT_CLASS}`}
               >
                 <option value="">Sem responsável</option>
                 {(users.data ?? []).map((user) => (
@@ -193,7 +195,7 @@ export function TriageMovementPanel({
               <select
                 value={draft.justification}
                 onChange={(event) => update("justification", event.target.value)}
-                className={FIELD_CLASS}
+                className={`mt-1 w-full ${CONTABIL_SELECT_CLASS}`}
               >
                 <option value="">Não definida</option>
                 {justifications.map((item) => (
@@ -209,7 +211,7 @@ export function TriageMovementPanel({
                 type="date"
                 value={draft.download_date}
                 onChange={(event) => update("download_date", event.target.value)}
-                className={FIELD_CLASS}
+                className={`mt-1 w-full ${CONTABIL_SELECT_CLASS}`}
               />
             </label>
             <label className="text-xs text-gray-600 dark:text-slate-300">
@@ -218,7 +220,7 @@ export function TriageMovementPanel({
                 type="date"
                 value={draft.settlement_date}
                 onChange={(event) => update("settlement_date", event.target.value)}
-                className={FIELD_CLASS}
+                className={`mt-1 w-full ${CONTABIL_SELECT_CLASS}`}
               />
             </label>
             <label className="text-xs text-gray-600 dark:text-slate-300 sm:col-span-2">
@@ -228,12 +230,12 @@ export function TriageMovementPanel({
                 onChange={(event) => update("notes", event.target.value)}
                 rows={2}
                 maxLength={2000}
-                className={FIELD_CLASS}
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
               />
             </label>
           </div>
           {canEdit ? (
-            <button type="button" onClick={() => void saveMonthly()} className={`mt-3 ${BUTTON_CLASS}`}>
+            <button type="button" onClick={() => void saveMonthly()} className={`mt-3 ${CONTABIL_OUTLINE_ACTION_CLASS}`}>
               Salvar movimento do mês
             </button>
           ) : null}

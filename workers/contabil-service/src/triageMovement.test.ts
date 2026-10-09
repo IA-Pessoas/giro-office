@@ -87,6 +87,22 @@ describe("movimento e estados do checklist Contábil (#1691)", () => {
     });
   });
 
+  it("competência aberta antes do movimento padrão usa o padrão atual", async () => {
+    const database = prisma();
+    database.triageMonthly.findFirst.mockResolvedValue(null);
+    database.triageCompetence.findFirst.mockResolvedValue({
+      configuration_snapshot: { configs: [{ type: "FISCAL", active_items: [] }] },
+    });
+    database.triageConfig.findFirst.mockResolvedValue({ active_items: ["bank_reconciliation"] });
+
+    const result = await start(database);
+
+    expect(result.checklist).toMatchObject({
+      bank_reconciliation: "PENDING",
+      financial_transactions: "NOT_APPLICABLE",
+    });
+  });
+
   it("sem competência aberta usa o movimento padrão atual do cliente na organização", async () => {
     const database = prisma();
     database.triageMonthly.findFirst.mockResolvedValue(null);
@@ -131,9 +147,10 @@ describe("movimento e estados do checklist Contábil (#1691)", () => {
     );
     database.triageCatalogItem.findMany.mockResolvedValue([]);
 
-    const result = await createDocumentsService(database as never, audit()).updateItem(
+    const service = createDocumentsService(database as never, audit());
+    const result = await service.updateItem(
       MONTHLY,
-      { type: "CONTABIL", field: "card_statements", status: "PENDING" },
+      { type: "CONTABIL", field: "accounts_payable_report", status: "COMPLETED" },
       auth,
     );
 
@@ -142,9 +159,10 @@ describe("movimento e estados do checklist Contábil (#1691)", () => {
       triaged_transactions: "NOT_PRESENT",
       inventory_control: "ATTENTION",
       accounts_payable_report: "COMPLETED",
-      card_statements: "PENDING",
       bank_reconciliation: "NOT_APPLICABLE",
     });
+    // Fora do checklist legado: não aplicável, mas editável como no legado.
+    expect(result.item_notes.bank_reconciliation).not.toHaveProperty("required");
   });
 
   it("operação em lote ignora itens desativados e não aplicáveis", async () => {
@@ -251,8 +269,10 @@ describe("movimento e estados do checklist Contábil (#1691)", () => {
 
   it("configura o movimento padrão do cliente da organização", async () => {
     const database = prisma();
+    database.triageConfig.findFirst.mockResolvedValue({ active_items: ["card_statements"] });
     database.triageConfig.upsert.mockImplementation(async ({ create }) => create);
-    const service = createDocumentsService(database as never, audit());
+    const log = audit();
+    const service = createDocumentsService(database as never, log);
 
     const saved = await service.saveConfig(
       {
@@ -275,8 +295,16 @@ describe("movimento e estados do checklist Contábil (#1691)", () => {
     expect(saved).toEqual({
       client_id: CLIENT,
       type: "CONTABIL",
+      configured: true,
       active_items: ["financial_transactions", "bank_reconciliation"],
     });
+    expect(log.logUpdateIfChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        referring: "triagem.configs",
+        oldData: { active_items: ["card_statements"] },
+        updatedData: { active_items: ["financial_transactions", "bank_reconciliation"] },
+      }),
+    );
 
     database.client.findFirst.mockResolvedValueOnce(null);
     await expect(
@@ -297,7 +325,12 @@ describe("movimento e estados do checklist Contábil (#1691)", () => {
       where: { client_id: CLIENT, organization_id: ORG, type: "CONTABIL" },
       select: { active_items: true },
     });
-    expect(config).toEqual({ client_id: CLIENT, type: "CONTABIL", active_items: [] });
+    expect(config).toEqual({
+      client_id: CLIENT,
+      type: "CONTABIL",
+      configured: false,
+      active_items: [],
+    });
   });
 
   it("recusa configurar sem permissão de escrita no Contábil", async () => {

@@ -354,6 +354,9 @@ describe("contabil Worker remainder routes", () => {
     });
     const emptyMonthly = await send("PATCH", `/triagem/monthly/${ID}`, { type: "CONTABIL" });
     const badDate = await send("PATCH", `/triagem/monthly/${ID}`, { download_date: "03/10/2026" });
+    const impossibleDate = await send("PATCH", `/triagem/monthly/${ID}`, {
+      settlement_date: "2026-02-31",
+    });
     const config = await send("PUT", "/triagem/config", {
       client_id: CLIENT,
       active_items: ["bank_reconciliation"],
@@ -366,7 +369,12 @@ describe("contabil Worker remainder routes", () => {
     const anonymous = await send("GET", `/triagem/config?client_id=${CLIENT}`, undefined, false);
 
     expect(monthly.status).toBe(200);
-    expect([emptyMonthly.status, badDate.status, fiscalField.status]).toEqual([400, 400, 400]);
+    expect([
+      emptyMonthly.status,
+      badDate.status,
+      impossibleDate.status,
+      fiscalField.status,
+    ]).toEqual([400, 400, 400, 400]);
     expect(config.status).toBe(200);
     expect(read.status).toBe(200);
     expect(anonymous.status).toBe(401);

@@ -787,6 +787,7 @@ const LEGACY_DOCUMENT_STATUSES: Record<string, TriageDocumentStatus> = {
   "": "PENDING",
   "nao possui": "NOT_PRESENT",
   atenção: "ATTENTION",
+  atencao: "ATTENTION",
   concluido: "COMPLETED",
 };
 
@@ -794,7 +795,8 @@ function documentStatus(value: unknown): TriageDocumentStatus {
   if (validStatus(value)) return value;
   if (typeof value === "string" && Object.hasOwn(LEGACY_DOCUMENT_STATUSES, value))
     return LEGACY_DOCUMENT_STATUSES[value] as TriageDocumentStatus;
-  // Item ausente do checklist legado não fazia parte do movimento do cliente.
+  // Item ausente do checklist legado não fazia parte do movimento; o legado ainda deixava
+  // gravá-lo depois, então segue editável (sem `required: false`).
   return "NOT_APPLICABLE";
 }
 
@@ -1278,15 +1280,22 @@ export function createDocumentsService(
                 "Crie a competência fiscal antes de iniciar a rotina mensal.",
               );
             // Com competência aberta vale o movimento padrão congelado nela; sem, o atual.
+            // Snapshot sem a config da rotina (competência aberta antes do padrão) usa o atual.
             const configs = jsonObject(competence?.configuration_snapshot).configs;
-            const config = competence
-              ? Array.isArray(configs)
+            const config =
+              (Array.isArray(configs)
                 ? configs.map(jsonObject).find((item) => item.type === type)
-                : undefined
-              : await transaction.triageConfig.findFirst({
-                  where: { client_id: input.client_id, organization_id: auth.organizationId, type },
-                  select: { active_items: true },
-                });
+                : undefined) ??
+              (type === "CONTABIL"
+                ? await transaction.triageConfig.findFirst({
+                    where: {
+                      client_id: input.client_id,
+                      organization_id: auth.organizationId,
+                      type,
+                    },
+                    select: { active_items: true },
+                  })
+                : undefined);
             const configured = initialItems(config?.active_items);
             // Sem movimento padrão nenhum item é desativado: a rotina segue editável como antes.
             const unconfigured =
@@ -1582,6 +1591,7 @@ export function createDocumentsService(
       return {
         client_id: input.client_id,
         type,
+        configured: Boolean(config),
         active_items: activeContabilFields(config?.active_items),
       };
     },
@@ -1589,26 +1599,34 @@ export function createDocumentsService(
       const type = routineType(input.type);
       const clientId = String(input.client_id);
       const activeItems = activeContabilFields(input.active_items);
-      await assertClientInOrganization(prisma, clientId, auth.organizationId);
-      await canEdit(prisma, clientId, auth, type);
-      await prisma.triageConfig.upsert({
-        where: {
-          organization_id_client_id_type: {
-            organization_id: auth.organizationId,
-            client_id: clientId,
-            type,
-          },
-        },
-        create: {
-          client_id: clientId,
-          type,
-          active_items: activeItems,
-          organization_id: auth.organizationId,
-        },
-        update: { active_items: activeItems },
+      const identity = { organization_id: auth.organizationId, client_id: clientId, type };
+      const result = await prisma.$transaction(async (transaction) => {
+        await lock(transaction, `triagem.configs:${auth.organizationId}:${clientId}:${type}`);
+        await assertClientInOrganization(transaction, clientId, auth.organizationId);
+        await canEdit(transaction, clientId, auth, type);
+        const current = await transaction.triageConfig.findFirst({
+          where: identity,
+          select: { active_items: true },
+        });
+        const updated = await transaction.triageConfig.upsert({
+          where: { organization_id_client_id_type: identity },
+          create: { ...identity, active_items: activeItems },
+          update: { active_items: activeItems },
+        });
+        return { current, updated };
       });
-      await auditCreate(audit, auth, "triagem.configs", clientId, "Configurar movimento padrão");
-      return { client_id: clientId, type, active_items: activeItems };
+      const changed = result as { current: JsonRecord | null; updated: JsonRecord };
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Configurar movimento padrão",
+        referring: "triagem.configs",
+        referringId: clientId,
+        oldData: { active_items: activeContabilFields(changed.current?.active_items) },
+        updatedData: { active_items: activeItems },
+      });
+      return { client_id: clientId, type, configured: true, active_items: activeItems };
     },
     async listStatements(input, organizationId) {
       return prisma.triageBankStatement.findMany({

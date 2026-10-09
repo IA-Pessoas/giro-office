@@ -24,6 +24,10 @@ export function triageMonthlyQueryKey(
   return [...CONTABIL_QUERY_KEY, "triage", "monthly", clientId, competence, type] as const;
 }
 
+export function triageMovementConfigQueryKey(clientId: string) {
+  return [...CONTABIL_QUERY_KEY, "triage", "movement-config", clientId] as const;
+}
+
 export function triageFiscalPortfolioQueryKey(competence: string) {
   return [...CONTABIL_QUERY_KEY, "triage", "fiscal-portfolio", competence] as const;
 }

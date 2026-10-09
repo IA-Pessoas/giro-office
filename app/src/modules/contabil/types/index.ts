@@ -233,6 +233,8 @@ export type TriageMonthlyUpdate = Partial<{
 export interface TriageMovementConfig {
   client_id: string;
   type: "CONTABIL";
+  /** false enquanto o cliente nunca salvou um padrão: nada fica desativado. */
+  configured: boolean;
   active_items: TriageDocumentField[];
 }
 

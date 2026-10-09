@@ -98,10 +98,11 @@ export const editabilitySchema = z
 export const monthlyIdSchema = z.object({ id: uuid("id") }).strict();
 const dateOnly = z
   .string()
-  .regex(
-    /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u,
-    "data deve estar no formato YYYY-MM-DD.",
-  );
+  .regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u, "data deve estar no formato YYYY-MM-DD.")
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
+  }, "data inválida.");
 export const monthlyUpdateSchema = z
   .object({
     type: monthlySchema.shape.type,
