@@ -113,6 +113,14 @@ describe("activityCatalog", () => {
     ["POST", "/fiscal/conferences/invoice-pdfs", "somou", "totais de faturas em PDF"],
     ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
     ["POST", "/fiscal/malhas", "cadastrou", "uma nova malha fiscal"],
+    ["POST", "/fiscal/anticipations/batches", "importou", "um lote de XML para antecipações"],
+    ["GET", "/fiscal/anticipations/batches/list", "consultou", "a lista de lotes de antecipações"],
+    [
+      "GET",
+      "/fiscal/anticipations/batches/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "consultou",
+      "um lote de antecipações",
+    ],
     [
       "GET",
       "/fiscal/clients/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/wholesale",

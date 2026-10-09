@@ -738,6 +738,66 @@ describe("fiscal Worker", () => {
     expect(revenues.list).toHaveBeenCalledOnce();
   });
 
+  it("importa lote de antecipações no tenant autenticado e deixa nível 1 só consultar", async () => {
+    const clientId = "d0000000-0000-4000-8000-000000000001";
+    const batch = { id: ICMS_ID, client_id: clientId, status: "pending_review", items: [] };
+    const anticipations = {
+      importBatch: vi.fn(async () => batch),
+      list: vi.fn(async () => ({ data: [batch], total: 1, page: 1, limit: 50, hasMore: false })),
+      detail: vi.fn(async () => batch),
+    };
+    const app = createFiscalWorkerApp({ env: env(), anticipationService: anticipations as never });
+    const viewer = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
+    const body = JSON.stringify({
+      client_id: clientId,
+      competence: "2026-09",
+      file_name: "notas.zip",
+      zip_base64: "UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==",
+    });
+
+    const created = await app.request("https://fiscal.test/fiscal/anticipations/batches", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body,
+    });
+    expect(created.status).toBe(201);
+    expect(anticipations.importBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        client_id: clientId,
+        competence: "2026-09",
+      }),
+    );
+
+    const listed = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/list?client_id=${clientId}&competence=2026-09`,
+      { headers: viewer },
+    );
+    expect(listed.status).toBe(200);
+    expect(anticipations.list).toHaveBeenCalledWith(
+      expect.objectContaining({ client_id: clientId, competence: "2026-09" }),
+      ORGANIZATION_ID,
+    );
+
+    const detail = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}`,
+      {
+        headers: viewer,
+      },
+    );
+    expect(detail.status).toBe(200);
+    expect(anticipations.detail).toHaveBeenCalledWith(ICMS_ID, ORGANIZATION_ID);
+
+    const viewerImport = await app.request("https://fiscal.test/fiscal/anticipations/batches", {
+      method: "POST",
+      headers: { ...viewer, "content-type": "application/json" },
+      body,
+    });
+    expect(viewerImport.status).toBe(403);
+    expect(anticipations.importBatch).toHaveBeenCalledTimes(1);
+  });
+
   it("acompanha malhas no tenant autenticado, com anexo e leitura para nível 1", async () => {
     const malha = {
       id: ICMS_ID,

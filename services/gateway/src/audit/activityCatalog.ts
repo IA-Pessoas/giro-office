@@ -378,6 +378,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["POST"],
+    pattern: /^\/fiscal\/anticipations\/batches$/,
+    description: { action: "importou", item: "um lote de XML para antecipações" },
+  },
+  {
+    methods: ["POST"],
     pattern: /^\/fiscal\/malhas\/[^/]+\/attachment$/,
     description: { action: "anexou", item: "um arquivo a uma malha fiscal" },
   },
@@ -1460,6 +1465,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um registro de alíquota fiscal",
     newSingular: "um novo registro de alíquota fiscal",
     plural: "registros de alíquotas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/anticipations\/batches(?:\/|$)/,
+    singular: "um lote de antecipações",
+    newSingular: "um novo lote de antecipações",
+    plural: "lotes de antecipações",
   },
   {
     pattern: /^\/fiscal\/malhas(?:\/|$)/,

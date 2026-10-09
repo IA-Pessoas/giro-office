@@ -72,6 +72,22 @@ function storedZip(fileName, body) {
   return Buffer.concat([local, body, central, end]);
 }
 
+/** NF-e mínima com chave de acesso válida e número aleatório: cada rodada importa nota nova. */
+function smokeNfeWithAccessKey() {
+  const issuer = "11222333000181";
+  const number = String(Math.floor(Math.random() * 999_999_999) + 1);
+  const base = `352610${issuer}55001${number.padStart(9, "0")}100000001`;
+  let weight = 2;
+  let sum = 0;
+  for (let i = base.length - 1; i >= 0; i -= 1) {
+    sum += Number(base[i]) * weight;
+    weight = weight === 9 ? 2 : weight + 1;
+  }
+  const rest = sum % 11;
+  const key = `${base}${rest < 2 ? 0 : 11 - rest}`;
+  return `<NFe><infNFe Id="NFe${key}"><ide><mod>55</mod><serie>1</serie><nNF>${number}</nNF></ide><emit><CNPJ>${issuer}</CNPJ></emit><det nItem="1"><prod><cProd>P1</cProd><xProd>Smoke</xProd><NCM>22030000</NCM><CFOP>6102</CFOP><qCom>1</qCom><vProd>10.00</vProd></prod></det></infNFe></NFe>`;
+}
+
 const { manifest } = await import(
   pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href
 );
@@ -5100,6 +5116,54 @@ const handlers = {
       expectedStatus: [400],
       json: { is_wholesale: "sim" },
     });
+  },
+
+  async fiscalAnticipationImport(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+        file_name: "smoke-antecipacoes.zip",
+        zip_base64: storedZip("nota.xml", Buffer.from(smokeNfeWithAccessKey())).toString("base64"),
+      },
+    });
+    if (!isBadExpectation(op)) {
+      if (
+        response.body?.data?.status !== "pending_review" ||
+        response.body?.data?.item_count !== 1
+      ) {
+        throw new Error(`Lote de antecipações inesperado: ${JSON.stringify(response.body?.data)}`);
+      }
+      state.fiscalAnticipationBatchId = pickFirst(response.body, "data.id");
+    }
+  },
+
+  async fiscalAnticipationImportInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-09",
+        file_name: "smoke-invalido.zip",
+        zip_base64: storedZip("a.xml", Buffer.from("<NFe/>")).toString("base64"),
+      },
+    });
+  },
+
+  async fiscalAnticipationList(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), competence: "2026-09" },
+    });
+  },
+
+  async fiscalAnticipationDetail(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}`,
+    });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data?.items)) {
+      throw new Error(`Lote sem itens: ${JSON.stringify(response.body?.data)}`);
+    }
   },
 
   async fiscalMalhaCreate(op) {

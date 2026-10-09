@@ -23,6 +23,10 @@ import {
   createAnnualControlRoutes,
 } from "./routes/annualControl.routes.js";
 import {
+  type AnticipationRouteDeps,
+  createAnticipationRoutes,
+} from "./routes/anticipation.routes.js";
+import {
   type ClientWholesaleRouteDeps,
   createClientWholesaleRoutes,
 } from "./routes/clientWholesale.routes.js";
@@ -51,6 +55,7 @@ import {
 import { createNcmRoutes, type NcmRouteDeps } from "./routes/ncm.routes.js";
 import { createSimplesRateRoutes, type SimplesRateRouteDeps } from "./routes/simplesRate.routes.js";
 import { AnnualControlService } from "./services/annualControlService.js";
+import { AnticipationService } from "./services/anticipationService.js";
 import { ClientWholesaleService } from "./services/clientWholesaleService.js";
 import { FiscalRateService } from "./services/fiscalRateService.js";
 import { FiscalSearchService } from "./services/fiscalSearchService.js";
@@ -87,6 +92,7 @@ export function createFiscalApp(options: {
   fiscalRateRouteDeps?: FiscalRateRouteDeps;
   monthlyRevenueRouteDeps?: MonthlyRevenueRouteDeps;
   malhaRouteDeps?: MalhaRouteDeps;
+  anticipationRouteDeps?: AnticipationRouteDeps;
   clientWholesaleRouteDeps?: ClientWholesaleRouteDeps;
   monthlyControlRouteDeps?: MonthlyControlRouteDeps;
   monthlyObligationRouteDeps?: MonthlyObligationRouteDeps;
@@ -115,6 +121,8 @@ export function createFiscalApp(options: {
           )
         : undefined,
     );
+  const anticipationRouteDeps =
+    options.anticipationRouteDeps ?? new AnticipationService(prismaClient, { createLog });
   const clientWholesaleRouteDeps =
     options.clientWholesaleRouteDeps ?? new ClientWholesaleService(prismaClient, { createLog });
   const monthlyControlRouteDeps =
@@ -136,8 +144,9 @@ export function createFiscalApp(options: {
   app.use(createSecurityHeadersMiddleware({ nodeEnv: env.nodeEnv }));
   app.use(cors(createServiceCorsOptions(env.allowedOrigins, "fiscal-service")));
   app.use(requestContext);
-  // Antes do parser global: a conferência recebe planilhas maiores que o limite padrão.
+  // Antes do parser global: conferência e antecipações recebem arquivos maiores que o padrão.
   app.use("/fiscal", createDocumentConferenceRoutes());
+  app.use("/fiscal", createAnticipationRoutes(anticipationRouteDeps));
   app.use(express.json());
 
   app.get("/health", (_req, res) => {

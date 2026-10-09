@@ -4,6 +4,7 @@
 // AUDIT_SERVICE é stub: só o banco é real.
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import {
+  createZip,
   getFiscalIcmsReportingFields,
   getFiscalIpiReportingFields,
   getFiscalNcmReportingFields,
@@ -26,6 +27,29 @@ const REPORTS_SECRET = "crud-smoke-reports-secret";
 // Objetos rasos com arrays de string: JSON com chaves ordenadas é o canonicalJson do Worker.
 function canonical(value: Record<string, unknown>): string {
   return JSON.stringify(value, Object.keys(value).sort());
+}
+
+/** NF-e com chave de acesso válida (DV módulo 11), um item por valor. */
+function nfeWithKey(number: number, values: string[]): { key: string; xml: string } {
+  const issuer = "11222333000181";
+  const base = `352610${issuer}55001${String(number).padStart(9, "0")}100000001`;
+  let weight = 2;
+  let sum = 0;
+  for (let i = base.length - 1; i >= 0; i -= 1) {
+    sum += Number(base[i]) * weight;
+    weight = weight === 9 ? 2 : weight + 1;
+  }
+  const key = `${base}${sum % 11 < 2 ? 0 : 11 - (sum % 11)}`;
+  const det = values
+    .map(
+      (value, index) =>
+        `<det nItem="${index + 1}"><prod><cProd>P${index + 1}</cProd><xProd>Item</xProd><NCM>22030000</NCM><CFOP>6102</CFOP><qCom>1.5</qCom><vProd>${value}</vProd></prod></det>`,
+    )
+    .join("");
+  return {
+    key,
+    xml: `<NFe><infNFe Id="NFe${key}"><ide><mod>55</mod><serie>1</serie><nNF>${number}</nNF></ide><emit><CNPJ>${issuer}</CNPJ></emit>${det}</infNFe></NFe>`,
+  };
 }
 
 function reportingHeaders(
@@ -863,6 +887,88 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       otherOrganization,
     );
     expect(foreignUpdate.status).not.toBe(200);
+  });
+
+  it("antecipações: importa lote, recusa duplicata entre lotes e isola por organização", async () => {
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Antecipação ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+    });
+    const clientId = String(client.id);
+    const number = Number(suffix);
+    const note = nfeWithKey(number, ["10.00", "5.50"]);
+    const zip = (files: Record<string, string>) =>
+      createZip(
+        Object.entries(files).map(([fileName, text]) => ({ fileName, body: Buffer.from(text) })),
+      ).toString("base64");
+    const body = (files: Record<string, string>) => ({
+      client_id: clientId,
+      competence: "2026-09",
+      file_name: "notas.zip",
+      zip_base64: zip(files),
+    });
+
+    const created = expectOk(
+      await call("POST", "/fiscal/anticipations/batches", body({ "a.xml": note.xml })),
+      "POST /fiscal/anticipations/batches",
+    );
+    const id = created.data.id as string;
+    expect(created.data).toMatchObject({
+      status: "pending_review",
+      competence: "2026-09",
+      item_count: 2,
+      issues: [],
+    });
+    expect(created.data.items[1]).toMatchObject({
+      access_key: note.key,
+      item_number: 2,
+      quantity: "1.5",
+      value: "5.5",
+    });
+
+    // A mesma nota de novo, mais uma nota nova: só a nova entra, a repetida vira issue.
+    const second = expectOk(
+      await call(
+        "POST",
+        "/fiscal/anticipations/batches",
+        body({ "a.xml": note.xml, "b.xml": nfeWithKey(number + 1, ["1.00"]).xml }),
+      ),
+      "POST com duplicata de outro lote",
+    );
+    expect(second.data.item_count).toBe(1);
+    expect(second.data.issues).toEqual([
+      expect.objectContaining({ entry: "a.xml", kind: "duplicate" }),
+      expect.objectContaining({ entry: "a.xml", kind: "duplicate" }),
+    ]);
+    expectOk(
+      await call("POST", "/fiscal/anticipations/batches", body({ "a.xml": note.xml })),
+      "POST só com duplicatas",
+      [400],
+    );
+
+    const list = expectOk(
+      await call("GET", `/fiscal/anticipations/batches/list?client_id=${clientId}`),
+      "GET /fiscal/anticipations/batches/list",
+    );
+    expect(list.data.total).toBe(2);
+    expectOk(
+      await call("GET", `/fiscal/anticipations/batches/${id}`),
+      "GET /fiscal/anticipations/batches/:id",
+    );
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    const foreign = await call(
+      "GET",
+      `/fiscal/anticipations/batches/${id}`,
+      undefined,
+      otherOrganization,
+    );
+    expect(foreign.status).not.toBe(200);
   });
 
   it("atacadista: marca, desmarca com trilha e isola por organização", async () => {

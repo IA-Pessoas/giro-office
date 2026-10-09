@@ -20,6 +20,7 @@ export interface NfeItem {
   number: string;
   code: string;
   description: string;
+  ncm: string;
   cfop: string;
   quantity: string | null;
   value: string | null;
@@ -154,6 +155,7 @@ function items(infNFe: string, errors: string[]): NfeItem[] {
       number: stripZeros(number),
       code: tagText(prod, "cProd"),
       description: tagText(prod, "xProd"),
+      ncm: tagText(prod, "NCM"),
       cfop: tagText(prod, "CFOP"),
       quantity: normalizeDecimal(tagText(prod, "qCom")),
       value: money(tagText(prod, "vProd")),
