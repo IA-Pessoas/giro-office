@@ -20,8 +20,9 @@ import {
   updateClientBodySchema,
 } from "../../../services/client-service/src/schemas/client.schemas.js";
 import {
-  clientRegimeBodySchema,
-  clientRegimeParamsSchema,
+  clientRegimeIdParamsSchema,
+  createClientRegimeBodySchema,
+  updateClientRegimeBodySchema,
 } from "../../../services/client-service/src/schemas/clientRegime.schemas.js";
 import {
   cnpjLookupQuerySchema,
@@ -281,7 +282,7 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
 
   app.post("/client/regimes", async (c) =>
     withService(c, async (service) => {
-      const { name } = parse(clientRegimeBodySchema, await jsonBody(c));
+      const { name } = parse(createClientRegimeBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(await service.createRegime(organizationId(c), name, authz(c))),
         201,
@@ -291,8 +292,8 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
 
   app.patch("/client/regimes/:id", async (c) =>
     withService(c, async (service) => {
-      const id = pathParam(c, clientRegimeParamsSchema);
-      const { name } = parse(clientRegimeBodySchema, await jsonBody(c));
+      const id = pathParam(c, clientRegimeIdParamsSchema);
+      const { name } = parse(updateClientRegimeBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(await service.updateRegime(id, organizationId(c), name, authz(c))),
       );

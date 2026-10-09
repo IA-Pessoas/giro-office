@@ -152,6 +152,23 @@ describe("client regime selection", () => {
     );
   });
 
+  it("keeps the stored value when it differs only in case or spacing", async () => {
+    const { prisma, service, events } = setup({ regime: "simples nacional " });
+    await service.update("client-1", ORG, { regime: "Simples  Nacional" }, editor);
+    expect(prisma.client.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { regime: "simples nacional " } }),
+    );
+    expect(events).toEqual([]);
+  });
+
+  it("audits a regime change made through the integration form", async () => {
+    const { service, events } = setup({ regime: "MEI" });
+    await service.updateIntegration("client-1", ORG, { regime: "Lucro Real" }, editor);
+    expect(events).toEqual([
+      expect.objectContaining({ changes: { regime: { from: "MEI", to: "Lucro Real" } } }),
+    ]);
+  });
+
   it("rejects a regime outside the organization catalog", async () => {
     const { prisma, service } = setup({ regime: null });
     await expect(

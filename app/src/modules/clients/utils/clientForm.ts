@@ -106,7 +106,6 @@ function normalizeOptionalAddress(value: string): string | null {
 }
 
 export function buildUpdateClientPayload(values: ClientFormValues): UpdateClientPayload {
-
   return {
     name: getClientInternalName(values),
     company_name: values.company_name.trim() || null,

@@ -417,10 +417,12 @@ function isClientDocumentUniqueConstraintError(error: unknown): boolean {
 
 const regimeSelect = { id: true, name: true, created_at: true, updated_at: true } as const;
 
+function regimeDisplayName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
 function normalizeRegimeName(name: string): string {
-  return name
-    .trim()
-    .replace(/\s+/g, " ")
+  return regimeDisplayName(name)
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase("pt-BR");
@@ -476,10 +478,11 @@ export class ClientService implements ClientWorkerService {
     current: unknown,
   ): Promise<string | null | undefined> {
     if (value === undefined) return undefined;
-    const name = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+    const name = typeof value === "string" ? regimeDisplayName(value) : "";
     if (!name) return null;
-    if (name === current) return name;
     const normalized = normalizeRegimeName(name);
+    // Mesmo valor gravado (até em caixa ou espaços diferentes) volta como está.
+    if (typeof current === "string" && normalizeRegimeName(current) === normalized) return current;
     const shared = TAX_REGIME_OPTIONS.find((option) => normalizeRegimeName(option) === normalized);
     if (shared) return shared;
     const row = await this.db.clientRegime.findFirst({
@@ -540,10 +543,10 @@ export class ClientService implements ClientWorkerService {
     authorization: ClientAuthorization,
   ): Promise<unknown> {
     requirePermission(authorization, 2);
-    const trimmed = name.trim().replace(/\s+/g, " ");
+    const trimmed = regimeDisplayName(name);
     const normalized = normalizeRegimeName(trimmed);
     await this.assertRegimeNameFree(organizationId, normalized);
-    let row: ClientRow;
+    let row: ClientRow; // linha de clients.regimes
     try {
       row = await this.db.clientRegime.create({
         data: { organization_id: organizationId, name: trimmed, normalized_name: normalized },
@@ -578,10 +581,10 @@ export class ClientService implements ClientWorkerService {
       select: regimeSelect,
     });
     if (!existing) throw new ServiceError(404, "Regime não encontrado.");
-    const trimmed = name.trim().replace(/\s+/g, " ");
+    const trimmed = regimeDisplayName(name);
     const normalized = normalizeRegimeName(trimmed);
     await this.assertRegimeNameFree(organizationId, normalized, id);
-    let row: ClientRow;
+    let row: ClientRow; // linha de clients.regimes
     try {
       // Clientes guardam o nome: renomear o catálogo não reescreve fichas já gravadas.
       row = await this.db.clientRegime.update({
@@ -856,7 +859,7 @@ export class ClientService implements ClientWorkerService {
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
     if (data.cpf_agent !== undefined) data.cpf_agent = cleanDocument(String(data.cpf_agent));
     try {
-      return await this.db.client.update({
+      const row = await this.db.client.update({
         where: { id },
         data,
         select: {
@@ -883,6 +886,15 @@ export class ClientService implements ClientWorkerService {
           service_unique: true,
         },
       });
+      // O schema de integração só aceita os regimes compartilhados; a troca também é auditada.
+      await this.auditRegimeChange(
+        id,
+        organizationId,
+        authorization,
+        existing.regime,
+        data.regime === undefined ? undefined : (data.regime ?? null),
+      );
+      return row;
     } catch (error) {
       if (isClientDocumentUniqueConstraintError(error)) {
         throw new ServiceError(409, "Cliente já cadastrado.", error);

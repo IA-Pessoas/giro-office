@@ -242,10 +242,13 @@ describe("matriz de regressão das políticas modulares", () => {
       ["POST", "/client/groups", false, true],
       ["PATCH", "/client/groups/group-1", false, true],
       ["PUT", "/client/groups/group-1/clients", false, true],
-      ["GET", "/client/regimes", true, true],
       ["POST", "/client/regimes", false, true],
       ["PATCH", "/client/regimes/regime-1", false, true],
     ] as const;
+
+    const regimesRead = requiredRoutePolicy("GET", "/client/regimes");
+    expect(canAccessRoute(otherModule, regimesRead), "catálogo de regimes na ficha").toBe(true);
+    expect(canAccessRoute(authContext({ modules: {} }), regimesRead)).toBe(false);
 
     for (const [method, path, canRead, canWrite] of routes) {
       const policy = requiredRoutePolicy(method, path);
