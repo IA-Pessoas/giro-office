@@ -37,6 +37,41 @@ function loadEnvFile(filePath) {
 loadEnvFile(path.join(rootDir, "services", "gateway", ".env"));
 loadEnvFile(path.join(rootDir, ".env"));
 
+/** ZIP de um arquivo sem compressão (método 0), para o smoke da seleção de XML. */
+function storedZip(fileName, body) {
+  let crc = 0xffffffff;
+  for (const byte of body) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  crc = (crc ^ 0xffffffff) >>> 0;
+  const name = Buffer.from(fileName, "utf8");
+  const local = Buffer.alloc(30 + name.length);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt32LE(crc, 14);
+  local.writeUInt32LE(body.length, 18);
+  local.writeUInt32LE(body.length, 22);
+  local.writeUInt16LE(name.length, 26);
+  name.copy(local, 30);
+  const central = Buffer.alloc(46 + name.length);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(20, 4);
+  central.writeUInt16LE(20, 6);
+  central.writeUInt32LE(crc, 16);
+  central.writeUInt32LE(body.length, 20);
+  central.writeUInt32LE(body.length, 24);
+  central.writeUInt16LE(name.length, 28);
+  name.copy(central, 46);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(central.length, 12);
+  end.writeUInt32LE(local.length + body.length, 16);
+  return Buffer.concat([local, body, central, end]);
+}
+
 const { manifest } = await import(
   pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href
 );
@@ -4745,6 +4780,28 @@ const handlers = {
         dominio: { file_name: "dominio.csv", content: "Número;Valor\n100;10,00" },
         sefaz: { file_name: "sefaz.csv", content: "Número;Valor\n100;10,00" },
       },
+    });
+  },
+
+  async fiscalXmlSelection(op) {
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit></infNFe></NFe>";
+    const response = await httpRequest(op, {
+      json: {
+        file_name: "notas.zip",
+        zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+        requests: ["100"],
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.selected?.length !== 1) {
+      throw new Error(`Seleção de XML inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalXmlSelectionInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { file_name: "notas.zip", zip_base64: "bm9wZQ==", requests: ["100"] },
     });
   },
 

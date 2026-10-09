@@ -3,11 +3,15 @@ import type { NextFunction, Request, Response } from "express";
 import express, { Router } from "express";
 
 import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/isAuthenticated.js";
-import { documentConferenceBodySchema } from "../schemas/documentConference.schemas.js";
+import {
+  documentConferenceBodySchema,
+  xmlSelectionBodySchema,
+} from "../schemas/documentConference.schemas.js";
 import {
   compareDocumentSpreadsheets,
   documentConferenceCsvExport,
 } from "../services/documentConferenceService.js";
+import { selectXmlFromZip } from "../services/xmlSelectionService.js";
 
 /**
  * Conferências de arquivos (E2): processam o que foi enviado e devolvem o resultado sem gravar
@@ -30,6 +34,22 @@ export function createDocumentConferenceRoutes(): ReturnType<typeof Router> {
         res.json(createSuccessResponse({ ...result, ...documentConferenceCsvExport(result) }));
       } catch (err) {
         logError("Erro ao conferir planilhas Domínio e SEFAZ", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/conferences/xml-selection",
+    express.json({ limit: "1mb" }),
+    isAuthenticated,
+    requireFiscalWritePermission,
+    (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(xmlSelectionBodySchema, req.body);
+        res.json(createSuccessResponse(selectXmlFromZip(body)));
+      } catch (err) {
+        logError("Erro ao selecionar XML de notas no ZIP", { err });
         next(err);
       }
     },

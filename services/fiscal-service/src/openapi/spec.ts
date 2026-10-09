@@ -1068,6 +1068,47 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/conferences/xml-selection": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Selecionar XML de notas em ZIP",
+          description:
+            "Recebe um ZIP de XML (base64, até ~650 kB) e a lista de notas pedidas: chave de acesso (44 dígitos) ou número, série;número, emitente;série;número ou emitente;modelo;série;número. Devolve um ZIP só com os XML selecionados e o relatorio-selecao.csv (zip_base64; null quando nada foi selecionado), o mesmo CSV no campo csv e o relatório: selected, ambiguous (mais de uma nota ou cópias diferentes da mesma nota, sem escolha automática), not_found, invalid_requests e, do arquivo, discarded, errors e duplicates. Nomes inseguros, entradas criptografadas, corrompidas ou grandes demais aparecem como erro por arquivo. status partial quando algum pedido não foi atendido ou há erro no ZIP. Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["file_name", "zip_base64", "requests"],
+                  additionalProperties: false,
+                  properties: {
+                    file_name: { type: "string", minLength: 1, maxLength: 255 },
+                    zip_base64: { type: "string", minLength: 1, maxLength: 900_000 },
+                    requests: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 1000,
+                      items: { type: "string", minLength: 1, maxLength: 80 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "ZIP dos XML selecionados, CSV e relatório da seleção",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou ZIP ilegível" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
       "/fiscal/revenues/{id}": {
         put: {
           tags: ["Receitas"],

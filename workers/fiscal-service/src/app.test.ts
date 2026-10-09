@@ -1,3 +1,4 @@
+import { createZip } from "@workspace/shared";
 import { ServiceError } from "@workspace/shared/http";
 import { describe, expect, it, vi } from "vitest";
 import { createFiscalWorkerApp, type FiscalWorkerEnv } from "./app.js";
@@ -222,6 +223,36 @@ describe("fiscal Worker", () => {
       sefaz: { file_name: "s.csv", content: "Número\n100" },
     });
     expect(invalid.status).toBe(400);
+  });
+
+  it("seleciona XML de notas em ZIP sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CPF>12345678909</CPF></emit></infNFe></NFe>";
+    const body = {
+      file_name: "notas.zip",
+      zip_base64: createZip([{ fileName: "n.xml", body: Buffer.from(nfe) }]).toString("base64"),
+      requests: ["7", "8"],
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/xml-selection", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { status: string; selected: { entry: string }[]; not_found: { request: string }[] };
+    };
+    expect(payload.data).toMatchObject({
+      status: "partial",
+      selected: [{ entry: "n.xml" }],
+      not_found: [{ request: "8" }],
+    });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
   });
 
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {

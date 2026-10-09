@@ -177,7 +177,7 @@ export function parseConferenceCsv(
 }
 
 /** Chave NF-e: 44 dígitos com dígito verificador módulo 11. */
-function isValidAccessKey(key: string): boolean {
+export function isValidAccessKey(key: string): boolean {
   if (!/^\d{44}$/u.test(key)) return false;
   let weight = 2;
   let sum = 0;
