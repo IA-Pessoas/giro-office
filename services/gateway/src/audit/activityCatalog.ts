@@ -340,6 +340,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "baixou", item: "um PDF de alíquota fiscal" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/malhas\/[^/]+\/attachment$/,
+    description: { action: "anexou", item: "um arquivo a uma malha fiscal" },
+  },
+  {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/malhas\/[^/]+\/attachment$/,
+    description: { action: "abriu", item: "o anexo de uma malha fiscal" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/fiscal\/simples\/preview$/,
     description: { action: "consultou", item: "a prévia de alíquotas do Simples" },
@@ -1378,6 +1388,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "um registro de alíquota fiscal",
     newSingular: "um novo registro de alíquota fiscal",
     plural: "registros de alíquotas fiscais",
+  },
+  {
+    pattern: /^\/fiscal\/malhas(?:\/|$)/,
+    singular: "uma malha fiscal",
+    newSingular: "uma nova malha fiscal",
+    plural: "malhas fiscais",
   },
   {
     pattern: /^\/fiscal\/revenues(?:\/|$)/,

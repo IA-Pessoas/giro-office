@@ -4737,6 +4737,78 @@ const handlers = {
     });
   },
 
+  async fiscalMalhaCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        period_start: "2025-01",
+        period_end: "2025-12",
+        reason: "Smoke: divergência em declaração",
+        deadline: "2026-12-15",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalMalhaId = pickFirst(response.body, "data.id") ?? findFirstId(response.body?.data);
+    }
+  },
+
+  async fiscalMalhaCreateInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        client_id: requireState("primaryClientId"),
+        period_start: "2025-12",
+        period_end: "2025-01",
+        reason: "Smoke: período invertido",
+      },
+    });
+  },
+
+  async fiscalMalhaList(op) {
+    await httpRequest(op, {
+      query: { client_id: requireState("primaryClientId"), status: "aberta" },
+    });
+  },
+
+  async fiscalMalhaDetail(op) {
+    const response = await httpRequest(op, {
+      path: `/fiscal/malhas/${requireState("fiscalMalhaId")}`,
+    });
+    if (!isBadExpectation(op) && !Array.isArray(response.body?.data?.history)) {
+      throw new Error(`malha sem histórico: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalMalhaUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/malhas/${requireState("fiscalMalhaId")}`,
+      json: { status: "em_andamento" },
+    });
+  },
+
+  async fiscalMalhaAttachmentReplace(op) {
+    await httpRequest(op, {
+      path: `/fiscal/malhas/${requireState("fiscalMalhaId")}/attachment`,
+      expectedStatus: [201],
+      form: {
+        file: {
+          fieldName: "file",
+          path: env.fixturePath,
+          filename: "smoke-malha.png",
+          contentType: "image/png",
+        },
+      },
+    });
+  },
+
+  async fiscalMalhaAttachmentAccess(op) {
+    await httpRequest(op, {
+      path: `/fiscal/malhas/${requireState("fiscalMalhaId")}/attachment`,
+      expectedStatus: [200],
+    });
+  },
+
   async fiscalRatePdf(op) {
     await httpRequest(op, {
       path: `/fiscal/rates/${requireState("fiscalRateId")}/pdf`,
