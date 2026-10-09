@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  filterContabilTriagePortfolio,
   filterFiscalTriagePortfolio,
-  parseFiscalTriagePortfolioFilters,
+  fiscalTriagePortfolioFiltersFromQuery,
 } from "../../src/triagem/triagePortfolioFilters.ts";
 
 const rows = [
@@ -75,13 +76,10 @@ test("filtra por busca, responsável, regime e estado do item", () => {
   );
 });
 
-test("filtra por justificativa no item ou em qualquer item", () => {
+test("justificativa vale para a empresa, qualquer que seja a coluna filtrada", () => {
   assert.deepEqual(
     names(
-      filterFiscalTriagePortfolio(rows, {
-        documentField: "outbound_report",
-        justification: "with",
-      }),
+      filterFiscalTriagePortfolio(rows, { documentField: "inbound_report", justification: "with" }),
     ),
     ["Alfa Ltda"],
   );
@@ -94,30 +92,39 @@ test("filtra por justificativa no item ou em qualquer item", () => {
   ]);
 });
 
-test("lê os filtros da query string e rejeita valores inválidos", () => {
+test("converte a query validada nos filtros da tela", () => {
   assert.deepEqual(
-    parseFiscalTriagePortfolioFilters({
-      search: " alfa ",
+    fiscalTriagePortfolioFiltersFromQuery({
       responsible_id: "u1",
-      regime: "Simples Nacional",
       document_field: "outbound_report",
       document_status: "PENDING",
       justification: "with",
     }),
     {
-      search: "alfa",
+      search: undefined,
       responsibleId: "u1",
-      regime: "Simples Nacional",
+      regime: undefined,
       documentField: "outbound_report",
       documentStatus: "PENDING",
       justification: "with",
     },
   );
-  assert.deepEqual(parseFiscalTriagePortfolioFilters({}), {});
-  assert.throws(() => parseFiscalTriagePortfolioFilters({ document_field: "x" }), /document_field/);
-  assert.throws(
-    () => parseFiscalTriagePortfolioFilters({ document_status: "x" }),
-    /document_status/,
-  );
-  assert.throws(() => parseFiscalTriagePortfolioFilters({ justification: "x" }), /justification/);
+});
+
+test("filtra a carteira contábil por responsável, regime e fechamento", () => {
+  const contabil = [
+    {
+      id: "a",
+      regime: "Simples Nacional",
+      person_responsible_id: "u1",
+      closing: { status: "CLOSED" },
+    },
+    { id: "b", regime: "", person_responsible_id: null, closing: { status: "NOT_RECEIVED" } },
+  ];
+  const ids = (filters: Parameters<typeof filterContabilTriagePortfolio>[1]) =>
+    filterContabilTriagePortfolio(contabil, filters).map((row) => row.id);
+  assert.deepEqual(ids({}), ["a", "b"]);
+  assert.deepEqual(ids({ responsibleId: "none", regime: "Não informado" }), ["b"]);
+  assert.deepEqual(ids({ responsibleId: "u1", closingStatus: "CLOSED" }), ["a"]);
+  assert.deepEqual(ids({ closingStatus: "RECEIVED" }), []);
 });

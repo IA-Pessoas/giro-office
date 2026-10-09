@@ -272,6 +272,29 @@ describe("contabil Worker remainder routes", () => {
     expect(invalid.status).toBe(400);
   });
 
+  it("carteiras filtradas exigem sessão e consultam só a organização do token (#1690)", async () => {
+    const OTHER_ORG = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const urls = [
+      "https://contabil.test/triagem/fiscal-portfolio?competence=2025-03&justification=with",
+      "https://contabil.test/contabil/controls/list?competence=2025-03&status=CLOSED",
+    ];
+    const otherOrg = { ...headers("2"), "x-auth-organization-id": OTHER_ORG };
+
+    for (const url of urls) {
+      expect((await app.request(url)).status).toBe(401);
+      expect((await app.request(url, { headers: otherOrg })).status).toBe(200);
+    }
+
+    expect(deps.triageDocumentsService.listFiscalPortfolio).toHaveBeenCalledOnce();
+    expect(deps.triageDocumentsService.listFiscalPortfolio).toHaveBeenCalledWith(
+      "2025-03",
+      expect.objectContaining({ organizationId: OTHER_ORG }),
+    );
+    expect(deps.controlService.list).toHaveBeenCalledExactlyOnceWith("2025-03", OTHER_ORG);
+  });
+
   it("filtra a carteira contábil por regime, responsável e estado do fechamento", async () => {
     const deps = services();
     deps.controlService.list.mockResolvedValue({
