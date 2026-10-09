@@ -31,7 +31,7 @@ function BirthdayReportContent({ report }: { report: MarketingMonthlyBirthdays }
   return (
     <article
       aria-label={`Aniversariantes de ${monthName}`}
-      className="space-y-6 text-gray-900 dark:text-slate-100"
+      className="marketing-print-report space-y-6 text-gray-900 dark:text-slate-100"
       id="marketing-birthday-report"
     >
       <div className="hide-on-print flex flex-wrap justify-end gap-2">

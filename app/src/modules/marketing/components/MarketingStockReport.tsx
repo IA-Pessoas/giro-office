@@ -10,6 +10,7 @@ import {
   downloadCsvFile,
   MARKETING_STOCK_COLUMNS,
   marketingStockRows,
+  marketingStockTotalsLabel,
 } from "../utils/marketingCsv";
 import { printMarketingReport } from "../utils/printMarketingReport";
 import { marketingPrimaryButtonClass, marketingSecondaryButtonClass } from "./marketingButtonStyles";
@@ -19,14 +20,14 @@ function StockReportContent({ stock }: { stock: MarketingStock }) {
   return (
     <article
       aria-label={`Estoque do departamento ${stock.department.name}`}
-      className="space-y-6 text-gray-900 dark:text-slate-100"
+      className="marketing-print-report space-y-6 text-gray-900 dark:text-slate-100"
       id="marketing-stock-report"
     >
       <div className="hide-on-print flex flex-wrap justify-end gap-2">
         <button
           className={marketingSecondaryButtonClass}
           disabled={stock.items.length === 0}
-          onClick={() => downloadCsvFile("estoque-marketing.csv", createMarketingStockCsv(stock.items))}
+          onClick={() => downloadCsvFile("estoque-marketing.csv", createMarketingStockCsv(stock))}
           type="button"
         >
           <Download aria-hidden="true" className="mr-1.5 inline h-4 w-4" />
@@ -46,8 +47,7 @@ function StockReportContent({ stock }: { stock: MarketingStock }) {
         <p className="text-sm text-gray-600 dark:text-slate-300">Relatório de estoque</p>
         <h2 className="text-xl font-semibold">Departamento {stock.department.name}</h2>
         <p className="text-sm text-gray-700 dark:text-slate-200">
-          {stock.totals.items} {stock.totals.items === 1 ? "item" : "itens"} · {stock.totals.quantity}{" "}
-          {stock.totals.quantity === 1 ? "unidade" : "unidades"} em estoque
+          {marketingStockTotalsLabel(stock.totals)}
         </p>
       </header>
 

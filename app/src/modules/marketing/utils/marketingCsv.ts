@@ -1,4 +1,4 @@
-import type { MarketingStockItem } from "../types/marketingDashboard";
+import type { MarketingStock, MarketingStockItem } from "../types/marketingDashboard";
 
 export interface BirthdayCsvItem {
   name: string;
@@ -92,9 +92,23 @@ export function marketingStockRows(
   ]);
 }
 
+function itemCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "item" : "itens"}`;
+}
+
+export function marketingStockTotalsLabel(totals: MarketingStock["totals"]): string {
+  const units = `${totals.quantity} ${totals.quantity === 1 ? "unidade" : "unidades"}`;
+  return `${itemCountLabel(totals.items)} · ${units} em estoque`;
+}
+
+/** A última linha repete os totais exibidos na tela e na impressão. */
 export function createMarketingStockCsv(
-  items: readonly MarketingStockItem[],
+  stock: Pick<MarketingStock, "items" | "totals">,
   timeZone?: string,
 ): string {
-  return createCsv([MARKETING_STOCK_COLUMNS, ...marketingStockRows(items, timeZone)]);
+  return createCsv([
+    MARKETING_STOCK_COLUMNS,
+    ...marketingStockRows(stock.items, timeZone),
+    [`Total: ${itemCountLabel(stock.totals.items)}`, String(stock.totals.quantity), "", ""],
+  ]);
 }
