@@ -1,3 +1,4 @@
+import { formatFiscalDateLabel } from "./fiscalDate.ts";
 import type {
   FiscalControlStatus,
   FiscalMonthlyControl,
@@ -88,6 +89,5 @@ export function formatAnnualDeclaration(
   if (!declaration) return "—";
   if (declaration.status === "NOT_APPLICABLE") return "Não aplicável";
   if (declaration.status === "PENDING") return "Pendente";
-  const [year, month, day] = (declaration.completed_on ?? "").split("-");
-  return year ? `Cumprida em ${day}/${month}/${year}` : "Cumprida";
+  return `Cumprida em ${formatFiscalDateLabel(declaration.completed_on)}`;
 }

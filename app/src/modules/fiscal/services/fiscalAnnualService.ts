@@ -19,6 +19,8 @@ export const FISCAL_ANNUAL_DECLARATIONS = [
   ["DASN_SIMEI", "DASN-SIMEI"],
 ] as const;
 
+export type FiscalAnnualDeclarationCode = (typeof FISCAL_ANNUAL_DECLARATIONS)[number][0];
+
 /** Sem situação geral: o andamento anual é o de cada declaração. */
 export interface FiscalAnnualControl {
   id: string;
@@ -39,20 +41,23 @@ export const fiscalAnnualService = {
     return unwrapFiscalEnvelope<{ year: number; items: FiscalAnnualControl[] }>(response.data);
   },
 
-  async items(controlId: string): Promise<FiscalControlItems> {
+  async items(controlId: string): Promise<FiscalControlItems<FiscalAnnualDeclarationCode>> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     const response = await api.get(`/fiscal/annual-controls/${controlId}/items`);
-    return unwrapFiscalEnvelope<FiscalControlItems>(response.data);
+    return unwrapFiscalEnvelope<FiscalControlItems<FiscalAnnualDeclarationCode>>(response.data);
   },
 
-  async addItem(controlId: string, payload: { code: string; reason?: string }): Promise<void> {
+  async addItem(
+    controlId: string,
+    payload: { code: FiscalAnnualDeclarationCode; reason?: string },
+  ): Promise<void> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     await api.post(`/fiscal/annual-controls/${controlId}/items`, payload);
   },
 
   async updateItem(
     controlId: string,
-    code: string,
+    code: FiscalAnnualDeclarationCode,
     payload: UpdateFiscalObligationPayload,
   ): Promise<void> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
@@ -61,7 +66,9 @@ export const fiscalAnnualService = {
 };
 
 /** Declarações do controle anual no painel de itens. */
-export function annualItemSource(controlId: string): FiscalItemSource {
+export function annualItemSource(
+  controlId: string,
+): FiscalItemSource<FiscalAnnualDeclarationCode> {
   return {
     queryKey: fiscalAnnualItemsQueryKey(controlId),
     portfolioKey: FISCAL_ANNUAL_CONTROLS_QUERY_KEY,

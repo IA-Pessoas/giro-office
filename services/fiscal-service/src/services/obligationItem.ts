@@ -7,6 +7,22 @@ import { ServiceError } from "@workspace/shared";
  */
 export type ObligationItemStatus = "PENDING" | "COMPLETED" | "NOT_APPLICABLE";
 
+/** Ações da trilha de um item (obrigação mensal ou declaração anual). */
+export const OBLIGATION_ITEM_ACTION = {
+  suggested: "OBLIGATION_SUGGESTED",
+  added: "OBLIGATION_ADDED",
+  notApplicable: "OBLIGATION_NOT_APPLICABLE",
+  applicable: "OBLIGATION_APPLICABLE",
+  completed: "OBLIGATION_COMPLETED",
+  undone: "OBLIGATION_UNDONE",
+} as const;
+
+/** Valores de aplicabilidade gravados em from_value/to_value da trilha. */
+export const ITEM_APPLICABILITY = {
+  applicable: "applicable",
+  notApplicable: "not_applicable",
+} as const;
+
 export interface StoredObligationItem {
   applicable: boolean;
   not_applicable_reason: string | null;
@@ -23,11 +39,7 @@ export interface ObligationItemInput {
 }
 
 export interface ObligationItemEvent {
-  action:
-    | "OBLIGATION_NOT_APPLICABLE"
-    | "OBLIGATION_APPLICABLE"
-    | "OBLIGATION_COMPLETED"
-    | "OBLIGATION_UNDONE";
+  action: (typeof OBLIGATION_ITEM_ACTION)["notApplicable" | "applicable" | "completed" | "undone"];
   from_value: string | null;
   to_value: string | null;
   reason: string | null;
@@ -75,18 +87,18 @@ export function planObligationItemChange(
       data.applicable = false;
       data.not_applicable_reason = reason;
       events.push({
-        action: "OBLIGATION_NOT_APPLICABLE",
-        from_value: "applicable",
-        to_value: "not_applicable",
+        action: OBLIGATION_ITEM_ACTION.notApplicable,
+        from_value: ITEM_APPLICABILITY.applicable,
+        to_value: ITEM_APPLICABILITY.notApplicable,
         reason,
       });
     } else {
       data.applicable = true;
       data.not_applicable_reason = null;
       events.push({
-        action: "OBLIGATION_APPLICABLE",
-        from_value: "not_applicable",
-        to_value: "applicable",
+        action: OBLIGATION_ITEM_ACTION.applicable,
+        from_value: ITEM_APPLICABILITY.notApplicable,
+        to_value: ITEM_APPLICABILITY.applicable,
         reason,
       });
     }
@@ -97,7 +109,12 @@ export function planObligationItemChange(
     data.completed_on = null;
     data.completed_by = null;
     data.protocol = null;
-    events.push({ action: "OBLIGATION_UNDONE", from_value: previousDate, to_value: null, reason });
+    events.push({
+      action: OBLIGATION_ITEM_ACTION.undone,
+      from_value: previousDate,
+      to_value: null,
+      reason,
+    });
   } else if (input.completed_on) {
     if (!(data.applicable ?? current.applicable)) {
       throw new ServiceError(409, "Obrigação não aplicável não pode ser cumprida.");
@@ -112,7 +129,7 @@ export function planObligationItemChange(
       data.completed_by = input.completed_on === previousDate ? current.completed_by : actorId;
       data.protocol = protocol;
       events.push({
-        action: "OBLIGATION_COMPLETED",
+        action: OBLIGATION_ITEM_ACTION.completed,
         from_value: previousDate,
         to_value: input.completed_on,
         reason,

@@ -16,6 +16,8 @@ import {
 import { loadDefaultResponsibles, loadUserNames } from "./fiscalResponsibles.js";
 import {
   dateKey,
+  ITEM_APPLICABILITY,
+  OBLIGATION_ITEM_ACTION,
   type ObligationItemEvent,
   type ObligationItemInput,
   type ObligationItemStatus,
@@ -96,7 +98,7 @@ type StoredItem = {
 type EventInput =
   | ObligationItemEvent
   | {
-      action: "CREATED" | "OBLIGATION_SUGGESTED" | "OBLIGATION_ADDED";
+      action: "CREATED" | (typeof OBLIGATION_ITEM_ACTION)["suggested" | "added"];
       from_value: string | null;
       to_value: string | null;
       reason: string | null;
@@ -211,9 +213,11 @@ export class AnnualControlService {
   ): Promise<{ year: number; items: AnnualControlListItem[] }> {
     const { organizationId, userId } = actor;
     const { year } = input;
-    // Ano futuro ainda não tem fatos a declarar: só gera até o ano corrente.
+    // Gera só o ano corrente e o anterior (cujas declarações vencem agora). Ano futuro
+    // não tem fatos a declarar; anos antigos vêm da importação histórica, não daqui.
+    const currentYear = this.now().getUTCFullYear();
     const eligible =
-      year <= this.now().getUTCFullYear()
+      year <= currentYear && year >= currentYear - 1
         ? await this.prisma.client.findMany({
             where: eligibleClientsWhere(organizationId, year),
             select: { id: true, regime: true },
@@ -272,10 +276,10 @@ export class AnnualControlService {
             ...suggested.map((row) => ({
               organization_id: organizationId,
               control_id: row.control_id,
-              action: "OBLIGATION_SUGGESTED",
+              action: OBLIGATION_ITEM_ACTION.suggested,
               item_code: row.code,
               from_value: null,
-              to_value: "applicable",
+              to_value: ITEM_APPLICABILITY.applicable,
               reason: null,
               actor_id: userId,
             })),
@@ -389,7 +393,12 @@ export class AnnualControlService {
           },
         });
         await this.writeEvents(tx, actor, control.id, input.code, [
-          { action: "OBLIGATION_ADDED", from_value: null, to_value: "applicable", reason },
+          {
+            action: OBLIGATION_ITEM_ACTION.added,
+            from_value: null,
+            to_value: ITEM_APPLICABILITY.applicable,
+            reason,
+          },
         ]);
         return row;
       });

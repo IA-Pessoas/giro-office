@@ -13,6 +13,8 @@ import {
 } from "./fiscalObligationCatalog.js";
 import {
   dateKey,
+  ITEM_APPLICABILITY,
+  OBLIGATION_ITEM_ACTION,
   type ObligationItemEvent,
   type ObligationItemInput,
   type ObligationItemStatus,
@@ -78,7 +80,7 @@ type StoredObligation = {
 type EventInput =
   | ObligationItemEvent
   | {
-      action: "OBLIGATION_SUGGESTED" | "OBLIGATION_ADDED";
+      action: (typeof OBLIGATION_ITEM_ACTION)["suggested" | "added"];
       from_value: string | null;
       to_value: string | null;
       reason: string | null;
@@ -141,9 +143,9 @@ export async function createSuggestedObligations(
       organization_id: organizationId,
       control_id: row.control_id,
       obligation_code: row.code,
-      action: "OBLIGATION_SUGGESTED",
+      action: OBLIGATION_ITEM_ACTION.suggested,
       from_value: null,
-      to_value: "applicable",
+      to_value: ITEM_APPLICABILITY.applicable,
       reason: null,
       actor_id: actorId,
     })),
@@ -256,7 +258,12 @@ export class MonthlyObligationService {
           },
         });
         await this.writeEvents(tx, actor, control.id, input.code, [
-          { action: "OBLIGATION_ADDED", from_value: null, to_value: "applicable", reason },
+          {
+            action: OBLIGATION_ITEM_ACTION.added,
+            from_value: null,
+            to_value: ITEM_APPLICABILITY.applicable,
+            reason,
+          },
         ]);
         return row;
       });

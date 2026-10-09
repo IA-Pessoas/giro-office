@@ -26,9 +26,9 @@ import { FiscalStateBox } from "./FiscalStateBox";
 const REASON_MESSAGE = "Informe o motivo com pelo menos 3 caracteres.";
 const LINK_BUTTON_CLASSNAME = "text-sm text-blue-700 hover:underline dark:text-blue-300";
 
-type Action = { code: string; kind: "complete" | "dispense" | "undo" };
+type Action<C extends string> = { code: C; kind: "complete" | "dispense" | "undo" };
 
-function statusLabel(item: FiscalControlItem): string {
+function statusLabel(item: FiscalControlItem<string>): string {
   if (item.status === "NOT_APPLICABLE") return `Não aplicável: ${item.not_applicable_reason ?? ""}`;
   if (item.status === "COMPLETED") {
     const protocol = item.protocol ? ` · protocolo ${item.protocol}` : "";
@@ -38,23 +38,23 @@ function statusLabel(item: FiscalControlItem): string {
 }
 
 /** Itens de um controle (obrigações do mensal ou declarações do anual). */
-export function FiscalControlObligationsPanel({
+export function FiscalControlObligationsPanel<C extends string>({
   source,
   clientName,
   canEdit,
   locked,
 }: {
-  source: FiscalItemSource;
+  source: FiscalItemSource<C>;
   clientName: string;
   canEdit: boolean;
   locked: boolean;
 }) {
-  const [action, setAction] = useState<Action | null>(null);
+  const [action, setAction] = useState<Action<C> | null>(null);
   const [date, setDate] = useState(todayInputDate);
   const [protocol, setProtocol] = useState("");
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
-  const [addCode, setAddCode] = useState("");
+  const [addCode, setAddCode] = useState<C | "">("");
   const [addReason, setAddReason] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -68,7 +68,7 @@ export function FiscalControlObligationsPanel({
     await queryClient.invalidateQueries({ queryKey: source.portfolioKey });
   };
   const update = useMutation({
-    mutationFn: ({ code, payload }: { code: string; payload: UpdateFiscalObligationPayload }) =>
+    mutationFn: ({ code, payload }: { code: C; payload: UpdateFiscalObligationPayload }) =>
       source.update(code, payload),
     onSuccess: () => {
       toast.success(source.noun.updated);
@@ -78,7 +78,7 @@ export function FiscalControlObligationsPanel({
     onSettled: refresh,
   });
   const add = useMutation({
-    mutationFn: (payload: { code: string; reason?: string }) => source.add(payload),
+    mutationFn: (payload: { code: C; reason?: string }) => source.add(payload),
     onSuccess: () => {
       toast.success(source.noun.added);
       setAddCode("");
@@ -88,7 +88,7 @@ export function FiscalControlObligationsPanel({
     onSettled: refresh,
   });
 
-  function start(next: Action) {
+  function start(next: Action<C>) {
     setAction(next);
     setDate(todayInputDate());
     setProtocol("");
@@ -207,7 +207,7 @@ export function FiscalControlObligationsPanel({
         <form noValidate onSubmit={submitAdd} aria-label={`Incluir ${source.noun.singular}`} className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             Incluir {source.noun.singular}
-            <select value={addCode} onChange={(event) => setAddCode(event.target.value)} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
+            <select value={addCode} onChange={(event) => setAddCode(event.target.value as C | "")} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
               <option value="">Selecione</option>
               {list.data.addable.map((item) => <option key={item.code} value={item.code}>{item.name}{item.conditional ? " (condicional)" : ""}</option>)}
             </select>

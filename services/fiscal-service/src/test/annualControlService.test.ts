@@ -192,9 +192,10 @@ describe("AnnualControlService.list", () => {
     expect(result.items[1].declarations).toEqual([]);
   });
 
-  it("não gera controles para ano futuro", async () => {
+  it("não gera controles para ano futuro nem para anos antigos", async () => {
     const { prisma, service } = dependencies();
     await service.list({ year: 2027 }, actor);
+    await service.list({ year: 2024 }, actor);
     expect(prisma.client.findMany).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
