@@ -54,7 +54,7 @@ function dependencies() {
 }
 
 describe("MonthlyObligationService.list", () => {
-  it("garante as sugestões do regime do controle e lista com catálogo e o que dá para incluir", async () => {
+  it("lista sem gravar nada e oferece só o que o regime permite incluir", async () => {
     const { prisma, service } = dependencies();
 
     const result = await service.list(controlId, actor);
@@ -63,29 +63,16 @@ describe("MonthlyObligationService.list", () => {
       where: { id: controlId, organization_id: organizationId },
       select: { id: true, status: true, regime: true },
     });
-    expect(prisma.fiscalMonthlyControlObligation.createMany).toHaveBeenCalledWith({
-      data: [
-        {
-          organization_id: organizationId,
-          control_id: controlId,
-          code: "PGDAS_D",
-          origin: "SUGGESTED",
-        },
-      ],
-      skipDuplicates: true,
-    });
+    expect(prisma.fiscalMonthlyControlObligation.createMany).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(result.items[0]).toMatchObject({
       code: "PGDAS_D",
       name: "PGDAS-D",
       status: "PENDING",
       source: expect.stringContaining("gov.br"),
     });
-    expect(result.addable.map((item) => item.code)).toEqual([
-      "DCTFWEB",
-      "EFD_CONTRIBUICOES",
-      "DIRBI",
-    ]);
-    expect(result.addable.find((item) => item.code === "DIRBI")?.conditional).toBe(true);
+    // Optante do Simples é dispensada da DIRBI: nem aparece para inclusão.
+    expect(result.addable.map((item) => item.code)).toEqual(["DCTFWEB", "EFD_CONTRIBUICOES"]);
   });
 
   it("controle de outra organização é 404", async () => {
@@ -96,8 +83,18 @@ describe("MonthlyObligationService.list", () => {
 });
 
 describe("MonthlyObligationService.add", () => {
+  it("DIRBI não entra em controle do Simples nem com motivo", async () => {
+    const { prisma, service } = dependencies();
+    prisma.fiscalMonthlyControlObligation.findFirst.mockResolvedValue(null);
+    await expect(
+      service.add(controlId, { code: "DIRBI", reason: "Benefício" }, actor),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prisma.fiscalMonthlyControlObligation.create).not.toHaveBeenCalled();
+  });
+
   it("obrigação condicional só entra com motivo e fica na trilha", async () => {
     const { prisma, service } = dependencies();
+    prisma.fiscalMonthlyControl.findFirst.mockResolvedValue(control({ regime: "Lucro Real" }));
     prisma.fiscalMonthlyControlObligation.findFirst.mockResolvedValue(null);
 
     await expect(service.add(controlId, { code: "DIRBI" }, actor)).rejects.toMatchObject({
@@ -221,6 +218,35 @@ describe("MonthlyObligationService.update", () => {
     await expect(
       service.update(controlId, "PGDAS_D", { applicable: false, reason: "Dispensa" }, actor),
     ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it("mudar só o protocolo mantém quem cumpriu", async () => {
+    const { prisma, service } = dependencies();
+    const original = "d0000000-0000-4000-8000-000000000009";
+    prisma.fiscalMonthlyControlObligation.findFirst.mockResolvedValueOnce(
+      obligation({
+        completed_on: new Date("2026-09-10T00:00:00.000Z"),
+        completed_by: original,
+        protocol: "REC-1",
+      }),
+    );
+
+    await service.update(
+      controlId,
+      "PGDAS_D",
+      { completed_on: "2026-09-10", protocol: "REC-2" },
+      actor,
+    );
+
+    expect(prisma.fiscalMonthlyControlObligation.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          completed_on: new Date("2026-09-10T00:00:00.000Z"),
+          completed_by: original,
+          protocol: "REC-2",
+        },
+      }),
+    );
   });
 
   it("desfazer cumprimento limpa data, ator e protocolo", async () => {

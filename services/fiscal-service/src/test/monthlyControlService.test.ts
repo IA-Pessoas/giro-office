@@ -183,7 +183,16 @@ describe("MonthlyControlService.list", () => {
           origin: "SUGGESTED",
         },
       ],
-      skipDuplicates: true,
+    });
+    expect(prisma.fiscalMonthlyControlEvent.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          control_id: "generated-1",
+          obligation_code: "EFD_CONTRIBUICOES",
+          action: "OBLIGATION_SUGGESTED",
+          actor_id: userId,
+        }),
+      ]),
     });
     expect(prisma.fiscalMonthlyControlObligation.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
