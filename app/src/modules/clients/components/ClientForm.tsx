@@ -6,7 +6,8 @@ import { clientTextFieldClassName } from "../form/clientFormControls";
 import { ClientAddressFields } from "../form/ClientAddressFields";
 import { FormField } from "@shared/components/FormField";
 import type { ClientFormValues } from "../types";
-import { CLIENT_TAX_REGIME_OPTIONS, getClientInternalName } from "../utils/clientForm";
+import { useClientRegimes } from "../hooks/useClients";
+import { buildClientRegimeOptions, getClientInternalName } from "../utils/clientForm";
 import {
   formatCpfCnpjInput,
   validateCpfCnpjDocument,
@@ -17,7 +18,8 @@ interface ClientFormProps {
   disabled?: boolean;
   showPersonType?: boolean;
   showDocumentError?: boolean;
-  legacyTaxRegime?: string | null;
+  /** Regime gravado no cliente; fica selecionável mesmo fora do catálogo. */
+  storedRegime?: string | null;
   submitLabel: string;
   onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   onSubmit: () => void;
@@ -29,13 +31,18 @@ export function ClientForm({
   disabled = false,
   showPersonType = false,
   showDocumentError = false,
-  legacyTaxRegime = null,
+  storedRegime = null,
   submitLabel,
   onChange,
   onSubmit,
   onCancel,
 }: ClientFormProps) {
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const regimesQuery = useClientRegimes();
+  const regimeOptions = buildClientRegimeOptions(
+    (regimesQuery.data ?? []).map((regime) => regime.name),
+    storedRegime,
+  );
   const documentLabel = showPersonType ? (values.type === "PF" ? "CPF" : "CNPJ") : "CPF/CNPJ";
   // Erros do envio aparecem abaixo de cada campo, ligados por aria-describedby (#1367).
   const documentError = (showDocumentError || hasSubmitted) && values.cpf_cnpj
@@ -166,15 +173,15 @@ export function ClientForm({
           </span>
           <ClientNativeSelect name="regime" value={values.regime} onChange={onChange} disabled={disabled}>
             <option value="">Selecione um regime</option>
-            {CLIENT_TAX_REGIME_OPTIONS.map((option) => (
+            {regimeOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
           </ClientNativeSelect>
-          {legacyTaxRegime && values.regime === "" ? (
-            <span className="block text-xs text-slate-500 dark:text-slate-400">
-              Regime atual: {legacyTaxRegime}
+          {regimesQuery.error ? (
+            <span role="alert" className="block text-xs text-rose-700 dark:text-rose-300">
+              Não foi possível carregar os regimes da organização.
             </span>
           ) : null}
         </label>

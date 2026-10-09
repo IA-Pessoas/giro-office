@@ -2,6 +2,7 @@ import { setupAPIClient } from "@shared/services/api";
 
 import type {
   ClientGroup,
+  ClientRegime,
   Client,
   ClientCompanyLookup,
   ClientFinanceRecord,
@@ -32,6 +33,7 @@ import type {
 } from "../types";
 import {
   CLIENT_GROUP_ENDPOINTS,
+  CLIENT_REGIME_ENDPOINTS,
   buildClientListParams,
   CLIENT_ENDPOINTS,
   unwrapClientEnvelope,
@@ -62,6 +64,21 @@ export const clientService = {
     const api = setupAPIClient();
     const response = await api.put(CLIENT_GROUP_ENDPOINTS.clients(id), { client_ids });
     return unwrapClientEnvelope<{ id: string; clients: { id: string }[] }>(response.data);
+  },
+
+  async listRegimes(): Promise<ClientRegime[]> {
+    const response = await setupAPIClient().get(CLIENT_REGIME_ENDPOINTS.list);
+    return unwrapClientEnvelope<ClientRegime[]>(response.data);
+  },
+
+  async createRegime(name: string): Promise<ClientRegime> {
+    const response = await setupAPIClient().post(CLIENT_REGIME_ENDPOINTS.create, { name });
+    return unwrapClientEnvelope<ClientRegime>(response.data);
+  },
+
+  async updateRegime(id: string, name: string): Promise<ClientRegime> {
+    const response = await setupAPIClient().patch(CLIENT_REGIME_ENDPOINTS.detail(id), { name });
+    return unwrapClientEnvelope<ClientRegime>(response.data);
   },
 
   async listCoringa(filters: ClientCoringaFilters): Promise<ClientCoringaPage> {

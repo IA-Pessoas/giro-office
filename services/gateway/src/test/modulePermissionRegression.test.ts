@@ -233,7 +233,7 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
   });
 
-  it("restringe a gestão de grupos de empresas ao módulo Integração", () => {
+  it("restringe a gestão de grupos de empresas e regimes ao módulo Integração", () => {
     const reader = authContext({ modules: { integracao: 1, comercial: 3 } });
     const editor = authContext({ modules: { integracao: 2 } });
     const otherModule = authContext({ modules: { comercial: 3, contabil: 3 } });
@@ -242,7 +242,13 @@ describe("matriz de regressão das políticas modulares", () => {
       ["POST", "/client/groups", false, true],
       ["PATCH", "/client/groups/group-1", false, true],
       ["PUT", "/client/groups/group-1/clients", false, true],
+      ["POST", "/client/regimes", false, true],
+      ["PATCH", "/client/regimes/regime-1", false, true],
     ] as const;
+
+    const regimesRead = requiredRoutePolicy("GET", "/client/regimes");
+    expect(canAccessRoute(otherModule, regimesRead), "catálogo de regimes na ficha").toBe(true);
+    expect(canAccessRoute(authContext({ modules: {} }), regimesRead)).toBe(false);
 
     for (const [method, path, canRead, canWrite] of routes) {
       const policy = requiredRoutePolicy(method, path);

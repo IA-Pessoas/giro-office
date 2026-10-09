@@ -148,13 +148,15 @@ const clientListPolicy: AuthPolicy = {
 };
 
 const integracaoClientPath =
-  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/groups(?:\/[^/]+(?:\/clients)?)?|\/[^/]+)?\/?$/;
+  /^\/client(?:\/list|\/integration|\/[^/]+\/integration|\/[^/]+\/activate|\/groups(?:\/[^/]+(?:\/clients)?)?|\/regimes(?:\/[^/]+)?|\/[^/]+)?\/?$/;
 
 const exactRoutePolicies = new Map<string, AuthPolicy>([
   ["GET /dashboard/stats", authenticatedPolicy],
   ["GET /client/list", clientListPolicy],
   ["GET /client/coringa/list", clientListPolicy],
   ["GET /client/coringa/pdf", clientListPolicy],
+  // Ficha e Regularize leem o catálogo; criar e renomear seguem exigindo Integração.
+  ["GET /client/regimes", clientListPolicy],
   ["GET /user/me", authenticatedPolicy],
   ["GET /rh/notifications", rhModulePolicy],
   ["PUT /rh/notifications/read", rhModulePolicy],
