@@ -121,6 +121,10 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
         name: "Receitas",
         description: "Receita bruta mensal por cliente, base do Simples Nacional",
       },
+      {
+        name: "Conferências",
+        description: "Comparação de arquivos e notas, sem gravar nem alterar dados operacionais",
+      },
       { name: "InternalReporting", description: "Fonte interna governada para relatórios" },
     ],
     components: {
@@ -1457,6 +1461,325 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
             "400": { description: "Entrada inválida" },
             "403": { description: "Sem permissão de edição Fiscal" },
             "500": { description: "Falha ao gerar os PDFs; nenhum arquivo entregue" },
+          },
+        },
+      },
+      "/fiscal/conferences/documents": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Conferir planilhas Domínio e SEFAZ por documento",
+          description:
+            "Recebe duas planilhas CSV (separador ; , ou tab, primeira linha como cabeçalho) e compara as notas pela chave de acesso NF-e quando há; sem ela, por emitente (CPF/CNPJ) + modelo + série + número. Número isolado é descartado. Devolve coincidentes, divergentes (valor ou chave), exclusivos de cada fonte, duplicadas (sem correspondência automática), descartes e erros por linha, totais e o CSV do resultado (campo csv). status partial indica descartes ou erros; cabeçalho sem colunas de identidade ou arquivo sem linhas responde 400 sem relatório. Nada é gravado. Compatibilidade com exportações reais ainda não validada.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["dominio", "sefaz"],
+                  additionalProperties: false,
+                  properties: Object.fromEntries(
+                    ["dominio", "sefaz"].map((source) => [
+                      source,
+                      {
+                        type: "object",
+                        required: ["file_name", "content"],
+                        additionalProperties: false,
+                        properties: {
+                          file_name: { type: "string", minLength: 1, maxLength: 255 },
+                          content: { type: "string", minLength: 1, maxLength: 450_000 },
+                        },
+                      },
+                    ]),
+                  ),
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description:
+                "Resultado da conferência (status, summary, matched, divergent, only_dominio, only_sefaz, duplicates, discarded, errors, totals) com file_name e csv",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou planilha sem formato reconhecível" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
+      "/fiscal/conferences/xml-selection": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Selecionar XML de notas em ZIP",
+          description:
+            "Recebe um ZIP de XML (base64, até ~650 kB) e a lista de notas pedidas: chave de acesso (44 dígitos) ou número, série;número, emitente;série;número ou emitente;modelo;série;número. Devolve um ZIP só com os XML selecionados e o relatorio-selecao.csv (zip_base64; null quando nada foi selecionado), o mesmo CSV no campo csv e o relatório: selected, ambiguous (mais de uma nota ou cópias diferentes da mesma nota, sem escolha automática), not_found, invalid_requests e, do arquivo, discarded, errors e duplicates. Nomes inseguros, entradas criptografadas, corrompidas ou grandes demais aparecem como erro por arquivo. status partial quando algum pedido não foi atendido ou há erro no ZIP. Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["file_name", "zip_base64", "requests"],
+                  additionalProperties: false,
+                  properties: {
+                    file_name: { type: "string", minLength: 1, maxLength: 255 },
+                    zip_base64: { type: "string", minLength: 1, maxLength: 900_000 },
+                    requests: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 1000,
+                      items: { type: "string", minLength: 1, maxLength: 80 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "ZIP dos XML selecionados, CSV e relatório da seleção",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou ZIP ilegível" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
+      "/fiscal/conferences/sefaz-xml": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Conferir CSV SEFAZ contra XML NF-e",
+          description:
+            "Recebe a planilha CSV da SEFAZ (até 300 mil caracteres; colunas de chave ou emitente/modelo/série/número, e opcionais Situação e Valor) e um ZIP de XML NF-e (base64, até ~450 kB). Pareia pela chave de acesso quando os dois lados têm, senão por emitente + modelo + série + número, e informa a chave usada (match_key). Separa matched, divergent (valor ou chave), only_sefaz e only_xml (ausência real), duplicates (sem correspondência automática), not_comparable (situação não autorizada na planilha ou protocolo com cStat diferente de 100/150), discarded e errors por linha/arquivo, com totais e o CSV do resultado (campo csv). Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["sefaz", "xml"],
+                  additionalProperties: false,
+                  properties: {
+                    sefaz: {
+                      type: "object",
+                      required: ["file_name", "content"],
+                      additionalProperties: false,
+                      properties: {
+                        file_name: { type: "string", minLength: 1, maxLength: 255 },
+                        content: { type: "string", minLength: 1, maxLength: 300_000 },
+                      },
+                    },
+                    xml: {
+                      type: "object",
+                      required: ["file_name", "zip_base64"],
+                      additionalProperties: false,
+                      properties: {
+                        file_name: { type: "string", minLength: 1, maxLength: 255 },
+                        zip_base64: { type: "string", minLength: 1, maxLength: 600_000 },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Resultado da conferência SEFAZ × XML com file_name e csv",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": {
+              description: "Entrada inválida, planilha sem formato reconhecível ou ZIP ilegível",
+            },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
+      "/fiscal/conferences/sped-xml": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Conferir SPED C100/C170 contra XML NF-e",
+          description:
+            "Recebe o arquivo SPED EFD ICMS/IPI (texto |REG|...|, até 300 mil caracteres; usa 0000, 0150, C100 e C170) e um ZIP de XML NF-e (base64, até ~450 kB). Cada C170 pertence ao C100 anterior; C170 fora de um C100 é erro e nunca vai para outro documento. C100 × NF-e pela chave de acesso ou por emitente (0000/0150) + modelo + série + número; itens C170 × det pelo número do item dentro da mesma nota (código e CFOP só na emissão própria). Devolve documentos matched/divergent (com a comparação de itens), only_sped, only_xml, duplicates, not_comparable (COD_SIT cancelado/denegado/inutilizado, modelo sem NF-e ou protocolo não autorizado), errors de leiaute por linha e descartes, totais e o CSV (campo csv). Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["sped", "xml"],
+                  additionalProperties: false,
+                  properties: {
+                    sped: {
+                      type: "object",
+                      required: ["file_name", "content"],
+                      additionalProperties: false,
+                      properties: {
+                        file_name: { type: "string", minLength: 1, maxLength: 255 },
+                        content: { type: "string", minLength: 1, maxLength: 300_000 },
+                      },
+                    },
+                    xml: {
+                      type: "object",
+                      required: ["file_name", "zip_base64"],
+                      additionalProperties: false,
+                      properties: {
+                        file_name: { type: "string", minLength: 1, maxLength: 255 },
+                        zip_base64: { type: "string", minLength: 1, maxLength: 600_000 },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Resultado da conferência SPED × XML com file_name e csv",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida, arquivo sem C100 ou ZIP ilegível" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
+      "/fiscal/conferences/xml-taxes": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Somar IPI e ICMS ST de XML NF-e",
+          description:
+            "Recebe um ZIP de XML NF-e (base64, até ~650 kB) e soma, em centavos inteiros, o vIPI (grupo IPI) e o vICMSST destacado (grupo ICMS) de cada item; ST retida anteriormente (vICMSSTRet) e FCP ST não entram. Nota cancelada por evento 110111 presente no ZIP fica fora da soma; nota sem protocolo é somada com aviso em warnings. Devolve totals (ipi, icms_st, notes, items), a composição por nota e item (notes, com differences quando a soma dos itens não bate com vIPI/vST do ICMSTot), excluded (XML repetido com conteúdo diferente ou protocolo não autorizado, fora da soma), errors (XML inválido ou valor fora do formato), discarded (não XML/NF-e, cópia idêntica) e o CSV (campo csv). status partial com XML inválido, duplicado ou ZIP sem NF-e. Nada é gravado; não é apuração tributária.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["file_name", "zip_base64"],
+                  additionalProperties: false,
+                  properties: {
+                    file_name: { type: "string", minLength: 1, maxLength: 255 },
+                    zip_base64: { type: "string", minLength: 1, maxLength: 900_000 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Totais de IPI e ICMS ST com composição, exclusões e CSV",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou ZIP ilegível" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
+      "/fiscal/conferences/ipi-spreadsheets": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Conferir IPI entre duas planilhas",
+          description:
+            "Recebe duas planilhas CSV (first e second; separador ; , ou tab; até 450 mil caracteres cada) com colunas de identidade (chave de acesso ou emitente/modelo/série/número) e uma coluna de IPI (ex.: Valor IPI). Pareia as notas pela identidade e devolve matched, divergent (IPI diferente, com difference = planilha 2 − planilha 1 em centavos), only_first, only_second, duplicates (sem correspondência automática; cada planilha deve ter uma linha por nota, linhas por item viram duplicata), not_comparable (nota com IPI vazio ou ilegível em alguma planilha), discarded e errors por linha, totais de cada planilha e da diferença e o CSV (campo csv; diferença negativa em formato contábil, ex.: (0,80)). status partial com descarte, erro ou duplicata. Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["first", "second"],
+                  additionalProperties: false,
+                  properties: Object.fromEntries(
+                    ["first", "second"].map((source) => [
+                      source,
+                      {
+                        type: "object",
+                        required: ["file_name", "content"],
+                        additionalProperties: false,
+                        properties: {
+                          file_name: { type: "string", minLength: 1, maxLength: 255 },
+                          content: { type: "string", minLength: 1, maxLength: 450_000 },
+                        },
+                      },
+                    ]),
+                  ),
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Resultado da conferência de IPI com file_name e csv",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou planilha sem identidade ou coluna de IPI" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
+      "/fiscal/conferences/invoice-pdfs": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Somar totais de faturas em PDF",
+          description:
+            "Recebe até 50 PDFs em base64 (files; até ~650 kB somados). Formato suportado (devolvido em supported_format): um total por PDF; PDF com camada de texto (gerado por sistema, não escaneado), sem senha, conteúdo sem filtro ou FlateDecode, fontes padrão ou com mapa ToUnicode, inclusive em Form XObject; até 500 páginas e 20 MB descompactados. Em cada PDF procura o total pelos rótulos Total a pagar, Total da fatura, Total da nota, Total geral, Total do documento, Valor total (exceto subtotais como dos produtos ou dos tributos), Valor a pagar, Valor da fatura, Valor cobrado e Valor do documento (valor na mesma linha ou na seguinte; negativo por sinal ou parênteses) e soma em centavos as faturas com um único valor. Rótulos em cabeçalho de tabela tornam a fatura ambígua; página sem texto legível ou fatura com o mesmo conteúdo de outra deixam o arquivo como não processado. Devolve invoices (valor, página, rótulo e linha de origem), ambiguous (totais diferentes na mesma fatura, fora da soma), not_processed (PDF ilegível, sem total ou repetido), totals, supported_format e o CSV (campo csv). status partial quando há fatura fora da soma. Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["files"],
+                  additionalProperties: false,
+                  properties: {
+                    files: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 50,
+                      items: {
+                        type: "object",
+                        required: ["file_name", "content_base64"],
+                        additionalProperties: false,
+                        properties: {
+                          file_name: { type: "string", minLength: 1, maxLength: 255 },
+                          content_base64: { type: "string", minLength: 1 },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description:
+                "Total das faturas com a origem de cada valor, ambiguidades e não processados",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida" },
+            "403": { description: "Sem permissão de edição Fiscal" },
           },
         },
       },

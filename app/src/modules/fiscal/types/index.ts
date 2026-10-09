@@ -8,7 +8,8 @@ export type FiscalTabId =
   | "icms"
   | "ipi"
   | "rates"
-  | "revenues";
+  | "revenues"
+  | "conferences";
 
 export interface FiscalNcm {
   id: string;

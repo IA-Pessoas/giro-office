@@ -37,6 +37,41 @@ function loadEnvFile(filePath) {
 loadEnvFile(path.join(rootDir, "services", "gateway", ".env"));
 loadEnvFile(path.join(rootDir, ".env"));
 
+/** ZIP de um arquivo sem compressão (método 0), para o smoke da seleção de XML. */
+function storedZip(fileName, body) {
+  let crc = 0xffffffff;
+  for (const byte of body) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  crc = (crc ^ 0xffffffff) >>> 0;
+  const name = Buffer.from(fileName, "utf8");
+  const local = Buffer.alloc(30 + name.length);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt32LE(crc, 14);
+  local.writeUInt32LE(body.length, 18);
+  local.writeUInt32LE(body.length, 22);
+  local.writeUInt16LE(name.length, 26);
+  name.copy(local, 30);
+  const central = Buffer.alloc(46 + name.length);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(20, 4);
+  central.writeUInt16LE(20, 6);
+  central.writeUInt32LE(crc, 16);
+  central.writeUInt32LE(body.length, 20);
+  central.writeUInt32LE(body.length, 24);
+  central.writeUInt16LE(name.length, 28);
+  name.copy(central, 46);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(central.length, 12);
+  end.writeUInt32LE(local.length + body.length, 16);
+  return Buffer.concat([local, body, central, end]);
+}
+
 const { manifest } = await import(
   pathToFileURL(path.join(__dirname, "all-services-smoke.manifest.mjs")).href
 );
@@ -4829,6 +4864,204 @@ const handlers = {
     if (!isBadExpectation(op) && !Array.isArray(response.body?.data?.skipped)) {
       throw new Error(`ZIP do Simples sem resultado: ${JSON.stringify(response.body?.data)}`);
     }
+  },
+
+  async fiscalDocumentConference(op) {
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor";
+    const response = await httpRequest(op, {
+      json: {
+        dominio: { file_name: "dominio.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+        sefaz: { file_name: "sefaz.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(
+        `Conferência Domínio × SEFAZ inesperada: ${JSON.stringify(response.body?.data)}`,
+      );
+    }
+  },
+
+  async fiscalDocumentConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        dominio: { file_name: "dominio.csv", content: "Número;Valor\n100;10,00" },
+        sefaz: { file_name: "sefaz.csv", content: "Número;Valor\n100;10,00" },
+      },
+    });
+  },
+
+  async fiscalXmlSelection(op) {
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit></infNFe></NFe>";
+    const response = await httpRequest(op, {
+      json: {
+        file_name: "notas.zip",
+        zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+        requests: ["100"],
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.selected?.length !== 1) {
+      throw new Error(`Seleção de XML inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalXmlSelectionInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { file_name: "notas.zip", zip_base64: "bm9wZQ==", requests: ["100"] },
+    });
+  },
+
+  async fiscalSefazXmlConference(op) {
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><total><ICMSTot><vNF>10.00</vNF></ICMSTot></total></infNFe></NFe>";
+    const response = await httpRequest(op, {
+      json: {
+        sefaz: {
+          file_name: "sefaz.csv",
+          content: "CNPJ Emitente;Modelo;Série;Número;Valor\n11222333000181;55;1;100;10,00",
+        },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+        },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(`Conferência SEFAZ × XML inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSefazXmlConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        sefaz: { file_name: "sefaz.csv", content: "Número;Valor\n100;10,00" },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from("<NFe/>")).toString("base64"),
+        },
+      },
+    });
+  },
+
+  async fiscalSpedXmlConference(op) {
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd><CFOP>5102</CFOP><qCom>1</qCom><vProd>10.00</vProd></prod></det><total><ICMSTot><vNF>10.00</vNF></ICMSTot></total></infNFe></NFe>';
+    const response = await httpRequest(op, {
+      json: {
+        sped: {
+          file_name: "sped.txt",
+          content: [
+            "|0000|017|0|01082026|31082026|EMPRESA|11222333000181||SP|",
+            "|C100|0|0||55|00|1|100||01082026|01082026|10,00|",
+            "|C170|1|A||1|UN|10,00|0|0|000|5102|",
+          ].join("\n"),
+        },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+        },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(`Conferência SPED × XML inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSpedXmlConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        sped: { file_name: "sped.txt", content: "|0000|017|" },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from("<NFe/>")).toString("base64"),
+        },
+      },
+    });
+  },
+
+  async fiscalXmlTaxTotals(op) {
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd></prod><imposto><IPI><IPITrib><vIPI>1.10</vIPI></IPITrib></IPI></imposto></det></infNFe></NFe>';
+    const response = await httpRequest(op, {
+      json: {
+        file_name: "xml.zip",
+        zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.totals?.ipi !== "1.10") {
+      throw new Error(`Totais de IPI/ICMS ST inesperados: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalXmlTaxTotalsInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { file_name: "xml.zip", zip_base64: "bm9wZQ==" },
+    });
+  },
+
+  async fiscalIpiSpreadsheetConference(op) {
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor IPI";
+    const response = await httpRequest(op, {
+      json: {
+        first: { file_name: "a.csv", content: `${header}\n11222333000181;55;1;100;1,00` },
+        second: { file_name: "b.csv", content: `${header}\n11222333000181;55;1;100;1,00` },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(`Conferência de IPI inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalIpiSpreadsheetConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        first: {
+          file_name: "a.csv",
+          content: "CNPJ Emitente;Modelo;Série;Número\n11222333000181;55;1;100",
+        },
+        second: {
+          file_name: "b.csv",
+          content: "CNPJ Emitente;Modelo;Série;Número\n11222333000181;55;1;100",
+        },
+      },
+    });
+  },
+
+  async fiscalInvoicePdfTotals(op) {
+    // PDF mínimo de uma página (Helvetica, sem compressão) com o total da fatura.
+    const content = "BT /F1 12 Tf 50 700 Td (Total a pagar R$ 10,00) Tj ET";
+    const pdf = [
+      "%PDF-1.4",
+      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+      "3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj",
+      `4 0 obj << /Length ${content.length} >>\nstream\n${content}\nendstream endobj`,
+      "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+      "trailer << /Root 1 0 R >>",
+    ].join("\n");
+    const response = await httpRequest(op, {
+      json: {
+        files: [
+          {
+            file_name: "fatura.pdf",
+            content_base64: Buffer.from(pdf, "latin1").toString("base64"),
+          },
+        ],
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.totals?.value !== "10.00") {
+      throw new Error(`Total de faturas em PDF inesperado: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalInvoicePdfTotalsInvalid(op) {
+    await httpRequest(op, { expectedStatus: [400], json: { files: [] } });
   },
 
   async fiscalSimplesZipInvalid(op) {

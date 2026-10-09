@@ -345,6 +345,140 @@ await runTest("fiscal Simples batch parses pasted documents and exports CSV for 
   assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });
 
+await runTest("fiscal Domínio × SEFAZ conference reads files and shows partial results", async () => {
+  const { readSpreadsheetText } = await import("./utils/readSpreadsheetText.ts");
+  assert.equal(await readSpreadsheetText(new File(["Série;Número"], "a.csv")), "Série;Número");
+  // Exportação em Windows-1252: "é" é o byte 0xE9, inválido em UTF-8.
+  assert.equal(await readSpreadsheetText(new File([Uint8Array.of(0x53, 0xe9, 0x72)], "b.csv")), "Sér");
+
+  const section = await readSource("./components/FiscalConferencesSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /id: "conferences",\s*label: "Conferências"/);
+  assert.match(fiscalSources.shell, /<FiscalConferencesSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/documents", \{/);
+  // Viewer não executa; resultado parcial vira alerta, nunca "completo".
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /exige permissão de edição no Fiscal/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  // Arquivo acima do teto do gateway é barrado antes do envio.
+  assert.match(section, /const MAX_FILE_BYTES = 450_000;/);
+  assert.match(section, /size \?\? 0\) > MAX_FILE_BYTES/);
+  assert.match(section, /catch \(error\) \{\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
+});
+
+await runTest("fiscal XML selection parses requests, encodes the ZIP and shows ambiguous items", async () => {
+  const { fileToBase64, parseNoteRequests } = await import("./utils/xmlSelection.ts");
+  assert.deepEqual(parseNoteRequests(" 100\r\n\n11.222.333/0001-81;1;101, 2;7 \n"), [
+    "100",
+    "11.222.333/0001-81;1;101",
+    "2;7",
+  ]);
+  const bytes = Uint8Array.from({ length: 70_000 }, (_, index) => index % 256);
+  assert.equal(await fileToBase64(new Blob([bytes])), Buffer.from(bytes).toString("base64"));
+
+  const section = await readSource("./components/FiscalXmlSelectionSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalXmlSelectionSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/xml-selection", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Só oferece o ZIP quando o servidor selecionou algo; o relatório sempre pode ser baixado.
+  assert.match(section, /\{result\.zip_base64 \? \(/);
+  assert.match(section, /Baixar relatório CSV/);
+  assert.match(section, /const MAX_ZIP_BYTES = 650_000;/);
+});
+
+await runTest("fiscal SEFAZ × XML conference posts both files and separates situations", async () => {
+  const section = await readSource("./components/FiscalSefazXmlSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalSefazXmlSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/sefaz-xml", \{/);
+  assert.match(client, /zip_base64: zipBase64/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Chave usada visível por par; não comparável separado de ausência.
+  assert.match(section, /<th className="px-4 py-2">Chave usada<\/th>/);
+  assert.match(section, /"Não comparável"/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  assert.match(section, /const MAX_ZIP_BYTES = 450_000;/);
+  // Ordem da tabela igual à do CSV exportado: Coincidente primeiro.
+  assert.match(section, /const SITUATIONS = \[\s*"Coincidente",/);
+  assert.match(section, /return \[\s*\.\.\.result\.matched\.map/);
+  assert.match(section, /Identidade: \{result\.identity_rule\}/);
+});
+
+await runTest("fiscal SPED × XML conference keeps items under their document", async () => {
+  const section = await readSource("./components/FiscalSpedXmlSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalSpedXmlSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/sped-xml", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Linha do documento seguida dos itens dele, na ordem do CSV.
+  assert.match(section, /list\.flatMap\(\(pair\) => \[\s*\{ level: "Documento"/);
+  assert.match(section, /\.\.\.pair\.items\.map\(\(item\) => \(\{ level: "Item"/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  assert.match(section, /const MAX_SPED_BYTES = 300_000;/);
+});
+
+await runTest("fiscal IPI/ICMS ST totals show composition and excluded XML", async () => {
+  const section = await readSource("./components/FiscalXmlTaxesSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalXmlTaxesSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/xml-taxes", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Nota seguida dos itens que compõem o valor; excluídos visíveis, fora da soma.
+  assert.match(section, /result\.notes\.flatMap\(\(note\) => \[/);
+  assert.match(section, /result\.excluded\.map/);
+  assert.match(section, /Não é apuração de imposto/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});
+
+await runTest("fiscal money formatting avoids floating point", async () => {
+  const { formatMoney } = await import("./utils/formatMoney.ts");
+  assert.equal(formatMoney("99999999999.99"), "R$ 99.999.999.999,99");
+  assert.equal(formatMoney("0.30"), "R$ 0,30");
+  assert.equal(formatMoney("-1234.5"), "-R$ 1.234,50");
+  assert.equal(formatMoney(null), "—");
+  assert.equal(formatMoney(null, "sem valor"), "sem valor");
+  for (const name of ["FiscalConferencesSection", "FiscalSefazXmlSection", "FiscalSpedXmlSection", "FiscalXmlTaxesSection"]) {
+    const source = await readSource(`./components/${name}.tsx`);
+    assert.doesNotMatch(source, /Intl\.NumberFormat/);
+    assert.match(source, /formatMoney\(value/);
+  }
+});
+
+await runTest("fiscal IPI spreadsheet conference shows each source and the difference", async () => {
+  const section = await readSource("./components/FiscalIpiSpreadsheetSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalIpiSpreadsheetSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/ipi-spreadsheets", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  assert.match(section, /Diferença \(2 − 1\)/);
+  assert.match(section, /formatMoney\(pair\.difference\)/);
+  assert.match(section, /IPI vazio aparece como erro, não como zero/);
+  assert.match(section, /result\.not_comparable\.map/);
+  assert.match(section, /uma linha por nota/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});
+
+await runTest("fiscal invoice PDF totals show origin, ambiguous and unprocessed files", async () => {
+  const section = await readSource("./components/FiscalInvoicePdfSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalInvoicePdfSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/invoice-pdfs", \{ files: payload \}\)/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  assert.match(section, /Formato suportado: \{result\.supported_format\}/);
+  assert.match(section, /\{invoice\.origin\.page\}/);
+  assert.match(section, /invoice\.occurrences > 1/);
+  assert.match(section, /result\.not_processed\.map/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});
+
 await runTest("fiscal control reopening needs level 3 and a reason", async () => {
   const { fiscalControlStatusChange, FISCAL_CONTROL_STATUS_LABELS } = await import(
     "./utils/fiscalControl.ts"

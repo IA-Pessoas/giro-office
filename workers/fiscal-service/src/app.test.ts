@@ -1,3 +1,4 @@
+import { createZip } from "@workspace/shared";
 import { ServiceError } from "@workspace/shared/http";
 import { describe, expect, it, vi } from "vitest";
 import { createFiscalWorkerApp, type FiscalWorkerEnv } from "./app.js";
@@ -187,6 +188,221 @@ describe("fiscal Worker", () => {
     });
     expect(readerZip.status).toBe(403);
     expect(simples.batch).toHaveBeenCalledTimes(2);
+  });
+
+  it("confere planilhas Domínio × SEFAZ sem banco e só com edição Fiscal", async () => {
+    // Sem HYPERDRIVE/DATABASE_URL: qualquer acesso a dados operacionais responderia 503.
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor";
+    const body = {
+      dominio: { file_name: "d.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+      sefaz: { file_name: "s.csv", content: `${header}\n11222333000181;55;1;100;10,50` },
+    };
+    const post = (headers: HeadersInit, payload: unknown = body) =>
+      app.request("https://fiscal.test/fiscal/conferences/documents", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { status: string; summary: { divergent: number }; csv: string; file_name: string };
+    };
+    expect(payload.data).toMatchObject({ status: "complete", summary: { divergent: 1 } });
+    expect(payload.data.csv).toContain("Divergente;11222333000181|55|1|100;2;10,00;2;10,50");
+
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+    expect(
+      (await post(gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) }))).status,
+    ).toBe(403);
+    const invalid = await post(gatewayHeaders(), {
+      ...body,
+      sefaz: { file_name: "s.csv", content: "Número\n100" },
+    });
+    expect(invalid.status).toBe(400);
+  });
+
+  it("seleciona XML de notas em ZIP sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CPF>12345678909</CPF></emit></infNFe></NFe>";
+    const body = {
+      file_name: "notas.zip",
+      zip_base64: createZip([{ fileName: "n.xml", body: Buffer.from(nfe) }]).toString("base64"),
+      requests: ["7", "8"],
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/xml-selection", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { status: string; selected: { entry: string }[]; not_found: { request: string }[] };
+    };
+    expect(payload.data).toMatchObject({
+      status: "partial",
+      selected: [{ entry: "n.xml" }],
+      not_found: [{ request: "8" }],
+    });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("confere CSV SEFAZ contra XML sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><total><ICMSTot><vNF>9.90</vNF></ICMSTot></total></infNFe></NFe>";
+    const body = {
+      sefaz: {
+        file_name: "s.csv",
+        content:
+          "CNPJ Emitente;Modelo;Série;Número;Valor\n11222333000181;55;1;7;9,90\n11222333000181;55;1;8;1,00",
+      },
+      xml: {
+        file_name: "x.zip",
+        zip_base64: createZip([{ fileName: "7.xml", body: Buffer.from(nfe) }]).toString("base64"),
+      },
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/sefaz-xml", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { summary: { matched: number; only_sefaz: number }; csv: string };
+    };
+    expect(payload.data.summary).toMatchObject({ matched: 1, only_sefaz: 1 });
+    expect(payload.data.csv).toContain("Só SEFAZ;11222333000181|55|1|8");
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("confere SPED C100/C170 contra XML sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd><CFOP>5102</CFOP><qCom>2</qCom><vProd>5.00</vProd></prod></det><total><ICMSTot><vNF>5.00</vNF></ICMSTot></total></infNFe></NFe>';
+    const body = {
+      sped: {
+        file_name: "sped.txt",
+        content:
+          "|0000|017|0|01082026|31082026|EMPRESA|11222333000181||SP|\n|C100|0|0||55|00|1|7||01082026|01082026|5,00|\n|C170|1|A||1|UN|5,00|0|0|000|5102|",
+      },
+      xml: {
+        file_name: "x.zip",
+        zip_base64: createZip([{ fileName: "7.xml", body: Buffer.from(nfe) }]).toString("base64"),
+      },
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/sped-xml", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { summary: { divergent: number; items_divergent: number }; csv: string };
+    };
+    expect(payload.data.summary).toMatchObject({ divergent: 1, items_divergent: 1 });
+    expect(payload.data.csv).toContain("Quantidade: SPED 1 × XML 2");
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("soma IPI e ICMS ST de XML sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd></prod><imposto><ICMS><ICMS10><vICMSST>0.30</vICMSST></ICMS10></ICMS><IPI><IPITrib><vIPI>0.10</vIPI></IPITrib></IPI></imposto></det><det nItem="2"><prod><cProd>B</cProd></prod><imposto><IPI><IPITrib><vIPI>0.20</vIPI></IPITrib></IPI></imposto></det></infNFe></NFe>';
+    const body = {
+      file_name: "x.zip",
+      zip_base64: createZip([{ fileName: "7.xml", body: Buffer.from(nfe) }]).toString("base64"),
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/xml-taxes", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as { data: { totals: { ipi: string; icms_st: string } } };
+    // 0.10 + 0.20 sem erro de ponto flutuante.
+    expect(payload.data.totals).toMatchObject({ ipi: "0.30", icms_st: "0.30" });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("confere IPI entre planilhas sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor IPI";
+    const body = {
+      first: {
+        file_name: "a.csv",
+        content: `${header}\n11222333000181;55;1;7;0,10\n11222333000181;55;1;8;0,20`,
+      },
+      second: {
+        file_name: "b.csv",
+        content: `${header}\n11222333000181;55;1;7;0,10\n11222333000181;55;1;8;0,20`,
+      },
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/ipi-spreadsheets", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as { data: { status: string; totals: { first: string } } };
+    expect(payload.data).toMatchObject({ status: "complete", totals: { first: "0.30" } });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
+  it("soma totais de faturas em PDF sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const content = "BT /F1 12 Tf 50 700 Td (Fatura 1) Tj 0 -20 Td (Valor total R$ 12,34) Tj ET";
+    const pdf = [
+      "%PDF-1.4",
+      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+      "3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj",
+      `4 0 obj << /Length ${content.length} >>\nstream\n${content}\nendstream endobj`,
+      "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+      "trailer << /Root 1 0 R >>",
+    ].join("\n");
+    const body = {
+      files: [
+        { file_name: "f.pdf", content_base64: Buffer.from(pdf, "latin1").toString("base64") },
+      ],
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/invoice-pdfs", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as { data: { totals: { value: string; invoices: number } } };
+    expect(payload.data.totals).toEqual({ value: "12.34", invoices: 1 });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
   });
 
   it("controle mensal: lista com reconciliação, abre e altera no tenant, leitura sem escrita", async () => {
