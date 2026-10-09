@@ -1863,7 +1863,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Antecipações"],
           summary: "Importar ZIP de XML NF-e em lote de antecipações",
           description:
-            "Cria um lote pendente de revisão (status pending_review) para cliente e competência, com um item por det das NF-e e a origem (arquivo, chave de acesso, número do item). Duplicata de chave de acesso + item no próprio ZIP (versões diferentes da mesma nota) ou já importada para o mesmo cliente em qualquer lote da organização não entra e aparece em issues (kind duplicate); XML inválido, NF-e sem chave, cancelada ou não autorizada aparece como error; arquivo que não é NF-e, como discarded. ZIP sem nenhum item importável devolve 400 e não cria lote. Não calcula imposto nem emite guia.",
+            "Cria um lote pendente de revisão (status pending_review) para cliente e competência, com um item por det das NF-e e a origem (arquivo, chave de acesso, número do item). Duplicata de chave de acesso + item no próprio ZIP (versões diferentes da mesma nota) ou já importada em qualquer lote da organização (qualquer cliente) não entra: a nota inteira fica de fora e aparece em issues (kind duplicate); XML inválido, NF-e sem chave, cancelada ou não autorizada aparece como error; arquivo que não é NF-e, como discarded. ZIP sem nenhum item importável devolve 400 e não cria lote. Não calcula imposto nem emite guia.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
