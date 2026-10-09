@@ -1,7 +1,7 @@
+import { formatBrlAmount } from "@shared/utils/inputFormatting";
 import type { ContingencySimulation } from "../services/contabilContingencyService";
 
-const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const money = (cents: number) => currency.format(cents / 100);
+const money = (cents: number) => formatBrlAmount(cents / 100);
 const hypotheses: Record<string, string> = {
   declaredRevenue: "Faturamento informado no balancete.",
   bankReceipts: "Total de recebimentos bancários usado na comparação.",

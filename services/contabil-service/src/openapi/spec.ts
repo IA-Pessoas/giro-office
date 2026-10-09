@@ -1,5 +1,6 @@
 import { MAX_REPORTING_QUERY_LIMIT, reportingQueryOpenApiSchema } from "@workspace/shared";
 import type { OpenApiDocument } from "@workspace/shared/http";
+import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 
 import type { ContabilServiceEnv } from "../config/env.js";
 import { TRIAGE_CATALOG_CODE_MAX_LENGTH } from "../constants/triageDocuments.js";
@@ -215,7 +216,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               required: true,
               schema: {
                 type: "string",
-                enum: ["Simples Nacional", "Lucro Presumido", "Lucro Real"],
+                enum: [...TAX_REGIME_OPTIONS],
               },
             },
             {
