@@ -115,6 +115,9 @@ export type DocumentsService = {
   getOrCreateMonthly(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   updateItem(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   updateAll(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  updateMonthly(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  getConfig(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  saveConfig(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   listStatements(input: JsonRecord, organizationId: string): Promise<unknown[]>;
   upsertStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   archiveStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
@@ -779,15 +782,52 @@ function validStatus(value: unknown): value is TriageDocumentStatus {
   return typeof value === "string" && (triageDocumentStatuses as readonly string[]).includes(value);
 }
 
+// Estados gravados pelo sistema legado (`TriageStatus`): vazio é pendente.
+const LEGACY_DOCUMENT_STATUSES: Record<string, TriageDocumentStatus> = {
+  "": "PENDING",
+  "nao possui": "NOT_PRESENT",
+  atenção: "ATTENTION",
+  atencao: "ATTENTION",
+  concluido: "COMPLETED",
+};
+
+function documentStatus(value: unknown): TriageDocumentStatus {
+  if (validStatus(value)) return value;
+  if (typeof value === "string" && Object.hasOwn(LEGACY_DOCUMENT_STATUSES, value))
+    return LEGACY_DOCUMENT_STATUSES[value] as TriageDocumentStatus;
+  // Item ausente do checklist legado não fazia parte do movimento; o legado ainda deixava
+  // gravá-lo depois, então segue editável (sem `required: false`).
+  return "NOT_APPLICABLE";
+}
+
 function checklist(
   value: unknown,
   fields: readonly string[],
 ): Record<string, TriageDocumentStatus> {
   const source =
     value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
-  return Object.fromEntries(
-    fields.map((field) => [field, validStatus(source[field]) ? source[field] : "NOT_APPLICABLE"]),
-  ) as Record<string, TriageDocumentStatus>;
+  return Object.fromEntries(fields.map((field) => [field, documentStatus(source[field])]));
+}
+
+/**
+ * Item desativado no movimento padrão do cliente (fora de `active_items` na criação da
+ * rotina contábil). Na Fiscal, `required: false` só marca item opcional e segue editável.
+ */
+function disabledItem(notes: JsonRecord, field: string, type: "CONTABIL" | "FISCAL"): boolean {
+  return type === "CONTABIL" && jsonObject(notes[field]).required === false;
+}
+
+/** Itens contábeis ativos de `active_items` (nomes ou `{ field }`), na ordem do checklist. */
+function activeContabilFields(value: unknown): string[] {
+  const configured = initialItems(value);
+  return triageDocumentFields.filter(
+    (field) => jsonObject(configured[field]).required !== false && field in configured,
+  );
+}
+
+function dateOnly(value: unknown): Date | null | undefined {
+  if (value === undefined || value === null) return value;
+  return new Date(`${String(value)}T00:00:00.000Z`);
 }
 
 function itemNotes(value: unknown, fields: readonly string[]): JsonRecord {
@@ -1225,41 +1265,43 @@ export function createDocumentsService(
             const existing = await transaction.triageMonthly.findFirst({ where: identity });
             if (existing) return existing;
             await canEdit(transaction, String(input.client_id), auth, type);
-            let configured: JsonRecord = {};
-            if (type === "FISCAL") {
-              const competence = await transaction.triageCompetence.findFirst({
-                where: {
-                  client_id: input.client_id,
-                  competence: input.competence,
-                  organization_id: auth.organizationId,
-                  archived_at: null,
-                },
-                select: { configuration_snapshot: true },
-              });
-              if (!competence)
-                throw new ServiceError(
-                  409,
-                  "Crie a competência fiscal antes de iniciar a rotina mensal.",
-                );
-              const snapshot = competence.configuration_snapshot;
-              const configs =
-                snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)
-                  ? (snapshot as JsonRecord).configs
-                  : undefined;
-              const fiscal = Array.isArray(configs)
-                ? (configs.find(
-                    (item) =>
-                      item && typeof item === "object" && (item as JsonRecord).type === "FISCAL",
-                  ) as JsonRecord | undefined)
-                : undefined;
-              configured = initialItems(fiscal?.active_items);
-            } else {
-              const config = await transaction.triageConfig.findFirst({
-                where: { client_id: input.client_id, organization_id: auth.organizationId, type },
-                select: { active_items: true },
-              });
-              configured = initialItems(config?.active_items);
-            }
+            const competence = await transaction.triageCompetence.findFirst({
+              where: {
+                client_id: input.client_id,
+                competence: input.competence,
+                organization_id: auth.organizationId,
+                archived_at: null,
+              },
+              select: { configuration_snapshot: true },
+            });
+            if (type === "FISCAL" && !competence)
+              throw new ServiceError(
+                409,
+                "Crie a competência fiscal antes de iniciar a rotina mensal.",
+              );
+            // Com competência aberta vale o movimento padrão congelado nela; sem, o atual.
+            // Snapshot sem a config da rotina (competência aberta antes do padrão) usa o atual.
+            const configs = jsonObject(competence?.configuration_snapshot).configs;
+            const config =
+              (Array.isArray(configs)
+                ? configs.map(jsonObject).find((item) => item.type === type)
+                : undefined) ??
+              (type === "CONTABIL"
+                ? await transaction.triageConfig.findFirst({
+                    where: {
+                      client_id: input.client_id,
+                      organization_id: auth.organizationId,
+                      type,
+                    },
+                    select: { active_items: true },
+                  })
+                : undefined);
+            const configured = initialItems(config?.active_items);
+            // Sem movimento padrão nenhum item é desativado: a rotina segue editável como antes.
+            const unconfigured =
+              type === "CONTABIL" && config
+                ? { note: null, justification: null, required: false }
+                : { note: null, justification: null };
             const fields = type === "FISCAL" ? triageFiscalFields : triageDocumentFields;
             const checklistValue = Object.fromEntries(
               fields.map((field) => {
@@ -1272,10 +1314,7 @@ export function createDocumentsService(
               }),
             );
             const notes = Object.fromEntries(
-              fields.map((field) => [
-                field,
-                configured[field] ?? { note: null, justification: null },
-              ]),
+              fields.map((field) => [field, configured[field] ?? unconfigured]),
             );
             const values = Object.values(notes) as JsonRecord[];
             await assertActiveCatalogItems(
@@ -1391,6 +1430,8 @@ export function createDocumentsService(
             type === "FISCAL" ? triageFiscalFields.slice(0, -1) : fields,
           );
           const currentNotes = itemNotes(current.item_notes, fields);
+          if (!billing && disabledItem(currentNotes, field, type))
+            throw new ServiceError(409, "Item desativado no movimento padrão do cliente.");
           const nextNotes = {
             ...currentNotes,
             [field]: {
@@ -1439,13 +1480,16 @@ export function createDocumentsService(
           if (!current) throw new ServiceError(404, "Pendência documental mensal não encontrada.");
           await canEdit(transaction, String(current.client_id), auth, type);
           const values = checklist(current.checklist, fields);
+          const notes = itemNotes(current.item_notes, fields);
           const updated = await transaction.triageMonthly.update({
             where: { id },
             data: {
               checklist: Object.fromEntries(
                 fields.map((field) => [
                   field,
-                  values[field] === "NOT_APPLICABLE" ? values[field] : input.status,
+                  values[field] === "NOT_APPLICABLE" || disabledItem(notes, field, type)
+                    ? values[field]
+                    : input.status,
                 ]),
               ),
               updated_at: new Date(),
@@ -1467,6 +1511,122 @@ export function createDocumentsService(
         updatedData: changed.updated,
       });
       return monthlyDto(changed.updated, type);
+    },
+    async updateMonthly(id, input, auth) {
+      const type = routineType(input.type);
+      const notes = normalizeOptionalNote(input.notes, "Observação da rotina");
+      const justification = normalizeOptionalCatalogCode(
+        input.justification,
+        "Justificativa da rotina",
+      );
+      const responsibleId =
+        input.responsible_id === undefined || input.responsible_id === null
+          ? input.responsible_id
+          : String(input.responsible_id);
+      const result = await prisma.$transaction(
+        async (transaction) => {
+          await lock(transaction, `triagem.monthly:${id}`);
+          const current = await transaction.triageMonthly.findFirst({
+            where: { id, organization_id: auth.organizationId, type, archived_at: null },
+          });
+          if (!current) throw new ServiceError(404, "Pendência documental mensal não encontrada.");
+          await canEdit(transaction, String(current.client_id), auth, type);
+          if (responsibleId) {
+            const user = await transaction.user.findFirst({
+              where: { id: responsibleId, organization_id: auth.organizationId },
+              select: { id: true },
+            });
+            if (!user) throw new ServiceError(400, "Responsável não encontrado na organização.");
+          }
+          await assertActiveCatalogItems(
+            transaction,
+            "JUSTIFICATION",
+            [justification],
+            auth.organizationId,
+            String(current.client_id),
+            String(current.competence),
+          );
+          const data: JsonRecord = {
+            ...(typeof input.triad_moviment === "boolean"
+              ? { triad_moviment: input.triad_moviment }
+              : {}),
+            ...(notes !== undefined ? { notes } : {}),
+            ...(justification !== undefined ? { justification } : {}),
+            ...(responsibleId !== undefined ? { responsible_id: responsibleId } : {}),
+            ...(input.download_date !== undefined
+              ? { download_date: dateOnly(input.download_date) }
+              : {}),
+            ...(input.settlement_date !== undefined
+              ? { settlement_date: dateOnly(input.settlement_date) }
+              : {}),
+          };
+          await resetRlsRole(transaction);
+          const updated = await transaction.triageMonthly.update({
+            where: { id },
+            data: { ...data, updated_at: new Date() },
+          });
+          return { current, updated };
+        },
+        { isolationLevel: "Serializable" },
+      );
+      const changed = result as { current: JsonRecord; updated: JsonRecord };
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Atualizar movimento mensal da triagem",
+        referring: "triagem.monthly",
+        referringId: id,
+        oldData: changed.current,
+        updatedData: changed.updated,
+      });
+      return monthlyDto(changed.updated, type);
+    },
+    async getConfig(input, auth) {
+      const type = routineType(input.type);
+      const config = await prisma.triageConfig.findFirst({
+        where: { client_id: input.client_id, organization_id: auth.organizationId, type },
+        select: { active_items: true },
+      });
+      return {
+        client_id: input.client_id,
+        type,
+        configured: Boolean(config),
+        active_items: activeContabilFields(config?.active_items),
+      };
+    },
+    async saveConfig(input, auth) {
+      const type = routineType(input.type);
+      const clientId = String(input.client_id);
+      const activeItems = activeContabilFields(input.active_items);
+      const identity = { organization_id: auth.organizationId, client_id: clientId, type };
+      const result = await prisma.$transaction(async (transaction) => {
+        await lock(transaction, `triagem.configs:${auth.organizationId}:${clientId}:${type}`);
+        await assertClientInOrganization(transaction, clientId, auth.organizationId);
+        await canEdit(transaction, clientId, auth, type);
+        const current = await transaction.triageConfig.findFirst({
+          where: identity,
+          select: { active_items: true },
+        });
+        const updated = await transaction.triageConfig.upsert({
+          where: { organization_id_client_id_type: identity },
+          create: { ...identity, active_items: activeItems },
+          update: { active_items: activeItems },
+        });
+        return { current, updated };
+      });
+      const changed = result as { current: JsonRecord | null; updated: JsonRecord };
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Configurar movimento padrão",
+        referring: "triagem.configs",
+        referringId: clientId,
+        oldData: { active_items: activeContabilFields(changed.current?.active_items) },
+        updatedData: { active_items: activeItems },
+      });
+      return { client_id: clientId, type, configured: true, active_items: activeItems };
     },
     async listStatements(input, organizationId) {
       return prisma.triageBankStatement.findMany({

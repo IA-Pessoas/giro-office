@@ -259,6 +259,31 @@ await (async () => {
     assert.match(source, /NOT_RECEIVED/);
   });
 
+  await runTest("triagem contábil configura movimento padrão e atribui o movimento do mês (#1691)", () => {
+    const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    const panel = readWorkspaceSource("./components/TriageMovementPanel.tsx");
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
+
+    assert.equal(CONTABIL_ENDPOINTS.triageConfig, "/triagem/config");
+    assert.equal(CONTABIL_ENDPOINTS.triageMonthlyById("m1"), "/triagem/monthly/m1");
+    assert.match(labels, /\["NOT_PRESENT", "Não possui"\]/);
+    assert.match(source, /<TriageMovementPanel/);
+    assert.match(source, /Desativado no movimento padrão/);
+    assert.match(source, /canEdit && !isDisabled\(field\)/);
+    for (const text of [
+      "Movimento padrão do cliente",
+      "Movimento enviado",
+      "Responsável",
+      "Justificativa",
+      "Data de download",
+      "Data de baixa",
+      "Observação",
+    ])
+      assert.ok(panel.includes(text), text);
+    assert.match(panel, /saveMovementConfig/);
+    assert.match(panel, /updateMonthly/);
+  });
+
   await runTest("triagem fiscal apresenta os 14 campos e controla revisão e entrega", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
     const pageSource = readWorkspaceSource("../../pages/triagem.tsx");

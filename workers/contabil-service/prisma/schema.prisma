@@ -113,7 +113,7 @@ model TriageConfig {
   client_id       String
   type            String
   active_items    Json
-  updated_at      DateTime
+  updated_at      DateTime @updatedAt
   organization_id String
 
   @@unique([organization_id, client_id, type])
@@ -127,7 +127,13 @@ model TriageMonthly {
   type            String
   checklist       Json
   item_notes      Json     @default("{}")
+  download_date   DateTime?
+  settlement_date DateTime?
   billing_amount  String?
+  triad_moviment  Boolean  @default(false)
+  responsible_id  String?
+  notes           String?
+  justification   String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
   archived_at     DateTime?

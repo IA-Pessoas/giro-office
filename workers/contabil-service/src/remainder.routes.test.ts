@@ -124,6 +124,9 @@ function services() {
       getOrCreateMonthly: vi.fn(async () => ({ id: ID })),
       updateItem: vi.fn(async () => ({ id: ID })),
       updateAll: vi.fn(async () => ({ id: ID })),
+      updateMonthly: vi.fn(async () => ({ id: ID })),
+      getConfig: vi.fn(async () => ({ active_items: [] })),
+      saveConfig: vi.fn(async () => ({ active_items: [] })),
       listStatements: vi.fn(async () => []),
       upsertStatement: vi.fn(async () => ({ id: ID })),
       archiveStatement: vi.fn(async () => ({ id: ID })),
@@ -332,6 +335,62 @@ describe("contabil Worker remainder routes", () => {
     ).toEqual(["Beta"]);
     expect(invalid.status).toBe(400);
     expect(deps.controlService.list).toHaveBeenCalledWith("2026-09", ORG);
+  });
+
+  it("movimento mensal e movimento padrão validam corpo e usam a organização do token (#1691)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, path: string, body?: unknown, auth = true) =>
+      app.request(`https://contabil.test${path}`, {
+        method,
+        headers: auth ? { ...headers("2"), "content-type": "application/json" } : {},
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    const monthly = await send("PATCH", `/triagem/monthly/${ID}`, {
+      type: "CONTABIL",
+      triad_moviment: true,
+      download_date: "2026-10-03",
+    });
+    const emptyMonthly = await send("PATCH", `/triagem/monthly/${ID}`, { type: "CONTABIL" });
+    const badDate = await send("PATCH", `/triagem/monthly/${ID}`, { download_date: "03/10/2026" });
+    const impossibleDate = await send("PATCH", `/triagem/monthly/${ID}`, {
+      settlement_date: "2026-02-31",
+    });
+    const config = await send("PUT", "/triagem/config", {
+      client_id: CLIENT,
+      active_items: ["bank_reconciliation"],
+    });
+    const fiscalField = await send("PUT", "/triagem/config", {
+      client_id: CLIENT,
+      active_items: ["inbound_report"],
+    });
+    const read = await send("GET", `/triagem/config?client_id=${CLIENT}`);
+    const anonymous = await send("GET", `/triagem/config?client_id=${CLIENT}`, undefined, false);
+
+    expect(monthly.status).toBe(200);
+    expect([
+      emptyMonthly.status,
+      badDate.status,
+      impossibleDate.status,
+      fiscalField.status,
+    ]).toEqual([400, 400, 400, 400]);
+    expect(config.status).toBe(200);
+    expect(read.status).toBe(200);
+    expect(anonymous.status).toBe(401);
+    expect(deps.triageDocumentsService.updateMonthly).toHaveBeenCalledExactlyOnceWith(
+      ID,
+      { type: "CONTABIL", triad_moviment: true, download_date: "2026-10-03" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+    expect(deps.triageDocumentsService.saveConfig).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, type: "CONTABIL", active_items: ["bank_reconciliation"] },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+    expect(deps.triageDocumentsService.getConfig).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, type: "CONTABIL" },
+      expect.objectContaining({ organizationId: ORG }),
+    );
   });
 
   it("mantém reporting interno fechado sem token e grant válidos", async () => {

@@ -62,8 +62,11 @@ import {
   fiscalPortfolioSchema,
   monthlyIdSchema,
   monthlySchema,
+  monthlyUpdateSchema,
   statementArchiveSchema,
   statementSchema,
+  triageConfigBodySchema,
+  triageConfigQuerySchema,
 } from "./schemas.js";
 import {
   type AuthContext,
@@ -585,6 +588,28 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const body = parseWithZod(documentItemSchema, await readJson(c));
     const data = await withDocuments(c, (service) =>
       service.updateItem(params.id, body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.patch("/triagem/monthly/:id", async (c) => {
+    const params = parseWithZod(monthlyIdSchema, { id: c.req.param("id") });
+    const body = parseWithZod(monthlyUpdateSchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.updateMonthly(params.id, body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/config", async (c) => {
+    const query = parseWithZod(triageConfigQuerySchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.getConfig(query, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.put("/triagem/config", async (c) => {
+    const body = parseWithZod(triageConfigBodySchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.saveConfig(body, authContext(c.get("auth"))),
     );
     return c.json(createSuccessResponse(data));
   });

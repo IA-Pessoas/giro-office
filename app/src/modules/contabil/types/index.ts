@@ -211,6 +211,31 @@ export interface TriageDocumentsMonthly {
   checklist: Record<string, TriageDocumentStatus>;
   item_notes: Record<string, TriageDocumentItemNotes>;
   summary: { applicable: number; completed: number; attention: number; pending: number; notApplicable: number; notPresent: number; percentage: number };
+  triad_moviment?: boolean;
+  notes?: string | null;
+  justification?: string | null;
+  responsible_id?: string | null;
+  download_date?: string | null;
+  settlement_date?: string | null;
+}
+
+/** Dados do movimento mensal atribuíveis fora do checklist (envio, observação, datas). */
+export type TriageMonthlyUpdate = Partial<{
+  triad_moviment: boolean;
+  notes: string | null;
+  justification: string | null;
+  responsible_id: string | null;
+  download_date: string | null;
+  settlement_date: string | null;
+}>;
+
+/** Movimento padrão do cliente: itens contábeis que entram em cada competência. */
+export interface TriageMovementConfig {
+  client_id: string;
+  type: "CONTABIL";
+  /** false enquanto o cliente nunca salvou um padrão: nada fica desativado. */
+  configured: boolean;
+  active_items: TriageDocumentField[];
 }
 
 export interface FiscalTriagePortfolioItem {
