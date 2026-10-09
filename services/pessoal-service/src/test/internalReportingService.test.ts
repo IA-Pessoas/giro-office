@@ -366,6 +366,22 @@ describe("pessoal internal reporting service", () => {
     });
   });
 
+  it("devolve client_name nulo quando o cliente não está na organização", async () => {
+    const service = new InternalReportingService({
+      payroll: { findMany: vi.fn().mockResolvedValue([{ client_id: "client-outra-org" }]) },
+      client: { findMany: vi.fn().mockResolvedValue([]) },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.payroll",
+        fields: ["client_name"],
+        limit: 1,
+      }),
+    ).resolves.toEqual({ rows: [{ client_name: null }], reachedLimit: false });
+  });
+
   it("não consulta clientes quando client_name não foi pedido", async () => {
     const payrollFindMany = vi.fn().mockResolvedValue([{ advance: true }]);
     const clientFindMany = vi.fn();
