@@ -2,6 +2,14 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CalendarDays, FileDown, Loader2, Printer, RotateCcw, Search } from "lucide-react";
 
+import {
+  filterFiscalTriagePortfolio,
+  fiscalTriagePortfolioItemStatus,
+  TRIAGE_PORTFOLIO_NO_REGIME,
+  TRIAGE_PORTFOLIO_NO_RESPONSIBLE,
+  type TriagePortfolioJustificationFilter,
+} from "@workspace/shared/triagem/portfolioFilters";
+
 import { triagemCompetenceService } from "@modules/triagem/services/triagemCompetenceService";
 import { PaginationControls } from "@shared/components";
 import { useFetch } from "@shared/hooks";
@@ -19,9 +27,7 @@ import { CONTABIL_OUTLINE_ACTION_CLASS, CONTABIL_TABLE_FILTER_CLASS } from "./co
 const PAGE_SIZE = 50;
 const STATUS_LABELS = Object.fromEntries(STATUSES) as Record<TriageDocumentStatus, string>;
 
-function cellStatus(row: FiscalTriagePortfolioItem, field: TriageFiscalChecklistField) {
-  return row.monthly?.checklist[field] ?? row.planned_checklist?.[field] ?? "NOT_STARTED";
-}
+const cellStatus = fiscalTriagePortfolioItemStatus;
 
 function statusLabel(status: string) {
   return status === "NOT_STARTED"
@@ -110,6 +116,7 @@ export function FiscalTriagePortfolioSection({
     FISCAL_DOCUMENTS[0][0],
   );
   const [documentStatus, setDocumentStatus] = useState("");
+  const [justification, setJustification] = useState<TriagePortfolioJustificationFilter | "">("");
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState("");
   const [actionError, setActionError] = useState("");
@@ -118,28 +125,33 @@ export function FiscalTriagePortfolioSection({
     triageDocumentsService.getFiscalPortfolio(competence),
   );
   const items = portfolio.data?.items ?? [];
+  // Filtro pelo id: dois responsáveis homônimos continuam distintos, como no endpoint.
   const responsibles = [
-    ...new Set(items.map((row) => row.responsible_name ?? "Sem responsável")),
-  ].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  const regimes = [...new Set(items.map((row) => row.regime ?? "Não informado"))].sort((a, b) =>
-    a.localeCompare(b, "pt-BR"),
+    ...new Map(
+      items.map((row) => [
+        row.responsible_id ?? TRIAGE_PORTFOLIO_NO_RESPONSIBLE,
+        row.responsible_name ?? "Sem responsável",
+      ]),
+    ),
+  ]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const regimes = [...new Set(items.map((row) => row.regime ?? TRIAGE_PORTFOLIO_NO_REGIME))].sort(
+    (a, b) => a.localeCompare(b, "pt-BR"),
   );
 
+  // Mesma função do GET /triagem/fiscal-portfolio: tela, CSV e consulta veem o mesmo conjunto.
   const filtered = useMemo(
     () =>
-      items.filter((row) => {
-        const query = search.trim().toLocaleLowerCase("pt-BR");
-        if (
-          query &&
-          !`${row.legal_name} ${row.cpf_cnpj}`.toLocaleLowerCase("pt-BR").includes(query)
-        )
-          return false;
-        if (responsible && (row.responsible_name ?? "Sem responsável") !== responsible)
-          return false;
-        if (regime && (row.regime ?? "Não informado") !== regime) return false;
-        return !documentStatus || cellStatus(row, documentField) === documentStatus;
+      filterFiscalTriagePortfolio(items, {
+        search,
+        responsibleId: responsible,
+        regime,
+        documentField,
+        documentStatus,
+        justification: justification || undefined,
       }),
-    [items, search, responsible, regime, documentField, documentStatus],
+    [items, search, responsible, regime, documentField, documentStatus, justification],
   );
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visible = filtered.slice(
@@ -147,9 +159,12 @@ export function FiscalTriagePortfolioSection({
     Math.min(page, totalPages) * PAGE_SIZE,
   );
   const counts = responsibles
-    .map((name) => ({
+    .map(({ id, name }) => ({
+      id,
       name,
-      count: filtered.filter((row) => (row.responsible_name ?? "Sem responsável") === name).length,
+      count: filtered.filter(
+        (row) => (row.responsible_id ?? TRIAGE_PORTFOLIO_NO_RESPONSIBLE) === id,
+      ).length,
     }))
     .filter(({ count }) => count > 0);
 
@@ -281,8 +296,8 @@ export function FiscalTriagePortfolioSection({
               {filtered.length !== items.length ? ` · ${filtered.length} exibidas` : ""}
             </p>
             <div className="flex flex-wrap gap-2" aria-label="Empresas por responsável">
-              {counts.map(({ name, count }) => (
-                <span key={name} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+              {counts.map(({ id, name, count }) => (
+                <span key={id} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                   <strong className="font-semibold text-blue-700 dark:text-blue-300">{count}</strong>
                   {name}
                 </span>
@@ -331,6 +346,19 @@ export function FiscalTriagePortfolioSection({
                 </option>
               ))}
             </select>
+            <select
+              aria-label="Filtrar justificativa"
+              value={justification}
+              onChange={(event) => {
+                setJustification(event.target.value as TriagePortfolioJustificationFilter | "");
+                setPage(1);
+              }}
+              className={CONTABIL_SELECT_CLASS}
+            >
+              <option value="">Com ou sem justificativa</option>
+              <option value="with">Com justificativa</option>
+              <option value="without">Sem justificativa</option>
+            </select>
           </div>
           <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700">
               <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-slate-700">
@@ -361,7 +389,7 @@ export function FiscalTriagePortfolioSection({
                         className={CONTABIL_TABLE_FILTER_CLASS}
                       >
                         <option value="">Todos</option>
-                        {responsibles.map((value) => <option key={value} value={value}>{value}</option>)}
+                        {responsibles.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
                       </select>
                     </th>
                     {FISCAL_DOCUMENTS.map(([field, label]) => (
