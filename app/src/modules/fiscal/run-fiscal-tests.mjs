@@ -424,3 +424,42 @@ await runTest("fiscal control reads Triagem documents without editing them", asy
   assert.match(section, /Concluir com pendência na Triagem/);
   assert.match(section, /Há documentos pendentes na Triagem: concluir exige Fiscal nível 3 e justificativa\./);
 });
+
+await runTest("fiscal responsibles: portfolio by competence or current, transfer for level 3", async () => {
+  const { formatTransferResult, matchesResponsible } = await import("./utils/fiscalControl.ts");
+  const item = { responsible_id: "ana", default_responsible_id: "bruno" };
+  assert.equal(matchesResponsible(item, { userId: "", basis: "competence" }), true);
+  assert.equal(matchesResponsible(item, { userId: "ana", basis: "competence" }), true);
+  assert.equal(matchesResponsible(item, { userId: "ana", basis: "current" }), false);
+  assert.equal(matchesResponsible(item, { userId: "bruno", basis: "current" }), true);
+  assert.equal(
+    matchesResponsible(
+      { responsible_id: null, default_responsible_id: "bruno" },
+      { userId: "none", basis: "competence" },
+    ),
+    true,
+  );
+  assert.equal(formatTransferResult({ transferred: ["a"], skipped: [] }), "1 transferido.");
+  assert.equal(
+    formatTransferResult({
+      transferred: [],
+      skipped: [
+        { id: "b", reason: "Controle concluído." },
+        { id: "c", reason: "Controle concluído." },
+      ],
+    }),
+    "0 transferidos, 2 ignorados (Controle concluído.).",
+  );
+
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const dialog = await readSource("./components/FiscalControlTransferDialog.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(client, /api\.post\("\/fiscal\/monthly-controls\/transfer", payload\)/);
+  assert.match(client, /api\.get\("\/fiscal\/monthly-controls\/responsibles"\)/);
+  // Seleção e transferência só para nível 3; concluídos não são selecionáveis.
+  assert.match(section, /\{canAuthorize && selectedIds\.length \? \(/);
+  assert.match(section, /disabled=\{item\.status === "COMPLETED"\} title=\{item\.status === "COMPLETED" \? "Controle concluído não é transferido\." : undefined\}/);
+  assert.match(section, /Carteira atual: \{item\.default_responsible_name/);
+  assert.match(dialog, /if \(reason\.trim\(\)\.length < 3\) \{/);
+  assert.match(dialog, /enabled: open/);
+});

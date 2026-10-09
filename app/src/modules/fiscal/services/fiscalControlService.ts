@@ -13,12 +13,28 @@ export interface FiscalMonthlyControl {
   no_movement: boolean;
   regime: string | null;
   opening_reason: string | null;
+  /** Responsável da competência (registrado ao nascer ou na última transferência). */
+  responsible_id: string | null;
+  responsible_name: string | null;
+  /** Responsável padrão atual do cliente; vale para as próximas competências. */
+  default_responsible_id: string | null;
+  default_responsible_name: string | null;
   updated_by: string;
   updatedAt: string;
   /** Obrigações aplicáveis ainda sem cumprimento; não mudam a situação. */
   pending_obligations: number;
   /** Documentos pendentes na Triagem; null quando ela não tem registro. */
   triage_pending: number | null;
+}
+
+export interface FiscalResponsibleCandidate {
+  id: string;
+  name: string;
+}
+
+export interface FiscalTransferResult {
+  transferred: string[];
+  skipped: Array<{ id: string; reason: string }>;
 }
 
 export interface FiscalControlTriage {
@@ -97,6 +113,24 @@ export const fiscalControlService = {
   async update(id: string, payload: UpdateFiscalMonthlyControlPayload): Promise<void> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     await api.patch(`/fiscal/monthly-controls/${id}`, payload);
+  },
+
+  /** Quem pode receber controles (Fiscal nível 3). */
+  async responsibles(): Promise<FiscalResponsibleCandidate[]> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.get("/fiscal/monthly-controls/responsibles");
+    return unwrapFiscalEnvelope<FiscalResponsibleCandidate[]>(response.data);
+  },
+
+  /** Transfere controles abertos; concluídos voltam em skipped. */
+  async transfer(payload: {
+    control_ids: string[];
+    to_user_id: string;
+    reason: string;
+  }): Promise<FiscalTransferResult> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.post("/fiscal/monthly-controls/transfer", payload);
+    return unwrapFiscalEnvelope<FiscalTransferResult>(response.data);
   },
 
   /** Documentos da Triagem do mesmo cliente e competência (só leitura). */
