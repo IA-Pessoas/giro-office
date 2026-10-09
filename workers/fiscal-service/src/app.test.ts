@@ -745,6 +745,9 @@ describe("fiscal Worker", () => {
       importBatch: vi.fn(async () => batch),
       list: vi.fn(async () => ({ data: [batch], total: 1, page: 1, limit: 50, hasMore: false })),
       detail: vi.fn(async () => batch),
+      updateItem: vi.fn(async () => ({})),
+      submit: vi.fn(async () => batch),
+      check: vi.fn(async () => batch),
     };
     const app = createFiscalWorkerApp({ env: env(), anticipationService: anticipations as never });
     const viewer = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
@@ -796,6 +799,47 @@ describe("fiscal Worker", () => {
     });
     expect(viewerImport.status).toBe(403);
     expect(anticipations.importBatch).toHaveBeenCalledTimes(1);
+
+    const itemId = "e0000000-0000-4000-8000-000000000001";
+    const reviewed = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/items/${itemId}`,
+      {
+        method: "PUT",
+        headers: { ...gatewayHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ classification: "partial", reason: "Parcial" }),
+      },
+    );
+    expect(reviewed.status).toBe(200);
+    expect(anticipations.updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        batchId: ICMS_ID,
+        itemId,
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        classification: "partial",
+      }),
+    );
+
+    const submitted = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/submit`,
+      {
+        method: "POST",
+        headers: { ...gatewayHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ reviewer_id: USER_ID }),
+      },
+    );
+    expect(submitted.status).toBe(200);
+
+    const viewerCheck = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/check`,
+      {
+        method: "POST",
+        headers: { ...viewer, "content-type": "application/json" },
+        body: JSON.stringify({ decision: "approve" }),
+      },
+    );
+    expect(viewerCheck.status).toBe(403);
+    expect(anticipations.check).not.toHaveBeenCalled();
   });
 
   it("acompanha malhas no tenant autenticado, com anexo e leitura para nível 1", async () => {

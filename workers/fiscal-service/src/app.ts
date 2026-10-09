@@ -9,8 +9,12 @@ import {
 } from "@workspace/fiscal-service/src/schemas/annualControl.schemas.js";
 import {
   anticipationBatchIdParamsSchema,
+  anticipationItemParamsSchema,
+  checkAnticipationBatchBodySchema,
   importAnticipationBatchBodySchema,
   listAnticipationBatchesQuerySchema,
+  submitAnticipationBatchBodySchema,
+  updateAnticipationItemBodySchema,
 } from "@workspace/fiscal-service/src/schemas/anticipation.schemas.js";
 import {
   clientWholesaleParamsSchema,
@@ -168,7 +172,10 @@ type MalhaServiceLike = Pick<
   MalhaService,
   "create" | "update" | "list" | "detail" | "replaceAttachment" | "attachmentAccess"
 >;
-type AnticipationServiceLike = Pick<AnticipationService, "importBatch" | "list" | "detail">;
+type AnticipationServiceLike = Pick<
+  AnticipationService,
+  "importBatch" | "list" | "detail" | "updateItem" | "submit" | "check"
+>;
 type ControlServiceLike = Pick<
   MonthlyControlService,
   "list" | "open" | "update" | "triage" | "transfer" | "responsibles"
@@ -480,6 +487,36 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const { id } = parseWithZod(anticipationBatchIdParamsSchema, { id: c.req.param("id") });
     const data = await withService("anticipationService", (service) =>
       service.detail(id, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.put("/fiscal/anticipations/batches/:id/items/:item_id", async (c) => {
+    const { id, item_id } = parseWithZod(anticipationItemParamsSchema, {
+      id: c.req.param("id"),
+      item_id: c.req.param("item_id"),
+    });
+    const body = parseWithZod(updateAnticipationItemBodySchema, await readJson(c));
+    const data = await withService("anticipationService", (service) =>
+      service.updateItem({ ...actor(c), ...body, batchId: id, itemId: item_id }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/anticipations/batches/:id/submit", async (c) => {
+    const { id } = parseWithZod(anticipationBatchIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(submitAnticipationBatchBodySchema, await readJson(c));
+    const data = await withService("anticipationService", (service) =>
+      service.submit({ ...actor(c), ...body, batchId: id }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/anticipations/batches/:id/check", async (c) => {
+    const { id } = parseWithZod(anticipationBatchIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(checkAnticipationBatchBodySchema, await readJson(c));
+    const data = await withService("anticipationService", (service) =>
+      service.check({ ...actor(c), ...body, batchId: id }),
     );
     return c.json(createSuccessResponse(data));
   });

@@ -2,10 +2,15 @@ import { ServiceError } from "@workspace/shared/http";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
-import type {
-  AnticipationBatchStatus,
-  ImportAnticipationBatchBody,
-  ListAnticipationBatchesQuery,
+import {
+  ANTICIPATION_CORRECTABLE_FIELDS,
+  type AnticipationBatchStatus,
+  type AnticipationClassification,
+  type AnticipationCorrectableField,
+  type CheckAnticipationBatchBody,
+  type ImportAnticipationBatchBody,
+  type ListAnticipationBatchesQuery,
+  type UpdateAnticipationItemBody,
 } from "../schemas/anticipation.schemas.js";
 import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
@@ -13,6 +18,7 @@ import {
   dropIdenticalCopies,
   isAuthorizedProtocol,
   type NfeFile,
+  normalizeDecimal,
   readNfeArchive,
 } from "./nfeXml.js";
 
@@ -21,16 +27,23 @@ import {
 /**
  * Antecipações (E3, FIS-16): importa ZIP de XML NF-e num lote por cliente e competência, com os
  * itens rastreáveis até o arquivo de origem. Não calcula imposto (RF-13): a revisão é manual.
+ * FIS-17: o responsável classifica e corrige os itens (valores do XML ficam preservados) e um
+ * conferente aprova ou devolve o lote; cada mudança vai para o histórico na mesma transação.
  */
 
 type AnticipationTransaction = Pick<
   PrismaClient,
-  "fiscalAnticipationBatch" | "fiscalAnticipationItem"
+  "fiscalAnticipationBatch" | "fiscalAnticipationItem" | "fiscalAnticipationHistory"
 >;
 
 export type AnticipationPrisma = Pick<
   PrismaClient,
-  "client" | "fiscalAnticipationBatch" | "fiscalAnticipationItem"
+  | "client"
+  | "user"
+  | "permission"
+  | "fiscalAnticipationBatch"
+  | "fiscalAnticipationItem"
+  | "fiscalAnticipationHistory"
 > & {
   $transaction<T>(callback: (transaction: AnticipationTransaction) => Promise<T>): Promise<T>;
 };
@@ -83,7 +96,12 @@ type ItemRecord = {
   value: Amount;
   ipi: Amount;
   icms_st: Amount;
+  classification?: string | null;
+  manual_value?: Amount;
+  corrections?: unknown;
 };
+
+type Corrections = Partial<Record<AnticipationCorrectableField, string>>;
 
 export interface AnticipationBatchDto {
   id: string;
@@ -104,13 +122,40 @@ export interface AnticipationBatchDto {
 
 export type AnticipationItemDto = Omit<
   ItemRecord,
-  "id" | "quantity" | "value" | "ipi" | "icms_st"
+  | "id"
+  | "quantity"
+  | "value"
+  | "ipi"
+  | "icms_st"
+  | "classification"
+  | "manual_value"
+  | "corrections"
 > & {
   id: string;
   quantity: string | null;
   value: string | null;
   ipi: string | null;
   icms_st: string | null;
+  classification: AnticipationClassification | null;
+  manual_value: string | null;
+  /** Correção por campo; o valor do XML continua no campo de mesmo nome. */
+  corrections: Corrections;
+};
+
+export interface AnticipationHistoryDto {
+  id: string;
+  item_id: string | null;
+  field: string;
+  previous_value: string | null;
+  new_value: string | null;
+  reason: string | null;
+  actor_user_id: string;
+  created_at: string;
+}
+
+export type AnticipationBatchDetailDto = AnticipationBatchDto & {
+  items: AnticipationItemDto[];
+  history: AnticipationHistoryDto[];
 };
 
 const REFERRING = "fiscal.anticipations";
@@ -156,7 +201,23 @@ function serializeItem(record: ItemRecord): AnticipationItemDto {
     value: amount(record.value),
     ipi: amount(record.ipi),
     icms_st: amount(record.icms_st),
+    classification: (record.classification ?? null) as AnticipationClassification | null,
+    manual_value: money(amount(record.manual_value ?? null)),
+    corrections: (record.corrections ?? {}) as Corrections,
   };
+}
+
+/** Valor monetário canônico ("7.5" → "7.50"), para comparar e registrar sem ruído. */
+function money(value: string | null): string | null {
+  if (value === null) return null;
+  const [integer = "0", fraction = ""] = value.split(".");
+  return `${integer}.${fraction.padEnd(2, "0")}`;
+}
+
+function canonicalCorrection(field: AnticipationCorrectableField, value: string): string {
+  if (field === "quantity") return normalizeDecimal(value) ?? value;
+  if (field === "ncm" || field === "cfop") return value;
+  return money(value) ?? value;
 }
 
 /** Notas do ZIP que podem virar itens, e o motivo por arquivo das que não podem. */
@@ -385,14 +446,247 @@ export class AnticipationService {
     };
   }
 
-  async detail(
+  async detail(id: string, organizationId: string): Promise<AnticipationBatchDetailDto> {
+    const record = await this.findBatch(id, organizationId);
+    const [items, history] = await Promise.all([
+      this.items(record.id, organizationId),
+      this.prisma.fiscalAnticipationHistory.findMany({
+        where: { batch_id: record.id, organization_id: organizationId },
+        orderBy: [{ created_at: "desc" }],
+      }),
+    ]);
+    return {
+      ...serializeBatch(record),
+      items,
+      history: history.map((row) => ({
+        id: row.id,
+        item_id: row.item_id,
+        field: row.field,
+        previous_value: row.previous_value,
+        new_value: row.new_value,
+        reason: row.reason,
+        actor_user_id: row.actor_user_id,
+        created_at: row.created_at.toISOString(),
+      })),
+    };
+  }
+
+  private async findBatch(
     id: string,
     organizationId: string,
-  ): Promise<AnticipationBatchDto & { items: AnticipationItemDto[] }> {
-    const record = await this.prisma.fiscalAnticipationBatch.findFirst({
+    client: Pick<AnticipationTransaction, "fiscalAnticipationBatch"> = this.prisma,
+  ): Promise<BatchRecord> {
+    const record = await client.fiscalAnticipationBatch.findFirst({
       where: { id, organization_id: organizationId },
     });
     if (!record) throw new ServiceError(404, "Lote de antecipação não encontrado.");
-    return { ...serializeBatch(record), items: await this.items(record.id, organizationId) };
+    return record;
+  }
+
+  /**
+   * Muda o estado do lote só a partir de `from`. O UPDATE condicional trava a linha do lote até
+   * o fim da transação: edições de item e transições do mesmo lote ficam em fila.
+   */
+  private async moveBatch(
+    transaction: AnticipationTransaction,
+    input: Actor & { batchId: string },
+    from: AnticipationBatchStatus,
+    data: { status?: AnticipationBatchStatus; reviewer_id?: string },
+    where: { reviewer_id?: string } = {},
+  ): Promise<void> {
+    const result = await transaction.fiscalAnticipationBatch.updateMany({
+      where: { id: input.batchId, organization_id: input.organizationId, status: from, ...where },
+      data: { ...data, updatedAt: new Date() },
+    });
+    if (result.count === 1) return;
+    await this.findBatch(input.batchId, input.organizationId, transaction);
+    throw new ServiceError(
+      409,
+      from === "pending_review"
+        ? "O lote não está em classificação; devolva-o antes de alterar itens."
+        : "O lote não está aguardando conferência.",
+    );
+  }
+
+  async updateItem(
+    input: UpdateAnticipationItemBody & Actor & { batchId: string; itemId: string },
+  ): Promise<AnticipationItemDto> {
+    const { item, rows } = await this.prisma.$transaction(async (transaction) => {
+      await this.moveBatch(transaction, input, "pending_review", {});
+      const current = await transaction.fiscalAnticipationItem.findFirst({
+        where: { id: input.itemId, batch_id: input.batchId, organization_id: input.organizationId },
+      });
+      if (!current) throw new ServiceError(404, "Item não encontrado no lote.");
+
+      const changes: { field: string; previous_value: string | null; new_value: string | null }[] =
+        [];
+      const change = (field: string, previous: string | null, next: string | null) => {
+        if (previous !== next) changes.push({ field, previous_value: previous, new_value: next });
+      };
+      if (input.classification !== undefined) {
+        change("classification", current.classification, input.classification);
+      }
+      const manualValue = money(amount(current.manual_value));
+      if (input.manual_value !== undefined) {
+        change("manual_value", manualValue, money(input.manual_value));
+      }
+      const corrections = { ...((current.corrections ?? {}) as Corrections) };
+      for (const field of ANTICIPATION_CORRECTABLE_FIELDS) {
+        const next = input.corrections?.[field];
+        if (next === undefined) continue;
+        const value = next === null ? null : canonicalCorrection(field, next);
+        change(`correction.${field}`, corrections[field] ?? null, value);
+        if (value === null) delete corrections[field];
+        else corrections[field] = value;
+      }
+      if (changes.length === 0) return { item: current, rows: changes };
+
+      const updated = await transaction.fiscalAnticipationItem.update({
+        where: { id: current.id },
+        data: {
+          ...(input.classification !== undefined ? { classification: input.classification } : {}),
+          ...(input.manual_value !== undefined ? { manual_value: money(input.manual_value) } : {}),
+          corrections,
+        },
+      });
+      await transaction.fiscalAnticipationHistory.createMany({
+        data: changes.map((row) => ({
+          ...row,
+          organization_id: input.organizationId,
+          batch_id: input.batchId,
+          item_id: current.id,
+          reason: input.reason,
+          actor_user_id: input.userId,
+        })),
+      });
+      return { item: updated, rows: changes };
+    });
+
+    if (rows.length > 0) {
+      await this.audit.createLog({
+        userId: input.userId,
+        organizationId: input.organizationId,
+        permission: input.permission ?? null,
+        action: "Revisão de item",
+        referring: REFERRING,
+        referringId: input.batchId,
+        changes: Object.fromEntries(
+          rows.map((row) => [row.field, { from: row.previous_value, to: row.new_value }]),
+        ),
+      });
+    }
+    return serializeItem(item);
+  }
+
+  private async requireReviewer(userId: string, organizationId: string): Promise<void> {
+    const [permission, user] = await Promise.all([
+      this.prisma.permission.findFirst({
+        where: { user_id: userId, organization_id: organizationId, fiscal: { gt: 0 } },
+        select: { id: true },
+      }),
+      this.prisma.user.findFirst({ where: { id: userId, status: "active" }, select: { id: true } }),
+    ]);
+    if (!permission || !user) {
+      throw new ServiceError(404, "Conferente não encontrado ou sem acesso ao Fiscal.");
+    }
+  }
+
+  private async transition(
+    input: Actor & { batchId: string },
+    from: AnticipationBatchStatus,
+    to: AnticipationBatchStatus,
+    options: {
+      reviewerId?: string;
+      onlyReviewer?: boolean;
+      reason?: string;
+      validate?: (transaction: AnticipationTransaction) => Promise<void>;
+    },
+  ): Promise<AnticipationBatchDto> {
+    const batch = await this.prisma.$transaction(async (transaction) => {
+      const current = await this.findBatch(input.batchId, input.organizationId, transaction);
+      if (options.onlyReviewer && current.status === from && current.reviewer_id !== input.userId) {
+        throw new ServiceError(403, "Só o conferente designado conclui a conferência.");
+      }
+      // Trava o lote no estado de origem, valida e só então muda o estado.
+      await this.moveBatch(
+        transaction,
+        input,
+        from,
+        {},
+        options.onlyReviewer ? { reviewer_id: input.userId } : {},
+      );
+      await options.validate?.(transaction);
+      await transaction.fiscalAnticipationBatch.updateMany({
+        where: { id: input.batchId, organization_id: input.organizationId },
+        data: { status: to, ...(options.reviewerId ? { reviewer_id: options.reviewerId } : {}) },
+      });
+      const history = [{ field: "status", previous_value: from, new_value: to }];
+      if (options.reviewerId && options.reviewerId !== current.reviewer_id) {
+        history.push({
+          field: "reviewer_id",
+          previous_value: current.reviewer_id as AnticipationBatchStatus,
+          new_value: options.reviewerId as AnticipationBatchStatus,
+        });
+      }
+      await transaction.fiscalAnticipationHistory.createMany({
+        data: history.map((row) => ({
+          ...row,
+          organization_id: input.organizationId,
+          batch_id: input.batchId,
+          item_id: null,
+          reason: options.reason ?? null,
+          actor_user_id: input.userId,
+        })),
+      });
+      return this.findBatch(input.batchId, input.organizationId, transaction);
+    });
+
+    await this.audit.createLog({
+      userId: input.userId,
+      organizationId: input.organizationId,
+      permission: input.permission ?? null,
+      action: "Revisão de lote",
+      referring: REFERRING,
+      referringId: input.batchId,
+      changes: { status: { from, to }, reviewer_id: batch.reviewer_id },
+    });
+    return serializeBatch(batch);
+  }
+
+  /** Envia o lote ao conferente; exige todos os itens classificados. */
+  async submit(
+    input: Actor & { batchId: string; reviewer_id: string },
+  ): Promise<AnticipationBatchDto> {
+    await this.requireReviewer(input.reviewer_id, input.organizationId);
+    return this.transition(input, "pending_review", "awaiting_check", {
+      reviewerId: input.reviewer_id,
+      validate: async (transaction) => {
+        const pending = await transaction.fiscalAnticipationItem.count({
+          where: {
+            batch_id: input.batchId,
+            organization_id: input.organizationId,
+            classification: null,
+          },
+        });
+        if (pending > 0) {
+          throw new ServiceError(
+            400,
+            `Classifique todos os itens antes de enviar à conferência (${pending} pendente${pending > 1 ? "s" : ""}).`,
+          );
+        }
+      },
+    });
+  }
+
+  /** O conferente designado aprova o lote ou o devolve à classificação com motivo. */
+  async check(
+    input: CheckAnticipationBatchBody & Actor & { batchId: string },
+  ): Promise<AnticipationBatchDto> {
+    return this.transition(
+      input,
+      "awaiting_check",
+      input.decision === "approve" ? "checked" : "pending_review",
+      { onlyReviewer: true, reason: input.reason },
+    );
   }
 }
