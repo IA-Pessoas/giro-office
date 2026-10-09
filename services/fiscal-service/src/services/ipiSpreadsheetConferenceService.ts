@@ -38,6 +38,7 @@ export interface IpiSpreadsheetConferenceResult {
     only_first: number;
     only_second: number;
     duplicates: number;
+    not_comparable: number;
     discarded: number;
     errors: number;
   };
@@ -49,6 +50,13 @@ export interface IpiSpreadsheetConferenceResult {
   only_second: ConferenceDocumentRow[];
   duplicates: {
     identity: string;
+    first: ConferenceDocumentRow[];
+    second: ConferenceDocumentRow[];
+  }[];
+  /** Nota com IPI vazio ou ilegível em alguma planilha: não é exclusiva nem divergente. */
+  not_comparable: {
+    identity: string;
+    reason: string;
     first: ConferenceDocumentRow[];
     second: ConferenceDocumentRow[];
   }[];
@@ -73,15 +81,25 @@ function readSource(source: SourceId, input: ConferenceSourceInput) {
       `Arquivo ${LABEL[source]}: o cabeçalho precisa ter uma coluna de IPI (ex.: Valor IPI).`,
     );
   }
-  // IPI vazio não é zero presumido: a linha fica fora e aparece como erro.
-  const missing = parsed.rows.filter((row) => row.ipi === null);
+  // IPI vazio não é zero presumido e texto como "Isento" não é número: a linha continua no
+  // pareamento (a nota existe) mas não é comparada, e o motivo aparece por linha.
+  const problems = new Map<number, string>();
+  const rows = parsed.rows.map((row) => {
+    const value = row.ipi === null ? null : parseCents(row.ipi);
+    if (value === null) {
+      problems.set(row.line, row.ipi === null ? "IPI não informado." : `IPI inválido: ${row.ipi}.`);
+      return row;
+    }
+    return { ...row, ipi: formatCents(value) };
+  });
   return {
-    info: { ...parsed.info, accepted_rows: parsed.rows.length - missing.length },
-    rows: parsed.rows.filter((row) => row.ipi !== null),
+    info: { ...parsed.info, accepted_rows: parsed.rows.length - problems.size },
+    rows,
+    problems,
     discarded: parsed.discarded,
     errors: [
       ...parsed.errors,
-      ...missing.map((row) => ({ source, line: row.line, message: "IPI não informado." })),
+      ...[...problems].map(([line, message]) => ({ source, line, message })),
     ].sort((a, b) => a.line - b.line),
   };
 }
@@ -95,19 +113,44 @@ export function compareIpiSpreadsheets(input: {
 
   const buckets: Pick<
     IpiSpreadsheetConferenceResult,
-    "matched" | "divergent" | "only_first" | "only_second" | "duplicates" | "discarded" | "errors"
+    | "matched"
+    | "divergent"
+    | "only_first"
+    | "only_second"
+    | "duplicates"
+    | "not_comparable"
+    | "discarded"
+    | "errors"
   > = {
     matched: [],
     divergent: [],
     only_first: [],
     only_second: [],
     duplicates: [],
+    not_comparable: [],
     discarded: [...first.discarded, ...second.discarded],
     errors: [...first.errors, ...second.errors],
   };
 
   for (const item of pairByIdentity(first.rows, second.rows)) {
-    if (item.kind === "duplicate") {
+    const firstSide = item.kind === "duplicate" ? item.left : "left" in item ? [item.left] : [];
+    const secondSide = item.kind === "duplicate" ? item.right : "right" in item ? [item.right] : [];
+    const reasons = [
+      ...firstSide
+        .flatMap((row) => first.problems.get(row.line) ?? [])
+        .map((m) => `Planilha 1: ${m}`),
+      ...secondSide
+        .flatMap((row) => second.problems.get(row.line) ?? [])
+        .map((m) => `Planilha 2: ${m}`),
+    ];
+    if (item.kind !== "duplicate" && reasons.length > 0) {
+      buckets.not_comparable.push({
+        identity: item.identity,
+        reason: reasons.join(" | "),
+        first: firstSide.map(publicRow),
+        second: secondSide.map(publicRow),
+      });
+    } else if (item.kind === "duplicate") {
       buckets.duplicates.push({
         identity: item.identity,
         first: item.left.map(publicRow),
@@ -143,10 +186,11 @@ export function compareIpiSpreadsheets(input: {
   const summary = Object.fromEntries(
     Object.entries(buckets).map(([name, items]) => [name, items.length]),
   ) as IpiSpreadsheetConferenceResult["summary"];
-  const total = (rows: { ipi: string | null }[]) =>
-    rows.reduce((sum, row) => sum + cents(row.ipi), 0);
-  const firstTotal = total(first.rows);
-  const secondTotal = total(second.rows);
+  // Só IPI legível entra nos totais (linhas com problema estão em errors/not_comparable).
+  const total = (source: ReturnType<typeof readSource>) =>
+    source.rows.reduce((sum, row) => sum + (source.problems.has(row.line) ? 0 : cents(row.ipi)), 0);
+  const firstTotal = total(first);
+  const secondTotal = total(second);
   return {
     status: summary.discarded + summary.errors + summary.duplicates > 0 ? "partial" : "complete",
     identity_rule: IDENTITY_RULE,
@@ -226,6 +270,16 @@ export function ipiSpreadsheetConferenceCsvExport(result: IpiSpreadsheetConferen
     lines.push(["Só planilha 1", row.identity, ...rows([row]), "", "", "", ""]);
   for (const row of result.only_second)
     lines.push(["Só planilha 2", row.identity, "", "", ...rows([row]), "", ""]);
+  for (const item of result.not_comparable) {
+    lines.push([
+      "Não comparável",
+      item.identity,
+      ...rows(item.first),
+      ...rows(item.second),
+      "",
+      item.reason,
+    ]);
+  }
   for (const item of result.duplicates) {
     lines.push([
       "Duplicada",

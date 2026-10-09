@@ -229,6 +229,18 @@ describe("compareDocumentSpreadsheets", () => {
   });
 });
 
+describe("coluna de IPI nas outras conferências", () => {
+  it("é ignorada pela Domínio × SEFAZ, mesmo com texto como Isento", () => {
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor;IPI";
+    const result = compareDocumentSpreadsheets({
+      dominio: source(`${header}\n${ISSUER_A};55;1;1;10,00;Isento`),
+      sefaz: source(`${header}\n${ISSUER_A};55;1;1;10,00;-`),
+    });
+    expect(result.status).toBe("complete");
+    expect(result.matched).toHaveLength(1);
+  });
+});
+
 describe("documentConferenceCsvExport", () => {
   it("exporta uma linha por item com situação e marca o resultado parcial", () => {
     const key = accessKey(ISSUER_A, "55", "1", "100");

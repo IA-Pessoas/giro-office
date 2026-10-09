@@ -27,7 +27,10 @@ export interface ConferenceDocumentRow {
   value: string | null;
   /** Situação informada na planilha (ex.: Autorizada, Cancelada), quando há coluna. */
   status: string | null;
-  /** Valor de IPI da linha, quando há coluna de IPI. */
+  /**
+   * Texto da coluna de IPI, sem validação: só a conferência de IPI interpreta o valor, para que
+   * uma célula como "Isento" não derrube a linha nas ferramentas que ignoram o IPI.
+   */
   ipi: string | null;
 }
 
@@ -314,19 +317,13 @@ export function parseNoteSpreadsheet<S extends string>(
       fail(`Valor inválido: ${rawValue}.`);
       continue;
     }
-    const rawIpi = cell("ipi");
-    const ipiCents = rawIpi ? parseCents(rawIpi) : null;
-    if (rawIpi && ipiCents === null) {
-      fail(`IPI inválido: ${rawIpi}.`);
-      continue;
-    }
     parsed.rows.push({
       line,
       identity: `${row.issuer}|${row.model}|${row.series}|${row.number}`,
       ...row,
       value: cents === null ? null : formatCents(cents),
       status: cell("status") || null,
-      ipi: ipiCents === null ? null : formatCents(ipiCents),
+      ipi: cell("ipi") || null,
       cents,
     });
   }

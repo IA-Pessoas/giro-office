@@ -84,6 +84,22 @@ describe("compareIpiSpreadsheets", () => {
     expect(lines).toContain("Erro;;7;;;;;IPI não informado.");
   });
 
+  it("nota com IPI vazio ou ilegível de um lado não vira exclusiva do outro", () => {
+    const outcome = compareIpiSpreadsheets({
+      first: source([`${A};55;1;1;`, `${A};55;1;2;Isento`, `${A};55;1;3;0,00`]),
+      second: source([`${A};55;1;1;1,00`, `${A};55;1;2;1,00`, `${A};55;1;3;0,00`]),
+    });
+    expect(outcome.only_second).toEqual([]);
+    expect(outcome.not_comparable.map((item) => [item.identity, item.reason])).toEqual([
+      [`${A}|55|1|1`, "Planilha 1: IPI não informado."],
+      [`${A}|55|1|2`, "Planilha 1: IPI inválido: Isento."],
+    ]);
+    // Zero informado é valor; só o vazio é problema.
+    expect(outcome.matched.map((pair) => pair.identity)).toEqual([`${A}|55|1|3`]);
+    expect(outcome.totals).toEqual({ first: "0.00", second: "2.00", difference: "2.00" });
+    expect(outcome.status).toBe("partial");
+  });
+
   it("exige coluna de IPI nas duas planilhas", () => {
     expect(() =>
       compareIpiSpreadsheets({

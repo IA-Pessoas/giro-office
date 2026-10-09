@@ -1253,7 +1253,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Conferências"],
           summary: "Conferir IPI entre duas planilhas",
           description:
-            "Recebe duas planilhas CSV (first e second; separador ; , ou tab; até 450 mil caracteres cada) com colunas de identidade (chave de acesso ou emitente/modelo/série/número) e uma coluna de IPI (ex.: Valor IPI). Pareia as notas pela identidade e devolve matched, divergent (IPI diferente, com difference = planilha 2 − planilha 1 em centavos), only_first, only_second, duplicates (sem correspondência automática), discarded e errors por linha (IPI vazio ou inválido), totais de cada planilha e da diferença e o CSV (campo csv). status partial com descarte, erro ou duplicata. Nada é gravado.",
+            "Recebe duas planilhas CSV (first e second; separador ; , ou tab; até 450 mil caracteres cada) com colunas de identidade (chave de acesso ou emitente/modelo/série/número) e uma coluna de IPI (ex.: Valor IPI). Pareia as notas pela identidade e devolve matched, divergent (IPI diferente, com difference = planilha 2 − planilha 1 em centavos), only_first, only_second, duplicates (sem correspondência automática; cada planilha deve ter uma linha por nota, linhas por item viram duplicata), not_comparable (nota com IPI vazio ou ilegível em alguma planilha), discarded e errors por linha, totais de cada planilha e da diferença e o CSV (campo csv; diferença negativa em formato contábil, ex.: (0,80)). status partial com descarte, erro ou duplicata. Nada é gravado.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,

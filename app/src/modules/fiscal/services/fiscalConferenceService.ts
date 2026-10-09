@@ -239,7 +239,14 @@ export interface FiscalIpiSpreadsheetConference {
   identity_rule: string;
   sources: Record<"first" | "second", FiscalDocumentConference["sources"]["dominio"]>;
   summary: Record<
-    "matched" | "divergent" | "only_first" | "only_second" | "duplicates" | "discarded" | "errors",
+    | "matched"
+    | "divergent"
+    | "only_first"
+    | "only_second"
+    | "duplicates"
+    | "not_comparable"
+    | "discarded"
+    | "errors",
     number
   >;
   totals: { first: string; second: string; difference: string };
@@ -248,6 +255,12 @@ export interface FiscalIpiSpreadsheetConference {
   only_first: FiscalConferenceRow[];
   only_second: FiscalConferenceRow[];
   duplicates: { identity: string; first: FiscalConferenceRow[]; second: FiscalConferenceRow[] }[];
+  not_comparable: {
+    identity: string;
+    reason: string;
+    first: FiscalConferenceRow[];
+    second: FiscalConferenceRow[];
+  }[];
   discarded: { source: "first" | "second"; line: number; reason: string }[];
   errors: { source: "first" | "second"; line: number; message: string }[];
   file_name: string;

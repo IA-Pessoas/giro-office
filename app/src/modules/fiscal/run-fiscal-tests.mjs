@@ -460,5 +460,7 @@ await runTest("fiscal IPI spreadsheet conference shows each source and the diffe
   assert.match(section, /Diferença \(2 − 1\)/);
   assert.match(section, /formatMoney\(pair\.difference\)/);
   assert.match(section, /IPI vazio aparece como erro, não como zero/);
+  assert.match(section, /result\.not_comparable\.map/);
+  assert.match(section, /uma linha por nota/);
   assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
 });

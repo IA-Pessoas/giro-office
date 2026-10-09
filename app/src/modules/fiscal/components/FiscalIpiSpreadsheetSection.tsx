@@ -31,8 +31,10 @@ interface Line {
   note: string;
 }
 
+// IPI ilegível chega como texto bruto (ex.: "Isento"); só número vai para o formato de moeda.
+const ipiText = (ipi: string | null) => (ipi && /^-?\d+\.\d{2}$/u.test(ipi) ? formatMoney(ipi) : (ipi ?? "vazio"));
 const lineOf = (rows: FiscalConferenceRow[]) =>
-  rows.map((row) => `linha ${row.line} · ${formatMoney(row.ipi)}`).join(" | ");
+  rows.map((row) => `linha ${row.line} · ${ipiText(row.ipi)}`).join(" | ");
 
 /** Mesma ordem do CSV exportado pelo serviço. */
 function conferenceLines(result: FiscalIpiSpreadsheetConference): Line[] {
@@ -43,6 +45,7 @@ function conferenceLines(result: FiscalIpiSpreadsheetConference): Line[] {
     ...result.divergent.map((pair) => ({ situation: "Divergente", identity: pair.identity, first: lineOf([pair.first]), second: lineOf([pair.second]), difference: formatMoney(pair.difference), note: pair.differences.join(" | ") })),
     ...result.only_first.map((row) => ({ situation: "Só planilha 1", identity: row.identity, first: lineOf([row]), second: "", difference: "", note: "" })),
     ...result.only_second.map((row) => ({ situation: "Só planilha 2", identity: row.identity, first: "", second: lineOf([row]), difference: "", note: "" })),
+    ...result.not_comparable.map((item) => ({ situation: "Não comparável", identity: item.identity, first: lineOf(item.first), second: lineOf(item.second), difference: "", note: item.reason })),
     ...result.duplicates.map((item) => ({ situation: "Duplicada", identity: item.identity, first: lineOf(item.first), second: lineOf(item.second), difference: "", note: "Identidade repetida; sem correspondência automática" })),
     ...result.errors.map((item) => ({ situation: "Erro", identity: "", ...issue(item), difference: "", note: item.message })),
     ...result.discarded.map((item) => ({ situation: "Descartada", identity: "", ...issue(item), difference: "", note: item.reason })),
@@ -79,7 +82,7 @@ export function FiscalIpiSpreadsheetSection({ canEdit }: { canEdit: boolean }) {
           IPI entre planilhas
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Envie duas planilhas CSV com a identidade da nota (chave de acesso ou CPF/CNPJ do emitente, modelo, série e número) e uma coluna de IPI (ex.: Valor IPI). O IPI de cada nota é comparado e a diferença é planilha 2 − planilha 1. IPI vazio aparece como erro, não como zero. Nada é gravado.
+          Envie duas planilhas CSV (separador ponto e vírgula, vírgula ou tab, com cabeçalho) com a identidade da nota (chave de acesso ou CPF/CNPJ do emitente, modelo, série e número) e uma coluna de IPI (ex.: Valor IPI), com uma linha por nota. O IPI de cada nota é comparado e a diferença é planilha 2 − planilha 1. IPI vazio aparece como erro, não como zero; no CSV exportado, diferença negativa vem entre parênteses. Nada é gravado.
         </p>
         <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
           Compatibilidade com exportações reais ainda não validada: confira o resultado antes de usá-lo como definitivo.
@@ -108,7 +111,7 @@ export function FiscalIpiSpreadsheetSection({ canEdit }: { canEdit: boolean }) {
         <div className="space-y-3">
           {result.status === "partial" ? (
             <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
-              Conferência parcial: {result.summary.discarded} descarte(s), {result.summary.errors} erro(s) e {result.summary.duplicates} identidade(s) duplicada(s) ficaram sem correspondência.
+              Conferência parcial: {result.summary.discarded} descarte(s), {result.summary.errors} erro(s), {result.summary.not_comparable} nota(s) não comparável(is) e {result.summary.duplicates} identidade(s) duplicada(s) ficaram sem correspondência.
             </p>
           ) : (
             <p role="status" className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-900 dark:border-green-700 dark:bg-green-900/20 dark:text-green-200">
@@ -121,7 +124,7 @@ export function FiscalIpiSpreadsheetSection({ canEdit }: { canEdit: boolean }) {
               <div key={source.id} className="rounded-lg border border-gray-200 p-3 dark:border-slate-700">
                 <dt className="text-gray-600 dark:text-gray-400">{source.label}: {result.sources[source.id].file_name}</dt>
                 <dd className="text-lg font-semibold text-gray-900 dark:text-white">{formatMoney(result.totals[source.id])}</dd>
-                <dd className="text-xs text-gray-600 dark:text-gray-400">{result.sources[source.id].accepted_rows} de {result.sources[source.id].data_rows} linha(s)</dd>
+                <dd className="text-xs text-gray-600 dark:text-gray-400">{result.sources[source.id].accepted_rows} de {result.sources[source.id].data_rows} linha(s) · identidade por {result.sources[source.id].identity_columns.join(", ")}</dd>
               </div>
             ))}
             <div className="rounded-lg border border-gray-200 p-3 dark:border-slate-700">
