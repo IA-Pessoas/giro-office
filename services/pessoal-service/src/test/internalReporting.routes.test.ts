@@ -167,6 +167,9 @@ describe("pessoal internal reporting routes", () => {
     expect(obligationsSource.fields.map((field: { key: string }) => field.key)).toEqual([
       "competence",
       "client_name",
+      "client_code",
+      "client_document",
+      "client_status",
       "responsible_name",
       "group_snapshot_name",
       "group_snapshot_policy",
@@ -179,6 +182,14 @@ describe("pessoal internal reporting routes", () => {
       "bsf",
       "va",
       "vt",
+      "advance_state",
+      "payroll_state",
+      "charges_state",
+      "assistance_fee_state",
+      "bem_mais_state",
+      "bsf_state",
+      "va_state",
+      "vt_state",
     ]);
 
     const unionsSource = response.body.data.sources.find(

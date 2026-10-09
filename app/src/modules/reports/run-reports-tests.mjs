@@ -300,6 +300,9 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
       fields: [
         "competence",
         "client_name",
+        "client_code",
+        "client_document",
+        "client_status",
         "responsible_name",
         "group_snapshot_name",
         "group_snapshot_policy",
@@ -312,6 +315,14 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
         "bsf",
         "va",
         "vt",
+        "advance_state",
+        "payroll_state",
+        "charges_state",
+        "assistance_fee_state",
+        "bem_mais_state",
+        "bsf_state",
+        "va_state",
+        "vt_state",
       ].map((key) => ({ key, label: key, selectable: true })),
     },
   ];
@@ -327,14 +338,20 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
       "pessoal-folha-por-responsavel",
       "pessoal-folha-por-situacao",
       "pessoal-obrigacoes-competencia",
+      "pessoal-obrigacoes-responsavel",
     ],
   );
   assert.deepEqual(
-    presets.slice(2).map((preset) => preset.areas[0].filters),
+    presets.slice(2, 7).map((preset) => preset.areas[0].filters),
     ["group_name", "union_name", "responsible_name", "client_status", "competence"].map(
       (field) => [{ field, operator: "eq", value: "" }],
     ),
   );
+  assert.deepEqual(
+    presets[7].areas[0].filters.map((filter) => filter.field),
+    ["competence", "responsible_name"],
+  );
+  assert.ok(presets[7].areas[0].fields.includes("payroll_state"));
   assert.equal(getPessoalReportPresets(sources.slice(0, 2)).length, 6);
   for (const field of ["client_code", "client_document", "client_status", "previous", "info", "contact"]) {
     assert.ok(presets[0].areas[0].fields.includes(field), field);

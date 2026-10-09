@@ -450,6 +450,100 @@ describe("pessoal internal reporting service", () => {
     expect(clientFindMany).not.toHaveBeenCalled();
   });
 
+  it("deriva o estado de cada item da obrigação e identifica o cliente", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        payroll: true,
+        charges: false,
+        vt: null,
+        client: { dominio_code: "123", cpf_cnpj: "123.456.789-00", status: "Ativo" },
+      },
+    ]);
+    const service = new InternalReportingService({ obrigationsPessoal: { findMany } } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.obligations",
+        fields: [
+          "client_code",
+          "client_document",
+          "client_status",
+          "payroll_state",
+          "charges_state",
+          "vt_state",
+        ],
+        limit: 1,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          client_code: "123",
+          client_document: "123.456.789-00",
+          client_status: "Ativo",
+          payroll_state: "CONCLUIDO",
+          charges_state: "PENDENTE",
+          vt_state: "NAO_POSSUI",
+        },
+      ],
+      reachedLimit: false,
+    });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+      select: {
+        payroll: true,
+        charges: true,
+        vt: true,
+        client: { select: { name: true, dominio_code: true, cpf_cnpj: true, status: true } },
+      },
+      take: 2,
+    });
+  });
+
+  it("filtra obrigações pelo estado do item sem tocar no snapshot do grupo", async () => {
+    const records = [
+      { id: "o-1", payroll: false, group_snapshot_name: "Grupo A" },
+      { id: "o-2", payroll: true, group_snapshot_name: "Grupo A" },
+      { id: "o-3", payroll: null, group_snapshot_name: "Grupo B" },
+    ];
+    const findMany = vi.fn().mockResolvedValue(records);
+    const transaction = vi.fn(async (read: (client: unknown) => Promise<unknown>) =>
+      read({ obrigationsPessoal: { findMany } }),
+    );
+    const service = new InternalReportingService({ $transaction: transaction } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.obligations",
+        fields: ["group_snapshot_name", "payroll_state"],
+        limit: 10,
+        query: {
+          filters: [
+            {
+              field: "payroll_state",
+              operator: "in",
+              parameter: "state",
+              value: ["PENDENTE", "NAO_POSSUI"],
+            },
+          ],
+        },
+      }),
+    ).resolves.toEqual({
+      rows: [
+        { group_snapshot_name: "Grupo A", payroll_state: "PENDENTE" },
+        { group_snapshot_name: "Grupo B", payroll_state: "NAO_POSSUI" },
+      ],
+      reachedLimit: false,
+    });
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organization_id: organizationId },
+        select: expect.objectContaining({ group_snapshot_name: true, payroll: true }),
+      }),
+    );
+  });
+
   it("rejeita campo não publicado de payroll antes de consultar o banco", async () => {
     const findMany = vi.fn();
     const service = new InternalReportingService({ payroll: { findMany } } as never);

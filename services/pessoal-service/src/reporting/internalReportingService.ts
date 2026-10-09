@@ -230,7 +230,7 @@ function projectReportingFields(
   );
 }
 
-const PAYROLL_CLIENT_FIELDS = {
+const CLIENT_REPORTING_FIELDS = {
   client_name: "name",
   client_code: "dominio_code",
   client_document: "cpf_cnpj",
@@ -250,7 +250,7 @@ function projectPayrollReportingRow(
     {
       ...row,
       ...Object.fromEntries(
-        Object.entries(PAYROLL_CLIENT_FIELDS).map(([field, column]) => [
+        Object.entries(CLIENT_REPORTING_FIELDS).map(([field, column]) => [
           field,
           clientValue(row, column),
         ]),
@@ -265,6 +265,28 @@ function projectPayrollReportingRow(
   );
 }
 
+const OBLIGATION_ITEMS = [
+  "advance",
+  "payroll",
+  "charges",
+  "assistance_fee",
+  "bem_mais",
+  "bsf",
+  "va",
+  "vt",
+] as const;
+
+function obligationItemState(value: unknown): string {
+  if (value === true) return "CONCLUIDO";
+  if (value === false) return "PENDENTE";
+  return "NAO_POSSUI";
+}
+
+function obligationFieldColumn(field: string): string {
+  const item = OBLIGATION_ITEMS.find((candidate) => field === `${candidate}_state`);
+  return item ?? field;
+}
+
 function projectObligationReportingRow(
   row: Record<string, unknown>,
   fields: readonly string[],
@@ -272,6 +294,15 @@ function projectObligationReportingRow(
   return projectReportingFields(
     {
       ...row,
+      ...Object.fromEntries(
+        Object.entries(CLIENT_REPORTING_FIELDS).map(([field, column]) => [
+          field,
+          clientValue(row, column),
+        ]),
+      ),
+      ...Object.fromEntries(
+        OBLIGATION_ITEMS.map((item) => [`${item}_state`, obligationItemState(row[item])]),
+      ),
       client_name: reportName(row, "client", "client_name"),
       responsible_name: reportName(row, "responsible", "responsible_name"),
       group_snapshot_state: textValue(row.group_snapshot_state) ?? obligationSnapshotState(row),
@@ -372,7 +403,7 @@ export class InternalReportingService {
     if (input.source === PESSOAL_PAYROLL_REPORTING_SOURCES[0]) {
       const projectRow = (row: Record<string, unknown>) =>
         projectPayrollReportingRow(row, input.fields);
-      const needsClient = input.fields.some((field) => field in PAYROLL_CLIENT_FIELDS);
+      const needsClient = input.fields.some((field) => field in CLIENT_REPORTING_FIELDS);
       const rows = await readReportingRows(
         input.limit,
         { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
@@ -413,10 +444,14 @@ export class InternalReportingService {
           this.prisma.obrigationsPessoal.findMany({
             where: { organization_id: input.organizationId },
             select: {
-              ...selectScalars(input.fields, OBLIGATION_SCALAR_FIELDS),
+              ...selectScalars(input.fields.map(obligationFieldColumn), OBLIGATION_SCALAR_FIELDS),
               ...(page.includeCursor ? { id: true } : {}),
-              ...(input.fields.includes("client_name")
-                ? { client: { select: { name: true } } }
+              ...(input.fields.some((field) => field in CLIENT_REPORTING_FIELDS)
+                ? {
+                    client: {
+                      select: { name: true, dominio_code: true, cpf_cnpj: true, status: true },
+                    },
+                  }
                 : {}),
               ...(input.fields.includes("responsible_name")
                 ? { responsible: { select: { name: true } } }
