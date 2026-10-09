@@ -47,6 +47,18 @@ function isInstagramOnlyUpdate(body: unknown): boolean {
   return fields.length === 1 && fields[0] === "instagram";
 }
 
+function isSelfPasswordUpdate(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return false;
+  }
+
+  const fields = Object.keys(body);
+  return (
+    fields.includes("password") &&
+    fields.every((field) => field === "password" || field === "current_password")
+  );
+}
+
 export function buildAuthorizeMiddleware(
   mode: GatewayAuthorizationMode,
   logger?: Pick<Logger, "warn">,
@@ -111,7 +123,8 @@ export function buildAuthorizeMiddleware(
     if (
       request.auth.actorKind === "organization" &&
       request.auth.organizationId.length > 0 &&
-      selfUserPutMatch?.[1] === request.auth.userId
+      selfUserPutMatch?.[1] === request.auth.userId &&
+      isSelfPasswordUpdate(request.body)
     ) {
       next();
       return;
