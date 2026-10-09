@@ -300,7 +300,8 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
       "/client/groups/{id}": {
         patch: {
           tags: ["Clients"],
-          summary: "Renomear grupo de clientes",
+          summary: "Renomear, ativar ou inativar grupo de clientes",
+          description: "Integração ou Regularize nível 2. Informe nome, status ou ambos.",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
@@ -311,8 +312,10 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
               "application/json": {
                 schema: {
                   type: "object",
-                  required: ["name"],
-                  properties: { name: { type: "string", minLength: 1, maxLength: 120 } },
+                  properties: {
+                    name: { type: "string", minLength: 1, maxLength: 120 },
+                    status: { type: "boolean" },
+                  },
                   additionalProperties: false,
                 },
               },

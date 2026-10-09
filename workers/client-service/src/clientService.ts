@@ -27,7 +27,7 @@ export type ClientAuditEvent = {
   userId: string;
   permission: number | null;
   action: "create" | "update";
-  referring: "clients" | "clients.regimes" | "clients.segments";
+  referring: "clients" | "clients.regimes" | "clients.segments" | "clients.group";
   referringId: string;
   changes: Record<string, { from: unknown; to: unknown }>;
 };
@@ -161,6 +161,24 @@ export type ClientWorkerService = {
     id: string,
     organizationId: string,
     input: CatalogItemInput,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  listGroups: (organizationId: string, authorization: ClientAuthorization) => Promise<unknown>;
+  createGroup: (
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  updateGroup: (
+    id: string,
+    organizationId: string,
+    input: { name?: string; status?: boolean },
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  replaceGroupClients: (
+    id: string,
+    organizationId: string,
+    clientIds: readonly string[],
     authorization: ClientAuthorization,
   ) => Promise<unknown>;
   runCompetenceOutputUpdate: () => Promise<unknown>;
@@ -467,6 +485,45 @@ function normalizeCatalogName(name: string): string {
     .toLocaleLowerCase("pt-BR");
 }
 
+// Grupos canônicos são da Integração e também são geridos pelo Regularize (#1742).
+const GROUP_MODULES = ["integracao", "regularize"] as const;
+
+function requireGroupPermission(auth: ClientAuthorization, minimum: number): void {
+  if (auth.isOwner) return;
+  if (!GROUP_MODULES.some((module) => (auth.modules?.[module] ?? 0) >= minimum)) {
+    throw new ServiceError(403, "Usuário não possui permissão para grupos de empresas.");
+  }
+}
+
+function groupSelect(organizationId: string) {
+  return {
+    id: true,
+    name: true,
+    status: true,
+    organization_id: true,
+    clients: {
+      where: {
+        organization_id: organizationId,
+        client: { is: { organization_id: organizationId } },
+      },
+      select: {
+        client: {
+          select: { id: true, name: true, company_name: true, fantasy_name: true, cpf_cnpj: true },
+        },
+      },
+    },
+  } as const;
+}
+
+type GroupRow = { clients: Array<{ client: { id: string } & Record<string, unknown> }> } & Record<
+  string,
+  unknown
+>;
+
+function presentGroup(group: GroupRow) {
+  return { ...group, clients: group.clients.map(({ client }) => client) };
+}
+
 function serialize(value: unknown): unknown {
   return value instanceof Date ? value.toISOString() : value;
 }
@@ -734,6 +791,163 @@ export class ClientService implements ClientWorkerService {
     authorization: ClientAuthorization,
   ): Promise<unknown> {
     return this.updateCatalogItem("segment", id, organizationId, input, authorization);
+  }
+
+  private async auditGroup(
+    organizationId: string,
+    authorization: ClientAuthorization,
+    action: "create" | "update",
+    groupId: string,
+    changes: Record<string, { from: unknown; to: unknown }>,
+  ): Promise<void> {
+    if (Object.keys(changes).length === 0) return;
+    await this.audit?.({
+      organizationId,
+      userId: authorization.userId,
+      permission: authorization.permission ?? null,
+      action,
+      referring: "clients.group",
+      referringId: groupId,
+      changes,
+    });
+  }
+
+  private async assertGroupNameFree(
+    organizationId: string,
+    name: string,
+    exceptId?: string,
+  ): Promise<void> {
+    const duplicate = await this.prisma.group.findFirst({
+      where: {
+        organization_id: organizationId,
+        name,
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (duplicate) throw new ServiceError(409, "Já existe um grupo com este nome.");
+  }
+
+  async listGroups(organizationId: string, authorization: ClientAuthorization): Promise<unknown> {
+    requireGroupPermission(authorization, 1);
+    const groups = await this.prisma.group.findMany({
+      where: { organization_id: organizationId },
+      orderBy: { name: "asc" },
+      select: groupSelect(organizationId),
+    });
+    return groups.map(presentGroup);
+  }
+
+  async createGroup(
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireGroupPermission(authorization, 2);
+    const trimmed = catalogDisplayName(name);
+    await this.assertGroupNameFree(organizationId, trimmed);
+    const group = await this.prisma.group.create({
+      data: { name: trimmed, organization_id: organizationId },
+      select: groupSelect(organizationId),
+    });
+    await this.auditGroup(organizationId, authorization, "create", group.id, {
+      name: { from: null, to: trimmed },
+      status: { from: null, to: group.status },
+    });
+    return presentGroup(group);
+  }
+
+  async updateGroup(
+    id: string,
+    organizationId: string,
+    input: { name?: string; status?: boolean },
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireGroupPermission(authorization, 2);
+    const existing = await this.prisma.group.findFirst({
+      where: { id, organization_id: organizationId },
+      select: { id: true, name: true, status: true },
+    });
+    if (!existing) throw new ServiceError(404, "Grupo não encontrado.");
+    const data: { name?: string; status?: boolean } = {};
+    if (input.name !== undefined) {
+      data.name = catalogDisplayName(input.name);
+      await this.assertGroupNameFree(organizationId, data.name, id);
+    }
+    if (input.status !== undefined) data.status = input.status;
+    const group = await this.prisma.group.update({
+      where: { id },
+      data,
+      select: groupSelect(organizationId),
+    });
+    await this.auditGroup(
+      organizationId,
+      authorization,
+      "update",
+      id,
+      Object.fromEntries(
+        (["name", "status"] as const)
+          .filter((key) => data[key] !== undefined && data[key] !== existing[key])
+          .map((key) => [key, { from: existing[key], to: data[key] }]),
+      ),
+    );
+    return presentGroup(group);
+  }
+
+  async replaceGroupClients(
+    id: string,
+    organizationId: string,
+    clientIds: readonly string[],
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireGroupPermission(authorization, 2);
+    const wanted = [...new Set(clientIds)];
+    const result = await this.prisma.$transaction(async (transaction) => {
+      const group = await transaction.group.findFirst({
+        where: { id, organization_id: organizationId },
+        select: { id: true },
+      });
+      if (!group) throw new ServiceError(404, "Grupo não encontrado.");
+      const clients = wanted.length
+        ? await transaction.client.findMany({
+            where: { id: { in: wanted }, organization_id: organizationId },
+            select: { id: true },
+          })
+        : [];
+      if (clients.length !== wanted.length) {
+        throw new ServiceError(404, "Um ou mais clientes não foram encontrados nesta organização.");
+      }
+      const before = await transaction.clientsGroup.findMany({
+        where: { group_id: id, organization_id: organizationId },
+        select: { client_id: true },
+      });
+      const current = new Set(before.map((row) => row.client_id));
+      const removed = [...current].filter((clientId) => !wanted.includes(clientId));
+      const added = wanted.filter((clientId) => !current.has(clientId));
+      if (removed.length) {
+        await transaction.clientsGroup.deleteMany({
+          where: { group_id: id, organization_id: organizationId, client_id: { in: removed } },
+        });
+      }
+      if (added.length) {
+        // O índice único (group_id, client_id) impede o par repetido mesmo em gravações concorrentes.
+        await transaction.clientsGroup.createMany({
+          data: added.map((clientId) => ({
+            group_id: id,
+            client_id: clientId,
+            organization_id: organizationId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      return { clients, added, removed };
+    });
+    if (result.added.length || result.removed.length) {
+      await this.auditGroup(organizationId, authorization, "update", id, {
+        clients: { from: { removed: result.removed }, to: { added: result.added } },
+      });
+    }
+    return { id, clients: result.clients };
   }
 
   private async client(id: string, organizationId: string): Promise<ClientRow> {

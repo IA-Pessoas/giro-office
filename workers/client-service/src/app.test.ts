@@ -97,6 +97,15 @@ function service(): ClientWorkerService {
     listSegments: vi.fn(async () => [{ id: REGIME_ID, name: "Varejo", type: "comercio" }]),
     createSegment: vi.fn(async () => ({ id: REGIME_ID, name: "Varejo", type: "comercio" })),
     updateSegment: vi.fn(async () => ({ id: REGIME_ID, name: "Atacado", type: "comercio" })),
+    listGroups: vi.fn(async () => []),
+    createGroup: vi.fn(async () => ({ id: REGIME_ID, name: "Holding", status: true, clients: [] })),
+    updateGroup: vi.fn(async () => ({
+      id: REGIME_ID,
+      name: "Holding",
+      status: false,
+      clients: [],
+    })),
+    replaceGroupClients: vi.fn(async () => ({ id: REGIME_ID, clients: [{ id: CLIENT_ID }] })),
   };
 }
 
@@ -239,6 +248,60 @@ describe("client Worker", () => {
       expect.anything(),
     );
     expect(empty.status).toBe(400);
+  });
+
+  it("serves canonical groups before /client/:id and validates the payloads", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const json = { ...headers(), "content-type": "application/json" };
+
+    const list = await app.request("https://client.test/client/groups", { headers: headers() });
+    const create = await app.request("https://client.test/client/groups", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: "Holding" }),
+    });
+    const inactivate = await app.request(`https://client.test/client/groups/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({ status: false }),
+    });
+    const emptyPatch = await app.request(`https://client.test/client/groups/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({}),
+    });
+    const members = await app.request(`https://client.test/client/groups/${REGIME_ID}/clients`, {
+      method: "PUT",
+      headers: json,
+      body: JSON.stringify({ client_ids: [CLIENT_ID] }),
+    });
+    const badMember = await app.request(`https://client.test/client/groups/${REGIME_ID}/clients`, {
+      method: "PUT",
+      headers: json,
+      body: JSON.stringify({ client_ids: ["nao-e-uuid"] }),
+    });
+
+    expect(list.status).toBe(200);
+    expect(clientService.listGroups).toHaveBeenCalledWith(ORGANIZATION_ID, expect.anything());
+    expect(create.status).toBe(201);
+    expect(inactivate.status).toBe(200);
+    expect(clientService.updateGroup).toHaveBeenCalledWith(
+      REGIME_ID,
+      ORGANIZATION_ID,
+      { status: false },
+      expect.anything(),
+    );
+    expect(emptyPatch.status).toBe(400);
+    expect(members.status).toBe(200);
+    expect(clientService.replaceGroupClients).toHaveBeenCalledWith(
+      REGIME_ID,
+      ORGANIZATION_ID,
+      [CLIENT_ID],
+      expect.anything(),
+    );
+    expect(badMember.status).toBe(400);
+    expect(clientService.getById).not.toHaveBeenCalled();
   });
 
   it("preserves representative CRUD and validation behavior", async () => {
