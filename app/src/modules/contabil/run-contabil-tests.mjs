@@ -11,6 +11,7 @@ import {
 } from "./services/contabilService.contract.ts";
 import {
   contabilControlHistoryQueryKey,
+  contabilRelationshipHistoryQueryKey,
   contabilControlQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
@@ -28,7 +29,10 @@ import {
   CONTABIL_CONTROL_NOTES_FIELD,
   getContabilControlFieldLabel,
 } from "./components/contabilControlFields.ts";
-import { CONTABIL_RELATIONSHIP_FIELDS } from "./components/contabilRelationshipFields.ts";
+import {
+  CONTABIL_RELATIONSHIP_FIELDS,
+  getContabilRelationshipFieldLabel,
+} from "./components/contabilRelationshipFields.ts";
 import {
   formatContabilControlHistoryValue,
   getContabilControlHistoryPageCount,
@@ -52,6 +56,7 @@ import {
   buildContabilResponsibleFormValues,
   formatContabilBidding,
   formatContabilChartAccounts,
+  formatContabilRelationshipHistoryValue,
   getContabilChartAccountsOptions,
   pickChangedContabilRelationshipFields,
   getContabilSelectLabel,
@@ -540,6 +545,26 @@ await (async () => {
       "contabil",
       "relationship",
       "client-1",
+    ]);
+  });
+
+  await runTest("relationship history labels fields and legacy states (#1723)", () => {
+    assert.equal(getContabilRelationshipFieldLabel("bidding"), "Participa de licitação");
+    assert.equal(getContabilRelationshipFieldLabel("chart_accounts"), "Plano de contas");
+    assert.equal(formatContabilRelationshipHistoryValue("bidding", null), "Não selecionado");
+    assert.equal(formatContabilRelationshipHistoryValue("bidding", true), "Sim");
+    assert.equal(formatContabilRelationshipHistoryValue("chart_accounts", "Sim — Jonrick"), "Sim — Jonrick");
+    assert.equal(
+      formatContabilRelationshipHistoryValue("chart_accounts", "Plano próprio"),
+      "Plano próprio (texto legado)",
+    );
+    assert.equal(formatContabilRelationshipHistoryValue("chart_accounts", null), "Não selecionado");
+    assert.equal(formatContabilRelationshipHistoryValue("tool", ""), "(vazio)");
+    assert.deepEqual(contabilRelationshipHistoryQueryKey("client-1", 1), [
+      "contabil",
+      "relationship-history",
+      "client-1",
+      1,
     ]);
   });
 

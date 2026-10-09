@@ -21,6 +21,11 @@ export function contabilRelationshipQueryKey(clientId: string) {
   return [...CONTABIL_QUERY_KEY, "relationship", clientId] as const;
 }
 
+export function contabilRelationshipHistoryQueryKey(clientId: string, page?: number) {
+  const key = [...CONTABIL_QUERY_KEY, "relationship-history", clientId] as const;
+  return page === undefined ? key : ([...key, page] as const);
+}
+
 export function triageMonthlyQueryKey(
   clientId: string,
   competence: string,

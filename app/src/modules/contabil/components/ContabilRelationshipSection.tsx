@@ -19,6 +19,7 @@ import {
   useUpdateContabilRelationshipMutation,
 } from "../hooks";
 import { getContabilErrorMessage } from "../services";
+import { ContabilRelationshipHistory } from "./ContabilRelationshipHistory";
 import { ContabilStateBox } from "./ContabilStateBox";
 import {
   CONTABIL_RELATIONSHIP_FIELDS,
@@ -36,6 +37,7 @@ import {
 
 interface ContabilRelationshipSectionProps {
   clientId: string;
+  clientName?: string;
   canEdit: boolean;
 }
 
@@ -50,6 +52,7 @@ const DANGER_BUTTON_CLASSNAME =
 
 export function ContabilRelationshipSection({
   clientId,
+  clientName,
   canEdit,
 }: ContabilRelationshipSectionProps) {
   const relationshipQuery = useContabilRelationship(clientId, { enabled: Boolean(clientId) });
@@ -268,6 +271,10 @@ export function ContabilRelationshipSection({
             ))}
           </div>
         </div>
+      ) : null}
+
+      {relationship ? (
+        <ContabilRelationshipHistory key={clientId} clientId={clientId} clientName={clientName} />
       ) : null}
 
       <Dialog

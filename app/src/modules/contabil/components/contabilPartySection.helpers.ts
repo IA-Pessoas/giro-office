@@ -103,6 +103,12 @@ const BIDDING_OPTIONS: ContabilSelectOption[] = [
 
 type ContabilRelationshipEditableField = keyof ContabilRelationshipFormValues;
 
+export function formatContabilRelationshipHistoryValue(field: string, value: unknown) {
+  if (field === "bidding") return formatContabilBidding(value as boolean | null);
+  if (field === "chart_accounts") return formatContabilChartAccounts(value as string | null);
+  return typeof value === "string" && value.trim() ? value : "(vazio)";
+}
+
 export function formatContabilRelationshipField(
   relationship: ContabilRelationship,
   field: ContabilRelationshipEditableField,

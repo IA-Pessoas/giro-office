@@ -263,7 +263,7 @@ function ContabilActiveTabPanel({
       id="contabil-panel-relationship"
       aria-labelledby="contabil-tab-relationship"
     >
-      <ContabilRelationshipSection clientId={clientId} canEdit={canEdit} />
+      <ContabilRelationshipSection clientId={clientId} clientName={clientName} canEdit={canEdit} />
     </div>
   );
 }
