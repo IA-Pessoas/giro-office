@@ -151,7 +151,7 @@ describe("compareSefazWithXml", () => {
       "Situação;Identidade;Chave usada;Linha SEFAZ;Valor SEFAZ;Arquivo XML;Valor XML;Observação",
     );
     expect(lines).toContain(
-      `Coincidente;${ISSUER}|55|1|100;chave de acesso;2;10,00;100.xml;10,00;`,
+      `Coincidente;${ISSUER}|55|1|100;chave de acesso;2;10,00;100.xml;10,00;XML sem protocolo de autorização`,
     );
     expect(lines).toContain(`Só XML;${ISSUER}|55|1|104;;;;104.xml;7,00;`);
     expect(lines).toContain(
@@ -159,6 +159,93 @@ describe("compareSefazWithXml", () => {
     );
     expect(lines).toContain("Erro;;;;;quebrado.xml;;XML inválido.");
     expect(lines.filter((line) => line.startsWith("Resultado;"))).toHaveLength(1);
+  });
+
+  it("não aceita situação negada, denegada ou cancelada como autorizada", () => {
+    const statuses = [
+      "Autorizada",
+      "Uso autorizado",
+      "Não autorizada",
+      "Autorização denegada",
+      "Cancelada",
+    ];
+    const csv = [
+      "Chave;Situação",
+      ...statuses.map((status, index) => `${key(String(200 + index))};${status}`),
+    ].join("\n");
+    const files = Object.fromEntries(
+      statuses.map((_, index) => [`${200 + index}.xml`, nfe(String(200 + index), "1.00")]),
+    );
+    const outcome = compareSefazWithXml({
+      sefaz: { file_name: "s.csv", content: csv },
+      xml: zip(files),
+    });
+    expect(outcome.matched.map((pair) => pair.sefaz.status)).toEqual([
+      "Autorizada",
+      "Uso autorizado",
+    ]);
+    expect(outcome.not_comparable.map((item) => item.reason)).toEqual([
+      'SEFAZ: situação "Não autorizada"',
+      'SEFAZ: situação "Autorização denegada"',
+      'SEFAZ: situação "Cancelada"',
+    ]);
+  });
+
+  it("usa a identidade composta como chave quando as chaves divergem", () => {
+    const otherKey = `${key("300").slice(0, 35)}87654321`;
+    const fixedKey = (() => {
+      let weight = 2;
+      let sum = 0;
+      for (let i = otherKey.length - 1; i >= 0; i -= 1) {
+        sum += Number(otherKey[i]) * weight;
+        weight = weight === 9 ? 2 : weight + 1;
+      }
+      const rest = sum % 11;
+      return `${otherKey.slice(0, 43)}${rest < 2 ? 0 : 11 - rest}`;
+    })();
+    const outcome = compareSefazWithXml({
+      sefaz: { file_name: "s.csv", content: `Chave\n${fixedKey}` },
+      xml: zip({ "300.xml": nfe("300", "1.00") }),
+    });
+    expect(outcome.divergent[0]).toMatchObject({
+      match_key: "emitente, modelo, série e número",
+      differences: ["Chave de acesso diferente"],
+    });
+  });
+
+  it("não chama de divergência o valor ausente e trata cópia idêntica como descarte", () => {
+    const outcome = compareSefazWithXml({
+      sefaz: { file_name: "s.csv", content: `Chave;Valor\n${key("400")};` },
+      xml: zip({
+        "proc.xml": nfe("400", "4.00", { cStat: "100" }),
+        "sem-protocolo.xml": nfe("400", "4.00"),
+      }),
+    });
+    expect(outcome.matched[0]?.notes).toEqual(["Valor ausente em um dos lados"]);
+    expect(outcome.duplicates).toEqual([]);
+    expect(outcome.discarded).toEqual([
+      { source: "xml", entry: "sem-protocolo.xml", reason: "Cópia idêntica de proc.xml." },
+    ]);
+    expect(outcome.status).toBe("complete");
+  });
+
+  it("deixa parcial o ZIP sem nenhuma NF-e e mantém duplicata com situação ruim como duplicata", () => {
+    const empty = compareSefazWithXml({
+      sefaz: { file_name: "s.csv", content: `Chave\n${key("500")}` },
+      xml: zip({ "evento.xml": "<procEventoNFe/>" }),
+    });
+    expect(empty.status).toBe("partial");
+    expect(empty.only_sefaz).toHaveLength(1);
+
+    const duplicated = compareSefazWithXml({
+      sefaz: {
+        file_name: "s.csv",
+        content: `Chave;Situação\n${key("501")};Cancelada\n${key("501")};Autorizada`,
+      },
+      xml: zip({ "501.xml": nfe("501", "1.00") }),
+    });
+    expect(duplicated.duplicates).toHaveLength(1);
+    expect(duplicated.not_comparable).toEqual([]);
   });
 
   it("fica completo sem erros, descartes de planilha ou duplicatas", () => {

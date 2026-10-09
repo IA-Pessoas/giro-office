@@ -87,6 +87,7 @@ type SefazXmlPair = {
   match_key: string;
   sefaz: FiscalConferenceRow;
   xml: FiscalXmlNoteRow;
+  notes: string[];
 };
 
 type SefazXmlIssue<T> = ({ source: "sefaz"; line: number } | { source: "xml"; entry: string }) & T;

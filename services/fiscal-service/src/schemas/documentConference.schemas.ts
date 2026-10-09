@@ -42,6 +42,9 @@ export const xmlSelectionBodySchema = z
   .strict();
 
 // Planilha e ZIP dividem o 1 MB do gateway: 300 mil caracteres + 600 mil em base64 (~450 kB).
+export const SEFAZ_XML_MAX_CONTENT_LENGTH = 300_000;
+export const SEFAZ_XML_MAX_BASE64_LENGTH = 600_000;
+
 export const sefazXmlConferenceBodySchema = z
   .object({
     sefaz: z
@@ -50,7 +53,7 @@ export const sefazXmlConferenceBodySchema = z
         content: z
           .string({ message: "Envie a planilha SEFAZ." })
           .min(1, "Arquivo vazio.")
-          .max(300_000, "Planilha excede o limite de 300 mil caracteres."),
+          .max(SEFAZ_XML_MAX_CONTENT_LENGTH, "Planilha excede o limite de 300 mil caracteres."),
       })
       .strict(),
     xml: z
@@ -59,7 +62,7 @@ export const sefazXmlConferenceBodySchema = z
         zip_base64: z
           .string({ message: "Envie o ZIP de XML." })
           .min(1, "Envie o ZIP de XML.")
-          .max(600_000, "ZIP excede o limite de 450 kB.")
+          .max(SEFAZ_XML_MAX_BASE64_LENGTH, "ZIP excede o limite de 450 kB.")
           .regex(/^[A-Za-z0-9+/]+={0,2}$/u, "ZIP em base64 inválido."),
       })
       .strict(),

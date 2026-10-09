@@ -38,6 +38,8 @@ interface Pair {
   match_key: MatchKey;
   sefaz: ConferenceDocumentRow;
   xml: XmlNoteRow;
+  /** Observações que não são divergência (ex.: XML sem protocolo de autorização). */
+  notes: string[];
 }
 
 type Issue<T> = ({ source: "sefaz"; line: number } & T) | ({ source: "xml"; entry: string } & T);
@@ -81,18 +83,8 @@ const IDENTITY_RULE =
 // cStat 100 (autorizada) e 150 (autorizada fora de prazo); sem protocolo, o XML é comparado.
 const AUTHORIZED_PROTOCOL = new Set(["100", "150"]);
 
-function xmlRow(note: NfeFile): XmlNoteRow {
-  return {
-    entry: note.entry,
-    identity: note.identity,
-    access_key: note.access_key,
-    issuer: note.issuer,
-    model: note.model,
-    series: note.series,
-    number: note.number,
-    value: note.value,
-    protocol_status: note.protocol_status,
-  };
+function xmlRow({ kind: _kind, body: _body, content: _content, ...row }: NfeFile): XmlNoteRow {
+  return row;
 }
 
 function sefazStatusProblem(row: ConferenceDocumentRow): string | null {
@@ -101,7 +93,10 @@ function sefazStatusProblem(row: ConferenceDocumentRow): string | null {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
-  return normalized.includes("autoriza") ? null : `SEFAZ: situação "${row.status}"`;
+  // "Autorizada", "Uso autorizado"; negação, denegação, cancelamento e afins ficam de fora.
+  const authorized =
+    /autorizad/u.test(normalized) && !/\bnao\b|denega|cancel|inutiliz|rejeit/u.test(normalized);
+  return authorized ? null : `SEFAZ: situação "${row.status}"`;
 }
 
 function xmlStatusProblem(row: XmlNoteRow): string | null {
@@ -116,8 +111,21 @@ export function compareSefazWithXml(input: {
 }): SefazXmlConferenceResult {
   const sefaz = parseNoteSpreadsheet("sefaz", "SEFAZ", input.sefaz);
   const archive = readNfeArchive(input.xml.zip_base64);
-  const xmlRows = archive.notes.map(xmlRow);
-  const xmlCents = archive.notes.map((note) => (note.value ? parseCents(note.value) : null));
+  // Cópia idêntica da mesma nota (mesma infNFe, com ou sem protocolo) não é duplicata: fica a
+  // primeira e as demais são relatadas como descarte.
+  const copies: { entry: string; reason: string }[] = [];
+  const notes = archive.notes.filter((note, index) => {
+    const first = archive.notes.find(
+      (other) => other.identity === note.identity && other.content === note.content,
+    );
+    if (first && archive.notes.indexOf(first) !== index) {
+      copies.push({ entry: note.entry, reason: `Cópia idêntica de ${first.entry}.` });
+      return false;
+    }
+    return true;
+  });
+  const xmlRows = notes.map(xmlRow);
+  const xmlCents = notes.map((note) => (note.value ? parseCents(note.value) : null));
 
   // Identidade com situação não comparável em qualquer lado sai inteira do pareamento: não é
   // ausência nem divergência.
@@ -149,7 +157,7 @@ export function compareSefazWithXml(input: {
     not_comparable: [],
     discarded: [
       ...sefaz.discarded,
-      ...archive.discarded.map((item) => ({ source: "xml" as const, ...item })),
+      ...[...archive.discarded, ...copies].map((item) => ({ source: "xml" as const, ...item })),
     ],
     errors: [
       ...sefaz.errors,
@@ -161,34 +169,38 @@ export function compareSefazWithXml(input: {
     const sefazSide = item.kind === "duplicate" ? item.left : "left" in item ? [item.left] : [];
     const xmlSide = item.kind === "duplicate" ? item.right : "right" in item ? [item.right] : [];
     const problem = problems.get(item.identity);
-    if (problem) {
+    // Duplicata vem antes: sem saber qual linha vale, nem a situação pode ser atribuída.
+    if (item.kind === "duplicate") {
+      buckets.duplicates.push({
+        identity: item.identity,
+        sefaz: sefazSide.map(publicRow),
+        xml: xmlSide,
+      });
+    } else if (problem) {
       buckets.not_comparable.push({
         identity: item.identity,
         reason: problem.join("; "),
         sefaz: sefazSide.map(publicRow),
         xml: xmlSide,
       });
-    } else if (item.kind === "duplicate") {
-      buckets.duplicates.push({
-        identity: item.identity,
-        sefaz: sefazSide.map(publicRow),
-        xml: xmlSide,
-      });
     } else if (item.kind === "pair") {
       const { left: s, right: x } = item;
       const differences: string[] = [];
-      if (s.access_key && x.access_key && s.access_key !== x.access_key) {
-        differences.push("Chave de acesso diferente");
-      }
-      if (sefaz.hasValue && s.value !== x.value) {
-        differences.push(`Valor: SEFAZ ${s.value ?? "ausente"} × XML ${x.value ?? "ausente"}`);
+      const sameKey = Boolean(s.access_key && s.access_key === x.access_key);
+      if (s.access_key && x.access_key && !sameKey) differences.push("Chave de acesso diferente");
+      // Valor só é comparado quando os dois lados têm; ausência não é diferença de valor.
+      if (s.value !== null && x.value !== null && s.value !== x.value) {
+        differences.push(`Valor: SEFAZ ${s.value} × XML ${x.value}`);
       }
       const pair: Pair = {
         identity: item.identity,
-        match_key:
-          s.access_key && x.access_key ? "chave de acesso" : "emitente, modelo, série e número",
+        match_key: sameKey ? "chave de acesso" : "emitente, modelo, série e número",
         sefaz: publicRow(s),
         xml: x,
+        notes: [
+          ...(x.protocol_status === null ? ["XML sem protocolo de autorização"] : []),
+          ...(s.value === null || x.value === null ? ["Valor ausente em um dos lados"] : []),
+        ],
       };
       if (differences.length > 0) buckets.divergent.push({ ...pair, differences });
       else buckets.matched.push(pair);
@@ -202,8 +214,10 @@ export function compareSefazWithXml(input: {
   const summary = Object.fromEntries(
     Object.entries(buckets).map(([name, items]) => [name, items.length]),
   ) as SefazXmlConferenceResult["summary"];
-  // Descarte de XML (não é XML/NF-e) não esconde nota pedida; descarte de linha da planilha sim.
-  const incomplete = sefaz.discarded.length + summary.errors + summary.duplicates > 0;
+  // Descarte de XML (não é XML/NF-e) não esconde nota; descarte de linha da planilha sim. ZIP sem
+  // nenhuma NF-e também não pode parecer conferência completa.
+  const incomplete =
+    sefaz.discarded.length + summary.errors + summary.duplicates > 0 || notes.length === 0;
   return {
     status: incomplete ? "partial" : "complete",
     identity_rule: IDENTITY_RULE,
@@ -212,7 +226,7 @@ export function compareSefazWithXml(input: {
       xml: {
         file_name: input.xml.file_name,
         entries: archive.entries,
-        nfe_entries: archive.notes.length,
+        nfe_entries: notes.length,
       },
     },
     summary,
@@ -268,7 +282,7 @@ export function sefazXmlConferenceCsvExport(result: SefazXmlConferenceResult) {
       item.identity,
       item.match_key,
       ...sides([item.sefaz], [item.xml]),
-      "",
+      item.notes.join(" | "),
     ]);
   }
   for (const item of result.divergent) {
@@ -277,7 +291,7 @@ export function sefazXmlConferenceCsvExport(result: SefazXmlConferenceResult) {
       item.identity,
       item.match_key,
       ...sides([item.sefaz], [item.xml]),
-      item.differences.join(" | "),
+      [...item.differences, ...item.notes].join(" | "),
     ]);
   }
   for (const row of result.only_sefaz) {

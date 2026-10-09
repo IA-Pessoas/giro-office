@@ -402,4 +402,8 @@ await runTest("fiscal SEFAZ × XML conference posts both files and separates sit
   assert.match(section, /"Não comparável"/);
   assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
   assert.match(section, /const MAX_ZIP_BYTES = 450_000;/);
+  // Ordem da tabela igual à do CSV exportado: Coincidente primeiro.
+  assert.match(section, /const SITUATIONS = \[\s*"Coincidente",/);
+  assert.match(section, /return \[\s*\.\.\.result\.matched\.map/);
+  assert.match(section, /Identidade: \{result\.identity_rule\}/);
 });

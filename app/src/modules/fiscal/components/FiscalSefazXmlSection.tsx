@@ -20,6 +20,7 @@ const MAX_SPREADSHEET_BYTES = 300_000;
 const MAX_ZIP_BYTES = 450_000;
 
 const SITUATIONS = [
+  "Coincidente",
   "Divergente",
   "Só SEFAZ",
   "Só XML",
@@ -27,7 +28,6 @@ const SITUATIONS = [
   "Duplicada",
   "Erro",
   "Descartada",
-  "Coincidente",
 ] as const;
 type Situation = (typeof SITUATIONS)[number];
 
@@ -50,14 +50,14 @@ function conferenceLines(result: FiscalSefazXmlConference): Line[] {
   const issueSide = (issue: { source: "sefaz"; line: number } | { source: "xml"; entry: string }) =>
     issue.source === "sefaz" ? { sefaz: `linha ${issue.line}`, xml: "" } : { sefaz: "", xml: issue.entry };
   return [
-    ...result.divergent.map((item) => ({ situation: "Divergente" as const, identity: item.identity, matchKey: item.match_key, sefaz: sefazText([item.sefaz]), xml: xmlText([item.xml]), note: item.differences.join(" | ") })),
+    ...result.matched.map((item) => ({ situation: "Coincidente" as const, identity: item.identity, matchKey: item.match_key, sefaz: sefazText([item.sefaz]), xml: xmlText([item.xml]), note: item.notes.join(" | ") })),
+    ...result.divergent.map((item) => ({ situation: "Divergente" as const, identity: item.identity, matchKey: item.match_key, sefaz: sefazText([item.sefaz]), xml: xmlText([item.xml]), note: [...item.differences, ...item.notes].join(" | ") })),
     ...result.only_sefaz.map((row) => ({ situation: "Só SEFAZ" as const, identity: row.identity, matchKey: "", sefaz: sefazText([row]), xml: "", note: "" })),
     ...result.only_xml.map((row) => ({ situation: "Só XML" as const, identity: row.identity, matchKey: "", sefaz: "", xml: xmlText([row]), note: "" })),
     ...result.not_comparable.map((item) => ({ situation: "Não comparável" as const, identity: item.identity, matchKey: "", sefaz: sefazText(item.sefaz), xml: xmlText(item.xml), note: item.reason })),
     ...result.duplicates.map((item) => ({ situation: "Duplicada" as const, identity: item.identity, matchKey: "", sefaz: sefazText(item.sefaz), xml: xmlText(item.xml), note: "Identidade repetida; sem correspondência automática" })),
     ...result.errors.map((item) => ({ situation: "Erro" as const, identity: "", matchKey: "", ...issueSide(item), note: item.message })),
     ...result.discarded.map((item) => ({ situation: "Descartada" as const, identity: "", matchKey: "", ...issueSide(item), note: item.reason })),
-    ...result.matched.map((item) => ({ situation: "Coincidente" as const, identity: item.identity, matchKey: item.match_key, sefaz: sefazText([item.sefaz]), xml: xmlText([item.xml]), note: "" })),
   ];
 }
 
@@ -95,7 +95,7 @@ export function FiscalSefazXmlSection({ canEdit }: { canEdit: boolean }) {
           CSV SEFAZ × XML
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Envie a planilha CSV da SEFAZ e um ZIP com os XML de NF-e. As notas são pareadas pela chave de acesso ou por emitente, modelo, série e número; canceladas ou denegadas ficam como não comparáveis, separadas das ausências reais. Nada é gravado.
+          Envie a planilha CSV da SEFAZ e um ZIP com os XML de NF-e ou NFC-e. As notas são pareadas pela chave de acesso ou por emitente, modelo, série e número; canceladas ou denegadas ficam como não comparáveis, separadas das ausências reais. Nada é gravado.
         </p>
         <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
           Compatibilidade com exportações reais ainda não validada: confira o resultado antes de usá-lo como definitivo.
@@ -133,6 +133,7 @@ export function FiscalSefazXmlSection({ canEdit }: { canEdit: boolean }) {
               Todas as linhas e XML foram lidos e pareados sem ambiguidade.
             </p>
           )}
+          <p className="text-sm text-gray-600 dark:text-gray-400">Identidade: {result.identity_rule}</p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {result.sources.sefaz.file_name}: {result.sources.sefaz.accepted_rows} de {result.sources.sefaz.data_rows} linha(s){result.totals.sefaz ? ` · total ${money(result.totals.sefaz)}` : ""} · {result.sources.xml.file_name}: {result.sources.xml.nfe_entries} NF-e em {result.sources.xml.entries} arquivo(s){result.totals.xml ? ` · total ${money(result.totals.xml)}` : ""}
           </p>

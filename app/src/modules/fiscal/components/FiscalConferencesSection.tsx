@@ -37,13 +37,13 @@ interface ConferenceLine {
 }
 
 const SITUATIONS: Situation[] = [
+  "Coincidente",
   "Divergente",
   "Só Domínio",
   "Só SEFAZ",
   "Duplicada",
   "Erro",
   "Descartada",
-  "Coincidente",
 ];
 
 // Mesmo teto do serviço (450 mil caracteres por planilha, dentro do 1 MB do gateway).
@@ -60,6 +60,13 @@ function conferenceLines(result: FiscalDocumentConference): ConferenceLine[] {
       ? { dominio: { line, value: null }, sefaz: null }
       : { dominio: null, sefaz: { line, value: null } };
   return [
+    ...result.matched.map((item) => ({
+      situation: "Coincidente" as const,
+      identity: item.identity,
+      dominio: side(item.dominio),
+      sefaz: side(item.sefaz),
+      note: "",
+    })),
     ...result.divergent.map((item) => ({
       situation: "Divergente" as const,
       identity: item.identity,
@@ -108,13 +115,6 @@ function conferenceLines(result: FiscalDocumentConference): ConferenceLine[] {
       identity: "",
       ...issue(item.source, item.line),
       note: item.reason,
-    })),
-    ...result.matched.map((item) => ({
-      situation: "Coincidente" as const,
-      identity: item.identity,
-      dominio: side(item.dominio),
-      sefaz: side(item.sefaz),
-      note: "",
     })),
   ];
 }
