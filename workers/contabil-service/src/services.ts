@@ -6,6 +6,7 @@ import {
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
+import { CONTROL_AUDIT_ACTIONS } from "../../../services/contabil-service/src/services/controlHistoryService.js";
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
@@ -428,7 +429,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
           userId: auth.userId,
           organizationId: auth.organizationId,
           permission: auth.permission ?? null,
-          action: "Atualização",
+          action: CONTROL_AUDIT_ACTIONS.updateField,
           referring: "contabil.control",
           referringId: id,
           oldData: current,
@@ -454,7 +455,7 @@ export function createControlService(prisma: ContabilPrisma, audit: Audit): Cont
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Concluir todos os itens do controle contábil",
+        action: CONTROL_AUDIT_ACTIONS.completeAll,
         referring: "contabil.control",
         referringId: id,
         oldData: current,

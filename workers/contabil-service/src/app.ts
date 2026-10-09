@@ -11,6 +11,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { buildContabilServiceOpenApiSpec } from "../../../services/contabil-service/src/openapi/spec.js";
 import {
   controlCompetenceBodySchema,
+  controlHistoryQuerySchema,
   controlIdParamsSchema,
   createControlBodySchema,
   createYearControlsBodySchema,
@@ -30,6 +31,10 @@ import {
   responsibleIdParamsSchema,
   updateResponsibleBodySchema,
 } from "../../../services/contabil-service/src/schemas/responsible.schemas.js";
+import {
+  type ControlHistoryPrisma,
+  listControlHistory,
+} from "../../../services/contabil-service/src/services/controlHistoryService.js";
 import { createContabilAudit } from "./audit.js";
 import {
   authenticateContabilRequest,
@@ -339,6 +344,21 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       : await withPrisma(c, options, (prisma) =>
           invoke(createControlService(prisma, createContabilAudit(options.env ?? c.env))),
         );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/contabil/controls/history", async (c) => {
+    const query = parseWithZod(controlHistoryQuerySchema, c.req.query());
+    const auth = c.get("auth");
+    const data = await withPrisma(c, options, (prisma) =>
+      listControlHistory(prisma as unknown as ControlHistoryPrisma, {
+        organizationId: auth.organizationId,
+        clientId: query.client_id,
+        competence: query.competence,
+        page: query.page,
+        pageSize: query.pageSize,
+      }),
+    );
     return c.json(createSuccessResponse(data));
   });
 

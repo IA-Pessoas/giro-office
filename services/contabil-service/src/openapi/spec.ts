@@ -450,6 +450,54 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           },
         },
       },
+      "/contabil/controls/history": {
+        get: {
+          tags: ["Controls"],
+          summary: "Histórico de alterações do controle (etapas e observação)",
+          description:
+            "Lido da auditoria, do mais recente para o mais antigo, sem corte por data. Cada item traz ator, instante e os campos alterados com valor anterior e novo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+              example: "2026-01",
+            },
+            {
+              name: "page",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Página do histórico; controle inexistente devolve lista vazia",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/SuccessEnvelope" },
+                },
+              },
+            },
+            "400": { description: "Parâmetros inválidos" },
+            "401": { description: "Não autenticado" },
+          },
+        },
+      },
       "/contabil/controls/year": {
         post: {
           tags: ["Controls"],

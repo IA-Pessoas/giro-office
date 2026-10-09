@@ -4,6 +4,11 @@ export function contabilControlQueryKey(clientId: string, competence: string) {
   return [...CONTABIL_QUERY_KEY, "control", clientId, competence] as const;
 }
 
+export function contabilControlHistoryQueryKey(clientId: string, competence: string, page?: number) {
+  const key = [...CONTABIL_QUERY_KEY, "control-history", clientId, competence] as const;
+  return page === undefined ? key : ([...key, page] as const);
+}
+
 export function contabilControlPortfolioQueryKey(competence: string) {
   return [...CONTABIL_QUERY_KEY, "controls", "list", competence] as const;
 }

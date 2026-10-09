@@ -4629,6 +4629,14 @@ const baseManifest = [
   }),
   op({
     service: "contabil-service",
+    method: "GET",
+    path: "/contabil/controls/history",
+    action: "contabilControlHistory",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "contabil-service",
     method: "PATCH",
     path: "/contabil/controls/{id}",
     action: "contabilControlPatch",

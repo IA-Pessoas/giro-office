@@ -124,6 +124,7 @@ export function ContabilShell({
         <ContabilActiveTabPanel
           activeTab={activeTab}
           clientId={clientId}
+          clientName={clientName}
           canEdit={canEdit}
           pickedClientId={pickedClientId}
           onPickClient={setPickedClientId}
@@ -175,12 +176,14 @@ function ContabilClientSelect({
 function ContabilActiveTabPanel({
   activeTab,
   clientId,
+  clientName,
   canEdit,
   pickedClientId,
   onPickClient,
 }: {
   activeTab: ContabilTabId;
   clientId?: string;
+  clientName?: string;
   canEdit: boolean;
   pickedClientId: string;
   onPickClient: (clientId: string) => void;
@@ -233,7 +236,7 @@ function ContabilActiveTabPanel({
   if (activeTab === "control") {
     return (
       <div role="tabpanel" id="contabil-panel-control" aria-labelledby="contabil-tab-control">
-        <ContabilControlSection clientId={clientId} canEdit={canEdit} />
+        <ContabilControlSection clientId={clientId} clientName={clientName} canEdit={canEdit} />
       </div>
     );
   }

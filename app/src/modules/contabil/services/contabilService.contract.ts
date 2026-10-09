@@ -11,6 +11,7 @@ import type {
 export const CONTABIL_ENDPOINTS = {
   controls: "/contabil/controls",
   controlsList: "/contabil/controls/list",
+  controlsHistory: "/contabil/controls/history",
   controlById: (controlId: string) => `/contabil/controls/${controlId}`,
   controlItems: (controlId: string) => `/contabil/controls/${controlId}/items`,
   controlsYear: "/contabil/controls/year",

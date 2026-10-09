@@ -22,6 +22,7 @@ export {
   useCreateYearContabilControlsMutation,
   useArchiveContabilCompetenceMutation,
   useContabilControlDetail,
+  useContabilControlHistory,
   useContabilControlPortfolio,
   usePatchContabilControlFieldMutation,
   useRestoreContabilCompetenceMutation,

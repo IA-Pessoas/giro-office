@@ -1151,6 +1151,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/contabil\/controls\/history$/,
+    description: { action: "consultou", item: "o histórico de um controle contábil" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/contabil\/relationships\/client\/[^/]+$/,
     description: { action: "consultou", item: "o vínculo contábil de um cliente" },
   },

@@ -10,6 +10,7 @@ import {
   unwrapContabilEnvelope,
 } from "./services/contabilService.contract.ts";
 import {
+  contabilControlHistoryQueryKey,
   contabilControlQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
@@ -25,8 +26,13 @@ import {
   CONTABIL_CONTROL_CHECKLIST_FIELDS,
   CONTABIL_CONTROL_FIELDS,
   CONTABIL_CONTROL_NOTES_FIELD,
+  getContabilControlFieldLabel,
 } from "./components/contabilControlFields.ts";
 import { CONTABIL_RELATIONSHIP_FIELDS } from "./components/contabilRelationshipFields.ts";
+import {
+  formatContabilControlHistoryValue,
+  getContabilControlHistoryPageCount,
+} from "./components/contabilControlHistory.helpers.ts";
 import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
@@ -534,6 +540,25 @@ await (async () => {
       "contabil",
       "relationship",
       "client-1",
+    ]);
+  });
+
+  await runTest("control history labels fields and values and paginates (#1722)", () => {
+    assert.equal(getContabilControlFieldLabel("depreciation"), "Depreciação");
+    assert.equal(getContabilControlFieldLabel("desconhecido"), "desconhecido");
+    assert.equal(formatContabilControlHistoryValue("depreciation", true), "Concluído");
+    assert.equal(formatContabilControlHistoryValue("depreciation", false), "Pendente");
+    assert.equal(formatContabilControlHistoryValue("depreciation", null), "—");
+    assert.equal(formatContabilControlHistoryValue("notes", ""), "(vazio)");
+    assert.equal(formatContabilControlHistoryValue("notes", "Conferir"), "Conferir");
+    assert.equal(getContabilControlHistoryPageCount(0, 20), 1);
+    assert.equal(getContabilControlHistoryPageCount(41, 20), 3);
+    assert.deepEqual(contabilControlHistoryQueryKey("client-1", "2026-09", 2), [
+      "contabil",
+      "control-history",
+      "client-1",
+      "2026-09",
+      2,
     ]);
   });
 

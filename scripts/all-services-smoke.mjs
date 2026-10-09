@@ -5488,6 +5488,17 @@ const handlers = {
     });
   },
 
+  async contabilControlHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      query: {
+        client_id: requireState("primaryClientId"),
+        competence: requireState("contabilControlCompetence"),
+        pageSize: "5",
+      },
+    });
+  },
+
   async contabilControlPatch(op) {
     await httpRequest(op, {
       expectedStatus: [200],
