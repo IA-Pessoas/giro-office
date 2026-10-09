@@ -475,7 +475,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
               name: "page",
               in: "query",
               required: false,
-              schema: { type: "integer", minimum: 1, default: 1 },
+              schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 },
             },
             {
               name: "pageSize",

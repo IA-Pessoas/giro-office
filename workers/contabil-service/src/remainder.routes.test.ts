@@ -235,10 +235,10 @@ describe("contabil Worker remainder routes", () => {
     const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
     const url = `https://contabil.test/contabil/controls/history?client_id=${CLIENT}&competence=2026-09&organization_id=forged`;
 
-    const viewer = await app.request(url, { headers: headers("1") });
+    const forged = await app.request(url, { headers: headers("1") });
     const denied = await app.request(url, { headers: headers("0") });
 
-    expect(viewer.status).toBe(400);
+    expect(forged.status).toBe(400);
     expect(denied.status).toBe(403);
     const ok = await app.request(url.replace("&organization_id=forged", ""), {
       headers: headers("1"),

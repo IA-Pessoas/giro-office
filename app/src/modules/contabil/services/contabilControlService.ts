@@ -48,12 +48,10 @@ export const contabilControlService = {
   },
 
   async getHistory(
-    filters: ContabilControlFilters,
-    page: number,
-    pageSize: number,
+    filters: ContabilControlFilters & { page: number; pageSize: number },
   ): Promise<ContabilControlHistoryPage> {
     const response = await setupAPIClient().get(CONTABIL_ENDPOINTS.controlsHistory, {
-      params: { ...buildContabilControlParams(filters), page, pageSize },
+      params: { ...buildContabilControlParams(filters), page: filters.page, pageSize: filters.pageSize },
     });
     return unwrapContabilEnvelope<ContabilControlHistoryPage>(response.data);
   },

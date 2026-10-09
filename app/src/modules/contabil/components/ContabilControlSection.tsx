@@ -562,7 +562,13 @@ export function ContabilControlSection({
         </div>
       ) : null}
 
-      <ContabilControlHistory clientId={clientId} clientName={clientName} competence={competence} />
+      {/* key volta para a página 1 ao trocar cliente ou competência. */}
+      <ContabilControlHistory
+        key={`${clientId}:${competence}`}
+        clientId={clientId}
+        clientName={clientName}
+        competence={competence}
+      />
 
       {operationError ? (
         <ContabilStateBox icon={AlertCircle} tone="danger" title="Não foi possível concluir a operação" compact>

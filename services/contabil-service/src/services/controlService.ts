@@ -8,10 +8,12 @@ import {
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
 import {
+  CONTROL_AUDIT_ACTIONS,
+  CONTROL_HISTORY_FIELDS,
   type ControlHistoryInput,
   type ControlHistoryPrisma,
   listControlHistory,
-} from "./controlHistory.js";
+} from "./controlHistoryService.js";
 
 export type ControlServicePrisma = typeof prismaClient;
 
@@ -56,26 +58,7 @@ export interface ControlPortfolio {
   }>;
 }
 
-const UPDATABLE_FIELDS = new Set<string>([
-  "regenerate_accounting_entries",
-  "check_summary_by_accumulator",
-  "post_accounting_transaction",
-  "import_bank_statements",
-  "reconcile_bank_statements",
-  "reconcile_vendors",
-  "integrate_taxes",
-  "settle_federal_taxes_via_ecac",
-  "settle_state_taxes_via_sefaz_ba",
-  "integrate_payroll",
-  "suspense_accounts",
-  "check_overdrawn_accounts",
-  "general_account_reconciliation",
-  "check_loan_and_interest_accounts",
-  "monthly_closing",
-  "reconcile_icms_pis_cofins",
-  "depreciation",
-  "notes",
-]);
+const UPDATABLE_FIELDS = new Set<string>(CONTROL_HISTORY_FIELDS);
 
 const DEFAULT_CREATE_DATA = {
   regenerate_accounting_entries: false,
@@ -402,7 +385,7 @@ export class ControlService {
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Atualização",
+        action: CONTROL_AUDIT_ACTIONS.updateField,
         referring: "contabil.control",
         referringId: id,
         oldData: exists as unknown as Record<string, unknown>,
@@ -437,7 +420,7 @@ export class ControlService {
       userId: auth.userId,
       organizationId: auth.organizationId,
       permission: auth.permission ?? null,
-      action: "Concluir todos os itens do controle contábil",
+      action: CONTROL_AUDIT_ACTIONS.completeAll,
       referring: "contabil.control",
       referringId: id,
       oldData: current as unknown as Record<string, unknown>,

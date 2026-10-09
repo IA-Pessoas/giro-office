@@ -62,7 +62,7 @@ export function useContabilControlHistory(
 ): UseQueryResult<ContabilControlHistoryPage, Error> {
   return useFetch(
     contabilControlHistoryQueryKey(filters.clientId, filters.competence, filters.page),
-    () => contabilControlService.getHistory(filters, filters.page, filters.pageSize),
+    () => contabilControlService.getHistory(filters),
     { enabled: Boolean(filters.clientId) },
   );
 }

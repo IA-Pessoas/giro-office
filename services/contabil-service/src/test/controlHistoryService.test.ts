@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { type ControlHistoryPrisma, listControlHistory } from "../services/controlHistory.js";
+import {
+  type ControlHistoryPrisma,
+  listControlHistory,
+} from "../services/controlHistoryService.js";
 
 const ORG = "a0000000-0000-4000-8000-000000000001";
 const CLIENT = "b0000000-0000-4000-8000-000000000001";
@@ -41,6 +44,7 @@ describe("listControlHistory (#1722)", () => {
       referring: "contabil.control",
       referring_id: CONTROL,
       action: { in: ["Atualização", "Concluir todos os itens do controle contábil"] },
+      NOT: { changes_json: { equals: {} } },
     };
     expect(db.auditRequest.findMany).toHaveBeenCalledWith({
       where,

@@ -34,7 +34,7 @@ import {
 import {
   type ControlHistoryPrisma,
   listControlHistory,
-} from "../../../services/contabil-service/src/services/controlHistory.js";
+} from "../../../services/contabil-service/src/services/controlHistoryService.js";
 import { createContabilAudit } from "./audit.js";
 import {
   authenticateContabilRequest,

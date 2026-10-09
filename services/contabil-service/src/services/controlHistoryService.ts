@@ -23,8 +23,13 @@ export const CONTROL_HISTORY_FIELDS = [
   "notes",
 ] as const;
 
-// Únicas ações que gravam campos do controle (updateField e completeAll).
-const CONTROL_CHANGE_ACTIONS = ["Atualização", "Concluir todos os itens do controle contábil"];
+// Quem grava (updateField e completeAll, Node e Worker) usa estas constantes; o histórico
+// filtra por elas. Mudar o texto aqui muda os dois lados juntos.
+export const CONTROL_AUDIT_REFERRING = "contabil.control";
+export const CONTROL_AUDIT_ACTIONS = {
+  updateField: "Atualização",
+  completeAll: "Concluir todos os itens do controle contábil",
+} as const;
 
 type AuditRow = {
   id: string;
@@ -80,9 +85,11 @@ export async function listControlHistory(prisma: ControlHistoryPrisma, input: Co
 
   const where = {
     organization_id: input.organizationId,
-    referring: "contabil.control",
+    referring: CONTROL_AUDIT_REFERRING,
     referring_id: control.id,
-    action: { in: CONTROL_CHANGE_ACTIONS },
+    action: { in: Object.values(CONTROL_AUDIT_ACTIONS) },
+    // logUpdateIfChanged grava `{}` quando nada mudou (mesmo valor, tudo já concluído).
+    NOT: { changes_json: { equals: {} } },
   };
   const [rows, total] = await Promise.all([
     prisma.auditRequest.findMany({

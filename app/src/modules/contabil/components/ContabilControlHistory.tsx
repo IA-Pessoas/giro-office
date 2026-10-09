@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertCircle, History, Loader2 } from "lucide-react";
 
 import { formatDateTime } from "@shared/utils/dateFormat";
@@ -33,10 +33,6 @@ export function ContabilControlHistory({
     page,
     pageSize: CONTABIL_CONTROL_HISTORY_PAGE_SIZE,
   });
-
-  useEffect(() => {
-    setPage(1);
-  }, [clientId, competence]);
 
   const history = historyQuery.data;
   const pageCount = getContabilControlHistoryPageCount(
