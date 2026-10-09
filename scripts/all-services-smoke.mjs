@@ -4675,6 +4675,32 @@ const handlers = {
     });
   },
 
+  async fiscalMonthlyControlList(op) {
+    await httpRequest(op, { query: { competence: "2026-01" } });
+  },
+
+  async fiscalMonthlyControlOpen(op) {
+    // Motivo enviado sempre: o cliente do smoke pode não ter Fiscal ativo (abertura excepcional).
+    const response = await httpRequest(op, {
+      expectedStatus: [200, 201],
+      json: {
+        client_id: requireState("primaryClientId"),
+        competence: "2026-01",
+        reason: "Smoke de serviços",
+      },
+    });
+    if (!isBadExpectation(op)) {
+      state.fiscalMonthlyControlId = pickFirst(response.body, "data.control.id");
+    }
+  },
+
+  async fiscalMonthlyControlUpdate(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}`,
+      json: { status: "IN_PROGRESS", no_movement: true },
+    });
+  },
+
   async fiscalSimplesPreview(op) {
     const response = await httpRequest(op, {
       query: { client_id: requireState("primaryClientId"), competence: "2026-02" },

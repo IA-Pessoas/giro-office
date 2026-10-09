@@ -20,6 +20,12 @@ import {
   updateIpiBodySchema,
 } from "@workspace/fiscal-service/src/schemas/ipi.schemas.js";
 import {
+  listMonthlyControlsQuerySchema,
+  monthlyControlIdParamsSchema,
+  openMonthlyControlBodySchema,
+  updateMonthlyControlBodySchema,
+} from "@workspace/fiscal-service/src/schemas/monthlyControl.schemas.js";
+import {
   createMonthlyRevenueBodySchema,
   listMonthlyRevenuesQuerySchema,
   monthlyRevenueIdParamsSchema,
@@ -42,6 +48,7 @@ import {
 } from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
+import { MonthlyControlService } from "@workspace/fiscal-service/src/services/monthlyControlService.js";
 import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
 import { simplesRateCsvExport } from "@workspace/fiscal-service/src/services/simplesRateCsvService.js";
 import {
@@ -90,6 +97,7 @@ type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
 type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
+type ControlServiceLike = Pick<MonthlyControlService, "list" | "open" | "update">;
 type SimplesServiceLike = Pick<SimplesRateService, "preview" | "emission" | "batch">;
 
 interface FiscalWorkerOptions {
@@ -101,6 +109,7 @@ interface FiscalWorkerOptions {
   reportingService?: ReportingServiceLike;
   rateService?: RateServiceLike;
   revenueService?: RevenueServiceLike;
+  controlService?: ControlServiceLike;
   simplesService?: SimplesServiceLike;
 }
 
@@ -117,6 +126,7 @@ type WorkerServices = {
   reportingService: ReportingServiceLike;
   rateService: RateServiceLike;
   revenueService: RevenueServiceLike;
+  controlService: ControlServiceLike;
   simplesService: SimplesServiceLike;
 };
 
@@ -240,6 +250,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         ConstructorParameters<typeof FiscalSearchService>[0] &
         ConstructorParameters<typeof FiscalRateService>[0] &
         ConstructorParameters<typeof MonthlyRevenueService>[0] &
+        ConstructorParameters<typeof MonthlyControlService>[0] &
         ConstructorParameters<typeof SimplesRateService>[0] &
         ConstructorParameters<typeof InternalReportingService>[0];
       const factories: { [S in keyof WorkerServices]: () => WorkerServices[S] } = {
@@ -250,6 +261,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         reportingService: () => new InternalReportingService(prisma),
         rateService: () => new FiscalRateService(prisma, createFiscalAudit(env)),
         revenueService: () => new MonthlyRevenueService(prisma, createFiscalAudit(env)),
+        controlService: () => new MonthlyControlService(prisma, createFiscalAudit(env)),
         simplesService: () => new SimplesRateService(prisma),
       };
       return callback(factories[key]());
@@ -316,6 +328,31 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     });
     const data = await withService("revenueService", (service) =>
       service.list(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/monthly-controls", async (c) => {
+    const query = parseWithZod(listMonthlyControlsQuerySchema, {
+      competence: c.req.query("competence"),
+    });
+    const data = await withService("controlService", (service) => service.list(query, actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/monthly-controls", async (c) => {
+    const body = parseWithZod(openMonthlyControlBodySchema, await readJson(c));
+    const result = await withService("controlService", (service) =>
+      service.open({ ...actor(c), ...body }),
+    );
+    return c.json(createSuccessResponse(result), result.created ? 201 : 200);
+  });
+
+  app.patch("/fiscal/monthly-controls/:id", async (c) => {
+    const { id } = parseWithZod(monthlyControlIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(updateMonthlyControlBodySchema, await readJson(c));
+    const data = await withService("controlService", (service) =>
+      service.update({ ...actor(c), ...body, id }),
     );
     return c.json(createSuccessResponse(data));
   });

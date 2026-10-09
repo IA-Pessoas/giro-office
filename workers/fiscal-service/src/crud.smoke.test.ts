@@ -227,6 +227,129 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     expectOk(await call("GET", `/fiscal/ipi?ipi_id=${id}`), "GET após DELETE", [404]);
   });
 
+  it("controle mensal: geração única sob concorrência, elegibilidade, abertura excepcional e reabertura", async () => {
+    const eligible = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Controle ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+      regime: "Simples Nacional",
+      // Meio do mês: o pg grava Date em hora local e 01/01 00:00Z viraria 31/12.
+      competence_entry: new Date("2026-08-15T12:00:00.000Z"),
+    });
+    const withoutFiscal = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Sem Fiscal ${suffix}`,
+      status: "Ativo",
+      fiscal: false,
+    });
+    const eligibleId = String(eligible.id);
+    const withoutFiscalId = String(withoutFiscal.id);
+
+    const before = expectOk(
+      await call("GET", "/fiscal/monthly-controls?competence=2026-07"),
+      "GET antes da entrada",
+    );
+    expect(before.data.items.map((item: { client_id: string }) => item.client_id)).not.toContain(
+      eligibleId,
+    );
+
+    const lists = await Promise.all(
+      Array.from({ length: 5 }, () => call("GET", "/fiscal/monthly-controls?competence=2026-09")),
+    );
+    for (const list of lists) expectOk(list, "GET concorrente");
+    const listed = expectOk(
+      await call("GET", "/fiscal/monthly-controls?competence=2026-09"),
+      "GET /fiscal/monthly-controls",
+    );
+    const mine = listed.data.items.filter(
+      (item: { client_id: string }) => item.client_id === eligibleId,
+    );
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({
+      competence: "2026-09",
+      status: "PENDING",
+      no_movement: false,
+      regime: "Simples Nacional",
+      client_name: `Smoke Controle ${suffix}`,
+    });
+    expect(listed.data.items.map((item: { client_id: string }) => item.client_id)).not.toContain(
+      withoutFiscalId,
+    );
+
+    expectOk(
+      await call("POST", "/fiscal/monthly-controls", {
+        client_id: withoutFiscalId,
+        competence: "2026-09",
+      }),
+      "POST excepcional sem motivo",
+      [400],
+    );
+    const opened = expectOk(
+      await call("POST", "/fiscal/monthly-controls", {
+        client_id: withoutFiscalId,
+        competence: "2026-09",
+        reason: "Apuração avulsa pedida pelo cliente",
+      }),
+      "POST excepcional",
+      [201],
+    );
+    expect(opened.data.control.opening_reason).toBe("Apuração avulsa pedida pelo cliente");
+    const again = expectOk(
+      await call("POST", "/fiscal/monthly-controls", {
+        client_id: withoutFiscalId,
+        competence: "2026-09",
+        reason: "De novo",
+      }),
+      "POST repetido",
+      [200],
+    );
+    expect(again.data).toMatchObject({ created: false, control: { id: opened.data.control.id } });
+
+    const id = mine[0].id as string;
+    const completed = expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${id}`, {
+        status: "COMPLETED",
+        no_movement: true,
+      }),
+      "PATCH concluir",
+    );
+    expect(completed.data).toMatchObject({ status: "COMPLETED", no_movement: true });
+    expectOk(
+      await call(
+        "PATCH",
+        `/fiscal/monthly-controls/${id}`,
+        { status: "IN_PROGRESS", reason: "Retificação" },
+        await smokeHeaders({ type: "user", permission: 2, modules: { fiscal: 2 } }),
+      ),
+      "PATCH reabrir nível 2",
+      [403],
+    );
+    const reopened = expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${id}`, {
+        status: "IN_PROGRESS",
+        reason: "Retificação",
+      }),
+      "PATCH reabrir nível 3",
+    );
+    expect(reopened.data.status).toBe("IN_PROGRESS");
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    expectOk(
+      await call(
+        "PATCH",
+        `/fiscal/monthly-controls/${id}`,
+        { status: "COMPLETED" },
+        otherOrganization,
+      ),
+      "PATCH de outra organização",
+      [403, 404],
+    );
+  });
+
   it("receitas mensais: cria, recusa duplicada, lista por período e corrige", async () => {
     const client = await smokeInsert("clients", {
       id: randomUUID(),

@@ -12,6 +12,10 @@ export function fiscalRevenuesQueryKey(clientId: string) {
   return [...FISCAL_QUERY_KEY, "revenues", clientId] as const;
 }
 
+export function fiscalMonthlyControlsQueryKey(competence: string) {
+  return [...FISCAL_QUERY_KEY, "monthly-controls", competence] as const;
+}
+
 export function fiscalSimplesPreviewQueryKey(clientId: string, competence: string) {
   return [...fiscalRevenuesQueryKey(clientId), "simples-preview", competence] as const;
 }
