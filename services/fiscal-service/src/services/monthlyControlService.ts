@@ -99,14 +99,9 @@ function eligibleClientsWhere(organizationId: string, start: Date) {
   };
 }
 
-function isEligible(
-  client: { fiscal: boolean | null; competence_entry: Date | null; competence_output: Date | null },
-  start: Date,
-): boolean {
-  if (client.fiscal !== true) return false;
-  if (client.competence_entry && client.competence_entry > competenceEnd(start)) return false;
-  if (client.competence_output && client.competence_output < start) return false;
-  return true;
+/** Geração automática vai até o mês seguinte ao corrente; além disso só abertura explícita. */
+function isGenerable(competence: Date, now: Date): boolean {
+  return competence <= new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -121,6 +116,7 @@ export class MonthlyControlService {
   constructor(
     private readonly prisma: MonthlyControlPrisma,
     private readonly audit: { createLog(params: CreateLogParams): Promise<void> },
+    private readonly now: () => Date = () => new Date(),
   ) {}
 
   private async recordEvents(
@@ -149,10 +145,12 @@ export class MonthlyControlService {
     const { organizationId, userId } = actor;
     const competence = competenceDate(input.competence);
 
-    const eligible = await this.prisma.client.findMany({
-      where: eligibleClientsWhere(organizationId, competence),
-      select: { id: true, regime: true },
-    });
+    const eligible = isGenerable(competence, this.now())
+      ? await this.prisma.client.findMany({
+          where: eligibleClientsWhere(organizationId, competence),
+          select: { id: true, regime: true },
+        })
+      : [];
     const existing = await this.prisma.fiscalMonthlyControl.findMany({
       where: { organization_id: organizationId, competence },
     });
@@ -223,13 +221,7 @@ export class MonthlyControlService {
   ): Promise<{ control: MonthlyControlDto; created: boolean }> {
     const client = await this.prisma.client.findFirst({
       where: { id: input.client_id, organization_id: input.organizationId },
-      select: {
-        id: true,
-        regime: true,
-        fiscal: true,
-        competence_entry: true,
-        competence_output: true,
-      },
+      select: { id: true, regime: true },
     });
     if (!client) throw new ServiceError(404, "Cliente não encontrado.");
 
@@ -238,7 +230,10 @@ export class MonthlyControlService {
     const existing = await this.prisma.fiscalMonthlyControl.findFirst({ where });
     if (existing) return { control: serialize(existing), created: false };
 
-    const exceptional = !isEligible(client, competence);
+    const eligible = await this.prisma.client.count({
+      where: { ...eligibleClientsWhere(input.organizationId, competence), id: client.id },
+    });
+    const exceptional = eligible === 0;
     const reason = input.reason ?? null;
     if (exceptional && !reason) {
       throw new ServiceError(
@@ -317,6 +312,9 @@ export class MonthlyControlService {
       });
     }
     if (input.no_movement !== undefined && input.no_movement !== current.no_movement) {
+      if (current.status === "COMPLETED" && data.status === undefined) {
+        throw new ServiceError(409, "Controle concluído: reabra antes de alterar o movimento.");
+      }
       data.no_movement = input.no_movement;
       events.push({
         action: "NO_MOVEMENT",

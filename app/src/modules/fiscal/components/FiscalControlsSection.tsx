@@ -21,6 +21,7 @@ import {
   getFiscalErrorMessage,
 } from "../utils";
 import {
+  FISCAL_CANCEL_BUTTON_CLASSNAME,
   FISCAL_FIELD_CONTROL_CLASSNAME,
   FISCAL_FIELD_ERROR_CLASSNAME,
   FISCAL_PRIMARY_BUTTON_CLASSNAME,
@@ -222,7 +223,8 @@ export function FiscalControlsSection({
                       <input
                         type="checkbox"
                         checked={item.no_movement}
-                        disabled={!canEdit || update.isPending}
+                        disabled={!canEdit || item.status === "COMPLETED" || update.isPending}
+                        title={item.status === "COMPLETED" ? "Controle concluído: reabra para alterar o movimento." : undefined}
                         onChange={(event) => update.mutate({ id: item.id, payload: { no_movement: event.target.checked } })}
                         aria-label={`Sem movimento: ${item.client_name}`}
                         className="h-4 w-4"
@@ -252,7 +254,7 @@ export function FiscalControlsSection({
             {reopenError ? <span id="fiscal-control-reopen-error" role="alert" className={FISCAL_FIELD_ERROR_CLASSNAME}>{reopenError}</span> : null}
           </label>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setReopen(null)} disabled={update.isPending} className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-800">Cancelar</button>
+            <button type="button" onClick={() => setReopen(null)} disabled={update.isPending} className={FISCAL_CANCEL_BUTTON_CLASSNAME}>Cancelar</button>
             <button type="submit" disabled={update.isPending} className={FISCAL_PRIMARY_BUTTON_CLASSNAME}>{update.isPending ? "Reabrindo..." : "Reabrir"}</button>
           </div>
         </form>
