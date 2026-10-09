@@ -17,11 +17,16 @@ import {
   submitAnticipationBatchBodySchema,
   updateAnticipationItemBodySchema,
 } from "../schemas/anticipation.schemas.js";
+import {
+  anticipationDemonstrativeHeaders,
+  renderAnticipationCsv,
+  renderAnticipationPdf,
+} from "../services/anticipationExportService.js";
 import type { AnticipationService } from "../services/anticipationService.js";
 
 export type AnticipationRouteDeps = Pick<
   AnticipationService,
-  "importBatch" | "list" | "detail" | "updateItem" | "submit" | "check"
+  "importBatch" | "list" | "detail" | "updateItem" | "submit" | "check" | "demonstrative"
 >;
 
 /**
@@ -145,6 +150,35 @@ export function createAnticipationRoutes(
       }
     },
   );
+
+  // Demonstrativo (FIS-18): leitura, então Fiscal nível 1 também exporta.
+  for (const format of ["csv", "pdf"] as const) {
+    router.get(
+      `/anticipations/batches/:id/${format}`,
+      isAuthenticated,
+      async (req: Request, res: Response, next: NextFunction) => {
+        try {
+          const { id } = parseWithZod(anticipationBatchIdParamsSchema, req.params);
+          const demonstrative = await service.demonstrative(id, organizationId(req));
+          for (const [name, value] of Object.entries(
+            anticipationDemonstrativeHeaders(demonstrative, format),
+          )) {
+            res.setHeader(name, value);
+          }
+          res
+            .status(200)
+            .send(
+              format === "pdf"
+                ? await renderAnticipationPdf(demonstrative)
+                : renderAnticipationCsv(demonstrative),
+            );
+        } catch (err) {
+          logError("Erro ao exportar demonstrativo de antecipações", { err });
+          next(err);
+        }
+      },
+    );
+  }
 
   return router;
 }

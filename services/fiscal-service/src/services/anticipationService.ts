@@ -14,6 +14,7 @@ import {
 } from "../schemas/anticipation.schemas.js";
 import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
 import { getPaginationParams } from "../schemas/pagination.schemas.js";
+import type { AnticipationDemonstrative } from "./anticipationExportService.js";
 import {
   dropIdenticalCopies,
   isAuthorizedProtocol,
@@ -474,6 +475,27 @@ export class AnticipationService {
         actor_user_id: row.actor_user_id,
         created_at: row.created_at.toISOString(),
       })),
+    };
+  }
+
+  /** Lote completo, cliente e nomes de responsável e conferente para o demonstrativo (FIS-18). */
+  async demonstrative(id: string, organizationId: string): Promise<AnticipationDemonstrative> {
+    const batch = await this.detail(id, organizationId);
+    const ids = [batch.responsible_id, batch.reviewer_id].filter((value): value is string =>
+      Boolean(value),
+    );
+    const [client, users] = await Promise.all([
+      this.prisma.client.findFirst({
+        where: { id: batch.client_id, organization_id: organizationId },
+        select: { name: true, company_name: true, cpf_cnpj: true },
+      }),
+      this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }),
+    ]);
+    if (!client) throw new ServiceError(404, "Cliente não encontrado.");
+    return {
+      batch,
+      client: { name: client.company_name?.trim() || client.name, document: client.cpf_cnpj },
+      people: Object.fromEntries(users.map((user) => [user.id, user.name])),
     };
   }
 

@@ -82,6 +82,11 @@ import {
   simplesPreviewQuerySchema,
 } from "@workspace/fiscal-service/src/schemas/simplesRate.schemas.js";
 import { AnnualControlService } from "@workspace/fiscal-service/src/services/annualControlService.js";
+import {
+  anticipationDemonstrativeHeaders,
+  renderAnticipationCsv,
+  renderAnticipationPdf,
+} from "@workspace/fiscal-service/src/services/anticipationExportService.js";
 import { AnticipationService } from "@workspace/fiscal-service/src/services/anticipationService.js";
 import { ClientWholesaleService } from "@workspace/fiscal-service/src/services/clientWholesaleService.js";
 import {
@@ -174,7 +179,7 @@ type MalhaServiceLike = Pick<
 >;
 type AnticipationServiceLike = Pick<
   AnticipationService,
-  "importBatch" | "list" | "detail" | "updateItem" | "submit" | "check"
+  "importBatch" | "list" | "detail" | "updateItem" | "submit" | "check" | "demonstrative"
 >;
 type ControlServiceLike = Pick<
   MonthlyControlService,
@@ -520,6 +525,22 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     );
     return c.json(createSuccessResponse(data));
   });
+
+  for (const format of ["csv", "pdf"] as const) {
+    app.get(`/fiscal/anticipations/batches/:id/${format}`, async (c) => {
+      const { id } = parseWithZod(anticipationBatchIdParamsSchema, { id: c.req.param("id") });
+      const demonstrative = await withService("anticipationService", (service) =>
+        service.demonstrative(id, c.get("auth").organizationId),
+      );
+      const body =
+        format === "pdf"
+          ? new Uint8Array(await renderAnticipationPdf(demonstrative))
+          : renderAnticipationCsv(demonstrative);
+      return new Response(body, {
+        headers: anticipationDemonstrativeHeaders(demonstrative, format),
+      });
+    });
+  }
 
   app.post("/fiscal/malhas", async (c) => {
     const body = parseWithZod(createMalhaBodySchema, await readJson(c));

@@ -748,6 +748,18 @@ describe("fiscal Worker", () => {
       updateItem: vi.fn(async () => ({})),
       submit: vi.fn(async () => batch),
       check: vi.fn(async () => batch),
+      demonstrative: vi.fn(async () => ({
+        batch: {
+          ...batch,
+          competence: "2026-09",
+          file_name: "notas.zip",
+          responsible_id: USER_ID,
+          reviewer_id: null,
+          history: [],
+        },
+        client: { name: "Padaria Exemplo Ltda", document: "12.345.678/0001-90" },
+        people: {},
+      })),
     };
     const app = createFiscalWorkerApp({ env: env(), anticipationService: anticipations as never });
     const viewer = gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) });
@@ -840,6 +852,25 @@ describe("fiscal Worker", () => {
     );
     expect(viewerCheck.status).toBe(403);
     expect(anticipations.check).not.toHaveBeenCalled();
+
+    const csv = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/csv`,
+      {
+        headers: viewer,
+      },
+    );
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get("content-disposition")).toContain(".csv");
+    expect(await csv.text()).toContain("não houve apuração automática de imposto");
+    const pdf = await app.request(
+      `https://fiscal.test/fiscal/anticipations/batches/${ICMS_ID}/pdf`,
+      {
+        headers: viewer,
+      },
+    );
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    expect(anticipations.demonstrative).toHaveBeenCalledWith(ICMS_ID, ORGANIZATION_ID);
   });
 
   it("acompanha malhas no tenant autenticado, com anexo e leitura para nível 1", async () => {

@@ -1946,6 +1946,40 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/anticipations/batches/{id}/csv": {
+        get: {
+          tags: ["Antecipações"],
+          summary: "Baixar demonstrativo manual do lote em CSV",
+          description:
+            "Mesmo lote do detalhe: cabeçalho com cliente, competência, estado da revisão, responsável e conferente, a declaração de que não houve apuração automática de imposto nem emissão de guia oficial e uma linha por item. Cada campo traz valor final, origem (XML ou Corrigido) e valor do XML; o valor informado manualmente vem identificado. Separador ponto e vírgula, decimais com vírgula, UTF-8 com BOM.",
+          security: [{ bearerAuth: [] }],
+          parameters: [idPathParameter],
+          responses: {
+            "200": {
+              description: "CSV do demonstrativo",
+              content: { "text/csv": { schema: { type: "string" } } },
+            },
+            "404": { description: "Lote não encontrado nesta organização" },
+          },
+        },
+      },
+      "/fiscal/anticipations/batches/{id}/pdf": {
+        get: {
+          tags: ["Antecipações"],
+          summary: "Baixar demonstrativo manual do lote em PDF",
+          description:
+            "Mesmo conteúdo do CSV: cada valor com a origem (XML, corrigido com o valor do XML, informado manualmente) e a declaração de que não houve apuração automática nem guia oficial.",
+          security: [{ bearerAuth: [] }],
+          parameters: [idPathParameter],
+          responses: {
+            "200": {
+              description: "PDF do demonstrativo",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+            "404": { description: "Lote não encontrado nesta organização" },
+          },
+        },
+      },
       "/fiscal/anticipations/batches/{id}/items/{item_id}": {
         put: {
           tags: ["Antecipações"],
