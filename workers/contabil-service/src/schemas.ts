@@ -1,3 +1,8 @@
+import {
+  TRIAGE_FISCAL_CHECKLIST_FIELDS,
+  TRIAGE_PORTFOLIO_DOCUMENT_STATUSES,
+  TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS,
+} from "@workspace/shared/triagem";
 import { z } from "zod";
 
 const competence = z
@@ -60,16 +65,23 @@ export const monthlySchema = z
   })
   .strict();
 const optionalText = z.string().max(200).optional();
-// Valores semânticos (campo, status, justificativa) são validados por parseFiscalTriagePortfolioFilters.
 export const fiscalPortfolioSchema = z
   .object({
     competence,
     search: optionalText,
     responsible_id: optionalText,
     regime: optionalText,
-    document_field: optionalText,
-    document_status: optionalText,
-    justification: optionalText,
+    document_field: z
+      .enum(TRIAGE_FISCAL_CHECKLIST_FIELDS, { message: "document_field inválido." })
+      .optional(),
+    document_status: z
+      .enum(TRIAGE_PORTFOLIO_DOCUMENT_STATUSES, { message: "document_status inválido." })
+      .optional(),
+    justification: z
+      .enum(TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS, {
+        message: "justification deve ser with ou without.",
+      })
+      .optional(),
   })
   .strict();
 export const contabilPortfolioSchema = z

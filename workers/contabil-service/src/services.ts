@@ -212,6 +212,9 @@ function competenceInterval(competence: string): { start: Date; end: Date } {
   };
 }
 
+/** Status do cadastro de cliente inativado (client-service, `inactivate`). */
+const CLIENT_INACTIVE_STATUS = "Inativo";
+
 /**
  * Janela de elegibilidade da carteira na competência: entrada até o fim do mês, saída e
  * inativação a partir do início. Inativo sem data de inativação não tem como ser datado e sai.
@@ -221,7 +224,10 @@ function portfolioWindow(start: Date, end: Date) {
     { OR: [{ competence_entry: null }, { competence_entry: { lte: end } }] },
     { OR: [{ competence_output: null }, { competence_output: { gte: start } }] },
     {
-      OR: [{ deletion_date: { gte: start } }, { deletion_date: null, NOT: { status: "Inativo" } }],
+      OR: [
+        { deletion_date: { gte: start } },
+        { deletion_date: null, NOT: { status: CLIENT_INACTIVE_STATUS } },
+      ],
     },
   ];
 }

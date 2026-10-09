@@ -1,19 +1,18 @@
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
-import {
-  type FiscalTriagePortfolioFilterable,
-  type FiscalTriagePortfolioFilters,
-  filterFiscalTriagePortfolio,
-  parseFiscalTriagePortfolioFilters,
-  parseWithZod,
-  TRIAGE_PORTFOLIO_NO_REGIME,
-  TRIAGE_PORTFOLIO_NO_RESPONSIBLE,
-} from "@workspace/shared";
+import { parseWithZod } from "@workspace/shared";
 import {
   createSuccessResponse,
   REQUEST_ID_HEADER,
   ServiceError,
   serializeError,
 } from "@workspace/shared/http";
+import {
+  type ContabilTriagePortfolioFilterable,
+  type FiscalTriagePortfolioFilterable,
+  filterContabilTriagePortfolio,
+  filterFiscalTriagePortfolio,
+  fiscalTriagePortfolioFiltersFromQuery,
+} from "@workspace/shared/triagem";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { buildContabilServiceOpenApiSpec } from "../../../services/contabil-service/src/openapi/spec.js";
@@ -150,25 +149,9 @@ function withPrisma<T>(
   );
 }
 
-/** Filtros da carteira contábil, com os mesmos sentinelas ("none", "Não informado") da Fiscal. */
-function filterContabilPortfolio(
-  data: Record<string, unknown>,
-  query: { responsible_id?: string; regime?: string; status?: string },
-) {
-  const items = Array.isArray(data.items) ? (data.items as Record<string, unknown>[]) : [];
-  const value = (item: Record<string, unknown>, key: string, fallback: string) =>
-    typeof item[key] === "string" && item[key] ? item[key] : fallback;
-  return {
-    ...data,
-    items: items.filter(
-      (item) =>
-        (!query.responsible_id ||
-          value(item, "person_responsible_id", TRIAGE_PORTFOLIO_NO_RESPONSIBLE) ===
-            query.responsible_id) &&
-        (!query.regime || value(item, "regime", TRIAGE_PORTFOLIO_NO_REGIME) === query.regime) &&
-        (!query.status || (item.closing as { status?: string } | null)?.status === query.status),
-    ),
-  };
+/** Aplica um filtro da carteira sobre `items` da resposta, mantendo o resto (competência). */
+function filterItems<T>(data: Record<string, unknown>, filter: (items: T[]) => T[]) {
+  return { ...data, items: filter(Array.isArray(data.items) ? (data.items as T[]) : []) };
 }
 
 function executeAuthWrite(c: Context): void {
@@ -270,7 +253,17 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       : await withPrisma(c, options, async (prisma) =>
           invoke(createControlService(prisma, createContabilAudit(options.env ?? c.env))),
         );
-    return c.json(createSuccessResponse(filterContabilPortfolio(data, query)));
+    return c.json(
+      createSuccessResponse(
+        filterItems<ContabilTriagePortfolioFilterable>(data, (items) =>
+          filterContabilTriagePortfolio(items, {
+            responsibleId: query.responsible_id,
+            regime: query.regime,
+            closingStatus: query.status,
+          }),
+        ),
+      ),
+    );
   });
 
   app.post("/contabil/controls/year", async (c) => {
@@ -555,20 +548,15 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
   };
   app.get("/triagem/fiscal-portfolio", async (c) => {
     const query = parseWithZod(fiscalPortfolioSchema, c.req.query());
-    let filters: FiscalTriagePortfolioFilters;
-    try {
-      filters = parseFiscalTriagePortfolioFilters(query);
-    } catch (error) {
-      throw new ServiceError(400, error instanceof Error ? error.message : "Filtro inválido.");
-    }
     const data = await withDocuments(c, (service) =>
       service.listFiscalPortfolio(query.competence, authContext(c.get("auth"))),
     );
-    const items = Array.isArray(data.items)
-      ? (data.items as FiscalTriagePortfolioFilterable[])
-      : [];
     return c.json(
-      createSuccessResponse({ ...data, items: filterFiscalTriagePortfolio(items, filters) }),
+      createSuccessResponse(
+        filterItems<FiscalTriagePortfolioFilterable>(data, (items) =>
+          filterFiscalTriagePortfolio(items, fiscalTriagePortfolioFiltersFromQuery(query)),
+        ),
+      ),
     );
   });
   app.get("/triagem/editability", async (c) => {

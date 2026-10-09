@@ -7,6 +7,7 @@ import {
   fiscalTriagePortfolioItemStatus,
   TRIAGE_PORTFOLIO_NO_REGIME,
   TRIAGE_PORTFOLIO_NO_RESPONSIBLE,
+  type TriagePortfolioDocumentStatus,
   type TriagePortfolioJustificationFilter,
 } from "@workspace/shared/triagem/portfolioFilters";
 
@@ -27,7 +28,6 @@ import { CONTABIL_OUTLINE_ACTION_CLASS, CONTABIL_TABLE_FILTER_CLASS } from "./co
 const PAGE_SIZE = 50;
 const STATUS_LABELS = Object.fromEntries(STATUSES) as Record<TriageDocumentStatus, string>;
 
-const cellStatus = fiscalTriagePortfolioItemStatus;
 
 function statusLabel(status: string) {
   return status === "NOT_STARTED"
@@ -48,7 +48,7 @@ function exportTable(rows: FiscalTriagePortfolioItem[]) {
       row.cpf_cnpj,
       row.regime ?? "",
       row.responsible_name ?? "",
-      ...FISCAL_DOCUMENTS.map(([field]) => statusLabel(cellStatus(row, field))),
+      ...FISCAL_DOCUMENTS.map(([field]) => statusLabel(fiscalTriagePortfolioItemStatus(row, field))),
     ]),
   ];
 }
@@ -115,7 +115,7 @@ export function FiscalTriagePortfolioSection({
   const [documentField, setDocumentField] = useState<TriageFiscalChecklistField>(
     FISCAL_DOCUMENTS[0][0],
   );
-  const [documentStatus, setDocumentStatus] = useState("");
+  const [documentStatus, setDocumentStatus] = useState<TriagePortfolioDocumentStatus | "">("");
   const [justification, setJustification] = useState<TriagePortfolioJustificationFilter | "">("");
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState("");
@@ -129,14 +129,14 @@ export function FiscalTriagePortfolioSection({
   const responsibles = [
     ...new Map(
       items.map((row) => [
-        row.responsible_id ?? TRIAGE_PORTFOLIO_NO_RESPONSIBLE,
+        row.responsible_id || TRIAGE_PORTFOLIO_NO_RESPONSIBLE,
         row.responsible_name ?? "Sem responsável",
       ]),
     ),
   ]
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  const regimes = [...new Set(items.map((row) => row.regime ?? TRIAGE_PORTFOLIO_NO_REGIME))].sort(
+  const regimes = [...new Set(items.map((row) => row.regime || TRIAGE_PORTFOLIO_NO_REGIME))].sort(
     (a, b) => a.localeCompare(b, "pt-BR"),
   );
 
@@ -148,7 +148,7 @@ export function FiscalTriagePortfolioSection({
         responsibleId: responsible,
         regime,
         documentField,
-        documentStatus,
+        documentStatus: documentStatus || undefined,
         justification: justification || undefined,
       }),
     [items, search, responsible, regime, documentField, documentStatus, justification],
@@ -163,7 +163,7 @@ export function FiscalTriagePortfolioSection({
       id,
       name,
       count: filtered.filter(
-        (row) => (row.responsible_id ?? TRIAGE_PORTFOLIO_NO_RESPONSIBLE) === id,
+        (row) => (row.responsible_id || TRIAGE_PORTFOLIO_NO_RESPONSIBLE) === id,
       ).length,
     }))
     .filter(({ count }) => count > 0);
@@ -335,7 +335,10 @@ export function FiscalTriagePortfolioSection({
             <select
               aria-label="Filtrar status documental"
               value={documentStatus}
-              onChange={(event) => updateFilter(setDocumentStatus, event.target.value)}
+              onChange={(event) => {
+                setDocumentStatus(event.target.value as TriagePortfolioDocumentStatus | "");
+                setPage(1);
+              }}
               className={CONTABIL_SELECT_CLASS}
             >
               <option value="">Todos os status</option>
@@ -356,7 +359,7 @@ export function FiscalTriagePortfolioSection({
               className={CONTABIL_SELECT_CLASS}
             >
               <option value="">Com ou sem justificativa</option>
-              <option value="with">Com justificativa</option>
+              <option value="with">Com justificativa em algum item</option>
               <option value="without">Sem justificativa</option>
             </select>
           </div>
@@ -453,7 +456,7 @@ export function FiscalTriagePortfolioSection({
                               ))}
                             </select>
                           ) : (
-                            <span className="text-xs">{statusLabel(cellStatus(row, field))}</span>
+                            <span className="text-xs">{statusLabel(fiscalTriagePortfolioItemStatus(row, field))}</span>
                           )}
                         </td>
                       ))}

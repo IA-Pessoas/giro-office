@@ -11,7 +11,16 @@ export const TRIAGE_PORTFOLIO_NO_RESPONSIBLE = "none";
 /** Valor de `regime` que seleciona clientes sem regime cadastrado. */
 export const TRIAGE_PORTFOLIO_NO_REGIME = "Não informado";
 
-export type TriagePortfolioJustificationFilter = "with" | "without";
+/** Estados de item filtráveis na carteira Fiscal: os do checklist mais "a configurar". */
+export const TRIAGE_PORTFOLIO_DOCUMENT_STATUSES = [
+  ...TRIAGE_DOCUMENT_STATUSES,
+  TRIAGE_PORTFOLIO_NOT_STARTED,
+] as const;
+export type TriagePortfolioDocumentStatus = (typeof TRIAGE_PORTFOLIO_DOCUMENT_STATUSES)[number];
+
+export const TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS = ["with", "without"] as const;
+export type TriagePortfolioJustificationFilter =
+  (typeof TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS)[number];
 
 /** Filtros da carteira Fiscal: os mesmos na tela, no CSV e em `GET /triagem/fiscal-portfolio`. */
 export interface FiscalTriagePortfolioFilters {
@@ -19,11 +28,11 @@ export interface FiscalTriagePortfolioFilters {
   responsibleId?: string;
   regime?: string;
   documentField?: TriageFiscalChecklistField;
-  documentStatus?: string;
+  documentStatus?: TriagePortfolioDocumentStatus;
   justification?: TriagePortfolioJustificationFilter;
 }
 
-/** Forma mínima de um item da carteira que os filtros leem. */
+/** Forma mínima de um item da carteira Fiscal que os filtros leem. */
 export interface FiscalTriagePortfolioFilterable {
   legal_name: string;
   cpf_cnpj: string | null;
@@ -46,13 +55,10 @@ export function fiscalTriagePortfolioItemStatus(
   );
 }
 
-function hasJustification(
-  row: FiscalTriagePortfolioFilterable,
-  field?: TriageFiscalChecklistField,
-) {
+/** A empresa tem justificativa em algum item da rotina, qualquer que seja a coluna filtrada. */
+function hasJustification(row: FiscalTriagePortfolioFilterable) {
   const notes = row.monthly?.item_notes ?? {};
-  const fields = field ? [field] : TRIAGE_FISCAL_CHECKLIST_FIELDS;
-  return fields.some((key) => Boolean(notes[key]?.justification?.trim()));
+  return TRIAGE_FISCAL_CHECKLIST_FIELDS.some((key) => Boolean(notes[key]?.justification?.trim()));
 }
 
 export function filterFiscalTriagePortfolio<T extends FiscalTriagePortfolioFilterable>(
@@ -68,10 +74,10 @@ export function filterFiscalTriagePortfolio<T extends FiscalTriagePortfolioFilte
       return false;
     if (
       filters.responsibleId &&
-      (row.responsible_id ?? TRIAGE_PORTFOLIO_NO_RESPONSIBLE) !== filters.responsibleId
+      (row.responsible_id || TRIAGE_PORTFOLIO_NO_RESPONSIBLE) !== filters.responsibleId
     )
       return false;
-    if (filters.regime && (row.regime ?? TRIAGE_PORTFOLIO_NO_REGIME) !== filters.regime)
+    if (filters.regime && (row.regime || TRIAGE_PORTFOLIO_NO_REGIME) !== filters.regime)
       return false;
     if (
       filters.documentField &&
@@ -79,47 +85,53 @@ export function filterFiscalTriagePortfolio<T extends FiscalTriagePortfolioFilte
       fiscalTriagePortfolioItemStatus(row, filters.documentField) !== filters.documentStatus
     )
       return false;
-    if (filters.justification) {
-      return hasJustification(row, filters.documentField) === (filters.justification === "with");
-    }
+    if (filters.justification) return hasJustification(row) === (filters.justification === "with");
     return true;
   });
 }
 
-const DOCUMENT_STATUSES: readonly string[] = [
-  ...TRIAGE_DOCUMENT_STATUSES,
-  TRIAGE_PORTFOLIO_NOT_STARTED,
-];
+/** Converte a query já validada (`document_field`, `responsible_id`…) nos filtros da tela. */
+export function fiscalTriagePortfolioFiltersFromQuery(query: {
+  search?: string;
+  responsible_id?: string;
+  regime?: string;
+  document_field?: TriageFiscalChecklistField;
+  document_status?: TriagePortfolioDocumentStatus;
+  justification?: TriagePortfolioJustificationFilter;
+}): FiscalTriagePortfolioFilters {
+  return {
+    search: query.search,
+    responsibleId: query.responsible_id,
+    regime: query.regime,
+    documentField: query.document_field,
+    documentStatus: query.document_status,
+    justification: query.justification,
+  };
+}
 
-/** Lê os filtros da query string (`document_field`, `responsible_id`…); lança em valor inválido. */
-export function parseFiscalTriagePortfolioFilters(
-  query: Record<string, string | undefined>,
-): FiscalTriagePortfolioFilters {
-  const text = (key: string) => query[key]?.trim() || undefined;
-  const filters: FiscalTriagePortfolioFilters = {};
-  const search = text("search");
-  const responsibleId = text("responsible_id");
-  const regime = text("regime");
-  const documentField = text("document_field");
-  const documentStatus = text("document_status");
-  const justification = text("justification");
-  if (search) filters.search = search;
-  if (responsibleId) filters.responsibleId = responsibleId;
-  if (regime) filters.regime = regime;
-  if (documentField) {
-    if (!(TRIAGE_FISCAL_CHECKLIST_FIELDS as readonly string[]).includes(documentField))
-      throw new RangeError("document_field inválido.");
-    filters.documentField = documentField as TriageFiscalChecklistField;
-  }
-  if (documentStatus) {
-    if (!DOCUMENT_STATUSES.includes(documentStatus))
-      throw new RangeError("document_status inválido.");
-    filters.documentStatus = documentStatus;
-  }
-  if (justification) {
-    if (justification !== "with" && justification !== "without")
-      throw new RangeError("justification deve ser with ou without.");
-    filters.justification = justification;
-  }
-  return filters;
+/** Forma mínima de um item da carteira Contábil que os filtros leem. */
+export interface ContabilTriagePortfolioFilterable {
+  regime: string | null;
+  person_responsible_id: string | null;
+  closing: { status: string } | null;
+}
+
+/** Filtros da carteira Contábil, com os mesmos sentinelas da Fiscal. */
+export interface ContabilTriagePortfolioFilters {
+  responsibleId?: string;
+  regime?: string;
+  closingStatus?: string;
+}
+
+export function filterContabilTriagePortfolio<T extends ContabilTriagePortfolioFilterable>(
+  rows: readonly T[],
+  filters: ContabilTriagePortfolioFilters,
+): T[] {
+  return rows.filter(
+    (row) =>
+      (!filters.responsibleId ||
+        (row.person_responsible_id || TRIAGE_PORTFOLIO_NO_RESPONSIBLE) === filters.responsibleId) &&
+      (!filters.regime || (row.regime || TRIAGE_PORTFOLIO_NO_REGIME) === filters.regime) &&
+      (!filters.closingStatus || row.closing?.status === filters.closingStatus),
+  );
 }
