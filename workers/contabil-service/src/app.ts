@@ -7,6 +7,7 @@ import {
   serializeError,
 } from "@workspace/shared/http";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { buildContabilServiceOpenApiSpec } from "../../../services/contabil-service/src/openapi/spec.js";
 import {
@@ -19,6 +20,10 @@ import {
   updateControlFieldBodySchema,
 } from "../../../services/contabil-service/src/schemas/control.schemas.js";
 import {
+  noahIdParamsSchema,
+  noahUploadQuerySchema,
+} from "../../../services/contabil-service/src/schemas/noah.schemas.js";
+import {
   createRelationshipBodySchema,
   relationshipClientIdParamsSchema,
   relationshipIdParamsSchema,
@@ -30,6 +35,8 @@ import {
   responsibleIdParamsSchema,
   updateResponsibleBodySchema,
 } from "../../../services/contabil-service/src/schemas/responsible.schemas.js";
+import { NOAH_LIMITS } from "../../../services/contabil-service/src/services/noahConversionService.js";
+import { NoahService } from "../../../services/contabil-service/src/services/noahService.js";
 import { createContabilAudit } from "./audit.js";
 import {
   authenticateContabilRequest,
@@ -88,6 +95,7 @@ type ContabilOptions = {
   triageClosingService?: ClosingService;
   triageDocumentsService?: DocumentsService;
   reportingService?: ReportingService;
+  noahService?: Pick<NoahService, "create" | "download">;
 };
 type ContabilContext = { Bindings: ContabilWorkerEnv; Variables: { auth: WorkerAuthContext } };
 type Context = {
@@ -230,6 +238,52 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     requireTriagemModule(auth);
     c.set("auth", auth);
     await next();
+  });
+
+  app.post(
+    "/contabil/noah",
+    (c, next) => {
+      executeAuthWrite(c);
+      return next();
+    },
+    bodyLimit({
+      maxSize: NOAH_LIMITS.zipBytes,
+      onError: () => {
+        throw new ServiceError(413, "O ZIP excede 5 MiB.");
+      },
+    }),
+    async (c) => {
+      if (c.req.header("content-type")?.split(";")[0] !== "application/zip") {
+        throw new ServiceError(415, "Envie um arquivo ZIP.");
+      }
+      const { filename } = parseWithZod(noahUploadQuerySchema, c.req.query());
+      const bytes = Buffer.from(await c.req.arrayBuffer());
+      const auth = contabilAuthContext(c.get("auth"));
+      const invoke = (service: Pick<NoahService, "create">) =>
+        service.create(bytes, filename, auth);
+      const data = options.noahService
+        ? await invoke(options.noahService)
+        : await withPrisma(c, options, (prisma) => invoke(new NoahService(prisma)));
+      c.header("Cache-Control", "no-store");
+      return c.json(createSuccessResponse(data), 201);
+    },
+  );
+
+  app.get("/contabil/noah/:id/csv", async (c) => {
+    const { id } = parseWithZod(noahIdParamsSchema, { id: c.req.param("id") });
+    const auth = contabilAuthContext(c.get("auth"));
+    const invoke = (service: Pick<NoahService, "download">) => service.download(id, auth);
+    const csv = options.noahService
+      ? await invoke(options.noahService)
+      : await withPrisma(c, options, (prisma) => invoke(new NoahService(prisma)));
+    return new Response(csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="NOAH-${id}.csv"`,
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
   });
 
   app.get("/contabil/controls/list", async (c) => {

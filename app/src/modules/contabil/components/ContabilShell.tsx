@@ -19,8 +19,9 @@ import { ContabilResponsibleSection } from "./ContabilResponsibleSection";
 import { ContabilRelationshipSection } from "./ContabilRelationshipSection";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { TriageDocumentsSection } from "./TriageDocumentsSection";
+import { ContabilNoahSection } from "./ContabilNoahSection";
 
-type ContabilTabId = "control" | "responsible" | "relationship" | "documents";
+type ContabilTabId = "control" | "responsible" | "relationship" | "documents" | "noah";
 
 interface ContabilShellProps {
   clientId?: string;
@@ -62,6 +63,7 @@ export function ContabilShell({
       icon: Waypoints,
     },
     { id: "documents", label: "Documentos", icon: FileText },
+    { id: "noah", label: "Noah", icon: FileText },
   ];
 
   return (
@@ -185,6 +187,13 @@ function ContabilActiveTabPanel({
   pickedClientId: string;
   onPickClient: (clientId: string) => void;
 }) {
+  if (activeTab === "noah") {
+    return (
+      <div role="tabpanel" id="contabil-panel-noah" aria-labelledby="contabil-tab-noah">
+        <ContabilNoahSection canEdit={canEdit} />
+      </div>
+    );
+  }
   if (!clientId) {
     if (activeTab === "control") {
       return (
@@ -216,13 +225,18 @@ function ContabilActiveTabPanel({
           <ContabilClientSelect value={pickedClientId} onChange={onPickClient} />
           {pickedClientId ? (
             activeTab === "documents" ? (
-              <TriageDocumentsSection clientId={pickedClientId} canEdit={canEdit} canEditClosing={canEdit} />
+              <TriageDocumentsSection
+                clientId={pickedClientId}
+                canEdit={canEdit}
+                canEditClosing={canEdit}
+              />
             ) : (
               <ContabilRelationshipSection clientId={pickedClientId} canEdit={canEdit} />
             )
           ) : (
             <ContabilStateBox icon={Calculator} title="Selecione uma empresa para começar">
-              Escolha a empresa acima para abrir o {activeTab === "documents" ? "controle de documentos" : "relacionamento contábil"}.
+              Escolha a empresa acima para abrir o{" "}
+              {activeTab === "documents" ? "controle de documentos" : "relacionamento contábil"}.
             </ContabilStateBox>
           )}
         </div>
@@ -251,7 +265,11 @@ function ContabilActiveTabPanel({
   }
 
   if (activeTab === "documents") {
-    return <div role="tabpanel" id="contabil-panel-documents" aria-labelledby="contabil-tab-documents"><TriageDocumentsSection clientId={clientId} canEdit={canEdit} canEditClosing={canEdit} /></div>;
+    return (
+      <div role="tabpanel" id="contabil-panel-documents" aria-labelledby="contabil-tab-documents">
+        <TriageDocumentsSection clientId={clientId} canEdit={canEdit} canEditClosing={canEdit} />
+      </div>
+    );
   }
 
   return (

@@ -37,6 +37,23 @@ model User {
   @@map("users")
 }
 
+model NoahConversion {
+  id              String   @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime @default(now())
+  source_name     String
+  source_sha256   String
+  result_sha256   String
+  csv             String
+  row_count       Int
+  file_count      Int
+  rejections      Json
+
+  @@index([organization_id, created_at])
+  @@map("contabil.noah_conversions")
+}
+
 model ControlContabil {
   id                               String   @id @default(uuid())
   competence                       String

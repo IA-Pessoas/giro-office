@@ -17,6 +17,7 @@ import { TriagemOverviewClient } from "./integrations/triagemOverviewClient.js";
 import { buildContabilServiceOpenApiSpec } from "./openapi/spec.js";
 import { type ControlRouteDeps, createControlRoutes } from "./routes/control.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
+import { createNoahRoutes, type NoahRouteDeps } from "./routes/noah.routes.js";
 import {
   createRelationshipRoutes,
   type RelationshipRouteDeps,
@@ -32,6 +33,7 @@ import {
 } from "./routes/triageDocuments.routes.js";
 import { ControlService } from "./services/controlService.js";
 import { InternalReportingService } from "./services/internalReportingService.js";
+import { NoahService } from "./services/noahService.js";
 import { RelationshipService } from "./services/relationshipService.js";
 import { ResponsibleService } from "./services/responsibleService.js";
 import { TriageClosingService } from "./services/triageClosingService.js";
@@ -66,6 +68,7 @@ export function createContabilApp(options: {
   triageDocumentsRouteDeps?: TriageDocumentsRouteDeps;
   triageClosingRouteDeps?: TriageClosingRouteDeps;
   internalReportingService?: InternalReportingService;
+  noahRouteDeps?: NoahRouteDeps;
 }): express.Express {
   const { env, logger } = options;
   const controlRouteDeps = options.controlRouteDeps ?? new ControlService();
@@ -108,6 +111,10 @@ export function createContabilApp(options: {
   app.use("/contabil", createControlRoutes(controlRouteDeps));
   app.use("/contabil", createResponsibleRoutes(responsibleRouteDeps));
   app.use("/contabil", createRelationshipRoutes(relationshipRouteDeps));
+  app.use(
+    "/contabil/noah",
+    createNoahRoutes(options.noahRouteDeps ?? new NoahService(prismaClient)),
+  );
   app.use("/triagem", createTriageDocumentsRoutes(triageDocumentsRouteDeps));
   app.use("/triagem", createTriageClosingRoutes(triageClosingRouteDeps));
   app.use(

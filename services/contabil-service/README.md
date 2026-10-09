@@ -62,6 +62,32 @@ Infraestrutura direto no serviço: `GET http://localhost:3038/health` e `GET htt
 pnpm --filter @workspace/contabil-service dev
 ```
 
+## Conversão Noah
+
+`POST /contabil/noah?filename=comprovantes.zip` recebe bytes `application/zip` e exige
+permissão de edição no Contábil. Retorna 201 com identificador, rejeições por arquivo,
+quantidades, ator, instante e hashes SHA-256 da origem e do CSV. O resultado é imutável
+e persistido em `contabil.noah_conversions`; o ZIP/HTML só permanece em memória durante
+a requisição. `GET /contabil/noah/:id/csv` exige leitura e consulta somente a organização
+autenticada. O gateway encaminha o upload binário e o download pelo mesmo prefixo.
+
+Limites: ZIP de 5 MiB, 100 entradas, 1 MiB por HTML, 10 MiB expandidos e 10.000 pagamentos.
+Não extrai no filesystem, não executa HTML e rejeita caminhos inseguros, symlinks,
+arquivos corrompidos e pagamentos inválidos. O CSV usa UTF-8, ponto e vírgula e as quatro
+colunas `FORNECEDOR;DATA;VALOR;ARQUIVO`; células que poderiam executar fórmulas recebem
+um apóstrofo inicial. Nenhum lançamento, Controle ou checklist é alterado.
+
+Regras de extração: `classes/Contabil.php` do legado (tabela `TBLResultado`, colunas
+1/6/7 e alternativas 5/6). Validação usa casos sintéticos; compatibilidade com ZIPs
+reais permanece não validada conforme #1716. A migration
+`20261009214500_contabil_noah_conversions` deve ser aplicada pelo processo de publicação.
+
+### Comandos locais
+
+```bash
+pnpm --filter @workspace/contabil-service dev
+```
+
 Gerar cliente Prisma: `pnpm --filter @workspace/contabil-service prisma:generate`.
 
 ## Critérios de relatórios

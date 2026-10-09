@@ -774,6 +774,7 @@ async function httpRequest(op, options) {
     query,
     json,
     form,
+    raw,
     headers: optionHeaders = {},
     expectedStatus: optionExpectedStatus,
     expectEnvelope: optionExpectEnvelope,
@@ -807,7 +808,9 @@ async function httpRequest(op, options) {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   };
 
-  if (json !== undefined) {
+  if (raw !== undefined) {
+    fetchOptions.body = raw;
+  } else if (json !== undefined) {
     requestHeaders.set("content-type", "application/json");
     fetchOptions.body = JSON.stringify(json);
   } else if (form) {
@@ -5408,6 +5411,34 @@ const handlers = {
       expectedStatus: [200],
       query: { ipi_id: requireState("fiscalIpiId") },
     });
+  },
+
+  async contabilNoahCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      query: { filename: "noah-synthetic.zip" },
+      headers: { "content-type": "application/zip" },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/noah/synthetic.zip")),
+    });
+    if (!isBadExpectation(op)) {
+      if (response.body?.data?.row_count !== 1)
+        throw new Error("Noah deve extrair um pagamento sintético.");
+      state.contabilNoahId = response.body.data.id;
+    }
+  },
+
+  async contabilNoahDownload(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/noah/${requireState("contabilNoahId")}/csv`,
+      expectedStatus: [200],
+      expectEnvelope: false,
+    });
+    if (
+      !isBadExpectation(op) &&
+      !response.text.includes("Fornecedor Sintético;09/10/2026;100,00;comprovante.html")
+    ) {
+      throw new Error("CSV Noah diverge do comprovante sintético.");
+    }
   },
 
   async contabilControlCreate(op) {
