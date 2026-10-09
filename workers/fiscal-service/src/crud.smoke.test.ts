@@ -798,6 +798,109 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     expect(after.data.data[0].amount).toBe("999.1");
   });
 
+  it("malhas: cria, atualiza com histórico, filtra e isola por organização", async () => {
+    const state = requireSmokeState();
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Malha ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+    });
+    const clientId = String(client.id);
+    const created = expectOk(
+      await call("POST", "/fiscal/malhas", {
+        client_id: clientId,
+        period_start: "2025-01",
+        period_end: "2025-12",
+        reason: "Divergência DCTFWeb",
+        deadline: "2026-11-10",
+        responsible_id: state.ownerId,
+      }),
+      "POST /fiscal/malhas",
+    );
+    const id = created.data.id as string;
+    expect(created.data).toMatchObject({ status: "aberta", deadline: "2026-11-10" });
+    expectOk(
+      await call("POST", "/fiscal/malhas", {
+        client_id: clientId,
+        period_start: "2025-01",
+        period_end: "2025-12",
+        reason: "x",
+        task_id: randomUUID(),
+      }),
+      "POST com tarefa inexistente",
+      [404],
+    );
+
+    expectOk(
+      await call("PUT", `/fiscal/malhas/${id}`, { status: "respondida", deadline: null }),
+      "PUT /fiscal/malhas/:id",
+    );
+    const detail = expectOk(await call("GET", `/fiscal/malhas/${id}`), "GET /fiscal/malhas/:id");
+    const history = detail.data.history as { field: string; new_value: string | null }[];
+    expect(history.filter((row) => row.field === "status").map((row) => row.new_value)).toEqual([
+      "respondida",
+      "aberta",
+    ]);
+    expect(history.find((row) => row.field === "deadline")).toMatchObject({ new_value: null });
+
+    const list = expectOk(
+      await call("GET", `/fiscal/malhas/list?client_id=${clientId}&status=respondida`),
+      "GET /fiscal/malhas/list",
+    );
+    expect(list.data.data.map((row: { id: string }) => row.id)).toEqual([id]);
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    const foreign = await call("GET", `/fiscal/malhas/${id}`, undefined, otherOrganization);
+    expect(foreign.status).not.toBe(200);
+    const foreignUpdate = await call(
+      "PUT",
+      `/fiscal/malhas/${id}`,
+      { status: "encerrada" },
+      otherOrganization,
+    );
+    expect(foreignUpdate.status).not.toBe(200);
+  });
+
+  it("atacadista: marca, desmarca com trilha e isola por organização", async () => {
+    const client = await smokeInsert("clients", {
+      id: randomUUID(),
+      name: `Smoke Atacadista ${suffix}`,
+      status: "Ativo",
+      fiscal: true,
+    });
+    const clientId = String(client.id);
+    const path = `/fiscal/clients/${clientId}/wholesale`;
+    const initial = expectOk(await call("GET", path), "GET wholesale inicial");
+    expect(initial.data).toMatchObject({ is_wholesale: false, history: [] });
+
+    expectOk(await call("PUT", path, { is_wholesale: true }), "PUT wholesale true");
+    expectOk(await call("PUT", path, { is_wholesale: true }), "PUT wholesale repetido");
+    const final = expectOk(await call("PUT", path, { is_wholesale: false }), "PUT wholesale false");
+    expect(final.data.is_wholesale).toBe(false);
+    expect(
+      final.data.history.map((row: { previous_value: boolean; new_value: boolean }) => [
+        row.previous_value,
+        row.new_value,
+      ]),
+    ).toEqual([
+      [true, false],
+      [false, true],
+    ]);
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    const foreign = await call("PUT", path, { is_wholesale: true }, otherOrganization);
+    expect(foreign.status).not.toBe(200);
+    const after = expectOk(await call("GET", path), "GET após outra organização");
+    expect(after.data.is_wholesale).toBe(false);
+  });
+
   it("lote do Simples: CSV com elegíveis e motivo dos ignorados", async () => {
     const document = `91${suffix}0001`;
     const eligible = await smokeInsert("clients", {

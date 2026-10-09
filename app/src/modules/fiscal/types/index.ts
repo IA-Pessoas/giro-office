@@ -9,6 +9,8 @@ export type FiscalTabId =
   | "ipi"
   | "rates"
   | "revenues"
+  | "malhas"
+  | "wholesale"
   | "conferences";
 
 export interface FiscalNcm {

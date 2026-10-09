@@ -8,6 +8,10 @@ import {
   updateAnnualDeclarationBodySchema,
 } from "@workspace/fiscal-service/src/schemas/annualControl.schemas.js";
 import {
+  clientWholesaleParamsSchema,
+  updateClientWholesaleBodySchema,
+} from "@workspace/fiscal-service/src/schemas/clientWholesale.schemas.js";
+import {
   documentConferenceBodySchema,
   invoicePdfTotalsBodySchema,
   ipiSpreadsheetConferenceBodySchema,
@@ -36,6 +40,12 @@ import {
   updateIpiBodySchema,
 } from "@workspace/fiscal-service/src/schemas/ipi.schemas.js";
 import {
+  createMalhaBodySchema,
+  listMalhasQuerySchema,
+  malhaIdParamsSchema,
+  updateMalhaBodySchema,
+} from "@workspace/fiscal-service/src/schemas/malha.schemas.js";
+import {
   addMonthlyObligationBodySchema,
   listMonthlyControlsQuerySchema,
   monthlyControlIdParamsSchema,
@@ -63,6 +73,7 @@ import {
   simplesPreviewQuerySchema,
 } from "@workspace/fiscal-service/src/schemas/simplesRate.schemas.js";
 import { AnnualControlService } from "@workspace/fiscal-service/src/services/annualControlService.js";
+import { ClientWholesaleService } from "@workspace/fiscal-service/src/services/clientWholesaleService.js";
 import {
   compareDocumentSpreadsheets,
   documentConferenceCsvExport,
@@ -81,6 +92,7 @@ import {
   compareIpiSpreadsheets,
   ipiSpreadsheetConferenceCsvExport,
 } from "@workspace/fiscal-service/src/services/ipiSpreadsheetConferenceService.js";
+import { MalhaService } from "@workspace/fiscal-service/src/services/malhaService.js";
 import { MonthlyControlService } from "@workspace/fiscal-service/src/services/monthlyControlService.js";
 import { MonthlyObligationService } from "@workspace/fiscal-service/src/services/monthlyObligationService.js";
 import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
@@ -126,6 +138,7 @@ import { createFiscalAudit, requireAuditConfigured } from "./audit.js";
 import { authenticateFiscalRequest, authorizeFiscalRequest } from "./auth.js";
 import type { FiscalWorkerEnv } from "./env.js";
 import { FiscalSearchService, IpiService, NcmService } from "./fiscalServices.js";
+import { WorkerMalhaAttachmentStorage } from "./malhaAttachmentStorage.js";
 import { PrismaClient } from "./prisma.js";
 import { verifyReportingGrant } from "./reporting.js";
 
@@ -144,6 +157,11 @@ type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
 type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
+type WholesaleServiceLike = Pick<ClientWholesaleService, "get" | "set">;
+type MalhaServiceLike = Pick<
+  MalhaService,
+  "create" | "update" | "list" | "detail" | "replaceAttachment" | "attachmentAccess"
+>;
 type ControlServiceLike = Pick<
   MonthlyControlService,
   "list" | "open" | "update" | "triage" | "transfer" | "responsibles"
@@ -161,6 +179,8 @@ interface FiscalWorkerOptions {
   reportingService?: ReportingServiceLike;
   rateService?: RateServiceLike;
   revenueService?: RevenueServiceLike;
+  malhaService?: MalhaServiceLike;
+  wholesaleService?: WholesaleServiceLike;
   controlService?: ControlServiceLike;
   obligationService?: ObligationServiceLike;
   annualService?: AnnualServiceLike;
@@ -180,6 +200,8 @@ type WorkerServices = {
   reportingService: ReportingServiceLike;
   rateService: RateServiceLike;
   revenueService: RevenueServiceLike;
+  malhaService: MalhaServiceLike;
+  wholesaleService: WholesaleServiceLike;
   controlService: ControlServiceLike;
   obligationService: ObligationServiceLike;
   annualService: AnnualServiceLike;
@@ -306,6 +328,8 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         ConstructorParameters<typeof FiscalSearchService>[0] &
         ConstructorParameters<typeof FiscalRateService>[0] &
         ConstructorParameters<typeof MonthlyRevenueService>[0] &
+        ConstructorParameters<typeof MalhaService>[0] &
+        ConstructorParameters<typeof ClientWholesaleService>[0] &
         ConstructorParameters<typeof MonthlyControlService>[0] &
         ConstructorParameters<typeof MonthlyObligationService>[0] &
         ConstructorParameters<typeof AnnualControlService>[0] &
@@ -319,6 +343,13 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         reportingService: () => new InternalReportingService(prisma),
         rateService: () => new FiscalRateService(prisma, createFiscalAudit(env)),
         revenueService: () => new MonthlyRevenueService(prisma, createFiscalAudit(env)),
+        malhaService: () =>
+          new MalhaService(
+            prisma,
+            createFiscalAudit(env),
+            WorkerMalhaAttachmentStorage.fromEnv(env),
+          ),
+        wholesaleService: () => new ClientWholesaleService(prisma, createFiscalAudit(env)),
         controlService: () => new MonthlyControlService(prisma, createFiscalAudit(env)),
         obligationService: () => new MonthlyObligationService(prisma, createFiscalAudit(env)),
         annualService: () => new AnnualControlService(prisma, createFiscalAudit(env)),
@@ -389,6 +420,99 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const data = await withService("revenueService", (service) =>
       service.list(query, c.get("auth").organizationId),
     );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/clients/:client_id/wholesale", async (c) => {
+    const { client_id } = parseWithZod(clientWholesaleParamsSchema, {
+      client_id: c.req.param("client_id"),
+    });
+    const data = await withService("wholesaleService", (service) =>
+      service.get(client_id, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.put("/fiscal/clients/:client_id/wholesale", async (c) => {
+    const { client_id } = parseWithZod(clientWholesaleParamsSchema, {
+      client_id: c.req.param("client_id"),
+    });
+    const { is_wholesale } = parseWithZod(updateClientWholesaleBodySchema, await readJson(c));
+    const data = await withService("wholesaleService", (service) =>
+      service.set({ ...actor(c), clientId: client_id, isWholesale: is_wholesale }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/malhas", async (c) => {
+    const body = parseWithZod(createMalhaBodySchema, await readJson(c));
+    const data = await withService("malhaService", (service) =>
+      service.create({ ...actor(c), ...body }),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.get("/fiscal/malhas/list", async (c) => {
+    const query = parseWithZod(listMalhasQuerySchema, {
+      client_id: c.req.query("client_id"),
+      status: c.req.query("status"),
+      responsible_id: c.req.query("responsible_id"),
+      page: c.req.query("page"),
+      page_size: c.req.query("page_size"),
+    });
+    const data = await withService("malhaService", (service) =>
+      service.list(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/malhas/:id", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("malhaService", (service) =>
+      service.detail(id, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.put("/fiscal/malhas/:id", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(updateMalhaBodySchema, await readJson(c));
+    const data = await withService("malhaService", (service) =>
+      service.update({ ...actor(c), ...body, id }),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/malhas/:id/attachment", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    let form: FormData;
+    try {
+      form = await c.req.raw.formData();
+    } catch {
+      throw new ServiceError(400, "Upload inválido.");
+    }
+    const entry = form.get("file");
+    const file =
+      entry instanceof File
+        ? {
+            bytes: new Uint8Array(await entry.arrayBuffer()),
+            mimetype: entry.type,
+            originalname: entry.name,
+            size: entry.size,
+          }
+        : undefined;
+    const data = await withService("malhaService", (service) =>
+      service.replaceAttachment({ ...actor(c), id, file }),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.get("/fiscal/malhas/:id/attachment", async (c) => {
+    const { id } = parseWithZod(malhaIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("malhaService", (service) =>
+      service.attachmentAccess(id, c.get("auth").organizationId),
+    );
+    c.header("Cache-Control", "no-store");
     return c.json(createSuccessResponse(data));
   });
 

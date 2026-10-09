@@ -7,12 +7,14 @@ import {
 import { requestContext } from "@workspace/shared/http";
 import type { Logger } from "@workspace/shared/logger";
 import { mountOpenApiDocs } from "@workspace/shared/openapi";
+import { createSupabaseServiceClient } from "@workspace/shared/storage";
 import cors from "cors";
 import express, { type Request } from "express";
 import "express-async-errors";
 
 import type { FiscalServiceEnv } from "./config/env.js";
 import { createLog, logUpdateIfChanged } from "./integrations/audit.js";
+import { SupabaseMalhaAttachmentStorage } from "./integrations/malhaAttachmentStorage.js";
 import prismaClient from "./integrations/prisma.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
@@ -20,6 +22,10 @@ import {
   type AnnualControlRouteDeps,
   createAnnualControlRoutes,
 } from "./routes/annualControl.routes.js";
+import {
+  type ClientWholesaleRouteDeps,
+  createClientWholesaleRoutes,
+} from "./routes/clientWholesale.routes.js";
 import { createDocumentConferenceRoutes } from "./routes/documentConference.routes.js";
 import { createFiscalRateRoutes, type FiscalRateRouteDeps } from "./routes/fiscalRate.routes.js";
 import {
@@ -29,6 +35,7 @@ import {
 import { createIcmsRoutes, type IcmsRouteDeps } from "./routes/icms.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createIpiRoutes, type IpiRouteDeps } from "./routes/ipi.routes.js";
+import { createMalhaRoutes, type MalhaRouteDeps } from "./routes/malha.routes.js";
 import {
   createMonthlyControlRoutes,
   type MonthlyControlRouteDeps,
@@ -44,10 +51,12 @@ import {
 import { createNcmRoutes, type NcmRouteDeps } from "./routes/ncm.routes.js";
 import { createSimplesRateRoutes, type SimplesRateRouteDeps } from "./routes/simplesRate.routes.js";
 import { AnnualControlService } from "./services/annualControlService.js";
+import { ClientWholesaleService } from "./services/clientWholesaleService.js";
 import { FiscalRateService } from "./services/fiscalRateService.js";
 import { FiscalSearchService } from "./services/fiscalSearchService.js";
 import { IcmsService } from "./services/icmsService.js";
 import { IpiService } from "./services/ipiService.js";
+import { MalhaService } from "./services/malhaService.js";
 import { MonthlyControlService } from "./services/monthlyControlService.js";
 import { MonthlyObligationService } from "./services/monthlyObligationService.js";
 import { MonthlyRevenueService } from "./services/monthlyRevenueService.js";
@@ -77,6 +86,8 @@ export function createFiscalApp(options: {
   fiscalSearchRouteDeps?: FiscalSearchRouteDeps;
   fiscalRateRouteDeps?: FiscalRateRouteDeps;
   monthlyRevenueRouteDeps?: MonthlyRevenueRouteDeps;
+  malhaRouteDeps?: MalhaRouteDeps;
+  clientWholesaleRouteDeps?: ClientWholesaleRouteDeps;
   monthlyControlRouteDeps?: MonthlyControlRouteDeps;
   monthlyObligationRouteDeps?: MonthlyObligationRouteDeps;
   annualControlRouteDeps?: AnnualControlRouteDeps;
@@ -92,6 +103,20 @@ export function createFiscalApp(options: {
     options.fiscalRateRouteDeps ?? new FiscalRateService(prismaClient, { createLog });
   const monthlyRevenueRouteDeps =
     options.monthlyRevenueRouteDeps ?? new MonthlyRevenueService(prismaClient, { createLog });
+  const malhaRouteDeps =
+    options.malhaRouteDeps ??
+    new MalhaService(
+      prismaClient,
+      { createLog },
+      env.supabaseUrl && env.supabaseServiceRoleKey
+        ? new SupabaseMalhaAttachmentStorage(
+            createSupabaseServiceClient(env.supabaseUrl, env.supabaseServiceRoleKey),
+            env.malhaAttachmentBucket,
+          )
+        : undefined,
+    );
+  const clientWholesaleRouteDeps =
+    options.clientWholesaleRouteDeps ?? new ClientWholesaleService(prismaClient, { createLog });
   const monthlyControlRouteDeps =
     options.monthlyControlRouteDeps ?? new MonthlyControlService(prismaClient, { createLog });
   const monthlyObligationRouteDeps =
@@ -132,6 +157,8 @@ export function createFiscalApp(options: {
   app.use("/fiscal", createFiscalSearchRoutes(fiscalSearchRouteDeps));
   app.use("/fiscal", createFiscalRateRoutes(fiscalRateRouteDeps));
   app.use("/fiscal", createMonthlyRevenueRoutes(monthlyRevenueRouteDeps));
+  app.use("/fiscal", createMalhaRoutes(malhaRouteDeps));
+  app.use("/fiscal", createClientWholesaleRoutes(clientWholesaleRouteDeps));
   app.use("/fiscal", createMonthlyControlRoutes(monthlyControlRouteDeps));
   app.use("/fiscal", createMonthlyObligationRoutes(monthlyObligationRouteDeps));
   app.use("/fiscal", createAnnualControlRoutes(annualControlRouteDeps));

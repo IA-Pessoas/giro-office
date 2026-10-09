@@ -44,6 +44,19 @@ export function fiscalSimplesPreviewQueryKey(clientId: string, competence: strin
   return [...fiscalRevenuesQueryKey(clientId), "simples-preview", competence] as const;
 }
 
+/** Prefixo das malhas do cliente; invalidá-lo também atualiza o histórico aberto. */
+export function fiscalMalhasQueryKey(clientId: string) {
+  return [...FISCAL_QUERY_KEY, "malhas", clientId] as const;
+}
+
+export function fiscalMalhaDetailQueryKey(clientId: string, malhaId: string) {
+  return [...fiscalMalhasQueryKey(clientId), "detail", malhaId] as const;
+}
+
+export function fiscalWholesaleQueryKey(clientId: string) {
+  return [...FISCAL_QUERY_KEY, "wholesale", clientId] as const;
+}
+
 export function fiscalNcmSearchQueryKey(ncmCode: string) {
   return [...FISCAL_QUERY_KEY, "search", ncmCode] as const;
 }

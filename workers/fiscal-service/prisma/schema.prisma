@@ -222,6 +222,65 @@ model Ipi {
   @@map("fiscal.ipi")
 }
 
+model FiscalMalha {
+  id                       String    @id @default(uuid())
+  organization_id          String
+  client_id                String
+  period_start             DateTime  @db.Date
+  period_end               DateTime  @db.Date
+  reason                   String
+  deadline                 DateTime? @db.Date
+  status                   String
+  responsible_id           String?
+  task_id                  String?
+  attachment_path          String?
+  attachment_original_name String?
+  attachment_mime_type     String?
+  attachment_size_bytes    Int?
+  attachment_uploaded_at   DateTime?
+  attachment_uploaded_by   String?
+  created_by               String
+  updated_by               String
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@map("fiscal.malhas")
+}
+
+model FiscalMalhaHistory {
+  id              String   @id @default(uuid())
+  organization_id String
+  malha_id        String
+  field           String
+  previous_value  String?
+  new_value       String?
+  actor_user_id   String
+  created_at      DateTime @default(now())
+
+  @@map("fiscal.malha_history")
+}
+
+model FiscalClientWholesaleHistory {
+  id              String   @id @default(uuid())
+  organization_id String
+  client_id       String
+  sequence        Int
+  previous_value  Boolean
+  new_value       Boolean
+  actor_user_id   String
+  created_at      DateTime @default(now())
+
+  @@unique([client_id, sequence], map: "uq_fiscal_client_wholesale_history_client_sequence")
+  @@map("fiscal.client_wholesale_history")
+}
+
+model Task {
+  id              String @id
+  organization_id String
+
+  @@map("integracao.tasks")
+}
+
 // Só leitura: o Fiscal consulta o checklist documental da Triagem, nunca edita.
 model TriageMonthly {
   id              String    @id @default(uuid())
