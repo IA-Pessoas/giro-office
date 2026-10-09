@@ -1,6 +1,13 @@
 import { buildFiscalServiceOpenApiSpec } from "@workspace/fiscal-service/src/openapi/spec.js";
 import { InternalReportingService } from "@workspace/fiscal-service/src/reporting/internalReportingService.js";
 import {
+  addAnnualDeclarationBodySchema,
+  annualControlIdParamsSchema,
+  annualDeclarationParamsSchema,
+  listAnnualControlsQuerySchema,
+  updateAnnualDeclarationBodySchema,
+} from "@workspace/fiscal-service/src/schemas/annualControl.schemas.js";
+import {
   createFiscalRateBodySchema,
   fiscalRateIdParamsSchema,
   listFiscalRatesQuerySchema,
@@ -46,6 +53,7 @@ import {
   simplesPdfQuerySchema,
   simplesPreviewQuerySchema,
 } from "@workspace/fiscal-service/src/schemas/simplesRate.schemas.js";
+import { AnnualControlService } from "@workspace/fiscal-service/src/services/annualControlService.js";
 import {
   fiscalRatePdfHeaders,
   renderFiscalRatePdf,
@@ -107,6 +115,7 @@ type ControlServiceLike = Pick<
   "list" | "open" | "update" | "triage" | "transfer" | "responsibles"
 >;
 type ObligationServiceLike = Pick<MonthlyObligationService, "list" | "add" | "update">;
+type AnnualServiceLike = Pick<AnnualControlService, "list" | "items" | "addItem" | "updateItem">;
 type SimplesServiceLike = Pick<SimplesRateService, "preview" | "emission" | "batch">;
 
 interface FiscalWorkerOptions {
@@ -120,6 +129,7 @@ interface FiscalWorkerOptions {
   revenueService?: RevenueServiceLike;
   controlService?: ControlServiceLike;
   obligationService?: ObligationServiceLike;
+  annualService?: AnnualServiceLike;
   simplesService?: SimplesServiceLike;
 }
 
@@ -138,6 +148,7 @@ type WorkerServices = {
   revenueService: RevenueServiceLike;
   controlService: ControlServiceLike;
   obligationService: ObligationServiceLike;
+  annualService: AnnualServiceLike;
   simplesService: SimplesServiceLike;
 };
 
@@ -263,6 +274,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         ConstructorParameters<typeof MonthlyRevenueService>[0] &
         ConstructorParameters<typeof MonthlyControlService>[0] &
         ConstructorParameters<typeof MonthlyObligationService>[0] &
+        ConstructorParameters<typeof AnnualControlService>[0] &
         ConstructorParameters<typeof SimplesRateService>[0] &
         ConstructorParameters<typeof InternalReportingService>[0];
       const factories: { [S in keyof WorkerServices]: () => WorkerServices[S] } = {
@@ -275,6 +287,7 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
         revenueService: () => new MonthlyRevenueService(prisma, createFiscalAudit(env)),
         controlService: () => new MonthlyControlService(prisma, createFiscalAudit(env)),
         obligationService: () => new MonthlyObligationService(prisma, createFiscalAudit(env)),
+        annualService: () => new AnnualControlService(prisma, createFiscalAudit(env)),
         simplesService: () => new SimplesRateService(prisma),
       };
       return callback(factories[key]());
@@ -412,6 +425,39 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const body = parseWithZod(updateMonthlyObligationBodySchema, await readJson(c));
     const data = await withService("obligationService", (service) =>
       service.update(id, code, body, actor(c)),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/annual-controls", async (c) => {
+    const query = parseWithZod(listAnnualControlsQuerySchema, { year: c.req.query("year") });
+    const data = await withService("annualService", (service) => service.list(query, actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/annual-controls/:id/items", async (c) => {
+    const { id } = parseWithZod(annualControlIdParamsSchema, { id: c.req.param("id") });
+    const data = await withService("annualService", (service) => service.items(id, actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/annual-controls/:id/items", async (c) => {
+    const { id } = parseWithZod(annualControlIdParamsSchema, { id: c.req.param("id") });
+    const body = parseWithZod(addAnnualDeclarationBodySchema, await readJson(c));
+    const data = await withService("annualService", (service) =>
+      service.addItem(id, body, actor(c)),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+
+  app.patch("/fiscal/annual-controls/:id/items/:code", async (c) => {
+    const { id, code } = parseWithZod(annualDeclarationParamsSchema, {
+      id: c.req.param("id"),
+      code: c.req.param("code"),
+    });
+    const body = parseWithZod(updateAnnualDeclarationBodySchema, await readJson(c));
+    const data = await withService("annualService", (service) =>
+      service.updateItem(id, code, body, actor(c)),
     );
     return c.json(createSuccessResponse(data));
   });

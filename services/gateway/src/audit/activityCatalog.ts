@@ -335,6 +335,12 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "o histórico de relatórios" },
   },
   {
+    // O último segmento é o código da declaração (DEFIS), não um id.
+    methods: ["PATCH"],
+    pattern: /^\/fiscal\/annual-controls\/[^/]+\/items\/[A-Z_]+$/,
+    description: { action: "atualizou", item: "uma declaração fiscal anual" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/fiscal\/monthly-controls\/responsibles$/,
     description: { action: "consultou", item: "os responsáveis fiscais disponíveis" },
@@ -1405,6 +1411,18 @@ const RESOURCE_RULES: ResourceRule[] = [
     singular: "uma obrigação fiscal mensal",
     newSingular: "uma nova obrigação fiscal mensal",
     plural: "obrigações fiscais mensais",
+  },
+  {
+    pattern: /^\/fiscal\/annual-controls\/[^/]+\/items(?:\/|$)/,
+    singular: "uma declaração fiscal anual",
+    newSingular: "uma nova declaração fiscal anual",
+    plural: "declarações fiscais anuais",
+  },
+  {
+    pattern: /^\/fiscal\/annual-controls(?:\/|$)/,
+    singular: "um controle fiscal anual",
+    newSingular: "um novo controle fiscal anual",
+    plural: "controles fiscais anuais",
   },
   {
     pattern: /^\/fiscal\/monthly-controls(?:\/|$)/,

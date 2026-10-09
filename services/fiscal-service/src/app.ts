@@ -16,6 +16,10 @@ import { createLog, logUpdateIfChanged } from "./integrations/audit.js";
 import prismaClient from "./integrations/prisma.js";
 import { buildFiscalServiceOpenApiSpec } from "./openapi/spec.js";
 import { InternalReportingService } from "./reporting/internalReportingService.js";
+import {
+  type AnnualControlRouteDeps,
+  createAnnualControlRoutes,
+} from "./routes/annualControl.routes.js";
 import { createFiscalRateRoutes, type FiscalRateRouteDeps } from "./routes/fiscalRate.routes.js";
 import {
   createFiscalSearchRoutes,
@@ -38,6 +42,7 @@ import {
 } from "./routes/monthlyRevenue.routes.js";
 import { createNcmRoutes, type NcmRouteDeps } from "./routes/ncm.routes.js";
 import { createSimplesRateRoutes, type SimplesRateRouteDeps } from "./routes/simplesRate.routes.js";
+import { AnnualControlService } from "./services/annualControlService.js";
 import { FiscalRateService } from "./services/fiscalRateService.js";
 import { FiscalSearchService } from "./services/fiscalSearchService.js";
 import { IcmsService } from "./services/icmsService.js";
@@ -73,6 +78,7 @@ export function createFiscalApp(options: {
   monthlyRevenueRouteDeps?: MonthlyRevenueRouteDeps;
   monthlyControlRouteDeps?: MonthlyControlRouteDeps;
   monthlyObligationRouteDeps?: MonthlyObligationRouteDeps;
+  annualControlRouteDeps?: AnnualControlRouteDeps;
   simplesRateRouteDeps?: SimplesRateRouteDeps;
   icmsRouteDeps?: IcmsRouteDeps;
   ipiRouteDeps?: IpiRouteDeps;
@@ -89,6 +95,8 @@ export function createFiscalApp(options: {
     options.monthlyControlRouteDeps ?? new MonthlyControlService(prismaClient, { createLog });
   const monthlyObligationRouteDeps =
     options.monthlyObligationRouteDeps ?? new MonthlyObligationService(prismaClient, { createLog });
+  const annualControlRouteDeps =
+    options.annualControlRouteDeps ?? new AnnualControlService(prismaClient, { createLog });
   const simplesRateRouteDeps = options.simplesRateRouteDeps ?? new SimplesRateService(prismaClient);
   const icmsRouteDeps =
     options.icmsRouteDeps ?? new IcmsService(prismaClient, { createLog, logUpdateIfChanged });
@@ -123,6 +131,7 @@ export function createFiscalApp(options: {
   app.use("/fiscal", createMonthlyRevenueRoutes(monthlyRevenueRouteDeps));
   app.use("/fiscal", createMonthlyControlRoutes(monthlyControlRouteDeps));
   app.use("/fiscal", createMonthlyObligationRoutes(monthlyObligationRouteDeps));
+  app.use("/fiscal", createAnnualControlRoutes(annualControlRouteDeps));
   app.use("/fiscal", createSimplesRateRoutes(simplesRateRouteDeps));
   app.use(
     "/internal",

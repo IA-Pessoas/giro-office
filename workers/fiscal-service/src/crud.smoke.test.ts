@@ -634,6 +634,75 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     expect(await mineIn("2026-08")).toMatchObject({ responsible_id: ownerId });
   });
 
+  it("controle anual: um por cliente e ano sob concorrência, DEFIS no Simples, declarações e trilha", async () => {
+    const insertClient = async (name: string, regime: string) =>
+      String(
+        (
+          await smokeInsert("clients", {
+            id: randomUUID(),
+            name: `${name} ${suffix}`,
+            status: "Ativo",
+            fiscal: true,
+            regime,
+          })
+        ).id,
+      );
+    const simples = await insertClient("Smoke Anual Simples", "Simples Nacional");
+    const real = await insertClient("Smoke Anual Real", "Lucro Real");
+
+    const lists = await Promise.all(
+      Array.from({ length: 4 }, () => call("GET", "/fiscal/annual-controls?year=2025")),
+    );
+    for (const list of lists) expectOk(list, "GET anual concorrente");
+    const list = expectOk(await call("GET", "/fiscal/annual-controls?year=2025"), "GET anual");
+    const find = (clientId: string) =>
+      list.data.items.filter((item: { client_id: string }) => item.client_id === clientId);
+    expect(find(simples)).toHaveLength(1);
+    expect(find(simples)[0].declarations).toEqual([
+      { code: "DEFIS", status: "PENDING", completed_on: null },
+    ]);
+    expect(find(real)[0].declarations).toEqual([]);
+    expect(find(simples)[0]).not.toHaveProperty("status");
+
+    const realBase = `/fiscal/annual-controls/${find(real)[0].id}/items`;
+    const addable = expectOk(await call("GET", realBase), "GET declarações Real");
+    expect(addable.data.addable.map((item: { code: string }) => item.code)).toEqual([
+      "DMED",
+      "DIMOB",
+    ]);
+    expectOk(await call("POST", realBase, { code: "DEFIS", reason: "x".repeat(3) }), "DEFIS no Real", [
+      400,
+    ]);
+    expectOk(await call("POST", realBase, { code: "DIMOB" }), "DIMOB sem motivo", [400]);
+    expectOk(
+      await call("POST", realBase, { code: "DIMOB", reason: "Incorporadora" }),
+      "incluir DIMOB",
+      [201],
+    );
+
+    const simplesBase = `/fiscal/annual-controls/${find(simples)[0].id}/items`;
+    const done = expectOk(
+      await call("PATCH", `${simplesBase}/DEFIS`, { completed_on: "2026-03-20", protocol: "DEF-1" }),
+      "cumprir DEFIS",
+    );
+    expect(done.data).toMatchObject({ status: "COMPLETED", completed_on: "2026-03-20" });
+    expectOk(
+      await call("PATCH", `${simplesBase}/DEFIS`, { applicable: false, reason: "MEI" }),
+      "dispensar cumprida",
+      [409],
+    );
+
+    const otherOrganization = {
+      ...(await smokeHeaders()),
+      "x-auth-organization-id": randomUUID(),
+    };
+    expectOk(
+      await call("GET", simplesBase, undefined, otherOrganization),
+      "declarações de outra organização",
+      [403, 404],
+    );
+  });
+
   it("receitas mensais: cria, recusa duplicada, lista por período e corrige", async () => {
     const client = await smokeInsert("clients", {
       id: randomUUID(),

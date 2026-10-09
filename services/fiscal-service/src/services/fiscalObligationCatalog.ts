@@ -22,8 +22,8 @@ export type FiscalObligationCode = (typeof FISCAL_OBLIGATION_CODES)[number];
 /** Como a obrigação entrou no controle (CHECK em monthly_control_obligations.origin). */
 export const FISCAL_OBLIGATION_ORIGIN = { suggested: "SUGGESTED", manual: "MANUAL" } as const;
 
-export interface FiscalObligationDefinition {
-  code: FiscalObligationCode;
+export interface FiscalObligationDefinition<C extends string = FiscalObligationCode> {
+  code: C;
   name: string;
   /** Regimes (rótulo normalizado) em que a obrigação é sugerida. Vazio em condicionais. */
   regimes: readonly string[];
@@ -35,9 +35,16 @@ export interface FiscalObligationDefinition {
   note: string;
 }
 
-const SIMPLES = "simples nacional";
-const PRESUMIDO = "lucro presumido";
-const REAL = "lucro real";
+/** Regimes como ficam depois de normalizeRegime. */
+export const FISCAL_REGIMES = {
+  simples: "simples nacional",
+  presumido: "lucro presumido",
+  real: "lucro real",
+} as const;
+
+const SIMPLES = FISCAL_REGIMES.simples;
+const PRESUMIDO = FISCAL_REGIMES.presumido;
+const REAL = FISCAL_REGIMES.real;
 
 export const FISCAL_OBLIGATION_CATALOG: readonly FiscalObligationDefinition[] = [
   {
@@ -97,17 +104,23 @@ export function findObligation(code: string): FiscalObligationDefinition | undef
 }
 
 /** Inclusão manual permitida para o regime registrado no controle. */
-export function isObligationAllowed(
-  definition: FiscalObligationDefinition,
+export function isObligationAllowed<C extends string>(
+  definition: FiscalObligationDefinition<C>,
   regime: string | null,
 ): boolean {
   return !definition.excludedRegimes.includes(normalizeRegime(regime));
 }
 
-/** Obrigações sugeridas para o regime registrado no controle. */
-export function suggestedObligations(regime: string | null): FiscalObligationDefinition[] {
+/** Itens não condicionais do catálogo sugeridos para o regime registrado no controle. */
+export function suggestedFrom<C extends string>(
+  catalog: readonly FiscalObligationDefinition<C>[],
+  regime: string | null,
+): FiscalObligationDefinition<C>[] {
   const normalized = normalizeRegime(regime);
-  return FISCAL_OBLIGATION_CATALOG.filter(
-    (item) => !item.conditional && item.regimes.includes(normalized),
-  );
+  return catalog.filter((item) => !item.conditional && item.regimes.includes(normalized));
+}
+
+/** Obrigações mensais sugeridas para o regime registrado no controle. */
+export function suggestedObligations(regime: string | null): FiscalObligationDefinition[] {
+  return suggestedFrom(FISCAL_OBLIGATION_CATALOG, regime);
 }
