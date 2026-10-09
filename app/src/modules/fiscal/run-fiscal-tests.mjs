@@ -362,6 +362,34 @@ await runTest("fiscal anticipations summary shows imported items and what stayed
   );
 });
 
+await runTest("fiscal anticipation review sends only changed fields and labels history", async () => {
+  const {
+    buildAnticipationItemChanges,
+    formatAnticipationHistoryField,
+    formatAnticipationHistoryValue,
+  } = await import("./utils/fiscalAnticipation.ts");
+  const item = { classification: "total", manual_value: "7.50", corrections: { cfop: "6403" } };
+  assert.equal(
+    buildAnticipationItemChanges(item, {
+      classification: "total",
+      manual_value: "7.50",
+      corrections: { cfop: "6403", ncm: "" },
+    }),
+    null,
+  );
+  assert.deepEqual(
+    buildAnticipationItemChanges(item, {
+      classification: "freight",
+      manual_value: "",
+      corrections: { cfop: "", value: "9,90" },
+    }),
+    { classification: "freight", manual_value: null, corrections: { cfop: null, value: "9.90" } },
+  );
+  assert.equal(formatAnticipationHistoryField("correction.icms_st"), "Correção de ICMS ST");
+  assert.equal(formatAnticipationHistoryValue("status", "awaiting_check", () => undefined), "Aguardando conferência");
+  assert.equal(formatAnticipationHistoryValue("reviewer_id", "u1", () => "Ana"), "Ana");
+});
+
 await runTest("fiscal malhas formats dates, periods and history values", async () => {
   const { formatMalhaDate, formatMalhaHistoryValue, formatMalhaPeriod } = await import(
     "./utils/fiscalMalha.ts"

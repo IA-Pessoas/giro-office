@@ -6,9 +6,110 @@ export const FISCAL_ANTICIPATION_ISSUE_LABELS: Record<FiscalAnticipationIssueKin
   duplicate: "Duplicata",
 };
 
-export const FISCAL_ANTICIPATION_STATUS_LABELS = {
-  pending_review: "Pendente de revisão",
-} as const;
+export type FiscalAnticipationStatus = "pending_review" | "awaiting_check" | "checked";
+export type FiscalAnticipationClassification = "partial" | "total" | "freight";
+export type FiscalAnticipationCorrectableField =
+  | "ncm"
+  | "cfop"
+  | "quantity"
+  | "value"
+  | "ipi"
+  | "icms_st";
+
+export const FISCAL_ANTICIPATION_STATUS_LABELS: Record<FiscalAnticipationStatus, string> = {
+  pending_review: "Em classificação",
+  awaiting_check: "Aguardando conferência",
+  checked: "Conferido",
+};
+
+export const FISCAL_ANTICIPATION_CLASSIFICATION_LABELS: Record<
+  FiscalAnticipationClassification,
+  string
+> = {
+  partial: "Parcial",
+  total: "Total",
+  freight: "Frete",
+};
+
+export const FISCAL_ANTICIPATION_FIELD_LABELS: Record<FiscalAnticipationCorrectableField, string> = {
+  ncm: "NCM",
+  cfop: "CFOP",
+  quantity: "Quantidade",
+  value: "Valor",
+  ipi: "IPI",
+  icms_st: "ICMS ST",
+};
+
+/** Rótulo do campo do histórico: "correction.ncm" → "Correção de NCM". */
+export function formatAnticipationHistoryField(field: string): string {
+  if (field.startsWith("correction.")) {
+    const name = field.slice("correction.".length) as FiscalAnticipationCorrectableField;
+    return `Correção de ${FISCAL_ANTICIPATION_FIELD_LABELS[name] ?? name}`;
+  }
+  const labels: Record<string, string> = {
+    classification: "Classificação",
+    manual_value: "Valor manual",
+    status: "Estado do lote",
+    reviewer_id: "Conferente",
+  };
+  return labels[field] ?? field;
+}
+
+/** Valor do histórico legível: estados e classificações pelos rótulos, vazio como "—". */
+export function formatAnticipationHistoryValue(
+  field: string,
+  value: string | null,
+  userName: (id: string) => string | undefined,
+): string {
+  if (value === null) return "—";
+  if (field === "status") {
+    return FISCAL_ANTICIPATION_STATUS_LABELS[value as FiscalAnticipationStatus] ?? value;
+  }
+  if (field === "classification") {
+    return (
+      FISCAL_ANTICIPATION_CLASSIFICATION_LABELS[value as FiscalAnticipationClassification] ?? value
+    );
+  }
+  if (field === "reviewer_id") return userName(value) ?? "Usuário sem acesso atual";
+  return value;
+}
+
+/**
+ * Alterações do formulário de revisão em relação ao item: só os campos mudados vão ao serviço,
+ * texto vazio desfaz (null). Devolve null quando nada mudou.
+ */
+export function buildAnticipationItemChanges(
+  item: {
+    classification: FiscalAnticipationClassification | null;
+    manual_value: string | null;
+    corrections: Partial<Record<FiscalAnticipationCorrectableField, string>>;
+  },
+  form: {
+    classification: FiscalAnticipationClassification | "";
+    manual_value: string;
+    corrections: Partial<Record<FiscalAnticipationCorrectableField, string>>;
+  },
+): {
+  classification?: FiscalAnticipationClassification | null;
+  manual_value?: string | null;
+  corrections?: Partial<Record<FiscalAnticipationCorrectableField, string | null>>;
+} | null {
+  const changes: ReturnType<typeof buildAnticipationItemChanges> & object = {};
+  const classification = form.classification || null;
+  if (classification !== item.classification) changes.classification = classification;
+  const manualValue = form.manual_value.trim().replace(",", ".") || null;
+  if (manualValue !== item.manual_value) changes.manual_value = manualValue;
+  const corrections: Partial<Record<FiscalAnticipationCorrectableField, string | null>> = {};
+  for (const [field, raw] of Object.entries(form.corrections) as [
+    FiscalAnticipationCorrectableField,
+    string,
+  ][]) {
+    const next = raw.trim().replace(",", ".") || null;
+    if (next !== (item.corrections[field] ?? null)) corrections[field] = next;
+  }
+  if (Object.keys(corrections).length) changes.corrections = corrections;
+  return Object.keys(changes).length ? changes : null;
+}
 
 /** Resumo do lote: o que entrou e o que ficou de fora, sem esconder duplicatas e erros. */
 export function formatAnticipationSummary(batch: {
