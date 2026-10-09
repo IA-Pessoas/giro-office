@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Banknote,
   FileSearch,
+  FileStack,
   FileCheck2,
   CalendarRange,
   ClipboardList,
@@ -17,6 +18,7 @@ import {
 import { useModuleAccess } from "@modules/auth";
 
 import type { FiscalTabId } from "../types";
+import { FiscalAnticipationsSection } from "./FiscalAnticipationsSection";
 import { FiscalConferencesSection } from "./FiscalConferencesSection";
 import { FiscalAnnualControlsSection } from "./FiscalAnnualControlsSection";
 import { FiscalControlsSection } from "./FiscalControlsSection";
@@ -85,6 +87,11 @@ const fiscalTabs: Array<{
     id: "malhas",
     label: "Malhas",
     icon: FileSearch,
+  },
+  {
+    id: "anticipations",
+    label: "Antecipações",
+    icon: FileStack,
   },
   {
     id: "wholesale",
@@ -204,6 +211,10 @@ function FiscalActiveTabPanel({
 
   if (activeTab === "malhas") {
     return <div role="tabpanel" id="fiscal-panel-malhas" aria-labelledby="fiscal-tab-malhas"><FiscalMalhasSection canEdit={canEdit} canTransfer={canDelete} /></div>;
+  }
+
+  if (activeTab === "anticipations") {
+    return <div role="tabpanel" id="fiscal-panel-anticipations" aria-labelledby="fiscal-tab-anticipations"><FiscalAnticipationsSection canEdit={canEdit} /></div>;
   }
 
   if (activeTab === "conferences") {

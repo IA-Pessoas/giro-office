@@ -345,6 +345,23 @@ await runTest("fiscal Simples batch parses pasted documents and exports CSV for 
   assert.match(batch, /catch \(error\) \{\s*setResult\(null\);\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });
 
+await runTest("fiscal anticipations summary shows imported items and what stayed outside", async () => {
+  const { formatAnticipationSummary } = await import("./utils/fiscalAnticipation.ts");
+  assert.equal(
+    formatAnticipationSummary({ entry_count: 2, note_count: 1, item_count: 3, issues: [] }),
+    "3 item(ns) de 1 nota(s), 2 arquivo(s) no ZIP",
+  );
+  assert.equal(
+    formatAnticipationSummary({
+      entry_count: 4,
+      note_count: 1,
+      item_count: 1,
+      issues: [{ kind: "duplicate" }, { kind: "duplicate" }, { kind: "error" }],
+    }),
+    "1 item(ns) de 1 nota(s), 4 arquivo(s) no ZIP; fora do lote: 2 duplicata(s), 1 erro(s)",
+  );
+});
+
 await runTest("fiscal malhas formats dates, periods and history values", async () => {
   const { formatMalhaDate, formatMalhaHistoryValue, formatMalhaPeriod } = await import(
     "./utils/fiscalMalha.ts"

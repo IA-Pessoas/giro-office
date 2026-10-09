@@ -27,3 +27,8 @@ export {
 } from "./fiscalRevenue";
 export { fileToBase64, parseNoteRequests } from "./xmlSelection";
 export { formatMoney } from "./formatMoney";
+export {
+  FISCAL_ANTICIPATION_ISSUE_LABELS,
+  FISCAL_ANTICIPATION_STATUS_LABELS,
+  formatAnticipationSummary,
+} from "./fiscalAnticipation";
