@@ -186,6 +186,7 @@ assert.equal(
   '"Nome","Competência"\r\n"Ana Souza","04/2026"\r\n"\'=bia","04/2026"',
 );
 assert.match(aiUsageReport, /key: "unanswered"/);
+assert.match(aiUsage, /\.\.\.AI_USAGE_REPORT_SECTIONS/);
 assert.match(aiUsageReport, /key: "withoutIntegration"/);
 assert.match(aiUsageReport, /aiUsageReportRows\(report\[section\.key\], competence\)/);
 assert.match(aiUsageReport, /printMarketingReport\("marketing-ai-usage-report"\)/);

@@ -157,6 +157,67 @@ describe("MarketingAiUsageControlService", () => {
     });
   });
 
+  it("separa não respondeu de respondeu Não e ignora outra organização", async () => {
+    type Row = Record<string, unknown> & { id: string };
+    const april = new Date("2026-04-01T00:00:00.000Z");
+    const rows: Row[] = [
+      {
+        id: "sem-resposta",
+        organization_id: organizationId,
+        competence: april,
+        knowledge: null,
+        integration: null,
+      },
+      {
+        id: "respondeu-nao",
+        organization_id: organizationId,
+        competence: april,
+        knowledge: false,
+        integration: false,
+      },
+      {
+        id: "respondeu-sim",
+        organization_id: organizationId,
+        competence: april,
+        knowledge: true,
+        integration: true,
+      },
+      {
+        id: "outra-org",
+        organization_id: "other-org",
+        competence: april,
+        knowledge: null,
+        integration: false,
+      },
+      {
+        id: "outro-mes",
+        organization_id: organizationId,
+        competence: new Date("2026-05-01T00:00:00.000Z"),
+        knowledge: null,
+        integration: false,
+      },
+    ];
+    // Avalia o `where` do Prisma sobre linhas em memória (igualdade e OR).
+    const matches = (where: Record<string, unknown>, row: Row): boolean =>
+      Object.entries(where).every(([key, expected]) =>
+        key === "OR"
+          ? (expected as Record<string, unknown>[]).some((clause) => matches(clause, row))
+          : expected instanceof Date
+            ? (row[key] as Date).getTime() === expected.getTime()
+            : row[key] === expected,
+      );
+    prisma.marketingAiUsageControl.findMany = vi.fn(async ({ where }) =>
+      rows.filter((row) => matches(where, row)),
+    );
+
+    const report = await service.getReport(organizationId, competence);
+    const ids = (list: Row[]) => list.map((row) => row.id);
+
+    expect(ids(report.unanswered as Row[])).toEqual(["sem-resposta"]);
+    expect(ids(report.withoutIntegration as Row[])).toEqual(["respondeu-nao"]);
+    expect(ids(report.pending as Row[])).toEqual(["sem-resposta"]);
+  });
+
   it("atualiza respostas dentro da organização autenticada", async () => {
     const control = { id: "control-1", frequency: 10 };
     prisma.marketingAiUsageControl.findFirst = vi.fn().mockResolvedValue(control);
