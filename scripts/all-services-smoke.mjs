@@ -4727,6 +4727,40 @@ const handlers = {
     });
   },
 
+  async fiscalAnnualControlList(op) {
+    const response = await httpRequest(op, { query: { year: "2025" } });
+    if (!isBadExpectation(op)) {
+      state.fiscalAnnualControlId = pickFirst(response.body, "data.items.0.id") ?? null;
+    }
+  },
+
+  async fiscalAnnualControlItems(op) {
+    // Sem cliente com Fiscal ativo no ambiente do smoke, não há controle anual: 404 esperado.
+    const id = state.fiscalAnnualControlId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      path: `/fiscal/annual-controls/${id}/items`,
+      expectedStatus: state.fiscalAnnualControlId ? [200] : [404],
+    });
+  },
+
+  async fiscalAnnualControlItemAdd(op) {
+    const id = state.fiscalAnnualControlId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      path: `/fiscal/annual-controls/${id}/items`,
+      expectedStatus: state.fiscalAnnualControlId ? [201, 409] : [404],
+      json: { code: "DIMOB", reason: "Smoke de serviços" },
+    });
+  },
+
+  async fiscalAnnualControlItemUpdate(op) {
+    const id = state.fiscalAnnualControlId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      path: `/fiscal/annual-controls/${id}/items/DIMOB`,
+      expectedStatus: state.fiscalAnnualControlId ? [200] : [404],
+      json: { applicable: false, reason: "Smoke de serviços" },
+    });
+  },
+
   async fiscalMonthlyControlTriage(op) {
     await httpRequest(op, {
       path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/triage`,

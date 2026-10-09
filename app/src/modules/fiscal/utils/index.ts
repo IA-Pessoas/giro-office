@@ -4,6 +4,7 @@ export {
   fiscalControlStatusChange,
   fiscalObligationActions,
   formatTriagePending,
+  formatAnnualDeclaration,
   formatTransferResult,
   matchesResponsible,
   todayInputDate,

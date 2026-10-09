@@ -4,6 +4,7 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import type { CreateLogParams } from "../integrations/audit.js";
 import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
 import type { MonthlyControlStatus } from "../schemas/monthlyControl.schemas.js";
+import { fiscalUserWhere, loadDefaultResponsibles, loadUserNames } from "./fiscalResponsibles.js";
 import { createSuggestedObligations } from "./monthlyObligationService.js";
 import {
   hasTriagePendency,
@@ -172,14 +173,6 @@ function defaultResponsible(
   };
 }
 
-/** Usuário ativo com acesso ao Fiscal na organização: quem pode ser responsável. */
-function fiscalUserWhere(organizationId: string) {
-  return {
-    status: "active",
-    permissions: { some: { organization_id: organizationId, fiscal: { gt: 0 } } },
-  };
-}
-
 function isUniqueViolation(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === "P2002";
 }
@@ -232,7 +225,7 @@ export class MonthlyControlService {
     });
     const withControl = new Set(existing.map((control) => control.client_id));
     const missing = eligible.filter((client) => !withControl.has(client.id));
-    const defaults = await this.defaultResponsibles(organizationId, [
+    const defaults = await loadDefaultResponsibles(this.prisma, organizationId, [
       ...new Set([...eligible.map((client) => client.id), ...withControl]),
     ]);
 
@@ -305,7 +298,7 @@ export class MonthlyControlService {
       controls.map((control) => control.client_id),
     );
 
-    const userNames = await this.userNames(organizationId, [
+    const userNames = await loadUserNames(this.prisma, organizationId, [
       ...controls.flatMap((control) => (control.responsible_id ? [control.responsible_id] : [])),
       ...defaults.values(),
     ]);
@@ -323,32 +316,6 @@ export class MonthlyControlService {
       }))
       .sort((a, b) => a.client_name.localeCompare(b.client_name, "pt-BR", { sensitivity: "base" }));
     return { competence: input.competence, items };
-  }
-
-  /** Responsável fiscal padrão de cada cliente (carteira vigente, mantida na Triagem). */
-  private async defaultResponsibles(
-    organizationId: string,
-    clientIds: string[],
-  ): Promise<Map<string, string>> {
-    if (!clientIds.length) return new Map();
-    const rows = await this.prisma.triageResponsible.findMany({
-      where: { organization_id: organizationId, type: "FISCAL", client_id: { in: clientIds } },
-      select: { client_id: true, user_id: true },
-    });
-    return new Map(rows.map((row) => [row.client_id, row.user_id]));
-  }
-
-  private async userNames(organizationId: string, ids: string[]): Promise<Map<string, string>> {
-    const unique = [...new Set(ids)];
-    if (!unique.length) return new Map();
-    const users = await this.prisma.user.findMany({
-      where: {
-        id: { in: unique },
-        permissions: { some: { organization_id: organizationId } },
-      },
-      select: { id: true, name: true },
-    });
-    return new Map(users.map((user) => [user.id, user.name]));
   }
 
   /** Quem pode receber controles: usuários ativos com acesso ao Fiscal. Só nível 3 consulta. */
@@ -529,7 +496,9 @@ export class MonthlyControlService {
     }
 
     const responsibleId =
-      (await this.defaultResponsibles(input.organizationId, [client.id])).get(client.id) ?? null;
+      (await loadDefaultResponsibles(this.prisma, input.organizationId, [client.id])).get(
+        client.id,
+      ) ?? null;
 
     let created: StoredControl;
     try {

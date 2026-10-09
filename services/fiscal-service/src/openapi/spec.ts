@@ -946,6 +946,138 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/annual-controls": {
+        get: {
+          tags: ["Controle anual"],
+          summary: "Listar a carteira de controles fiscais anuais do ano",
+          description:
+            "Antes de listar, gera um controle por cliente com Fiscal ativo no ano (até o ano corrente), com regime e responsável registrados ao nascer e DEFIS sugerida para o Simples. Sem situação geral: o andamento é por declaração.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "year",
+              in: "query",
+              required: true,
+              schema: { type: "integer", minimum: 2000, maximum: 2100 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Ano e controles com declarações e seus andamentos",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Ano inválido" },
+          },
+        },
+      },
+      "/fiscal/annual-controls/{id}/items": {
+        get: {
+          tags: ["Controle anual"],
+          summary: "Listar declarações do controle anual",
+          description:
+            "Só leitura; inclui as declarações do catálogo que ainda podem ser incluídas.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Declarações com fonte oficial, situação e catálogo incluível",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "404": { description: "Controle não encontrado nesta organização" },
+          },
+        },
+        post: {
+          tags: ["Controle anual"],
+          summary: "Incluir declaração do catálogo no controle anual",
+          description: "DMED, DIMOB e DASN-SIMEI são condicionais e exigem motivo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["code"],
+                  additionalProperties: false,
+                  properties: {
+                    code: { type: "string", enum: ["DEFIS", "DMED", "DIMOB", "DASN_SIMEI"] },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Declaração incluída",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida, condicional sem motivo ou regime vetado" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Controle não encontrado nesta organização" },
+            "409": { description: "Declaração já incluída" },
+          },
+        },
+      },
+      "/fiscal/annual-controls/{id}/items/{code}": {
+        patch: {
+          tags: ["Controle anual"],
+          summary: "Alterar aplicabilidade ou cumprimento da declaração",
+          description:
+            "Não aplicável exige motivo; cumprir grava data (não futura) e ator, com protocolo opcional; completed_on null desfaz. Cada mudança entra na trilha do controle anual.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "code",
+              in: "path",
+              required: true,
+              schema: { type: "string", enum: ["DEFIS", "DMED", "DIMOB", "DASN_SIMEI"] },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  minProperties: 1,
+                  properties: {
+                    applicable: { type: "boolean" },
+                    completed_on: { type: "string", format: "date", nullable: true },
+                    protocol: { type: "string", maxLength: 200 },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Declaração atualizada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida, sem motivo ou data futura" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Controle ou declaração não encontrados" },
+            "409": { description: "Regra de cumprimento ou alteração concorrente" },
+          },
+        },
+      },
       "/fiscal/monthly-controls/{id}/obligations": {
         get: {
           tags: ["Controle mensal"],

@@ -393,6 +393,64 @@ describe("fiscal Worker", () => {
     expect(obligations.update).toHaveBeenCalledOnce();
   });
 
+  it("controle anual: leitura nível 1, declarações com escrita nível 2 e contrato validado", async () => {
+    const declaration = {
+      code: "DEFIS" as const,
+      name: "DEFIS",
+      note: "",
+      source: "https://www.gov.br/",
+      origin: "SUGGESTED",
+      status: "PENDING" as const,
+      not_applicable_reason: null,
+      completed_on: null,
+      completed_by: null,
+      protocol: null,
+      updatedAt: "2026-03-01T12:00:00.000Z",
+    };
+    const annual = {
+      list: vi.fn(async () => ({ year: 2025, items: [] })),
+      items: vi.fn(async () => ({ control_id: ICMS_ID, items: [declaration], addable: [] })),
+      addItem: vi.fn(async () => declaration),
+      updateItem: vi.fn(async () => declaration),
+    };
+    const app = createFiscalWorkerApp({ env: env(), annualService: annual });
+    const reader = gatewayHeaders({
+      "x-auth-permission": "1",
+      "x-auth-modules": JSON.stringify({ fiscal: 1 }),
+    });
+
+    const listed = await app.request("https://fiscal.test/fiscal/annual-controls?year=2025", {
+      headers: reader,
+    });
+    expect(listed.status).toBe(200);
+    expect(annual.list).toHaveBeenCalledWith(
+      { year: 2025 },
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+    );
+    const base = `https://fiscal.test/fiscal/annual-controls/${ICMS_ID}/items`;
+    expect((await app.request(base, { headers: reader })).status).toBe(200);
+
+    const added = await app.request(base, {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ code: "DIMOB", reason: "Imobiliária" }),
+    });
+    expect(added.status).toBe(201);
+    const readerWrite = await app.request(`${base}/DEFIS`, {
+      method: "PATCH",
+      headers: { ...reader, "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-03-10" }),
+    });
+    expect(readerWrite.status).toBe(403);
+    const invalid = await app.request(`${base}/DIRBI`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ completed_on: "2026-03-10" }),
+    });
+    expect(invalid.status).toBe(400);
+    expect(annual.updateItem).not.toHaveBeenCalled();
+  });
+
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
     const revenue = {
       id: ICMS_ID,

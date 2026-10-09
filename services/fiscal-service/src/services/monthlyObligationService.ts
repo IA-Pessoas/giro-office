@@ -11,6 +11,16 @@ import {
   isObligationAllowed,
   suggestedObligations,
 } from "./fiscalObligationCatalog.js";
+import {
+  dateKey,
+  ITEM_APPLICABILITY,
+  OBLIGATION_ITEM_ACTION,
+  type ObligationItemEvent,
+  type ObligationItemInput,
+  type ObligationItemStatus,
+  obligationItemStatus,
+  planObligationItemChange,
+} from "./obligationItem.js";
 
 export type MonthlyObligationPrisma = Pick<
   PrismaClient,
@@ -29,14 +39,9 @@ interface Actor {
   permission?: number;
 }
 
-export interface UpdateMonthlyObligationInput {
-  applicable?: boolean;
-  completed_on?: string | null;
-  protocol?: string;
-  reason?: string;
-}
+export type UpdateMonthlyObligationInput = ObligationItemInput;
 
-export type MonthlyObligationStatus = "PENDING" | "COMPLETED" | "NOT_APPLICABLE";
+export type MonthlyObligationStatus = ObligationItemStatus;
 
 export interface MonthlyObligationDto {
   code: FiscalObligationCode;
@@ -72,22 +77,14 @@ type StoredObligation = {
   updatedAt: Date;
 };
 
-type EventInput = {
-  action:
-    | "OBLIGATION_SUGGESTED"
-    | "OBLIGATION_ADDED"
-    | "OBLIGATION_NOT_APPLICABLE"
-    | "OBLIGATION_APPLICABLE"
-    | "OBLIGATION_COMPLETED"
-    | "OBLIGATION_UNDONE";
-  from_value: string | null;
-  to_value: string | null;
-  reason: string | null;
-};
-
-function dateKey(value: Date | null): string | null {
-  return value ? value.toISOString().slice(0, 10) : null;
-}
+type EventInput =
+  | ObligationItemEvent
+  | {
+      action: (typeof OBLIGATION_ITEM_ACTION)["suggested" | "added"];
+      from_value: string | null;
+      to_value: string | null;
+      reason: string | null;
+    };
 
 function catalogItem(definition: FiscalObligationDefinition): MonthlyObligationCatalogItem {
   return {
@@ -107,7 +104,7 @@ function serialize(value: StoredObligation): MonthlyObligationDto {
     note: definition?.note ?? "",
     source: definition?.source ?? "",
     origin: value.origin,
-    status: !value.applicable ? "NOT_APPLICABLE" : value.completed_on ? "COMPLETED" : "PENDING",
+    status: obligationItemStatus(value),
     not_applicable_reason: value.not_applicable_reason,
     completed_on: dateKey(value.completed_on),
     completed_by: value.completed_by,
@@ -146,9 +143,9 @@ export async function createSuggestedObligations(
       organization_id: organizationId,
       control_id: row.control_id,
       obligation_code: row.code,
-      action: "OBLIGATION_SUGGESTED",
+      action: OBLIGATION_ITEM_ACTION.suggested,
       from_value: null,
-      to_value: "applicable",
+      to_value: ITEM_APPLICABILITY.applicable,
       reason: null,
       actor_id: actorId,
     })),
@@ -261,7 +258,12 @@ export class MonthlyObligationService {
           },
         });
         await this.writeEvents(tx, actor, control.id, input.code, [
-          { action: "OBLIGATION_ADDED", from_value: null, to_value: "applicable", reason },
+          {
+            action: OBLIGATION_ITEM_ACTION.added,
+            from_value: null,
+            to_value: ITEM_APPLICABILITY.applicable,
+            reason,
+          },
         ]);
         return row;
       });
@@ -293,76 +295,12 @@ export class MonthlyObligationService {
     const current = await this.findObligation(control.id, code, actor.organizationId);
     if (!current) throw new ServiceError(404, "Obrigação não está neste controle.");
 
-    const reason = input.reason ?? null;
-    const events: EventInput[] = [];
-    const data: {
-      applicable?: boolean;
-      not_applicable_reason?: string | null;
-      completed_on?: Date | null;
-      completed_by?: string | null;
-      protocol?: string | null;
-    } = {};
-
-    if (input.applicable !== undefined && input.applicable !== current.applicable) {
-      if (!input.applicable) {
-        if (current.completed_on) {
-          throw new ServiceError(409, "Desfaça o cumprimento antes de marcar como não aplicável.");
-        }
-        if (!reason)
-          throw new ServiceError(400, "Informe o motivo para marcar como não aplicável.");
-        data.applicable = false;
-        data.not_applicable_reason = reason;
-        events.push({
-          action: "OBLIGATION_NOT_APPLICABLE",
-          from_value: "applicable",
-          to_value: "not_applicable",
-          reason,
-        });
-      } else {
-        data.applicable = true;
-        data.not_applicable_reason = null;
-        events.push({
-          action: "OBLIGATION_APPLICABLE",
-          from_value: "not_applicable",
-          to_value: "applicable",
-          reason,
-        });
-      }
-    }
-
-    const previousDate = dateKey(current.completed_on);
-    if (input.completed_on === null && previousDate) {
-      data.completed_on = null;
-      data.completed_by = null;
-      data.protocol = null;
-      events.push({
-        action: "OBLIGATION_UNDONE",
-        from_value: previousDate,
-        to_value: null,
-        reason,
-      });
-    } else if (input.completed_on) {
-      if (!(data.applicable ?? current.applicable)) {
-        throw new ServiceError(409, "Obrigação não aplicável não pode ser cumprida.");
-      }
-      if (input.completed_on > this.now().toISOString().slice(0, 10)) {
-        throw new ServiceError(400, "Data de cumprimento no futuro.");
-      }
-      const protocol = input.protocol === undefined ? current.protocol : input.protocol || null;
-      if (input.completed_on !== previousDate || protocol !== current.protocol) {
-        data.completed_on = new Date(`${input.completed_on}T00:00:00.000Z`);
-        // Só o protocolo mudou: quem cumpriu continua sendo quem cumpriu.
-        data.completed_by =
-          input.completed_on === previousDate ? current.completed_by : actor.userId;
-        data.protocol = protocol;
-        events.push({
-          action: "OBLIGATION_COMPLETED",
-          from_value: previousDate,
-          to_value: input.completed_on,
-          reason,
-        });
-      }
-    }
+    const { data, events } = planObligationItemChange(
+      current,
+      input,
+      actor.userId,
+      this.now().toISOString().slice(0, 10),
+    );
     if (!events.length) return serialize(current);
 
     await this.prisma.$transaction(async (tx) => {

@@ -1,5 +1,9 @@
 import { setupAPIClient } from "@shared/services/api";
 
+import {
+  FISCAL_MONTHLY_CONTROLS_QUERY_KEY,
+  fiscalMonthlyObligationsQueryKey,
+} from "../hooks/queryKeys";
 import { unwrapFiscalEnvelope } from "./fiscalService.contract";
 
 export type FiscalControlStatus = "PENDING" | "IN_PROGRESS" | "AWAITING_CLIENT" | "COMPLETED";
@@ -76,6 +80,27 @@ export interface FiscalMonthlyObligations {
   addable: FiscalObligationCatalogItem[];
 }
 
+/** Item de obrigação (mensal) ou declaração (anual): mesmo formato e mesmas regras. */
+export type FiscalControlItem<C extends string = string> = Omit<FiscalMonthlyObligation, "code"> & {
+  code: C;
+};
+
+export interface FiscalControlItems<C extends string = string> {
+  control_id: string;
+  items: FiscalControlItem<C>[];
+  addable: Array<Omit<FiscalObligationCatalogItem, "code"> & { code: C }>;
+}
+
+/** De onde o painel de itens lê e para onde escreve, e o que invalida depois. */
+export interface FiscalItemSource<C extends string = string> {
+  queryKey: readonly unknown[];
+  portfolioKey: readonly unknown[];
+  noun: { singular: string; added: string; updated: string };
+  list(): Promise<FiscalControlItems<C>>;
+  add(payload: { code: C; reason?: string }): Promise<void>;
+  update(code: C, payload: UpdateFiscalObligationPayload): Promise<void>;
+}
+
 export interface UpdateFiscalObligationPayload {
   applicable?: boolean;
   completed_on?: string | null;
@@ -92,6 +117,18 @@ export interface UpdateFiscalMonthlyControlPayload {
   status?: FiscalControlStatus;
   no_movement?: boolean;
   reason?: string;
+}
+
+/** Obrigações do controle mensal no painel de itens. */
+export function monthlyItemSource(controlId: string): FiscalItemSource<FiscalObligationCode> {
+  return {
+    queryKey: fiscalMonthlyObligationsQueryKey(controlId),
+    portfolioKey: FISCAL_MONTHLY_CONTROLS_QUERY_KEY,
+    noun: { singular: "obrigação", added: "Obrigação incluída.", updated: "Obrigação atualizada." },
+    list: () => fiscalControlService.listObligations(controlId),
+    add: (payload) => fiscalControlService.addObligation(controlId, payload),
+    update: (code, payload) => fiscalControlService.updateObligation(controlId, code, payload),
+  };
 }
 
 export const fiscalControlService = {

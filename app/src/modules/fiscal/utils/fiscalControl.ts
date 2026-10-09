@@ -1,3 +1,4 @@
+import { formatFiscalDateLabel } from "./fiscalDate.ts";
 import type {
   FiscalControlStatus,
   FiscalMonthlyControl,
@@ -79,4 +80,14 @@ export function formatTransferResult(result: FiscalTransferResult): string {
     parts.push(`${count === 1 ? "1 ignorado" : `${count} ignorados`} (${reasons})`);
   }
   return `${parts.join(", ")}.`;
+}
+
+/** Célula da carteira anual: "—" quando a declaração não está no controle. */
+export function formatAnnualDeclaration(
+  declaration: { status: FiscalMonthlyObligation["status"]; completed_on: string | null } | undefined,
+): string {
+  if (!declaration) return "—";
+  if (declaration.status === "NOT_APPLICABLE") return "Não aplicável";
+  if (declaration.status === "PENDING") return "Pendente";
+  return `Cumprida em ${formatFiscalDateLabel(declaration.completed_on)}`;
 }
