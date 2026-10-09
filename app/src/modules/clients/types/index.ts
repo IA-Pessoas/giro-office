@@ -209,6 +209,11 @@ export interface ClientListFilters {
   legacyIntegrationStatusFilter?: boolean;
 }
 
+export interface ClientRegime {
+  id: string;
+  name: string;
+}
+
 export interface ClientFormValues {
   type?: "PJ" | "PF";
   name: string;
@@ -216,7 +221,8 @@ export interface ClientFormValues {
   fantasy_name: string;
   cpf_cnpj: string;
   status: string;
-  regime: ClientTaxRegime | "";
+  // Regime compartilhado, do catálogo da organização ou o valor já gravado (#1740).
+  regime: string;
   service_unique: boolean;
   address: string;
   cep: string;
@@ -371,7 +377,7 @@ export interface CreateClientPayload {
   cpf_cnpj: string;
   company_name?: string | null;
   fantasy_name?: string | null;
-  regime?: ClientTaxRegime | null;
+  regime?: string | null;
   service_unique?: boolean;
   address?: string | null;
   cep?: string | null;
@@ -418,7 +424,7 @@ export interface UpdateClientPayload {
   cpf_cnpj?: string;
   company_name?: string | null;
   fantasy_name?: string | null;
-  regime?: ClientTaxRegime | null;
+  regime?: string | null;
   service_unique?: boolean;
   address?: string | null;
   cep?: string | null;

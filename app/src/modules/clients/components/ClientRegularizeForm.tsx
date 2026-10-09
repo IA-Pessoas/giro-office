@@ -7,6 +7,7 @@ import {
 } from "@shared/utils/inputFormatting";
 
 import { forwardFormattedInputChange } from "./formattedInputChange";
+import { useClientRegimes } from "../hooks/useClients";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientRegularizeFormValues } from "../types";
@@ -102,6 +103,7 @@ export function ClientRegularizeForm({
   onCancel,
 }: ClientRegularizeFormProps) {
   const isCompanyClient = isRegularizeCompanyClient(values);
+  const regimeCatalog = (useClientRegimes().data ?? []).map((regime) => regime.name);
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
     forwardFormattedInputChange(event, formatCpfCnpjInput, onChange);
   };
@@ -159,7 +161,7 @@ export function ClientRegularizeForm({
             <span className={labelClassName}>Regime</span>
             <ClientNativeSelect name="regime" value={values.regime} onChange={onChange} disabled={disabled}>
               <option value="">Selecione um regime</option>
-              {getRegularizeRegimeOptions(values.regime).map((option) => (
+              {getRegularizeRegimeOptions(values.regime, regimeCatalog).map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>

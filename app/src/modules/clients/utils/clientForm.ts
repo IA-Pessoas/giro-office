@@ -19,8 +19,20 @@ function isClientTaxRegime(value: string | null | undefined): value is ClientTax
   return CLIENT_TAX_REGIME_OPTIONS.includes(value as ClientTaxRegime);
 }
 
-function normalizeTaxRegime(value: ClientTaxRegime | ""): ClientTaxRegime | null {
-  return value || null;
+function normalizeTaxRegime(value: string): string | null {
+  return value.trim() || null;
+}
+
+/**
+ * Opções do regime na ficha: regimes compartilhados, catálogo da organização e o valor já
+ * gravado, que continua selecionável mesmo fora do catálogo (#1740).
+ */
+export function buildClientRegimeOptions(
+  catalog: readonly string[],
+  storedRegime?: string | null,
+): string[] {
+  const options = [...new Set<string>([...CLIENT_TAX_REGIME_OPTIONS, ...catalog])];
+  return storedRegime && !options.includes(storedRegime) ? [...options, storedRegime] : options;
 }
 
 export function getClientTaxRegime(value: string | null | undefined): ClientTaxRegime | "" {
@@ -42,7 +54,7 @@ export function createClientFormInitialValues(client?: Partial<Client>): ClientF
     fantasy_name: client?.fantasy_name ?? "",
     cpf_cnpj: client?.cpf_cnpj ?? "",
     status: client?.status ? mapClientStatusFromApi(client.status) : "Ativo",
-    regime: getClientTaxRegime(client?.regime),
+    regime: client?.regime ?? "",
     service_unique: client?.service_unique ?? false,
     address: client?.address ?? "",
     cep: client?.cep ?? "",
@@ -93,12 +105,7 @@ function normalizeOptionalAddress(value: string): string | null {
   return value.trim() || null;
 }
 
-export function buildUpdateClientPayload(
-  values: ClientFormValues,
-  currentRegime?: string | null,
-): UpdateClientPayload {
-  const regime = normalizeTaxRegime(values.regime);
-  const preservesLegacyRegime = regime === null && currentRegime && !isClientTaxRegime(currentRegime);
+export function buildUpdateClientPayload(values: ClientFormValues): UpdateClientPayload {
 
   return {
     name: getClientInternalName(values),
@@ -106,7 +113,7 @@ export function buildUpdateClientPayload(
     fantasy_name: values.fantasy_name.trim() || null,
     cpf_cnpj: normalizeClientDocumentValue(values.cpf_cnpj, values.type),
     status: mapClientStatusToApi(values.status),
-    ...(preservesLegacyRegime ? {} : { regime }),
+    regime: normalizeTaxRegime(values.regime),
     service_unique: values.service_unique,
     address: normalizeOptionalAddress(values.address),
     cep: normalizeOptionalAddress(values.cep),

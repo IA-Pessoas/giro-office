@@ -120,7 +120,7 @@ export default function ClientDetailPage() {
     }
 
     try {
-      await updateClientMutation.mutateAsync(buildUpdateClientPayload(formValues, client.regime));
+      await updateClientMutation.mutateAsync(buildUpdateClientPayload(formValues));
 
       toast.success("Cliente atualizado com sucesso.");
       await clientQuery.refetch();
@@ -314,7 +314,7 @@ export default function ClientDetailPage() {
 
                 <ClientForm
                   values={formValues}
-                  legacyTaxRegime={client.regime}
+                  storedRegime={client.regime}
                   onChange={handleInputChange}
                   onSubmit={() => void handleUpdate()}
                   onCancel={() =>

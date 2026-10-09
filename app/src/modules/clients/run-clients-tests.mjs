@@ -59,6 +59,7 @@ import {
   CLIENT_TAX_REGIME_OPTIONS,
   createClientFormInitialValues,
   getClientTaxRegime,
+  buildClientRegimeOptions,
 } from "./utils/clientForm.ts";
 import { getDocumentIssue } from "../../shared/utils/documentIssue.ts";
 import { toDatetimeLocalValue, toHistoryIsoDate } from "./utils/historyDate.ts";
@@ -124,6 +125,8 @@ runTest("client form sends the selected tax regime on creation and update", () =
   assert.equal(getClientTaxRegime("MEI"), "");
   assert.equal(getClientTaxRegime(null), "");
   assert.equal(createClientFormInitialValues({ regime: null }).regime, "");
+  // Valor gravado fora da lista continua selecionado na ficha, sem conversão (#1740).
+  assert.equal(createClientFormInitialValues({ regime: "MEI" }).regime, "MEI");
 
   const values = {
     ...createClientFormInitialValues(),
@@ -141,10 +144,25 @@ runTest("client form sends the selected tax regime on creation and update", () =
     "Lucro Presumido",
   );
   assert.equal(buildUpdateClientPayload({ ...values, regime: "" }).regime, null);
-  assert.equal(
-    "regime" in buildUpdateClientPayload({ ...values, regime: "" }, "MEI"),
-    false,
-  );
+  assert.equal(buildUpdateClientPayload({ ...values, regime: "MEI" }).regime, "MEI");
+});
+
+runTest("client regime options join shared regimes, the catalog and the stored value", () => {
+  assert.deepEqual(buildClientRegimeOptions([]), [...CLIENT_TAX_REGIME_OPTIONS]);
+  assert.deepEqual(buildClientRegimeOptions(["Imune", "Lucro Real"], "Imune"), [
+    ...CLIENT_TAX_REGIME_OPTIONS,
+    "Imune",
+  ]);
+  assert.deepEqual(buildClientRegimeOptions(["Imune"], "Regime antigo"), [
+    ...CLIENT_TAX_REGIME_OPTIONS,
+    "Imune",
+    "Regime antigo",
+  ]);
+  assert.deepEqual(getRegularizeRegimeOptions("E-SOCIAL", ["Imune"]), [
+    ...CLIENT_TAX_REGIME_OPTIONS,
+    "Imune",
+    "E-SOCIAL",
+  ]);
 });
 
 runTest("new client form sends Ativo when status remains unchanged", () => {
@@ -382,14 +400,14 @@ runTest("client regime is constrained and bound in both shared client flows", ()
     types,
     /export type ClientTaxRegime = "Simples Nacional" \| "Lucro Presumido" \| "Lucro Real"/,
   );
-  assert.match(types, /regime: ClientTaxRegime \| "";/);
-  assert.match(form, /name="regime"[\s\S]*?CLIENT_TAX_REGIME_OPTIONS/);
-  assert.match(form, /legacyTaxRegime && values\.regime === ""/);
-  assert.match(form, /Regime atual:/);
+  assert.match(types, /export interface ClientFormValues[\s\S]*?regime: string;/);
+  assert.match(form, /useClientRegimes\(\)/);
+  assert.match(form, /buildClientRegimeOptions\([\s\S]*?storedRegime/);
+  assert.match(form, /name="regime"[\s\S]*?regimeOptions\.map/);
   assert.match(createModal, /buildCreateClientPayload\(formValues, organizationId\)/);
   assert.match(detailPage, /createClientFormInitialValues\(client\)/);
-  assert.match(detailPage, /buildUpdateClientPayload\(formValues, client\.regime\)/);
-  assert.match(detailPage, /legacyTaxRegime=\{client\.regime\}/);
+  assert.match(detailPage, /buildUpdateClientPayload\(formValues\)/);
+  assert.match(detailPage, /storedRegime=\{client\.regime\}/);
 });
 
 runTest("mapClientStatusToApi converts Prospect to API status", () => {
