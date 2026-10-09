@@ -405,7 +405,7 @@ await runTest("fiscal obligations: actions follow status and lock with the contr
   assert.match(panel, /action\.kind === "dispense" && trimmed\.length < 3/);
   assert.match(panel, /definition\.conditional \|\| trimmed\) && trimmed\.length < 3/);
   assert.match(panel, /max=\{todayInputDate\(\)\}/);
-  assert.match(panel, /queryKey: FISCAL_MONTHLY_CONTROLS_QUERY_KEY/);
+  assert.match(panel, /queryKey: source\.portfolioKey/);
 });
 
 await runTest("fiscal control reads Triagem documents without editing them", async () => {
@@ -462,4 +462,26 @@ await runTest("fiscal responsibles: portfolio by competence or current, transfer
   assert.match(section, /Carteira atual: \{item\.default_responsible_name/);
   assert.match(dialog, /if \(reason\.trim\(\)\.length < 3\) \{/);
   assert.match(dialog, /enabled: open/);
+});
+
+await runTest("fiscal annual control shows each declaration and reuses the item rules", async () => {
+  const { formatAnnualDeclaration } = await import("./utils/fiscalControl.ts");
+  assert.equal(formatAnnualDeclaration(undefined), "—");
+  assert.equal(formatAnnualDeclaration({ status: "PENDING", completed_on: null }), "Pendente");
+  assert.equal(
+    formatAnnualDeclaration({ status: "COMPLETED", completed_on: "2026-03-20" }),
+    "Cumprida em 20/03/2026",
+  );
+  assert.equal(formatAnnualDeclaration({ status: "NOT_APPLICABLE", completed_on: null }), "Não aplicável");
+
+  const section = await readSource("./components/FiscalAnnualControlsSection.tsx");
+  const client = await readSource("./services/fiscalAnnualService.ts");
+  assert.match(fiscalSources.shell, /<FiscalAnnualControlsSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.get\("\/fiscal\/annual-controls", \{ params: \{ year \} \}\)/);
+  assert.match(client, /api\.patch\(`\/fiscal\/annual-controls\/\$\{controlId\}\/items\/\$\{code\}`/);
+  // Sem situação geral: só as colunas de cada declaração, sem DIRBI.
+  assert.doesNotMatch(section, /item\.status/);
+  assert.doesNotMatch(client, /DIRBI/);
+  assert.match(section, /<FiscalControlObligationsPanel source=\{annualItemSource\(item\.id\)\}/);
+  assert.match(section, /<div role="status">\s*<FiscalStateBox icon=\{Loader2\} tone="loading" title="Carregando controles anuais"/);
 });

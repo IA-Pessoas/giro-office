@@ -4,15 +4,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
-import {
-  FISCAL_MONTHLY_CONTROLS_QUERY_KEY,
-  fiscalMonthlyObligationsQueryKey,
-} from "../hooks/queryKeys";
-import {
-  fiscalControlService,
-  type FiscalMonthlyObligation,
-  type FiscalObligationCode,
-  type UpdateFiscalObligationPayload,
+import type {
+  FiscalControlItem,
+  FiscalItemSource,
+  UpdateFiscalObligationPayload,
 } from "../services/fiscalControlService";
 import {
   fiscalObligationActions,
@@ -31,9 +26,9 @@ import { FiscalStateBox } from "./FiscalStateBox";
 const REASON_MESSAGE = "Informe o motivo com pelo menos 3 caracteres.";
 const LINK_BUTTON_CLASSNAME = "text-sm text-blue-700 hover:underline dark:text-blue-300";
 
-type Action = { code: FiscalObligationCode; kind: "complete" | "dispense" | "undo" };
+type Action = { code: string; kind: "complete" | "dispense" | "undo" };
 
-function statusLabel(item: FiscalMonthlyObligation): string {
+function statusLabel(item: FiscalControlItem): string {
   if (item.status === "NOT_APPLICABLE") return `Não aplicável: ${item.not_applicable_reason ?? ""}`;
   if (item.status === "COMPLETED") {
     const protocol = item.protocol ? ` · protocolo ${item.protocol}` : "";
@@ -42,13 +37,14 @@ function statusLabel(item: FiscalMonthlyObligation): string {
   return "Pendente";
 }
 
+/** Itens de um controle (obrigações do mensal ou declarações do anual). */
 export function FiscalControlObligationsPanel({
-  controlId,
+  source,
   clientName,
   canEdit,
   locked,
 }: {
-  controlId: string;
+  source: FiscalItemSource;
   clientName: string;
   canEdit: boolean;
   locked: boolean;
@@ -58,34 +54,33 @@ export function FiscalControlObligationsPanel({
   const [protocol, setProtocol] = useState("");
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
-  const [addCode, setAddCode] = useState<FiscalObligationCode | "">("");
+  const [addCode, setAddCode] = useState("");
   const [addReason, setAddReason] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const queryKey = fiscalMonthlyObligationsQueryKey(controlId);
-  const list = useFetch(queryKey, () => fiscalControlService.listObligations(controlId));
+  const { queryKey } = source;
+  const list = useFetch(queryKey, () => source.list());
   const editable = canEdit && !locked;
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey });
     // Pendências da carteira mudam junto.
-    await queryClient.invalidateQueries({ queryKey: FISCAL_MONTHLY_CONTROLS_QUERY_KEY });
+    await queryClient.invalidateQueries({ queryKey: source.portfolioKey });
   };
   const update = useMutation({
-    mutationFn: ({ code, payload }: { code: FiscalObligationCode; payload: UpdateFiscalObligationPayload }) =>
-      fiscalControlService.updateObligation(controlId, code, payload),
+    mutationFn: ({ code, payload }: { code: string; payload: UpdateFiscalObligationPayload }) =>
+      source.update(code, payload),
     onSuccess: () => {
-      toast.success("Obrigação atualizada.");
+      toast.success(source.noun.updated);
       setAction(null);
     },
     onError: (error) => toast.error(getFiscalErrorMessage(error)),
     onSettled: refresh,
   });
   const add = useMutation({
-    mutationFn: (payload: { code: FiscalObligationCode; reason?: string }) =>
-      fiscalControlService.addObligation(controlId, payload),
+    mutationFn: (payload: { code: string; reason?: string }) => source.add(payload),
     onSuccess: () => {
-      toast.success("Obrigação incluída.");
+      toast.success(source.noun.added);
       setAddCode("");
       setAddReason("");
     },
@@ -134,8 +129,8 @@ export function FiscalControlObligationsPanel({
   if (list.isLoading) {
     return (
       <div role="status">
-        <FiscalStateBox icon={Loader2} tone="loading" title="Carregando obrigações" compact>
-          Consultando as obrigações de {clientName}.
+        <FiscalStateBox icon={Loader2} tone="loading" title={`Carregando ${source.noun.singular}`} compact>
+          Consultando {clientName}.
         </FiscalStateBox>
       </div>
     );
@@ -143,7 +138,7 @@ export function FiscalControlObligationsPanel({
   if (list.error || !list.data) {
     return (
       <div role="alert">
-        <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar as obrigações" compact>
+        <FiscalStateBox icon={AlertCircle} tone="danger" title="Não foi possível carregar os itens" compact>
           {getFiscalErrorMessage(list.error)}
         </FiscalStateBox>
       </div>
@@ -151,10 +146,10 @@ export function FiscalControlObligationsPanel({
   }
 
   return (
-    <section aria-label={`Obrigações de ${clientName}`} className="space-y-3">
-      {locked ? <p className="text-sm text-gray-600 dark:text-gray-400">Controle concluído: reabra para alterar as obrigações.</p> : null}
+    <section aria-label={`${source.noun.singular} de ${clientName}`} className="space-y-3">
+      {locked ? <p className="text-sm text-gray-600 dark:text-gray-400">Controle concluído: reabra para alterar os itens.</p> : null}
       {list.data.items.length === 0 ? (
-        <p className="text-sm text-gray-600 dark:text-gray-400">Nenhuma obrigação sugerida para o regime registrado neste controle. Inclua abaixo as que se aplicam.</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Nada sugerido para o regime registrado neste controle. Inclua abaixo o que se aplica.</p>
       ) : (
         <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 dark:divide-slate-700 dark:border-slate-700">
           {list.data.items.map((item) => (
@@ -209,18 +204,18 @@ export function FiscalControlObligationsPanel({
         </ul>
       )}
       {editable && list.data.addable.length ? (
-        <form noValidate onSubmit={submitAdd} aria-label="Incluir obrigação" className="flex flex-wrap items-end gap-3">
+        <form noValidate onSubmit={submitAdd} aria-label={`Incluir ${source.noun.singular}`} className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-            Incluir obrigação
-            <select value={addCode} onChange={(event) => setAddCode(event.target.value as FiscalObligationCode | "")} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
+            Incluir {source.noun.singular}
+            <select value={addCode} onChange={(event) => setAddCode(event.target.value)} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
               <option value="">Selecione</option>
               {list.data.addable.map((item) => <option key={item.code} value={item.code}>{item.name}{item.conditional ? " (condicional)" : ""}</option>)}
             </select>
           </label>
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             Motivo da inclusão
-            <input type="text" maxLength={500} value={addReason} onChange={(event) => setAddReason(event.target.value)} aria-invalid={addError ? true : undefined} aria-describedby={addError ? `fiscal-obligation-add-error-${controlId}` : undefined} className={FISCAL_FIELD_CONTROL_CLASSNAME} />
-            {addError ? <span id={`fiscal-obligation-add-error-${controlId}`} role="alert" className={FISCAL_FIELD_ERROR_CLASSNAME}>{addError}</span> : null}
+            <input type="text" maxLength={500} value={addReason} onChange={(event) => setAddReason(event.target.value)} aria-invalid={addError ? true : undefined} aria-describedby={addError ? `fiscal-obligation-add-error-${list.data.control_id}` : undefined} className={FISCAL_FIELD_CONTROL_CLASSNAME} />
+            {addError ? <span id={`fiscal-obligation-add-error-${list.data.control_id}`} role="alert" className={FISCAL_FIELD_ERROR_CLASSNAME}>{addError}</span> : null}
           </label>
           <button type="submit" disabled={!addCode || add.isPending} className={FISCAL_PRIMARY_BUTTON_CLASSNAME}>{add.isPending ? "Incluindo..." : "Incluir"}</button>
         </form>

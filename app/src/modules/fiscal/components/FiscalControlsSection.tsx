@@ -9,6 +9,7 @@ import { type FormEvent, Fragment, useState } from "react";
 import { fiscalMonthlyControlsQueryKey } from "../hooks/queryKeys";
 import {
   fiscalControlService,
+  monthlyItemSource,
   type FiscalControlStatus,
   type FiscalMonthlyControl,
   type UpdateFiscalMonthlyControlPayload,
@@ -341,7 +342,7 @@ export function FiscalControlsSection({
                     <tr id={`fiscal-obligations-${item.id}`}>
                       <td colSpan={canAuthorize ? 9 : 8} className="bg-gray-50 px-4 py-3 dark:bg-slate-800/50">
                         <FiscalControlTriagePanel controlId={item.id} clientName={item.client_name} />
-                        <FiscalControlObligationsPanel controlId={item.id} clientName={item.client_name} canEdit={canEdit} locked={item.status === "COMPLETED"} />
+                        <FiscalControlObligationsPanel source={monthlyItemSource(item.id)} clientName={item.client_name} canEdit={canEdit} locked={item.status === "COMPLETED"} />
                       </td>
                     </tr>
                   ) : null}

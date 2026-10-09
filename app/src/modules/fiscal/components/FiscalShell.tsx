@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Banknote,
+  CalendarRange,
   ClipboardList,
   Percent,
   Landmark,
@@ -13,6 +14,7 @@ import {
 import { useModuleAccess } from "@modules/auth";
 
 import type { FiscalTabId } from "../types";
+import { FiscalAnnualControlsSection } from "./FiscalAnnualControlsSection";
 import { FiscalControlsSection } from "./FiscalControlsSection";
 import { FiscalIcmsSection } from "./FiscalIcmsSection";
 import { FiscalIpiSection } from "./FiscalIpiSection";
@@ -36,6 +38,11 @@ const fiscalTabs: Array<{
     id: "controls",
     label: "Controle mensal",
     icon: ClipboardList,
+  },
+  {
+    id: "annual",
+    label: "Controle anual",
+    icon: CalendarRange,
   },
   {
     id: "ncm",
@@ -142,6 +149,10 @@ function FiscalActiveTabPanel({
 
   if (activeTab === "controls") {
     return <div role="tabpanel" id="fiscal-panel-controls" aria-labelledby="fiscal-tab-controls"><FiscalControlsSection canEdit={canEdit} canAuthorize={canDelete} /></div>;
+  }
+
+  if (activeTab === "annual") {
+    return <div role="tabpanel" id="fiscal-panel-annual" aria-labelledby="fiscal-tab-annual"><FiscalAnnualControlsSection canEdit={canEdit} /></div>;
   }
 
   if (activeTab === "ncm") {

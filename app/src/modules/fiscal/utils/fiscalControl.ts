@@ -80,3 +80,14 @@ export function formatTransferResult(result: FiscalTransferResult): string {
   }
   return `${parts.join(", ")}.`;
 }
+
+/** Célula da carteira anual: "—" quando a declaração não está no controle. */
+export function formatAnnualDeclaration(
+  declaration: { status: FiscalMonthlyObligation["status"]; completed_on: string | null } | undefined,
+): string {
+  if (!declaration) return "—";
+  if (declaration.status === "NOT_APPLICABLE") return "Não aplicável";
+  if (declaration.status === "PENDING") return "Pendente";
+  const [year, month, day] = (declaration.completed_on ?? "").split("-");
+  return year ? `Cumprida em ${day}/${month}/${year}` : "Cumprida";
+}
