@@ -421,3 +421,17 @@ await runTest("fiscal SPED × XML conference keeps items under their document", 
   assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
   assert.match(section, /const MAX_SPED_BYTES = 300_000;/);
 });
+
+await runTest("fiscal IPI/ICMS ST totals show composition and excluded XML", async () => {
+  const section = await readSource("./components/FiscalXmlTaxesSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalXmlTaxesSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/xml-taxes", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Nota seguida dos itens que compõem o valor; excluídos visíveis, fora da soma.
+  assert.match(section, /result\.notes\.flatMap\(\(note\) => \[/);
+  assert.match(section, /result\.excluded\.map/);
+  assert.match(section, /Não é apuração de imposto/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});
