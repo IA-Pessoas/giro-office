@@ -1,6 +1,7 @@
 import { csvLine } from "@workspace/shared";
 
 import {
+  brl,
   type ConferenceDocumentRow,
   type ConferenceSourceInput,
   formatCents,
@@ -228,7 +229,6 @@ export function compareSefazWithXml(input: {
   };
 }
 
-const brl = (value: string | null | undefined) => (value ? value.replace(".", ",") : "");
 const joined = (values: (string | number)[]) => values.join(" | ");
 
 /** CSV do resultado: uma linha por identidade conferida, descarte ou erro, com a situação. */

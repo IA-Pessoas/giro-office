@@ -35,7 +35,7 @@ const blank = { matchKey: "", item: "", spedLine: "", spedValue: null, xmlFile: 
 function conferenceLines(result: FiscalSpedConference): Line[] {
   const pairs = (situation: string, list: FiscalSpedConference["matched"]): Line[] =>
     list.flatMap((pair) => [
-      { level: "Documento" as const, situation, identity: pair.identity, matchKey: pair.match_key, item: "", spedLine: String(pair.sped.line), spedValue: pair.sped.value, xmlFile: pair.xml.entry, xmlValue: pair.xml.value, note: pair.differences.join(" | ") },
+      { level: "Documento" as const, situation, identity: pair.identity, matchKey: pair.match_key, item: "", spedLine: String(pair.sped.line), spedValue: pair.sped.value, xmlFile: pair.xml.entry, xmlValue: pair.xml.value, note: [...pair.differences, ...(pair.items_compared ? [] : ["SPED sem C170 para a nota; itens não comparados"])].join(" | ") },
       ...pair.items.map((item) => ({ level: "Item" as const, situation: item.situation, identity: pair.identity, matchKey: "", item: item.number, spedLine: item.sped ? String(item.sped.line) : "", spedValue: item.sped?.value ?? null, xmlFile: item.xml ? pair.xml.entry : "", xmlValue: item.xml?.value ?? null, note: [...item.differences, item.note].filter(Boolean).join(" | ") })),
     ]);
   const groups = (situation: string, list: FiscalSpedConference["duplicates"], note: (index: number) => string): Line[] =>
@@ -125,7 +125,7 @@ export function FiscalSpedXmlSection({ canEdit }: { canEdit: boolean }) {
           )}
           <p className="text-sm text-gray-600 dark:text-gray-400">Identidade: {result.identity_rule}</p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            {result.sources.sped.file_name}{result.sources.sped.period ? ` (${result.sources.sped.period})` : ""}: {result.sources.sped.documents} C100, {result.sources.sped.items} C170 · documentos {money(result.totals.sped_documents)}, itens {money(result.totals.sped_items)} · {result.sources.xml.file_name}: {result.sources.xml.nfe_entries} NF-e · documentos {money(result.totals.xml_documents)}, itens {money(result.totals.xml_items)}
+            {result.sources.sped.file_name}{result.sources.sped.period ? ` (${result.sources.sped.period})` : ""}: {result.sources.sped.documents} C100, {result.sources.sped.items} C170 · documentos {money(result.totals.sped_documents)}, itens comparados {money(result.totals.sped_items)} · {result.sources.xml.file_name}: {result.sources.xml.nfe_entries} NF-e · documentos {money(result.totals.xml_documents)}, itens comparados {money(result.totals.xml_items)}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Documentos: {result.summary.matched} coincidente(s), {result.summary.divergent} divergente(s), {result.summary.only_sped} só SPED, {result.summary.only_xml} só XML, {result.summary.not_comparable} não comparável(is) · Itens: {result.summary.items_matched} coincidente(s), {result.summary.items_divergent} divergente(s), {result.summary.items_only_sped} só SPED, {result.summary.items_only_xml} só XML, {result.summary.items_duplicates} duplicado(s)

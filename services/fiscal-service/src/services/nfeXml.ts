@@ -232,15 +232,16 @@ export function dropIdenticalCopies(notes: NfeFile[]): {
   notes: NfeFile[];
   copies: { entry: string; reason: string }[];
 } {
+  const firsts = new Map<string, NfeFile>();
   const copies: { entry: string; reason: string }[] = [];
-  const kept = notes.filter((note, index) => {
-    const first = notes.find(
-      (other) => other.identity === note.identity && other.content === note.content,
-    );
-    if (first && notes.indexOf(first) !== index) {
+  const kept = notes.filter((note) => {
+    const signature = `${note.identity}\n${note.content}`;
+    const first = firsts.get(signature);
+    if (first) {
       copies.push({ entry: note.entry, reason: `Cópia idêntica de ${first.entry}.` });
       return false;
     }
+    firsts.set(signature, note);
     return true;
   });
   return { notes: kept, copies };

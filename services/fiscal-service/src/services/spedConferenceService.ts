@@ -1,7 +1,7 @@
 import { csvLine, ServiceError } from "@workspace/shared";
 
 import { identityFromAccessKey, isValidAccessKey, stripZeros } from "./accessKey.js";
-import { formatCents, pairByIdentity, parseCents } from "./documentConferenceService.js";
+import { brl, formatCents, pairByIdentity, parseCents } from "./documentConferenceService.js";
 import {
   dropIdenticalCopies,
   type NfeFile,
@@ -64,6 +64,8 @@ interface DocumentPair {
   sped: Omit<SpedDocument, "items">;
   xml: Omit<XmlDocument, "items">;
   differences: string[];
+  /** false quando o SPED não traz C170 para a nota (ex.: emissão própria dispensada). */
+  items_compared: boolean;
   items: ItemComparison[];
 }
 
@@ -118,7 +120,7 @@ const NOT_COMPARABLE_SITUATIONS: Record<string, string> = {
 };
 const NFE_MODELS = new Set(["55", "65"]);
 const AUTHORIZED_PROTOCOL = new Set(["100", "150"]);
-const MIN_FIELDS: Record<string, number> = { "0000": 7, "0150": 6, C100: 12, C170: 11 };
+const MIN_FIELDS: Record<string, number> = { "0000": 8, "0150": 6, C100: 12, C170: 11 };
 
 const money = (raw: string | undefined) => {
   const cents = raw ? parseCents(raw) : null;
@@ -130,6 +132,8 @@ const sum = (values: (string | null)[]) =>
 interface ParsedSped {
   documents: SpedDocument[];
   errors: { source: "sped"; line: number; message: string }[];
+  discarded: { source: "sped"; line: number; reason: string }[];
+  sawC100: boolean;
   lines: number;
   period: string;
 }
@@ -137,13 +141,18 @@ interface ParsedSped {
 function parseSped(content: string): ParsedSped {
   const raw = content.replace(/^﻿/u, "").split(/\r?\n/u);
   const errors: ParsedSped["errors"] = [];
-  const records: { line: number; fields: string[] }[] = [];
+  // fields null: linha recusada. Ela fecha o documento aberto, para nenhum C170 seguinte ir parar
+  // no C100 anterior.
+  const records: { line: number; fields: string[] | null }[] = [];
+  let sawC100 = false;
   raw.forEach((text, index) => {
     const line = index + 1;
     if (text.trim() === "") return;
     const trimmed = text.trim();
+    if (trimmed.startsWith("|C100|")) sawC100 = true;
     if (!/^\|[A-Z0-9]{4}\|/u.test(trimmed) || !trimmed.endsWith("|")) {
       errors.push({ source: "sped", line, message: "Linha fora do leiaute SPED (|REG|...|)." });
+      records.push({ line, fields: null });
       return;
     }
     const fields = trimmed.slice(1, -1).split("|");
@@ -154,25 +163,44 @@ function parseSped(content: string): ParsedSped {
         line,
         message: `${fields[0]} com ${fields.length} campo(s); o leiaute pede ao menos ${minimum}.`,
       });
+      records.push({ line, fields: null });
       return;
     }
     records.push({ line, fields });
   });
 
-  const opening = records.find((record) => record.fields[0] === "0000")?.fields ?? [];
-  const ownIssuer = (opening[6] || opening[7] || "").replace(/\D/g, "");
+  const valid = records.flatMap(({ line, fields }) => (fields ? [{ line, fields }] : []));
+  const opening = valid.find((record) => record.fields[0] === "0000")?.fields;
+  if (opening && !(/^\d{8}$/u.test(opening[3] ?? "") && /^\d{8}$/u.test(opening[4] ?? ""))) {
+    throw new ServiceError(
+      400,
+      "Arquivo SPED: registro 0000 fora do leiaute da EFD ICMS/IPI (DT_INI e DT_FIN nos campos 4 e 5).",
+    );
+  }
+  const ownIssuer = (opening?.[6] || opening?.[7] || "").replace(/\D/g, "");
   const participants = new Map(
-    records
+    valid
       .filter((record) => record.fields[0] === "0150")
       .map(({ fields }) => [fields[1] ?? "", (fields[4] || fields[5] || "").replace(/\D/g, "")]),
   );
 
   const documents: SpedDocument[] = [];
+  const discarded: ParsedSped["discarded"] = [];
   let current: SpedDocument | null = null;
   let currentOpen = false;
+  let rejectedLine = 0;
   for (const { line, fields } of records) {
+    if (!fields) {
+      current = null;
+      currentOpen = true;
+      rejectedLine = line;
+      continue;
+    }
     const reg = fields[0] ?? "";
-    const fail = (message: string) => errors.push({ source: "sped", line, message });
+    const fail = (message: string) => {
+      errors.push({ source: "sped", line, message });
+      rejectedLine = line;
+    };
     if (reg === "C100") {
       current = null;
       currentOpen = true;
@@ -196,6 +224,13 @@ function parseSped(content: string): ParsedSped {
         }
         const [issuer = "", keyModel = "", keySeries = "", keyNumber = ""] =
           identityFromAccessKey(key).split("|");
+        if (
+          (series && stripZeros(series) !== keySeries) ||
+          (number && stripZeros(number) !== keyNumber)
+        ) {
+          fail("SER/NUM_DOC do C100 não conferem com a chave de acesso.");
+          continue;
+        }
         identity = {
           access_key: key,
           issuer,
@@ -245,8 +280,15 @@ function parseSped(content: string): ParsedSped {
         fail("C170 sem C100 correspondente.");
         continue;
       }
-      // C100 recusado: seus itens também ficam fora, para não irem a outro documento.
-      if (!current) continue;
+      // C100 recusado: seus itens ficam fora (descarte por linha), sem irem a outro documento.
+      if (!current) {
+        discarded.push({
+          source: "sped",
+          line,
+          reason: `C170 do registro recusado na linha ${rejectedLine}.`,
+        });
+        continue;
+      }
       const [, number = "", code = "", , quantity = "", , value = "", , , , cfop = ""] = fields;
       const item: SpedItem = {
         line,
@@ -270,8 +312,10 @@ function parseSped(content: string): ParsedSped {
   return {
     documents,
     errors: errors.sort((a, b) => a.line - b.line),
+    discarded,
+    sawC100,
     lines: raw.filter((text) => text.trim() !== "").length,
-    period: opening[3] && opening[4] ? `${opening[3]} a ${opening[4]}` : "",
+    period: opening ? `${opening[3]} a ${opening[4]}` : "",
   };
 }
 
@@ -354,7 +398,7 @@ export function compareSpedWithXml(input: {
   xml: { file_name: string; zip_base64: string };
 }): SpedConferenceResult {
   const sped = parseSped(input.sped.content);
-  if (sped.documents.length === 0 && !sped.errors.some((error) => /C100/u.test(error.message))) {
+  if (!sped.sawC100) {
     throw new ServiceError(400, "Arquivo SPED: nenhum registro C100 encontrado.");
   }
   const archive = readNfeArchive(input.xml.zip_base64);
@@ -391,10 +435,10 @@ export function compareSpedWithXml(input: {
     only_xml: [],
     duplicates: [],
     not_comparable: [],
-    discarded: [...archive.discarded, ...copies].map((item) => ({
-      source: "xml" as const,
-      ...item,
-    })),
+    discarded: [
+      ...sped.discarded,
+      ...[...archive.discarded, ...copies].map((item) => ({ source: "xml" as const, ...item })),
+    ],
     errors: [
       ...sped.errors,
       ...archive.errors.map((item) => ({ source: "xml" as const, ...item })),
@@ -424,16 +468,20 @@ export function compareSpedWithXml(input: {
       if (doc.value !== null && note.value !== null && doc.value !== note.value) {
         differences.push(`Valor do documento: SPED ${doc.value} × XML ${note.value}`);
       }
-      if (spedItems.length !== xmlItems.length) {
+      // Sem C170 (comum na NF-e de emissão própria) os itens não são comparados: ausência de
+      // detalhe no SPED não é divergência.
+      const itemsCompared = spedItems.length > 0;
+      if (itemsCompared && spedItems.length !== xmlItems.length) {
         differences.push(`Itens: ${spedItems.length} no SPED × ${xmlItems.length} no XML`);
       }
-      const items = compareItems(item.left, item.right);
+      const items = itemsCompared ? compareItems(item.left, item.right) : [];
       const pair: DocumentPair = {
         identity: item.identity,
         match_key: sameKey ? "chave de acesso" : "emitente, modelo, série e número",
         sped: doc,
         xml: note,
         differences,
+        items_compared: itemsCompared,
         items,
       };
       const clean =
@@ -488,14 +536,17 @@ export function compareSpedWithXml(input: {
     totals: {
       sped_documents: sum(sped.documents.map((doc) => doc.value)),
       xml_documents: sum(xmlDocs.map((doc) => doc.value)),
-      sped_items: sum(sped.documents.flatMap((doc) => doc.items.map((item) => item.value))),
-      xml_items: sum(xmlDocs.flatMap((doc) => doc.items.map((item) => item.value))),
+      // Itens só dos pares comparados: batem com o detalhamento da tabela e do CSV.
+      sped_items: sum(
+        pairs.flatMap((pair) => pair.items.flatMap((item) => (item.sped ? [item.sped.value] : []))),
+      ),
+      xml_items: sum(
+        pairs.flatMap((pair) => pair.items.flatMap((item) => (item.xml ? [item.xml.value] : []))),
+      ),
     },
     ...buckets,
   };
 }
-
-const brl = (value: string | null | undefined) => (value ? value.replace(".", ",") : "");
 
 /** CSV do resultado: linha do documento seguida das linhas dos seus itens, mais erros e descartes. */
 export function spedConferenceCsvExport(result: SpedConferenceResult) {
@@ -539,7 +590,10 @@ export function spedConferenceCsvExport(result: SpedConferenceResult) {
       brl(pair.sped.value),
       pair.xml.entry,
       brl(pair.xml.value),
-      pair.differences.join(" | "),
+      [
+        ...pair.differences,
+        ...(pair.items_compared ? [] : ["SPED sem C170 para a nota; itens não comparados"]),
+      ].join(" | "),
     ]);
     for (const item of pair.items) {
       lines.push([
@@ -556,6 +610,18 @@ export function spedConferenceCsvExport(result: SpedConferenceResult) {
       ]);
     }
   };
+  lines.push([
+    "Totais",
+    "",
+    "",
+    "",
+    "",
+    "",
+    `documentos ${brl(result.totals.sped_documents)}; itens comparados ${brl(result.totals.sped_items)}`,
+    "",
+    `documentos ${brl(result.totals.xml_documents)}; itens comparados ${brl(result.totals.xml_items)}`,
+    "",
+  ]);
   for (const pair of result.matched) pushPair("Coincidente", pair);
   for (const pair of result.divergent) pushPair("Divergente", pair);
   for (const doc of result.only_sped) {

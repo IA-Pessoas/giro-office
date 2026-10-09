@@ -162,6 +162,7 @@ type SpedDocumentPair = {
   sped: Omit<FiscalSpedDocument, "items">;
   xml: Omit<FiscalXmlDocument, "items">;
   differences: string[];
+  items_compared: boolean;
   items: FiscalSpedItemComparison[];
 };
 

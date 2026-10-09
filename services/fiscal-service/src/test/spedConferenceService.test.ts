@@ -179,8 +179,9 @@ describe("compareSpedWithXml", () => {
     expect(result.totals).toEqual({
       sped_documents: "16.00",
       xml_documents: "27.00",
-      sped_items: "16.00",
-      xml_items: "14.50",
+      // Itens só dos pares comparados (100 e 200; o 103 tem item duplicado, sem valor pareado).
+      sped_items: "13.00",
+      xml_items: "13.50",
     });
     expect(result.summary).toMatchObject({
       matched: 1,
@@ -209,6 +210,65 @@ describe("compareSpedWithXml", () => {
       `Item;Só XML;${OWN}|55|1|100;;3;;;100.xml;0,00;`,
     ]);
     expect(lines).toContain("Arquivo;Erro;;;;16;;;;C170 sem C100 correspondente.");
+  });
+
+  it("C100 recusado no meio fecha o documento e descarta seus itens por linha", () => {
+    const content = [
+      record(["0000", "017", "0", "01082026", "31082026", "EMPRESA", OWN, "", "SP"], 15),
+      c100({ series: "1", number: "100", key: accessKey(OWN, "1", "100"), value: "10,00" }),
+      c170("1", "A", "2", "6,00"),
+      "|C100|0|0||55|00|1|",
+      c170("2", "B", "1", "4,00"),
+      c100({ series: "1", number: "999", key: accessKey(OWN, "1", "100"), value: "1,00" }),
+      c170("1", "A", "1", "1,00"),
+    ].join("\n");
+    const outcome = compareSpedWithXml({
+      sped: { file_name: "s.txt", content },
+      xml: zip({ "100.xml": nfe(OWN, "100", "10.00", [["1", "A", "2", "6.00"]]) }),
+    });
+    expect(outcome.matched.map((pair) => pair.items.length)).toEqual([1]);
+    expect(outcome.errors.map((error) => error.message)).toEqual([
+      "C100 com 7 campo(s); o leiaute pede ao menos 12.",
+      "SER/NUM_DOC do C100 não conferem com a chave de acesso.",
+    ]);
+    expect(outcome.discarded).toEqual([
+      { source: "sped", line: 5, reason: "C170 do registro recusado na linha 4." },
+      { source: "sped", line: 7, reason: "C170 do registro recusado na linha 6." },
+    ]);
+  });
+
+  it("não compara itens quando o SPED não traz C170 da nota", () => {
+    const content = [
+      record(["0000", "017", "0", "01082026", "31082026", "EMPRESA", OWN, "", "SP"], 15),
+      c100({ series: "1", number: "100", key: accessKey(OWN, "1", "100"), value: "10,00" }),
+    ].join("\n");
+    const outcome = compareSpedWithXml({
+      sped: { file_name: "s.txt", content },
+      xml: zip({ "100.xml": nfe(OWN, "100", "10.00", [["1", "A", "1", "10.00"]]) }),
+    });
+    expect(outcome.matched[0]).toMatchObject({ items_compared: false, items: [] });
+    expect(outcome.status).toBe("complete");
+    expect(spedConferenceCsvExport(outcome).csv).toContain(
+      "SPED sem C170 para a nota; itens não comparados",
+    );
+  });
+
+  it("recusa 0000 de outro leiaute e arquivo só com C170", () => {
+    expect(() =>
+      compareSpedWithXml({
+        sped: {
+          file_name: "c.txt",
+          content: `|0000|006|0|||01082026|31082026|EMPRESA|${OWN}|\n${c100({ series: "1", number: "1", value: "1,00" })}`,
+        },
+        xml,
+      }),
+    ).toThrow(/fora do leiaute da EFD ICMS\/IPI/u);
+    expect(() =>
+      compareSpedWithXml({
+        sped: { file_name: "c.txt", content: c170("1", "A", "1", "1,00") },
+        xml,
+      }),
+    ).toThrow("Arquivo SPED: nenhum registro C100 encontrado.");
   });
 
   it("recusa arquivo sem registros SPED ou ZIP ilegível", () => {
