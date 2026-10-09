@@ -106,6 +106,7 @@ describe("compareDocumentSpreadsheets", () => {
       accepted_rows: 4,
       identity_columns: ["Chave de acesso", "CNPJ Emitente", "Modelo", "Série", "Número"],
       value_column: true,
+      ipi_column: false,
     });
   });
 

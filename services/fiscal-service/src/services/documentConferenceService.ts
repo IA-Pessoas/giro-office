@@ -27,6 +27,8 @@ export interface ConferenceDocumentRow {
   value: string | null;
   /** Situação informada na planilha (ex.: Autorizada, Cancelada), quando há coluna. */
   status: string | null;
+  /** Valor de IPI da linha, quando há coluna de IPI. */
+  ipi: string | null;
 }
 
 export interface ConferenceLineIssue<S extends string = ConferenceSourceId> {
@@ -72,7 +74,7 @@ const SOURCE_LABEL: Record<ConferenceSourceId, string> = { dominio: "Domínio", 
 const IDENTITY_RULE =
   "Chave de acesso da NF-e quando informada; sem ela, emitente (CPF/CNPJ) + modelo + série + número.";
 
-type Column = "access_key" | "issuer" | "model" | "series" | "number" | "value" | "status";
+type Column = "access_key" | "issuer" | "model" | "series" | "number" | "value" | "status" | "ipi";
 
 // Cabeçalhos comparados sem acento, caixa ou pontuação. ponytail: aliases deduzidos dos nomes
 // usuais das exportações; sem amostras reais anonimizadas a compatibilidade não está validada.
@@ -93,6 +95,7 @@ const COLUMN_ALIASES: Record<Column, string[]> = {
     "totalnota",
   ],
   status: ["situacao", "status", "situacaonfe", "situacaodocumento", "situacaodanota"],
+  ipi: ["ipi", "valoripi", "vipi", "valordoipi", "ipivalor", "totalipi"],
 };
 
 const IDENTITY_COLUMNS: Column[] = ["access_key", "issuer", "model", "series", "number"];
@@ -201,6 +204,7 @@ export interface SpreadsheetInfo {
   accepted_rows: number;
   identity_columns: string[];
   value_column: boolean;
+  ipi_column: boolean;
 }
 
 export interface ParsedSpreadsheet<S extends string = ConferenceSourceId> {
@@ -254,6 +258,7 @@ export function parseNoteSpreadsheet<S extends string>(
         return index === undefined ? [] : [header?.cells[index]?.trim() ?? ""];
       }),
       value_column: columns.has("value"),
+      ipi_column: columns.has("ipi"),
     },
   };
 
@@ -269,7 +274,7 @@ export function parseNoteSpreadsheet<S extends string>(
     };
 
     const rawKey = cell("access_key").replace(/\s/g, "");
-    let row: Omit<ConferenceDocumentRow, "line" | "identity" | "value" | "status">;
+    let row: Omit<ConferenceDocumentRow, "line" | "identity" | "value" | "status" | "ipi">;
     if (rawKey) {
       if (!isValidAccessKey(rawKey)) {
         fail("Chave de acesso inválida.");
@@ -309,12 +314,19 @@ export function parseNoteSpreadsheet<S extends string>(
       fail(`Valor inválido: ${rawValue}.`);
       continue;
     }
+    const rawIpi = cell("ipi");
+    const ipiCents = rawIpi ? parseCents(rawIpi) : null;
+    if (rawIpi && ipiCents === null) {
+      fail(`IPI inválido: ${rawIpi}.`);
+      continue;
+    }
     parsed.rows.push({
       line,
       identity: `${row.issuer}|${row.model}|${row.series}|${row.number}`,
       ...row,
       value: cents === null ? null : formatCents(cents),
       status: cell("status") || null,
+      ipi: ipiCents === null ? null : formatCents(ipiCents),
       cents,
     });
   }

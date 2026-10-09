@@ -1248,6 +1248,51 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/conferences/ipi-spreadsheets": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Conferir IPI entre duas planilhas",
+          description:
+            "Recebe duas planilhas CSV (first e second; separador ; , ou tab; até 450 mil caracteres cada) com colunas de identidade (chave de acesso ou emitente/modelo/série/número) e uma coluna de IPI (ex.: Valor IPI). Pareia as notas pela identidade e devolve matched, divergent (IPI diferente, com difference = planilha 2 − planilha 1 em centavos), only_first, only_second, duplicates (sem correspondência automática), discarded e errors por linha (IPI vazio ou inválido), totais de cada planilha e da diferença e o CSV (campo csv). status partial com descarte, erro ou duplicata. Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["first", "second"],
+                  additionalProperties: false,
+                  properties: Object.fromEntries(
+                    ["first", "second"].map((source) => [
+                      source,
+                      {
+                        type: "object",
+                        required: ["file_name", "content"],
+                        additionalProperties: false,
+                        properties: {
+                          file_name: { type: "string", minLength: 1, maxLength: 255 },
+                          content: { type: "string", minLength: 1, maxLength: 450_000 },
+                        },
+                      },
+                    ]),
+                  ),
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Resultado da conferência de IPI com file_name e csv",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou planilha sem identidade ou coluna de IPI" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
       "/fiscal/revenues/{id}": {
         put: {
           tags: ["Receitas"],

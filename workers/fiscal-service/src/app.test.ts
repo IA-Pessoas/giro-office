@@ -345,6 +345,34 @@ describe("fiscal Worker", () => {
     expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
   });
 
+  it("confere IPI entre planilhas sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor IPI";
+    const body = {
+      first: {
+        file_name: "a.csv",
+        content: `${header}\n11222333000181;55;1;7;0,10\n11222333000181;55;1;8;0,20`,
+      },
+      second: {
+        file_name: "b.csv",
+        content: `${header}\n11222333000181;55;1;7;0,10\n11222333000181;55;1;8;0,20`,
+      },
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/ipi-spreadsheets", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as { data: { status: string; totals: { first: string } } };
+    expect(payload.data).toMatchObject({ status: "complete", totals: { first: "0.30" } });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
     const revenue = {
       id: ICMS_ID,

@@ -2,6 +2,7 @@ import { buildFiscalServiceOpenApiSpec } from "@workspace/fiscal-service/src/ope
 import { InternalReportingService } from "@workspace/fiscal-service/src/reporting/internalReportingService.js";
 import {
   documentConferenceBodySchema,
+  ipiSpreadsheetConferenceBodySchema,
   sefazXmlConferenceBodySchema,
   spedConferenceBodySchema,
   xmlSelectionBodySchema,
@@ -53,6 +54,10 @@ import {
 } from "@workspace/fiscal-service/src/services/fiscalRatePdfService.js";
 import { FiscalRateService } from "@workspace/fiscal-service/src/services/fiscalRateService.js";
 import { IcmsService } from "@workspace/fiscal-service/src/services/icmsService.js";
+import {
+  compareIpiSpreadsheets,
+  ipiSpreadsheetConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/ipiSpreadsheetConferenceService.js";
 import { MonthlyRevenueService } from "@workspace/fiscal-service/src/services/monthlyRevenueService.js";
 import {
   compareSefazWithXml,
@@ -412,6 +417,14 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const body = parseWithZod(xmlTaxTotalsBodySchema, await readJson(c));
     const result = sumXmlTaxes(body);
     return c.json(createSuccessResponse({ ...result, ...xmlTaxTotalsCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/ipi-spreadsheets", async (c) => {
+    const body = parseWithZod(ipiSpreadsheetConferenceBodySchema, await readJson(c));
+    const result = compareIpiSpreadsheets(body);
+    return c.json(
+      createSuccessResponse({ ...result, ...ipiSpreadsheetConferenceCsvExport(result) }),
+    );
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {
