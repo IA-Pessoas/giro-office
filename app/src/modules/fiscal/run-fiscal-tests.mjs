@@ -449,3 +449,18 @@ await runTest("fiscal money formatting avoids floating point", async () => {
     assert.match(source, /formatMoney\(value/);
   }
 });
+
+await runTest("fiscal IPI spreadsheet conference shows each source and the difference", async () => {
+  const section = await readSource("./components/FiscalIpiSpreadsheetSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalIpiSpreadsheetSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/ipi-spreadsheets", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  assert.match(section, /Diferença \(2 − 1\)/);
+  assert.match(section, /formatMoney\(pair\.difference\)/);
+  assert.match(section, /IPI vazio aparece como erro, não como zero/);
+  assert.match(section, /result\.not_comparable\.map/);
+  assert.match(section, /uma linha por nota/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});

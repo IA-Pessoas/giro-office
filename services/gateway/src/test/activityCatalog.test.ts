@@ -109,6 +109,7 @@ describe("activityCatalog", () => {
     ["POST", "/fiscal/conferences/sefaz-xml", "conferiu", "o CSV da SEFAZ contra XML de notas"],
     ["POST", "/fiscal/conferences/sped-xml", "conferiu", "o SPED (C100/C170) contra XML de notas"],
     ["POST", "/fiscal/conferences/xml-taxes", "somou", "IPI e ICMS ST de XML de notas"],
+    ["POST", "/fiscal/conferences/ipi-spreadsheets", "conferiu", "o IPI entre duas planilhas"],
     ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
     [
       "PUT",

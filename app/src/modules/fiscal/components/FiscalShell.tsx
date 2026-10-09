@@ -16,6 +16,7 @@ import type { FiscalTabId } from "../types";
 import { FiscalConferencesSection } from "./FiscalConferencesSection";
 import { FiscalIcmsSection } from "./FiscalIcmsSection";
 import { FiscalIpiSection } from "./FiscalIpiSection";
+import { FiscalIpiSpreadsheetSection } from "./FiscalIpiSpreadsheetSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
 import { FiscalRatesSection } from "./FiscalRatesSection";
 import { FiscalRevenuesSection } from "./FiscalRevenuesSection";
@@ -161,7 +162,7 @@ function FiscalActiveTabPanel({
   }
 
   if (activeTab === "conferences") {
-    return <div role="tabpanel" id="fiscal-panel-conferences" aria-labelledby="fiscal-tab-conferences"><div className="space-y-8"><FiscalConferencesSection canEdit={canEdit} /><FiscalSefazXmlSection canEdit={canEdit} /><FiscalSpedXmlSection canEdit={canEdit} /><FiscalXmlSelectionSection canEdit={canEdit} /><FiscalXmlTaxesSection canEdit={canEdit} /></div></div>;
+    return <div role="tabpanel" id="fiscal-panel-conferences" aria-labelledby="fiscal-tab-conferences"><div className="space-y-8"><FiscalConferencesSection canEdit={canEdit} /><FiscalIpiSpreadsheetSection canEdit={canEdit} /><FiscalSefazXmlSection canEdit={canEdit} /><FiscalSpedXmlSection canEdit={canEdit} /><FiscalXmlSelectionSection canEdit={canEdit} /><FiscalXmlTaxesSection canEdit={canEdit} /></div></div>;
   }
 
   return <FiscalIpiTab canEdit={canEdit} canDelete={canDelete} />;

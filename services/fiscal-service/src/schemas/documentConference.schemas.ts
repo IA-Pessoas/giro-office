@@ -78,3 +78,8 @@ export const spedConferenceBodySchema = z
 
 // Só o ZIP de XML: mesmo arquivo e teto da seleção de XML (~650 kB).
 export const xmlTaxTotalsBodySchema = xmlSelectionBodySchema.omit({ requests: true });
+
+// Duas planilhas, mesmo formato e teto da Domínio × SEFAZ.
+export const ipiSpreadsheetConferenceBodySchema = z
+  .object({ first: conferenceSourceSchema, second: conferenceSourceSchema })
+  .strict();

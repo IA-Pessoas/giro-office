@@ -5,6 +5,7 @@ import express, { Router } from "express";
 import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/isAuthenticated.js";
 import {
   documentConferenceBodySchema,
+  ipiSpreadsheetConferenceBodySchema,
   sefazXmlConferenceBodySchema,
   spedConferenceBodySchema,
   xmlSelectionBodySchema,
@@ -14,6 +15,10 @@ import {
   compareDocumentSpreadsheets,
   documentConferenceCsvExport,
 } from "../services/documentConferenceService.js";
+import {
+  compareIpiSpreadsheets,
+  ipiSpreadsheetConferenceCsvExport,
+} from "../services/ipiSpreadsheetConferenceService.js";
 import {
   compareSefazWithXml,
   sefazXmlConferenceCsvExport,
@@ -110,6 +115,25 @@ export function createDocumentConferenceRoutes(): ReturnType<typeof Router> {
         res.json(createSuccessResponse({ ...result, ...xmlTaxTotalsCsvExport(result) }));
       } catch (err) {
         logError("Erro ao somar IPI e ICMS ST de XML", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/conferences/ipi-spreadsheets",
+    express.json({ limit: "1mb" }),
+    isAuthenticated,
+    requireFiscalWritePermission,
+    (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(ipiSpreadsheetConferenceBodySchema, req.body);
+        const result = compareIpiSpreadsheets(body);
+        res.json(
+          createSuccessResponse({ ...result, ...ipiSpreadsheetConferenceCsvExport(result) }),
+        );
+      } catch (err) {
+        logError("Erro ao conferir IPI entre planilhas", { err });
         next(err);
       }
     },

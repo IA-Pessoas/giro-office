@@ -385,6 +385,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "somou", item: "IPI e ICMS ST de XML de notas" },
   },
   {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/conferences\/ipi-spreadsheets$/,
+    description: { action: "conferiu", item: "o IPI entre duas planilhas" },
+  },
+  {
     methods: ["GET"],
     pattern: /^\/reports\/jobs\/[^/]+$/,
     description: { action: "consultou", item: "um job de relatório" },

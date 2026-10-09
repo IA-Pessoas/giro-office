@@ -242,3 +242,38 @@ describe("POST /fiscal/conferences/xml-taxes", () => {
       .expect(400);
   });
 });
+
+describe("POST /fiscal/conferences/ipi-spreadsheets", () => {
+  const app = createFiscalApp({ env, logger });
+  const ipiHeader = "CNPJ Emitente;Modelo;Série;Número;Valor IPI";
+  const body = {
+    first: { file_name: "a.csv", content: `${ipiHeader}\n11222333000181;55;1;100;1,00` },
+    second: { file_name: "b.csv", content: `${ipiHeader}\n11222333000181;55;1;100;1,50` },
+  };
+
+  it("exige nível 2 e devolve a diferença de IPI com o CSV", async () => {
+    await request(app)
+      .post("/fiscal/conferences/ipi-spreadsheets")
+      .set(headers(1))
+      .send(body)
+      .expect(403);
+    const response = await request(app)
+      .post("/fiscal/conferences/ipi-spreadsheets")
+      .set(headers(2))
+      .send(body)
+      .expect(200);
+    expect(response.body.data).toMatchObject({
+      summary: { divergent: 1 },
+      totals: { difference: "0.50" },
+      file_name: "conferencia-ipi-planilhas.csv",
+    });
+  });
+
+  it("recusa planilha sem coluna de IPI", async () => {
+    await request(app)
+      .post("/fiscal/conferences/ipi-spreadsheets")
+      .set(headers(2))
+      .send({ ...body, first: { file_name: "a.csv", content: "Chave\n1" } })
+      .expect(400);
+  });
+});

@@ -106,6 +106,7 @@ describe("compareDocumentSpreadsheets", () => {
       accepted_rows: 4,
       identity_columns: ["Chave de acesso", "CNPJ Emitente", "Modelo", "Série", "Número"],
       value_column: true,
+      ipi_column: false,
     });
   });
 
@@ -225,6 +226,18 @@ describe("compareDocumentSpreadsheets", () => {
         sefaz: source(`Chave\n${keyA1}`),
       }),
     ).toThrow(/cabeçalho precisa ter/u);
+  });
+});
+
+describe("coluna de IPI nas outras conferências", () => {
+  it("é ignorada pela Domínio × SEFAZ, mesmo com texto como Isento", () => {
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor;IPI";
+    const result = compareDocumentSpreadsheets({
+      dominio: source(`${header}\n${ISSUER_A};55;1;1;10,00;Isento`),
+      sefaz: source(`${header}\n${ISSUER_A};55;1;1;10,00;-`),
+    });
+    expect(result.status).toBe("complete");
+    expect(result.matched).toHaveLength(1);
   });
 });
 

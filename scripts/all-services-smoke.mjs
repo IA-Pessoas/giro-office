@@ -4896,6 +4896,35 @@ const handlers = {
     });
   },
 
+  async fiscalIpiSpreadsheetConference(op) {
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor IPI";
+    const response = await httpRequest(op, {
+      json: {
+        first: { file_name: "a.csv", content: `${header}\n11222333000181;55;1;100;1,00` },
+        second: { file_name: "b.csv", content: `${header}\n11222333000181;55;1;100;1,00` },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(`Conferência de IPI inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalIpiSpreadsheetConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        first: {
+          file_name: "a.csv",
+          content: "CNPJ Emitente;Modelo;Série;Número\n11222333000181;55;1;100",
+        },
+        second: {
+          file_name: "b.csv",
+          content: "CNPJ Emitente;Modelo;Série;Número\n11222333000181;55;1;100",
+        },
+      },
+    });
+  },
+
   async fiscalSimplesZipInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],
