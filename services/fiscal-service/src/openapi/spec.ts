@@ -834,6 +834,448 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/monthly-controls": {
+        get: {
+          tags: ["Controle mensal"],
+          summary: "Listar a carteira de controles fiscais da competência",
+          description:
+            "Antes de listar, gera os controles que faltam para clientes com Fiscal ativo na competência (entrada/saída respeitadas). Repetição ou concorrência não duplica: um controle por organização, cliente e competência.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Competência e controles com nome do cliente",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Competência inválida" },
+          },
+        },
+        post: {
+          tags: ["Controle mensal"],
+          summary: "Abrir controle fiscal do cliente na competência",
+          description:
+            "Idempotente. Cliente sem Fiscal ativo na competência exige motivo (abertura excepcional), registrado no controle e na trilha.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Controle já existia (created: false)",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "201": {
+              description: "Controle aberto (created: true)",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou abertura excepcional sem motivo" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+          },
+        },
+      },
+      "/fiscal/monthly-controls/responsibles": {
+        get: {
+          tags: ["Controle mensal"],
+          summary: "Listar quem pode receber controles (Fiscal nível 3)",
+          description: "Usuários ativos com acesso ao Fiscal na organização.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Lista de { id, name }",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "403": { description: "Exige Fiscal nível 3" },
+          },
+        },
+      },
+      "/fiscal/monthly-controls/transfer": {
+        post: {
+          tags: ["Controle mensal"],
+          summary: "Transferir controles abertos para outro responsável",
+          description:
+            "Fiscal nível 3, com motivo. Individual (um id) ou em lote. Concluídos não são transferidos: no lote voltam em skipped; sozinho é 409. Cada transferência grava evento RESPONSIBLE_TRANSFERRED; competências passadas não mudam por mudança da carteira.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["control_ids", "to_user_id", "reason"],
+                  additionalProperties: false,
+                  properties: {
+                    control_ids: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 500,
+                      items: { type: "string", format: "uuid" },
+                    },
+                    to_user_id: { type: "string", format: "uuid" },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "{ transferred: string[], skipped: { id, reason }[] }",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou destino sem acesso ao Fiscal" },
+            "403": { description: "Exige Fiscal nível 3" },
+            "404": { description: "Controle não encontrado (transferência individual)" },
+            "409": { description: "Controle concluído (transferência individual)" },
+          },
+        },
+      },
+      "/fiscal/monthly-controls/{id}/triage": {
+        get: {
+          tags: ["Controle mensal"],
+          summary: "Consultar documentos da Triagem do controle",
+          description:
+            "Só leitura do checklist da Triagem Fiscal do mesmo cliente e competência. pending é null quando a Triagem não tem registro; nesse caso, como com pendência, concluir o controle exige Fiscal nível 3 e justificativa.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Origem (MONTHLY, PLANNED ou NONE), pendências e itens com status",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "404": { description: "Controle não encontrado nesta organização" },
+          },
+        },
+      },
+      "/fiscal/annual-controls": {
+        get: {
+          tags: ["Controle anual"],
+          summary: "Listar a carteira de controles fiscais anuais do ano",
+          description:
+            "Antes de listar, gera um controle por cliente com Fiscal ativo no ano (até o ano corrente), com regime e responsável registrados ao nascer e DEFIS sugerida para o Simples. Sem situação geral: o andamento é por declaração.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "year",
+              in: "query",
+              required: true,
+              schema: { type: "integer", minimum: 2000, maximum: 2100 },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Ano e controles com declarações e seus andamentos",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Ano inválido" },
+          },
+        },
+      },
+      "/fiscal/annual-controls/{id}/items": {
+        get: {
+          tags: ["Controle anual"],
+          summary: "Listar declarações do controle anual",
+          description:
+            "Só leitura; inclui as declarações do catálogo que ainda podem ser incluídas.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Declarações com fonte oficial, situação e catálogo incluível",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "404": { description: "Controle não encontrado nesta organização" },
+          },
+        },
+        post: {
+          tags: ["Controle anual"],
+          summary: "Incluir declaração do catálogo no controle anual",
+          description: "DMED, DIMOB e DASN-SIMEI são condicionais e exigem motivo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["code"],
+                  additionalProperties: false,
+                  properties: {
+                    code: { type: "string", enum: ["DEFIS", "DMED", "DIMOB", "DASN_SIMEI"] },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Declaração incluída",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida, condicional sem motivo ou regime vetado" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Controle não encontrado nesta organização" },
+            "409": { description: "Declaração já incluída" },
+          },
+        },
+      },
+      "/fiscal/annual-controls/{id}/items/{code}": {
+        patch: {
+          tags: ["Controle anual"],
+          summary: "Alterar aplicabilidade ou cumprimento da declaração",
+          description:
+            "Não aplicável exige motivo; cumprir grava data (não futura) e ator, com protocolo opcional; completed_on null desfaz. Cada mudança entra na trilha do controle anual.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "code",
+              in: "path",
+              required: true,
+              schema: { type: "string", enum: ["DEFIS", "DMED", "DIMOB", "DASN_SIMEI"] },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  minProperties: 1,
+                  properties: {
+                    applicable: { type: "boolean" },
+                    completed_on: { type: "string", format: "date", nullable: true },
+                    protocol: { type: "string", maxLength: 200 },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Declaração atualizada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida, sem motivo ou data futura" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Controle ou declaração não encontrados" },
+            "409": { description: "Regra de cumprimento ou alteração concorrente" },
+          },
+        },
+      },
+      "/fiscal/monthly-controls/{id}/obligations": {
+        get: {
+          tags: ["Controle mensal"],
+          summary: "Listar obrigações do controle",
+          description:
+            "Garante antes as obrigações sugeridas pelo catálogo para o regime registrado no controle (sem duplicar) e devolve também as que podem ser incluídas. Pendências não alteram a situação do controle.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Obrigações com situação, fonte oficial e catálogo incluível",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "404": { description: "Controle não encontrado nesta organização" },
+          },
+        },
+        post: {
+          tags: ["Controle mensal"],
+          summary: "Incluir obrigação do catálogo no controle",
+          description:
+            "Obrigação condicional (ex.: DIRBI) exige motivo. Controle concluído não muda.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["code"],
+                  additionalProperties: false,
+                  properties: {
+                    code: {
+                      type: "string",
+                      enum: ["PGDAS_D", "DCTFWEB", "EFD_CONTRIBUICOES", "DIRBI"],
+                    },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Obrigação incluída",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou condicional sem motivo" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Controle não encontrado nesta organização" },
+            "409": { description: "Obrigação já incluída ou controle concluído" },
+          },
+        },
+      },
+      "/fiscal/monthly-controls/{id}/obligations/{code}": {
+        patch: {
+          tags: ["Controle mensal"],
+          summary: "Alterar aplicabilidade ou cumprimento da obrigação",
+          description:
+            "Não aplicável exige motivo; cumprir grava data (não futura) e ator, com protocolo opcional; completed_on null desfaz. Cada mudança entra na trilha do controle.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+            {
+              name: "code",
+              in: "path",
+              required: true,
+              schema: {
+                type: "string",
+                enum: ["PGDAS_D", "DCTFWEB", "EFD_CONTRIBUICOES", "DIRBI"],
+              },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  minProperties: 1,
+                  properties: {
+                    applicable: { type: "boolean" },
+                    completed_on: { type: "string", format: "date", nullable: true },
+                    protocol: { type: "string", maxLength: 200 },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Obrigação atualizada",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida, sem motivo ou data futura" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Controle ou obrigação não encontrados" },
+            "409": {
+              description: "Controle concluído, regra de cumprimento ou alteração concorrente",
+            },
+          },
+        },
+      },
+      "/fiscal/monthly-controls/{id}": {
+        patch: {
+          tags: ["Controle mensal"],
+          summary: "Alterar situação e/ou condição de movimento",
+          description:
+            "Cada mudança grava ator, instante, valor anterior, novo e motivo. Reabrir controle concluído exige Fiscal nível 3 e motivo. Concluir com documento pendente (ou sem registro) na Triagem exige Fiscal nível 3 e justificativa em reason; a Triagem não é alterada.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  minProperties: 1,
+                  properties: {
+                    status: {
+                      type: "string",
+                      enum: ["PENDING", "IN_PROGRESS", "AWAITING_CLIENT", "COMPLETED"],
+                    },
+                    no_movement: { type: "boolean" },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Controle atualizado",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou reabertura sem motivo" },
+            "403": {
+              description:
+                "Sem permissão (edição Fiscal; nível 3 para reabrir ou concluir com pendência na Triagem)",
+            },
+            "404": { description: "Controle não encontrado nesta organização" },
+            "409": { description: "Controle alterado por outra pessoa desde a leitura" },
+          },
+        },
+      },
       "/fiscal/revenues": {
         post: {
           tags: ["Receitas"],

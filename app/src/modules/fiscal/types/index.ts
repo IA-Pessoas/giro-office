@@ -1,6 +1,16 @@
 import type { PaginatedResult } from "@shared/pagination/pagination";
 
-export type FiscalTabId = "search" | "ncm" | "icms" | "ipi" | "rates" | "revenues" | "malhas" | "wholesale";
+export type FiscalTabId =
+  | "search"
+  | "controls"
+  | "annual"
+  | "ncm"
+  | "icms"
+  | "ipi"
+  | "rates"
+  | "revenues"
+  | "malhas"
+  | "wholesale";
 
 export interface FiscalNcm {
   id: string;
