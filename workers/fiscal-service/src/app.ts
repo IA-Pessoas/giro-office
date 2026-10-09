@@ -25,6 +25,7 @@ import {
   monthlyControlIdParamsSchema,
   monthlyObligationParamsSchema,
   openMonthlyControlBodySchema,
+  transferMonthlyControlsBodySchema,
   updateMonthlyControlBodySchema,
   updateMonthlyObligationBodySchema,
 } from "@workspace/fiscal-service/src/schemas/monthlyControl.schemas.js";
@@ -101,7 +102,10 @@ type SearchServiceLike = Pick<FiscalSearchService, "searchByNcmCode">;
 type ReportingServiceLike = Pick<InternalReportingService, "extract">;
 type RateServiceLike = Pick<FiscalRateService, "create" | "list" | "get">;
 type RevenueServiceLike = Pick<MonthlyRevenueService, "create" | "update" | "list">;
-type ControlServiceLike = Pick<MonthlyControlService, "list" | "open" | "update" | "triage">;
+type ControlServiceLike = Pick<
+  MonthlyControlService,
+  "list" | "open" | "update" | "triage" | "transfer" | "responsibles"
+>;
 type ObligationServiceLike = Pick<MonthlyObligationService, "list" | "add" | "update">;
 type SimplesServiceLike = Pick<SimplesRateService, "preview" | "emission" | "batch">;
 
@@ -346,6 +350,19 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
       competence: c.req.query("competence"),
     });
     const data = await withService("controlService", (service) => service.list(query, actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.get("/fiscal/monthly-controls/responsibles", async (c) => {
+    const data = await withService("controlService", (service) => service.responsibles(actor(c)));
+    return c.json(createSuccessResponse(data));
+  });
+
+  app.post("/fiscal/monthly-controls/transfer", async (c) => {
+    const body = parseWithZod(transferMonthlyControlsBodySchema, await readJson(c));
+    const data = await withService("controlService", (service) =>
+      service.transfer({ ...actor(c), ...body }),
+    );
     return c.json(createSuccessResponse(data));
   });
 

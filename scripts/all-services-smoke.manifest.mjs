@@ -2386,6 +2386,22 @@ const baseManifest = [
   }),
   op({
     service: "fiscal-service",
+    method: "GET",
+    path: "/fiscal/monthly-controls/responsibles",
+    action: "fiscalMonthlyControlResponsibles",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "fiscal-service",
+    method: "POST",
+    path: "/fiscal/monthly-controls/transfer",
+    action: "fiscalMonthlyControlTransfer",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "fiscal-service",
     method: "POST",
     path: "/fiscal/monthly-controls/{id}/obligations",
     action: "fiscalMonthlyObligationAdd",

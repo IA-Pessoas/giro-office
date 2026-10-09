@@ -4,6 +4,8 @@ export {
   fiscalControlStatusChange,
   fiscalObligationActions,
   formatTriagePending,
+  formatTransferResult,
+  matchesResponsible,
   todayInputDate,
 } from "./fiscalControl";
 export { getFiscalErrorMessage } from "./fiscalError";

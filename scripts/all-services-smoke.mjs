@@ -4707,6 +4707,26 @@ const handlers = {
     });
   },
 
+  async fiscalMonthlyControlResponsibles(op) {
+    const response = await httpRequest(op);
+    if (!isBadExpectation(op)) {
+      state.fiscalResponsibleId = pickFirst(response.body, "data.0.id") ?? null;
+    }
+  },
+
+  async fiscalMonthlyControlTransfer(op) {
+    // Sem candidato com acesso ao Fiscal no ambiente do smoke, o destino inválido dá 400.
+    const target = state.fiscalResponsibleId ?? crypto.randomUUID();
+    await httpRequest(op, {
+      expectedStatus: state.fiscalResponsibleId ? [200] : [400],
+      json: {
+        control_ids: [requireState("fiscalMonthlyControlId")],
+        to_user_id: target,
+        reason: "Smoke de serviços",
+      },
+    });
+  },
+
   async fiscalMonthlyControlTriage(op) {
     await httpRequest(op, {
       path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/triage`,

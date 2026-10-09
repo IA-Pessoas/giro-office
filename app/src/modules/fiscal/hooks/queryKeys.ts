@@ -19,6 +19,8 @@ export function fiscalMonthlyControlsQueryKey(competence: string) {
   return [...FISCAL_MONTHLY_CONTROLS_QUERY_KEY, competence] as const;
 }
 
+export const FISCAL_RESPONSIBLES_QUERY_KEY = [...FISCAL_QUERY_KEY, "responsibles"] as const;
+
 export function fiscalControlTriageQueryKey(controlId: string) {
   return [...FISCAL_QUERY_KEY, "monthly-control-triage", controlId] as const;
 }

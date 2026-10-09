@@ -9,6 +9,8 @@ const userId = "c0000000-0000-4000-8000-000000000001";
 const clientA = "d0000000-0000-4000-8000-000000000001";
 const clientB = "d0000000-0000-4000-8000-000000000002";
 const controlId = "f0000000-0000-4000-8000-000000000001";
+const responsibleA = "e0000000-0000-4000-8000-00000000000a";
+const responsibleB = "e0000000-0000-4000-8000-00000000000b";
 const competence = new Date("2026-08-01T00:00:00.000Z");
 
 function stored(overrides: Record<string, unknown> = {}) {
@@ -21,6 +23,7 @@ function stored(overrides: Record<string, unknown> = {}) {
     no_movement: false,
     regime: "Simples Nacional",
     opening_reason: null as string | null,
+    responsible_id: null as string | null,
     created_by: userId,
     updated_by: userId,
     createdAt: new Date("2026-09-01T12:00:00.000Z"),
@@ -55,6 +58,13 @@ function dependencies() {
       count: vi.fn(async () => 1),
     },
     fiscalMonthlyControl: control,
+    triageResponsible: {
+      findMany: vi.fn(async () => [] as Array<{ client_id: string; user_id: string }>),
+    },
+    user: {
+      findMany: vi.fn(async () => [] as Array<{ id: string; name: string }>),
+      findFirst: vi.fn(async () => ({ id: responsibleB }) as { id: string } | null),
+    },
     triageMonthly: {
       findMany: vi.fn(async () => [] as Array<{ client_id: string; checklist: unknown }>),
     },
@@ -124,6 +134,7 @@ describe("MonthlyControlService.list", () => {
           competence,
           status: "PENDING",
           regime: null,
+          responsible_id: null,
           created_by: userId,
           updated_by: userId,
         },
@@ -248,6 +259,198 @@ describe("MonthlyControlService.list", () => {
   });
 });
 
+describe("MonthlyControlService responsáveis", () => {
+  it("registra o responsável padrão ao nascer e mostra o da competência e o atual da carteira", async () => {
+    const { prisma, service } = dependencies();
+    prisma.client.findMany
+      .mockResolvedValueOnce([{ id: clientB, regime: null }])
+      .mockResolvedValueOnce([
+        { id: clientA, name: "Alfa", company_name: null },
+        { id: clientB, name: "Beta", company_name: null },
+      ]);
+    // clientA nasceu com responsibleA; hoje a carteira dele é de responsibleB.
+    prisma.fiscalMonthlyControl.findMany
+      .mockResolvedValueOnce([stored({ responsible_id: responsibleA })])
+      .mockResolvedValueOnce([
+        stored({ responsible_id: responsibleA }),
+        stored({ id: "generated-0", client_id: clientB, responsible_id: responsibleB }),
+      ]);
+    prisma.triageResponsible.findMany.mockResolvedValueOnce([
+      { client_id: clientA, user_id: responsibleB },
+      { client_id: clientB, user_id: responsibleB },
+    ]);
+    prisma.user.findMany.mockResolvedValueOnce([
+      { id: responsibleA, name: "Ana" },
+      { id: responsibleB, name: "Bruno" },
+    ]);
+
+    const result = await service.list({ competence: "2026-08" }, actor);
+
+    expect(prisma.fiscalMonthlyControl.createManyAndReturn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ client_id: clientB, responsible_id: responsibleB })],
+      }),
+    );
+    expect(prisma.triageResponsible.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: organizationId,
+        type: "FISCAL",
+        client_id: { in: [clientB, clientA] },
+      },
+      select: { client_id: true, user_id: true },
+    });
+    expect(result.items[0]).toMatchObject({
+      client_name: "Alfa",
+      responsible_id: responsibleA,
+      responsible_name: "Ana",
+      default_responsible_id: responsibleB,
+      default_responsible_name: "Bruno",
+    });
+  });
+
+  it("nível 2 edita o controle mesmo sem ser o responsável", async () => {
+    const { prisma, service } = dependencies();
+    prisma.fiscalMonthlyControl.findFirst
+      .mockResolvedValueOnce(stored({ responsible_id: responsibleA }))
+      .mockResolvedValueOnce(stored({ responsible_id: responsibleA, status: "IN_PROGRESS" }));
+
+    const result = await service.update({ ...actor, id: controlId, status: "IN_PROGRESS" });
+
+    expect(result.status).toBe("IN_PROGRESS");
+    expect(userId).not.toBe(responsibleA);
+  });
+
+  it("transferência exige nível 3 e destino com acesso ao Fiscal", async () => {
+    const { prisma, service } = dependencies();
+    const input = {
+      ...actor,
+      control_ids: [controlId],
+      to_user_id: responsibleB,
+      reason: "Férias da Ana",
+    };
+    await expect(service.transfer(input)).rejects.toMatchObject({ statusCode: 403 });
+    await expect(service.responsibles(actor)).rejects.toMatchObject({ statusCode: 403 });
+
+    prisma.user.findFirst.mockResolvedValueOnce(null);
+    await expect(service.transfer({ ...input, permission: 3 })).rejects.toMatchObject({
+      statusCode: 400,
+    });
+    expect(prisma.user.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: responsibleB,
+        status: "active",
+        permissions: { some: { organization_id: organizationId, fiscal: { gt: 0 } } },
+      },
+      select: { id: true },
+    });
+  });
+
+  it("transfere em lote só os abertos, com motivo e trilha; concluídos ficam de fora", async () => {
+    const { prisma, audit, service } = dependencies();
+    const open = "f0000000-0000-4000-8000-0000000000a1";
+    const completed = "f0000000-0000-4000-8000-0000000000a2";
+    const already = "f0000000-0000-4000-8000-0000000000a3";
+    const missing = "f0000000-0000-4000-8000-0000000000a4";
+    prisma.fiscalMonthlyControl.findMany.mockResolvedValueOnce([
+      stored({ id: open, responsible_id: responsibleA, status: "IN_PROGRESS" }),
+      stored({ id: completed, responsible_id: responsibleA, status: "COMPLETED" }),
+      stored({ id: already, responsible_id: responsibleB }),
+    ]);
+
+    const result = await service.transfer({
+      ...actor,
+      permission: 3,
+      control_ids: [open, completed, already, missing],
+      to_user_id: responsibleB,
+      reason: "Redistribuição da carteira",
+    });
+
+    expect(result).toEqual({
+      transferred: [open],
+      skipped: [
+        { id: completed, reason: "Controle concluído." },
+        { id: already, reason: "Já é o responsável." },
+        { id: missing, reason: "Controle não encontrado." },
+      ],
+    });
+    expect(prisma.fiscalMonthlyControl.updateMany).toHaveBeenCalledTimes(1);
+    expect(prisma.fiscalMonthlyControl.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: open,
+        organization_id: organizationId,
+        responsible_id: responsibleA,
+        status: { not: "COMPLETED" },
+      },
+      data: { responsible_id: responsibleB, updated_by: userId },
+    });
+    expect(prisma.fiscalMonthlyControlEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          control_id: open,
+          action: "RESPONSIBLE_TRANSFERRED",
+          from_value: responsibleA,
+          to_value: responsibleB,
+          reason: "Redistribuição da carteira",
+          actor_id: userId,
+        }),
+      ],
+    });
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "Transferência de responsável" }),
+    );
+  });
+
+  it("transferência individual de concluído é 409; conflito concorrente vira skipped", async () => {
+    const { prisma, service } = dependencies();
+    prisma.fiscalMonthlyControl.findMany.mockResolvedValueOnce([
+      stored({ status: "COMPLETED", responsible_id: responsibleA }),
+    ]);
+    await expect(
+      service.transfer({
+        ...actor,
+        permission: 3,
+        control_ids: [controlId],
+        to_user_id: responsibleB,
+        reason: "Férias",
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    prisma.fiscalMonthlyControl.findMany.mockResolvedValueOnce([
+      stored({ responsible_id: responsibleA }),
+    ]);
+    prisma.fiscalMonthlyControl.updateMany.mockResolvedValueOnce({ count: 0 });
+    const result = await service.transfer({
+      ...actor,
+      permission: 3,
+      control_ids: [controlId],
+      to_user_id: responsibleB,
+      reason: "Férias",
+    });
+    expect(result).toEqual({
+      transferred: [],
+      skipped: [{ id: controlId, reason: "Alterado por outra pessoa." }],
+    });
+    expect(prisma.fiscalMonthlyControlEvent.createMany).not.toHaveBeenCalled();
+  });
+
+  it("lista candidatos com acesso ao Fiscal para o nível 3", async () => {
+    const { prisma, service } = dependencies();
+    prisma.user.findMany.mockResolvedValueOnce([{ id: responsibleB, name: "Bruno" }]);
+
+    const result = await service.responsibles({ ...actor, permission: 3 });
+
+    expect(result).toEqual([{ id: responsibleB, name: "Bruno" }]);
+    expect(prisma.user.findMany).toHaveBeenCalledWith({
+      where: {
+        status: "active",
+        permissions: { some: { organization_id: organizationId, fiscal: { gt: 0 } } },
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  });
+});
+
 describe("MonthlyControlService.open", () => {
   it("abre fora da elegibilidade só com motivo e guarda o motivo no controle e na trilha", async () => {
     const { prisma, audit, service } = dependencies();
@@ -276,6 +479,7 @@ describe("MonthlyControlService.open", () => {
         competence,
         status: "PENDING",
         regime: "Lucro Presumido",
+        responsible_id: null,
         opening_reason: "Cliente pediu apuração avulsa",
         created_by: userId,
         updated_by: userId,

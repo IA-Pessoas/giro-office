@@ -12,13 +12,14 @@ import {
   listMonthlyControlsQuerySchema,
   monthlyControlIdParamsSchema,
   openMonthlyControlBodySchema,
+  transferMonthlyControlsBodySchema,
   updateMonthlyControlBodySchema,
 } from "../schemas/monthlyControl.schemas.js";
 import type { MonthlyControlService } from "../services/monthlyControlService.js";
 
 export type MonthlyControlRouteDeps = Pick<
   MonthlyControlService,
-  "list" | "open" | "update" | "triage"
+  "list" | "open" | "update" | "triage" | "transfer" | "responsibles"
 >;
 
 export function createMonthlyControlRoutes(
@@ -41,6 +42,47 @@ export function createMonthlyControlRoutes(
         res.json(createSuccessResponse(data));
       } catch (err) {
         logError("Erro ao listar controles fiscais mensais", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/monthly-controls/responsibles",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const auth = requireAuthenticatedRequestContext(req);
+        const data = await service.responsibles({
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+        });
+        res.json(createSuccessResponse(data));
+      } catch (err) {
+        logError("Erro ao listar responsáveis fiscais", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/monthly-controls/transfer",
+    isAuthenticated,
+    requireFiscalWritePermission,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(transferMonthlyControlsBodySchema, req.body);
+        const auth = requireAuthenticatedRequestContext(req);
+        const data = await service.transfer({
+          ...body,
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+        });
+        res.json(createSuccessResponse(data));
+      } catch (err) {
+        logError("Erro ao transferir controles fiscais", { err });
         next(err);
       }
     },

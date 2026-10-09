@@ -516,6 +516,124 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     });
   });
 
+  it("responsáveis: snapshot ao nascer, carteira atual separada e transferência auditada", async () => {
+    const { ownerId, userId, databaseUrl, organizationId } = requireSmokeState();
+    const clientId = String(
+      (
+        await smokeInsert("clients", {
+          id: randomUUID(),
+          name: `Smoke Responsável ${suffix}`,
+          status: "Ativo",
+          fiscal: true,
+          regime: "Lucro Real",
+        })
+      ).id,
+    );
+    await smokeInsert("triagem.responsibles", {
+      id: randomUUID(),
+      client_id: clientId,
+      user_id: ownerId,
+      type: "FISCAL",
+    });
+    const mineIn = async (competence: string) => {
+      const list = expectOk(
+        await call("GET", `/fiscal/monthly-controls?competence=${competence}`),
+        `GET ${competence}`,
+      );
+      return list.data.items.find((item: { client_id: string }) => item.client_id === clientId);
+    };
+
+    const august = await mineIn("2026-08");
+    expect(august).toMatchObject({ responsible_id: ownerId, default_responsible_id: ownerId });
+
+    // A carteira muda: vale para competências novas, sem reescrever agosto.
+    const { createRequire } = await import("node:module");
+    const require = createRequire(new URL("../../../infra/package.json", import.meta.url));
+    const { Client } = require("pg") as {
+      Client: new (
+        options: object,
+      ) => {
+        connect(): Promise<void>;
+        end(): Promise<void>;
+        query(text: string, values?: unknown[]): Promise<unknown>;
+      };
+    };
+    const pg = new Client({ connectionString: databaseUrl });
+    await pg.connect();
+    await pg.query(
+      `update "triagem.responsibles" set user_id = $1
+        where organization_id = $2 and client_id = $3 and type = 'FISCAL'`,
+      [userId, organizationId, clientId],
+    );
+    await pg.end();
+
+    const september = await mineIn("2026-09");
+    expect(september).toMatchObject({ responsible_id: userId, default_responsible_id: userId });
+    expect(await mineIn("2026-08")).toMatchObject({
+      responsible_id: ownerId,
+      default_responsible_id: userId,
+    });
+
+    const candidates = expectOk(
+      await call("GET", "/fiscal/monthly-controls/responsibles"),
+      "GET candidatos",
+    );
+    expect(candidates.data.map((user: { id: string }) => user.id)).toEqual(
+      expect.arrayContaining([ownerId, userId]),
+    );
+
+    const editor = await smokeHeaders({ type: "user", permission: 2, modules: { fiscal: 2 } });
+    expectOk(
+      await call(
+        "POST",
+        "/fiscal/monthly-controls/transfer",
+        { control_ids: [september.id], to_user_id: ownerId, reason: "Férias" },
+        editor,
+      ),
+      "transferência nível 2",
+      [403],
+    );
+    const single = expectOk(
+      await call("POST", "/fiscal/monthly-controls/transfer", {
+        control_ids: [september.id],
+        to_user_id: ownerId,
+        reason: "Férias do responsável",
+      }),
+      "transferência individual",
+    );
+    expect(single.data).toEqual({ transferred: [september.id], skipped: [] });
+
+    expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${august.id}`, {
+        status: "COMPLETED",
+        reason: "Sem Triagem nesta competência",
+      }),
+      "concluir agosto",
+    );
+    expectOk(
+      await call("POST", "/fiscal/monthly-controls/transfer", {
+        control_ids: [august.id],
+        to_user_id: userId,
+        reason: "Redistribuição",
+      }),
+      "transferência individual de concluído",
+      [409],
+    );
+    const batch = expectOk(
+      await call("POST", "/fiscal/monthly-controls/transfer", {
+        control_ids: [august.id, september.id],
+        to_user_id: userId,
+        reason: "Redistribuição",
+      }),
+      "transferência em lote",
+    );
+    expect(batch.data).toEqual({
+      transferred: [september.id],
+      skipped: [{ id: august.id, reason: "Controle concluído." }],
+    });
+    expect(await mineIn("2026-08")).toMatchObject({ responsible_id: ownerId });
+  });
+
   it("receitas mensais: cria, recusa duplicada, lista por período e corrige", async () => {
     const client = await smokeInsert("clients", {
       id: randomUUID(),

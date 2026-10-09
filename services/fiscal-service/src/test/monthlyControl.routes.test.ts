@@ -38,6 +38,7 @@ function control(status = "PENDING" as const) {
     no_movement: false,
     regime: null,
     opening_reason: null,
+    responsible_id: null,
     updated_by: userId,
     updatedAt: "2026-09-01T12:00:00.000Z",
   };
@@ -47,10 +48,22 @@ function deps() {
   return {
     list: vi.fn(async () => ({
       competence: "2026-08",
-      items: [{ ...control(), client_name: "Alfa", pending_obligations: 0, triage_pending: 0 }],
+      items: [
+        {
+          ...control(),
+          client_name: "Alfa",
+          pending_obligations: 0,
+          triage_pending: 0,
+          responsible_name: null,
+          default_responsible_id: null,
+          default_responsible_name: null,
+        },
+      ],
     })),
     open: vi.fn(async () => ({ control: control(), created: true })),
     update: vi.fn(async () => control()),
+    transfer: vi.fn(async () => ({ transferred: [controlId], skipped: [] })),
+    responsibles: vi.fn(async () => [{ id: userId, name: "Ana" }]),
     triage: vi.fn(async () => ({
       control_id: controlId,
       competence: "2026-08",
@@ -62,6 +75,49 @@ function deps() {
 }
 
 describe("fiscal monthly control routes", () => {
+  it("transfere com motivo e lista candidatos; nível 1 não transfere", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, monthlyControlRouteDeps: service });
+    const body = { control_ids: [controlId], to_user_id: userId, reason: "Férias" };
+
+    const viewer = await request(app)
+      .post("/fiscal/monthly-controls/transfer")
+      .set(headers(1))
+      .send(body);
+    expect(viewer.status).toBe(403);
+
+    const transferred = await request(app)
+      .post("/fiscal/monthly-controls/transfer")
+      .set(headers(3))
+      .send(body);
+    expect(transferred.status).toBe(200);
+    expect(service.transfer).toHaveBeenCalledWith({
+      ...body,
+      userId,
+      organizationId,
+      permission: 3,
+    });
+
+    for (const invalid of [
+      { ...body, reason: undefined },
+      { ...body, control_ids: [] },
+      { ...body, to_user_id: "x" },
+    ]) {
+      const response = await request(app)
+        .post("/fiscal/monthly-controls/transfer")
+        .set(headers(3))
+        .send(invalid);
+      expect(response.status).toBe(400);
+    }
+    expect(service.transfer).toHaveBeenCalledTimes(1);
+
+    const candidates = await request(app)
+      .get("/fiscal/monthly-controls/responsibles")
+      .set(headers(3));
+    expect(candidates.status).toBe(200);
+    expect(candidates.body.data).toEqual([{ id: userId, name: "Ana" }]);
+  });
+
   it("Fiscal nível 1 lista a competência e não altera", async () => {
     const service = deps();
     const app = createFiscalApp({ env, logger, monthlyControlRouteDeps: service });

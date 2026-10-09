@@ -19,6 +19,8 @@ export type MonthlyControlPrisma = Pick<
   | "fiscalMonthlyControlObligation"
   | "triageMonthly"
   | "triageCompetence"
+  | "triageResponsible"
+  | "user"
   | "$transaction"
 >;
 
@@ -29,6 +31,7 @@ type MonthlyControlTx = Pick<
 
 const REFERRING = "fiscal.monthly_controls";
 const FISCAL_ADMIN_PERMISSION = 3;
+const COMPLETED: MonthlyControlStatus = "COMPLETED";
 
 interface Actor {
   organizationId: string;
@@ -49,6 +52,22 @@ export interface UpdateMonthlyControlInput extends Actor {
   reason?: string;
 }
 
+export interface TransferMonthlyControlsInput extends Actor {
+  control_ids: string[];
+  to_user_id: string;
+  reason: string;
+}
+
+export interface TransferMonthlyControlsResult {
+  transferred: string[];
+  skipped: Array<{ id: string; reason: string }>;
+}
+
+export interface FiscalResponsibleCandidate {
+  id: string;
+  name: string;
+}
+
 export interface MonthlyControlDto {
   id: string;
   client_id: string;
@@ -57,6 +76,8 @@ export interface MonthlyControlDto {
   no_movement: boolean;
   regime: string | null;
   opening_reason: string | null;
+  /** Responsável registrado quando o controle nasceu ou na última transferência. */
+  responsible_id: string | null;
   updated_by: string;
   updatedAt: string;
 }
@@ -67,6 +88,10 @@ export interface MonthlyControlListItem extends MonthlyControlDto {
   pending_obligations: number;
   /** Documentos pendentes na Triagem; null quando a Triagem não tem registro. */
   triage_pending: number | null;
+  responsible_name: string | null;
+  /** Responsável padrão atual do cliente (carteira vigente), que vale para novas competências. */
+  default_responsible_id: string | null;
+  default_responsible_name: string | null;
 }
 
 export interface MonthlyControlTriage extends TriageDocumentsView {
@@ -82,6 +107,7 @@ type StoredControl = {
   no_movement: boolean;
   regime: string | null;
   opening_reason: string | null;
+  responsible_id: string | null;
   updated_by: string;
   updatedAt: Date;
 };
@@ -93,7 +119,8 @@ type EventInput = {
     | "STATUS"
     | "EXCEPTIONAL_COMPLETION"
     | "REOPENED"
-    | "NO_MOVEMENT";
+    | "NO_MOVEMENT"
+    | "RESPONSIBLE_TRANSFERRED";
   from_value: string | null;
   to_value: string | null;
   reason: string | null;
@@ -108,6 +135,7 @@ function serialize(value: StoredControl): MonthlyControlDto {
     no_movement: value.no_movement,
     regime: value.regime,
     opening_reason: value.opening_reason,
+    responsible_id: value.responsible_id,
     updated_by: value.updated_by,
     updatedAt: value.updatedAt.toISOString(),
   };
@@ -132,6 +160,24 @@ function eligibleClientsWhere(organizationId: string, start: Date) {
 /** Geração automática vai até o mês seguinte ao corrente; além disso só abertura explícita. */
 function isGenerable(competence: Date, now: Date): boolean {
   return competence <= new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
+
+function defaultResponsible(
+  id: string | undefined,
+  names: Map<string, string>,
+): { default_responsible_id: string | null; default_responsible_name: string | null } {
+  return {
+    default_responsible_id: id ?? null,
+    default_responsible_name: id ? (names.get(id) ?? null) : null,
+  };
+}
+
+/** Usuário ativo com acesso ao Fiscal na organização: quem pode ser responsável. */
+function fiscalUserWhere(organizationId: string) {
+  return {
+    status: "active",
+    permissions: { some: { organization_id: organizationId, fiscal: { gt: 0 } } },
+  };
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -186,6 +232,9 @@ export class MonthlyControlService {
     });
     const withControl = new Set(existing.map((control) => control.client_id));
     const missing = eligible.filter((client) => !withControl.has(client.id));
+    const defaults = await this.defaultResponsibles(organizationId, [
+      ...new Set([...eligible.map((client) => client.id), ...withControl]),
+    ]);
 
     let controls: StoredControl[] = existing;
     if (missing.length) {
@@ -199,6 +248,7 @@ export class MonthlyControlService {
             competence,
             status: "PENDING",
             regime: client.regime,
+            responsible_id: defaults.get(client.id) ?? null,
             created_by: userId,
             updated_by: userId,
           })),
@@ -255,15 +305,147 @@ export class MonthlyControlService {
       controls.map((control) => control.client_id),
     );
 
+    const userNames = await this.userNames(organizationId, [
+      ...controls.flatMap((control) => (control.responsible_id ? [control.responsible_id] : [])),
+      ...defaults.values(),
+    ]);
+
     const items = controls
       .map((control) => ({
         ...serialize(control),
         client_name: names.get(control.client_id) ?? "",
+        responsible_name: control.responsible_id
+          ? (userNames.get(control.responsible_id) ?? null)
+          : null,
+        ...defaultResponsible(defaults.get(control.client_id), userNames),
         pending_obligations: pendingByControl.get(control.id) ?? 0,
         triage_pending: triage(control.client_id).pending,
       }))
       .sort((a, b) => a.client_name.localeCompare(b.client_name, "pt-BR", { sensitivity: "base" }));
     return { competence: input.competence, items };
+  }
+
+  /** Responsável fiscal padrão de cada cliente (carteira vigente, mantida na Triagem). */
+  private async defaultResponsibles(
+    organizationId: string,
+    clientIds: string[],
+  ): Promise<Map<string, string>> {
+    if (!clientIds.length) return new Map();
+    const rows = await this.prisma.triageResponsible.findMany({
+      where: { organization_id: organizationId, type: "FISCAL", client_id: { in: clientIds } },
+      select: { client_id: true, user_id: true },
+    });
+    return new Map(rows.map((row) => [row.client_id, row.user_id]));
+  }
+
+  private async userNames(organizationId: string, ids: string[]): Promise<Map<string, string>> {
+    const unique = [...new Set(ids)];
+    if (!unique.length) return new Map();
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: { in: unique },
+        permissions: { some: { organization_id: organizationId } },
+      },
+      select: { id: true, name: true },
+    });
+    return new Map(users.map((user) => [user.id, user.name]));
+  }
+
+  /** Quem pode receber controles: usuários ativos com acesso ao Fiscal. Só nível 3 consulta. */
+  async responsibles(actor: Actor): Promise<FiscalResponsibleCandidate[]> {
+    if (Number(actor.permission ?? 0) < FISCAL_ADMIN_PERMISSION) {
+      throw new ServiceError(403, "Transferir responsáveis exige Fiscal nível 3.");
+    }
+    return this.prisma.user.findMany({
+      where: fiscalUserWhere(actor.organizationId),
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  /**
+   * Transfere controles abertos para outro responsável, com motivo e trilha. Concluídos não
+   * são transferidos: no lote ficam em `skipped`; sozinho, é 409.
+   */
+  async transfer(input: TransferMonthlyControlsInput): Promise<TransferMonthlyControlsResult> {
+    if (Number(input.permission ?? 0) < FISCAL_ADMIN_PERMISSION) {
+      throw new ServiceError(403, "Transferir responsáveis exige Fiscal nível 3.");
+    }
+    const target = await this.prisma.user.findFirst({
+      where: { id: input.to_user_id, ...fiscalUserWhere(input.organizationId) },
+      select: { id: true },
+    });
+    if (!target) {
+      throw new ServiceError(
+        400,
+        "O novo responsável precisa ter acesso ao Fiscal nesta organização.",
+      );
+    }
+    const ids = [...new Set(input.control_ids)];
+    const controls = await this.prisma.fiscalMonthlyControl.findMany({
+      where: { id: { in: ids }, organization_id: input.organizationId },
+    });
+    const byId = new Map(controls.map((control) => [control.id, control]));
+    if (ids.length === 1) {
+      const only = byId.get(ids[0]);
+      if (!only) throw new ServiceError(404, "Controle fiscal não encontrado.");
+      if (only.status === COMPLETED) {
+        throw new ServiceError(409, "Controle concluído não é transferido. Reabra antes.");
+      }
+    }
+
+    const skipped: TransferMonthlyControlsResult["skipped"] = [];
+    const candidates = ids.flatMap((id) => {
+      const control = byId.get(id);
+      if (!control) skipped.push({ id, reason: "Controle não encontrado." });
+      else if (control.status === COMPLETED) skipped.push({ id, reason: "Controle concluído." });
+      else if (control.responsible_id === target.id) {
+        skipped.push({ id, reason: "Já é o responsável." });
+      } else return [control];
+      return [];
+    });
+
+    const transferred: string[] = [];
+    await this.prisma.$transaction(async (tx) => {
+      for (const control of candidates) {
+        // Só transfere se ninguém mudou o controle desde a leitura.
+        const { count } = await tx.fiscalMonthlyControl.updateMany({
+          where: {
+            id: control.id,
+            organization_id: input.organizationId,
+            responsible_id: control.responsible_id,
+            status: { not: COMPLETED },
+          },
+          data: { responsible_id: target.id, updated_by: input.userId },
+        });
+        if (count === 0) {
+          skipped.push({ id: control.id, reason: "Alterado por outra pessoa." });
+          continue;
+        }
+        transferred.push(control.id);
+        await this.recordEvents(tx, input.organizationId, input.userId, control.id, [
+          {
+            action: "RESPONSIBLE_TRANSFERRED",
+            from_value: control.responsible_id,
+            to_value: target.id,
+            reason: input.reason,
+          },
+        ]);
+      }
+    });
+
+    if (transferred.length) {
+      await this.audit.createLog({
+        userId: input.userId,
+        organizationId: input.organizationId,
+        permission: input.permission ?? null,
+        action: "Transferência de responsável",
+        referring: REFERRING,
+        referringId: transferred.length === 1 ? transferred[0] : "batch",
+        changes: { to_user_id: target.id, transferred, skipped, reason: input.reason },
+      });
+    }
+    return { transferred, skipped };
   }
 
   /** Estado documental da Triagem Fiscal por cliente na competência (só leitura). */
@@ -346,6 +528,9 @@ export class MonthlyControlService {
       );
     }
 
+    const responsibleId =
+      (await this.defaultResponsibles(input.organizationId, [client.id])).get(client.id) ?? null;
+
     let created: StoredControl;
     try {
       created = await this.prisma.$transaction(async (tx) => {
@@ -354,6 +539,7 @@ export class MonthlyControlService {
             ...where,
             status: "PENDING",
             regime: client.regime,
+            responsible_id: responsibleId,
             opening_reason: exceptional ? reason : null,
             created_by: input.userId,
             updated_by: input.userId,

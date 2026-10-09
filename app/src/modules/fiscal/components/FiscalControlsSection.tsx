@@ -19,8 +19,10 @@ import {
   fiscalControlStatusChange,
   formatCompetenceLabel,
   formatTriagePending,
+  matchesResponsible,
   getFiscalErrorMessage,
 } from "../utils";
+import type { FiscalResponsibleFilter } from "../utils/fiscalControl";
 import {
   FISCAL_CANCEL_BUTTON_CLASSNAME,
   FISCAL_FIELD_CONTROL_CLASSNAME,
@@ -31,6 +33,7 @@ import {
   isCompetence,
 } from "./fiscalFieldStyles";
 import { FiscalControlObligationsPanel } from "./FiscalControlObligationsPanel";
+import { FiscalControlTransferDialog } from "./FiscalControlTransferDialog";
 import { FiscalControlTriagePanel } from "./FiscalControlTriagePanel";
 import { FiscalStateBox } from "./FiscalStateBox";
 
@@ -68,6 +71,12 @@ export function FiscalControlsSection({
 }) {
   const [competence, setCompetence] = useState(() => competenceFromToday(-1));
   const [statusFilter, setStatusFilter] = useState<FiscalControlStatus | "">("");
+  const [responsibleFilter, setResponsibleFilter] = useState<FiscalResponsibleFilter>({
+    userId: "",
+    basis: "competence",
+  });
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [transferOpen, setTransferOpen] = useState(false);
   const [openingForm, setOpeningForm] = useState(false);
   const [client, setClient] = useState<ClientPickerOption | null>(null);
   const [openingReason, setOpeningReason] = useState("");
@@ -154,9 +163,33 @@ export function FiscalControlsSection({
     open.mutate({ client_id: client.id, competence, ...(reason ? { reason } : {}) });
   }
 
-  const items = (list.data?.items ?? []).filter(
-    (item) => !statusFilter || item.status === statusFilter,
+  const allItems = list.data?.items ?? [];
+  const items = allItems.filter(
+    (item) =>
+      (!statusFilter || item.status === statusFilter) &&
+      matchesResponsible(item, responsibleFilter),
   );
+  // Quem aparece como responsável (da competência ou atual) vira opção do filtro.
+  const responsibleOptions = [
+    ...new Map(
+      allItems.flatMap((item) => [
+        ...(item.responsible_id ? [[item.responsible_id, item.responsible_name ?? "—"] as const] : []),
+        ...(item.default_responsible_id
+          ? [[item.default_responsible_id, item.default_responsible_name ?? "—"] as const]
+          : []),
+      ]),
+    ),
+  ].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+  const selectedIds = items.filter((item) => selected.has(item.id)).map((item) => item.id);
+
+  function toggleSelected(id: string, checked: boolean) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
 
   return (
     <section className="space-y-6">
@@ -179,6 +212,26 @@ export function FiscalControlsSection({
             {STATUSES.map((status) => <option key={status} value={status}>{FISCAL_CONTROL_STATUS_LABELS[status]}</option>)}
           </select>
         </label>
+        <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Responsável
+          <select value={responsibleFilter.userId} onChange={(event) => setResponsibleFilter((value) => ({ ...value, userId: event.target.value }))} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
+            <option value="">Todos</option>
+            <option value="none">Sem responsável</option>
+            {responsibleOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Carteira
+          <select value={responsibleFilter.basis} onChange={(event) => setResponsibleFilter((value) => ({ ...value, basis: event.target.value as FiscalResponsibleFilter["basis"] }))} className={FISCAL_FIELD_CONTROL_CLASSNAME}>
+            <option value="competence">Desta competência</option>
+            <option value="current">Atual do cliente</option>
+          </select>
+        </label>
+        {canAuthorize && selectedIds.length ? (
+          <button type="button" onClick={() => setTransferOpen(true)} className={FISCAL_SECONDARY_BUTTON_CLASSNAME}>
+            Transferir selecionados ({selectedIds.length})
+          </button>
+        ) : null}
         {canEdit && validCompetence ? (
           <button type="button" onClick={() => setOpeningForm((value) => !value)} aria-expanded={openingForm} className={FISCAL_SECONDARY_BUTTON_CLASSNAME}>
             Abrir controle de cliente
@@ -229,7 +282,7 @@ export function FiscalControlsSection({
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Controles fiscais de {formatCompetenceLabel(competence)}</caption>
             <thead className="bg-gray-50 text-gray-600 dark:bg-slate-800 dark:text-gray-300">
-              <tr><th className="px-4 py-3">Cliente</th><th className="px-4 py-3">Regime</th><th className="px-4 py-3">Situação</th><th className="px-4 py-3">Sem movimento</th><th className="px-4 py-3">Abertura</th><th className="px-4 py-3">Triagem</th><th className="px-4 py-3">Obrigações</th></tr>
+              <tr>{canAuthorize ? <th className="px-4 py-3"><span className="sr-only">Selecionar para transferir</span></th> : null}<th className="px-4 py-3">Cliente</th><th className="px-4 py-3">Regime</th><th className="px-4 py-3">Responsável</th><th className="px-4 py-3">Situação</th><th className="px-4 py-3">Sem movimento</th><th className="px-4 py-3">Abertura</th><th className="px-4 py-3">Triagem</th><th className="px-4 py-3">Obrigações</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
               {items.map((item) => {
@@ -238,8 +291,19 @@ export function FiscalControlsSection({
                 return (
                   <Fragment key={item.id}>
                   <tr className="text-gray-800 dark:text-gray-200">
+                    {canAuthorize ? (
+                      <td className="px-4 py-3">
+                        <input type="checkbox" checked={selected.has(item.id)} disabled={item.status === "COMPLETED"} title={item.status === "COMPLETED" ? "Controle concluído não é transferido." : undefined} onChange={(event) => toggleSelected(item.id, event.target.checked)} aria-label={`Selecionar ${item.client_name} para transferir`} className="h-4 w-4" />
+                      </td>
+                    ) : null}
                     <td className="px-4 py-3">{item.client_name}</td>
                     <td className="px-4 py-3">{item.regime ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      {item.responsible_name ?? "Sem responsável"}
+                      {item.default_responsible_id !== item.responsible_id ? (
+                        <span className="block text-xs text-gray-500 dark:text-gray-400">Carteira atual: {item.default_responsible_name ?? "sem responsável"}</span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3">
                       {canEdit ? (
                         <select
@@ -275,7 +339,7 @@ export function FiscalControlsSection({
                   </tr>
                   {expanded ? (
                     <tr id={`fiscal-obligations-${item.id}`}>
-                      <td colSpan={7} className="bg-gray-50 px-4 py-3 dark:bg-slate-800/50">
+                      <td colSpan={canAuthorize ? 9 : 8} className="bg-gray-50 px-4 py-3 dark:bg-slate-800/50">
                         <FiscalControlTriagePanel controlId={item.id} clientName={item.client_name} />
                         <FiscalControlObligationsPanel controlId={item.id} clientName={item.client_name} canEdit={canEdit} locked={item.status === "COMPLETED"} />
                       </td>
@@ -315,6 +379,15 @@ export function FiscalControlsSection({
           </div>
         </form>
       </Dialog>
+      <FiscalControlTransferDialog
+        controlIds={selectedIds}
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        onTransferred={() => {
+          setSelected(new Set());
+          void refresh();
+        }}
+      />
     </section>
   );
 }

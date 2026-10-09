@@ -198,16 +198,29 @@ describe("fiscal Worker", () => {
       no_movement: false,
       regime: null,
       opening_reason: null,
+      responsible_id: null,
       updated_by: USER_ID,
       updatedAt: "2026-09-28T12:00:00.000Z",
     };
     const controls = {
       list: vi.fn(async () => ({
         competence: "2026-08",
-        items: [{ ...control, client_name: "Alfa", pending_obligations: 0, triage_pending: 0 }],
+        items: [
+          {
+            ...control,
+            client_name: "Alfa",
+            pending_obligations: 0,
+            triage_pending: 0,
+            responsible_name: null,
+            default_responsible_id: null,
+            default_responsible_name: null,
+          },
+        ],
       })),
       open: vi.fn(async () => ({ control, created: true })),
       update: vi.fn(async () => ({ ...control, status: "IN_PROGRESS" as const })),
+      transfer: vi.fn(async () => ({ transferred: [ICMS_ID], skipped: [] })),
+      responsibles: vi.fn(async () => [{ id: USER_ID, name: "Ana" }]),
       triage: vi.fn(async () => ({
         control_id: ICMS_ID,
         competence: "2026-08",
@@ -231,6 +244,30 @@ describe("fiscal Worker", () => {
       { competence: "2026-08" },
       expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
     );
+
+    const transfer = await app.request("https://fiscal.test/fiscal/monthly-controls/transfer", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ control_ids: [ICMS_ID], to_user_id: USER_ID, reason: "Férias" }),
+    });
+    expect(transfer.status).toBe(200);
+    expect(controls.transfer).toHaveBeenCalledWith(
+      expect.objectContaining({ control_ids: [ICMS_ID], to_user_id: USER_ID, permission: 3 }),
+    );
+    const readerTransfer = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/transfer",
+      {
+        method: "POST",
+        headers: { ...reader, "content-type": "application/json" },
+        body: JSON.stringify({ control_ids: [ICMS_ID], to_user_id: USER_ID, reason: "Férias" }),
+      },
+    );
+    expect(readerTransfer.status).toBe(403);
+    const candidates = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls/responsibles",
+      { headers: gatewayHeaders() },
+    );
+    expect(candidates.status).toBe(200);
 
     const triage = await app.request(
       `https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}/triage`,
