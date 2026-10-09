@@ -58,7 +58,7 @@ export function MarketingUsers() {
           {result.users.map((profile) => (
             <li key={profile.id} className="flex min-w-0 items-center gap-3 rounded-lg border border-gray-100 p-3 dark:border-slate-700">
               {profile.photo_url ? (
-                <img src={profile.photo_url} alt={`Foto de ${profile.name}`} className="h-12 w-12 shrink-0 rounded-full object-cover" />
+                <img src={profile.photo_url} alt={`Foto de ${profile.name}`} loading="lazy" decoding="async" className="h-12 w-12 shrink-0 rounded-full object-cover" />
               ) : (
                 <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-300">
                   {profile.name.slice(0, 1).toUpperCase()}
