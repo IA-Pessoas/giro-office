@@ -211,6 +211,10 @@ function selectNotes(zipBase64: string) {
   return { entryCount: archive.entries, accepted, issues };
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === "P2002";
+}
+
 export class AnticipationService {
   constructor(
     private readonly prisma: AnticipationPrisma,
@@ -228,12 +232,12 @@ export class AnticipationService {
 
     const { entryCount, accepted, issues } = selectNotes(input.zip_base64);
 
-    // Importações pertinentes: as do mesmo cliente na organização, em qualquer competência.
+    // Importações pertinentes: toda a organização, em qualquer cliente e competência. A NF-e
+    // tem um único destinatário: a mesma chave em outro cliente também é colisão.
     const existing = accepted.length
       ? await this.prisma.fiscalAnticipationItem.findMany({
           where: {
             organization_id: input.organizationId,
-            client_id: input.client_id,
             access_key: { in: accepted.map((note) => note.access_key) },
           },
           select: { access_key: true, item_number: true, batch_id: true },
@@ -246,18 +250,24 @@ export class AnticipationService {
     const rows: (ItemRecord & { organization_id: string; client_id: string })[] = [];
     const notes = new Set<string>();
     for (const note of accepted) {
+      // Nota com qualquer item já importado fica inteira de fora: não divide a nota entre lotes.
+      const repeated = note.items.flatMap((item) => {
+        const batchId = importedIn.get(`${note.access_key}|${Number(item.number)}`);
+        return batchId ? [{ item: Number(item.number), batchId }] : [];
+      });
+      if (repeated.length) {
+        issues.push(
+          ...repeated.map(({ item, batchId }) => ({
+            entry: note.entry,
+            kind: "duplicate" as const,
+            message: `Chave ${note.access_key} item ${item} já importada no lote ${batchId}.`,
+          })),
+        );
+        continue;
+      }
+      notes.add(note.access_key);
       for (const item of note.items) {
         const itemNumber = Number(item.number);
-        const batchId = importedIn.get(`${note.access_key}|${itemNumber}`);
-        if (batchId) {
-          issues.push({
-            entry: note.entry,
-            kind: "duplicate",
-            message: `Chave ${note.access_key} item ${itemNumber} já importada no lote ${batchId}.`,
-          });
-          continue;
-        }
-        notes.add(note.access_key);
         rows.push({
           organization_id: input.organizationId,
           client_id: input.client_id,
@@ -281,11 +291,9 @@ export class AnticipationService {
     }
 
     if (rows.length === 0) {
-      const detail = issues
-        .slice(0, 5)
-        .map(({ entry, message }) => `${entry}: ${message}`)
-        .join(" ");
-      throw new ServiceError(400, `Nenhum item importável no ZIP.${detail ? ` ${detail}` : ""}`);
+      const shown = issues.slice(0, 5).map(({ entry, message }) => ` ${entry}: ${message}`);
+      const more = issues.length > 5 ? ` E mais ${issues.length - 5} ocorrência(s).` : "";
+      throw new ServiceError(400, `Nenhum item importável no ZIP.${shown.join("")}${more}`);
     }
 
     let batch: BatchRecord;
@@ -311,7 +319,7 @@ export class AnticipationService {
         return created;
       });
     } catch (error) {
-      if ((error as { code?: unknown } | null)?.code === "P2002") {
+      if (isUniqueViolation(error)) {
         throw new ServiceError(409, CONFLICT_MESSAGE);
       }
       throw error;

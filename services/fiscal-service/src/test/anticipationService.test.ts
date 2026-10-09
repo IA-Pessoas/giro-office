@@ -129,15 +129,18 @@ describe("AnticipationService.importBatch", () => {
     );
   });
 
-  it("recusa duplicata de chave + item já importada para o cliente e mostra o lote de origem", async () => {
+  it("deixa de fora a nota inteira com item já importado na organização e mostra o lote de origem", async () => {
     const { prisma, audit, createdItems } = dependencies([
       { access_key: accessKey(100), item_number: 1, batch_id: "lote-anterior" },
     ]);
     const service = new AnticipationService(prisma as never, audit);
 
-    const batch = await service.importBatch(importInput({ "100.xml": nfe(100, ["10.00", "5.5"]) }));
+    const batch = await service.importBatch(
+      importInput({ "100.xml": nfe(100, ["10.00", "5.5"]), "101.xml": nfe(101, ["1.00"]) }),
+    );
 
-    expect(createdItems.map((item) => item.item_number)).toEqual([2]);
+    expect(createdItems.map((item) => [item.note_number, item.item_number])).toEqual([["101", 1]]);
+    expect(batch.note_count).toBe(1);
     expect(batch.issues).toEqual([
       {
         entry: "100.xml",
@@ -147,7 +150,10 @@ describe("AnticipationService.importBatch", () => {
     ]);
     expect(prisma.fiscalAnticipationItem.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ organization_id: organizationId, client_id: clientId }),
+        where: {
+          organization_id: organizationId,
+          access_key: { in: [accessKey(100), accessKey(101)] },
+        },
       }),
     );
   });
@@ -215,6 +221,19 @@ describe("AnticipationService.importBatch", () => {
 
     await expect(service.importBatch(importInput({ "quebrado.xml": "<NFe>" }))).rejects.toEqual(
       new ServiceError(400, "Nenhum item importável no ZIP. quebrado.xml: XML inválido."),
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("resume no 400 as cinco primeiras falhas e conta as demais", async () => {
+    const { prisma, audit } = dependencies();
+    const service = new AnticipationService(prisma as never, audit);
+    const broken = Object.fromEntries(
+      Array.from({ length: 7 }, (_, index) => [`q${index}.xml`, "<NFe>"]),
+    );
+
+    await expect(service.importBatch(importInput(broken))).rejects.toThrow(
+      /E mais 2 ocorrência\(s\)\.$/u,
     );
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });

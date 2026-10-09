@@ -48,8 +48,8 @@ CREATE TABLE "fiscal.anticipation_items" (
     REFERENCES "fiscal.anticipation_batches" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
--- Duplicata entre importações do mesmo cliente nunca entra em silêncio: a corrida vira 409.
-CREATE UNIQUE INDEX "uq_fiscal_anticipation_items_org_client_key_item"
-  ON "fiscal.anticipation_items" ("organization_id", "client_id", "access_key", "item_number");
+-- Duplicata entre importações da organização nunca entra em silêncio: a corrida vira 409.
+CREATE UNIQUE INDEX "uq_fiscal_anticipation_items_org_key_item"
+  ON "fiscal.anticipation_items" ("organization_id", "access_key", "item_number");
 CREATE INDEX "idx_fiscal_anticipation_items_org_batch"
   ON "fiscal.anticipation_items" ("organization_id", "batch_id", "access_key", "item_number");

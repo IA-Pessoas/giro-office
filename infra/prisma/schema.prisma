@@ -1822,7 +1822,7 @@ model FiscalAnticipationBatch {
   @@map("fiscal.anticipation_batches")
 }
 
-// Item de NF-e extraído do lote; chave de acesso + item é única por organização e cliente.
+// Item de NF-e extraído do lote; chave de acesso + item é única na organização.
 model FiscalAnticipationItem {
   id              String                  @id @default(uuid())
   organization_id String
@@ -1846,7 +1846,7 @@ model FiscalAnticipationItem {
   created_at      DateTime                @default(now())
   batch           FiscalAnticipationBatch @relation(fields: [batch_id], references: [id], onDelete: Restrict)
 
-  @@unique([organization_id, client_id, access_key, item_number], map: "uq_fiscal_anticipation_items_org_client_key_item")
+  @@unique([organization_id, access_key, item_number], map: "uq_fiscal_anticipation_items_org_key_item")
   @@index([organization_id, batch_id, access_key, item_number], map: "idx_fiscal_anticipation_items_org_batch")
   @@map("fiscal.anticipation_items")
 }
