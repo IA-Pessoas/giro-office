@@ -670,9 +670,11 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       "DMED",
       "DIMOB",
     ]);
-    expectOk(await call("POST", realBase, { code: "DEFIS", reason: "x".repeat(3) }), "DEFIS no Real", [
-      400,
-    ]);
+    expectOk(
+      await call("POST", realBase, { code: "DEFIS", reason: "x".repeat(3) }),
+      "DEFIS no Real",
+      [400],
+    );
     expectOk(await call("POST", realBase, { code: "DIMOB" }), "DIMOB sem motivo", [400]);
     expectOk(
       await call("POST", realBase, { code: "DIMOB", reason: "Incorporadora" }),
@@ -682,7 +684,10 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
 
     const simplesBase = `/fiscal/annual-controls/${find(simples)[0].id}/items`;
     const done = expectOk(
-      await call("PATCH", `${simplesBase}/DEFIS`, { completed_on: "2026-03-20", protocol: "DEF-1" }),
+      await call("PATCH", `${simplesBase}/DEFIS`, {
+        completed_on: "2026-03-20",
+        protocol: "DEF-1",
+      }),
       "cumprir DEFIS",
     );
     expect(done.data).toMatchObject({ status: "COMPLETED", completed_on: "2026-03-20" });
