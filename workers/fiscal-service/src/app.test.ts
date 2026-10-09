@@ -189,6 +189,41 @@ describe("fiscal Worker", () => {
     expect(simples.batch).toHaveBeenCalledTimes(2);
   });
 
+  it("confere planilhas Domínio × SEFAZ sem banco e só com edição Fiscal", async () => {
+    // Sem HYPERDRIVE/DATABASE_URL: qualquer acesso a dados operacionais responderia 503.
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor";
+    const body = {
+      dominio: { file_name: "d.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+      sefaz: { file_name: "s.csv", content: `${header}\n11222333000181;55;1;100;10,50` },
+    };
+    const post = (headers: HeadersInit, payload: unknown = body) =>
+      app.request("https://fiscal.test/fiscal/conferences/documents", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as {
+      data: { status: string; summary: { divergent: number }; csv: string; file_name: string };
+    };
+    expect(payload.data).toMatchObject({ status: "complete", summary: { divergent: 1 } });
+    expect(payload.data.csv).toContain("Divergente;11222333000181|55|1|100;2;10,00;2;10,50");
+
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+    expect(
+      (await post(gatewayHeaders({ "x-auth-modules": JSON.stringify({ fiscal: 1 }) }))).status,
+    ).toBe(403);
+    const invalid = await post(gatewayHeaders(), {
+      ...body,
+      sefaz: { file_name: "s.csv", content: "Número\n100" },
+    });
+    expect(invalid.status).toBe(400);
+  });
+
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
     const revenue = {
       id: ICMS_ID,

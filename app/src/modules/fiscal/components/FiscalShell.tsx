@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Banknote,
+  FileCheck2,
   Percent,
   Landmark,
   Receipt,
@@ -12,6 +13,7 @@ import {
 import { useModuleAccess } from "@modules/auth";
 
 import type { FiscalTabId } from "../types";
+import { FiscalConferencesSection } from "./FiscalConferencesSection";
 import { FiscalIcmsSection } from "./FiscalIcmsSection";
 import { FiscalIpiSection } from "./FiscalIpiSection";
 import { FiscalNcmSection } from "./FiscalNcmSection";
@@ -55,6 +57,11 @@ const fiscalTabs: Array<{
     label: "Simples Nacional",
     icon: Banknote,
   },
+  {
+    id: "conferences",
+    label: "Conferências",
+    icon: FileCheck2,
+  },
 ];
 
 export function FiscalShell() {
@@ -72,7 +79,7 @@ export function FiscalShell() {
             Fiscal
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Consulta e cadastro de NCM, ICMS, IPI, alíquotas e receitas por empresa
+            Consulta e cadastro de NCM, ICMS, IPI, alíquotas e receitas por empresa, e conferência de arquivos
           </p>
         </div>
       </div>
@@ -147,6 +154,10 @@ function FiscalActiveTabPanel({
 
   if (activeTab === "revenues") {
     return <div role="tabpanel" id="fiscal-panel-revenues" aria-labelledby="fiscal-tab-revenues">{canEdit ? <FiscalSimplesBatchSection /> : null}<FiscalRevenuesSection canEdit={canEdit} /></div>;
+  }
+
+  if (activeTab === "conferences") {
+    return <div role="tabpanel" id="fiscal-panel-conferences" aria-labelledby="fiscal-tab-conferences"><FiscalConferencesSection canEdit={canEdit} /></div>;
   }
 
   return <FiscalIpiTab canEdit={canEdit} canDelete={canDelete} />;

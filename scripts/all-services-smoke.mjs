@@ -4723,6 +4723,31 @@ const handlers = {
     }
   },
 
+  async fiscalDocumentConference(op) {
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor";
+    const response = await httpRequest(op, {
+      json: {
+        dominio: { file_name: "dominio.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+        sefaz: { file_name: "sefaz.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(
+        `Conferência Domínio × SEFAZ inesperada: ${JSON.stringify(response.body?.data)}`,
+      );
+    }
+  },
+
+  async fiscalDocumentConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        dominio: { file_name: "dominio.csv", content: "Número;Valor\n100;10,00" },
+        sefaz: { file_name: "sefaz.csv", content: "Número;Valor\n100;10,00" },
+      },
+    });
+  },
+
   async fiscalSimplesZipInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],
