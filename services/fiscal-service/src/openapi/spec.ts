@@ -865,6 +865,66 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/monthly-controls/responsibles": {
+        get: {
+          tags: ["Controle mensal"],
+          summary: "Listar quem pode receber controles (Fiscal nível 3)",
+          description: "Usuários ativos com acesso ao Fiscal na organização.",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": {
+              description: "Lista de { id, name }",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "403": { description: "Exige Fiscal nível 3" },
+          },
+        },
+      },
+      "/fiscal/monthly-controls/transfer": {
+        post: {
+          tags: ["Controle mensal"],
+          summary: "Transferir controles abertos para outro responsável",
+          description:
+            "Fiscal nível 3, com motivo. Individual (um id) ou em lote. Concluídos não são transferidos: no lote voltam em skipped; sozinho é 409. Cada transferência grava evento RESPONSIBLE_TRANSFERRED; competências passadas não mudam por mudança da carteira.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["control_ids", "to_user_id", "reason"],
+                  additionalProperties: false,
+                  properties: {
+                    control_ids: {
+                      type: "array",
+                      minItems: 1,
+                      maxItems: 500,
+                      items: { type: "string", format: "uuid" },
+                    },
+                    to_user_id: { type: "string", format: "uuid" },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "{ transferred: string[], skipped: { id, reason }[] }",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou destino sem acesso ao Fiscal" },
+            "403": { description: "Exige Fiscal nível 3" },
+            "404": { description: "Controle não encontrado (transferência individual)" },
+            "409": { description: "Controle concluído (transferência individual)" },
+          },
+        },
+      },
       "/fiscal/monthly-controls/{id}/triage": {
         get: {
           tags: ["Controle mensal"],

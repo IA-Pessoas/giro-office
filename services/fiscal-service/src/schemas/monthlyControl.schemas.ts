@@ -44,6 +44,18 @@ export const updateMonthlyControlBodySchema = z
     path: ["status"],
   });
 
+/** Transferência individual (um id) ou em lote; motivo sempre obrigatório. */
+export const transferMonthlyControlsBodySchema = z
+  .object({
+    control_ids: z
+      .array(z.string().uuid("Controle inválido."))
+      .min(1, "Informe ao menos um controle.")
+      .max(500, "Transfira no máximo 500 controles por vez."),
+    to_user_id: z.string().uuid("Responsável inválido."),
+    reason: reasonSchema,
+  })
+  .strict();
+
 const obligationCodeSchema = z.enum(FISCAL_OBLIGATION_CODES, { message: "Obrigação inválida." });
 
 export const monthlyObligationParamsSchema = z

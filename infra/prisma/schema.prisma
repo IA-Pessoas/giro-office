@@ -1751,6 +1751,7 @@ model FiscalMonthlyControl {
   no_movement     Boolean                     @default(false)
   regime          String?
   opening_reason  String?
+  responsible_id  String?
   created_by      String
   updated_by      String
   createdAt       DateTime                    @default(now())
@@ -1760,6 +1761,7 @@ model FiscalMonthlyControl {
 
   @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_controls_org_client_competence")
   @@index([organization_id, competence], map: "idx_fiscal_monthly_controls_org_competence")
+  @@index([organization_id, responsible_id], map: "idx_fiscal_monthly_controls_org_responsible")
   @@map("fiscal.monthly_controls")
 }
 

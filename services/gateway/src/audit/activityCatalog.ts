@@ -336,6 +336,16 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/fiscal\/monthly-controls\/responsibles$/,
+    description: { action: "consultou", item: "os responsáveis fiscais disponíveis" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/fiscal\/monthly-controls\/transfer$/,
+    description: { action: "transferiu", item: "controles fiscais para outro responsável" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/fiscal\/monthly-controls\/[^/]+\/triage$/,
     description: { action: "consultou", item: "os documentos da Triagem de um controle fiscal" },
   },

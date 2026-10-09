@@ -81,6 +81,7 @@ model FiscalMonthlyControl {
   no_movement     Boolean                     @default(false)
   regime          String?
   opening_reason  String?
+  responsible_id  String?
   created_by      String
   updated_by      String
   createdAt       DateTime                    @default(now())
@@ -90,6 +91,7 @@ model FiscalMonthlyControl {
 
   @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_controls_org_client_competence")
   @@index([organization_id, competence], map: "idx_fiscal_monthly_controls_org_competence")
+  @@index([organization_id, responsible_id], map: "idx_fiscal_monthly_controls_org_responsible")
   @@map("fiscal.monthly_controls")
 }
 
@@ -188,4 +190,38 @@ model TriageCompetence {
 
   @@unique([organization_id, client_id, competence])
   @@map("triagem.competences")
+}
+
+// Só leitura: responsável fiscal padrão do cliente, mantido pela Triagem.
+model TriageResponsible {
+  id              String @id @default(uuid())
+  client_id       String
+  user_id         String
+  type            String
+  organization_id String
+
+  @@unique([organization_id, client_id, type])
+  @@map("triagem.responsibles")
+}
+
+// Só leitura: nome do responsável e candidatos à transferência (acesso Fiscal na organização).
+model User {
+  id              String       @id @default(uuid())
+  name            String
+  status          String
+  organization_id String?
+  permissions     Permission[]
+
+  @@map("users")
+}
+
+model Permission {
+  id              String @id @default(uuid())
+  user_id         String
+  fiscal          Int    @default(0)
+  organization_id String
+  user            User   @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, organization_id], map: "uq_permissions_user_org")
+  @@map("permissions")
 }
