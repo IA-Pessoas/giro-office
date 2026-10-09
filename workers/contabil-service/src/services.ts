@@ -6,7 +6,7 @@ import {
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
-import { assertChartAccountsState } from "../../../services/contabil-service/src/schemas/relationship.schemas.js";
+import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
   type TriageDocumentStatus,

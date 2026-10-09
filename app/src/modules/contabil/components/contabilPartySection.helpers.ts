@@ -95,6 +95,45 @@ export function getContabilChartAccountsOptions(
     : options;
 }
 
+const BIDDING_OPTIONS: ContabilSelectOption[] = [
+  { value: "", label: UNSELECTED_LABEL },
+  { value: "true", label: formatContabilBidding(true) },
+  { value: "false", label: formatContabilBidding(false) },
+];
+
+type ContabilRelationshipEditableField = keyof ContabilRelationshipFormValues;
+
+export function formatContabilRelationshipField(
+  relationship: ContabilRelationship,
+  field: ContabilRelationshipEditableField,
+) {
+  if (field === "bidding") return formatContabilBidding(relationship.bidding);
+  if (field === "chart_accounts") return formatContabilChartAccounts(relationship.chart_accounts);
+  return relationship[field] || "Não informado";
+}
+
+// null = campo de texto livre.
+export function getContabilRelationshipFieldOptions(
+  field: ContabilRelationshipEditableField,
+  relationship: ContabilRelationship | null,
+): ContabilSelectOption[] | null {
+  if (field === "bidding") return BIDDING_OPTIONS;
+  if (field === "chart_accounts") return getContabilChartAccountsOptions(relationship?.chart_accounts);
+  return null;
+}
+
+export function pickChangedContabilRelationshipFields(
+  payload: Required<UpdateContabilRelationshipPayload>,
+  relationship: ContabilRelationship,
+): UpdateContabilRelationshipPayload {
+  const previous = buildContabilRelationshipPayload(buildContabilRelationshipFormValues(relationship));
+  return Object.fromEntries(
+    Object.entries(payload).filter(
+      ([field, value]) => previous[field as keyof typeof previous] !== value,
+    ),
+  );
+}
+
 export function buildContabilRelationshipPayload(
   values: ContabilRelationshipFormValues,
 ): Required<UpdateContabilRelationshipPayload> {

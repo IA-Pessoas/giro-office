@@ -7,7 +7,7 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
-import { assertChartAccountsState } from "../schemas/relationship.schemas.js";
+import { assertChartAccountsState } from "./relationshipStates.js";
 
 export type RelationshipServicePrisma = typeof prismaClient;
 

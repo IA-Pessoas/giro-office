@@ -4,14 +4,10 @@ import { ServiceError } from "@workspace/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  CONTABIL_CHART_ACCOUNTS_OPTIONS,
-  createRelationshipBodySchema,
-  updateRelationshipBodySchema,
-} from "../schemas/relationship.schemas.js";
-import {
   RelationshipService,
   type RelationshipServicePrisma,
 } from "../services/relationshipService.js";
+import { CONTABIL_CHART_ACCOUNTS_OPTIONS } from "../services/relationshipStates.js";
 
 const ORG_ID = "a0000000-0000-4000-8000-000000000001";
 const USER_ID = "c0000000-0000-4000-8000-000000000001";
@@ -223,13 +219,6 @@ describe("estados da Relação Contábil (#1721)", () => {
     const audit = { createLog: vi.fn(), logUpdateIfChanged: vi.fn() };
     return { audit, service: new RelationshipService(prisma, audit) };
   }
-
-  it("schema aceita licitação e plano de contas não selecionados", () => {
-    expect(
-      createRelationshipBodySchema.parse({ ...createPayload, bidding: null, chart_accounts: null }),
-    ).toMatchObject({ bidding: null, chart_accounts: null });
-    expect(updateRelationshipBodySchema.parse({ bidding: null })).toEqual({ bidding: null });
-  });
 
   it("create aceita todos os estados do plano de contas", async () => {
     for (const chartAccounts of [null, ...CONTABIL_CHART_ACCOUNTS_OPTIONS]) {

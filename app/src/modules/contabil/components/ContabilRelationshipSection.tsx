@@ -27,9 +27,9 @@ import {
 import {
   buildContabilRelationshipFormValues,
   buildContabilRelationshipPayload,
-  formatContabilBidding,
-  formatContabilChartAccounts,
-  getContabilChartAccountsOptions,
+  formatContabilRelationshipField,
+  getContabilRelationshipFieldOptions,
+  pickChangedContabilRelationshipFields,
   isContabilTextValueFilled,
   type ContabilRelationshipFormValues,
 } from "./contabilPartySection.helpers";
@@ -45,11 +45,6 @@ const PRIMARY_BUTTON_CLASSNAME =
   "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60";
 const INPUT_CLASSNAME =
   "h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white";
-const BIDDING_OPTIONS = [
-  { value: "", label: formatContabilBidding(null) },
-  { value: "true", label: formatContabilBidding(true) },
-  { value: "false", label: formatContabilBidding(false) },
-];
 const DANGER_BUTTON_CLASSNAME =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-900/20";
 
@@ -139,11 +134,15 @@ export function ContabilRelationshipSection({
     try {
       const payload = buildContabilRelationshipPayload(formValues);
       if (relationship) {
-        await updateMutation.mutateAsync({
-          relationshipId: relationship.id,
-          clientId,
-          payload,
-        });
+        // Só o que mudou: reenviar o resto converteria "" legado em null sem o usuário pedir.
+        const changes = pickChangedContabilRelationshipFields(payload, relationship);
+        if (Object.keys(changes).length > 0) {
+          await updateMutation.mutateAsync({
+            relationshipId: relationship.id,
+            clientId,
+            payload: changes,
+          });
+        }
       } else {
         await createMutation.mutateAsync({ client_id: clientId, ...payload });
       }
@@ -263,11 +262,7 @@ export function ContabilRelationshipSection({
                   {field.label}
                 </p>
                 <p className="text-sm text-gray-900 dark:text-white">
-                  {field.field === "bidding"
-                    ? formatContabilBidding(relationship.bidding)
-                    : field.field === "chart_accounts"
-                      ? formatContabilChartAccounts(relationship.chart_accounts)
-                      : relationship[field.field] || "Não informado"}
+                  {formatContabilRelationshipField(relationship, field.field)}
                 </p>
               </div>
             ))}
@@ -293,12 +288,9 @@ export function ContabilRelationshipSection({
               if (field.kind === "textarea") {
                 return null;
               }
-              const options =
-                field.field === "bidding"
-                  ? BIDDING_OPTIONS
-                  : field.field === "chart_accounts"
-                    ? getContabilChartAccountsOptions(relationship?.chart_accounts)
-                    : null;
+              const options = getContabilRelationshipFieldOptions(field.field, relationship);
+              const handleChange = (value: string) =>
+                setFormValues((current) => ({ ...current, [field.field]: value }));
               return (
                 <label
                   key={field.field}
@@ -307,13 +299,8 @@ export function ContabilRelationshipSection({
                   <span>{field.label}</span>
                   {options ? (
                     <select
-                      value={formValues[field.field as "bidding" | "chart_accounts"]}
-                      onChange={(event) =>
-                        handleFieldChange(
-                          field.field as "chart_accounts",
-                          event.target.value,
-                        )
-                      }
+                      value={formValues[field.field]}
+                      onChange={(event) => handleChange(event.target.value)}
                       disabled={!canEdit}
                       className={INPUT_CLASSNAME}
                     >
@@ -326,10 +313,8 @@ export function ContabilRelationshipSection({
                   ) : (
                     <input
                       type="text"
-                      value={formValues[field.field as "tool" | "system"]}
-                      onChange={(event) =>
-                        handleFieldChange(field.field as "tool", event.target.value)
-                      }
+                      value={formValues[field.field]}
+                      onChange={(event) => handleChange(event.target.value)}
                       disabled={!canEdit}
                       className={INPUT_CLASSNAME}
                     />

@@ -47,6 +47,7 @@ import {
   formatContabilBidding,
   formatContabilChartAccounts,
   getContabilChartAccountsOptions,
+  pickChangedContabilRelationshipFields,
   getContabilSelectLabel,
   isContabilTextValueFilled,
   mapAssignableUsersToContabilOptions,
@@ -598,6 +599,25 @@ await (async () => {
       system: "Sistema",
       note: "",
     });
+    const emptyLegacy = {
+      id: "rel-1",
+      client_id: "client-1",
+      bidding: null,
+      chart_accounts: "",
+      tool: "ERP",
+      system: "Sistema",
+      note: "",
+    };
+    assert.deepEqual(
+      pickChangedContabilRelationshipFields(
+        {
+          ...buildContabilRelationshipPayload(buildContabilRelationshipFormValues(emptyLegacy)),
+          note: "nova",
+        },
+        emptyLegacy,
+      ),
+      { note: "nova" },
+    );
     assert.deepEqual(buildContabilRelationshipPayload(buildContabilRelationshipFormValues(null)), {
       bidding: null,
       chart_accounts: null,
