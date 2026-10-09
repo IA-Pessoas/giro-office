@@ -19,6 +19,8 @@ model Client {
   competence_output  DateTime?
   contabil           Boolean?
   fiscal             Boolean?
+  status             String
+  deletion_date      DateTime?
   organization_id    String
   controlContabil    ControlContabil[]
   triageClosings     TriageClosing[]

@@ -143,6 +143,8 @@ await context.addCookies([
 ]);
 
 const page = await context.newPage();
+// A competência inicial é a do relógio; fixar o mês mantém o smoke estável fora de 2026-09.
+await page.clock.setFixedTime(new Date("2026-09-15T12:00:00-03:00"));
 page.on("pageerror", (error) => console.error("[triagem-fiscal browser]", error));
 page.on("console", (message) => {
   if (message.type() === "error") console.error("[triagem-fiscal console]", message.text());
@@ -328,6 +330,13 @@ try {
     await section.screenshot({ path: `${portfolioScreenshotDir}/04-colunas-finais.png` });
     await scroller.evaluate((element) => { element.scrollLeft = 0; });
   }
+  await page.getByLabel("Filtrar responsável").selectOption("none");
+  await page.getByLabel("Filtrar justificativa").selectOption("without");
+  await expect(page.getByText("Empresa sem rotina")).toBeVisible();
+  await expect(page.getByLabel("Cliente Demonstração: Relatório de entradas")).toHaveCount(0);
+  await page.getByLabel("Filtrar responsável").selectOption("");
+  await page.getByLabel("Filtrar justificativa").selectOption("");
+  await expect(page.getByLabel("Cliente Demonstração: Relatório de entradas")).toHaveCount(1);
   const csvDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "CSV" }).click();
   const csv = await csvDownload;

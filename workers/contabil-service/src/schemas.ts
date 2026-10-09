@@ -1,3 +1,8 @@
+import {
+  TRIAGE_FISCAL_CHECKLIST_FIELDS,
+  TRIAGE_PORTFOLIO_DOCUMENT_STATUSES,
+  TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS,
+} from "@workspace/shared/triagem";
 import { z } from "zod";
 
 const competence = z
@@ -59,7 +64,34 @@ export const monthlySchema = z
     type: z.enum(["CONTABIL", "FISCAL"] as const).optional(),
   })
   .strict();
-export const fiscalPortfolioSchema = z.object({ competence }).strict();
+const optionalText = z.string().max(200).optional();
+export const fiscalPortfolioSchema = z
+  .object({
+    competence,
+    search: optionalText,
+    responsible_id: optionalText,
+    regime: optionalText,
+    document_field: z
+      .enum(TRIAGE_FISCAL_CHECKLIST_FIELDS, { message: "document_field inválido." })
+      .optional(),
+    document_status: z
+      .enum(TRIAGE_PORTFOLIO_DOCUMENT_STATUSES, { message: "document_status inválido." })
+      .optional(),
+    justification: z
+      .enum(TRIAGE_PORTFOLIO_JUSTIFICATION_FILTERS, {
+        message: "justification deve ser with ou without.",
+      })
+      .optional(),
+  })
+  .strict();
+export const contabilPortfolioSchema = z
+  .object({
+    competence,
+    responsible_id: optionalText,
+    regime: optionalText,
+    status: closingUpdateSchema.shape.status.optional(),
+  })
+  .strict();
 export const editabilitySchema = z
   .object({ client_id: uuid("client_id"), type: monthlySchema.shape.type })
   .strict();

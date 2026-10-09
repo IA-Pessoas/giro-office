@@ -6,6 +6,13 @@ import {
   ServiceError,
   serializeError,
 } from "@workspace/shared/http";
+import {
+  type ContabilTriagePortfolioFilterable,
+  type FiscalTriagePortfolioFilterable,
+  filterContabilTriagePortfolio,
+  filterFiscalTriagePortfolio,
+  fiscalTriagePortfolioFiltersFromQuery,
+} from "@workspace/shared/triagem";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { buildContabilServiceOpenApiSpec } from "../../../services/contabil-service/src/openapi/spec.js";
@@ -15,7 +22,6 @@ import {
   createControlBodySchema,
   createYearControlsBodySchema,
   detailControlQuerySchema,
-  listControlQuerySchema,
   updateControlFieldBodySchema,
 } from "../../../services/contabil-service/src/schemas/control.schemas.js";
 import {
@@ -49,6 +55,7 @@ import {
 import {
   closingQuerySchema,
   closingUpdateSchema,
+  contabilPortfolioSchema,
   documentItemSchema,
   documentsBulkSchema,
   editabilitySchema,
@@ -142,6 +149,11 @@ function withPrisma<T>(
   );
 }
 
+/** Aplica um filtro da carteira sobre `items` da resposta, mantendo o resto (competência). */
+function filterItems<T>(data: Record<string, unknown>, filter: (items: T[]) => T[]) {
+  return { ...data, items: filter(Array.isArray(data.items) ? (data.items as T[]) : []) };
+}
+
 function executeAuthWrite(c: Context): void {
   requireContabilWrite(c.get("auth"));
 }
@@ -233,7 +245,7 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
   });
 
   app.get("/contabil/controls/list", async (c) => {
-    const query = parseWithZod(listControlQuerySchema, c.req.query());
+    const query = parseWithZod(contabilPortfolioSchema, c.req.query());
     const auth = c.get("auth");
     const invoke = (service: ControlService) => service.list(query.competence, auth.organizationId);
     const data = options.controlService
@@ -241,7 +253,17 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
       : await withPrisma(c, options, async (prisma) =>
           invoke(createControlService(prisma, createContabilAudit(options.env ?? c.env))),
         );
-    return c.json(createSuccessResponse(data));
+    return c.json(
+      createSuccessResponse(
+        filterItems<ContabilTriagePortfolioFilterable>(data, (items) =>
+          filterContabilTriagePortfolio(items, {
+            responsibleId: query.responsible_id,
+            regime: query.regime,
+            closingStatus: query.status,
+          }),
+        ),
+      ),
+    );
   });
 
   app.post("/contabil/controls/year", async (c) => {
@@ -529,7 +551,13 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const data = await withDocuments(c, (service) =>
       service.listFiscalPortfolio(query.competence, authContext(c.get("auth"))),
     );
-    return c.json(createSuccessResponse(data));
+    return c.json(
+      createSuccessResponse(
+        filterItems<FiscalTriagePortfolioFilterable>(data, (items) =>
+          filterFiscalTriagePortfolio(items, fiscalTriagePortfolioFiltersFromQuery(query)),
+        ),
+      ),
+    );
   });
   app.get("/triagem/editability", async (c) => {
     const query = parseWithZod(editabilitySchema, c.req.query());
