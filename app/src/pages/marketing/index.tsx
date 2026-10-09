@@ -1,6 +1,7 @@
 import Head from "next/head";
 
 import { canSSRAuth } from "@modules/auth";
+import { MarketingBirthdayReport } from "@modules/marketing/components/MarketingBirthdayReport";
 import { MarketingDashboard } from "@modules/marketing/components/MarketingDashboard";
 import { MarketingCanonicalQueries } from "@modules/marketing/components/MarketingCanonicalQueries";
 import { MarketingAiUsageControls } from "@modules/marketing/components/MarketingAiUsageControls";
@@ -23,6 +24,7 @@ export default function MarketingPage() {
         </header>
         <MarketingCanonicalQueries />
         <MarketingDashboard />
+        <MarketingBirthdayReport />
         <MarketingEvents />
         <MarketingAiUsageControls />
         <MarketingInstagramProfiles />

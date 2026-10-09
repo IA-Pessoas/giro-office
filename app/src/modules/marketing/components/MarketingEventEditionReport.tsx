@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { MarketingEditionLists, MarketingEventEditionReport as EditionReport } from "../types/marketingEventEdition";
+import { printMarketingReport } from "../utils/printMarketingReport";
 import { marketingPrimaryButtonClass, marketingSecondaryButtonClass } from "./marketingButtonStyles";
 
 function formatAmount(amount: string): string {
@@ -62,12 +63,7 @@ function PlanningSection({ title, values }: { title: string; values: MarketingEd
 }
 
 function printReport() {
-  const report = document.getElementById("marketing-event-edition-report");
-  for (let element = report; element; element = element.parentElement) element.scrollTop = 0;
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-  window.scrollTo(0, 0);
-  window.print();
+  printMarketingReport("marketing-event-edition-report");
 }
 
 export function MarketingEventEditionReport({

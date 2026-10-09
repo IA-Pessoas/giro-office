@@ -1,7 +1,9 @@
 import type { PrismaClient } from "../generated/prisma/client.js";
 import {
   type MarketingDashboardResponse,
+  type MarketingMonthlyBirthdaysResponse,
   marketingDashboardResponseSchema,
+  marketingMonthlyBirthdaysResponseSchema,
 } from "../schemas/marketingDashboard.schemas.js";
 
 interface BirthdayAggregate {
@@ -209,6 +211,77 @@ export class MarketingDashboardService {
         pendingKnowledge,
       },
       alerts,
+    });
+  }
+
+  /**
+   * Relatório legado de aniversariantes: o mês inteiro, sem cortar dias já passados.
+   * Clientes PF entram pelo vínculo do legado: participação > 0 em empresa ativa,
+   * sem saída registrada. `month` chega validado (1-12) pela rota.
+   */
+  async getMonthlyBirthdays(
+    organizationId: string,
+    month: number,
+  ): Promise<MarketingMonthlyBirthdaysResponse> {
+    const [employees, clients] = await this.prisma.$transaction([
+      this.prisma.$queryRaw<MarketingMonthlyBirthdaysResponse["employees"]["items"]>`
+        SELECT employee.id,
+          COALESCE(NULLIF(employee.full_name, ''), employee.name) AS name,
+          to_char(employee.birth_date, 'YYYY-MM-DD') AS "birthDate",
+          EXTRACT(DAY FROM employee.birth_date)::int AS day,
+          department.name AS department
+        FROM users AS employee
+        LEFT JOIN departments AS department
+          ON department.id = employee.department_id
+          AND department.organization_id = ${organizationId}
+        WHERE (
+          employee.organization_id = ${organizationId}
+          OR (
+            employee.organization_id IS NULL
+            AND EXISTS (
+              SELECT 1 FROM departments AS scope
+              WHERE scope.id = employee.department_id
+                AND scope.organization_id = ${organizationId}
+            )
+          )
+        )
+          AND employee.status = 'active'
+          AND employee.termination_date IS NULL
+          AND employee.birth_date IS NOT NULL
+          AND EXTRACT(MONTH FROM employee.birth_date) = ${month}
+        ORDER BY day, name, employee.id
+      `,
+      this.prisma.$queryRaw<MarketingMonthlyBirthdaysResponse["clients"]["items"]>`
+        SELECT person.id, person.name,
+          to_char(person.date_of_birth, 'YYYY-MM-DD') AS "birthDate",
+          EXTRACT(DAY FROM person.date_of_birth)::int AS day,
+          string_agg(
+            DISTINCT COALESCE(
+              NULLIF(company.fantasy_name, ''), NULLIF(company.company_name, ''), company.name
+            ),
+            ', '
+          ) AS companies
+        FROM "clients.pf" AS person
+        JOIN "regularize.partners" AS partner
+          ON partner.pf_id = person.id
+          AND partner.organization_id = ${organizationId}
+          AND partner.part > 0
+          AND partner.exit IS NULL
+        JOIN clients AS company
+          ON company.id = partner.pj_id
+          AND company.organization_id = ${organizationId}
+          AND company.status = 'Ativo'
+        WHERE person.organization_id = ${organizationId}
+          AND EXTRACT(MONTH FROM person.date_of_birth) = ${month}
+        GROUP BY person.id, person.name, person.date_of_birth
+        ORDER BY day, person.name, person.id
+      `,
+    ]);
+
+    return marketingMonthlyBirthdaysResponseSchema.parse({
+      month,
+      employees: { total: employees.length, items: employees },
+      clients: { total: clients.length, items: clients },
     });
   }
 }

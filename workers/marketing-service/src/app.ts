@@ -6,6 +6,7 @@ import {
   marketingAiUsageControlQuerySchema,
   updateMarketingAiUsageControlBodySchema,
 } from "@workspace/marketing-service/src/schemas/marketingAiUsageControl.schemas.js";
+import { marketingMonthlyBirthdaysQuerySchema } from "@workspace/marketing-service/src/schemas/marketingDashboard.schemas.js";
 import {
   createMarketingEventBodySchema,
   marketingEventIdParamsSchema,
@@ -126,6 +127,13 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
   app.get(
     "/marketing/dashboard",
     handle(VIEWER, async (c, s, org) => ok(c, await s.dashboard.getDashboard(org))),
+  );
+  app.get(
+    "/marketing/birthdays",
+    handle(VIEWER, async (c, s, org) => {
+      const { month } = parseWithZod(marketingMonthlyBirthdaysQuerySchema, c.req.query());
+      return ok(c, await s.dashboard.getMonthlyBirthdays(org, month));
+    }),
   );
 
   // Controle mensal de uso de IA.

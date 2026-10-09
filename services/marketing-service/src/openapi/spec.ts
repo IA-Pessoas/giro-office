@@ -246,6 +246,11 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
           },
         },
       },
+      "/marketing/birthdays": {
+        get: protectedOperation(
+          "Listar aniversariantes do mês (query `month` 1-12): colaboradores ativos e clientes PF vinculados a empresas ativas.",
+        ),
+      },
       "/marketing/ai-usage-controls/users": {
         get: protectedOperation("Listar usuários ativos da organização elegíveis para pesquisa."),
       },

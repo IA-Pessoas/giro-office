@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { toInstagramProfileUrl } from "./utils/instagramProfile.ts";
-import { createBirthdayCsv } from "./utils/birthdayCsv.ts";
+import {
+  createBirthdayCsv,
+  createMonthlyClientBirthdayCsv,
+  createMonthlyEmployeeBirthdayCsv,
+} from "./utils/birthdayCsv.ts";
 
 const dashboard = await readFile(new URL("./components/MarketingDashboard.tsx", import.meta.url), "utf8");
+const birthdayReport = await readFile(new URL("./components/MarketingBirthdayReport.tsx", import.meta.url), "utf8");
 const events = await readFile(new URL("./components/MarketingEvents.tsx", import.meta.url), "utf8");
 const eventsService = await readFile(new URL("./services/marketingEventsService.ts", import.meta.url), "utf8");
 const eventsHooks = await readFile(new URL("./hooks/useMarketingEvents.ts", import.meta.url), "utf8");
@@ -123,6 +128,28 @@ assert.equal(
   '"Nome","Dia"\r\n"Ana ""Nina""","12"',
 );
 assert.match(createBirthdayCsv([{ name: "=HYPERLINK(1)", day: 8 }]), /'=HYPERLINK/);
+assert.equal(
+  createMonthlyEmployeeBirthdayCsv([
+    { name: "Ana", birthDate: "1990-05-01", department: "Marketing" },
+    { name: "Bruno", birthDate: "1985-05-31", department: null },
+  ]),
+  '"Data","Colaborador","Departamento"\r\n"01/05/1990","Ana","Marketing"\r\n"31/05/1985","Bruno","Sem departamento"',
+);
+assert.equal(
+  createMonthlyClientBirthdayCsv([{ name: "Carla", birthDate: "1970-05-15", companies: "Alfa, Beta" }]),
+  '"Data","Cliente","Empresa"\r\n"15/05/1970","Carla","Alfa, Beta"',
+);
+assert.match(birthdayReport, /useMarketingMonthlyBirthdays\(month/);
+assert.match(birthdayReport, /id="marketing-birthday-report"/);
+assert.match(birthdayReport, /printMarketingReport\("marketing-birthday-report"\)/);
+assert.match(birthdayReport, /employeeBirthdayRows\(report\.employees\.items\)/);
+assert.match(
+  await readFile(new URL("./utils/printMarketingReport.ts", import.meta.url), "utf8"),
+  /window\.print\(\)/,
+);
+assert.match(styles, /#marketing-birthday-report \*/);
+assert.match(page, /MarketingBirthdayReport/);
+assert.match(service, /"\/marketing\/birthdays"/);
 assert.match(events, /query\.isLoading/);
 assert.match(events, /query\.isError/);
 assert.match(events, /query\.data\?\.length\s*===\s*0/);
@@ -155,7 +182,7 @@ assert.match(editionsService, /createFeedback/);
 assert.match(editionsService, /getReport/);
 assert.match(editionsHooks, /useCreateMarketingEventEditionFeedback/);
 assert.match(editionsHooks, /invalidateQueries/);
-assert.match(editionReport, /window\.print\(\)/);
+assert.match(editionReport, /printMarketingReport\("marketing-event-edition-report"\)/);
 assert.match(editionReport, /budgetItems/);
 assert.match(editionReport, /logistics/);
 assert.match(editionReport, /marketingCommunication/);
