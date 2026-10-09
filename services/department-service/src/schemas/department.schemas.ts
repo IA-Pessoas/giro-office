@@ -4,8 +4,12 @@ export const listDepartmentsQuerySchema = z
   .object({
     status: z.enum(["Todos", "Ativo", "Inativo"]).optional(),
     administrative: z.enum(["true"]).optional(),
+    marketing: z.enum(["true"]).optional(),
   })
-  .strict();
+  .strict()
+  .refine((data) => !(data.administrative && data.marketing), {
+    message: "Use apenas um contexto de consulta por vez.",
+  });
 
 export const departmentDetailQuerySchema = z
   .object({

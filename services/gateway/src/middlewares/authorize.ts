@@ -47,6 +47,12 @@ function isInstagramOnlyUpdate(body: unknown): boolean {
   return fields.length === 1 && fields[0] === "instagram";
 }
 
+function isDepartmentColorOnlyUpdate(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const fields = Object.keys(body);
+  return fields.length === 2 && fields.includes("dep_id") && fields.includes("color");
+}
+
 function isSelfPasswordUpdate(body: unknown): boolean {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return false;
@@ -113,6 +119,27 @@ export function buildAuthorizeMiddleware(
       isClientIntegrationUpdate &&
       !hasIntegrationEditAccess &&
       !isInstagramOnlyUpdate(request.body)
+    ) {
+      deny(next);
+      return;
+    }
+
+    const isDepartmentUpdate =
+      request.method.toUpperCase() === "PUT" && normalizedPath === "/department";
+    const hasDepartmentAdminAccess = canAccessRoute(request.auth, {
+      anyOf: [
+        { modulePermission: { module: "rh", minPermission: 3 } },
+        { modulePermission: { module: "ti", minPermission: 3 } },
+      ],
+    });
+    const hasMarketingDepartmentAdminAccess = canAccessRoute(request.auth, {
+      modulePermission: { module: "marketing", minPermission: 3 },
+    });
+    if (
+      isDepartmentUpdate &&
+      hasMarketingDepartmentAdminAccess &&
+      !hasDepartmentAdminAccess &&
+      !isDepartmentColorOnlyUpdate(request.body)
     ) {
       deny(next);
       return;

@@ -179,6 +179,52 @@ describe("Marketing access to organization user profiles", () => {
   });
 });
 
+describe("Marketing access to departments", () => {
+  it("allows Marketing viewers to query the organization department list", () => {
+    expect(authorizeClientRequest("GET", "/department/list", { marketing: 1 })).toBeUndefined();
+    expect(authorizeClientRequest("GET", "/department/list", { marketing: 0 })).toMatchObject({
+      statusCode: 403,
+    });
+  });
+
+  it("allows Marketing level 3 to update only department color", () => {
+    expect(
+      authorizeClientRequest(
+        "PUT",
+        "/department",
+        { marketing: 3 },
+        {
+          dep_id: "department-1",
+          color: "#0F766E",
+        },
+      ),
+    ).toBeUndefined();
+    expect(
+      authorizeClientRequest(
+        "PUT",
+        "/department",
+        { marketing: 2 },
+        {
+          dep_id: "department-1",
+          color: "#0F766E",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+    expect(
+      authorizeClientRequest(
+        "PUT",
+        "/department",
+        { marketing: 3 },
+        {
+          dep_id: "department-1",
+          color: "#0F766E",
+          name: "Outro nome",
+        },
+      ),
+    ).toMatchObject({ statusCode: 403 });
+  });
+});
+
 describe("platform default deny", () => {
   it("deixa público somente o login e exige platformOnly nas demais rotas", () => {
     expect(isPublicRoute("POST", "/platform/session")).toBe(true);
