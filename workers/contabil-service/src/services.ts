@@ -1644,6 +1644,9 @@ export function createDocumentsService(
       return { client_id: clientId, type, configured: true, active_items: activeItems };
     },
     async getFiscalSettings(input, auth) {
+      if (Number(auth.modules?.fiscal ?? auth.permission ?? 0) < 1)
+        throw new ServiceError(403, "Permissão insuficiente para consultar a Triagem Fiscal.");
+      await assertClientInOrganization(prisma, String(input.client_id), auth.organizationId);
       const config = await prisma.triageConfig.findFirst({
         where: { client_id: input.client_id, organization_id: auth.organizationId, type: "FISCAL" },
         select: { priority: true, delivery_method: true },
@@ -1690,13 +1693,7 @@ export function createDocumentsService(
         const updated = await transaction.triageConfig.upsert({
           where: { organization_id_client_id_type: identity },
           // Só cria a linha fiscal; itens configurados vazios equivalem a "sem configuração".
-          create: {
-            ...identity,
-            active_items: [],
-            priority: false,
-            delivery_method: null,
-            ...data,
-          },
+          create: { ...identity, active_items: [], ...data },
           update: data,
         });
         return { current, updated };

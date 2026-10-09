@@ -43,6 +43,20 @@ describe("prioridade e meio de envio Fiscal do cliente (#1692)", () => {
     expect(settings).toEqual({ client_id: CLIENT, priority: false, delivery_method: null });
   });
 
+  it("consulta só cliente da organização e com acesso ao Fiscal", async () => {
+    const database = prisma();
+    const service = createDocumentsService(database as never, audit());
+
+    database.client.findFirst.mockResolvedValueOnce(null);
+    await expect(service.getFiscalSettings({ client_id: CLIENT }, auth)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    await expect(
+      service.getFiscalSettings({ client_id: CLIENT }, { ...auth, modules: {} }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(database.triageConfig.findFirst).not.toHaveBeenCalled();
+  });
+
   it("grava prioridade e meio de envio do catálogo ativo sem tocar nos itens configurados", async () => {
     const database = prisma();
     database.triageConfig.findFirst.mockResolvedValue({ priority: false, delivery_method: null });
@@ -67,7 +81,10 @@ describe("prioridade e meio de envio Fiscal do cliente (#1692)", () => {
       organization_id_client_id_type: { organization_id: ORG, client_id: CLIENT, type: "FISCAL" },
     });
     expect(args.update).toEqual({ priority: true, delivery_method: "EMAIL" });
-    expect(args.create).toMatchObject({
+    expect(args.create).toEqual({
+      organization_id: ORG,
+      client_id: CLIENT,
+      type: "FISCAL",
       active_items: [],
       priority: true,
       delivery_method: "EMAIL",

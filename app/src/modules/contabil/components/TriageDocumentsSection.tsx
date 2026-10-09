@@ -244,7 +244,7 @@ export function TriageDocumentsSection({
         </div>
       ) : null}
       {documentType === "FISCAL" ? (
-        <FiscalClientSettingsPanel clientId={clientId} canEdit={canEdit} />
+        <FiscalClientSettingsPanel key={clientId} clientId={clientId} canEdit={canEdit} />
       ) : null}
       {documentType === "CONTABIL" ? (
         <TriageMovementPanel
