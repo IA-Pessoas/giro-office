@@ -141,7 +141,7 @@ function FiscalActiveTabPanel({
   }
 
   if (activeTab === "controls") {
-    return <div role="tabpanel" id="fiscal-panel-controls" aria-labelledby="fiscal-tab-controls"><FiscalControlsSection canEdit={canEdit} canReopen={canDelete} /></div>;
+    return <div role="tabpanel" id="fiscal-panel-controls" aria-labelledby="fiscal-tab-controls"><FiscalControlsSection canEdit={canEdit} canAuthorize={canDelete} /></div>;
   }
 
   if (activeTab === "ncm") {

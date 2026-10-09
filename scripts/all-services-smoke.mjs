@@ -4707,6 +4707,12 @@ const handlers = {
     });
   },
 
+  async fiscalMonthlyControlTriage(op) {
+    await httpRequest(op, {
+      path: `/fiscal/monthly-controls/${requireState("fiscalMonthlyControlId")}/triage`,
+    });
+  },
+
   async fiscalMonthlyObligationAdd(op) {
     // DCTFWeb é incluível em qualquer regime (no Simples, com folha). Repetir dá 409.
     await httpRequest(op, {

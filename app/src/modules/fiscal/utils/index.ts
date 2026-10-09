@@ -3,6 +3,7 @@ export {
   FISCAL_CONTROL_STATUS_LABELS,
   fiscalControlStatusChange,
   fiscalObligationActions,
+  formatTriagePending,
   todayInputDate,
 } from "./fiscalControl";
 export { getFiscalErrorMessage } from "./fiscalError";

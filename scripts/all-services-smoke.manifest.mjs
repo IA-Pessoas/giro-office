@@ -2378,6 +2378,14 @@ const baseManifest = [
   }),
   op({
     service: "fiscal-service",
+    method: "GET",
+    path: "/fiscal/monthly-controls/{id}/triage",
+    action: "fiscalMonthlyControlTriage",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "fiscal-service",
     method: "POST",
     path: "/fiscal/monthly-controls/{id}/obligations",
     action: "fiscalMonthlyObligationAdd",

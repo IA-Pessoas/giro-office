@@ -232,13 +232,14 @@ await (async () => {
 
   await runTest("triagem apresenta dez documentos com nota, justificativa e banco sem dados de conta", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
 
-    const contabilDocuments = source.slice(
-      source.indexOf("const CONTABIL_DOCUMENTS"),
-      source.indexOf("const FISCAL_DOCUMENTS"),
+    const contabilDocuments = labels.slice(
+      labels.indexOf("const CONTABIL_DOCUMENTS"),
+      labels.indexOf("const FISCAL_DOCUMENTS"),
     );
     assert.equal((contabilDocuments.match(/\["[a-z0-9_]+", "/g) ?? []).length, 10);
-    assert.match(source, /triaged_transactions/);
+    assert.match(labels, /triaged_transactions/);
     assert.match(source, /Nota/);
     assert.match(source, /Justificativa/);
     assert.match(source, /Salvar observações de \$\{label\}/);
@@ -261,9 +262,10 @@ await (async () => {
   await runTest("triagem fiscal apresenta os 14 campos e controla revisão e entrega", () => {
     const source = readWorkspaceSource("./components/TriageDocumentsSection.tsx");
     const pageSource = readWorkspaceSource("../../pages/triagem.tsx");
-    const fiscalDocuments = source.slice(
-      source.indexOf("const FISCAL_DOCUMENTS"),
-      source.indexOf("const STATUSES"),
+    const labels = readWorkspaceSource("./components/triageDocumentLabels.ts");
+    const fiscalDocuments = labels.slice(
+      labels.indexOf("const FISCAL_DOCUMENTS"),
+      labels.indexOf("const STATUSES"),
     );
 
     assert.equal((fiscalDocuments.match(/\["[a-z0-9_]+", "/g) ?? []).length, 13);

@@ -17,6 +17,16 @@ export interface FiscalMonthlyControl {
   updatedAt: string;
   /** Obrigações aplicáveis ainda sem cumprimento; não mudam a situação. */
   pending_obligations: number;
+  /** Documentos pendentes na Triagem; null quando ela não tem registro. */
+  triage_pending: number | null;
+}
+
+export interface FiscalControlTriage {
+  control_id: string;
+  competence: string;
+  source: "MONTHLY" | "PLANNED" | "NONE";
+  pending: number | null;
+  items: Array<{ field: string; status: string }>;
 }
 
 export type FiscalObligationCode = "PGDAS_D" | "DCTFWEB" | "EFD_CONTRIBUICOES" | "DIRBI";
@@ -89,7 +99,14 @@ export const fiscalControlService = {
     await api.patch(`/fiscal/monthly-controls/${id}`, payload);
   },
 
-  /** Obrigações do controle; o serviço garante antes as sugeridas pelo regime. */
+  /** Documentos da Triagem do mesmo cliente e competência (só leitura). */
+  async triage(controlId: string): Promise<FiscalControlTriage> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.get(`/fiscal/monthly-controls/${controlId}/triage`);
+    return unwrapFiscalEnvelope<FiscalControlTriage>(response.data);
+  },
+
+  /** Obrigações do controle; as sugeridas nascem com ele. */
   async listObligations(controlId: string): Promise<FiscalMonthlyObligations> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     const response = await api.get(`/fiscal/monthly-controls/${controlId}/obligations`);

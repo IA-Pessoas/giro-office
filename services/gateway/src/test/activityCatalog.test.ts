@@ -109,6 +109,12 @@ describe("activityCatalog", () => {
     ["POST", "/fiscal/monthly-controls", "cadastrou", "um novo controle fiscal mensal"],
     [
       "GET",
+      "/fiscal/monthly-controls/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/triage",
+      "consultou",
+      "os documentos da Triagem de um controle fiscal",
+    ],
+    [
+      "GET",
       "/fiscal/monthly-controls/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/obligations",
       "consultou",
       "a lista de obrigações fiscais mensais",

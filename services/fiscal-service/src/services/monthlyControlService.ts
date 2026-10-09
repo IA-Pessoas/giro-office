@@ -5,6 +5,11 @@ import type { CreateLogParams } from "../integrations/audit.js";
 import { competenceDate, competenceKey } from "../schemas/competence.schemas.js";
 import type { MonthlyControlStatus } from "../schemas/monthlyControl.schemas.js";
 import { createSuggestedObligations } from "./monthlyObligationService.js";
+import {
+  hasTriagePendency,
+  type TriageDocumentsView,
+  triageDocumentsView,
+} from "./triageDocuments.js";
 
 export type MonthlyControlPrisma = Pick<
   PrismaClient,
@@ -12,6 +17,8 @@ export type MonthlyControlPrisma = Pick<
   | "fiscalMonthlyControl"
   | "fiscalMonthlyControlEvent"
   | "fiscalMonthlyControlObligation"
+  | "triageMonthly"
+  | "triageCompetence"
   | "$transaction"
 >;
 
@@ -58,6 +65,13 @@ export interface MonthlyControlListItem extends MonthlyControlDto {
   client_name: string;
   /** Obrigações aplicáveis ainda sem cumprimento; não mudam a situação do controle. */
   pending_obligations: number;
+  /** Documentos pendentes na Triagem; null quando a Triagem não tem registro. */
+  triage_pending: number | null;
+}
+
+export interface MonthlyControlTriage extends TriageDocumentsView {
+  control_id: string;
+  competence: string;
 }
 
 type StoredControl = {
@@ -73,7 +87,13 @@ type StoredControl = {
 };
 
 type EventInput = {
-  action: "CREATED" | "EXCEPTIONAL_OPENING" | "STATUS" | "REOPENED" | "NO_MOVEMENT";
+  action:
+    | "CREATED"
+    | "EXCEPTIONAL_OPENING"
+    | "STATUS"
+    | "EXCEPTIONAL_COMPLETION"
+    | "REOPENED"
+    | "NO_MOVEMENT";
   from_value: string | null;
   to_value: string | null;
   reason: string | null;
@@ -229,15 +249,74 @@ export class MonthlyControlService {
         })
       : [];
     const pendingByControl = new Map(pending.map((row) => [row.control_id, row._count._all]));
+    const triage = await this.triageByClient(
+      organizationId,
+      input.competence,
+      controls.map((control) => control.client_id),
+    );
 
     const items = controls
       .map((control) => ({
         ...serialize(control),
         client_name: names.get(control.client_id) ?? "",
         pending_obligations: pendingByControl.get(control.id) ?? 0,
+        triage_pending: triage(control.client_id).pending,
       }))
       .sort((a, b) => a.client_name.localeCompare(b.client_name, "pt-BR", { sensitivity: "base" }));
     return { competence: input.competence, items };
+  }
+
+  /** Estado documental da Triagem Fiscal por cliente na competência (só leitura). */
+  private async triageByClient(
+    organizationId: string,
+    competence: string,
+    clientIds: string[],
+  ): Promise<(clientId: string) => TriageDocumentsView> {
+    const where = {
+      organization_id: organizationId,
+      competence,
+      archived_at: null,
+      client_id: { in: clientIds },
+    };
+    const [monthlies, competences] = clientIds.length
+      ? await Promise.all([
+          this.prisma.triageMonthly.findMany({
+            where: { ...where, type: "FISCAL" },
+            select: { client_id: true, checklist: true },
+          }),
+          this.prisma.triageCompetence.findMany({
+            where,
+            select: { client_id: true, configuration_snapshot: true },
+          }),
+        ])
+      : [[], []];
+    const monthlyByClient = new Map(monthlies.map((row) => [row.client_id, row]));
+    const competenceByClient = new Map(competences.map((row) => [row.client_id, row]));
+    return (clientId) =>
+      triageDocumentsView(monthlyByClient.get(clientId), competenceByClient.get(clientId));
+  }
+
+  private async triageFor(
+    control: { client_id: string; competence: Date },
+    organizationId: string,
+  ): Promise<TriageDocumentsView> {
+    const read = await this.triageByClient(organizationId, competenceKey(control.competence), [
+      control.client_id,
+    ]);
+    return read(control.client_id);
+  }
+
+  /** Documentos da Triagem do mesmo cliente e competência; Fiscal só consulta. */
+  async triage(controlId: string, actor: Actor): Promise<MonthlyControlTriage> {
+    const control = await this.prisma.fiscalMonthlyControl.findFirst({
+      where: { id: controlId, organization_id: actor.organizationId },
+    });
+    if (!control) throw new ServiceError(404, "Controle fiscal não encontrado.");
+    return {
+      control_id: control.id,
+      competence: competenceKey(control.competence),
+      ...(await this.triageFor(control, actor.organizationId)),
+    };
   }
 
   /** Abre o controle de um cliente; fora da regra de elegibilidade exige motivo. */
@@ -310,7 +389,11 @@ export class MonthlyControlService {
     return { control: serialize(created), created: true };
   }
 
-  /** Mudança explícita de situação e/ou movimento. Reabrir concluído exige nível 3 e motivo. */
+  /**
+   * Mudança explícita de situação e/ou movimento. Reabrir concluído exige nível 3 e motivo.
+   * Concluir com documento pendente (ou sem registro) na Triagem é conclusão excepcional:
+   * nível 3 e justificativa. A Triagem não é alterada.
+   */
   async update(input: UpdateMonthlyControlInput): Promise<MonthlyControlDto> {
     const current = await this.prisma.fiscalMonthlyControl.findFirst({
       where: { id: input.id, organization_id: input.organizationId },
@@ -320,9 +403,24 @@ export class MonthlyControlService {
     const reason = input.reason ?? null;
     const events: EventInput[] = [];
     const data: { status?: string; no_movement?: boolean } = {};
+    let triage: TriageDocumentsView | null = null;
 
     if (input.status !== undefined && input.status !== current.status) {
       const reopening = current.status === "COMPLETED";
+      const completing = input.status === "COMPLETED";
+      if (completing) {
+        triage = await this.triageFor(current, input.organizationId);
+      }
+      const exceptional = triage !== null && hasTriagePendency(triage);
+      if (exceptional && Number(input.permission ?? 0) < FISCAL_ADMIN_PERMISSION) {
+        throw new ServiceError(
+          403,
+          "Há documentos pendentes na Triagem: concluir exige Fiscal nível 3 e justificativa.",
+        );
+      }
+      if (exceptional && !reason) {
+        throw new ServiceError(400, "Informe a justificativa da conclusão com pendência.");
+      }
       if (reopening && Number(input.permission ?? 0) < FISCAL_ADMIN_PERMISSION) {
         throw new ServiceError(403, "Reabrir controle concluído exige Fiscal nível 3.");
       }
@@ -331,7 +429,7 @@ export class MonthlyControlService {
       }
       data.status = input.status;
       events.push({
-        action: reopening ? "REOPENED" : "STATUS",
+        action: reopening ? "REOPENED" : exceptional ? "EXCEPTIONAL_COMPLETION" : "STATUS",
         from_value: current.status,
         to_value: input.status,
         reason,
@@ -380,12 +478,20 @@ export class MonthlyControlService {
       userId: input.userId,
       organizationId: input.organizationId,
       permission: input.permission ?? null,
-      action: events.some((event) => event.action === "REOPENED") ? "Reabertura" : "Atualização",
+      action: events.some((event) => event.action === "REOPENED")
+        ? "Reabertura"
+        : events.some((event) => event.action === "EXCEPTIONAL_COMPLETION")
+          ? "Conclusão excepcional"
+          : "Atualização",
       referring: REFERRING,
       referringId: current.id,
-      changes: Object.fromEntries(
-        events.map((event) => [event.action, { from: event.from_value, to: event.to_value }]),
-      ),
+      changes: {
+        ...Object.fromEntries(
+          events.map((event) => [event.action, { from: event.from_value, to: event.to_value }]),
+        ),
+        // Estado da Triagem lido na conclusão, para a autorização ficar explicável depois.
+        ...(triage ? { triage: { source: triage.source, pending: triage.pending } } : {}),
+      },
     });
     return serialize(updated);
   }

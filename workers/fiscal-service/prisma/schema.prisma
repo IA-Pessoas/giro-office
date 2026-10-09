@@ -163,3 +163,29 @@ model Ipi {
 
   @@map("fiscal.ipi")
 }
+
+// Só leitura: o Fiscal consulta o checklist documental da Triagem, nunca edita.
+model TriageMonthly {
+  id              String    @id @default(uuid())
+  client_id       String
+  competence      String
+  type            String
+  checklist       Json
+  archived_at     DateTime?
+  organization_id String
+
+  @@unique([organization_id, client_id, competence, type])
+  @@map("triagem.monthly")
+}
+
+model TriageCompetence {
+  id                     String    @id @default(uuid())
+  organization_id        String
+  client_id              String
+  competence             String
+  configuration_snapshot Json
+  archived_at            DateTime?
+
+  @@unique([organization_id, client_id, competence])
+  @@map("triagem.competences")
+}
