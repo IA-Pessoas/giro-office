@@ -3,6 +3,7 @@ import { setupAPIClient } from "@shared/services/api";
 import type {
   ClientGroup,
   ClientRegime,
+  ClientSegment,
   Client,
   ClientCompanyLookup,
   ClientFinanceRecord,
@@ -34,6 +35,7 @@ import type {
 import {
   CLIENT_GROUP_ENDPOINTS,
   CLIENT_REGIME_ENDPOINTS,
+  CLIENT_SEGMENT_ENDPOINTS,
   buildClientListParams,
   CLIENT_ENDPOINTS,
   unwrapClientEnvelope,
@@ -79,6 +81,24 @@ export const clientService = {
   async updateRegime(id: string, name: string): Promise<ClientRegime> {
     const response = await setupAPIClient().patch(CLIENT_REGIME_ENDPOINTS.detail(id), { name });
     return unwrapClientEnvelope<ClientRegime>(response.data);
+  },
+
+  async listSegments(): Promise<ClientSegment[]> {
+    const response = await setupAPIClient().get(CLIENT_SEGMENT_ENDPOINTS.list);
+    return unwrapClientEnvelope<ClientSegment[]>(response.data);
+  },
+
+  async createSegment(input: Pick<ClientSegment, "name" | "type">): Promise<ClientSegment> {
+    const response = await setupAPIClient().post(CLIENT_SEGMENT_ENDPOINTS.create, input);
+    return unwrapClientEnvelope<ClientSegment>(response.data);
+  },
+
+  async updateSegment(
+    id: string,
+    input: Partial<Pick<ClientSegment, "name" | "type">>,
+  ): Promise<ClientSegment> {
+    const response = await setupAPIClient().patch(CLIENT_SEGMENT_ENDPOINTS.detail(id), input);
+    return unwrapClientEnvelope<ClientSegment>(response.data);
   },
 
   async listCoringa(filters: ClientCoringaFilters): Promise<ClientCoringaPage> {

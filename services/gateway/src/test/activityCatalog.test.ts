@@ -8,6 +8,9 @@ describe("activityCatalog", () => {
     ["POST", "/client/groups", "cadastrou", "um novo grupo de empresas"],
     ["GET", "/client/regimes", "consultou", "a lista de regimes"],
     ["POST", "/client/regimes", "cadastrou", "um novo regime"],
+    ["GET", "/client/segments", "consultou", "a lista de segmentos"],
+    ["POST", "/client/segments", "cadastrou", "um novo segmento"],
+    ["PATCH", "/client/segments/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e", "atualizou", "um segmento"],
     ["PATCH", "/client/regimes/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e", "atualizou", "um regime"],
     [
       "PATCH",

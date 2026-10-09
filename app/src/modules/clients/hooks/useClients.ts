@@ -17,6 +17,7 @@ import type {
   ClientPa,
   ClientPaResponse,
   ClientRegime,
+  ClientSegment,
   ClientTerminationRecord,
   ClientListFilters,
   ClientListPage,
@@ -35,8 +36,14 @@ import type {
 export const CLIENTS_QUERY_KEY = ["clients"] as const;
 export const CLIENT_REGIMES_QUERY_KEY = ["client-regimes"] as const;
 
+export const CLIENT_SEGMENTS_QUERY_KEY = ["client-segments"] as const;
+
 export function useClientRegimes(): UseQueryResult<ClientRegime[], Error> {
   return useFetch(CLIENT_REGIMES_QUERY_KEY, clientService.listRegimes, { staleTime: 60_000 });
+}
+
+export function useClientSegments(): UseQueryResult<ClientSegment[], Error> {
+  return useFetch(CLIENT_SEGMENTS_QUERY_KEY, clientService.listSegments, { staleTime: 60_000 });
 }
 
 export function useCoringaClients(filters: ClientCoringaFilters): UseQueryResult<ClientCoringaPage, Error> {

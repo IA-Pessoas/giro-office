@@ -8,6 +8,7 @@ import {
   TAX_REGIME_OPTIONS,
   withReportingSnapshot,
 } from "@workspace/shared";
+import type { ClientSegmentType } from "@workspace/shared/regularize";
 import { ACTIVE_CLIENT_STATUS } from "../../../services/client-service/src/schemas/client.schemas.js";
 import { lookupOfficialCnpj } from "./cnpjLookup.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
@@ -26,7 +27,7 @@ export type ClientAuditEvent = {
   userId: string;
   permission: number | null;
   action: "create" | "update";
-  referring: "clients" | "clients.regimes";
+  referring: "clients" | "clients.regimes" | "clients.segments";
   referringId: string;
   changes: Record<string, { from: unknown; to: unknown }>;
 };
@@ -150,6 +151,18 @@ export type ClientWorkerService = {
     name: string,
     authorization: ClientAuthorization,
   ) => Promise<unknown>;
+  listSegments: (organizationId: string, authorization: ClientAuthorization) => Promise<unknown>;
+  createSegment: (
+    organizationId: string,
+    input: { name: string; type: ClientSegmentType },
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  updateSegment: (
+    id: string,
+    organizationId: string,
+    input: CatalogItemInput,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
   runCompetenceOutputUpdate: () => Promise<unknown>;
   applyCommercialProjection: (event: Record<string, unknown>) => Promise<unknown>;
   reportingCatalog: () => Promise<unknown>;
@@ -174,7 +187,8 @@ type WorkerModelName =
   | "clientHistoryPending"
   | "pA"
   | "clientCommercialProjectionEvent"
-  | "clientRegime";
+  | "clientRegime"
+  | "clientSegment";
 
 type WorkerModelDelegate = {
   findUnique: (args: unknown) => Promise<ClientRow | null>;
@@ -415,14 +429,39 @@ function isClientDocumentUniqueConstraintError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
-const regimeSelect = { id: true, name: true, created_at: true, updated_at: true } as const;
+type CatalogKind = "regime" | "segment";
 
-function regimeDisplayName(name: string): string {
+/**
+ * Catálogos da ficha por organização (#1740, #1741). O cliente guarda o nome: renomear não
+ * reescreve fichas, e um valor gravado fora do catálogo continua aceito como está.
+ */
+const CATALOGS = {
+  regime: {
+    model: "clientRegime",
+    field: "regime",
+    referring: "clients.regimes",
+    label: "Regime",
+    shared: TAX_REGIME_OPTIONS as readonly string[],
+    select: { id: true, name: true, created_at: true, updated_at: true },
+  },
+  segment: {
+    model: "clientSegment",
+    field: "segment",
+    referring: "clients.segments",
+    label: "Segmento",
+    shared: [] as readonly string[],
+    select: { id: true, name: true, type: true, created_at: true, updated_at: true },
+  },
+} as const;
+
+type CatalogItemInput = { name?: string; type?: ClientSegmentType };
+
+function catalogDisplayName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
-function normalizeRegimeName(name: string): string {
-  return regimeDisplayName(name)
+function normalizeCatalogName(name: string): string {
+  return catalogDisplayName(name)
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase("pt-BR");
@@ -468,39 +507,61 @@ export class ClientService implements ClientWorkerService {
     return row;
   }
 
-  /**
-   * Regime aceito na ficha: regimes compartilhados (TAX_REGIME_OPTIONS), catálogo da organização
-   * ou o próprio valor já gravado, que nunca é convertido em silêncio.
-   */
-  private async resolveRegime(
+  private catalog(kind: CatalogKind) {
+    const config = CATALOGS[kind];
+    return { config, delegate: this.db[config.model] };
+  }
+
+  /** Valor aceito na ficha: compartilhado, do catálogo da organização ou o já gravado. */
+  private async resolveCatalogValue(
+    kind: CatalogKind,
     organizationId: string,
     value: unknown,
     current: unknown,
   ): Promise<string | null | undefined> {
     if (value === undefined) return undefined;
-    const name = typeof value === "string" ? regimeDisplayName(value) : "";
+    const name = typeof value === "string" ? catalogDisplayName(value) : "";
     if (!name) return null;
-    const normalized = normalizeRegimeName(name);
+    const normalized = normalizeCatalogName(name);
     // Mesmo valor gravado (até em caixa ou espaços diferentes) volta como está.
-    if (typeof current === "string" && normalizeRegimeName(current) === normalized) return current;
-    const shared = TAX_REGIME_OPTIONS.find((option) => normalizeRegimeName(option) === normalized);
+    if (typeof current === "string" && normalizeCatalogName(current) === normalized) return current;
+    const { config, delegate } = this.catalog(kind);
+    const shared = config.shared.find((option) => normalizeCatalogName(option) === normalized);
     if (shared) return shared;
-    const row = await this.db.clientRegime.findFirst({
+    const row = await delegate.findFirst({
       where: { organization_id: organizationId, normalized_name: normalized },
       select: { name: true },
     });
-    if (!row) throw new ServiceError(400, "Regime não cadastrado na organização.");
+    if (!row) throw new ServiceError(400, `${config.label} não cadastrado na organização.`);
     return String(row.name);
   }
 
-  private async auditRegimeChange(
+  /** Resolve regime e segmento do input e devolve o de/para a auditar depois da gravação. */
+  private async resolveCatalogFields(
+    organizationId: string,
+    data: Record<string, unknown>,
+    existing: ClientRow | undefined,
+  ): Promise<Record<string, { from: unknown; to: unknown }>> {
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    for (const kind of ["regime", "segment"] as const) {
+      const field = CATALOGS[kind].field;
+      const current = existing?.[field];
+      const value = await this.resolveCatalogValue(kind, organizationId, data[field], current);
+      if (value === undefined) continue;
+      data[field] = value;
+      if (existing && (current ?? null) !== value)
+        changes[field] = { from: current ?? null, to: value };
+    }
+    return changes;
+  }
+
+  private async auditClientChanges(
     clientId: string,
     organizationId: string,
     authorization: Pick<ClientAuthorization, "userId" | "permission">,
-    from: unknown,
-    to: unknown,
+    changes: Record<string, { from: unknown; to: unknown }>,
   ): Promise<void> {
-    if (to === undefined || (from ?? null) === to) return;
+    if (Object.keys(changes).length === 0) return;
     await this.audit?.({
       organizationId,
       userId: authorization.userId,
@@ -508,25 +569,32 @@ export class ClientService implements ClientWorkerService {
       action: "update",
       referring: "clients",
       referringId: clientId,
-      changes: { regime: { from: from ?? null, to } },
+      changes,
     });
   }
 
-  async listRegimes(organizationId: string, authorization: ClientAuthorization): Promise<unknown> {
+  private async listCatalog(
+    kind: CatalogKind,
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
     requireClientListPermission(authorization);
-    return this.db.clientRegime.findMany({
+    const { config, delegate } = this.catalog(kind);
+    return delegate.findMany({
       where: { organization_id: organizationId },
       orderBy: { name: "asc" },
-      select: regimeSelect,
+      select: config.select,
     });
   }
 
-  private async assertRegimeNameFree(
+  private async assertCatalogNameFree(
+    kind: CatalogKind,
     organizationId: string,
     normalized: string,
     exceptId?: string,
   ): Promise<void> {
-    const duplicate = await this.db.clientRegime.findFirst({
+    const { config, delegate } = this.catalog(kind);
+    const duplicate = await delegate.findFirst({
       where: {
         organization_id: organizationId,
         normalized_name: normalized,
@@ -534,81 +602,138 @@ export class ClientService implements ClientWorkerService {
       },
       select: { id: true },
     });
-    if (duplicate) throw new ServiceError(409, "Regime já cadastrado.");
+    if (duplicate) throw new ServiceError(409, `${config.label} já cadastrado.`);
   }
 
-  async createRegime(
+  private async writeCatalogItem(
+    kind: CatalogKind,
+    write: () => Promise<ClientRow>,
+  ): Promise<ClientRow> {
+    try {
+      return await write();
+    } catch (error) {
+      if (isClientDocumentUniqueConstraintError(error))
+        throw new ServiceError(409, `${CATALOGS[kind].label} já cadastrado.`, error);
+      throw error;
+    }
+  }
+
+  private async createCatalogItem(
+    kind: CatalogKind,
     organizationId: string,
-    name: string,
+    input: CatalogItemInput,
     authorization: ClientAuthorization,
   ): Promise<unknown> {
     requirePermission(authorization, 2);
-    const trimmed = regimeDisplayName(name);
-    const normalized = normalizeRegimeName(trimmed);
-    await this.assertRegimeNameFree(organizationId, normalized);
-    let row: ClientRow; // linha de clients.regimes
-    try {
-      row = await this.db.clientRegime.create({
-        data: { organization_id: organizationId, name: trimmed, normalized_name: normalized },
-        select: regimeSelect,
-      });
-    } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error))
-        throw new ServiceError(409, "Regime já cadastrado.", error);
-      throw error;
-    }
+    const { config, delegate } = this.catalog(kind);
+    const name = catalogDisplayName(input.name ?? "");
+    const normalized = normalizeCatalogName(name);
+    await this.assertCatalogNameFree(kind, organizationId, normalized);
+    const fields = { name, ...(input.type !== undefined ? { type: input.type } : {}) };
+    const row = await this.writeCatalogItem(kind, () =>
+      delegate.create({
+        data: { organization_id: organizationId, ...fields, normalized_name: normalized },
+        select: config.select,
+      }),
+    );
     await this.audit?.({
       organizationId,
       userId: authorization.userId,
       permission: authorization.permission ?? null,
       action: "create",
-      referring: "clients.regimes",
+      referring: config.referring,
       referringId: String(row.id),
-      changes: { name: { from: null, to: trimmed } },
+      changes: Object.fromEntries(
+        Object.entries(fields).map(([key, to]) => [key, { from: null, to }]),
+      ),
     });
     return row;
   }
 
-  async updateRegime(
+  private async updateCatalogItem(
+    kind: CatalogKind,
     id: string,
     organizationId: string,
-    name: string,
+    input: CatalogItemInput,
     authorization: ClientAuthorization,
   ): Promise<unknown> {
     requirePermission(authorization, 2);
-    const existing = await this.db.clientRegime.findFirst({
+    const { config, delegate } = this.catalog(kind);
+    const existing = await delegate.findFirst({
       where: { id, organization_id: organizationId },
-      select: regimeSelect,
+      select: config.select,
     });
-    if (!existing) throw new ServiceError(404, "Regime não encontrado.");
-    const trimmed = regimeDisplayName(name);
-    const normalized = normalizeRegimeName(trimmed);
-    await this.assertRegimeNameFree(organizationId, normalized, id);
-    let row: ClientRow; // linha de clients.regimes
-    try {
-      // Clientes guardam o nome: renomear o catálogo não reescreve fichas já gravadas.
-      row = await this.db.clientRegime.update({
-        where: { id },
-        data: { name: trimmed, normalized_name: normalized },
-        select: regimeSelect,
-      });
-    } catch (error) {
-      if (isClientDocumentUniqueConstraintError(error))
-        throw new ServiceError(409, "Regime já cadastrado.", error);
-      throw error;
+    if (!existing) throw new ServiceError(404, `${config.label} não encontrado.`);
+    const data: Record<string, unknown> = {};
+    if (input.name !== undefined) {
+      data.name = catalogDisplayName(input.name);
+      data.normalized_name = normalizeCatalogName(input.name);
+      await this.assertCatalogNameFree(kind, organizationId, String(data.normalized_name), id);
     }
-    if (existing.name !== trimmed) {
+    if (input.type !== undefined) data.type = input.type;
+    // Clientes guardam o nome: renomear o catálogo não reescreve fichas já gravadas.
+    const row = await this.writeCatalogItem(kind, () =>
+      delegate.update({ where: { id }, data, select: config.select }),
+    );
+    const changes = Object.fromEntries(
+      (["name", "type"] as const)
+        .filter((key) => key in data && existing[key] !== data[key])
+        .map((key) => [key, { from: existing[key], to: data[key] }]),
+    );
+    if (Object.keys(changes).length > 0) {
       await this.audit?.({
         organizationId,
         userId: authorization.userId,
         permission: authorization.permission ?? null,
         action: "update",
-        referring: "clients.regimes",
+        referring: config.referring,
         referringId: id,
-        changes: { name: { from: existing.name, to: trimmed } },
+        changes,
       });
     }
     return row;
+  }
+
+  listRegimes(organizationId: string, authorization: ClientAuthorization): Promise<unknown> {
+    return this.listCatalog("regime", organizationId, authorization);
+  }
+
+  createRegime(
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    return this.createCatalogItem("regime", organizationId, { name }, authorization);
+  }
+
+  updateRegime(
+    id: string,
+    organizationId: string,
+    name: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    return this.updateCatalogItem("regime", id, organizationId, { name }, authorization);
+  }
+
+  listSegments(organizationId: string, authorization: ClientAuthorization): Promise<unknown> {
+    return this.listCatalog("segment", organizationId, authorization);
+  }
+
+  createSegment(
+    organizationId: string,
+    input: { name: string; type: ClientSegmentType },
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    return this.createCatalogItem("segment", organizationId, input, authorization);
+  }
+
+  updateSegment(
+    id: string,
+    organizationId: string,
+    input: CatalogItemInput,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    return this.updateCatalogItem("segment", id, organizationId, input, authorization);
   }
 
   private async client(id: string, organizationId: string): Promise<ClientRow> {
@@ -691,12 +816,12 @@ export class ClientService implements ClientWorkerService {
       select: { id: true },
     });
     if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
-    const regime = await this.resolveRegime(organizationId, input.regime, undefined);
+    const data: Record<string, unknown> = { ...input };
+    await this.resolveCatalogFields(organizationId, data, undefined);
     try {
       const row = await this.db.client.create({
         data: {
-          ...input,
-          ...(regime !== undefined ? { regime } : {}),
+          ...data,
           organization_id: organizationId,
           cpf_cnpj: normalizedDocument,
         },
@@ -732,15 +857,14 @@ export class ClientService implements ClientWorkerService {
       if (duplicate) throw new ServiceError(409, "Cliente já cadastrado.");
       data.cpf_cnpj = normalizedDocument;
     }
-    const regime = await this.resolveRegime(organizationId, data.regime, existing.regime);
-    if (regime !== undefined) data.regime = regime;
+    const changes = await this.resolveCatalogFields(organizationId, data, existing);
     try {
       const row = await this.db.client.update({
         where: { id },
         data,
         select: clientSelect,
       });
-      await this.auditRegimeChange(id, organizationId, authorization, existing.regime, regime);
+      await this.auditClientChanges(id, organizationId, authorization, changes);
       return toPublic(row, await this.organization(organizationId));
     } catch (error) {
       if (isClientDocumentUniqueConstraintError(error)) {
@@ -887,13 +1011,11 @@ export class ClientService implements ClientWorkerService {
         },
       });
       // O schema de integração só aceita os regimes compartilhados; a troca também é auditada.
-      await this.auditRegimeChange(
-        id,
-        organizationId,
-        authorization,
-        existing.regime,
-        data.regime === undefined ? undefined : (data.regime ?? null),
-      );
+      if (data.regime !== undefined && (existing.regime ?? null) !== (data.regime ?? null)) {
+        await this.auditClientChanges(id, organizationId, authorization, {
+          regime: { from: existing.regime ?? null, to: data.regime ?? null },
+        });
+      }
       return row;
     } catch (error) {
       if (isClientDocumentUniqueConstraintError(error)) {
@@ -1176,8 +1298,7 @@ export class ClientService implements ClientWorkerService {
   ): Promise<unknown> {
     const existing = await this.client(clientId, organizationId);
     const data = { ...input };
-    const regime = await this.resolveRegime(organizationId, data.regime, existing.regime);
-    if (regime !== undefined) data.regime = regime;
+    const changes = await this.resolveCatalogFields(organizationId, data, existing);
     if (data.cpf_cnpj !== undefined) {
       const normalizedDocument = assertValidClientDocument(data.cpf_cnpj, existing.type);
       const duplicate = await this.db.client.findFirst({
@@ -1234,7 +1355,7 @@ export class ClientService implements ClientWorkerService {
           deletion_date: true,
         },
       });
-      await this.auditRegimeChange(clientId, organizationId, { userId }, existing.regime, regime);
+      await this.auditClientChanges(clientId, organizationId, { userId }, changes);
       return row;
     } catch (error) {
       if (isClientDocumentUniqueConstraintError(error)) {

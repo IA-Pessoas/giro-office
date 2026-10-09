@@ -399,6 +399,81 @@ export function buildClientServiceOpenApiSpec(env: ClientServiceEnv): OpenApiDoc
           },
         },
       },
+      "/client/segments": {
+        get: {
+          tags: ["Clients"],
+          summary: "Listar o catálogo de segmentos da organização",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            "200": { description: "Segmentos com tipo", ...successEnvelopeContent() },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+          },
+        },
+        post: {
+          tags: ["Clients"],
+          summary: "Cadastrar segmento com tipo (serviço, comércio ou indústria)",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name", "type"],
+                  properties: {
+                    name: { type: "string", minLength: 1, maxLength: 80 },
+                    type: { type: "string", enum: ["servico", "comercio", "industria"] },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Segmento criado", ...successEnvelopeContent() },
+            "400": { description: "Nome ou tipo inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "409": { description: "Já existe segmento com o nome" },
+          },
+        },
+      },
+      "/client/segments/{id}": {
+        patch: {
+          tags: ["Clients"],
+          summary: "Renomear segmento ou mudar o tipo",
+          description:
+            "Clientes guardam o nome do segmento; renomear não altera fichas já gravadas.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", minLength: 1, maxLength: 80 },
+                    type: { type: "string", enum: ["servico", "comercio", "industria"] },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Segmento atualizado", ...successEnvelopeContent() },
+            "400": { description: "Nome ou tipo inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Permissão insuficiente" },
+            "404": { description: "Segmento não encontrado" },
+            "409": { description: "Já existe segmento com o nome" },
+          },
+        },
+      },
       "/client/groups/{id}/clients": {
         put: {
           tags: ["Clients"],

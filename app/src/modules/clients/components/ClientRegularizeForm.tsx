@@ -7,14 +7,14 @@ import {
 } from "@shared/utils/inputFormatting";
 
 import { forwardFormattedInputChange } from "./formattedInputChange";
-import { useClientRegimes } from "../hooks/useClients";
+import { useClientRegimes, useClientSegments } from "../hooks/useClients";
+import { buildClientSegmentOptions } from "../utils/clientForm";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 import type { ClientRegularizeFormValues } from "../types";
 import { isRegularizeCompanyClient } from "../utils/regularizeForm";
 import {
   getRegularizeRegimeOptions,
-  REGULARIZE_SEGMENT_OPTIONS,
   REGULARIZE_SIZE_OPTIONS,
 } from "../utils/regularizeForm";
 
@@ -104,6 +104,7 @@ export function ClientRegularizeForm({
 }: ClientRegularizeFormProps) {
   const isCompanyClient = isRegularizeCompanyClient(values);
   const regimeCatalog = (useClientRegimes().data ?? []).map((regime) => regime.name);
+  const segmentOptions = buildClientSegmentOptions(useClientSegments().data ?? [], values.segment);
   const handleCpfCnpjChange = (event: ChangeEvent<HTMLInputElement>) => {
     forwardFormattedInputChange(event, formatCpfCnpjInput, onChange);
   };
@@ -185,9 +186,9 @@ export function ClientRegularizeForm({
             <span className={labelClassName}>Segmento</span>
             <ClientNativeSelect name="segment" value={values.segment} onChange={onChange} disabled={disabled}>
               <option value="">Selecione um segmento</option>
-              {REGULARIZE_SEGMENT_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
+              {segmentOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </ClientNativeSelect>

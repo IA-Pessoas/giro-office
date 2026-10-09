@@ -38,6 +38,12 @@ export const CLIENT_REGIME_ENDPOINTS = {
   detail: (id: string) => `/client/regimes/${id}`,
 } as const;
 
+export const CLIENT_SEGMENT_ENDPOINTS = {
+  list: "/client/segments",
+  create: "/client/segments",
+  detail: (id: string) => `/client/segments/${id}`,
+} as const;
+
 const LEGACY_CLIENT_STATUS_FILTERS = new Set(["Ativo", "Inativo"]);
 
 export function buildClientListParams(filters: ClientListFilters) {

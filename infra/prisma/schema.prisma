@@ -161,6 +161,7 @@ model Organization {
   documentsTermination          DocumentClientTermination[]
   groups                        Group[]
   clientRegimes                 ClientRegime[]
+  clientSegments                ClientSegment[]
   clientHistorys                ClientHistory[]
   clientHistorysPending         ClientHistoryPending[]
   pas                           PA[]
@@ -906,6 +907,22 @@ model ClientRegime {
 
   @@unique([organization_id, normalized_name], map: "uq_client_regime_org_normalized_name")
   @@map("clients.regimes")
+}
+
+// Segmentos do cliente por organização, com o tipo herdado de tb_integracao.segmentos (#1741).
+// Client.segment guarda o nome; renomear aqui não reescreve clientes já gravados.
+model ClientSegment {
+  id              String       @id @default(uuid())
+  name            String
+  normalized_name String
+  type            String
+  organization_id String
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@unique([organization_id, normalized_name], map: "uq_client_segment_org_normalized_name")
+  @@map("clients.segments")
 }
 
 model ClientsGroup {

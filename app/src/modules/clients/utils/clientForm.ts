@@ -1,12 +1,13 @@
 import type {
   Client,
   ClientFormValues,
+  ClientSegment,
   ClientTaxRegime,
   CreateClientPayload,
   UpdateClientPayload,
 } from "../types";
 
-import { TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
+import { CLIENT_SEGMENT_TYPE_LABELS, TAX_REGIME_OPTIONS } from "@workspace/shared/regularize";
 import { normalizeCnpjInput } from "../../../shared/utils/inputFormatting.ts";
 
 import { normalizeDocumentValue } from "./documentValidation.ts";
@@ -39,6 +40,32 @@ export function getClientTaxRegime(value: string | null | undefined): ClientTaxR
   return isClientTaxRegime(value) ? value : "";
 }
 
+/**
+ * Opções do segmento com o tipo legado no rótulo. Não há lista fixa: o catálogo da organização é
+ * a fonte, e o valor gravado fora dele continua visível para revisão (#1741).
+ */
+export function buildClientSegmentOptions(
+  catalog: readonly ClientSegment[],
+  storedSegment?: string | null,
+): Array<{ value: string; label: string }> {
+  const options = catalog.map((segment) => ({
+    value: segment.name,
+    label: `${segment.name} (${CLIENT_SEGMENT_TYPE_LABELS[segment.type] ?? segment.type})`,
+  }));
+  return storedSegment && !options.some((option) => option.value === storedSegment)
+    ? [...options, { value: storedSegment, label: `${storedSegment} (fora do catálogo)` }]
+    : options;
+}
+
+export function describeClientSegment(
+  segment: string | null | undefined,
+  catalog: readonly ClientSegment[],
+): string {
+  if (!segment) return "A definir";
+  const type = catalog.find((item) => item.name === segment)?.type;
+  return type ? `${segment} (${CLIENT_SEGMENT_TYPE_LABELS[type]})` : segment;
+}
+
 function normalizeClientDocumentValue(
   value: string | null | undefined,
   type: ClientFormValues["type"],
@@ -55,6 +82,7 @@ export function createClientFormInitialValues(client?: Partial<Client>): ClientF
     cpf_cnpj: client?.cpf_cnpj ?? "",
     status: client?.status ? mapClientStatusFromApi(client.status) : "Ativo",
     regime: client?.regime ?? "",
+    segment: client?.segment ?? "",
     service_unique: client?.service_unique ?? false,
     address: client?.address ?? "",
     cep: client?.cep ?? "",
@@ -92,6 +120,7 @@ export function buildCreateClientPayload(
     cpf_cnpj: normalizeClientDocumentValue(values.cpf_cnpj, values.type),
     status: mapClientStatusToApi(values.status),
     regime: normalizeTaxRegime(values.regime),
+    segment: values.segment.trim() || null,
     service_unique: values.service_unique,
     address: normalizeOptionalAddress(values.address),
     cep: normalizeOptionalAddress(values.cep),
@@ -113,6 +142,7 @@ export function buildUpdateClientPayload(values: ClientFormValues): UpdateClient
     cpf_cnpj: normalizeClientDocumentValue(values.cpf_cnpj, values.type),
     status: mapClientStatusToApi(values.status),
     regime: normalizeTaxRegime(values.regime),
+    segment: values.segment.trim() || null,
     service_unique: values.service_unique,
     address: normalizeOptionalAddress(values.address),
     cep: normalizeOptionalAddress(values.cep),

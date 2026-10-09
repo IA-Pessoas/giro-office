@@ -6,30 +6,48 @@ const ORG = "org-1";
 const editor = { userId: "user-1", level: 2, permission: 2, isOwner: false };
 const viewer = { userId: "user-2", level: 1, permission: 1, isOwner: false };
 
-function setup(options: { regimes?: Array<{ id: string; name: string }>; regime?: string | null }) {
-  const regimes = options.regimes ?? [];
-  const byNormalized = (where: { normalized_name: string; id?: { not: string } }) =>
-    regimes.find(
-      (row) =>
-        row.name
-          .normalize("NFD")
-          .replace(/\p{Diacritic}/gu, "")
-          .toLocaleLowerCase("pt-BR") === where.normalized_name && row.id !== where.id?.not,
-    ) ?? null;
+type CatalogRow = { id: string; name: string; type?: string; organization_id?: string };
+
+const normalize = (name: string) =>
+  name
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("pt-BR");
+
+// Delegate em memória que respeita organization_id, para provar o isolamento por organização.
+function catalogDelegate(rows: CatalogRow[], newId: string) {
+  const matches = (row: CatalogRow, where: Record<string, unknown>) =>
+    (row.organization_id ?? ORG) === where.organization_id &&
+    (where.id === undefined || typeof where.id !== "string" || row.id === where.id) &&
+    (where.normalized_name === undefined || normalize(row.name) === where.normalized_name) &&
+    row.id !== (where.id as { not?: string } | undefined)?.not;
+  return {
+    findMany: vi.fn(async ({ where }) => rows.filter((row) => matches(row, where))),
+    findFirst: vi.fn(async ({ where }) => rows.find((row) => matches(row, where)) ?? null),
+    create: vi.fn(async ({ data }) => ({ id: newId, ...data })),
+    update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
+  };
+}
+
+function setup(options: {
+  regimes?: CatalogRow[];
+  segments?: CatalogRow[];
+  regime?: string | null;
+  segment?: string | null;
+}) {
   const prisma = {
     organization: { findUnique: vi.fn().mockResolvedValue({ id: ORG }) },
     client: {
-      findFirst: vi.fn().mockResolvedValue({ id: "client-1", regime: options.regime ?? null }),
+      findFirst: vi.fn().mockResolvedValue({
+        id: "client-1",
+        regime: options.regime ?? null,
+        segment: options.segment ?? null,
+      }),
+      create: vi.fn(async ({ data }) => ({ id: "client-new", ...data })),
       update: vi.fn(async ({ data }) => ({ id: "client-1", ...data })),
     },
-    clientRegime: {
-      findMany: vi.fn().mockResolvedValue(regimes),
-      findFirst: vi.fn(async ({ where }) =>
-        where.id ? (regimes.find((row) => row.id === where.id) ?? null) : byNormalized(where),
-      ),
-      create: vi.fn(async ({ data }) => ({ id: "regime-new", ...data })),
-      update: vi.fn(async ({ where, data }) => ({ id: where.id, ...data })),
-    },
+    clientRegime: catalogDelegate(options.regimes ?? [], "regime-new"),
+    clientSegment: catalogDelegate(options.segments ?? [], "segment-new"),
   };
   const events: ClientAuditEvent[] = [];
   const service = new ClientService(
@@ -175,5 +193,74 @@ describe("client regime selection", () => {
       service.update("client-1", ORG, { regime: "Inventado" }, editor),
     ).rejects.toMatchObject({ statusCode: 400, message: "Regime não cadastrado na organização." });
     expect(prisma.client.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("client segment catalog", () => {
+  const OTHER_ORG = "org-2";
+
+  it("creates a typed segment and audits name and type", async () => {
+    const { prisma, service, events } = setup({});
+    await service.createSegment(ORG, { name: " Varejo ", type: "comercio" }, editor);
+    expect(prisma.clientSegment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { organization_id: ORG, name: "Varejo", type: "comercio", normalized_name: "varejo" },
+      }),
+    );
+    expect(events[0]).toMatchObject({
+      action: "create",
+      referring: "clients.segments",
+      changes: { name: { from: null, to: "Varejo" }, type: { from: null, to: "comercio" } },
+    });
+  });
+
+  it("changes only the type and audits it", async () => {
+    const { prisma, service, events } = setup({
+      segments: [{ id: "s1", name: "Varejo", type: "comercio" }],
+    });
+    await service.updateSegment("s1", ORG, { type: "industria" }, editor);
+    expect(prisma.clientSegment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "s1" }, data: { type: "industria" } }),
+    );
+    expect(events[0]).toMatchObject({ changes: { type: { from: "comercio", to: "industria" } } });
+  });
+
+  it("isolates segments by organization", async () => {
+    const segments = [
+      { id: "s1", name: "Varejo", type: "comercio" },
+      { id: "s2", name: "Agro", type: "industria", organization_id: OTHER_ORG },
+    ];
+    const { service } = setup({ segments });
+    await expect(service.listSegments(ORG, viewer)).resolves.toEqual([segments[0]]);
+    // Outra organização pode ter o mesmo nome; aqui ele não existe e não é aceito.
+    await expect(
+      service.createSegment(ORG, { name: "agro", type: "servico" }, editor),
+    ).resolves.toMatchObject({ name: "agro" });
+    await expect(service.updateSegment("s2", ORG, { name: "X" }, editor)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    await expect(
+      service.update("client-1", ORG, { segment: "Agro" }, editor),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Segmento não cadastrado na organização.",
+    });
+  });
+
+  it("selects a catalog segment and keeps a stored value outside the catalog", async () => {
+    const { prisma, service, events } = setup({
+      segments: [{ id: "s1", name: "Varejo", type: "comercio" }],
+      segment: "Contabilidade",
+    });
+    await service.updateRegularize("client-1", ORG, "user-1", { segment: "Contabilidade" });
+    expect(events).toEqual([]);
+    await service.updateRegularize("client-1", ORG, "user-1", { segment: "varejo" });
+    expect(prisma.client.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { segment: "Varejo" } }),
+    );
+    expect(events[0]).toMatchObject({
+      referring: "clients",
+      changes: { segment: { from: "Contabilidade", to: "Varejo" } },
+    });
   });
 });
