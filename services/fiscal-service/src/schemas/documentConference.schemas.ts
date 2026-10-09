@@ -75,3 +75,15 @@ export const sefazXmlConferenceBodySchema = z
 export const spedConferenceBodySchema = z
   .object({ sped: textFileSchema("o arquivo SPED"), xml: xmlZipSchema })
   .strict();
+
+// Só o ZIP de XML: mesmo teto da seleção de XML (~650 kB).
+export const xmlTaxTotalsBodySchema = z
+  .object({
+    file_name: z.string().trim().min(1, "Informe o nome do arquivo.").max(255),
+    zip_base64: z
+      .string({ message: "Envie o ZIP de XML." })
+      .min(1, "Envie o ZIP de XML.")
+      .max(XML_SELECTION_MAX_BASE64_LENGTH, "ZIP excede o limite de 650 kB.")
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/u, "ZIP em base64 inválido."),
+  })
+  .strict();

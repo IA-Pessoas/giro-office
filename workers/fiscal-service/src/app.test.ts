@@ -321,6 +321,30 @@ describe("fiscal Worker", () => {
     expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
   });
 
+  it("soma IPI e ICMS ST de XML sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>7</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd></prod><imposto><ICMS><ICMS10><vICMSST>0.30</vICMSST></ICMS10></ICMS><IPI><IPITrib><vIPI>0.10</vIPI></IPITrib></IPI></imposto></det><det nItem="2"><prod><cProd>B</cProd></prod><imposto><IPI><IPITrib><vIPI>0.20</vIPI></IPITrib></IPI></imposto></det></infNFe></NFe>';
+    const body = {
+      file_name: "x.zip",
+      zip_base64: createZip([{ fileName: "7.xml", body: Buffer.from(nfe) }]).toString("base64"),
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/xml-taxes", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as { data: { totals: { ipi: string; icms_st: string } } };
+    // 0.10 + 0.20 sem erro de ponto flutuante.
+    expect(payload.data.totals).toMatchObject({ ipi: "0.30", icms_st: "0.30" });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
     const revenue = {
       id: ICMS_ID,

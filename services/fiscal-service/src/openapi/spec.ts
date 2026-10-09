@@ -1213,6 +1213,41 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/conferences/xml-taxes": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Somar IPI e ICMS ST de XML NF-e",
+          description:
+            "Recebe um ZIP de XML NF-e (base64, até ~650 kB) e soma, em centavos inteiros, o vIPI (grupo IPI) e o vICMSST (grupo ICMS) de cada item. Devolve totals (ipi, icms_st, notes, items), a composição por nota e item (notes, com differences quando a soma dos itens não bate com vIPI/vST do ICMSTot), excluded (XML repetido com conteúdo diferente ou protocolo não autorizado, fora da soma), errors (XML inválido ou valor fora do formato), discarded (não XML/NF-e, cópia idêntica) e o CSV (campo csv). status partial com XML inválido, duplicado ou ZIP sem NF-e. Nada é gravado; não é apuração tributária.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["file_name", "zip_base64"],
+                  additionalProperties: false,
+                  properties: {
+                    file_name: { type: "string", minLength: 1, maxLength: 255 },
+                    zip_base64: { type: "string", minLength: 1, maxLength: 900_000 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Totais de IPI e ICMS ST com composição, exclusões e CSV",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou ZIP ilegível" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
       "/fiscal/revenues/{id}": {
         put: {
           tags: ["Receitas"],

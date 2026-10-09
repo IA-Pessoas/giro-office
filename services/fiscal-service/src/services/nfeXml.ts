@@ -23,6 +23,9 @@ export interface NfeItem {
   cfop: string;
   quantity: string | null;
   value: string | null;
+  /** vIPI do grupo IPI e vICMSST do grupo ICMS do item; null quando a tag não existe. */
+  ipi: string | null;
+  icms_st: string | null;
 }
 
 export type NfeParseResult =
@@ -34,6 +37,9 @@ export type NfeParseResult =
       value: string | null;
       protocol_status: string | null;
       items: NfeItem[];
+      /** vIPI e vST declarados no ICMSTot. */
+      declared_ipi: string | null;
+      declared_icms_st: string | null;
     } & NfeIdentity)
   | { kind: "invalid"; message: string }
   | { kind: "other"; message: string };
@@ -123,11 +129,24 @@ function money(raw: string): string | null {
   return match ? `${stripZeros(match[1] ?? "0")}.${(match[2] ?? "").padEnd(2, "0")}` : null;
 }
 
+class InvalidNfeValue extends Error {}
+
+/** Valor monetário de uma tag: null se ausente; erro se presente e fora do formato. */
+function moneyTag(source: string, tag: string, where: string): string | null {
+  const raw = tagText(source, tag);
+  if (raw === "") return null;
+  const value = money(raw);
+  if (value === null) throw new InvalidNfeValue(`${tag} inválido ${where}: ${raw}.`);
+  return value;
+}
+
 function items(infNFe: string): NfeItem[] {
   const pattern =
     /<(?:\w+:)?det\b[^>]*\bnItem\s*=\s*["'](\d+)["'][^>]*>([\s\S]*?)<\/(?:\w+:)?det>/gu;
   return [...infNFe.matchAll(pattern)].map(([, number = "", body = ""]) => {
     const prod = block(body, "prod") ?? "";
+    const imposto = block(body, "imposto") ?? "";
+    const where = `no item ${stripZeros(number)}`;
     return {
       number: stripZeros(number),
       code: tagText(prod, "cProd"),
@@ -135,6 +154,8 @@ function items(infNFe: string): NfeItem[] {
       cfop: tagText(prod, "CFOP"),
       quantity: normalizeDecimal(tagText(prod, "qCom")),
       value: money(tagText(prod, "vProd")),
+      ipi: moneyTag(block(imposto, "IPI") ?? "", "vIPI", where),
+      icms_st: moneyTag(block(imposto, "ICMS") ?? "", "vICMSST", where),
     };
   });
 }
@@ -181,11 +202,26 @@ export function parseNfeXml(xml: string): NfeParseResult {
     }
   }
   const content = block(text, "infNFe") ?? "";
+  const totals = block(text, "ICMSTot") ?? "";
+  let parsedItems: NfeItem[];
+  let declared: { ipi: string | null; icms_st: string | null };
+  try {
+    parsedItems = items(content);
+    declared = {
+      ipi: moneyTag(totals, "vIPI", "no total"),
+      icms_st: moneyTag(totals, "vST", "no total"),
+    };
+  } catch (error) {
+    if (error instanceof InvalidNfeValue) return { kind: "invalid", message: error.message };
+    throw error;
+  }
   return {
     kind: "nfe",
     content,
-    items: items(content),
-    value: money(tagText(block(text, "ICMSTot") ?? "", "vNF")),
+    items: parsedItems,
+    declared_ipi: declared.ipi,
+    declared_icms_st: declared.icms_st,
+    value: money(tagText(totals, "vNF")),
     protocol_status: field(block(text, "infProt"), "cStat") ?? null,
     ...note,
   };

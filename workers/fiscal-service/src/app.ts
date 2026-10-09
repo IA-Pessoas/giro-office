@@ -5,6 +5,7 @@ import {
   sefazXmlConferenceBodySchema,
   spedConferenceBodySchema,
   xmlSelectionBodySchema,
+  xmlTaxTotalsBodySchema,
 } from "@workspace/fiscal-service/src/schemas/documentConference.schemas.js";
 import {
   createFiscalRateBodySchema,
@@ -69,6 +70,10 @@ import {
   spedConferenceCsvExport,
 } from "@workspace/fiscal-service/src/services/spedConferenceService.js";
 import { selectXmlFromZip } from "@workspace/fiscal-service/src/services/xmlSelectionService.js";
+import {
+  sumXmlTaxes,
+  xmlTaxTotalsCsvExport,
+} from "@workspace/fiscal-service/src/services/xmlTaxTotalsService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
   fiscalIcmsReportingCatalog,
@@ -401,6 +406,12 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const body = parseWithZod(spedConferenceBodySchema, await readJson(c));
     const result = compareSpedWithXml(body);
     return c.json(createSuccessResponse({ ...result, ...spedConferenceCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/xml-taxes", async (c) => {
+    const body = parseWithZod(xmlTaxTotalsBodySchema, await readJson(c));
+    const result = sumXmlTaxes(body);
+    return c.json(createSuccessResponse({ ...result, ...xmlTaxTotalsCsvExport(result) }));
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {

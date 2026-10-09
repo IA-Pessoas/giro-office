@@ -47,6 +47,8 @@ describe("parseNfeXml", () => {
       value: "10.00",
       protocol_status: null,
       items: [],
+      declared_ipi: null,
+      declared_icms_st: null,
       kind: "nfe",
       access_key: accessKey(ISSUER_A, "1", "100"),
       issuer: ISSUER_A,
