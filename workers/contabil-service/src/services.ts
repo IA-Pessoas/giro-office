@@ -6,6 +6,7 @@ import {
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
+import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
   type TriageDocumentStatus,
@@ -565,10 +566,12 @@ function createSimpleEntityService(
   delegateName: "relationshipContabil" | "responsibleContabil",
   referring: string,
   messages: { foreignKey: string },
+  validate: (input: JsonRecord, current?: JsonRecord) => void = () => {},
 ): RelationshipService {
   const delegate = prisma[delegateName];
   return {
     async create(input, auth) {
+      validate(input);
       const duplicate = await delegate.findFirst({
         where: { client_id: input.client_id, organization_id: auth.organizationId },
       });
@@ -591,6 +594,7 @@ function createSimpleEntityService(
         where: { id, organization_id: auth.organizationId },
       });
       if (!current) throw new ServiceError(404, "Não está cadastrado.");
+      validate(input, current);
       try {
         const updated = await delegate.update({ where: { id }, data: input });
         await audit.logUpdateIfChanged({
@@ -633,9 +637,18 @@ export function createRelationshipService(
   prisma: ContabilPrisma,
   audit: Audit,
 ): RelationshipService {
-  return createSimpleEntityService(prisma, audit, "relationshipContabil", "contabil.relationship", {
-    foreignKey: "Cliente não encontrado.",
-  });
+  return createSimpleEntityService(
+    prisma,
+    audit,
+    "relationshipContabil",
+    "contabil.relationship",
+    { foreignKey: "Cliente não encontrado." },
+    (input, current) =>
+      assertChartAccountsState(
+        input.chart_accounts as string | null | undefined,
+        current?.chart_accounts as string | null | undefined,
+      ),
+  );
 }
 
 export function createResponsibleService(prisma: ContabilPrisma, audit: Audit): ResponsibleService {

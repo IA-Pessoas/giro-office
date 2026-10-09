@@ -189,6 +189,32 @@ describe("contabil Worker remainder routes", () => {
     );
   });
 
+  it("relacionamento aceita estados não selecionados e exige permissão Contábil (#1721)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const put = (permission: string) =>
+      app.request(`https://contabil.test/contabil/relationships/${ID}`, {
+        method: "PUT",
+        headers: { ...headers(permission), "content-type": "application/json" },
+        body: JSON.stringify({ bidding: null, chart_accounts: null }),
+      });
+
+    expect((await put("2")).status).toBe(200);
+    expect(deps.relationshipService.update).toHaveBeenCalledWith(
+      ID,
+      { bidding: null, chart_accounts: null },
+      expect.objectContaining({ organizationId: ORG, userId: USER }),
+    );
+    expect((await put("1")).status).toBe(403);
+    const read = await app.request(
+      `https://contabil.test/contabil/relationships/client/${CLIENT}`,
+      { headers: headers("0") },
+    );
+    expect(read.status).toBe(403);
+    expect(deps.relationshipService.update).toHaveBeenCalledTimes(1);
+    expect(deps.relationshipService.getByClientId).not.toHaveBeenCalled();
+  });
+
   it("expõe triagem documental com validação de entrada", async () => {
     const deps = services();
     const app = createContabilWorkerApp({ env: env(), ...deps });

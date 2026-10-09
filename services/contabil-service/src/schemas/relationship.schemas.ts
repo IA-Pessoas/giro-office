@@ -3,8 +3,8 @@ import { z } from "zod";
 export const createRelationshipBodySchema = z
   .object({
     client_id: z.string().uuid({ message: "client_id inválido." }),
-    bidding: z.boolean(),
-    chart_accounts: z.string(),
+    bidding: z.boolean().nullable(),
+    chart_accounts: z.string().nullable(),
     tool: z.string(),
     system: z.string(),
     note: z.string(),
@@ -14,8 +14,8 @@ export const createRelationshipBodySchema = z
 export const updateRelationshipBodySchema = z
   .object({
     client_id: z.string().uuid({ message: "client_id inválido." }).optional(),
-    bidding: z.boolean().optional(),
-    chart_accounts: z.string().optional(),
+    bidding: z.boolean().nullable().optional(),
+    chart_accounts: z.string().nullable().optional(),
     tool: z.string().optional(),
     system: z.string().optional(),
     note: z.string().optional(),

@@ -21,13 +21,15 @@ import {
 import { getContabilErrorMessage } from "../services";
 import { ContabilStateBox } from "./ContabilStateBox";
 import {
-  CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS,
   CONTABIL_RELATIONSHIP_FIELDS,
   CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS,
-  CONTABIL_RELATIONSHIP_TEXT_FIELDS,
 } from "./contabilRelationshipFields";
 import {
   buildContabilRelationshipFormValues,
+  buildContabilRelationshipPayload,
+  formatContabilRelationshipField,
+  getContabilRelationshipFieldOptions,
+  pickChangedContabilRelationshipFields,
   isContabilTextValueFilled,
   type ContabilRelationshipFormValues,
 } from "./contabilPartySection.helpers";
@@ -41,6 +43,8 @@ const SECONDARY_BUTTON_CLASSNAME =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700";
 const PRIMARY_BUTTON_CLASSNAME =
   "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60";
+const INPUT_CLASSNAME =
+  "h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white";
 const DANGER_BUTTON_CLASSNAME =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-900/20";
 
@@ -106,10 +110,6 @@ export function ContabilRelationshipSection({
   }
 
   function validateRelationshipForm() {
-    if (!isContabilTextValueFilled(formValues.chart_accounts)) {
-      return "Informe o plano de contas.";
-    }
-
     if (!isContabilTextValueFilled(formValues.tool)) {
       return "Informe a ferramenta utilizada.";
     }
@@ -132,27 +132,19 @@ export function ContabilRelationshipSection({
     }
 
     try {
+      const payload = buildContabilRelationshipPayload(formValues);
       if (relationship) {
-        await updateMutation.mutateAsync({
-          relationshipId: relationship.id,
-          clientId,
-          payload: {
-            bidding: formValues.bidding,
-            chart_accounts: formValues.chart_accounts.trim(),
-            tool: formValues.tool.trim(),
-            system: formValues.system.trim(),
-            note: formValues.note,
-          },
-        });
+        // Só o que mudou: reenviar o resto converteria "" legado em null sem o usuário pedir.
+        const changes = pickChangedContabilRelationshipFields(payload, relationship);
+        if (Object.keys(changes).length > 0) {
+          await updateMutation.mutateAsync({
+            relationshipId: relationship.id,
+            clientId,
+            payload: changes,
+          });
+        }
       } else {
-        await createMutation.mutateAsync({
-          client_id: clientId,
-          bidding: formValues.bidding,
-          chart_accounts: formValues.chart_accounts.trim(),
-          tool: formValues.tool.trim(),
-          system: formValues.system.trim(),
-          note: formValues.note,
-        });
+        await createMutation.mutateAsync({ client_id: clientId, ...payload });
       }
 
       setIsEditorOpen(false);
@@ -270,11 +262,7 @@ export function ContabilRelationshipSection({
                   {field.label}
                 </p>
                 <p className="text-sm text-gray-900 dark:text-white">
-                  {field.kind === "boolean"
-                    ? relationship[field.field]
-                      ? "Sim"
-                      : "Não"
-                    : relationship[field.field] || "Não informado"}
+                  {formatContabilRelationshipField(relationship, field.field)}
                 </p>
               </div>
             ))}
@@ -296,41 +284,44 @@ export function ContabilRelationshipSection({
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
-            {CONTABIL_RELATIONSHIP_TEXT_FIELDS.map((field) => (
-              <label
-                key={field.field}
-                className="flex flex-col gap-2 text-sm text-gray-700 dark:text-slate-300"
-              >
-                <span>{field.label}</span>
-                <input
-                  type="text"
-                  value={formValues[field.field]}
-                  onChange={(event) =>
-                    handleFieldChange(field.field, event.target.value)
-                  }
-                  disabled={!canEdit}
-                  className="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                />
-              </label>
-            ))}
-
-            {CONTABIL_RELATIONSHIP_BOOLEAN_FIELDS.map((field) => (
-              <label
-                key={field.field}
-                className="flex h-11 items-center gap-3 self-end rounded-lg bg-gray-50/70 px-3 text-sm text-gray-700 dark:bg-slate-900/40 dark:text-slate-300"
-              >
-                <input
-                  type="checkbox"
-                  checked={formValues[field.field]}
-                  onChange={(event) =>
-                    handleFieldChange(field.field, event.target.checked)
-                  }
-                  disabled={!canEdit}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
-                />
-                <span>{field.label}</span>
-              </label>
-            ))}
+            {CONTABIL_RELATIONSHIP_FIELDS.map((field) => {
+              if (field.kind === "textarea") {
+                return null;
+              }
+              const options = getContabilRelationshipFieldOptions(field.field, relationship);
+              const handleChange = (value: string) =>
+                setFormValues((current) => ({ ...current, [field.field]: value }));
+              return (
+                <label
+                  key={field.field}
+                  className="flex flex-col gap-2 text-sm text-gray-700 dark:text-slate-300"
+                >
+                  <span>{field.label}</span>
+                  {options ? (
+                    <select
+                      value={formValues[field.field]}
+                      onChange={(event) => handleChange(event.target.value)}
+                      disabled={!canEdit}
+                      className={INPUT_CLASSNAME}
+                    >
+                      {options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={formValues[field.field]}
+                      onChange={(event) => handleChange(event.target.value)}
+                      disabled={!canEdit}
+                      className={INPUT_CLASSNAME}
+                    />
+                  )}
+                </label>
+              );
+            })}
           </div>
 
           {CONTABIL_RELATIONSHIP_TEXTAREA_FIELDS.map((field) => (

@@ -31,7 +31,7 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
   const createRelationshipExample = {
     client_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     bidding: true,
-    chart_accounts: "Plano referencial",
+    chart_accounts: "Sim — Jonrick",
     tool: "Domínio",
     system: "ERP X",
     note: "Cliente em implantação.",
@@ -729,8 +729,17 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    bidding: { type: "boolean" },
-                    chart_accounts: { type: "string" },
+                    bidding: {
+                      type: "boolean",
+                      nullable: true,
+                      description: "null = não selecionado.",
+                    },
+                    chart_accounts: {
+                      type: "string",
+                      nullable: true,
+                      description:
+                        "null = não selecionado. Novos valores: Sim, Não, Sim — Jonrick, Não — Jonrick; texto livre legado só pode ser reenviado sem mudança.",
+                    },
                     tool: { type: "string" },
                     system: { type: "string" },
                     note: { type: "string" },
@@ -774,8 +783,17 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
                   additionalProperties: false,
                   properties: {
                     client_id: { type: "string", format: "uuid" },
-                    bidding: { type: "boolean" },
-                    chart_accounts: { type: "string" },
+                    bidding: {
+                      type: "boolean",
+                      nullable: true,
+                      description: "null = não selecionado.",
+                    },
+                    chart_accounts: {
+                      type: "string",
+                      nullable: true,
+                      description:
+                        "null = não selecionado. Novos valores: Sim, Não, Sim — Jonrick, Não — Jonrick; texto livre legado só pode ser reenviado sem mudança.",
+                    },
                     tool: { type: "string" },
                     system: { type: "string" },
                     note: { type: "string" },
