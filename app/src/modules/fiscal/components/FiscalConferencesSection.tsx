@@ -46,6 +46,9 @@ const SITUATIONS: Situation[] = [
   "Coincidente",
 ];
 
+// Mesmo teto do serviço (450 mil caracteres por planilha, dentro do 1 MB do gateway).
+const MAX_FILE_BYTES = 450_000;
+
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const money = (value: string | null | undefined) => (value ? currency.format(Number(value)) : "—");
 
@@ -127,6 +130,11 @@ export function FiscalConferencesSection({ canEdit }: { canEdit: boolean }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!files.dominio || !files.sefaz) return;
+    const tooBig = SOURCES.find((source) => (files[source.id]?.size ?? 0) > MAX_FILE_BYTES);
+    if (tooBig) {
+      toast.error(`${tooBig.label} excede 450 kB; divida o período em arquivos menores.`);
+      return;
+    }
     setResult(null);
     try {
       setResult(await compare.mutateAsync({ dominio: files.dominio, sefaz: files.sefaz }));
@@ -194,11 +202,11 @@ export function FiscalConferencesSection({ canEdit }: { canEdit: boolean }) {
         <div className="space-y-3">
           {result.status === "partial" ? (
             <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
-              Conferência parcial: {result.summary.discarded} linha(s) descartada(s) e {result.summary.errors} com erro ficaram fora da comparação.
+              Conferência parcial: {result.summary.discarded} linha(s) descartada(s), {result.summary.errors} com erro e {result.summary.duplicates} identidade(s) duplicada(s) ficaram sem correspondência.
             </p>
           ) : (
             <p role="status" className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-900 dark:border-green-700 dark:bg-green-900/20 dark:text-green-200">
-              Todas as linhas dos dois arquivos foram lidas e comparadas.
+              Todas as linhas dos dois arquivos foram lidas e pareadas sem ambiguidade.
             </p>
           )}
 

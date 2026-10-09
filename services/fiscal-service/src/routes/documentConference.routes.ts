@@ -12,14 +12,15 @@ import {
 /**
  * Conferências de arquivos (E2): processam o que foi enviado e devolvem o resultado sem gravar
  * nada. Executar conferência é operação fiscal ordinária (nível 2), como no Worker (POST).
- * Montado antes do `express.json()` global para aceitar planilhas acima de 100 kB.
+ * Montado antes do `express.json()` global para aceitar planilhas acima de 100 kB, até o mesmo
+ * 1 MB do gateway.
  */
 export function createDocumentConferenceRoutes(): ReturnType<typeof Router> {
   const router = Router();
 
   router.post(
     "/conferences/documents",
-    express.json({ limit: "5mb" }),
+    express.json({ limit: "1mb" }),
     isAuthenticated,
     requireFiscalWritePermission,
     (req: Request, res: Response, next: NextFunction) => {

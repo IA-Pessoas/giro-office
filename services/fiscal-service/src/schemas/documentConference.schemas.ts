@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-// ponytail: 2 milhões de caracteres por planilha (~ dezenas de milhares de notas) cabem numa
-// requisição JSON; arquivos maiores pedem upload em partes ou R2.
-export const CONFERENCE_MAX_CONTENT_LENGTH = 2_000_000;
+// ponytail: as duas planilhas viajam num JSON que o gateway limita a 1 MB; 450 mil caracteres
+// por arquivo (alguns milhares de notas) cabem com folga. Mais que isso pede upload em partes/R2.
+export const CONFERENCE_MAX_CONTENT_LENGTH = 450_000;
 
 const conferenceSourceSchema = z
   .object({
@@ -10,7 +10,7 @@ const conferenceSourceSchema = z
     content: z
       .string({ message: "Envie o conteúdo do arquivo." })
       .min(1, "Arquivo vazio.")
-      .max(CONFERENCE_MAX_CONTENT_LENGTH, "Arquivo excede o limite de 2 milhões de caracteres."),
+      .max(CONFERENCE_MAX_CONTENT_LENGTH, "Arquivo excede o limite de 450 mil caracteres."),
   })
   .strict();
 

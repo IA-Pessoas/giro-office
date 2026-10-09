@@ -4,7 +4,7 @@ import { csvLine, ServiceError } from "@workspace/shared";
  * Conferência Domínio × SEFAZ (FIS-08): compara duas planilhas CSV de notas por documento, sem
  * gravar nada. A identidade da NF-e vem da chave de acesso quando há; sem ela, de emitente,
  * modelo, série e número. Número isolado não identifica a nota, e identidade repetida não ganha
- * correspondência escolhida pelo sistema: vira duplicata visível.
+ * correspondência escolhida pelo sistema: vira duplicata (ambígua) e o resultado fica parcial.
  */
 
 export type ConferenceSourceId = "dominio" | "sefaz";
@@ -30,6 +30,12 @@ export interface ConferenceLineIssue {
   line: number;
 }
 
+export interface ConferencePair {
+  identity: string;
+  dominio: ConferenceDocumentRow;
+  sefaz: ConferenceDocumentRow;
+}
+
 export interface DocumentConferenceResult {
   status: "complete" | "partial";
   identity_rule: string;
@@ -53,13 +59,8 @@ export interface DocumentConferenceResult {
     errors: number;
   };
   totals: Record<ConferenceSourceId, string | null>;
-  matched: { identity: string; dominio: ConferenceDocumentRow; sefaz: ConferenceDocumentRow }[];
-  divergent: {
-    identity: string;
-    dominio: ConferenceDocumentRow;
-    sefaz: ConferenceDocumentRow;
-    differences: string[];
-  }[];
+  matched: ConferencePair[];
+  divergent: (ConferencePair & { differences: string[] })[];
   only_dominio: ConferenceDocumentRow[];
   only_sefaz: ConferenceDocumentRow[];
   duplicates: {
@@ -80,20 +81,13 @@ type Column = "access_key" | "issuer" | "model" | "series" | "number" | "value";
 
 // Cabeçalhos comparados sem acento, caixa ou pontuação. ponytail: aliases deduzidos dos nomes
 // usuais das exportações; sem amostras reais anonimizadas a compatibilidade não está validada.
+// "CNPJ" ou "Nota" sozinhos ficam de fora: podem ser do destinatário ou de outro campo.
 const COLUMN_ALIASES: Record<Column, string[]> = {
   access_key: ["chave", "chaveacesso", "chavedeacesso", "chavenfe", "chavedanfe", "chavenota"],
-  issuer: [
-    "emitente",
-    "cnpjemitente",
-    "cpfcnpjemitente",
-    "cnpjcpfemitente",
-    "cnpj",
-    "cpfcnpj",
-    "documentoemitente",
-  ],
+  issuer: ["emitente", "cnpjemitente", "cpfcnpjemitente", "cnpjcpfemitente", "documentoemitente"],
   model: ["modelo", "mod", "modelodocumento"],
   series: ["serie"],
-  number: ["numero", "numeronota", "numerodocumento", "numeronf", "nnf", "nota"],
+  number: ["numero", "numeronota", "numerodocumento", "numeronf", "nnf"],
   value: [
     "valor",
     "valortotal",
@@ -105,13 +99,7 @@ const COLUMN_ALIASES: Record<Column, string[]> = {
   ],
 };
 
-const IDENTITY_COLUMN_LABEL: [Column, string][] = [
-  ["access_key", "chave de acesso"],
-  ["issuer", "emitente"],
-  ["model", "modelo"],
-  ["series", "série"],
-  ["number", "número"],
-];
+const IDENTITY_COLUMNS: Column[] = ["access_key", "issuer", "model", "series", "number"];
 
 const DISCARD_REASON =
   "Sem chave de acesso e sem emitente, modelo, série e número; o número isolado não identifica a nota.";
@@ -124,8 +112,14 @@ function normalizeHeader(value: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
-/** CSV com aspas (RFC 4180); separador detectado no cabeçalho entre `;`, `,` e tab. */
-export function parseConferenceCsv(content: string): { line: number; cells: string[] }[] {
+/**
+ * CSV com aspas (RFC 4180); separador detectado no cabeçalho entre `;`, `,` e tab. Aspas abertas
+ * até o fim do arquivo engoliriam as linhas seguintes, então recusam o arquivo inteiro.
+ */
+export function parseConferenceCsv(
+  content: string,
+  label = "CSV",
+): { line: number; cells: string[] }[] {
   const text = content.replace(/^﻿/u, "");
   const firstLine = text.split(/\r?\n/u).find((line) => line.trim() !== "") ?? "";
   const unquoted = firstLine.replace(/"[^"]*"/g, "");
@@ -172,6 +166,12 @@ export function parseConferenceCsv(content: string): { line: number; cells: stri
       cell += char;
     }
   }
+  if (quoted) {
+    throw new ServiceError(
+      400,
+      `Arquivo ${label}: aspas abertas na linha ${rowLine} não foram fechadas.`,
+    );
+  }
   endRow();
   return rows;
 }
@@ -189,14 +189,19 @@ function isValidAccessKey(key: string): boolean {
   return Number(key[43]) === (rest < 2 ? 0 : 11 - rest);
 }
 
-/** Valor monetário em centavos: aceita `1.234,56`, `1234,56` e `1234.56`. */
+/**
+ * Valor monetário em centavos: aceita `1.234,56`, `1234,56`, `1234.56`, `R$` e negativo com
+ * sinal ou entre parênteses.
+ */
 function parseCents(raw: string): number | null {
-  let value = raw.replace(/^R\$/u, "").replace(/\s/g, "");
+  let value = raw.replace(/R\$/gu, "").replace(/\s/g, "");
+  const parenthesized = /^\(.*\)$/u.test(value);
+  if (parenthesized) value = value.slice(1, -1);
   if (value.includes(",")) value = value.replace(/\./g, "").replace(",", ".");
   const match = /^(-?)(\d+)(?:\.(\d{1,2}))?$/u.exec(value);
-  if (!match) return null;
+  if (!match || (parenthesized && match[1])) return null;
   const cents = Number(match[2]) * 100 + Number((match[3] ?? "").padEnd(2, "0"));
-  return match[1] ? -cents : cents;
+  return match[1] || parenthesized ? -cents : cents;
 }
 
 function formatCents(cents: number): string {
@@ -218,7 +223,7 @@ interface ParsedSource {
 
 function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): ParsedSource {
   const label = SOURCE_LABEL[source];
-  const [header, ...data] = parseConferenceCsv(input.content);
+  const [header, ...data] = parseConferenceCsv(input.content, label);
   const columns = new Map<Column, number>();
   header?.cells.forEach((name, index) => {
     const normalized = normalizeHeader(name);
@@ -249,9 +254,11 @@ function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): 
       file_name: input.file_name,
       data_rows: data.length,
       accepted_rows: 0,
-      identity_columns: IDENTITY_COLUMN_LABEL.filter(([column]) => columns.has(column)).map(
-        ([, name]) => name,
-      ),
+      // Cabeçalhos originais, para a equipe ver qual coluna virou identidade.
+      identity_columns: IDENTITY_COLUMNS.flatMap((column) => {
+        const index = columns.get(column);
+        return index === undefined ? [] : [header?.cells[index]?.trim() ?? ""];
+      }),
       value_column: columns.has("value"),
     },
   };
@@ -274,6 +281,7 @@ function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): 
         fail("Chave de acesso inválida.");
         continue;
       }
+      // Na chave o emitente tem sempre 14 posições: CPF vem com zeros à esquerda.
       row = {
         access_key: rawKey,
         issuer: rawKey.slice(6, 20),
@@ -300,7 +308,7 @@ function parseSource(source: ConferenceSourceId, input: ConferenceSourceInput): 
       }
       row = {
         access_key: null,
-        issuer: issuerDigits,
+        issuer: issuerDigits.padStart(14, "0"),
         model: stripZeros(model).padStart(2, "0"),
         series: stripZeros(series),
         number: stripZeros(number),
@@ -339,30 +347,17 @@ export function compareDocumentSpreadsheets(input: {
     for (const row of rows) map.set(row.identity, [...(map.get(row.identity) ?? []), row]);
     return map;
   };
-  const left = group(dominio.rows);
-  const right = group(sefaz.rows);
+  const dominioById = group(dominio.rows);
+  const sefazById = group(sefaz.rows);
+  const total = (parsed: ParsedSource) =>
+    parsed.hasValue
+      ? formatCents(parsed.rows.reduce((sum, row) => sum + (row.cents ?? 0), 0))
+      : null;
 
-  const result: DocumentConferenceResult = {
-    status: "complete",
-    identity_rule: IDENTITY_RULE,
-    sources: { dominio: dominio.info, sefaz: sefaz.info },
-    summary: {
-      matched: 0,
-      divergent: 0,
-      only_dominio: 0,
-      only_sefaz: 0,
-      duplicates: 0,
-      discarded: 0,
-      errors: 0,
-    },
-    totals: {
-      dominio: dominio.hasValue
-        ? formatCents(dominio.rows.reduce((sum, row) => sum + (row.cents ?? 0), 0))
-        : null,
-      sefaz: sefaz.hasValue
-        ? formatCents(sefaz.rows.reduce((sum, row) => sum + (row.cents ?? 0), 0))
-        : null,
-    },
+  const buckets: Pick<
+    DocumentConferenceResult,
+    "matched" | "divergent" | "only_dominio" | "only_sefaz" | "duplicates" | "discarded" | "errors"
+  > = {
     matched: [],
     divergent: [],
     only_dominio: [],
@@ -372,43 +367,48 @@ export function compareDocumentSpreadsheets(input: {
     errors: [...dominio.errors, ...sefaz.errors],
   };
 
-  const identities = [...new Set([...left.keys(), ...right.keys()])];
+  const identities = [...new Set([...dominioById.keys(), ...sefazById.keys()])];
   for (const identity of identities) {
-    const a = left.get(identity) ?? [];
-    const b = right.get(identity) ?? [];
-    if (a.length > 1 || b.length > 1) {
-      result.duplicates.push({ identity, dominio: a.map(publicRow), sefaz: b.map(publicRow) });
-    } else if (a[0] && b[0]) {
+    const fromDominio = dominioById.get(identity) ?? [];
+    const fromSefaz = sefazById.get(identity) ?? [];
+    const [d, s] = [fromDominio[0], fromSefaz[0]];
+    if (fromDominio.length > 1 || fromSefaz.length > 1) {
+      buckets.duplicates.push({
+        identity,
+        dominio: fromDominio.map(publicRow),
+        sefaz: fromSefaz.map(publicRow),
+      });
+    } else if (d && s) {
       const differences: string[] = [];
-      if (a[0].access_key && b[0].access_key && a[0].access_key !== b[0].access_key) {
+      if (d.access_key && s.access_key && d.access_key !== s.access_key) {
         differences.push("Chave de acesso diferente");
       }
-      if (dominio.hasValue && sefaz.hasValue && a[0].value !== b[0].value) {
-        differences.push(
-          `Valor: Domínio ${a[0].value ?? "ausente"} × SEFAZ ${b[0].value ?? "ausente"}`,
-        );
+      if (dominio.hasValue && sefaz.hasValue && d.value !== s.value) {
+        differences.push(`Valor: Domínio ${d.value ?? "ausente"} × SEFAZ ${s.value ?? "ausente"}`);
       }
-      const pair = { identity, dominio: publicRow(a[0]), sefaz: publicRow(b[0]) };
-      if (differences.length > 0) result.divergent.push({ ...pair, differences });
-      else result.matched.push(pair);
-    } else if (a[0]) {
-      result.only_dominio.push(publicRow(a[0]));
-    } else if (b[0]) {
-      result.only_sefaz.push(publicRow(b[0]));
+      const pair = { identity, dominio: publicRow(d), sefaz: publicRow(s) };
+      if (differences.length > 0) buckets.divergent.push({ ...pair, differences });
+      else buckets.matched.push(pair);
+    } else if (d) {
+      buckets.only_dominio.push(publicRow(d));
+    } else if (s) {
+      buckets.only_sefaz.push(publicRow(s));
     }
   }
 
-  result.summary = {
-    matched: result.matched.length,
-    divergent: result.divergent.length,
-    only_dominio: result.only_dominio.length,
-    only_sefaz: result.only_sefaz.length,
-    duplicates: result.duplicates.length,
-    discarded: result.discarded.length,
-    errors: result.errors.length,
+  const summary = Object.fromEntries(
+    Object.entries(buckets).map(([name, items]) => [name, items.length]),
+  ) as DocumentConferenceResult["summary"];
+  // Duplicata não foi pareada: tanto quanto descarte e erro, deixa a conferência incompleta.
+  const incomplete = summary.discarded + summary.errors + summary.duplicates > 0;
+  return {
+    status: incomplete ? "partial" : "complete",
+    identity_rule: IDENTITY_RULE,
+    sources: { dominio: dominio.info, sefaz: sefaz.info },
+    summary,
+    totals: { dominio: total(dominio), sefaz: total(sefaz) },
+    ...buckets,
   };
-  if (result.discarded.length > 0 || result.errors.length > 0) result.status = "partial";
-  return result;
 }
 
 const DELIMITER = ";";
@@ -417,11 +417,7 @@ const brl = (value: string | null | undefined) => (value ? value.replace(".", ",
 /** CSV do resultado: uma linha por item conferido, descarte ou erro, com a situação. */
 export function documentConferenceCsvExport(result: DocumentConferenceResult) {
   type Line = (string | number)[];
-  const pairLine = (
-    situation: string,
-    item: { identity: string; dominio: ConferenceDocumentRow; sefaz: ConferenceDocumentRow },
-    note = "",
-  ): Line => [
+  const pairLine = (situation: string, item: ConferencePair, note = ""): Line => [
     situation,
     item.identity,
     item.dominio.line,
@@ -456,7 +452,7 @@ export function documentConferenceCsvExport(result: DocumentConferenceResult) {
   if (result.status === "partial") {
     lines.push([
       "Resultado",
-      "Conferência parcial: há linhas descartadas ou com erro",
+      "Conferência parcial: há linhas descartadas, com erro ou duplicadas",
       "",
       "",
       "",

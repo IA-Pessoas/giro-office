@@ -1046,7 +1046,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
                         additionalProperties: false,
                         properties: {
                           file_name: { type: "string", minLength: 1, maxLength: 255 },
-                          content: { type: "string", minLength: 1, maxLength: 2_000_000 },
+                          content: { type: "string", minLength: 1, maxLength: 450_000 },
                         },
                       },
                     ]),

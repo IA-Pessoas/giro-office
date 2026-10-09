@@ -104,18 +104,20 @@ describe("compareDocumentSpreadsheets", () => {
       file_name: "dominio.csv",
       data_rows: 4,
       accepted_rows: 4,
-      identity_columns: ["chave de acesso", "emitente", "modelo", "série", "número"],
+      identity_columns: ["Chave de acesso", "CNPJ Emitente", "Modelo", "Série", "Número"],
       value_column: true,
     });
   });
 
   it("não escolhe correspondência para identidade repetida e mostra as duplicatas", () => {
     const dominio = [
-      "Número;Série;Modelo;CNPJ;Valor",
+      "Número;Série;Modelo;CNPJ Emitente;Valor",
       `100;1;55;${ISSUER_A};1,00`,
       `100;1;55;${ISSUER_A};2,00`,
     ].join("\n");
-    const sefaz = ["Número;Série;Modelo;CNPJ;Valor", `100;1;55;${ISSUER_A};1,00`].join("\n");
+    const sefaz = ["Número;Série;Modelo;CNPJ Emitente;Valor", `100;1;55;${ISSUER_A};1,00`].join(
+      "\n",
+    );
 
     const result = compareDocumentSpreadsheets({ dominio: source(dominio), sefaz: source(sefaz) });
 
@@ -123,7 +125,8 @@ describe("compareDocumentSpreadsheets", () => {
     expect(result.duplicates).toHaveLength(1);
     expect(result.duplicates[0]?.dominio.map((row) => row.line)).toEqual([2, 3]);
     expect(result.duplicates[0]?.sefaz.map((row) => row.line)).toEqual([2]);
-    expect(result.status).toBe("complete");
+    // Linhas não pareadas: a conferência não pode parecer completa.
+    expect(result.status).toBe("partial");
   });
 
   it("aponta chaves de acesso diferentes para a mesma nota", () => {
@@ -137,7 +140,7 @@ describe("compareDocumentSpreadsheets", () => {
 
   it("descarta número isolado e lista erros por linha como resultado parcial", () => {
     const dominio = [
-      "Chave;Número;Série;Modelo;CNPJ;Valor",
+      "Chave;Número;Série;Modelo;CNPJ Emitente;Valor",
       ";100;;;;1,00",
       `${keyA1.slice(0, 43)}${(Number(keyA1[43]) + 1) % 10};;;;;1,00`,
       `;101;1;55;${ISSUER_A};abc`,
@@ -185,7 +188,43 @@ describe("compareDocumentSpreadsheets", () => {
       sefaz: source("Emitente;Modelo;Série;Número\n12345678909;55;1;100"),
     });
     expect(result.matched).toHaveLength(1);
-    expect(result.matched[0]?.identity).toBe("12345678909|55|1|100");
+    expect(result.matched[0]?.identity).toBe("00012345678909|55|1|100");
+  });
+
+  it("casa emitente CPF da chave de acesso com o CPF da coluna", () => {
+    const cpfKey = accessKey("00012345678909", "55", "1", "7");
+    const result = compareDocumentSpreadsheets({
+      dominio: source(`Chave\n${cpfKey}`),
+      sefaz: source("CPF/CNPJ Emitente;Modelo;Série;Número\n123.456.789-09;55;1;7"),
+    });
+    expect(result.matched).toHaveLength(1);
+  });
+
+  it("lê R$, sinal e parênteses como valor negativo", () => {
+    const header = "CNPJ Emitente;Modelo;Série;Número;Valor";
+    const result = compareDocumentSpreadsheets({
+      dominio: source(`${header}\n${ISSUER_A};55;1;1;(10,00)\n${ISSUER_A};55;1;2;-R$ 1.000,50`),
+      sefaz: source(`${header}\n${ISSUER_A};55;1;1;R$ -10,00\n${ISSUER_A};55;1;2;-1000.5`),
+    });
+    expect(result.matched.map((pair) => pair.dominio.value)).toEqual(["-10.00", "-1000.50"]);
+  });
+
+  it("recusa aspas não fechadas em vez de engolir as linhas seguintes", () => {
+    expect(() =>
+      compareDocumentSpreadsheets({
+        dominio: source(`Chave;Obs\n${keyA1};"sem fim\n${keyA1};ok`),
+        sefaz: source(`Chave\n${keyA1}`),
+      }),
+    ).toThrow("Arquivo Domínio: aspas abertas na linha 2 não foram fechadas.");
+  });
+
+  it("ignora CNPJ genérico, que pode ser do destinatário", () => {
+    expect(() =>
+      compareDocumentSpreadsheets({
+        dominio: source(`CNPJ;Modelo;Série;Número\n${ISSUER_A};55;1;1`),
+        sefaz: source(`Chave\n${keyA1}`),
+      }),
+    ).toThrow(/cabeçalho precisa ter/u);
   });
 });
 
@@ -205,7 +244,7 @@ describe("documentConferenceCsvExport", () => {
     expect(lines).toContain(`Coincidente;${ISSUER_A}|55|1|100;2;1,50;2;1,50;`);
     expect(lines[lines.length - 1]).toMatch(/^Descartada;;3;;;;"Sem chave de acesso/u);
     expect(lines).toContain(
-      "Resultado;Conferência parcial: há linhas descartadas ou com erro;;;;;",
+      "Resultado;Conferência parcial: há linhas descartadas, com erro ou duplicadas;;;;;",
     );
   });
 });

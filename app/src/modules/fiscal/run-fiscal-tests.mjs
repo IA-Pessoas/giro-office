@@ -361,5 +361,8 @@ await runTest("fiscal Domínio × SEFAZ conference reads files and shows partial
   assert.match(section, /exige permissão de edição no Fiscal/);
   assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
   assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  // Arquivo acima do teto do gateway é barrado antes do envio.
+  assert.match(section, /const MAX_FILE_BYTES = 450_000;/);
+  assert.match(section, /size \?\? 0\) > MAX_FILE_BYTES/);
   assert.match(section, /catch \(error\) \{\s*toast\.error\(getFiscalErrorMessage\(error\)\);/);
 });
