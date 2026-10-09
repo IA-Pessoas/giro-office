@@ -10,6 +10,7 @@ export type FiscalTabId =
   | "rates"
   | "revenues"
   | "malhas"
+  | "anticipations"
   | "wholesale"
   | "conferences";
 

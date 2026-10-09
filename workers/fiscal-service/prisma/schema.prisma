@@ -308,6 +308,58 @@ model TriageCompetence {
 }
 
 // Só leitura: responsável fiscal padrão do cliente, mantido pela Triagem.
+// Lote de antecipações importado de ZIP de XML NF-e (E3); revisão manual, sem cálculo de imposto.
+model FiscalAnticipationBatch {
+  id              String                   @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime                 @db.Date
+  file_name       String
+  status          String                   @default("pending_review")
+  responsible_id  String
+  reviewer_id     String?
+  entry_count     Int
+  note_count      Int
+  item_count      Int
+  issues          Json                     @default("[]")
+  created_by      String
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  items           FiscalAnticipationItem[]
+
+  @@index([organization_id, client_id, competence], map: "idx_fiscal_anticipation_batches_org_client_comp")
+  @@map("fiscal.anticipation_batches")
+}
+
+// Item de NF-e extraído do lote; chave de acesso + item é única na organização.
+model FiscalAnticipationItem {
+  id              String                  @id @default(uuid())
+  organization_id String
+  client_id       String
+  batch_id        String
+  entry           String
+  access_key      String
+  issuer          String
+  model           String
+  series          String
+  note_number     String
+  item_number     Int
+  code            String
+  description     String
+  ncm             String
+  cfop            String
+  quantity        Decimal?                @db.Decimal(15, 4)
+  value           Decimal?                @db.Decimal(15, 2)
+  ipi             Decimal?                @db.Decimal(15, 2)
+  icms_st         Decimal?                @db.Decimal(15, 2)
+  created_at      DateTime                @default(now())
+  batch           FiscalAnticipationBatch @relation(fields: [batch_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, access_key, item_number], map: "uq_fiscal_anticipation_items_org_key_item")
+  @@index([organization_id, batch_id, access_key, item_number], map: "idx_fiscal_anticipation_items_org_batch")
+  @@map("fiscal.anticipation_items")
+}
+
 model TriageResponsible {
   id              String @id @default(uuid())
   client_id       String

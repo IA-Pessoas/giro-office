@@ -44,6 +44,11 @@ export function fiscalSimplesPreviewQueryKey(clientId: string, competence: strin
   return [...fiscalRevenuesQueryKey(clientId), "simples-preview", competence] as const;
 }
 
+/** Lotes de antecipações do cliente; invalidá-lo também atualiza o detalhe aberto. */
+export function fiscalAnticipationsQueryKey(clientId: string) {
+  return [...FISCAL_QUERY_KEY, "anticipations", clientId] as const;
+}
+
 /** Prefixo das malhas do cliente; invalidá-lo também atualiza o histórico aberto. */
 export function fiscalMalhasQueryKey(clientId: string) {
   return [...FISCAL_QUERY_KEY, "malhas", clientId] as const;

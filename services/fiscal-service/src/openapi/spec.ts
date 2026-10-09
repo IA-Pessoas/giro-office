@@ -14,7 +14,7 @@ const clientIdParameter = {
   required: true,
   schema: { type: "string", format: "uuid" },
 };
-const malhaIdParameter = {
+const idPathParameter = {
   name: "id",
   in: "path",
   required: true,
@@ -147,6 +147,11 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
       {
         name: "Receitas",
         description: "Receita bruta mensal por cliente, base do Simples Nacional",
+      },
+      {
+        name: "Antecipações",
+        description:
+          "Lotes de XML NF-e para revisão manual de antecipações, sem cálculo automático de imposto",
       },
       {
         name: "Malhas",
@@ -1853,6 +1858,86 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/anticipations/batches": {
+        post: {
+          tags: ["Antecipações"],
+          summary: "Importar ZIP de XML NF-e em lote de antecipações",
+          description:
+            "Cria um lote pendente de revisão (status pending_review) para cliente e competência, com um item por det das NF-e e a origem (arquivo, chave de acesso, número do item). Duplicata de chave de acesso + item no próprio ZIP (versões diferentes da mesma nota) ou já importada em qualquer lote da organização (qualquer cliente) não entra: a nota inteira fica de fora e aparece em issues (kind duplicate); XML inválido, NF-e sem chave, cancelada ou não autorizada aparece como error; arquivo que não é NF-e, como discarded. ZIP sem nenhum item importável devolve 400 e não cria lote. Não calcula imposto nem emite guia.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence", "file_name", "zip_base64"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: {
+                      type: "string",
+                      pattern: competencePattern,
+                      description: "AAAA-MM",
+                    },
+                    file_name: { type: "string", minLength: 1, maxLength: 255 },
+                    zip_base64: { type: "string", minLength: 1, maxLength: 900_000 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Lote criado com itens e issues", content: successContent },
+            "400": { description: "Entrada inválida, ZIP ilegível ou nenhum item importável" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+            "409": { description: "Importação concorrente gravou as mesmas notas" },
+          },
+        },
+      },
+      "/fiscal/anticipations/batches/list": {
+        get: {
+          tags: ["Antecipações"],
+          summary: "Listar lotes de antecipações",
+          description: "Mais recentes primeiro; sem os itens.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "client_id",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "competence",
+              in: "query",
+              required: false,
+              schema: { type: "string", pattern: competencePattern },
+            },
+            ...paginationParameters,
+          ],
+          responses: {
+            "200": {
+              description: "Lotes paginados da organização",
+              content: { "application/json": { schema: paginatedListEnvelopeSchema } },
+            },
+            "400": { description: "Filtro inválido" },
+          },
+        },
+      },
+      "/fiscal/anticipations/batches/{id}": {
+        get: {
+          tags: ["Antecipações"],
+          summary: "Detalhar lote de antecipações com itens e issues",
+          security: [{ bearerAuth: [] }],
+          parameters: [idPathParameter],
+          responses: {
+            "200": { description: "Lote, itens e issues", content: successContent },
+            "404": { description: "Lote não encontrado nesta organização" },
+          },
+        },
+      },
       "/fiscal/malhas": {
         post: {
           tags: ["Malhas"],
@@ -1927,7 +2012,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Malhas"],
           summary: "Detalhar malha com histórico de prazo, situação e responsável",
           security: [{ bearerAuth: [] }],
-          parameters: [malhaIdParameter],
+          parameters: [idPathParameter],
           responses: {
             "200": {
               description: "Malha e histórico (mais recente primeiro)",
@@ -1942,7 +2027,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           description:
             "Mudanças de prazo, situação e responsável gravam histórico com ator e momento na mesma transação.",
           security: [{ bearerAuth: [] }],
-          parameters: [malhaIdParameter],
+          parameters: [idPathParameter],
           requestBody: {
             required: true,
             content: {
@@ -1969,7 +2054,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Malhas"],
           summary: "Enviar ou substituir o anexo da malha",
           security: [{ bearerAuth: [] }],
-          parameters: [malhaIdParameter],
+          parameters: [idPathParameter],
           requestBody: {
             required: true,
             content: {
@@ -2000,7 +2085,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Malhas"],
           summary: "Gerar URL assinada temporária do anexo",
           security: [{ bearerAuth: [] }],
-          parameters: [malhaIdParameter],
+          parameters: [idPathParameter],
           responses: {
             "200": {
               description: "URL assinada (url, expires_in_seconds)",
