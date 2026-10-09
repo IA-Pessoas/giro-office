@@ -115,6 +115,12 @@ describe("activityCatalog", () => {
     ["POST", "/fiscal/malhas", "cadastrou", "uma nova malha fiscal"],
     ["POST", "/fiscal/anticipations/batches", "importou", "um lote de XML para antecipações"],
     [
+      "GET",
+      "/fiscal/anticipations/batches/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/pdf",
+      "exportou",
+      "o demonstrativo de um lote de antecipações",
+    ],
+    [
       "PUT",
       "/fiscal/anticipations/batches/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/items/9a68a809-9a78-4ef9-94d0-b9bb9787ad2f",
       "revisou",

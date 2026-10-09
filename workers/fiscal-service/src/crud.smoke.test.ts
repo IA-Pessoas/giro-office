@@ -1046,6 +1046,15 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       "POST check approve",
     );
     expect(checked.data.status).toBe("checked");
+
+    // FIS-18: demonstrativo do mesmo lote com a origem de cada valor.
+    const csv = await call("GET", `/fiscal/anticipations/batches/${id}/csv`);
+    expect(csv.status).toBe(200);
+    expect(csv.text).toContain("Estado da revisão;Conferido");
+    expect(csv.text).toContain("22029900;Corrigido;22030000");
+    expect(csv.text).toContain("7,50;Informado manualmente");
+    const pdf = await call("GET", `/fiscal/anticipations/batches/${id}/pdf`);
+    expect(pdf.status).toBe(200);
     const detail = expectOk(await call("GET", `/fiscal/anticipations/batches/${id}`), "GET detail");
     const fields = (detail.data.history as { field: string }[]).map((row) => row.field);
     expect(fields.filter((field) => field === "status")).toHaveLength(4);

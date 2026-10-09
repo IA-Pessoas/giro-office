@@ -1987,6 +1987,40 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/anticipations/batches/{id}/csv": {
+        get: {
+          tags: ["Antecipações"],
+          summary: "Baixar demonstrativo manual do lote em CSV",
+          description:
+            "Mesmo lote do detalhe: cabeçalho com cliente, competência, estado da revisão, responsável e conferente, a declaração de que não houve apuração automática de imposto nem emissão de guia oficial e uma linha por item. Cada campo traz valor final, origem (XML ou Corrigido) e valor do XML; o valor informado manualmente vem identificado. Separador ponto e vírgula, decimais com vírgula, UTF-8 com BOM.",
+          security: [{ bearerAuth: [] }],
+          parameters: [idPathParameter],
+          responses: {
+            "200": {
+              description: "CSV do demonstrativo",
+              content: { "text/csv": { schema: { type: "string" } } },
+            },
+            "404": { description: "Lote não encontrado nesta organização" },
+          },
+        },
+      },
+      "/fiscal/anticipations/batches/{id}/pdf": {
+        get: {
+          tags: ["Antecipações"],
+          summary: "Baixar demonstrativo manual do lote em PDF",
+          description:
+            "Mesmo conteúdo do CSV: cada valor com a origem (XML, corrigido com o valor do XML, informado manualmente) e a declaração de que não houve apuração automática nem guia oficial.",
+          security: [{ bearerAuth: [] }],
+          parameters: [idPathParameter],
+          responses: {
+            "200": {
+              description: "PDF do demonstrativo",
+              content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+            },
+            "404": { description: "Lote não encontrado nesta organização" },
+          },
+        },
+      },
       "/fiscal/anticipations/batches/{id}/items/{item_id}": {
         put: {
           tags: ["Antecipações"],
@@ -2044,7 +2078,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Antecipações"],
           summary: "Enviar lote à conferência",
           description:
-            "Exige todos os itens classificados e conferente ativo com acesso ao Fiscal na organização. pending_review → awaiting_check, com histórico do estado e do conferente.",
+            "Exige todos os itens classificados e conferente ativo com Fiscal nível 2 ou superior na organização (conferir é escrita). pending_review → awaiting_check, com histórico do estado e do conferente.",
           security: [{ bearerAuth: [] }],
           parameters: [idPathParameter],
           requestBody: {
@@ -2064,7 +2098,9 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
             "200": { description: "Lote aguardando conferência", content: successContent },
             "400": { description: "Entrada inválida ou item sem classificação" },
             "403": { description: "Sem permissão de edição Fiscal" },
-            "404": { description: "Lote ou conferente não encontrado nesta organização" },
+            "404": {
+              description: "Lote não encontrado, ou conferente sem Fiscal nível 2 na organização",
+            },
             "409": { description: "Lote fora da classificação" },
           },
         },
@@ -2074,7 +2110,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Antecipações"],
           summary: "Conferir lote: aprovar ou devolver",
           description:
-            "Só o conferente designado decide. approve: awaiting_check → checked. return (motivo obrigatório): awaiting_check → pending_review.",
+            "Decide o conferente designado ou, no lugar dele, Fiscal nível 3 (RT-02); o histórico registra quem decidiu. approve: awaiting_check → checked. return (motivo obrigatório): awaiting_check → pending_review.",
           security: [{ bearerAuth: [] }],
           parameters: [idPathParameter],
           requestBody: {
@@ -2096,7 +2132,10 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           responses: {
             "200": { description: "Lote conferido ou devolvido", content: successContent },
             "400": { description: "Decisão inválida ou devolução sem motivo" },
-            "403": { description: "Sem permissão de edição Fiscal ou não é o conferente" },
+            "403": {
+              description:
+                "Sem permissão de edição Fiscal, ou não é o conferente nem Fiscal nível 3",
+            },
             "404": { description: "Lote não encontrado nesta organização" },
             "409": { description: "Lote não está aguardando conferência" },
           },

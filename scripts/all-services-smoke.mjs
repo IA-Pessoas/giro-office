@@ -5206,6 +5206,20 @@ const handlers = {
     }
   },
 
+  async fiscalAnticipationCsv(op) {
+    await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/csv`,
+      expectEnvelope: false,
+    });
+  },
+
+  async fiscalAnticipationPdf(op) {
+    await httpRequest(op, {
+      path: `/fiscal/anticipations/batches/${requireState("fiscalAnticipationBatchId")}/pdf`,
+      expectEnvelope: false,
+    });
+  },
+
   async fiscalMalhaCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

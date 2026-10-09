@@ -387,6 +387,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "importou", item: "um lote de XML para antecipações" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/anticipations\/batches\/[^/]+\/(?:csv|pdf)$/,
+    description: { action: "exportou", item: "o demonstrativo de um lote de antecipações" },
+  },
+  {
     methods: ["PUT"],
     pattern: /^\/fiscal\/anticipations\/batches\/[^/]+\/items\/[^/]+$/,
     description: { action: "revisou", item: "um item de antecipação" },
