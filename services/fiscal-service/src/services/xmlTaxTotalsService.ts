@@ -1,7 +1,12 @@
 import { csvLine } from "@workspace/shared";
 
 import { brl, formatCents, parseCents } from "./documentConferenceService.js";
-import { dropIdenticalCopies, type NfeFile, readNfeArchive } from "./nfeXml.js";
+import {
+  dropIdenticalCopies,
+  isAuthorizedProtocol,
+  type NfeFile,
+  readNfeArchive,
+} from "./nfeXml.js";
 
 /**
  * Totais de IPI e ICMS ST a partir de XML NF-e (FIS-12): soma em centavos inteiros os valores
@@ -27,6 +32,8 @@ export interface TaxNote {
   declared_icms_st: string | null;
   /** Soma dos itens diferente do total declarado no ICMSTot. */
   differences: string[];
+  /** Ex.: XML sem protocolo de autorização (somado, mas sem confirmação). */
+  warnings: string[];
   items: TaxItem[];
 }
 
@@ -39,8 +46,6 @@ export interface XmlTaxTotalsResult {
   discarded: { entry: string; reason: string }[];
   errors: { entry: string; message: string }[];
 }
-
-const AUTHORIZED_PROTOCOL = new Set(["100", "150"]);
 
 const cents = (value: string | null) => (value === null ? 0 : (parseCents(value) ?? 0));
 const sum = (values: (string | null)[]) => values.reduce((total, value) => total + cents(value), 0);
@@ -71,6 +76,7 @@ function taxNote(note: NfeFile): TaxNote {
     declared_ipi: note.declared_ipi,
     declared_icms_st: note.declared_icms_st,
     differences,
+    warnings: note.protocol_status === null ? ["XML sem protocolo de autorização"] : [],
     items,
   };
 }
@@ -78,6 +84,10 @@ function taxNote(note: NfeFile): TaxNote {
 export function sumXmlTaxes(input: { file_name: string; zip_base64: string }): XmlTaxTotalsResult {
   const archive = readNfeArchive(input.zip_base64);
   const { notes, copies } = dropIdenticalCopies(archive.notes);
+  const cancelledBy = new Map(
+    archive.cancellations.map((event) => [event.access_key, event.entry]),
+  );
+  const errors = [...archive.errors];
 
   const byIdentity = new Map<string, NfeFile[]>();
   for (const note of notes)
@@ -96,7 +106,16 @@ export function sumXmlTaxes(input: { file_name: string; zip_base64: string }): X
         entries: versions.map((version) => version.entry),
         reason: "XML repetido com dados da nota diferentes; nenhuma versão foi somada.",
       });
-    } else if (note.protocol_status && !AUTHORIZED_PROTOCOL.has(note.protocol_status)) {
+    } else if (note.tax_errors.length > 0) {
+      // Valor de imposto ilegível: somar daria total errado, então a nota sai como erro.
+      errors.push({ entry: note.entry, message: note.tax_errors.join(" ") });
+    } else if (note.access_key && cancelledBy.has(note.access_key)) {
+      excluded.push({
+        identity,
+        entries: [note.entry],
+        reason: `Cancelada pelo evento ${cancelledBy.get(note.access_key)}; não somada.`,
+      });
+    } else if (note.protocol_status && !isAuthorizedProtocol(note.protocol_status)) {
       excluded.push({
         identity,
         entries: [note.entry],
@@ -108,7 +127,7 @@ export function sumXmlTaxes(input: { file_name: string; zip_base64: string }): X
   }
 
   // XML inválido ou duplicado pode esconder imposto: o total não pode parecer completo.
-  const incomplete = archive.errors.length + duplicated > 0 || notes.length === 0;
+  const incomplete = errors.length + duplicated > 0 || notes.length === 0;
   return {
     status: incomplete ? "partial" : "complete",
     sources: {
@@ -123,7 +142,7 @@ export function sumXmlTaxes(input: { file_name: string; zip_base64: string }): X
     notes: included,
     excluded,
     discarded: [...archive.discarded, ...copies],
-    errors: archive.errors,
+    errors,
   };
 }
 
@@ -171,7 +190,7 @@ export function xmlTaxTotalsCsvExport(result: XmlTaxTotalsResult) {
       "",
       brl(note.ipi),
       brl(note.icms_st),
-      note.differences.join(" | "),
+      [...note.differences, ...note.warnings].join(" | "),
     ]);
     for (const item of note.items) {
       lines.push([
@@ -180,7 +199,7 @@ export function xmlTaxTotalsCsvExport(result: XmlTaxTotalsResult) {
         note.identity,
         note.entry,
         item.number,
-        item.description,
+        item.description || item.code,
         brl(item.ipi),
         brl(item.icms_st),
         "",

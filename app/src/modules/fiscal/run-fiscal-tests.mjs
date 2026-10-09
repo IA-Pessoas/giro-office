@@ -435,3 +435,17 @@ await runTest("fiscal IPI/ICMS ST totals show composition and excluded XML", asy
   assert.match(section, /Não é apuração de imposto/);
   assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
 });
+
+await runTest("fiscal money formatting avoids floating point", async () => {
+  const { formatMoney } = await import("./utils/formatMoney.ts");
+  assert.equal(formatMoney("99999999999.99"), "R$ 99.999.999.999,99");
+  assert.equal(formatMoney("0.30"), "R$ 0,30");
+  assert.equal(formatMoney("-1234.5"), "-R$ 1.234,50");
+  assert.equal(formatMoney(null), "—");
+  assert.equal(formatMoney(null, "sem valor"), "sem valor");
+  for (const name of ["FiscalConferencesSection", "FiscalSefazXmlSection", "FiscalSpedXmlSection", "FiscalXmlTaxesSection"]) {
+    const source = await readSource(`./components/${name}.tsx`);
+    assert.doesNotMatch(source, /Intl\.NumberFormat/);
+    assert.match(source, /formatMoney\(value/);
+  }
+});

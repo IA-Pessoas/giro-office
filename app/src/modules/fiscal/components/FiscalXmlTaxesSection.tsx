@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
 import { type FiscalXmlTaxTotals, fiscalConferenceService } from "../services/fiscalConferenceService";
-import { downloadFile, getFiscalErrorMessage } from "../utils";
+import { downloadFile, formatMoney, getFiscalErrorMessage } from "../utils";
 import {
   FISCAL_FIELD_CONTROL_CLASSNAME,
   FISCAL_PRIMARY_BUTTON_CLASSNAME,
@@ -13,8 +13,7 @@ import {
 // Mesmo teto do serviço: ~650 kB de ZIP em base64 dentro do 1 MB do gateway.
 const MAX_ZIP_BYTES = 650_000;
 
-const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const money = (value: string | null) => (value ? currency.format(Number(value)) : "—");
+const money = (value: string | null | undefined) => formatMoney(value);
 
 export function FiscalXmlTaxesSection({ canEdit }: { canEdit: boolean }) {
   const [file, setFile] = useState<File | null>(null);
@@ -43,7 +42,7 @@ export function FiscalXmlTaxesSection({ canEdit }: { canEdit: boolean }) {
           IPI e ICMS ST de XML
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Envie um ZIP com XML de NF-e. O total soma o vIPI e o vICMSST de cada item, nota por nota; XML inválido, repetido com conteúdo diferente ou não autorizado fica fora da soma e aparece abaixo. Não é apuração de imposto. Nada é gravado.
+          Envie um ZIP com XML de NF-e. O total soma o IPI (vIPI) e o ICMS ST destacado (vICMSST) de cada item, nota por nota; ST retida anteriormente e FCP ST não entram. Nota cancelada por evento presente no ZIP também fica de fora; XML inválido, repetido com conteúdo diferente ou não autorizado fica fora da soma e aparece abaixo. Não é apuração de imposto. Nada é gravado.
         </p>
         <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
           Compatibilidade com XMLs reais ainda não validada: confira o resultado antes de usá-lo como definitivo.
@@ -106,7 +105,7 @@ export function FiscalXmlTaxesSection({ canEdit }: { canEdit: boolean }) {
                     <td className="px-4 py-2">{note.entry}</td>
                     <td className="px-4 py-2">{money(note.ipi)}</td>
                     <td className="px-4 py-2">{money(note.icms_st)}</td>
-                    <td className="px-4 py-2">{note.differences.join(" | ")}</td>
+                    <td className="px-4 py-2">{[...note.differences, ...note.warnings].join(" | ")}</td>
                   </tr>,
                   ...note.items.map((item) => (
                     <tr key={`${note.identity}-${item.number}`} className="text-gray-700 dark:text-gray-300">

@@ -49,6 +49,7 @@ describe("parseNfeXml", () => {
       items: [],
       declared_ipi: null,
       declared_icms_st: null,
+      tax_errors: [],
       kind: "nfe",
       access_key: accessKey(ISSUER_A, "1", "100"),
       issuer: ISSUER_A,

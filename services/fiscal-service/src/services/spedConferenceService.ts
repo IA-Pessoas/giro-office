@@ -4,6 +4,7 @@ import { identityFromAccessKey, isValidAccessKey, stripZeros } from "./accessKey
 import { brl, formatCents, pairByIdentity, parseCents } from "./documentConferenceService.js";
 import {
   dropIdenticalCopies,
+  isAuthorizedProtocol,
   type NfeFile,
   type NfeItem,
   normalizeDecimal,
@@ -119,7 +120,6 @@ const NOT_COMPARABLE_SITUATIONS: Record<string, string> = {
   "05": "inutilizado",
 };
 const NFE_MODELS = new Set(["55", "65"]);
-const AUTHORIZED_PROTOCOL = new Set(["100", "150"]);
 const MIN_FIELDS: Record<string, number> = { "0000": 8, "0150": 6, C100: 12, C170: 11 };
 
 const money = (raw: string | undefined) => {
@@ -413,7 +413,7 @@ export function compareSpedWithXml(input: {
   };
   for (const doc of sped.documents) flag(doc.identity, spedProblem(doc));
   for (const doc of xmlDocs) {
-    if (doc.protocol_status && !AUTHORIZED_PROTOCOL.has(doc.protocol_status)) {
+    if (doc.protocol_status && !isAuthorizedProtocol(doc.protocol_status)) {
       flag(doc.identity, `XML: protocolo com cStat ${doc.protocol_status}`);
     }
   }

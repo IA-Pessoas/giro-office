@@ -215,6 +215,7 @@ export interface FiscalTaxNote {
   ipi: string;
   icms_st: string;
   differences: string[];
+  warnings: string[];
   items: { number: string; code: string; description: string; ipi: string | null; icms_st: string | null }[];
 }
 

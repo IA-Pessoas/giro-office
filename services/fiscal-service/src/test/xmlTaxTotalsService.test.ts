@@ -89,8 +89,8 @@ describe("sumXmlTaxes", () => {
       },
     ]);
     expect(result.errors).toEqual([
-      { entry: "104.xml", message: "vIPI inválido no item 1: 1,50." },
       { entry: "quebrado.xml", message: "XML inválido." },
+      { entry: "104.xml", message: "vIPI inválido no item 1: 1,50." },
     ]);
     expect(result.discarded).toEqual([
       { entry: "100-copia.xml", reason: "Cópia idêntica de 100.xml." },
@@ -106,10 +106,12 @@ describe("sumXmlTaxes", () => {
       "Nível;Situação;Identidade;Arquivo;Item;Descrição;IPI;ICMS ST;Observação",
     );
     expect(lines).toContain("Totais;;;;;;10,40;3,05;2 nota(s) e 3 item(ns) somados");
-    expect(lines).toContain(`Nota;Somada;${ISSUER}|55|1|100;100.xml;;;10,30;1,05;`);
+    expect(lines).toContain(
+      `Nota;Somada;${ISSUER}|55|1|100;100.xml;;;10,30;1,05;XML sem protocolo de autorização`,
+    );
     expect(lines).toContain(`Item;Somado;${ISSUER}|55|1|100;100.xml;2;Produto 2;0,20;;`);
     expect(lines).toContain(
-      `Nota;Somada;${ISSUER}|55|1|101;101.xml;;;0,10;2,00;IPI: itens 0.10 × total declarado 0.20`,
+      `Nota;Somada;${ISSUER}|55|1|101;101.xml;;;0,10;2,00;IPI: itens 0.10 × total declarado 0.20 | XML sem protocolo de autorização`,
     );
     expect(lines).toContain("Arquivo;Erro;;104.xml;;;;;vIPI inválido no item 1: 1,50.");
     // A soma das linhas de item bate com a linha de totais.
@@ -122,6 +124,63 @@ describe("sumXmlTaxes", () => {
           0,
         );
     expect([cents(6), cents(7)]).toEqual([1040, 305]);
+  });
+
+  it("cobre variantes de ICMS ST e IPI e recusa valores fora do formato", () => {
+    const det = (n: number, imposto: string) =>
+      `<det nItem="${n}"><prod><cProd>P${n}</cProd><xProd>Produto ${n}</xProd></prod>${imposto}</det>`;
+    const wrap = (number: string, body: string) =>
+      `<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>${number}</nNF></ide><emit><CNPJ>${ISSUER}</CNPJ></emit>${body}</infNFe></NFe>`;
+    const variants = wrap(
+      "300",
+      [
+        det(1, "<imposto><ICMS><ICMS70><vICMSST>1.11</vICMSST></ICMS70></ICMS></imposto>"),
+        det(2, "<imposto><ICMS><ICMSSN201><vICMSST>2.22</vICMSST></ICMSSN201></ICMS></imposto>"),
+        // ST retida anteriormente (ICMS60) não é ST destacada na nota.
+        det(3, "<imposto><ICMS><ICMS60><vICMSSTRet>9.99</vICMSSTRet></ICMS60></ICMS></imposto>"),
+        det(4, "<imposto><IPI><IPINT><CST>53</CST></IPINT></IPI></imposto>"),
+        det(5, ""),
+        det(6, "<imposto><IPI><IPITrib><vIPI>99999999999.99</vIPI></IPITrib></IPI></imposto>"),
+      ].join(""),
+    );
+    const outcome = sumXmlTaxes(
+      zip({
+        "300.xml": variants,
+        "301.xml": wrap(
+          "301",
+          det(1, "<imposto><IPI><IPITrib><vIPI>1.005</vIPI></IPITrib></IPI></imposto>"),
+        ),
+        "302.xml": wrap(
+          "302",
+          det(1, "<imposto><IPI><IPITrib><vIPI>-1.00</vIPI></IPITrib></IPI></imposto>"),
+        ),
+      }),
+    );
+    expect(outcome.notes[0]?.items.map((item) => [item.ipi, item.icms_st])).toEqual([
+      [null, "1.11"],
+      [null, "2.22"],
+      [null, null],
+      [null, null],
+      [null, null],
+      ["99999999999.99", null],
+    ]);
+    expect(outcome.totals).toMatchObject({ ipi: "99999999999.99", icms_st: "3.33", notes: 1 });
+    expect(outcome.errors).toEqual([
+      { entry: "301.xml", message: "vIPI inválido no item 1: 1.005." },
+      { entry: "302.xml", message: "vIPI inválido no item 1: -1.00." },
+    ]);
+  });
+
+  it("exclui nota cancelada por evento presente no ZIP", () => {
+    const key = "35260811222333000181550010000004001123456781";
+    const note = nfe("400", [{ ipi: "4.00" }]).replace("<infNFe>", `<infNFe Id="NFe${key}">`);
+    const event = `<procEventoNFe><evento><infEvento><chNFe>${key}</chNFe><tpEvento>110111</tpEvento></infEvento></evento></procEventoNFe>`;
+    const outcome = sumXmlTaxes(zip({ "400.xml": note, "cancelamento.xml": event }));
+    expect(outcome.notes).toEqual([]);
+    expect(outcome.excluded).toEqual([
+      expect.objectContaining({ reason: "Cancelada pelo evento cancelamento.xml; não somada." }),
+    ]);
+    expect(outcome.totals.ipi).toBe("0.00");
   });
 
   it("fica completo sem erros nem duplicatas e recusa ZIP ilegível", () => {

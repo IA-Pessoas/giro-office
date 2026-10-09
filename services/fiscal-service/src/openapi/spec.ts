@@ -1218,7 +1218,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Conferências"],
           summary: "Somar IPI e ICMS ST de XML NF-e",
           description:
-            "Recebe um ZIP de XML NF-e (base64, até ~650 kB) e soma, em centavos inteiros, o vIPI (grupo IPI) e o vICMSST (grupo ICMS) de cada item. Devolve totals (ipi, icms_st, notes, items), a composição por nota e item (notes, com differences quando a soma dos itens não bate com vIPI/vST do ICMSTot), excluded (XML repetido com conteúdo diferente ou protocolo não autorizado, fora da soma), errors (XML inválido ou valor fora do formato), discarded (não XML/NF-e, cópia idêntica) e o CSV (campo csv). status partial com XML inválido, duplicado ou ZIP sem NF-e. Nada é gravado; não é apuração tributária.",
+            "Recebe um ZIP de XML NF-e (base64, até ~650 kB) e soma, em centavos inteiros, o vIPI (grupo IPI) e o vICMSST destacado (grupo ICMS) de cada item; ST retida anteriormente (vICMSSTRet) e FCP ST não entram. Nota cancelada por evento 110111 presente no ZIP fica fora da soma; nota sem protocolo é somada com aviso em warnings. Devolve totals (ipi, icms_st, notes, items), a composição por nota e item (notes, com differences quando a soma dos itens não bate com vIPI/vST do ICMSTot), excluded (XML repetido com conteúdo diferente ou protocolo não autorizado, fora da soma), errors (XML inválido ou valor fora do formato), discarded (não XML/NF-e, cópia idêntica) e o CSV (campo csv). status partial com XML inválido, duplicado ou ZIP sem NF-e. Nada é gravado; não é apuração tributária.",
           security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
