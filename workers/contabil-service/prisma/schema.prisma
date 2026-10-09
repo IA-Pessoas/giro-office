@@ -37,6 +37,20 @@ model User {
   @@map("users")
 }
 
+// Só leitura: histórico do Controle Contábil (#1722).
+model AuditRequest {
+  id              String   @id @default(uuid())
+  organization_id String?
+  user_id         String?
+  created_at      DateTime @default(now())
+  action          String?
+  referring       String?
+  referring_id    String?
+  changes_json    Json?
+
+  @@map("audit_requests")
+}
+
 model ControlContabil {
   id                               String   @id @default(uuid())
   competence                       String

@@ -7,6 +7,11 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import {
+  type ControlHistoryInput,
+  type ControlHistoryPrisma,
+  listControlHistory,
+} from "./controlHistory.js";
 
 export type ControlServicePrisma = typeof prismaClient;
 
@@ -332,6 +337,10 @@ export class ControlService {
       }
       throw new ServiceError(500, "Erro ao criar controles contábeis anuais.", err);
     }
+  }
+
+  history(input: ControlHistoryInput) {
+    return listControlHistory(this.prisma as unknown as ControlHistoryPrisma, input);
   }
 
   async detail(

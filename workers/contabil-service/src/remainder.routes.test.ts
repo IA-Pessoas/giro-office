@@ -215,6 +215,54 @@ describe("contabil Worker remainder routes", () => {
     expect(deps.relationshipService.getByClientId).not.toHaveBeenCalled();
   });
 
+  it("histórico do controle lê a auditoria da organização e exige módulo Contábil (#1722)", async () => {
+    const prisma = {
+      controlContabil: { findFirst: vi.fn(async () => ({ id: ID })) },
+      auditRequest: {
+        findMany: vi.fn(async () => [
+          {
+            id: "audit-1",
+            user_id: USER,
+            created_at: new Date("2026-09-10T12:00:00.000Z"),
+            action: "Atualização",
+            changes_json: { depreciation: { from: false, to: true } },
+          },
+        ]),
+        count: vi.fn(async () => 1),
+      },
+      user: { findMany: vi.fn(async () => [{ id: USER, name: "Ana" }]) },
+    };
+    const app = createContabilWorkerApp({ env: env(), prisma: prisma as never });
+    const url = `https://contabil.test/contabil/controls/history?client_id=${CLIENT}&competence=2026-09&organization_id=forged`;
+
+    const viewer = await app.request(url, { headers: headers("1") });
+    const denied = await app.request(url, { headers: headers("0") });
+
+    expect(viewer.status).toBe(400);
+    expect(denied.status).toBe(403);
+    const ok = await app.request(url.replace("&organization_id=forged", ""), {
+      headers: headers("1"),
+    });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toMatchObject({
+      data: {
+        total: 1,
+        items: [
+          {
+            actor: { id: USER, name: "Ana" },
+            changes: [{ field: "depreciation", from: false, to: true }],
+          },
+        ],
+      },
+    });
+    expect(prisma.controlContabil.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+    expect(prisma.auditRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ organization_id: ORG }) }),
+    );
+  });
+
   it("expõe triagem documental com validação de entrada", async () => {
     const deps = services();
     const app = createContabilWorkerApp({ env: env(), ...deps });
