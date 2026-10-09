@@ -1,4 +1,7 @@
-import type { FiscalControlStatus } from "../services/fiscalControlService.ts";
+import type {
+  FiscalControlStatus,
+  FiscalMonthlyObligation,
+} from "../services/fiscalControlService.ts";
 
 export const FISCAL_CONTROL_STATUS_LABELS: Record<FiscalControlStatus, string> = {
   PENDING: "Pendente",
@@ -19,4 +22,20 @@ export function fiscalControlStatusChange(
   if (current === next) return "none";
   if (current !== "COMPLETED") return "direct";
   return canReopen ? "reason" : "forbidden";
+}
+
+/** Ações de uma obrigação conforme a situação; nenhuma com o controle concluído. */
+export function fiscalObligationActions(
+  status: FiscalMonthlyObligation["status"],
+  editable: boolean,
+): Array<"complete" | "dispense" | "undo" | "restore"> {
+  if (!editable) return [];
+  if (status === "PENDING") return ["complete", "dispense"];
+  if (status === "COMPLETED") return ["undo"];
+  return ["restore"];
+}
+
+/** Data local de hoje no formato do input date (AAAA-MM-DD). */
+export function todayInputDate(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }

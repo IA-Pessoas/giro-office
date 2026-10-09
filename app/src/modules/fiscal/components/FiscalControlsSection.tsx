@@ -4,7 +4,7 @@ import { useFetch } from "@shared/hooks";
 import { toast } from "@shared/services/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, ClipboardList, Loader2 } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, Fragment, useState } from "react";
 
 import { fiscalMonthlyControlsQueryKey } from "../hooks/queryKeys";
 import {
@@ -29,6 +29,7 @@ import {
   FISCAL_TEXTAREA_CLASSNAME,
   isCompetence,
 } from "./fiscalFieldStyles";
+import { FiscalControlObligationsPanel } from "./FiscalControlObligationsPanel";
 import { FiscalStateBox } from "./FiscalStateBox";
 
 const STATUSES = Object.keys(FISCAL_CONTROL_STATUS_LABELS) as FiscalControlStatus[];
@@ -50,6 +51,7 @@ export function FiscalControlsSection({
   const [openingReason, setOpeningReason] = useState("");
   const [reopen, setReopen] = useState<Reopen | null>(null);
   const [reopenReason, setReopenReason] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [openingError, setOpeningError] = useState<string | null>(null);
   const [reopenError, setReopenError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -196,13 +198,15 @@ export function FiscalControlsSection({
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Controles fiscais de {formatCompetenceLabel(competence)}</caption>
             <thead className="bg-gray-50 text-gray-600 dark:bg-slate-800 dark:text-gray-300">
-              <tr><th className="px-4 py-3">Cliente</th><th className="px-4 py-3">Regime</th><th className="px-4 py-3">Situação</th><th className="px-4 py-3">Sem movimento</th><th className="px-4 py-3">Abertura</th></tr>
+              <tr><th className="px-4 py-3">Cliente</th><th className="px-4 py-3">Regime</th><th className="px-4 py-3">Situação</th><th className="px-4 py-3">Sem movimento</th><th className="px-4 py-3">Abertura</th><th className="px-4 py-3">Obrigações</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
               {items.map((item) => {
                 const locked = item.status === "COMPLETED" && !canReopen;
+                const expanded = expandedId === item.id;
                 return (
-                  <tr key={item.id} className="text-gray-800 dark:text-gray-200">
+                  <Fragment key={item.id}>
+                  <tr className="text-gray-800 dark:text-gray-200">
                     <td className="px-4 py-3">{item.client_name}</td>
                     <td className="px-4 py-3">{item.regime ?? "—"}</td>
                     <td className="px-4 py-3">
@@ -231,7 +235,20 @@ export function FiscalControlsSection({
                       />
                     </td>
                     <td className="px-4 py-3">{item.opening_reason ? <span title={item.opening_reason}>Excepcional: {item.opening_reason}</span> : "Automática"}</td>
+                    <td className="px-4 py-3">
+                      <button type="button" onClick={() => setExpandedId(expanded ? null : item.id)} aria-expanded={expanded} aria-controls={`fiscal-obligations-${item.id}`} className="text-blue-700 hover:underline dark:text-blue-300">
+                        {item.pending_obligations === 1 ? "1 pendente" : `${item.pending_obligations} pendentes`}
+                      </button>
+                    </td>
                   </tr>
+                  {expanded ? (
+                    <tr id={`fiscal-obligations-${item.id}`}>
+                      <td colSpan={6} className="bg-gray-50 px-4 py-3 dark:bg-slate-800/50">
+                        <FiscalControlObligationsPanel controlId={item.id} clientName={item.client_name} canEdit={canEdit} locked={item.status === "COMPLETED"} />
+                      </td>
+                    </tr>
+                  ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>

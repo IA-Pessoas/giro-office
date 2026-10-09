@@ -15,6 +15,46 @@ export interface FiscalMonthlyControl {
   opening_reason: string | null;
   updated_by: string;
   updatedAt: string;
+  /** Obrigações aplicáveis ainda sem cumprimento; não mudam a situação. */
+  pending_obligations: number;
+}
+
+export type FiscalObligationCode = "PGDAS_D" | "DCTFWEB" | "EFD_CONTRIBUICOES" | "DIRBI";
+export type FiscalObligationStatus = "PENDING" | "COMPLETED" | "NOT_APPLICABLE";
+
+export interface FiscalMonthlyObligation {
+  code: FiscalObligationCode;
+  name: string;
+  note: string;
+  source: string;
+  origin: string;
+  status: FiscalObligationStatus;
+  not_applicable_reason: string | null;
+  completed_on: string | null;
+  completed_by: string | null;
+  protocol: string | null;
+  updatedAt: string;
+}
+
+export interface FiscalObligationCatalogItem {
+  code: FiscalObligationCode;
+  name: string;
+  note: string;
+  source: string;
+  conditional: boolean;
+}
+
+export interface FiscalMonthlyObligations {
+  control_id: string;
+  items: FiscalMonthlyObligation[];
+  addable: FiscalObligationCatalogItem[];
+}
+
+export interface UpdateFiscalObligationPayload {
+  applicable?: boolean;
+  completed_on?: string | null;
+  protocol?: string;
+  reason?: string;
 }
 
 export interface FiscalMonthlyControlPortfolio {
@@ -47,5 +87,29 @@ export const fiscalControlService = {
   async update(id: string, payload: UpdateFiscalMonthlyControlPayload): Promise<void> {
     const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
     await api.patch(`/fiscal/monthly-controls/${id}`, payload);
+  },
+
+  /** Obrigações do controle; o serviço garante antes as sugeridas pelo regime. */
+  async listObligations(controlId: string): Promise<FiscalMonthlyObligations> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.get(`/fiscal/monthly-controls/${controlId}/obligations`);
+    return unwrapFiscalEnvelope<FiscalMonthlyObligations>(response.data);
+  },
+
+  async addObligation(
+    controlId: string,
+    payload: { code: FiscalObligationCode; reason?: string },
+  ): Promise<void> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    await api.post(`/fiscal/monthly-controls/${controlId}/obligations`, payload);
+  },
+
+  async updateObligation(
+    controlId: string,
+    code: FiscalObligationCode,
+    payload: UpdateFiscalObligationPayload,
+  ): Promise<void> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    await api.patch(`/fiscal/monthly-controls/${controlId}/obligations/${code}`, payload);
   },
 };

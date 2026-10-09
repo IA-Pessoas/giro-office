@@ -12,8 +12,15 @@ export function fiscalRevenuesQueryKey(clientId: string) {
   return [...FISCAL_QUERY_KEY, "revenues", clientId] as const;
 }
 
+/** Prefixo das carteiras de controle; invalidá-lo atualiza as pendências de todas. */
+export const FISCAL_MONTHLY_CONTROLS_QUERY_KEY = [...FISCAL_QUERY_KEY, "monthly-controls"] as const;
+
 export function fiscalMonthlyControlsQueryKey(competence: string) {
-  return [...FISCAL_QUERY_KEY, "monthly-controls", competence] as const;
+  return [...FISCAL_MONTHLY_CONTROLS_QUERY_KEY, competence] as const;
+}
+
+export function fiscalMonthlyObligationsQueryKey(controlId: string) {
+  return [...FISCAL_QUERY_KEY, "monthly-obligations", controlId] as const;
 }
 
 export function fiscalSimplesPreviewQueryKey(clientId: string, competence: string) {

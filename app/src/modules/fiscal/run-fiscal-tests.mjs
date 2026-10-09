@@ -377,3 +377,27 @@ await runTest("fiscal monthly control tab keeps viewer read-only and reasons req
   assert.match(section, /id="fiscal-control-reopen-error" role="alert"/);
   assert.match(section, /if \(reason\.length < 3\) \{\s*setReopenError/);
 });
+
+await runTest("fiscal obligations: actions follow status and lock with the control", async () => {
+  const { fiscalObligationActions, todayInputDate } = await import("./utils/fiscalControl.ts");
+  assert.deepEqual(fiscalObligationActions("PENDING", true), ["complete", "dispense"]);
+  assert.deepEqual(fiscalObligationActions("COMPLETED", true), ["undo"]);
+  assert.deepEqual(fiscalObligationActions("NOT_APPLICABLE", true), ["restore"]);
+  assert.deepEqual(fiscalObligationActions("PENDING", false), []);
+  assert.equal(todayInputDate(new Date(2026, 0, 5)), "2026-01-05");
+
+  const panel = await readSource("./components/FiscalControlObligationsPanel.tsx");
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(client, /api\.get\(`\/fiscal\/monthly-controls\/\$\{controlId\}\/obligations`\)/);
+  assert.match(client, /api\.patch\(`\/fiscal\/monthly-controls\/\$\{controlId\}\/obligations\/\$\{code\}`/);
+  // Pendência só informa; a situação do controle não muda por ela.
+  assert.match(section, /item\.pending_obligations/);
+  assert.match(section, /locked=\{item\.status === "COMPLETED"\}/);
+  assert.match(panel, /const editable = canEdit && !locked;/);
+  // Dispensa sem motivo é barrada antes da API; condicional pede motivo na inclusão.
+  assert.match(panel, /action\.kind === "dispense" && trimmed\.length < 3/);
+  assert.match(panel, /definition\.conditional \|\| trimmed\) && trimmed\.length < 3/);
+  assert.match(panel, /max=\{todayInputDate\(\)\}/);
+  assert.match(panel, /queryKey: FISCAL_MONTHLY_CONTROLS_QUERY_KEY/);
+});

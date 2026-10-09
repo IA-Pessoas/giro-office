@@ -1,5 +1,10 @@
 export { downloadFile } from "./downloadFile";
-export { FISCAL_CONTROL_STATUS_LABELS, fiscalControlStatusChange } from "./fiscalControl";
+export {
+  FISCAL_CONTROL_STATUS_LABELS,
+  fiscalControlStatusChange,
+  fiscalObligationActions,
+  todayInputDate,
+} from "./fiscalControl";
 export { getFiscalErrorMessage } from "./fiscalError";
 export { formatFiscalDateLabel, toFiscalInputDate, toFiscalIsoDate } from "./fiscalDate";
 export {
