@@ -38,6 +38,15 @@ function deny(next: NextFunction): void {
   next(new ServiceError(403, "Acesso negado para esta rota."));
 }
 
+function isInstagramOnlyUpdate(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return false;
+  }
+
+  const fields = Object.keys(body);
+  return fields.length === 1 && fields[0] === "instagram";
+}
+
 export function buildAuthorizeMiddleware(
   mode: GatewayAuthorizationMode,
   logger?: Pick<Logger, "warn">,
@@ -78,6 +87,21 @@ export function buildAuthorizeMiddleware(
         return;
       }
 
+      deny(next);
+      return;
+    }
+
+    const isClientIntegrationUpdate =
+      request.method.toUpperCase() === "PATCH" &&
+      /^\/client\/[^/]+\/integration\/?$/.test(normalizedPath);
+    const hasIntegrationEditAccess = canAccessRoute(request.auth, {
+      modulePermission: { module: "integracao", minPermission: 2 },
+    });
+    if (
+      isClientIntegrationUpdate &&
+      !hasIntegrationEditAccess &&
+      !isInstagramOnlyUpdate(request.body)
+    ) {
       deny(next);
       return;
     }
