@@ -1,4 +1,14 @@
 export { downloadFile } from "./downloadFile";
+export {
+  FISCAL_CONTROL_STATUS_LABELS,
+  fiscalControlStatusChange,
+  fiscalObligationActions,
+  formatTriagePending,
+  formatAnnualDeclaration,
+  formatTransferResult,
+  matchesResponsible,
+  todayInputDate,
+} from "./fiscalControl";
 export { getFiscalErrorMessage } from "./fiscalError";
 export { formatFiscalDateLabel, toFiscalInputDate, toFiscalIsoDate } from "./fiscalDate";
 export {
