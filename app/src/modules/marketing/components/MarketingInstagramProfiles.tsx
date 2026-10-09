@@ -27,6 +27,7 @@ function ProfileRow({
 }) {
   const [instagram, setInstagram] = useState(client.instagram ?? "");
   const [qrOpen, setQrOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const profileUrl = toInstagramProfileUrl(client.instagram);
 
   useEffect(() => {
@@ -36,7 +37,14 @@ function ProfileRow({
   return (
     <tr className="border-t border-gray-100 align-top dark:border-slate-700">
       <td className="px-4 py-3">
-        <p className="font-medium text-gray-900 dark:text-white">{client.name}</p>
+        <button
+          className="text-left font-medium text-gray-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-white"
+          type="button"
+          aria-label={`Ver detalhes de ${client.name}`}
+          onClick={() => setDetailsOpen(true)}
+        >
+          {client.name}
+        </button>
         <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">{client.status}</p>
       </td>
       <td className="px-4 py-3">
@@ -117,13 +125,34 @@ function ProfileRow({
             </>
           ) : null}
         </Dialog>
+        <Dialog
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          title={client.name}
+          description="Dados do cadastro canônico disponíveis no contexto Marketing."
+          contentClassName="w-[min(92vw,420px)]"
+          bodyClassName="space-y-4"
+        >
+          <dl className="grid gap-3 text-sm">
+            <div>
+              <dt className="font-medium text-gray-500 dark:text-slate-400">Situação</dt>
+              <dd className="mt-1 text-gray-900 dark:text-white">{client.status}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-gray-500 dark:text-slate-400">Perfil Instagram</dt>
+              <dd className="mt-1 break-words text-gray-900 dark:text-white">
+                {client.instagram?.trim() || "Sem perfil"}
+              </dd>
+            </div>
+          </dl>
+        </Dialog>
       </td>
     </tr>
   );
 }
 
 export function MarketingInstagramProfiles() {
-  const { access, isLoading: accessLoading, user } = useModuleAccess("integracao");
+  const { access, isLoading: accessLoading, user } = useModuleAccess("marketing");
   const queryClient = useQueryClient();
   const [profile, setProfile] = useState<"all" | "with" | "without">("all");
   const [page, setPage] = useState(1);
@@ -167,7 +196,7 @@ export function MarketingInstagramProfiles() {
     return (
       <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Perfis Instagram dos clientes</h2>
-        <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">Seu perfil não tem permissão de leitura de clientes no Office.</p>
+        <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">Seu perfil não tem permissão de leitura no Marketing.</p>
       </section>
     );
   }

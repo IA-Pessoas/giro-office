@@ -22,6 +22,66 @@ function createPrisma() {
 }
 
 describe("updateIntegrationClient Instagram binding", () => {
+  it("allows a Marketing editor to update only the canonical Instagram field", async () => {
+    const { prisma, findFirst, update } = createPrisma();
+
+    await expect(
+      updateIntegrationClient(
+        prisma,
+        CLIENT_ID,
+        ORGANIZATION_ID,
+        { instagram: "@acme" },
+        { userId: "user-1", level: 0, isOwner: false, marketingLevel: 2 },
+      ),
+    ).resolves.toMatchObject({ id: CLIENT_ID, instagram: "@acme" });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: CLIENT_ID },
+        data: { instagram: "@acme" },
+        select: { id: true, name: true, status: true, instagram: true },
+      }),
+    );
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: CLIENT_ID, organization_id: ORGANIZATION_ID },
+      select: { id: true, type: true, cpf_cnpj: true },
+    });
+  });
+
+  it("denies Marketing editors changes to fields beyond Instagram", async () => {
+    const { prisma, findFirst, update } = createPrisma();
+
+    await expect(
+      updateIntegrationClient(
+        prisma,
+        CLIENT_ID,
+        ORGANIZATION_ID,
+        { instagram: "@acme", name: "Outro nome" },
+        { userId: "user-1", level: 0, isOwner: false, marketingLevel: 2 },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(update).not.toHaveBeenCalled();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
+  it("denies Marketing viewers Instagram edits", async () => {
+    const { prisma, findFirst, update } = createPrisma();
+
+    await expect(
+      updateIntegrationClient(
+        prisma,
+        CLIENT_ID,
+        ORGANIZATION_ID,
+        { instagram: "@acme" },
+        { userId: "user-1", level: 0, isOwner: false, marketingLevel: 1 },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(update).not.toHaveBeenCalled();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
   it("updates the profile on the canonical client and requires Office edit permission", async () => {
     const { prisma, findFirst, update } = createPrisma();
 
@@ -57,7 +117,7 @@ describe("updateIntegrationClient Instagram binding", () => {
       ),
     ).rejects.toMatchObject({ statusCode: 403 });
 
-    expect(findFirst).toHaveBeenCalledTimes(1);
+    expect(findFirst).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
   });
 
