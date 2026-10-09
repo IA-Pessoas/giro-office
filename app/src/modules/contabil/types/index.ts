@@ -92,6 +92,23 @@ export interface ContabilControlPortfolio {
   items: ContabilControlPortfolioItem[];
 }
 
+export interface ContabilControlHistoryEntry {
+  id: string;
+  at: string;
+  actor: { id: string; name: string | null } | null;
+  action: string | null;
+  changes: Array<{ field: ContabilControlField; from: boolean | string | null; to: boolean | string | null }>;
+}
+
+export interface ContabilControlHistoryPage {
+  client_id: string;
+  competence: ContabilCompetence;
+  page: number;
+  pageSize: number;
+  total: number;
+  items: ContabilControlHistoryEntry[];
+}
+
 export interface CreateOrGetContabilControlPayload {
   client_id: string;
   competence: ContabilCompetence;

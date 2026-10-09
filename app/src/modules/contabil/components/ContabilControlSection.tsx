@@ -35,10 +35,12 @@ import {
   updateContabilControlFieldStatus,
 } from "./contabilControlSection.helpers";
 import { ContabilCompetenceSelect } from "./ContabilCompetenceSelect";
+import { ContabilControlHistory } from "./ContabilControlHistory";
 import { ContabilStateBox } from "./ContabilStateBox";
 
 interface ContabilControlSectionProps {
   clientId: string;
+  clientName?: string;
   canEdit: boolean;
 }
 
@@ -54,6 +56,7 @@ const FIELD_SAVE_DEBOUNCE_MS = 400;
 
 export function ContabilControlSection({
   clientId,
+  clientName,
   canEdit,
 }: ContabilControlSectionProps) {
   const bootstrapMutation = useContabilControlBootstrapMutation();
@@ -558,6 +561,8 @@ export function ContabilControlSection({
           ) : null}
         </div>
       ) : null}
+
+      <ContabilControlHistory clientId={clientId} clientName={clientName} competence={competence} />
 
       {operationError ? (
         <ContabilStateBox icon={AlertCircle} tone="danger" title="Não foi possível concluir a operação" compact>

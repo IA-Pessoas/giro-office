@@ -10,6 +10,7 @@ import { useFetch } from "@shared/hooks";
 import { contabilControlService } from "../services";
 import type {
   ContabilControl,
+  ContabilControlHistoryPage,
   ContabilCompetence,
   ContabilControlPortfolio,
   ContabilCompetenceOperationPayload,
@@ -17,7 +18,12 @@ import type {
   CreateOrGetContabilControlPayload,
   PatchContabilControlFieldPayload,
 } from "../types";
-import { CONTABIL_QUERY_KEY, contabilControlPortfolioQueryKey, contabilControlQueryKey } from "./queryKeys";
+import {
+  CONTABIL_QUERY_KEY,
+  contabilControlHistoryQueryKey,
+  contabilControlPortfolioQueryKey,
+  contabilControlQueryKey,
+} from "./queryKeys";
 
 export function useContabilControlPortfolio(
   competence: ContabilCompetence,
@@ -48,6 +54,16 @@ export function useContabilControlDetail(
     {
       enabled: (options?.enabled ?? true) && Boolean(filters.clientId),
     },
+  );
+}
+
+export function useContabilControlHistory(
+  filters: { clientId: string; competence: ContabilCompetence; page: number; pageSize: number },
+): UseQueryResult<ContabilControlHistoryPage, Error> {
+  return useFetch(
+    contabilControlHistoryQueryKey(filters.clientId, filters.competence, filters.page),
+    () => contabilControlService.getHistory(filters, filters.page, filters.pageSize),
+    { enabled: Boolean(filters.clientId) },
   );
 }
 
@@ -87,6 +103,9 @@ export function usePatchContabilControlFieldMutation(): UseMutationResult<
         contabilControlQueryKey(variables.clientId, variables.competence),
         control,
       );
+      void queryClient.invalidateQueries({
+        queryKey: contabilControlHistoryQueryKey(variables.clientId, variables.competence),
+      });
       await queryClient.invalidateQueries({
         queryKey: contabilControlPortfolioQueryKey(variables.competence),
       });
@@ -105,6 +124,9 @@ export function useCompleteContabilControlMutation(): UseMutationResult<Contabil
     mutationFn: ({ controlId }) => contabilControlService.completeAll(controlId),
     onSuccess: async (control, variables) => {
       queryClient.setQueryData(contabilControlQueryKey(variables.clientId, variables.competence), control);
+      void queryClient.invalidateQueries({
+        queryKey: contabilControlHistoryQueryKey(variables.clientId, variables.competence),
+      });
       await queryClient.invalidateQueries({ queryKey: contabilControlPortfolioQueryKey(variables.competence) });
     },
   });
