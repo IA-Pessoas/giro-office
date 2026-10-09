@@ -362,7 +362,58 @@ describe("pessoal internal reporting service", () => {
     });
     expect(clientFindMany).toHaveBeenCalledWith({
       where: { organization_id: organizationId, id: { in: ["client-a", "client-b"] } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, dominio_code: true, cpf_cnpj: true, status: true },
+    });
+  });
+
+  it("projeta campos legados da folha e identificação/situação do cliente", async () => {
+    const payrollFindMany = vi
+      .fn()
+      .mockResolvedValue([
+        { previous: true, info: "Fecha dia 20", contact: "Maria (RH)", client_id: "client-a" },
+      ]);
+    const clientFindMany = vi.fn().mockResolvedValue([
+      {
+        id: "client-a",
+        name: "Cliente A",
+        dominio_code: "123",
+        cpf_cnpj: "12.345.678/0001-90",
+        status: "Ativo",
+      },
+    ]);
+    const service = new InternalReportingService({
+      payroll: { findMany: payrollFindMany },
+      client: { findMany: clientFindMany },
+    } as never);
+
+    await expect(
+      service.extract({
+        organizationId,
+        source: "pessoal.payroll",
+        fields: ["client_code", "client_document", "client_status", "previous", "info", "contact"],
+        limit: 1,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          client_code: "123",
+          client_document: "12.345.678/0001-90",
+          client_status: "Ativo",
+          previous: true,
+          info: "Fecha dia 20",
+          contact: "Maria (RH)",
+        },
+      ],
+      reachedLimit: false,
+    });
+    expect(payrollFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId },
+      select: { previous: true, info: true, contact: true, client_id: true },
+      take: 2,
+    });
+    expect(clientFindMany).toHaveBeenCalledWith({
+      where: { organization_id: organizationId, id: { in: ["client-a"] } },
+      select: { id: true, name: true, dominio_code: true, cpf_cnpj: true, status: true },
     });
   });
 
@@ -399,12 +450,17 @@ describe("pessoal internal reporting service", () => {
     expect(clientFindMany).not.toHaveBeenCalled();
   });
 
-  it("rejeita campo sensível de payroll antes de consultar o banco", async () => {
+  it("rejeita campo não publicado de payroll antes de consultar o banco", async () => {
     const findMany = vi.fn();
     const service = new InternalReportingService({ payroll: { findMany } } as never);
 
     await expect(
-      service.extract({ organizationId, source: "pessoal.payroll", fields: ["contact"], limit: 1 }),
+      service.extract({
+        organizationId,
+        source: "pessoal.payroll",
+        fields: ["organization_id"],
+        limit: 1,
+      }),
     ).rejects.toMatchObject({ statusCode: 403 });
     expect(findMany).not.toHaveBeenCalled();
   });

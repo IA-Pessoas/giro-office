@@ -112,10 +112,16 @@ describe("pessoal internal reporting routes", () => {
     });
     expect(payrollSource.fields.map((field: { key: string }) => field.key)).toEqual([
       "client_name",
+      "client_code",
+      "client_document",
+      "client_status",
       "responsible_name",
       "union_name",
       "group_name",
       "group_state",
+      "previous",
+      "info",
+      "contact",
       "advance",
       "advance_type",
       "advance_amount",
@@ -131,7 +137,7 @@ describe("pessoal internal reporting routes", () => {
       "employees",
     ]);
     expect(payrollSource.fields.map((field: { key: string }) => field.key)).not.toContain(
-      "contact",
+      "organization_id",
     );
 
     const situationsSource = response.body.data.sources.find(

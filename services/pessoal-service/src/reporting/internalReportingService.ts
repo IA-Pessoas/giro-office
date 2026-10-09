@@ -151,6 +151,9 @@ async function readReportingRows(
 }
 
 const PAYROLL_SCALAR_FIELDS = new Set([
+  "previous",
+  "info",
+  "contact",
   "advance",
   "advance_type",
   "advance_amount",
@@ -227,6 +230,18 @@ function projectReportingFields(
   );
 }
 
+const PAYROLL_CLIENT_FIELDS = {
+  client_name: "name",
+  client_code: "dominio_code",
+  client_document: "cpf_cnpj",
+  client_status: "status",
+} as const;
+
+function clientValue(row: Record<string, unknown>, column: string): unknown {
+  const client = row.client as Record<string, unknown> | null | undefined;
+  return client?.[column] ?? null;
+}
+
 function projectPayrollReportingRow(
   row: Record<string, unknown>,
   fields: readonly string[],
@@ -234,6 +249,12 @@ function projectPayrollReportingRow(
   return projectReportingFields(
     {
       ...row,
+      ...Object.fromEntries(
+        Object.entries(PAYROLL_CLIENT_FIELDS).map(([field, column]) => [
+          field,
+          clientValue(row, column),
+        ]),
+      ),
       client_name: reportName(row, "client", "client_name"),
       responsible_name: reportName(row, "responsible", "responsible_name"),
       union_name: reportName(row, "union", "union_name"),
@@ -287,7 +308,7 @@ export class InternalReportingService {
     private readonly inSnapshot = false,
   ) {}
 
-  private async withClientNames(
+  private async withClients(
     rows: readonly Record<string, unknown>[],
     organizationId: string,
   ): Promise<readonly Record<string, unknown>[]> {
@@ -299,7 +320,7 @@ export class InternalReportingService {
     if (!ids.length) return rows;
     const clients = await this.prisma.client.findMany({
       where: { organization_id: organizationId, id: { in: ids } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, dominio_code: true, cpf_cnpj: true, status: true },
     });
     const byId = new Map(clients.map((client) => [client.id, client]));
     return rows.map((row) => ({ ...row, client: byId.get(String(row.client_id)) ?? null }));
@@ -351,7 +372,7 @@ export class InternalReportingService {
     if (input.source === PESSOAL_PAYROLL_REPORTING_SOURCES[0]) {
       const projectRow = (row: Record<string, unknown>) =>
         projectPayrollReportingRow(row, input.fields);
-      const needsClientName = input.fields.includes("client_name");
+      const needsClient = input.fields.some((field) => field in PAYROLL_CLIENT_FIELDS);
       const rows = await readReportingRows(
         input.limit,
         { offset: input.offset, cursorId: input.cursorId, includeCursor: input.cursorPage },
@@ -362,7 +383,7 @@ export class InternalReportingService {
               ...selectScalars(input.fields, PAYROLL_SCALAR_FIELDS),
               ...(page.includeCursor ? { id: true } : {}),
               // Payroll não declara relação com Client no schema canônico (nem FK no banco).
-              ...(needsClientName ? { client_id: true } : {}),
+              ...(needsClient ? { client_id: true } : {}),
               ...(input.fields.includes("responsible_name")
                 ? { responsible: { select: { name: true } } }
                 : {}),
@@ -375,7 +396,7 @@ export class InternalReportingService {
             },
             ...reportingPageOptions(page),
           });
-          return needsClientName ? this.withClientNames(payrolls, input.organizationId) : payrolls;
+          return needsClient ? this.withClients(payrolls, input.organizationId) : payrolls;
         },
         projectRow,
       );
