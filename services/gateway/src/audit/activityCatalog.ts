@@ -335,6 +335,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
     description: { action: "consultou", item: "o histórico de relatórios" },
   },
   {
+    methods: ["GET"],
+    pattern: /^\/fiscal\/monthly-controls\/[^/]+\/triage$/,
+    description: { action: "consultou", item: "os documentos da Triagem de um controle fiscal" },
+  },
+  {
     // O último segmento é o código da obrigação (PGDAS_D), não um id.
     methods: ["PATCH"],
     pattern: /^\/fiscal\/monthly-controls\/[^/]+\/obligations\/[A-Z_]+$/,

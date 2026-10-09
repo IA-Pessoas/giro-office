@@ -311,6 +311,8 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       await call("PATCH", `/fiscal/monthly-controls/${id}`, {
         status: "COMPLETED",
         no_movement: true,
+        // Sem registro na Triagem: conclusão excepcional (owner é nível 3).
+        reason: "Sem Triagem nesta competência",
       }),
       "PATCH concluir",
     );
@@ -414,7 +416,10 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
     expect((await mineIn("2026-08")).pending_obligations).toBe(august.pending_obligations);
 
     expectOk(
-      await call("PATCH", `/fiscal/monthly-controls/${september.id}`, { status: "COMPLETED" }),
+      await call("PATCH", `/fiscal/monthly-controls/${september.id}`, {
+        status: "COMPLETED",
+        reason: "Sem Triagem nesta competência",
+      }),
       "concluir controle",
     );
     expectOk(
@@ -422,6 +427,93 @@ describe.skipIf(!smokeState)("fiscal-service CRUD smoke (banco real)", () => {
       "obrigação com controle concluído",
       [409],
     );
+  });
+
+  it("conclusão: Triagem em dia conclui no nível 2; com pendência só nível 3 com justificativa, sem tocar na Triagem", async () => {
+    const insertClient = async (name: string) =>
+      String(
+        (
+          await smokeInsert("clients", {
+            id: randomUUID(),
+            name: `${name} ${suffix}`,
+            status: "Ativo",
+            fiscal: true,
+            regime: "Lucro Presumido",
+          })
+        ).id,
+      );
+    const upToDate = await insertClient("Smoke Triagem em dia");
+    const pending = await insertClient("Smoke Triagem pendente");
+    const checklist = { inbound_report: "PENDING", outbound_report: "COMPLETED" };
+    for (const [clientId, items] of [
+      [upToDate, { inbound_report: "COMPLETED", outbound_report: "NOT_PRESENT" }],
+      [pending, checklist],
+    ] as const) {
+      await smokeInsert("triagem.monthly", {
+        id: randomUUID(),
+        client_id: clientId,
+        competence: "2026-09",
+        type: "FISCAL",
+        checklist: items,
+      });
+    }
+
+    const list = expectOk(
+      await call("GET", "/fiscal/monthly-controls?competence=2026-09"),
+      "GET carteira",
+    );
+    const find = (clientId: string) =>
+      list.data.items.find((item: { client_id: string }) => item.client_id === clientId);
+    expect(find(upToDate).triage_pending).toBe(0);
+    expect(find(pending).triage_pending).toBe(1);
+
+    const editor = await smokeHeaders({ type: "user", permission: 2, modules: { fiscal: 2 } });
+    expectOk(
+      await call(
+        "PATCH",
+        `/fiscal/monthly-controls/${find(upToDate).id}`,
+        { status: "COMPLETED" },
+        editor,
+      ),
+      "nível 2 conclui em dia",
+    );
+    expectOk(
+      await call(
+        "PATCH",
+        `/fiscal/monthly-controls/${find(pending).id}`,
+        { status: "COMPLETED", reason: "Urgente" },
+        editor,
+      ),
+      "nível 2 com pendência",
+      [403],
+    );
+    expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${find(pending).id}`, { status: "COMPLETED" }),
+      "nível 3 sem justificativa",
+      [400],
+    );
+    const completed = expectOk(
+      await call("PATCH", `/fiscal/monthly-controls/${find(pending).id}`, {
+        status: "COMPLETED",
+        reason: "Relatório recebido por e-mail",
+      }),
+      "conclusão excepcional",
+    );
+    expect(completed.data.status).toBe("COMPLETED");
+
+    const triage = expectOk(
+      await call("GET", `/fiscal/monthly-controls/${find(pending).id}/triage`, undefined, editor),
+      "GET triagem do controle",
+    );
+    // A Triagem fica como estava.
+    expect(triage.data).toMatchObject({
+      source: "MONTHLY",
+      pending: 1,
+      items: [
+        { field: "inbound_report", status: "PENDING" },
+        { field: "outbound_report", status: "COMPLETED" },
+      ],
+    });
   });
 
   it("receitas mensais: cria, recusa duplicada, lista por período e corrige", async () => {

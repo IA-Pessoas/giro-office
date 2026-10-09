@@ -204,10 +204,17 @@ describe("fiscal Worker", () => {
     const controls = {
       list: vi.fn(async () => ({
         competence: "2026-08",
-        items: [{ ...control, client_name: "Alfa", pending_obligations: 0 }],
+        items: [{ ...control, client_name: "Alfa", pending_obligations: 0, triage_pending: 0 }],
       })),
       open: vi.fn(async () => ({ control, created: true })),
       update: vi.fn(async () => ({ ...control, status: "IN_PROGRESS" as const })),
+      triage: vi.fn(async () => ({
+        control_id: ICMS_ID,
+        competence: "2026-08",
+        source: "NONE" as const,
+        pending: null,
+        items: [],
+      })),
     };
     const app = createFiscalWorkerApp({ env: env(), controlService: controls });
     const reader = gatewayHeaders({
@@ -223,6 +230,16 @@ describe("fiscal Worker", () => {
     expect(controls.list).toHaveBeenCalledWith(
       { competence: "2026-08" },
       expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+
+    const triage = await app.request(
+      `https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}/triage`,
+      { headers: reader },
+    );
+    expect(triage.status).toBe(200);
+    expect(controls.triage).toHaveBeenCalledWith(
+      ICMS_ID,
+      expect.objectContaining({ organizationId: ORGANIZATION_ID }),
     );
 
     const opened = await app.request("https://fiscal.test/fiscal/monthly-controls", {

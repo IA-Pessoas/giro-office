@@ -55,6 +55,14 @@ function dependencies() {
       count: vi.fn(async () => 1),
     },
     fiscalMonthlyControl: control,
+    triageMonthly: {
+      findMany: vi.fn(async () => [] as Array<{ client_id: string; checklist: unknown }>),
+    },
+    triageCompetence: {
+      findMany: vi.fn(
+        async () => [] as Array<{ client_id: string; configuration_snapshot: unknown }>,
+      ),
+    },
     fiscalMonthlyControlEvent: event,
     fiscalMonthlyControlObligation: obligation,
     $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
@@ -200,6 +208,8 @@ describe("MonthlyControlService.list", () => {
       }),
     );
     expect(result.items[0].pending_obligations).toBe(2);
+    // Sem registro na Triagem: null (nada confirma os documentos).
+    expect(result.items[0].triage_pending).toBeNull();
     // Pendência não altera a situação do controle.
     expect(result.items[0].status).toBe("PENDING");
   });
@@ -383,6 +393,9 @@ describe("MonthlyControlService.update", () => {
   it("alteração concorrente vira 409 em vez de sobrescrever", async () => {
     const { prisma, service } = dependencies();
     prisma.fiscalMonthlyControl.findFirst.mockResolvedValueOnce(stored());
+    prisma.triageMonthly.findMany.mockResolvedValueOnce([
+      { client_id: clientA, checklist: { inbound_report: "COMPLETED" } },
+    ]);
     prisma.fiscalMonthlyControl.updateMany.mockResolvedValueOnce({ count: 0 });
 
     await expect(
@@ -429,6 +442,105 @@ describe("MonthlyControlService.update", () => {
       service.update({ ...actor, permission: 3, id: controlId, no_movement: true }),
     ).rejects.toMatchObject({ statusCode: 409 });
     expect(prisma.fiscalMonthlyControl.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("nível 2 conclui sem pendência documental na Triagem, que fica intacta", async () => {
+    const { prisma, service } = dependencies();
+    prisma.fiscalMonthlyControl.findFirst
+      .mockResolvedValueOnce(stored({ status: "IN_PROGRESS" }))
+      .mockResolvedValueOnce(stored({ status: "COMPLETED" }));
+    prisma.triageMonthly.findMany.mockResolvedValueOnce([
+      {
+        client_id: clientA,
+        checklist: { inbound_report: "COMPLETED", sped_fiscal: "NOT_PRESENT" },
+      },
+    ]);
+
+    await service.update({ ...actor, id: controlId, status: "COMPLETED" });
+
+    expect(prisma.triageMonthly.findMany).toHaveBeenCalledWith({
+      where: {
+        organization_id: organizationId,
+        competence: "2026-08",
+        archived_at: null,
+        client_id: { in: [clientA] },
+        type: "FISCAL",
+      },
+      select: { client_id: true, checklist: true },
+    });
+    expect(prisma.fiscalMonthlyControlEvent.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ action: "STATUS", to_value: "COMPLETED" })],
+    });
+  });
+
+  it("com pendência na Triagem, concluir exige nível 3 e justificativa e vira conclusão excepcional", async () => {
+    const { prisma, audit, service } = dependencies();
+    prisma.fiscalMonthlyControl.findFirst.mockResolvedValue(stored({ status: "IN_PROGRESS" }));
+    prisma.triageMonthly.findMany.mockResolvedValue([
+      { client_id: clientA, checklist: { inbound_report: "PENDING" } },
+    ]);
+
+    await expect(
+      service.update({ ...actor, id: controlId, status: "COMPLETED", reason: "Urgente" }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      service.update({ ...actor, permission: 3, id: controlId, status: "COMPLETED" }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(prisma.fiscalMonthlyControl.updateMany).not.toHaveBeenCalled();
+
+    await service.update({
+      ...actor,
+      permission: 3,
+      id: controlId,
+      status: "COMPLETED",
+      reason: "Cliente enviou o relatório por e-mail; Triagem atualiza amanhã",
+    });
+    expect(prisma.fiscalMonthlyControlEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          action: "EXCEPTIONAL_COMPLETION",
+          from_value: "IN_PROGRESS",
+          to_value: "COMPLETED",
+          reason: "Cliente enviou o relatório por e-mail; Triagem atualiza amanhã",
+        }),
+      ],
+    });
+    expect(audit.createLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Conclusão excepcional",
+        changes: expect.objectContaining({ triage: { source: "MONTHLY", pending: 1 } }),
+      }),
+    );
+  });
+
+  it("sem registro na Triagem, concluir também é excepcional", async () => {
+    const { prisma, service } = dependencies();
+    prisma.fiscalMonthlyControl.findFirst.mockResolvedValue(stored({ status: "IN_PROGRESS" }));
+    await expect(
+      service.update({ ...actor, id: controlId, status: "COMPLETED" }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it("consulta os documentos da Triagem do controle sem gravar", async () => {
+    const { prisma, service } = dependencies();
+    prisma.fiscalMonthlyControl.findFirst.mockResolvedValueOnce(stored());
+    prisma.triageCompetence.findMany.mockResolvedValueOnce([
+      {
+        client_id: clientA,
+        configuration_snapshot: { configs: [{ type: "FISCAL", active_items: ["sped_fiscal"] }] },
+      },
+    ]);
+
+    const result = await service.triage(controlId, { ...actor, permission: 1 });
+
+    expect(result).toEqual({
+      control_id: controlId,
+      competence: "2026-08",
+      source: "PLANNED",
+      pending: 1,
+      items: [{ field: "sped_fiscal", status: "PENDING" }],
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("controle de outra organização é 404", async () => {

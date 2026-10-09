@@ -47,10 +47,17 @@ function deps() {
   return {
     list: vi.fn(async () => ({
       competence: "2026-08",
-      items: [{ ...control(), client_name: "Alfa", pending_obligations: 0 }],
+      items: [{ ...control(), client_name: "Alfa", pending_obligations: 0, triage_pending: 0 }],
     })),
     open: vi.fn(async () => ({ control: control(), created: true })),
     update: vi.fn(async () => control()),
+    triage: vi.fn(async () => ({
+      control_id: controlId,
+      competence: "2026-08",
+      source: "MONTHLY" as const,
+      pending: 1,
+      items: [{ field: "inbound_report", status: "PENDING" }],
+    })),
   };
 }
 
@@ -81,6 +88,17 @@ describe("fiscal monthly control routes", () => {
     expect(updated.status).toBe(403);
     expect(service.open).not.toHaveBeenCalled();
     expect(service.update).not.toHaveBeenCalled();
+
+    const triage = await request(app)
+      .get(`/fiscal/monthly-controls/${controlId}/triage`)
+      .set(headers(1));
+    expect(triage.status).toBe(200);
+    expect(triage.body.data.pending).toBe(1);
+    expect(service.triage).toHaveBeenCalledWith(controlId, {
+      userId,
+      organizationId,
+      permission: 1,
+    });
   });
 
   it("abre controle: 201 quando cria e 200 quando já existia", async () => {

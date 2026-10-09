@@ -865,6 +865,27 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/monthly-controls/{id}/triage": {
+        get: {
+          tags: ["Controle mensal"],
+          summary: "Consultar documentos da Triagem do controle",
+          description:
+            "Só leitura do checklist da Triagem Fiscal do mesmo cliente e competência. pending é null quando a Triagem não tem registro; nesse caso, como com pendência, concluir o controle exige Fiscal nível 3 e justificativa.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Origem (MONTHLY, PLANNED ou NONE), pendências e itens com status",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "404": { description: "Controle não encontrado nesta organização" },
+          },
+        },
+      },
       "/fiscal/monthly-controls/{id}/obligations": {
         get: {
           tags: ["Controle mensal"],
@@ -985,7 +1006,7 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           tags: ["Controle mensal"],
           summary: "Alterar situação e/ou condição de movimento",
           description:
-            "Cada mudança grava ator, instante, valor anterior, novo e motivo. Reabrir controle concluído exige Fiscal nível 3 e motivo.",
+            "Cada mudança grava ator, instante, valor anterior, novo e motivo. Reabrir controle concluído exige Fiscal nível 3 e motivo. Concluir com documento pendente (ou sem registro) na Triagem exige Fiscal nível 3 e justificativa em reason; a Triagem não é alterada.",
           security: [{ bearerAuth: [] }],
           parameters: [
             { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
@@ -1018,7 +1039,10 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
               },
             },
             "400": { description: "Entrada inválida ou reabertura sem motivo" },
-            "403": { description: "Sem permissão (edição Fiscal; nível 3 para reabrir)" },
+            "403": {
+              description:
+                "Sem permissão (edição Fiscal; nível 3 para reabrir ou concluir com pendência na Triagem)",
+            },
             "404": { description: "Controle não encontrado nesta organização" },
             "409": { description: "Controle alterado por outra pessoa desde a leitura" },
           },
