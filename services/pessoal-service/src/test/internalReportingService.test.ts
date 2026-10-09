@@ -481,9 +481,9 @@ describe("pessoal internal reporting service", () => {
           client_code: "123",
           client_document: "123.456.789-00",
           client_status: "Ativo",
-          payroll_state: "CONCLUIDO",
-          charges_state: "PENDENTE",
-          vt_state: "NAO_POSSUI",
+          payroll_state: "Concluído",
+          charges_state: "Pendente",
+          vt_state: "Não possui",
         },
       ],
       reachedLimit: false,
@@ -524,15 +524,15 @@ describe("pessoal internal reporting service", () => {
               field: "payroll_state",
               operator: "in",
               parameter: "state",
-              value: ["PENDENTE", "NAO_POSSUI"],
+              value: ["Pendente", "Não possui"],
             },
           ],
         },
       }),
     ).resolves.toEqual({
       rows: [
-        { group_snapshot_name: "Grupo A", payroll_state: "PENDENTE" },
-        { group_snapshot_name: "Grupo B", payroll_state: "NAO_POSSUI" },
+        { group_snapshot_name: "Grupo A", payroll_state: "Pendente" },
+        { group_snapshot_name: "Grupo B", payroll_state: "Não possui" },
       ],
       reachedLimit: false,
     });
@@ -542,6 +542,31 @@ describe("pessoal internal reporting service", () => {
         select: expect.objectContaining({ group_snapshot_name: true, payroll: true }),
       }),
     );
+  });
+
+  it("deriva o estado do grupo registrado mesmo quando é o único campo pedido", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      { group_snapshot_name: "Sem Movimento", group_snapshot_policy: "NO_OBLIGATIONS" },
+      { group_snapshot_name: "Grupo A", group_snapshot_policy: "DEFAULT" },
+    ]);
+    const service = new InternalReportingService({ obrigationsPessoal: { findMany } } as never);
+
+    const result = await service.extract({
+      organizationId,
+      source: "pessoal.obligations",
+      fields: ["group_snapshot_state"],
+      limit: 2,
+    });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: { group_snapshot_name: true, group_snapshot_policy: true },
+      }),
+    );
+    expect(result.rows).toEqual([
+      { group_snapshot_state: "SEM_MOVIMENTO" },
+      { group_snapshot_state: "ATIVO" },
+    ]);
   });
 
   it("rejeita campo não publicado de payroll antes de consultar o banco", async () => {

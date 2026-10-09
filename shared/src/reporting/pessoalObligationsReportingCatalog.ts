@@ -29,17 +29,23 @@ function field(
   };
 }
 
-// Estado derivado de cada item: true = CONCLUIDO, false = PENDENTE, null = NAO_POSSUI.
-const OBLIGATION_ITEMS = [
+export const PESSOAL_OBLIGATION_ITEMS = [
   ["advance", "Adiantamento"],
   ["payroll", "Folha"],
   ["charges", "Encargos"],
-  ["assistance_fee", "Taxa assistencial"],
+  ["assistance_fee", "Contribuição assistencial"],
   ["bem_mais", "Bem Mais"],
   ["bsf", "BSF"],
   ["va", "Vale-alimentação"],
   ["vt", "Vale-transporte"],
 ] as const;
+
+// Estado derivado de cada item: true = concluído, false = pendente, null = não possui.
+export const PESSOAL_OBLIGATION_ITEM_STATES = {
+  completed: "Concluído",
+  pending: "Pendente",
+  notApplicable: "Não possui",
+} as const;
 
 export const PESSOAL_OBLIGATIONS_REPORTING_SOURCES = ["pessoal.obligations"] as const;
 export type PessoalObligationsReportingSource =
@@ -71,15 +77,10 @@ export const pessoalObligationsReportingCatalog = {
           "string",
           snapshotStateOperators,
         ),
-        field("advance", "Adiantamento", "boolean", noFilterOperators),
-        field("payroll", "Folha", "boolean", noFilterOperators),
-        field("charges", "Encargos", "boolean", noFilterOperators),
-        field("assistance_fee", "Taxa assistencial", "boolean", noFilterOperators),
-        field("bem_mais", "Bem Mais", "boolean", noFilterOperators),
-        field("bsf", "BSF", "boolean", noFilterOperators),
-        field("va", "Vale-alimentação", "boolean", noFilterOperators),
-        field("vt", "Vale-transporte", "boolean", noFilterOperators),
-        ...OBLIGATION_ITEMS.map(([item, label]) =>
+        ...PESSOAL_OBLIGATION_ITEMS.map(([item, label]) =>
+          field(item, label, "boolean", noFilterOperators),
+        ),
+        ...PESSOAL_OBLIGATION_ITEMS.map(([item, label]) =>
           field(`${item}_state`, `${label} (estado)`, "string", snapshotStateOperators),
         ),
       ],
