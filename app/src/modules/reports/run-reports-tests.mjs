@@ -257,11 +257,17 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
       label: "Folha",
       module: "pessoal",
       fields: [
+        "client_code",
         "client_name",
+        "client_document",
+        "client_status",
         "responsible_name",
         "union_name",
         "group_name",
         "group_state",
+        "previous",
+        "info",
+        "contact",
         "advance",
         "advance_type",
         "advance_amount",
@@ -320,6 +326,9 @@ runTest("offers Pessoal presets only when their authorized sources and fields ar
     [{ field: "competence", operator: "eq", value: "" }],
   );
   assert.equal(getPessoalReportPresets(sources.slice(0, 2)).length, 2);
+  for (const field of ["client_code", "client_document", "client_status", "previous", "info", "contact"]) {
+    assert.ok(presets[0].areas[0].fields.includes(field), field);
+  }
 });
 
 runTest("offers a task count by current department only for an authorized report source", () => {

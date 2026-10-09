@@ -71,6 +71,8 @@ model Payroll {
 model Client {
   id              String @id @default(uuid())
   name            String
+  dominio_code    String?
+  cpf_cnpj        String @default("")
   status          String
   pessoal         Boolean
   organization_id String

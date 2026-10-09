@@ -20,11 +20,17 @@ const presets: readonly PessoalReportPreset[] = [
       {
         source: "pessoal.payroll",
         fields: [
+          "client_code",
           "client_name",
+          "client_document",
+          "client_status",
           "responsible_name",
           "union_name",
           "group_name",
           "group_state",
+          "previous",
+          "info",
+          "contact",
           "advance",
           "advance_type",
           "advance_amount",
@@ -50,11 +56,14 @@ const presets: readonly PessoalReportPreset[] = [
       {
         source: "pessoal.payroll",
         fields: [
+          "client_code",
           "client_name",
+          "client_status",
           "responsible_name",
           "union_name",
           "group_name",
           "group_state",
+          "previous",
           "advance",
           "onvio",
           "vt",
