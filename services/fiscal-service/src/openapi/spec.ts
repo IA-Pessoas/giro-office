@@ -798,6 +798,117 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/monthly-controls": {
+        get: {
+          tags: ["Controle mensal"],
+          summary: "Listar a carteira de controles fiscais da competência",
+          description:
+            "Antes de listar, gera os controles que faltam para clientes com Fiscal ativo na competência (entrada/saída respeitadas). Repetição ou concorrência não duplica: um controle por organização, cliente e competência.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Competência e controles com nome do cliente",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Competência inválida" },
+          },
+        },
+        post: {
+          tags: ["Controle mensal"],
+          summary: "Abrir controle fiscal do cliente na competência",
+          description:
+            "Idempotente. Cliente sem Fiscal ativo na competência exige motivo (abertura excepcional), registrado no controle e na trilha.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["client_id", "competence"],
+                  additionalProperties: false,
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Controle já existia (created: false)",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "201": {
+              description: "Controle aberto (created: true)",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou abertura excepcional sem motivo" },
+            "403": { description: "Sem permissão de edição Fiscal" },
+            "404": { description: "Cliente não encontrado nesta organização" },
+          },
+        },
+      },
+      "/fiscal/monthly-controls/{id}": {
+        patch: {
+          tags: ["Controle mensal"],
+          summary: "Alterar situação e/ou condição de movimento",
+          description:
+            "Cada mudança grava ator, instante, valor anterior, novo e motivo. Reabrir controle concluído exige Fiscal nível 3 e motivo.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  additionalProperties: false,
+                  minProperties: 1,
+                  properties: {
+                    status: {
+                      type: "string",
+                      enum: ["PENDING", "IN_PROGRESS", "AWAITING_CLIENT", "COMPLETED"],
+                    },
+                    no_movement: { type: "boolean" },
+                    reason: { type: "string", minLength: 3, maxLength: 500 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Controle atualizado",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Entrada inválida ou reabertura sem motivo" },
+            "403": { description: "Sem permissão (edição Fiscal; nível 3 para reabrir)" },
+            "404": { description: "Controle não encontrado nesta organização" },
+            "409": { description: "Controle alterado por outra pessoa desde a leitura" },
+          },
+        },
+      },
       "/fiscal/revenues": {
         post: {
           tags: ["Receitas"],

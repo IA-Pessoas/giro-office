@@ -105,6 +105,14 @@ describe("activityCatalog", () => {
     ["POST", "/fiscal/simples/csv", "exportou", "um CSV de alíquotas do Simples em lote"],
     ["POST", "/fiscal/simples/zip", "exportou", "os PDFs de alíquotas do Simples em lote"],
     ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
+    ["GET", "/fiscal/monthly-controls", "consultou", "a lista de controles fiscais mensais"],
+    ["POST", "/fiscal/monthly-controls", "cadastrou", "um novo controle fiscal mensal"],
+    [
+      "PATCH",
+      "/fiscal/monthly-controls/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",
+      "atualizou",
+      "um controle fiscal mensal",
+    ],
     [
       "PUT",
       "/fiscal/revenues/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e",

@@ -189,6 +189,88 @@ describe("fiscal Worker", () => {
     expect(simples.batch).toHaveBeenCalledTimes(2);
   });
 
+  it("controle mensal: lista com reconciliação, abre e altera no tenant, leitura sem escrita", async () => {
+    const control = {
+      id: ICMS_ID,
+      client_id: "d0000000-0000-4000-8000-000000000001",
+      competence: "2026-08",
+      status: "PENDING" as const,
+      no_movement: false,
+      regime: null,
+      opening_reason: null,
+      updated_by: USER_ID,
+      updatedAt: "2026-09-28T12:00:00.000Z",
+    };
+    const controls = {
+      list: vi.fn(async () => ({
+        competence: "2026-08",
+        items: [{ ...control, client_name: "Alfa" }],
+      })),
+      open: vi.fn(async () => ({ control, created: true })),
+      update: vi.fn(async () => ({ ...control, status: "IN_PROGRESS" as const })),
+    };
+    const app = createFiscalWorkerApp({ env: env(), controlService: controls });
+    const reader = gatewayHeaders({
+      "x-auth-permission": "1",
+      "x-auth-modules": JSON.stringify({ fiscal: 1 }),
+    });
+
+    const listed = await app.request(
+      "https://fiscal.test/fiscal/monthly-controls?competence=2026-08",
+      { headers: reader },
+    );
+    expect(listed.status).toBe(200);
+    expect(controls.list).toHaveBeenCalledWith(
+      { competence: "2026-08" },
+      expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+    );
+
+    const opened = await app.request("https://fiscal.test/fiscal/monthly-controls", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({
+        client_id: control.client_id,
+        competence: "2026-08",
+        reason: "Avulso",
+      }),
+    });
+    expect(opened.status).toBe(201);
+    controls.open.mockResolvedValueOnce({ control, created: false });
+    const reopened = await app.request("https://fiscal.test/fiscal/monthly-controls", {
+      method: "POST",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ client_id: control.client_id, competence: "2026-08" }),
+    });
+    expect(reopened.status).toBe(200);
+
+    const updated = await app.request(`https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ status: "IN_PROGRESS" }),
+    });
+    expect(updated.status).toBe(200);
+    expect(controls.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: ICMS_ID, status: "IN_PROGRESS", permission: 3 }),
+    );
+
+    const readerWrite = await app.request(
+      `https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}`,
+      {
+        method: "PATCH",
+        headers: { ...reader, "content-type": "application/json" },
+        body: JSON.stringify({ status: "COMPLETED" }),
+      },
+    );
+    expect(readerWrite.status).toBe(403);
+    const invalid = await app.request(`https://fiscal.test/fiscal/monthly-controls/${ICMS_ID}`, {
+      method: "PATCH",
+      headers: { ...gatewayHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ status: "DONE" }),
+    });
+    expect(invalid.status).toBe(400);
+    expect(controls.update).toHaveBeenCalledOnce();
+  });
+
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
     const revenue = {
       id: ICMS_ID,

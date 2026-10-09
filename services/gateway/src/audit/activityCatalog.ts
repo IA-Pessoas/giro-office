@@ -1380,6 +1380,12 @@ const RESOURCE_RULES: ResourceRule[] = [
     plural: "registros de alíquotas fiscais",
   },
   {
+    pattern: /^\/fiscal\/monthly-controls(?:\/|$)/,
+    singular: "um controle fiscal mensal",
+    newSingular: "um novo controle fiscal mensal",
+    plural: "controles fiscais mensais",
+  },
+  {
     pattern: /^\/fiscal\/revenues(?:\/|$)/,
     singular: "uma receita mensal",
     newSingular: "uma nova receita mensal",

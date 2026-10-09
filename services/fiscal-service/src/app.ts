@@ -25,6 +25,10 @@ import { createIcmsRoutes, type IcmsRouteDeps } from "./routes/icms.routes.js";
 import { createInternalReportingRouter } from "./routes/internalReporting.routes.js";
 import { createIpiRoutes, type IpiRouteDeps } from "./routes/ipi.routes.js";
 import {
+  createMonthlyControlRoutes,
+  type MonthlyControlRouteDeps,
+} from "./routes/monthlyControl.routes.js";
+import {
   createMonthlyRevenueRoutes,
   type MonthlyRevenueRouteDeps,
 } from "./routes/monthlyRevenue.routes.js";
@@ -34,6 +38,7 @@ import { FiscalRateService } from "./services/fiscalRateService.js";
 import { FiscalSearchService } from "./services/fiscalSearchService.js";
 import { IcmsService } from "./services/icmsService.js";
 import { IpiService } from "./services/ipiService.js";
+import { MonthlyControlService } from "./services/monthlyControlService.js";
 import { MonthlyRevenueService } from "./services/monthlyRevenueService.js";
 import { NcmService } from "./services/ncmService.js";
 import { SimplesRateService } from "./services/simplesRateService.js";
@@ -61,6 +66,7 @@ export function createFiscalApp(options: {
   fiscalSearchRouteDeps?: FiscalSearchRouteDeps;
   fiscalRateRouteDeps?: FiscalRateRouteDeps;
   monthlyRevenueRouteDeps?: MonthlyRevenueRouteDeps;
+  monthlyControlRouteDeps?: MonthlyControlRouteDeps;
   simplesRateRouteDeps?: SimplesRateRouteDeps;
   icmsRouteDeps?: IcmsRouteDeps;
   ipiRouteDeps?: IpiRouteDeps;
@@ -73,6 +79,8 @@ export function createFiscalApp(options: {
     options.fiscalRateRouteDeps ?? new FiscalRateService(prismaClient, { createLog });
   const monthlyRevenueRouteDeps =
     options.monthlyRevenueRouteDeps ?? new MonthlyRevenueService(prismaClient, { createLog });
+  const monthlyControlRouteDeps =
+    options.monthlyControlRouteDeps ?? new MonthlyControlService(prismaClient, { createLog });
   const simplesRateRouteDeps = options.simplesRateRouteDeps ?? new SimplesRateService(prismaClient);
   const icmsRouteDeps =
     options.icmsRouteDeps ?? new IcmsService(prismaClient, { createLog, logUpdateIfChanged });
@@ -105,6 +113,7 @@ export function createFiscalApp(options: {
   app.use("/fiscal", createFiscalSearchRoutes(fiscalSearchRouteDeps));
   app.use("/fiscal", createFiscalRateRoutes(fiscalRateRouteDeps));
   app.use("/fiscal", createMonthlyRevenueRoutes(monthlyRevenueRouteDeps));
+  app.use("/fiscal", createMonthlyControlRoutes(monthlyControlRouteDeps));
   app.use("/fiscal", createSimplesRateRoutes(simplesRateRouteDeps));
   app.use(
     "/internal",

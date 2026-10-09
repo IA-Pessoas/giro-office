@@ -33,6 +33,7 @@ model Client {
   organization_id   String
   type              String
   status            String
+  competence_entry  DateTime?
   competence_output DateTime?
   regime            String?
   fiscal            Boolean?
@@ -69,6 +70,42 @@ model FiscalMonthlyRevenue {
 
   @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_revenues_org_client_competence")
   @@map("fiscal.monthly_revenues")
+}
+
+model FiscalMonthlyControl {
+  id              String                      @id @default(uuid())
+  organization_id String
+  client_id       String
+  competence      DateTime                    @db.Date
+  status          String                      @default("PENDING")
+  no_movement     Boolean                     @default(false)
+  regime          String?
+  opening_reason  String?
+  created_by      String
+  updated_by      String
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  events          FiscalMonthlyControlEvent[]
+
+  @@unique([organization_id, client_id, competence], map: "uq_fiscal_monthly_controls_org_client_competence")
+  @@index([organization_id, competence], map: "idx_fiscal_monthly_controls_org_competence")
+  @@map("fiscal.monthly_controls")
+}
+
+model FiscalMonthlyControlEvent {
+  id              String               @id @default(uuid())
+  organization_id String
+  control_id      String
+  action          String
+  from_value      String?
+  to_value        String?
+  reason          String?
+  actor_id        String
+  createdAt       DateTime             @default(now())
+  control         FiscalMonthlyControl @relation(fields: [control_id], references: [id], onDelete: Cascade)
+
+  @@index([control_id, createdAt], map: "idx_fiscal_monthly_control_events_control_created")
+  @@map("fiscal.monthly_control_events")
 }
 
 model Ncm {
