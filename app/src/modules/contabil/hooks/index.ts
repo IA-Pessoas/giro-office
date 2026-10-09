@@ -29,6 +29,7 @@ export {
 } from "./useContabilControl";
 export {
   useContabilRelationship,
+  useContabilRelationshipHistory,
   useCreateContabilRelationshipMutation,
   useDeleteContabilRelationshipMutation,
   useUpdateContabilRelationshipMutation,

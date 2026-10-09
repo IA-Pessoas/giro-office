@@ -5938,6 +5938,14 @@ const handlers = {
     });
   },
 
+  async contabilRelationshipHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/contabil/relationships/client/${requireState("primaryClientId")}/history`,
+      query: { pageSize: "5" },
+    });
+  },
+
   async contabilRelationshipUpdate(op) {
     await httpRequest(op, {
       expectedStatus: [200],

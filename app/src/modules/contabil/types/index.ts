@@ -92,12 +92,29 @@ export interface ContabilControlPortfolio {
   items: ContabilControlPortfolioItem[];
 }
 
-export interface ContabilControlHistoryEntry {
+export interface ContabilHistoryEntry<F extends string> {
   id: string;
   at: string;
   actor: { id: string; name: string | null } | null;
   action: string | null;
-  changes: Array<{ field: ContabilControlField; from: boolean | string | null; to: boolean | string | null }>;
+  changes: Array<{ field: F; from: boolean | string | null; to: boolean | string | null }>;
+}
+
+export type ContabilControlHistoryEntry = ContabilHistoryEntry<ContabilControlField>;
+
+export type ContabilRelationshipHistoryField =
+  | "bidding"
+  | "chart_accounts"
+  | "tool"
+  | "system"
+  | "note";
+
+export interface ContabilRelationshipHistoryPage {
+  client_id: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  items: ContabilHistoryEntry<ContabilRelationshipHistoryField>[];
 }
 
 export interface ContabilControlHistoryPage {

@@ -6,7 +6,12 @@ import {
   type TriageAccountingSummaryDto,
   withReportingSnapshot,
 } from "@workspace/shared";
+import {
+  AUDIT_CREATE_ACTION,
+  AUDIT_UPDATE_ACTION,
+} from "../../../services/contabil-service/src/services/auditHistoryService.js";
 import { CONTROL_AUDIT_ACTIONS } from "../../../services/contabil-service/src/services/controlHistoryService.js";
+import { RELATIONSHIP_AUDIT_REFERRING } from "../../../services/contabil-service/src/services/relationshipHistoryService.js";
 import { assertChartAccountsState } from "../../../services/contabil-service/src/services/relationshipStates.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
@@ -581,7 +586,17 @@ function createSimpleEntityService(
         const row = await delegate.create({
           data: { ...input, organization_id: auth.organizationId },
         });
-        await auditCreate(audit, auth, referring, String(row.id), "Cadastro");
+        // Diff contra objeto vazio: o histórico mostra os valores iniciais como `null → valor`.
+        await audit.logUpdateIfChanged({
+          userId: auth.userId,
+          organizationId: auth.organizationId,
+          permission: auth.permission ?? null,
+          action: AUDIT_CREATE_ACTION,
+          referring,
+          referringId: String(row.id),
+          oldData: {},
+          updatedData: row,
+        });
         return row;
       } catch (error) {
         if (isUniqueViolation(error))
@@ -602,7 +617,7 @@ function createSimpleEntityService(
           userId: auth.userId,
           organizationId: auth.organizationId,
           permission: auth.permission ?? null,
-          action: "Atualização",
+          action: AUDIT_UPDATE_ACTION,
           referring,
           referringId: id,
           oldData: current,
@@ -642,7 +657,7 @@ export function createRelationshipService(
     prisma,
     audit,
     "relationshipContabil",
-    "contabil.relationship",
+    RELATIONSHIP_AUDIT_REFERRING,
     { foreignKey: "Cliente não encontrado." },
     (input, current) =>
       assertChartAccountsState(

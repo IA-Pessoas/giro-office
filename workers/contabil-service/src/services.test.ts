@@ -183,6 +183,14 @@ describe("contabil services tenant and catalog seams", () => {
 
     database.relationshipContabil.findFirst.mockResolvedValue(null);
     await service.create({ ...base, bidding: null, chart_accounts: "Não — Jonrick" }, auth);
+    expect(trail.logUpdateIfChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "Cadastro",
+        referring: "contabil.relationship",
+        oldData: {},
+        updatedData: expect.objectContaining({ chart_accounts: "Não — Jonrick" }),
+      }),
+    );
     expect(database.relationshipContabil.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ bidding: null, chart_accounts: "Não — Jonrick" }),
     });

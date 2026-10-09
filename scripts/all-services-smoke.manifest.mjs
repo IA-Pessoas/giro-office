@@ -4833,6 +4833,14 @@ const baseManifest = [
   }),
   op({
     service: "contabil-service",
+    method: "GET",
+    path: "/contabil/relationships/client/{clientId}/history",
+    action: "contabilRelationshipHistory",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "contabil-service",
     method: "PUT",
     path: "/contabil/relationships/{id}",
     action: "contabilRelationshipUpdate",

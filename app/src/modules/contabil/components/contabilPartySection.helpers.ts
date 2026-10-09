@@ -2,6 +2,7 @@ import type { AssignableUser } from "@modules/rh/types";
 
 import type {
   ContabilRelationship,
+  ContabilRelationshipHistoryField,
   ContabilResponsible,
   UpdateContabilRelationshipPayload,
 } from "../types";
@@ -102,6 +103,17 @@ const BIDDING_OPTIONS: ContabilSelectOption[] = [
 ];
 
 type ContabilRelationshipEditableField = keyof ContabilRelationshipFormValues;
+
+export function formatContabilRelationshipHistoryValue(
+  field: ContabilRelationshipHistoryField,
+  value: unknown,
+) {
+  if (field === "bidding") return formatContabilBidding(typeof value === "boolean" ? value : null);
+  if (field === "chart_accounts") {
+    return formatContabilChartAccounts(typeof value === "string" ? value : null);
+  }
+  return typeof value === "string" && value.trim() ? value : "(vazio)";
+}
 
 export function formatContabilRelationshipField(
   relationship: ContabilRelationship,

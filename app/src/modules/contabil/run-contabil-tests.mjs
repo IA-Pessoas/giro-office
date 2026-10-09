@@ -11,6 +11,7 @@ import {
 } from "./services/contabilService.contract.ts";
 import {
   contabilControlHistoryQueryKey,
+  contabilRelationshipHistoryQueryKey,
   contabilControlQueryKey,
   contabilRelationshipQueryKey,
   contabilResponsibleQueryKey,
@@ -28,11 +29,14 @@ import {
   CONTABIL_CONTROL_NOTES_FIELD,
   getContabilControlFieldLabel,
 } from "./components/contabilControlFields.ts";
-import { CONTABIL_RELATIONSHIP_FIELDS } from "./components/contabilRelationshipFields.ts";
+import {
+  CONTABIL_RELATIONSHIP_FIELDS,
+  getContabilRelationshipFieldLabel,
+} from "./components/contabilRelationshipFields.ts";
 import {
   formatContabilControlHistoryValue,
-  getContabilControlHistoryPageCount,
-} from "./components/contabilControlHistory.helpers.ts";
+  getContabilHistoryPageCount,
+} from "./components/contabilHistory.helpers.ts";
 import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
@@ -52,6 +56,7 @@ import {
   buildContabilResponsibleFormValues,
   formatContabilBidding,
   formatContabilChartAccounts,
+  formatContabilRelationshipHistoryValue,
   getContabilChartAccountsOptions,
   pickChangedContabilRelationshipFields,
   getContabilSelectLabel,
@@ -543,6 +548,26 @@ await (async () => {
     ]);
   });
 
+  await runTest("relationship history labels fields and legacy states (#1723)", () => {
+    assert.equal(getContabilRelationshipFieldLabel("bidding"), "Participa de licitação");
+    assert.equal(getContabilRelationshipFieldLabel("chart_accounts"), "Plano de contas");
+    assert.equal(formatContabilRelationshipHistoryValue("bidding", null), "Não selecionado");
+    assert.equal(formatContabilRelationshipHistoryValue("bidding", true), "Sim");
+    assert.equal(formatContabilRelationshipHistoryValue("chart_accounts", "Sim — Jonrick"), "Sim — Jonrick");
+    assert.equal(
+      formatContabilRelationshipHistoryValue("chart_accounts", "Plano próprio"),
+      "Plano próprio (texto legado)",
+    );
+    assert.equal(formatContabilRelationshipHistoryValue("chart_accounts", null), "Não selecionado");
+    assert.equal(formatContabilRelationshipHistoryValue("tool", ""), "(vazio)");
+    assert.deepEqual(contabilRelationshipHistoryQueryKey("client-1", 1), [
+      "contabil",
+      "relationship-history",
+      "client-1",
+      1,
+    ]);
+  });
+
   await runTest("control history labels fields and values and paginates (#1722)", () => {
     assert.equal(getContabilControlFieldLabel("depreciation"), "Depreciação");
     assert.equal(getContabilControlFieldLabel("desconhecido"), "desconhecido");
@@ -551,8 +576,8 @@ await (async () => {
     assert.equal(formatContabilControlHistoryValue("depreciation", null), "—");
     assert.equal(formatContabilControlHistoryValue("notes", ""), "(vazio)");
     assert.equal(formatContabilControlHistoryValue("notes", "Conferir"), "Conferir");
-    assert.equal(getContabilControlHistoryPageCount(0, 20), 1);
-    assert.equal(getContabilControlHistoryPageCount(41, 20), 3);
+    assert.equal(getContabilHistoryPageCount(0, 20), 1);
+    assert.equal(getContabilHistoryPageCount(41, 20), 3);
     assert.deepEqual(contabilControlHistoryQueryKey("client-1", "2026-09", 2), [
       "contabil",
       "control-history",
