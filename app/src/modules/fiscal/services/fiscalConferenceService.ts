@@ -16,6 +16,7 @@ export interface FiscalConferenceRow {
   number: string;
   value: string | null;
   status: string | null;
+  ipi: string | null;
 }
 
 type Pair = { identity: string; dominio: FiscalConferenceRow; sefaz: FiscalConferenceRow };
@@ -231,6 +232,28 @@ export interface FiscalXmlTaxTotals {
   csv: string;
 }
 
+type IpiPair = { identity: string; first: FiscalConferenceRow; second: FiscalConferenceRow };
+
+export interface FiscalIpiSpreadsheetConference {
+  status: "complete" | "partial";
+  identity_rule: string;
+  sources: Record<"first" | "second", FiscalDocumentConference["sources"]["dominio"]>;
+  summary: Record<
+    "matched" | "divergent" | "only_first" | "only_second" | "duplicates" | "discarded" | "errors",
+    number
+  >;
+  totals: { first: string; second: string; difference: string };
+  matched: IpiPair[];
+  divergent: (IpiPair & { difference: string; differences: string[] })[];
+  only_first: FiscalConferenceRow[];
+  only_second: FiscalConferenceRow[];
+  duplicates: { identity: string; first: FiscalConferenceRow[]; second: FiscalConferenceRow[] }[];
+  discarded: { source: "first" | "second"; line: number; reason: string }[];
+  errors: { source: "first" | "second"; line: number; message: string }[];
+  file_name: string;
+  csv: string;
+}
+
 export const fiscalConferenceService = {
   /** Conferência Domínio × SEFAZ: nada é gravado no servidor. */
   async compareDocuments(files: Record<FiscalConferenceSource, File>): Promise<FiscalDocumentConference> {
@@ -287,5 +310,16 @@ export const fiscalConferenceService = {
       zip_base64: await fileToBase64(file),
     });
     return unwrapFiscalEnvelope<FiscalXmlTaxTotals>(response.data);
+  },
+
+  /** Conferência de IPI entre duas planilhas: nada é gravado no servidor. */
+  async compareIpiSpreadsheets(files: { first: File; second: File }): Promise<FiscalIpiSpreadsheetConference> {
+    const [first, second] = await Promise.all([readSpreadsheetText(files.first), readSpreadsheetText(files.second)]);
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.post("/fiscal/conferences/ipi-spreadsheets", {
+      first: { file_name: files.first.name, content: first },
+      second: { file_name: files.second.name, content: second },
+    });
+    return unwrapFiscalEnvelope<FiscalIpiSpreadsheetConference>(response.data);
   },
 };
