@@ -920,11 +920,14 @@ html.dark .ui-input,
     }
 
     #marketing-event-edition-report,
-    #marketing-event-edition-report * {
+    #marketing-event-edition-report *,
+    #marketing-birthday-report,
+    #marketing-birthday-report * {
         visibility: visible !important;
     }
 
-    #marketing-event-edition-report {
+    #marketing-event-edition-report,
+    #marketing-birthday-report {
         position: relative;
         inset: auto;
         width: 100%;
@@ -966,7 +969,8 @@ html.dark .ui-input,
         padding: 0 !important;
     }
 
-    #marketing-event-edition-report * {
+    #marketing-event-edition-report *,
+    #marketing-birthday-report * {
         color: #111827 !important;
         background: transparent !important;
         border-color: #d1d5db !important;
@@ -978,7 +982,8 @@ html.dark .ui-input,
     }
 
     #marketing-event-edition-report section,
-    #marketing-event-edition-report tr {
+    #marketing-event-edition-report tr,
+    #marketing-birthday-report tr {
         break-inside: avoid;
     }
 }

@@ -15,7 +15,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createMarketingApp } from "../app.js";
 import { getMarketingServiceEnv } from "../config/env.js";
 import type { MarketingDashboardProvider } from "../routes/marketingDashboard.routes.js";
-import type { MarketingDashboardResponse } from "../schemas/marketingDashboard.schemas.js";
+import type {
+  MarketingDashboardResponse,
+  MarketingMonthlyBirthdaysResponse,
+} from "../schemas/marketingDashboard.schemas.js";
 
 const organizationId = "10000000-0000-4000-8000-000000000001";
 const userId = "00000000-0000-4000-8000-000000000001";
@@ -47,8 +50,23 @@ function createTestLogger() {
   });
 }
 
+const monthlyBirthdays: MarketingMonthlyBirthdaysResponse = {
+  month: 5,
+  employees: {
+    total: 1,
+    items: [{ id: "e-1", name: "Ana", birthDate: "1990-05-01", day: 1, department: "Marketing" }],
+  },
+  clients: {
+    total: 1,
+    items: [{ id: "pf-1", name: "Carla", birthDate: "1970-05-15", day: 15, companies: "Alfa" }],
+  },
+};
+
 function createDashboardProvider(): MarketingDashboardProvider {
-  return { getDashboard: vi.fn(async () => dashboard) };
+  return {
+    getDashboard: vi.fn(async () => dashboard),
+    getMonthlyBirthdays: vi.fn(async () => monthlyBirthdays),
+  };
 }
 
 function gatewayHeaders(permission = 1): Record<string, string> {
@@ -129,5 +147,43 @@ describe("GET /marketing/dashboard", () => {
 
     expect(response.status).toBe(401);
     expect(service.getDashboard).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /marketing/birthdays", () => {
+  it("returns the selected month for the authenticated organization", async () => {
+    const service = createDashboardProvider();
+    const response = await request(createTestApp(service))
+      .get("/marketing/birthdays?month=5")
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, data: monthlyBirthdays });
+    expect(service.getMonthlyBirthdays).toHaveBeenCalledWith(organizationId, 5);
+  });
+
+  it.each([
+    "",
+    "?month=0",
+    "?month=13",
+    "?month=abc",
+  ])("rejects invalid month %s", async (query) => {
+    const service = createDashboardProvider();
+    const response = await request(createTestApp(service))
+      .get(`/marketing/birthdays${query}`)
+      .set(gatewayHeaders());
+
+    expect(response.status).toBe(400);
+    expect(service.getMonthlyBirthdays).not.toHaveBeenCalled();
+  });
+
+  it("rejects users without Marketing permission", async () => {
+    const service = createDashboardProvider();
+    const response = await request(createTestApp(service))
+      .get("/marketing/birthdays?month=5")
+      .set(gatewayHeaders(0));
+
+    expect(response.status).toBe(403);
+    expect(service.getMonthlyBirthdays).not.toHaveBeenCalled();
   });
 });

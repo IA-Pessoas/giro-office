@@ -95,6 +95,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/marketing\/birthdays$/,
+    description: { action: "consultou", item: "os aniversariantes do mês do Marketing" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/marketing\/ai-usage-controls\/users$/,
     description: { action: "consultou", item: "os usuários elegíveis para a pesquisa de IA" },
   },

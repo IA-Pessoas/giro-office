@@ -8,7 +8,10 @@ const INTERNAL_TOKEN = "marketing-gateway-internal-token";
 function services() {
   const passwords = { list: vi.fn(async () => [{ id: "p-1" }]) };
   return {
-    dashboard: { getDashboard: vi.fn(async () => ({ alerts: [] })) },
+    dashboard: {
+      getDashboard: vi.fn(async () => ({ alerts: [] })),
+      getMonthlyBirthdays: vi.fn(async () => ({ month: 5 })),
+    },
     controls: {},
     events: {
       updateEvent: vi.fn(async () => null),
@@ -50,6 +53,21 @@ describe("marketing Worker", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true, data: { alerts: [] } });
     expect(s.dashboard.getDashboard).toHaveBeenCalledWith(ORGANIZATION_ID);
+  });
+
+  it("serve os aniversariantes do mês escolhido e recusa mês inválido", async () => {
+    const { app, s } = setup();
+    const response = await app.request("/marketing/birthdays?month=5", {
+      headers: gateway({ marketing: 1 }),
+    });
+    const invalid = await app.request("/marketing/birthdays?month=13", {
+      headers: gateway({ marketing: 1 }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(s.dashboard.getMonthlyBirthdays).toHaveBeenCalledWith(ORGANIZATION_ID, 5);
+    expect(invalid.status).toBe(400);
+    expect(s.dashboard.getMonthlyBirthdays).toHaveBeenCalledTimes(1);
   });
 
   it("serve as rotas de credenciais, eventos e edições", async () => {

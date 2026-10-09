@@ -9,9 +9,34 @@ function csvCell(value: string | number): string {
   return `"${safeText.replaceAll('"', '""')}"`;
 }
 
+export function createCsv(rows: readonly (readonly (string | number)[])[]): string {
+  return rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+}
+
 export function createBirthdayCsv(items: readonly BirthdayCsvItem[]): string {
-  return [
-    ["Nome", "Dia"].map(csvCell).join(","),
-    ...items.map((item) => [csvCell(item.name), csvCell(item.day)].join(",")),
-  ].join("\r\n");
+  return createCsv([["Nome", "Dia"], ...items.map((item) => [item.name, item.day])]);
+}
+
+/** `1990-05-31` → `31/05/1990`, como o relatório legado. */
+export function formatBirthDate(birthDate: string): string {
+  const [year, month, day] = birthDate.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+export function createMonthlyEmployeeBirthdayCsv(
+  items: readonly { name: string; birthDate: string; department: string | null }[],
+): string {
+  return createCsv([
+    ["Data", "Colaborador", "Departamento"],
+    ...items.map((item) => [formatBirthDate(item.birthDate), item.name, item.department ?? "Sem departamento"]),
+  ]);
+}
+
+export function createMonthlyClientBirthdayCsv(
+  items: readonly { name: string; birthDate: string; companies: string }[],
+): string {
+  return createCsv([
+    ["Data", "Cliente", "Empresa"],
+    ...items.map((item) => [formatBirthDate(item.birthDate), item.name, item.companies]),
+  ]);
 }
