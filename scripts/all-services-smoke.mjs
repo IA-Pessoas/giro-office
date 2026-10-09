@@ -4838,6 +4838,43 @@ const handlers = {
     });
   },
 
+  async fiscalSpedXmlConference(op) {
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd><CFOP>5102</CFOP><qCom>1</qCom><vProd>10.00</vProd></prod></det><total><ICMSTot><vNF>10.00</vNF></ICMSTot></total></infNFe></NFe>';
+    const response = await httpRequest(op, {
+      json: {
+        sped: {
+          file_name: "sped.txt",
+          content: [
+            "|0000|017|0|01082026|31082026|EMPRESA|11222333000181||SP|",
+            "|C100|0|0||55|00|1|100||01082026|01082026|10,00|",
+            "|C170|1|A||1|UN|10,00|0|0|000|5102|",
+          ].join("\n"),
+        },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+        },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(`Conferência SPED × XML inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSpedXmlConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        sped: { file_name: "sped.txt", content: "|0000|017|" },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from("<NFe/>")).toString("base64"),
+        },
+      },
+    });
+  },
+
   async fiscalSimplesZipInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],

@@ -16,6 +16,15 @@ export interface NfeIdentity {
   identity: string;
 }
 
+export interface NfeItem {
+  number: string;
+  code: string;
+  description: string;
+  cfop: string;
+  quantity: string | null;
+  value: string | null;
+}
+
 export type NfeParseResult =
   // content: corpo da infNFe, para comparar cópias da mesma nota (com ou sem protocolo).
   // value: vNF do ICMSTot; protocol_status: cStat do protocolo (100 = autorizada), se houver.
@@ -24,6 +33,7 @@ export type NfeParseResult =
       content: string;
       value: string | null;
       protocol_status: string | null;
+      items: NfeItem[];
     } & NfeIdentity)
   | { kind: "invalid"; message: string }
   | { kind: "other"; message: string };
@@ -90,6 +100,45 @@ function block(text: string, tag: string): string | undefined {
   )?.[1];
 }
 
+function tagText(source: string, tag: string): string {
+  return (
+    new RegExp(`<(?:\\w+:)?${tag}>([^<]*)</(?:\\w+:)?${tag}>`, "u").exec(source)?.[1]?.trim() ?? ""
+  );
+}
+
+/** Decimal do XML (ponto) ou do SPED (vírgula) sem zeros à direita: "10.0000" e "10,0" → "10". */
+export function normalizeDecimal(raw: string): string | null {
+  const value = raw.trim().replace(",", ".");
+  if (!/^-?\d+(\.\d+)?$/u.test(value)) return null;
+  const [integer = "0", fraction = ""] = value.split(".");
+  const sign = integer.startsWith("-") ? "-" : "";
+  const digits = integer.replace("-", "").replace(/^0+(?=\d)/u, "");
+  const trimmed = fraction.replace(/0+$/u, "");
+  return `${sign}${digits}${trimmed ? `.${trimmed}` : ""}`;
+}
+
+/** Valor monetário do XML (até 2 decimais, ponto) no formato "1234.50". */
+function money(raw: string): string | null {
+  const match = /^(-?\d+)(?:\.(\d{1,2}))?$/u.exec(raw.trim());
+  return match ? `${stripZeros(match[1] ?? "0")}.${(match[2] ?? "").padEnd(2, "0")}` : null;
+}
+
+function items(infNFe: string): NfeItem[] {
+  const pattern =
+    /<(?:\w+:)?det\b[^>]*\bnItem\s*=\s*["'](\d+)["'][^>]*>([\s\S]*?)<\/(?:\w+:)?det>/gu;
+  return [...infNFe.matchAll(pattern)].map(([, number = "", body = ""]) => {
+    const prod = block(body, "prod") ?? "";
+    return {
+      number: stripZeros(number),
+      code: tagText(prod, "cProd"),
+      description: tagText(prod, "xProd"),
+      cfop: tagText(prod, "CFOP"),
+      quantity: normalizeDecimal(tagText(prod, "qCom")),
+      value: money(tagText(prod, "vProd")),
+    };
+  });
+}
+
 function field(text: string | undefined, tag: string): string | undefined {
   if (text === undefined) return undefined;
   return new RegExp(`<(?:\\w+:)?${tag}>\\s*(\\d+)\\s*</(?:\\w+:)?${tag}>`, "u").exec(text)?.[1];
@@ -131,13 +180,12 @@ export function parseNfeXml(xml: string): NfeParseResult {
       };
     }
   }
-  const total = /<(?:\w+:)?vNF>\s*(\d+)(?:\.(\d{1,2}))?\s*<\/(?:\w+:)?vNF>/u.exec(
-    block(text, "ICMSTot") ?? "",
-  );
+  const content = block(text, "infNFe") ?? "";
   return {
     kind: "nfe",
-    content: block(text, "infNFe") ?? "",
-    value: total ? `${stripZeros(total[1] ?? "0")}.${(total[2] ?? "").padEnd(2, "0")}` : null,
+    content,
+    items: items(content),
+    value: money(tagText(block(text, "ICMSTot") ?? "", "vNF")),
     protocol_status: field(block(text, "infProt"), "cStat") ?? null,
     ...note,
   };
@@ -174,4 +222,26 @@ export function readNfeArchive(zipBase64: string): NfeArchive {
     else result.errors.push({ entry: name, message: parsed.message });
   }
   return result;
+}
+
+/**
+ * Cópia idêntica da mesma nota (mesma infNFe, com ou sem protocolo) não é duplicata: fica a
+ * primeira e as demais voltam como descarte.
+ */
+export function dropIdenticalCopies(notes: NfeFile[]): {
+  notes: NfeFile[];
+  copies: { entry: string; reason: string }[];
+} {
+  const copies: { entry: string; reason: string }[] = [];
+  const kept = notes.filter((note, index) => {
+    const first = notes.find(
+      (other) => other.identity === note.identity && other.content === note.content,
+    );
+    if (first && notes.indexOf(first) !== index) {
+      copies.push({ entry: note.entry, reason: `Cópia idêntica de ${first.entry}.` });
+      return false;
+    }
+    return true;
+  });
+  return { notes: kept, copies };
 }

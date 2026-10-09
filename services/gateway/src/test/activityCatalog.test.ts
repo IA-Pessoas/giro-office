@@ -107,6 +107,7 @@ describe("activityCatalog", () => {
     ["POST", "/fiscal/conferences/documents", "conferiu", "planilhas Domínio e SEFAZ"],
     ["POST", "/fiscal/conferences/xml-selection", "selecionou", "XML de notas em um ZIP"],
     ["POST", "/fiscal/conferences/sefaz-xml", "conferiu", "o CSV da SEFAZ contra XML de notas"],
+    ["POST", "/fiscal/conferences/sped-xml", "conferiu", "o SPED (C100/C170) contra XML de notas"],
     ["GET", "/fiscal/revenues/list", "consultou", "a lista de receitas mensais"],
     [
       "PUT",

@@ -3,6 +3,7 @@ import { InternalReportingService } from "@workspace/fiscal-service/src/reportin
 import {
   documentConferenceBodySchema,
   sefazXmlConferenceBodySchema,
+  spedConferenceBodySchema,
   xmlSelectionBodySchema,
 } from "@workspace/fiscal-service/src/schemas/documentConference.schemas.js";
 import {
@@ -63,6 +64,10 @@ import {
 } from "@workspace/fiscal-service/src/services/simplesRatePdfService.js";
 import { SimplesRateService } from "@workspace/fiscal-service/src/services/simplesRateService.js";
 import { simplesRateZipExport } from "@workspace/fiscal-service/src/services/simplesRateZipService.js";
+import {
+  compareSpedWithXml,
+  spedConferenceCsvExport,
+} from "@workspace/fiscal-service/src/services/spedConferenceService.js";
 import { selectXmlFromZip } from "@workspace/fiscal-service/src/services/xmlSelectionService.js";
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
@@ -390,6 +395,12 @@ export function createFiscalWorkerApp(options: FiscalWorkerOptions) {
     const body = parseWithZod(sefazXmlConferenceBodySchema, await readJson(c));
     const result = compareSefazWithXml(body);
     return c.json(createSuccessResponse({ ...result, ...sefazXmlConferenceCsvExport(result) }));
+  });
+
+  app.post("/fiscal/conferences/sped-xml", async (c) => {
+    const body = parseWithZod(spedConferenceBodySchema, await readJson(c));
+    const result = compareSpedWithXml(body);
+    return c.json(createSuccessResponse({ ...result, ...spedConferenceCsvExport(result) }));
   });
 
   app.put("/fiscal/revenues/:id", async (c) => {
