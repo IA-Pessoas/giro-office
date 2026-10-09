@@ -249,10 +249,13 @@ function projectPayrollReportingRow(
   return projectReportingFields(
     {
       ...row,
+      ...Object.fromEntries(
+        Object.entries(PAYROLL_CLIENT_FIELDS).map(([field, column]) => [
+          field,
+          clientValue(row, column),
+        ]),
+      ),
       client_name: reportName(row, "client", "client_name"),
-      client_code: clientValue(row, PAYROLL_CLIENT_FIELDS.client_code),
-      client_document: clientValue(row, PAYROLL_CLIENT_FIELDS.client_document),
-      client_status: clientValue(row, PAYROLL_CLIENT_FIELDS.client_status),
       responsible_name: reportName(row, "responsible", "responsible_name"),
       union_name: reportName(row, "union", "union_name"),
       group_name: reportName(row, "group", "group_name"),

@@ -1,7 +1,7 @@
 import { reportingAggregations } from "./reportingCapabilities.js";
 
 const textOperators = ["eq", "neq", "contains", "in"] as const;
-const groupStateOperators = ["eq", "in"] as const;
+const enumOperators = ["eq", "in"] as const;
 const booleanOperators = ["eq", "neq"] as const;
 
 function field(
@@ -40,11 +40,11 @@ export const pessoalPayrollReportingCatalog = {
         field("client_name", "Cliente", "string", textOperators),
         field("client_code", "Código do cliente", "string", textOperators),
         field("client_document", "CPF/CNPJ do cliente", "string", textOperators),
-        field("client_status", "Situação do cliente", "string", groupStateOperators),
+        field("client_status", "Situação do cliente", "string", enumOperators),
         field("responsible_name", "Responsável", "string", textOperators),
         field("union_name", "Sindicato", "string", textOperators),
         field("group_name", "Grupo", "string", textOperators),
-        field("group_state", "Estado do grupo", "string", groupStateOperators),
+        field("group_state", "Estado do grupo", "string", enumOperators),
         field("previous", "Prévia", "boolean", booleanOperators),
         field("info", "Informações", "string"),
         field("contact", "Contato", "string"),
