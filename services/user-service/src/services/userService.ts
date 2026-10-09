@@ -319,7 +319,7 @@ class UserManagementService {
     skip: number;
     take: number;
   }> {
-    const where = { organization_id: organizationId };
+    const where = organizationUsersWhere(organizationId);
     const [users, total] = await Promise.all([
       prismaClient.user.findMany({
         where,

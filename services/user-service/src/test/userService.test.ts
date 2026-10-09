@@ -953,7 +953,12 @@ describe("UserService", () => {
     ]);
     expect(prismaMock.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organization_id: "org-1" },
+        where: {
+          OR: [
+            { organization_id: "org-1" },
+            { organization_id: null, department: { organization_id: "org-1" } },
+          ],
+        },
         select: {
           id: true,
           name: true,
@@ -963,6 +968,14 @@ describe("UserService", () => {
         },
       }),
     );
+    expect(prismaMock.user.count).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { organization_id: "org-1" },
+          { organization_id: null, department: { organization_id: "org-1" } },
+        ],
+      },
+    });
   });
 
   it("rejeita o rebaixamento do último owner ativo antes de persistir", async () => {
