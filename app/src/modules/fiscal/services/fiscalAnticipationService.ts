@@ -74,6 +74,8 @@ export type FiscalAnticipationImportResult = FiscalAnticipationBatch & {
 
 export const ANTICIPATION_PAGE_SIZE = 20;
 
+export type FiscalAnticipationExportFormat = "csv" | "pdf";
+
 const api = () =>
   setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
 
@@ -143,5 +145,13 @@ export const fiscalAnticipationService = {
       ...(input.reason ? { reason: input.reason } : {}),
     });
     return unwrapFiscalEnvelope<FiscalAnticipationBatch>(response.data);
+  },
+
+  /** Demonstrativo manual do lote (CSV ou PDF) como arquivo para download. */
+  async download(batchId: string, format: FiscalAnticipationExportFormat): Promise<Blob> {
+    const response = await api().get(`/fiscal/anticipations/batches/${batchId}/${format}`, {
+      responseType: "blob",
+    });
+    return response.data as Blob;
   },
 };

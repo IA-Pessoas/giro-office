@@ -111,8 +111,18 @@ function fakeDatabase(status = "pending_review") {
   const tx = { fiscalAnticipationBatch, fiscalAnticipationItem, fiscalAnticipationHistory };
   const prisma = {
     ...tx,
-    client: { findFirst: vi.fn(async () => ({ id: "client" })) },
-    user: { findFirst: vi.fn(async () => ({ id: reviewerId }) as { id: string } | null) },
+    client: {
+      findFirst: vi.fn(async (_args: unknown) => ({
+        id: "client",
+        name: "Padaria",
+        company_name: "Padaria Exemplo Ltda" as string | null,
+        cpf_cnpj: "12.345.678/0001-90",
+      })),
+    },
+    user: {
+      findFirst: vi.fn(async () => ({ id: reviewerId }) as { id: string } | null),
+      findMany: vi.fn(async () => [{ id: responsibleId, name: "Ana Responsável" }]),
+    },
     permission: { findFirst: vi.fn(async () => ({ id: "p1" }) as { id: string } | null) },
     $transaction: vi.fn(async (callback: (transaction: typeof tx) => Promise<unknown>) =>
       callback(tx),
@@ -366,5 +376,26 @@ describe("AnticipationService conferência do lote", () => {
         actor_user_id: supervisor.userId,
       }),
     ]);
+  });
+
+  it("monta o demonstrativo com cliente da organização e nomes da revisão", async () => {
+    const { service, prisma } = fakeDatabase();
+
+    const demonstrative = await service.demonstrative(batchId, organizationId);
+
+    expect(demonstrative.client).toEqual({
+      name: "Padaria Exemplo Ltda",
+      document: "12.345.678/0001-90",
+    });
+    expect(demonstrative.people).toEqual({ [responsibleId]: "Ana Responsável" });
+    expect(demonstrative.batch.items).toHaveLength(2);
+    expect(prisma.client.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "d0000000-0000-4000-8000-000000000001", organization_id: organizationId },
+      }),
+    );
+    await expect(
+      service.demonstrative(batchId, "a0000000-0000-4000-8000-000000000009"),
+    ).rejects.toEqual(new ServiceError(404, "Lote de antecipação não encontrado."));
   });
 });

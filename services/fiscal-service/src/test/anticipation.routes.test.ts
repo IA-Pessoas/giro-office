@@ -54,6 +54,11 @@ function deps() {
     updateItem: vi.fn(async () => ({}) as never),
     submit: vi.fn(async () => ({ ...batch, status: "awaiting_check" as const })),
     check: vi.fn(async () => ({ ...batch, status: "checked" as const })),
+    demonstrative: vi.fn(async () => ({
+      batch: { ...batch, items: [], history: [] },
+      client: { name: "Padaria Exemplo Ltda", document: "12.345.678/0001-90" },
+      people: {},
+    })),
   };
 }
 
@@ -189,5 +194,34 @@ describe("fiscal anticipation routes", () => {
     expect([noReason.status, badReturn.status, viewer.status]).toEqual([400, 400, 403]);
     expect(service.updateItem).not.toHaveBeenCalled();
     expect(service.check).not.toHaveBeenCalled();
+  });
+
+  it("exporta CSV e PDF do lote para leitura (nível 1) na organização autenticada", async () => {
+    const service = deps();
+    const app = createFiscalApp({ env, logger, anticipationRouteDeps: service });
+
+    const csv = await request(app)
+      .get(`/fiscal/anticipations/batches/${batchId}/csv`)
+      .set(headers(1));
+    expect(csv.status).toBe(200);
+    expect(csv.headers["content-type"]).toContain("text/csv");
+    expect(csv.headers["content-disposition"]).toBe(
+      `attachment; filename="antecipacoes-2026-09-${batchId}.csv"`,
+    );
+    expect(csv.text).toContain("não houve apuração automática de imposto");
+
+    const pdf = await request(app)
+      .get(`/fiscal/anticipations/batches/${batchId}/pdf`)
+      .set(headers(1))
+      .buffer(true)
+      .parse((res, callback) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => callback(null, Buffer.concat(chunks)));
+      });
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers["content-type"]).toBe("application/pdf");
+    expect((pdf.body as Buffer).subarray(0, 4).toString()).toBe("%PDF");
+    expect(service.demonstrative).toHaveBeenCalledWith(batchId, organizationId);
   });
 });

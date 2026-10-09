@@ -7,11 +7,13 @@ import { type FormEvent, useState } from "react";
 
 import { fiscalAnticipationsQueryKey } from "../hooks/queryKeys";
 import {
+  type FiscalAnticipationExportFormat,
   type FiscalAnticipationItem,
   fiscalAnticipationService,
 } from "../services/fiscalAnticipationService";
 import {
   buildAnticipationItemChanges,
+  downloadFile,
   FISCAL_ANTICIPATION_CLASSIFICATION_LABELS,
   FISCAL_ANTICIPATION_FIELD_LABELS,
   FISCAL_ANTICIPATION_ISSUE_LABELS,
@@ -170,6 +172,7 @@ export function FiscalAnticipationBatchPanel({
   const [reviewerId, setReviewerId] = useState("");
   const [returnReason, setReturnReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<FiscalAnticipationExportFormat | null>(null);
 
   const detail = useFetch(
     [...fiscalAnticipationsQueryKey(clientId), "detail", batchId],
@@ -188,6 +191,19 @@ export function FiscalAnticipationBatchPanel({
       toast.success(success);
     } catch (error) {
       setActionError(getFiscalErrorMessage(error));
+    }
+  }
+
+  async function download(format: FiscalAnticipationExportFormat) {
+    setActionError(null);
+    setDownloading(format);
+    try {
+      const blob = await fiscalAnticipationService.download(batchId, format);
+      downloadFile(blob, `antecipacoes-${detail.data?.competence ?? ""}-${batchId}.${format}`);
+    } catch (error) {
+      setActionError(getFiscalErrorMessage(error));
+    } finally {
+      setDownloading(null);
     }
   }
 
@@ -212,6 +228,18 @@ export function FiscalAnticipationBatchPanel({
           Responsável: {displayName(batch.responsible_id)} · Conferente: {batch.reviewer_id ? displayName(batch.reviewer_id) : "não designado"}
         </p>
         <p className="text-xs text-amber-700 dark:text-amber-300">Classificação e valores são manuais: nenhum imposto é calculado.</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => void download("csv")} disabled={downloading !== null} className={FISCAL_SECONDARY_BUTTON_CLASSNAME}>
+          {downloading === "csv" ? "Exportando..." : "Exportar CSV"}
+        </button>
+        <button type="button" onClick={() => void download("pdf")} disabled={downloading !== null} className={FISCAL_SECONDARY_BUTTON_CLASSNAME}>
+          {downloading === "pdf" ? "Exportando..." : "Exportar PDF"}
+        </button>
+        <p className="text-xs text-gray-600 dark:text-gray-400">
+          Demonstrativo manual{batch.status === "checked" ? "" : " (lote ainda não conferido)"}: mostra a origem de cada valor (XML, corrigido ou informado) e não é apuração de imposto nem guia oficial.
+        </p>
       </div>
 
       {batch.issues.length ? (
