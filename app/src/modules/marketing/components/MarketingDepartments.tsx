@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useModuleAccess } from "@modules/auth";
 import { departmentService, type DepItem } from "@modules/departments";
 import { DepartmentColorField } from "@modules/departments/components/DepartmentColorField";
+import { DepartmentColorPreview } from "@modules/departments/components/DepartmentColorPreview";
 import { useFetch } from "@shared/hooks";
 
 import { marketingQueryKey } from "../utils/marketingQueryKeys";
@@ -38,7 +39,7 @@ function MarketingDepartmentRow({ department, canEdit }: { department: DepItem; 
           />
         ) : (
           <span className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-slate-300">
-            <span aria-hidden="true" className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: department.color }} />
+            <DepartmentColorPreview color={department.color} />
             Cor: {department.color}
           </span>
         )}
