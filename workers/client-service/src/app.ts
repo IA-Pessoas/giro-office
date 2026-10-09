@@ -22,8 +22,8 @@ import {
 import {
   clientGroupParamsSchema,
   createClientGroupBodySchema,
-  patchClientGroupBodySchema,
   replaceClientGroupClientsBodySchema,
+  updateClientGroupBodySchema,
 } from "../../../services/client-service/src/schemas/clientGroup.schemas.js";
 import {
   clientRegimeIdParamsSchema,
@@ -356,7 +356,7 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
   app.patch("/client/groups/:id", async (c) =>
     withService(c, async (service) => {
       const id = pathParam(c, clientGroupParamsSchema);
-      const body = parse(patchClientGroupBodySchema, await jsonBody(c));
+      const body = parse(updateClientGroupBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(await service.updateGroup(id, organizationId(c), body, authz(c))),
       );

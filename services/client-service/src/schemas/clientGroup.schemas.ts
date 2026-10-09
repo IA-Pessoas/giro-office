@@ -4,9 +4,8 @@ export const clientGroupParamsSchema = z.object({ id: z.string().uuid() }).stric
 export const createClientGroupBodySchema = z
   .object({ name: z.string().trim().min(1).max(120) })
   .strict();
-export const updateClientGroupBodySchema = createClientGroupBodySchema;
-// Worker: renomeia e/ou ativa/inativa o grupo (#1742).
-export const patchClientGroupBodySchema = z
+// Renomeia e/ou ativa/inativa o grupo (#1742).
+export const updateClientGroupBodySchema = z
   .object({ name: z.string().trim().min(1).max(120).optional(), status: z.boolean().optional() })
   .strict()
   .refine((body) => body.name !== undefined || body.status !== undefined, {

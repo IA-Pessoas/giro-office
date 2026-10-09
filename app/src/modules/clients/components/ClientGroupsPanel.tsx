@@ -7,6 +7,9 @@ import { useClients } from "../hooks/useClients";
 import { ClientNativeSelect } from "../form/ClientNativeSelect";
 import { clientTextFieldClassName } from "../form/clientFormControls";
 
+const secondaryButtonClassName =
+  "rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
+
 interface ClientGroupsPanelProps {
   canEdit: boolean;
 }
@@ -232,7 +235,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                     disabled={
                       isSaving || !groupName.trim() || groupName.trim() === selectedGroup.name
                     }
-                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className={secondaryButtonClassName}
                   >
                     Salvar nome
                   </button>
@@ -242,7 +245,7 @@ export function ClientGroupsPanel({ canEdit }: ClientGroupsPanelProps) {
                     type="button"
                     onClick={() => void toggleStatus()}
                     disabled={isSaving}
-                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className={secondaryButtonClassName}
                   >
                     {selectedGroup.status ? "Inativar grupo" : "Reativar grupo"}
                   </button>

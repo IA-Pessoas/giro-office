@@ -148,6 +148,7 @@ const clientListPolicy: AuthPolicy = {
 };
 
 // Grupos canônicos da Integração também são geridos pelo Regularize (#1742).
+// Mesma regra de requireGroupPermission em workers/client-service/src/clientService.ts.
 const clientGroupsPath = /^\/client\/groups(?:\/[^/]+(?:\/clients)?)?\/?$/;
 const clientGroupsReadPolicy: AuthPolicy = {
   anyModulePermission: {

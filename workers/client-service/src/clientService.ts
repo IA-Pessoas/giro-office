@@ -474,6 +474,18 @@ const CATALOGS = {
 
 type CatalogItemInput = { name?: string; type?: ClientSegmentType };
 
+function changedFields(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+  keys: readonly string[],
+): Record<string, { from: unknown; to: unknown }> {
+  return Object.fromEntries(
+    keys
+      .filter((key) => after[key] !== undefined && after[key] !== before[key])
+      .map((key) => [key, { from: before[key], to: after[key] }]),
+  );
+}
+
 function catalogDisplayName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
@@ -486,6 +498,7 @@ function normalizeCatalogName(name: string): string {
 }
 
 // Grupos canônicos são da Integração e também são geridos pelo Regularize (#1742).
+// Mesma regra de clientGroupsReadPolicy/EditPolicy em services/gateway/src/security/policies.ts.
 const GROUP_MODULES = ["integracao", "regularize"] as const;
 
 function requireGroupPermission(auth: ClientAuthorization, minimum: number): void {
@@ -732,11 +745,7 @@ export class ClientService implements ClientWorkerService {
     const row = await this.writeCatalogItem(kind, () =>
       delegate.update({ where: { id }, data, select: config.select }),
     );
-    const changes = Object.fromEntries(
-      (["name", "type"] as const)
-        .filter((key) => key in data && existing[key] !== data[key])
-        .map((key) => [key, { from: existing[key], to: data[key] }]),
-    );
+    const changes = changedFields(existing, data, ["name", "type"]);
     if (Object.keys(changes).length > 0) {
       await this.audit?.({
         organizationId,
@@ -885,11 +894,7 @@ export class ClientService implements ClientWorkerService {
       authorization,
       "update",
       id,
-      Object.fromEntries(
-        (["name", "status"] as const)
-          .filter((key) => data[key] !== undefined && data[key] !== existing[key])
-          .map((key) => [key, { from: existing[key], to: data[key] }]),
-      ),
+      changedFields(existing, data, ["name", "status"]),
     );
     return presentGroup(group);
   }
