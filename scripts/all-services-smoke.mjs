@@ -5898,7 +5898,7 @@ const handlers = {
       json: {
         client_id: requireState("primaryClientId"),
         bidding: false,
-        chart_accounts: uniqueText("Smoke chart"),
+        chart_accounts: "Não",
         tool: "Ferramenta smoke",
         system: "Sistema smoke",
         note: uniqueText("Smoke relationship note"),

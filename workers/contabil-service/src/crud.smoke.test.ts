@@ -250,8 +250,8 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     const created = expectOk(
       await call("POST", "/contabil/relationships", {
         client_id: clientId,
-        bidding: false,
-        chart_accounts: "Plano padrão",
+        bidding: null,
+        chart_accounts: null,
         tool: "Domínio",
         system: "ERP Smoke",
         note: "Criado pelo smoke",
@@ -266,7 +266,7 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     expectOk(
       await call("PUT", `/contabil/relationships/${id}`, {
         bidding: true,
-        chart_accounts: "Plano próprio",
+        chart_accounts: "Sim — Jonrick",
         tool: "Questor",
         system: "ERP Novo",
         note: "Atualizado",
@@ -279,7 +279,7 @@ describe.skipIf(!smokeState)("contabil-service CRUD smoke (banco real)", () => {
     );
     expect(after.data).toMatchObject({
       bidding: true,
-      chart_accounts: "Plano próprio",
+      chart_accounts: "Sim — Jonrick",
       tool: "Questor",
       system: "ERP Novo",
       note: "Atualizado",

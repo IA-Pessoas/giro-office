@@ -7,6 +7,7 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import { assertChartAccountsState } from "../schemas/relationship.schemas.js";
 
 export type RelationshipServicePrisma = typeof prismaClient;
 
@@ -27,8 +28,8 @@ export interface RelationshipAuthContext {
 
 export interface CreateRelationshipRequest {
   client_id: string;
-  bidding: boolean;
-  chart_accounts: string;
+  bidding: boolean | null;
+  chart_accounts: string | null;
   tool: string;
   system: string;
   note: string;
@@ -36,8 +37,8 @@ export interface CreateRelationshipRequest {
 
 export interface UpdateRelationshipRequest {
   client_id?: string;
-  bidding?: boolean;
-  chart_accounts?: string;
+  bidding?: boolean | null;
+  chart_accounts?: string | null;
   tool?: string;
   system?: string;
   note?: string;
@@ -54,6 +55,7 @@ export class RelationshipService {
     auth: RelationshipAuthContext,
   ): Promise<RelationshipContabilEntity> {
     try {
+      assertChartAccountsState(data.chart_accounts);
       const duplicate = await this.prisma.relationshipContabil.findFirst({
         where: {
           client_id: data.client_id,
@@ -110,11 +112,12 @@ export class RelationshipService {
       if (!exists) {
         throw new ServiceError(404, "Não está cadastrado.");
       }
+      assertChartAccountsState(data.chart_accounts, exists.chart_accounts);
 
       const updatePayload: {
         client_id?: string;
-        bidding?: boolean;
-        chart_accounts?: string;
+        bidding?: boolean | null;
+        chart_accounts?: string | null;
         tool?: string;
         system?: string;
         note?: string;
