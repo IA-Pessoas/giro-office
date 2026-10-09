@@ -373,6 +373,38 @@ describe("fiscal Worker", () => {
     expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
   });
 
+  it("soma totais de faturas em PDF sem banco e só com edição Fiscal", async () => {
+    const { HYPERDRIVE: _db, ...noDatabase } = env();
+    const app = createFiscalWorkerApp({ env: noDatabase });
+    const content = "BT /F1 12 Tf 50 700 Td (Fatura 1) Tj 0 -20 Td (Valor total R$ 12,34) Tj ET";
+    const pdf = [
+      "%PDF-1.4",
+      "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+      "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+      "3 0 obj << /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >> endobj",
+      `4 0 obj << /Length ${content.length} >>\nstream\n${content}\nendstream endobj`,
+      "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+      "trailer << /Root 1 0 R >>",
+    ].join("\n");
+    const body = {
+      files: [
+        { file_name: "f.pdf", content_base64: Buffer.from(pdf, "latin1").toString("base64") },
+      ],
+    };
+    const post = (headers: HeadersInit) =>
+      app.request("https://fiscal.test/fiscal/conferences/invoice-pdfs", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await post(gatewayHeaders({ "x-auth-permission": "2" }));
+    expect(ok.status).toBe(200);
+    const payload = (await ok.json()) as { data: { totals: { value: string; invoices: number } } };
+    expect(payload.data.totals).toEqual({ value: "12.34", invoices: 1 });
+    expect((await post(gatewayHeaders({ "x-auth-permission": "1" }))).status).toBe(403);
+  });
+
   it("mantém receitas mensais no tenant autenticado e bloqueia escrita sem edição Fiscal", async () => {
     const revenue = {
       id: ICMS_ID,

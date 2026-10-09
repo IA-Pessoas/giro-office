@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { createFiscalApp } from "../app.js";
 import { getFiscalServiceEnv } from "../config/env.js";
+import { type0Pdf } from "./pdfFixtures.js";
 
 const env = getFiscalServiceEnv();
 const logger = createLogger({ service: "fiscal-service", env: env.nodeEnv, level: env.logLevel });
@@ -274,6 +275,47 @@ describe("POST /fiscal/conferences/ipi-spreadsheets", () => {
       .post("/fiscal/conferences/ipi-spreadsheets")
       .set(headers(2))
       .send({ ...body, first: { file_name: "a.csv", content: "Chave\n1" } })
+      .expect(400);
+  });
+});
+
+describe("POST /fiscal/conferences/invoice-pdfs", () => {
+  const app = createFiscalApp({ env, logger });
+  const body = {
+    files: [
+      { file_name: "a.pdf", content_base64: type0Pdf("Total a pagar R$ 10,00").toString("base64") },
+    ],
+  };
+
+  it("exige nível 2 e devolve o total com a origem", async () => {
+    await request(app)
+      .post("/fiscal/conferences/invoice-pdfs")
+      .set(headers(1))
+      .send(body)
+      .expect(403);
+    const response = await request(app)
+      .post("/fiscal/conferences/invoice-pdfs")
+      .set(headers(2))
+      .send(body)
+      .expect(200);
+    expect(response.body.data).toMatchObject({
+      status: "complete",
+      totals: { value: "10.00", invoices: 1 },
+      invoices: [{ file_name: "a.pdf", origin: { page: 1 } }],
+      file_name: "totais-faturas-pdf.csv",
+    });
+  });
+
+  it("recusa lista vazia e base64 inválido", async () => {
+    await request(app)
+      .post("/fiscal/conferences/invoice-pdfs")
+      .set(headers(2))
+      .send({ files: [] })
+      .expect(400);
+    await request(app)
+      .post("/fiscal/conferences/invoice-pdfs")
+      .set(headers(2))
+      .send({ files: [{ file_name: "a.pdf", content_base64: "%%%" }] })
       .expect(400);
   });
 });

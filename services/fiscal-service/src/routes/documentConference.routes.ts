@@ -5,6 +5,7 @@ import express, { Router } from "express";
 import { isAuthenticated, requireFiscalWritePermission } from "../middlewares/isAuthenticated.js";
 import {
   documentConferenceBodySchema,
+  invoicePdfTotalsBodySchema,
   ipiSpreadsheetConferenceBodySchema,
   sefazXmlConferenceBodySchema,
   spedConferenceBodySchema,
@@ -15,6 +16,7 @@ import {
   compareDocumentSpreadsheets,
   documentConferenceCsvExport,
 } from "../services/documentConferenceService.js";
+import { invoicePdfTotalsCsvExport, sumInvoicePdfs } from "../services/invoicePdfTotalsService.js";
 import {
   compareIpiSpreadsheets,
   ipiSpreadsheetConferenceCsvExport,
@@ -134,6 +136,23 @@ export function createDocumentConferenceRoutes(): ReturnType<typeof Router> {
         );
       } catch (err) {
         logError("Erro ao conferir IPI entre planilhas", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/conferences/invoice-pdfs",
+    express.json({ limit: "1mb" }),
+    isAuthenticated,
+    requireFiscalWritePermission,
+    (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(invoicePdfTotalsBodySchema, req.body);
+        const result = sumInvoicePdfs(body);
+        res.json(createSuccessResponse({ ...result, ...invoicePdfTotalsCsvExport(result) }));
+      } catch (err) {
+        logError("Erro ao somar totais de faturas em PDF", { err });
         next(err);
       }
     },
