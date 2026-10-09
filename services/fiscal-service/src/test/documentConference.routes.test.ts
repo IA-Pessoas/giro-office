@@ -211,3 +211,34 @@ describe("POST /fiscal/conferences/sped-xml", () => {
       .expect(400);
   });
 });
+
+describe("POST /fiscal/conferences/xml-taxes", () => {
+  const app = createFiscalApp({ env, logger });
+  const nfe = `<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd></prod><imposto><IPI><IPITrib><vIPI>1.10</vIPI></IPITrib></IPI></imposto></det></infNFe></NFe>`;
+  const body = {
+    file_name: "xml.zip",
+    zip_base64: createZip([{ fileName: "a.xml", body: Buffer.from(nfe) }]).toString("base64"),
+  };
+
+  it("exige nível 2 e devolve os totais com o CSV", async () => {
+    await request(app).post("/fiscal/conferences/xml-taxes").set(headers(1)).send(body).expect(403);
+    const response = await request(app)
+      .post("/fiscal/conferences/xml-taxes")
+      .set(headers(2))
+      .send(body)
+      .expect(200);
+    expect(response.body.data).toMatchObject({
+      status: "complete",
+      totals: { ipi: "1.10", icms_st: "0.00", notes: 1, items: 1 },
+      file_name: "totais-ipi-icms-st.csv",
+    });
+  });
+
+  it("recusa ZIP que não é base64", async () => {
+    await request(app)
+      .post("/fiscal/conferences/xml-taxes")
+      .set(headers(2))
+      .send({ ...body, zip_base64: "%%%" })
+      .expect(400);
+  });
+});

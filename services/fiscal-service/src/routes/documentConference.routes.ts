@@ -8,6 +8,7 @@ import {
   sefazXmlConferenceBodySchema,
   spedConferenceBodySchema,
   xmlSelectionBodySchema,
+  xmlTaxTotalsBodySchema,
 } from "../schemas/documentConference.schemas.js";
 import {
   compareDocumentSpreadsheets,
@@ -19,6 +20,7 @@ import {
 } from "../services/sefazXmlConferenceService.js";
 import { compareSpedWithXml, spedConferenceCsvExport } from "../services/spedConferenceService.js";
 import { selectXmlFromZip } from "../services/xmlSelectionService.js";
+import { sumXmlTaxes, xmlTaxTotalsCsvExport } from "../services/xmlTaxTotalsService.js";
 
 /**
  * Conferências de arquivos (E2): processam o que foi enviado e devolvem o resultado sem gravar
@@ -91,6 +93,23 @@ export function createDocumentConferenceRoutes(): ReturnType<typeof Router> {
         res.json(createSuccessResponse({ ...result, ...spedConferenceCsvExport(result) }));
       } catch (err) {
         logError("Erro ao conferir SPED C100/C170 contra XML", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    "/conferences/xml-taxes",
+    express.json({ limit: "1mb" }),
+    isAuthenticated,
+    requireFiscalWritePermission,
+    (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const body = parseWithZod(xmlTaxTotalsBodySchema, req.body);
+        const result = sumXmlTaxes(body);
+        res.json(createSuccessResponse({ ...result, ...xmlTaxTotalsCsvExport(result) }));
+      } catch (err) {
+        logError("Erro ao somar IPI e ICMS ST de XML", { err });
         next(err);
       }
     },

@@ -209,6 +209,28 @@ export interface FiscalSpedConference {
   csv: string;
 }
 
+export interface FiscalTaxNote {
+  entry: string;
+  identity: string;
+  ipi: string;
+  icms_st: string;
+  differences: string[];
+  warnings: string[];
+  items: { number: string; code: string; description: string; ipi: string | null; icms_st: string | null }[];
+}
+
+export interface FiscalXmlTaxTotals {
+  status: "complete" | "partial";
+  sources: { xml: { file_name: string; entries: number; nfe_entries: number } };
+  totals: { ipi: string; icms_st: string; notes: number; items: number };
+  notes: FiscalTaxNote[];
+  excluded: { identity: string; entries: string[]; reason: string }[];
+  discarded: { entry: string; reason: string }[];
+  errors: { entry: string; message: string }[];
+  file_name: string;
+  csv: string;
+}
+
 export const fiscalConferenceService = {
   /** Conferência Domínio × SEFAZ: nada é gravado no servidor. */
   async compareDocuments(files: Record<FiscalConferenceSource, File>): Promise<FiscalDocumentConference> {
@@ -255,5 +277,15 @@ export const fiscalConferenceService = {
       xml: { file_name: xml.name, zip_base64: zipBase64 },
     });
     return unwrapFiscalEnvelope<FiscalSpedConference>(response.data);
+  },
+
+  /** Totais de IPI e ICMS ST de um ZIP de XML: nada é gravado no servidor. */
+  async sumXmlTaxes(file: File): Promise<FiscalXmlTaxTotals> {
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.post("/fiscal/conferences/xml-taxes", {
+      file_name: file.name,
+      zip_base64: await fileToBase64(file),
+    });
+    return unwrapFiscalEnvelope<FiscalXmlTaxTotals>(response.data);
   },
 };

@@ -7,7 +7,7 @@ import {
   type FiscalDocumentConference,
   fiscalConferenceService,
 } from "../services/fiscalConferenceService";
-import { downloadFile, getFiscalErrorMessage } from "../utils";
+import { downloadFile, formatMoney, getFiscalErrorMessage } from "../utils";
 import {
   FISCAL_FIELD_CONTROL_CLASSNAME,
   FISCAL_PRIMARY_BUTTON_CLASSNAME,
@@ -49,8 +49,7 @@ const SITUATIONS: Situation[] = [
 // Mesmo teto do serviço (450 mil caracteres por planilha, dentro do 1 MB do gateway).
 const MAX_FILE_BYTES = 450_000;
 
-const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const money = (value: string | null | undefined) => (value ? currency.format(Number(value)) : "—");
+const money = (value: string | null | undefined) => formatMoney(value);
 
 /** Mesma ordem e situações do CSV exportado pelo serviço. */
 function conferenceLines(result: FiscalDocumentConference): ConferenceLine[] {

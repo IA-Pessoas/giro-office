@@ -421,3 +421,31 @@ await runTest("fiscal SPED × XML conference keeps items under their document", 
   assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
   assert.match(section, /const MAX_SPED_BYTES = 300_000;/);
 });
+
+await runTest("fiscal IPI/ICMS ST totals show composition and excluded XML", async () => {
+  const section = await readSource("./components/FiscalXmlTaxesSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalXmlTaxesSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/xml-taxes", \{/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Nota seguida dos itens que compõem o valor; excluídos visíveis, fora da soma.
+  assert.match(section, /result\.notes\.flatMap\(\(note\) => \[/);
+  assert.match(section, /result\.excluded\.map/);
+  assert.match(section, /Não é apuração de imposto/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+});
+
+await runTest("fiscal money formatting avoids floating point", async () => {
+  const { formatMoney } = await import("./utils/formatMoney.ts");
+  assert.equal(formatMoney("99999999999.99"), "R$ 99.999.999.999,99");
+  assert.equal(formatMoney("0.30"), "R$ 0,30");
+  assert.equal(formatMoney("-1234.5"), "-R$ 1.234,50");
+  assert.equal(formatMoney(null), "—");
+  assert.equal(formatMoney(null, "sem valor"), "sem valor");
+  for (const name of ["FiscalConferencesSection", "FiscalSefazXmlSection", "FiscalSpedXmlSection", "FiscalXmlTaxesSection"]) {
+    const source = await readSource(`./components/${name}.tsx`);
+    assert.doesNotMatch(source, /Intl\.NumberFormat/);
+    assert.match(source, /formatMoney\(value/);
+  }
+});

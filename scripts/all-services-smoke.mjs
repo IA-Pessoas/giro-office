@@ -4875,6 +4875,27 @@ const handlers = {
     });
   },
 
+  async fiscalXmlTaxTotals(op) {
+    const nfe =
+      '<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><det nItem="1"><prod><cProd>A</cProd></prod><imposto><IPI><IPITrib><vIPI>1.10</vIPI></IPITrib></IPI></imposto></det></infNFe></NFe>';
+    const response = await httpRequest(op, {
+      json: {
+        file_name: "xml.zip",
+        zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.totals?.ipi !== "1.10") {
+      throw new Error(`Totais de IPI/ICMS ST inesperados: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalXmlTaxTotalsInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: { file_name: "xml.zip", zip_base64: "bm9wZQ==" },
+    });
+  },
+
   async fiscalSimplesZipInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],

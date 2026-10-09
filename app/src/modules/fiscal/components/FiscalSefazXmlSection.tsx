@@ -8,7 +8,7 @@ import {
   type FiscalXmlNoteRow,
   fiscalConferenceService,
 } from "../services/fiscalConferenceService";
-import { downloadFile, getFiscalErrorMessage } from "../utils";
+import { downloadFile, formatMoney, getFiscalErrorMessage } from "../utils";
 import {
   FISCAL_FIELD_CONTROL_CLASSNAME,
   FISCAL_PRIMARY_BUTTON_CLASSNAME,
@@ -40,8 +40,7 @@ interface Line {
   note: string;
 }
 
-const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const money = (value: string | null) => (value ? currency.format(Number(value)) : "sem valor");
+const money = (value: string | null | undefined) => formatMoney(value, "sem valor");
 const sefazText = (rows: FiscalConferenceRow[]) => rows.map((row) => `linha ${row.line} · ${money(row.value)}`).join(" | ");
 const xmlText = (rows: FiscalXmlNoteRow[]) => rows.map((row) => `${row.entry} · ${money(row.value)}`).join(" | ");
 

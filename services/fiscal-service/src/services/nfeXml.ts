@@ -23,6 +23,9 @@ export interface NfeItem {
   cfop: string;
   quantity: string | null;
   value: string | null;
+  /** vIPI do grupo IPI e vICMSST do grupo ICMS do item; null quando a tag não existe. */
+  ipi: string | null;
+  icms_st: string | null;
 }
 
 export type NfeParseResult =
@@ -34,6 +37,11 @@ export type NfeParseResult =
       value: string | null;
       protocol_status: string | null;
       items: NfeItem[];
+      /** vIPI e vST declarados no ICMSTot. */
+      declared_ipi: string | null;
+      declared_icms_st: string | null;
+      /** Valores de IPI/ICMS ST fora do formato; só a soma de impostos recusa a nota por isso. */
+      tax_errors: string[];
     } & NfeIdentity)
   | { kind: "invalid"; message: string }
   | { kind: "other"; message: string };
@@ -123,11 +131,25 @@ function money(raw: string): string | null {
   return match ? `${stripZeros(match[1] ?? "0")}.${(match[2] ?? "").padEnd(2, "0")}` : null;
 }
 
-function items(infNFe: string): NfeItem[] {
+/**
+ * Valor de imposto de uma tag: null se ausente. Fora do formato (mais de 2 decimais, negativo)
+ * entra em `errors` e conta como zero, para quem soma recusar a nota em vez de errar o total.
+ */
+function taxTag(source: string, tag: string, where: string, errors: string[]): string | null {
+  const raw = tagText(source, tag);
+  if (raw === "") return null;
+  const value = /^\d+(\.\d{1,2})?$/u.test(raw) ? money(raw) : null;
+  if (value === null) errors.push(`${tag} inválido ${where}: ${raw}.`);
+  return value;
+}
+
+function items(infNFe: string, errors: string[]): NfeItem[] {
   const pattern =
     /<(?:\w+:)?det\b[^>]*\bnItem\s*=\s*["'](\d+)["'][^>]*>([\s\S]*?)<\/(?:\w+:)?det>/gu;
   return [...infNFe.matchAll(pattern)].map(([, number = "", body = ""]) => {
     const prod = block(body, "prod") ?? "";
+    const imposto = block(body, "imposto") ?? "";
+    const where = `no item ${stripZeros(number)}`;
     return {
       number: stripZeros(number),
       code: tagText(prod, "cProd"),
@@ -135,6 +157,8 @@ function items(infNFe: string): NfeItem[] {
       cfop: tagText(prod, "CFOP"),
       quantity: normalizeDecimal(tagText(prod, "qCom")),
       value: money(tagText(prod, "vProd")),
+      ipi: taxTag(block(imposto, "IPI") ?? "", "vIPI", where, errors),
+      icms_st: taxTag(block(imposto, "ICMS") ?? "", "vICMSST", where, errors),
     };
   });
 }
@@ -181,11 +205,16 @@ export function parseNfeXml(xml: string): NfeParseResult {
     }
   }
   const content = block(text, "infNFe") ?? "";
+  const totals = block(text, "ICMSTot") ?? "";
+  const taxErrors: string[] = [];
   return {
     kind: "nfe",
     content,
-    items: items(content),
-    value: money(tagText(block(text, "ICMSTot") ?? "", "vNF")),
+    items: items(content, taxErrors),
+    declared_ipi: taxTag(totals, "vIPI", "no total", taxErrors),
+    declared_icms_st: taxTag(totals, "vST", "no total", taxErrors),
+    tax_errors: taxErrors,
+    value: money(tagText(totals, "vNF")),
     protocol_status: field(block(text, "infProt"), "cStat") ?? null,
     ...note,
   };
@@ -197,6 +226,8 @@ export interface NfeArchive {
   /** Arquivos do ZIP, inclusive os recusados (pastas não contam). */
   entries: number;
   notes: NfeFile[];
+  /** Eventos de cancelamento (tpEvento 110111) encontrados no ZIP, por chave de acesso. */
+  cancellations: { entry: string; access_key: string }[];
   discarded: { entry: string; reason: string }[];
   errors: { entry: string; message: string }[];
 }
@@ -207,6 +238,7 @@ export function readNfeArchive(zipBase64: string): NfeArchive {
   const result: NfeArchive = {
     entries: archive.entries.length + archive.errors.length,
     notes: [],
+    cancellations: [],
     discarded: [],
     errors: [...archive.errors],
   };
@@ -215,9 +247,20 @@ export function readNfeArchive(zipBase64: string): NfeArchive {
       result.discarded.push({ entry: name, reason: "Não é arquivo .xml." });
       continue;
     }
-    const parsed = parseNfeXml(body.toString("utf8"));
+    const text = body.toString("utf8");
+    const parsed = parseNfeXml(text);
+    const cancelled =
+      parsed.kind === "other" && /<(?:\w+:)?tpEvento>\s*110111\s*</u.test(text)
+        ? /<(?:\w+:)?chNFe>\s*(\d{44})\s*</u.exec(text)?.[1]
+        : undefined;
     if (parsed.kind === "nfe") result.notes.push({ ...parsed, entry: name, body });
-    else if (parsed.kind === "other")
+    else if (cancelled) {
+      result.cancellations.push({ entry: name, access_key: cancelled });
+      result.discarded.push({
+        entry: name,
+        reason: `Evento de cancelamento da chave ${cancelled}.`,
+      });
+    } else if (parsed.kind === "other")
       result.discarded.push({ entry: name, reason: parsed.message });
     else result.errors.push({ entry: name, message: parsed.message });
   }
@@ -245,4 +288,11 @@ export function dropIdenticalCopies(notes: NfeFile[]): {
     return true;
   });
   return { notes: kept, copies };
+}
+
+const AUTHORIZED_PROTOCOL = new Set(["100", "150"]);
+
+/** cStat 100 (autorizada) ou 150 (autorizada fora de prazo). */
+export function isAuthorizedProtocol(status: string): boolean {
+  return AUTHORIZED_PROTOCOL.has(status);
 }

@@ -75,3 +75,6 @@ export const sefazXmlConferenceBodySchema = z
 export const spedConferenceBodySchema = z
   .object({ sped: textFileSchema("o arquivo SPED"), xml: xmlZipSchema })
   .strict();
+
+// Só o ZIP de XML: mesmo arquivo e teto da seleção de XML (~650 kB).
+export const xmlTaxTotalsBodySchema = xmlSelectionBodySchema.omit({ requests: true });

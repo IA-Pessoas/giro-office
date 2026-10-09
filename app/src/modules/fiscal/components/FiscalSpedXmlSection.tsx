@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useMemo, useState, type FormEvent } from "react";
 
 import { type FiscalSpedConference, fiscalConferenceService } from "../services/fiscalConferenceService";
-import { downloadFile, getFiscalErrorMessage } from "../utils";
+import { downloadFile, formatMoney, getFiscalErrorMessage } from "../utils";
 import {
   FISCAL_FIELD_CONTROL_CLASSNAME,
   FISCAL_PRIMARY_BUTTON_CLASSNAME,
@@ -27,8 +27,7 @@ interface Line {
   note: string;
 }
 
-const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const money = (value: string | null) => (value ? currency.format(Number(value)) : "—");
+const money = (value: string | null | undefined) => formatMoney(value);
 const blank = { matchKey: "", item: "", spedLine: "", spedValue: null, xmlFile: "", xmlValue: null };
 
 /** Mesma ordem do CSV exportado: documento seguido dos seus itens, depois erros e descartes. */

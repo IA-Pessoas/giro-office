@@ -12,7 +12,12 @@ import {
   type SpreadsheetInfo,
   totalOf,
 } from "./documentConferenceService.js";
-import { dropIdenticalCopies, type NfeFile, readNfeArchive } from "./nfeXml.js";
+import {
+  dropIdenticalCopies,
+  isAuthorizedProtocol,
+  type NfeFile,
+  readNfeArchive,
+} from "./nfeXml.js";
 
 /**
  * Conferência CSV SEFAZ × XML NF-e (FIS-10): confronta a planilha da SEFAZ com os XML de um ZIP,
@@ -81,9 +86,6 @@ export interface SefazXmlConferenceResult {
 const IDENTITY_RULE =
   "Chave de acesso da NF-e quando os dois lados têm; senão emitente (CPF/CNPJ) + modelo + série + número. Só notas autorizadas são comparadas.";
 
-// cStat 100 (autorizada) e 150 (autorizada fora de prazo); sem protocolo, o XML é comparado.
-const AUTHORIZED_PROTOCOL = new Set(["100", "150"]);
-
 function xmlRow({ kind: _kind, body: _body, content: _content, ...row }: NfeFile): XmlNoteRow {
   return row;
 }
@@ -101,7 +103,7 @@ function sefazStatusProblem(row: ConferenceDocumentRow): string | null {
 }
 
 function xmlStatusProblem(row: XmlNoteRow): string | null {
-  return row.protocol_status && !AUTHORIZED_PROTOCOL.has(row.protocol_status)
+  return row.protocol_status && !isAuthorizedProtocol(row.protocol_status)
     ? `XML: protocolo com cStat ${row.protocol_status}`
     : null;
 }
