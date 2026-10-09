@@ -388,3 +388,22 @@ await runTest("fiscal XML selection parses requests, encodes the ZIP and shows a
   assert.match(section, /Baixar relatório CSV/);
   assert.match(section, /const MAX_ZIP_BYTES = 650_000;/);
 });
+
+await runTest("fiscal SEFAZ × XML conference posts both files and separates situations", async () => {
+  const section = await readSource("./components/FiscalSefazXmlSection.tsx");
+  const client = await readSource("./services/fiscalConferenceService.ts");
+  assert.match(fiscalSources.shell, /<FiscalSefazXmlSection canEdit=\{canEdit\} \/>/);
+  assert.match(client, /api\.post\("\/fiscal\/conferences\/sefaz-xml", \{/);
+  assert.match(client, /zip_base64: zipBase64/);
+  assert.match(section, /\{canEdit \? \(\s*<form/);
+  assert.match(section, /result\.status === "partial" \? \(\s*<p role="alert"/);
+  // Chave usada visível por par; não comparável separado de ausência.
+  assert.match(section, /<th className="px-4 py-2">Chave usada<\/th>/);
+  assert.match(section, /"Não comparável"/);
+  assert.match(section, /downloadFile\(new Blob\(\[result\.csv\]/);
+  assert.match(section, /const MAX_ZIP_BYTES = 450_000;/);
+  // Ordem da tabela igual à do CSV exportado: Coincidente primeiro.
+  assert.match(section, /const SITUATIONS = \[\s*"Coincidente",/);
+  assert.match(section, /return \[\s*\.\.\.result\.matched\.map/);
+  assert.match(section, /Identidade: \{result\.identity_rule\}/);
+});

@@ -1,8 +1,7 @@
 import { createZip, csvLine } from "@workspace/shared";
 
 import { identityFromAccessKey, isValidAccessKey, stripZeros } from "./accessKey.js";
-import { type NfeIdentity, parseNfeXml } from "./nfeXml.js";
-import { readZipArchive } from "./safeZipReader.js";
+import { type NfeFile, readNfeArchive } from "./nfeXml.js";
 
 /**
  * Seleção de XML em ZIP (FIS-09): a equipe informa notas e recebe só os XML correspondentes, num
@@ -14,12 +13,6 @@ export interface XmlSelectionInput {
   file_name: string;
   zip_base64: string;
   requests: string[];
-}
-
-interface NoteFile extends NfeIdentity {
-  entry: string;
-  body: Buffer;
-  content: string;
 }
 
 type Criteria =
@@ -77,7 +70,7 @@ function parseRequest(request: string): Criteria | string {
   };
 }
 
-function matches(note: NoteFile, criteria: Criteria): boolean {
+function matches(note: NfeFile, criteria: Criteria): boolean {
   if ("key" in criteria) {
     return note.access_key
       ? note.access_key === criteria.key
@@ -91,28 +84,12 @@ function matches(note: NoteFile, criteria: Criteria): boolean {
   );
 }
 
-const outputName = (note: NoteFile) =>
-  `${note.access_key ?? note.identity.replace(/\|/g, "-")}.xml`;
+const outputName = (note: NfeFile) => `${note.access_key ?? note.identity.replace(/\|/g, "-")}.xml`;
 
 export function selectXmlFromZip(input: XmlSelectionInput): XmlSelectionResult {
-  const archive = readZipArchive(Buffer.from(input.zip_base64, "base64"));
-  const notes: NoteFile[] = [];
-  const discarded: XmlSelectionResult["archive"]["discarded"] = [];
-  const errors = [...archive.errors];
-  for (const { name, body } of archive.entries) {
-    if (!name.toLowerCase().endsWith(".xml")) {
-      discarded.push({ entry: name, reason: "Não é arquivo .xml." });
-      continue;
-    }
-    const parsed = parseNfeXml(body.toString("utf8"));
-    if (parsed.kind === "nfe") {
-      const { kind: _kind, ...note } = parsed;
-      notes.push({ ...note, entry: name, body });
-    } else if (parsed.kind === "other") discarded.push({ entry: name, reason: parsed.message });
-    else errors.push({ entry: name, message: parsed.message });
-  }
+  const { entries, notes, discarded, errors } = readNfeArchive(input.zip_base64);
 
-  const byIdentity = new Map<string, NoteFile[]>();
+  const byIdentity = new Map<string, NfeFile[]>();
   for (const note of notes)
     byIdentity.set(note.identity, [...(byIdentity.get(note.identity) ?? []), note]);
   const duplicates = [...byIdentity.entries()]
@@ -134,14 +111,14 @@ export function selectXmlFromZip(input: XmlSelectionInput): XmlSelectionResult {
     repeated_requests: [],
     archive: {
       file_name: input.file_name,
-      entries: archive.entries.length + archive.errors.length,
+      entries,
       nfe_entries: notes.length,
       discarded,
       errors,
       duplicates,
     },
   };
-  const chosen = new Map<string, NoteFile>();
+  const chosen = new Map<string, NfeFile>();
   const seenRequests = new Set<string>();
 
   for (const raw of input.requests) {

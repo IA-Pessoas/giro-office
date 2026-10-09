@@ -1109,6 +1109,59 @@ export function buildFiscalServiceOpenApiSpec(env: FiscalServiceEnv): OpenApiDoc
           },
         },
       },
+      "/fiscal/conferences/sefaz-xml": {
+        post: {
+          tags: ["Conferências"],
+          summary: "Conferir CSV SEFAZ contra XML NF-e",
+          description:
+            "Recebe a planilha CSV da SEFAZ (até 300 mil caracteres; colunas de chave ou emitente/modelo/série/número, e opcionais Situação e Valor) e um ZIP de XML NF-e (base64, até ~450 kB). Pareia pela chave de acesso quando os dois lados têm, senão por emitente + modelo + série + número, e informa a chave usada (match_key). Separa matched, divergent (valor ou chave), only_sefaz e only_xml (ausência real), duplicates (sem correspondência automática), not_comparable (situação não autorizada na planilha ou protocolo com cStat diferente de 100/150), discarded e errors por linha/arquivo, com totais e o CSV do resultado (campo csv). Nada é gravado.",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["sefaz", "xml"],
+                  additionalProperties: false,
+                  properties: {
+                    sefaz: {
+                      type: "object",
+                      required: ["file_name", "content"],
+                      additionalProperties: false,
+                      properties: {
+                        file_name: { type: "string", minLength: 1, maxLength: 255 },
+                        content: { type: "string", minLength: 1, maxLength: 300_000 },
+                      },
+                    },
+                    xml: {
+                      type: "object",
+                      required: ["file_name", "zip_base64"],
+                      additionalProperties: false,
+                      properties: {
+                        file_name: { type: "string", minLength: 1, maxLength: 255 },
+                        zip_base64: { type: "string", minLength: 1, maxLength: 600_000 },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Resultado da conferência SEFAZ × XML com file_name e csv",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": {
+              description: "Entrada inválida, planilha sem formato reconhecível ou ZIP ilegível",
+            },
+            "403": { description: "Sem permissão de edição Fiscal" },
+          },
+        },
+      },
       "/fiscal/revenues/{id}": {
         put: {
           tags: ["Receitas"],

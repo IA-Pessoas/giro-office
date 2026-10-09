@@ -129,3 +129,42 @@ describe("POST /fiscal/conferences/xml-selection", () => {
       .expect(400);
   });
 });
+
+describe("POST /fiscal/conferences/sefaz-xml", () => {
+  const app = createFiscalApp({ env, logger });
+  const nfe = `<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><total><ICMSTot><vNF>10.00</vNF></ICMSTot></total></infNFe></NFe>`;
+  const conference = {
+    sefaz: { file_name: "sefaz.csv", content: `${header}\n11222333000181;55;1;100;10,00` },
+    xml: {
+      file_name: "xml.zip",
+      zip_base64: createZip([{ fileName: "a.xml", body: Buffer.from(nfe) }]).toString("base64"),
+    },
+  };
+
+  it("exige nível 2 e devolve a conferência com o CSV", async () => {
+    await request(app)
+      .post("/fiscal/conferences/sefaz-xml")
+      .set(headers(1))
+      .send(conference)
+      .expect(403);
+    const response = await request(app)
+      .post("/fiscal/conferences/sefaz-xml")
+      .set(headers(2))
+      .send(conference)
+      .expect(200);
+    expect(response.body.data).toMatchObject({
+      status: "complete",
+      summary: { matched: 1 },
+      file_name: "conferencia-sefaz-xml.csv",
+    });
+    expect(response.body.data.csv).toContain("Coincidente;11222333000181|55|1|100");
+  });
+
+  it("recusa ZIP que não é base64", async () => {
+    await request(app)
+      .post("/fiscal/conferences/sefaz-xml")
+      .set(headers(2))
+      .send({ ...conference, xml: { file_name: "x.zip", zip_base64: "%%%" } })
+      .expect(400);
+  });
+});

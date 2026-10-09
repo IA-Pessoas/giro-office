@@ -4805,6 +4805,39 @@ const handlers = {
     });
   },
 
+  async fiscalSefazXmlConference(op) {
+    const nfe =
+      "<NFe><infNFe><ide><mod>55</mod><serie>1</serie><nNF>100</nNF></ide><emit><CNPJ>11222333000181</CNPJ></emit><total><ICMSTot><vNF>10.00</vNF></ICMSTot></total></infNFe></NFe>";
+    const response = await httpRequest(op, {
+      json: {
+        sefaz: {
+          file_name: "sefaz.csv",
+          content: "CNPJ Emitente;Modelo;Série;Número;Valor\n11222333000181;55;1;100;10,00",
+        },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from(nfe)).toString("base64"),
+        },
+      },
+    });
+    if (!isBadExpectation(op) && response.body?.data?.summary?.matched !== 1) {
+      throw new Error(`Conferência SEFAZ × XML inesperada: ${JSON.stringify(response.body?.data)}`);
+    }
+  },
+
+  async fiscalSefazXmlConferenceInvalid(op) {
+    await httpRequest(op, {
+      expectedStatus: [400],
+      json: {
+        sefaz: { file_name: "sefaz.csv", content: "Número;Valor\n100;10,00" },
+        xml: {
+          file_name: "xml.zip",
+          zip_base64: storedZip("a.xml", Buffer.from("<NFe/>")).toString("base64"),
+        },
+      },
+    });
+  },
+
   async fiscalSimplesZipInvalid(op) {
     await httpRequest(op, {
       expectedStatus: [400],

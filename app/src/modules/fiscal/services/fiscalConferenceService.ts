@@ -15,6 +15,7 @@ export interface FiscalConferenceRow {
   series: string;
   number: string;
   value: string | null;
+  status: string | null;
 }
 
 type Pair = { identity: string; dominio: FiscalConferenceRow; sefaz: FiscalConferenceRow };
@@ -73,6 +74,59 @@ export interface FiscalXmlSelection {
   };
 }
 
+export interface FiscalXmlNoteRow {
+  entry: string;
+  identity: string;
+  access_key: string | null;
+  value: string | null;
+  protocol_status: string | null;
+}
+
+type SefazXmlPair = {
+  identity: string;
+  match_key: string;
+  sefaz: FiscalConferenceRow;
+  xml: FiscalXmlNoteRow;
+  notes: string[];
+};
+
+type SefazXmlIssue<T> = ({ source: "sefaz"; line: number } | { source: "xml"; entry: string }) & T;
+
+export interface FiscalSefazXmlConference {
+  status: "complete" | "partial";
+  identity_rule: string;
+  sources: {
+    sefaz: FiscalDocumentConference["sources"]["sefaz"];
+    xml: { file_name: string; entries: number; nfe_entries: number };
+  };
+  summary: {
+    matched: number;
+    divergent: number;
+    only_sefaz: number;
+    only_xml: number;
+    duplicates: number;
+    not_comparable: number;
+    discarded: number;
+    errors: number;
+  };
+  totals: { sefaz: string | null; xml: string | null };
+  matched: SefazXmlPair[];
+  divergent: (SefazXmlPair & { differences: string[] })[];
+  only_sefaz: FiscalConferenceRow[];
+  only_xml: FiscalXmlNoteRow[];
+  duplicates: { identity: string; sefaz: FiscalConferenceRow[]; xml: FiscalXmlNoteRow[] }[];
+  not_comparable: {
+    identity: string;
+    reason: string;
+    sefaz: FiscalConferenceRow[];
+    xml: FiscalXmlNoteRow[];
+  }[];
+  discarded: SefazXmlIssue<{ reason: string }>[];
+  errors: SefazXmlIssue<{ message: string }>[];
+  file_name: string;
+  csv: string;
+}
+
 export const fiscalConferenceService = {
   /** Conferência Domínio × SEFAZ: nada é gravado no servidor. */
   async compareDocuments(files: Record<FiscalConferenceSource, File>): Promise<FiscalDocumentConference> {
@@ -97,5 +151,16 @@ export const fiscalConferenceService = {
       requests,
     });
     return unwrapFiscalEnvelope<FiscalXmlSelection>(response.data);
+  },
+
+  /** Conferência CSV SEFAZ × XML NF-e: nada é gravado no servidor. */
+  async compareSefazXml({ sefaz, xml }: { sefaz: File; xml: File }): Promise<FiscalSefazXmlConference> {
+    const [content, zipBase64] = await Promise.all([readSpreadsheetText(sefaz), fileToBase64(xml)]);
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.post("/fiscal/conferences/sefaz-xml", {
+      sefaz: { file_name: sefaz.name, content },
+      xml: { file_name: xml.name, zip_base64: zipBase64 },
+    });
+    return unwrapFiscalEnvelope<FiscalSefazXmlConference>(response.data);
   },
 };
