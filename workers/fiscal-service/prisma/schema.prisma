@@ -307,7 +307,6 @@ model TriageCompetence {
   @@map("triagem.competences")
 }
 
-// Só leitura: responsável fiscal padrão do cliente, mantido pela Triagem.
 // Lote de antecipações importado de ZIP de XML NF-e (E3); revisão manual, sem cálculo de imposto.
 model FiscalAnticipationBatch {
   id              String                   @id @default(uuid())
@@ -384,6 +383,7 @@ model FiscalAnticipationHistory {
   @@map("fiscal.anticipation_history")
 }
 
+// Só leitura: responsável fiscal padrão do cliente, mantido pela Triagem.
 model TriageResponsible {
   id              String @id @default(uuid())
   client_id       String
