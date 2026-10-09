@@ -4758,6 +4758,10 @@ const handlers = {
     });
   },
 
+  async fiscalResponsibleReport(op) {
+    await httpRequest(op, { query: { basis: "competence", competence: "2026-08" } });
+  },
+
   async fiscalMonthlyControlResponsibles(op) {
     const response = await httpRequest(op);
     if (!isBadExpectation(op)) {

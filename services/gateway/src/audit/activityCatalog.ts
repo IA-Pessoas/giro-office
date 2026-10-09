@@ -342,6 +342,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/fiscal\/monthly-controls\/responsibles-report$/,
+    description: { action: "consultou", item: "o relatório Responsáveis × Empresas" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/fiscal\/monthly-controls\/responsibles$/,
     description: { action: "consultou", item: "os responsáveis fiscais disponíveis" },
   },

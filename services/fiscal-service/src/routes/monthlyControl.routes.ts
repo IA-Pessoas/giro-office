@@ -12,6 +12,7 @@ import {
   listMonthlyControlsQuerySchema,
   monthlyControlIdParamsSchema,
   openMonthlyControlBodySchema,
+  responsibleReportQuerySchema,
   transferMonthlyControlsBodySchema,
   updateMonthlyControlBodySchema,
 } from "../schemas/monthlyControl.schemas.js";
@@ -19,7 +20,7 @@ import type { MonthlyControlService } from "../services/monthlyControlService.js
 
 export type MonthlyControlRouteDeps = Pick<
   MonthlyControlService,
-  "list" | "open" | "update" | "triage" | "transfer" | "responsibles"
+  "list" | "open" | "update" | "triage" | "transfer" | "responsibles" | "responsibleReport"
 >;
 
 export function createMonthlyControlRoutes(
@@ -61,6 +62,26 @@ export function createMonthlyControlRoutes(
         res.json(createSuccessResponse(data));
       } catch (err) {
         logError("Erro ao listar responsáveis fiscais", { err });
+        next(err);
+      }
+    },
+  );
+
+  router.get(
+    "/monthly-controls/responsibles-report",
+    isAuthenticated,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const query = parseWithZod(responsibleReportQuerySchema, req.query);
+        const auth = requireAuthenticatedRequestContext(req);
+        const data = await service.responsibleReport(query, {
+          userId: auth.user_id,
+          organizationId: auth.organization_id,
+          permission: auth.permission,
+        });
+        res.json(createSuccessResponse(data));
+      } catch (err) {
+        logError("Erro ao gerar o relatório Responsáveis × Empresas", { err });
         next(err);
       }
     },

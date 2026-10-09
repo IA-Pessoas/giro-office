@@ -189,6 +189,12 @@ describe("activityCatalog", () => {
     ],
     [
       "GET",
+      "/fiscal/monthly-controls/responsibles-report",
+      "consultou",
+      "o relatório Responsáveis × Empresas",
+    ],
+    [
+      "GET",
       "/fiscal/monthly-controls/responsibles",
       "consultou",
       "os responsáveis fiscais disponíveis",

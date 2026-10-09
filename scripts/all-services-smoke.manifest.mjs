@@ -2421,6 +2421,14 @@ const baseManifest = [
   op({
     service: "fiscal-service",
     method: "GET",
+    path: "/fiscal/monthly-controls/responsibles-report",
+    action: "fiscalResponsibleReport",
+    target: "gateway",
+    auth: "bearer",
+  }),
+  op({
+    service: "fiscal-service",
+    method: "GET",
     path: "/fiscal/monthly-controls/responsibles",
     action: "fiscalMonthlyControlResponsibles",
     target: "gateway",
