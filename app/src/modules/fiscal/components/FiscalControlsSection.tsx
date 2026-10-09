@@ -18,6 +18,7 @@ import {
   FISCAL_CONTROL_STATUS_LABELS,
   fiscalControlStatusChange,
   formatCompetenceLabel,
+  formatTriagePending,
   getFiscalErrorMessage,
 } from "../utils";
 import {
@@ -30,19 +31,25 @@ import {
   isCompetence,
 } from "./fiscalFieldStyles";
 import { FiscalControlObligationsPanel } from "./FiscalControlObligationsPanel";
+import { FiscalControlTriagePanel } from "./FiscalControlTriagePanel";
 import { FiscalStateBox } from "./FiscalStateBox";
 
 const STATUSES = Object.keys(FISCAL_CONTROL_STATUS_LABELS) as FiscalControlStatus[];
 const REASON_MESSAGE = "Informe o motivo com pelo menos 3 caracteres.";
 
-type Reopen = { control: FiscalMonthlyControl; status: FiscalControlStatus };
+/** Mudança que pede motivo e nível 3: reabrir ou concluir com pendência na Triagem. */
+type Reopen = {
+  control: FiscalMonthlyControl;
+  status: FiscalControlStatus;
+  kind: "reopen" | "complete";
+};
 
 export function FiscalControlsSection({
   canEdit,
-  canReopen,
+  canAuthorize,
 }: {
   canEdit: boolean;
-  canReopen: boolean;
+  canAuthorize: boolean;
 }) {
   const [competence, setCompetence] = useState(() => competenceFromToday(-1));
   const [statusFilter, setStatusFilter] = useState<FiscalControlStatus | "">("");
@@ -86,10 +93,23 @@ export function FiscalControlsSection({
   });
 
   function changeStatus(control: FiscalMonthlyControl, status: FiscalControlStatus) {
-    const change = fiscalControlStatusChange(control.status, status, canReopen);
+    const change = fiscalControlStatusChange(
+      control.status,
+      status,
+      canAuthorize,
+      control.triage_pending,
+    );
+    const kind = control.status === "COMPLETED" ? "reopen" : "complete";
     if (change === "direct") update.mutate({ id: control.id, payload: { status } });
+    if (change === "forbidden") {
+      toast.error(
+        kind === "reopen"
+          ? "Reabrir controle concluído exige Fiscal nível 3."
+          : "Há documentos pendentes na Triagem: concluir exige Fiscal nível 3 e justificativa.",
+      );
+    }
     if (change === "reason") {
-      setReopen({ control, status });
+      setReopen({ control, status, kind });
       setReopenReason("");
       setReopenError(null);
     }
@@ -198,11 +218,11 @@ export function FiscalControlsSection({
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Controles fiscais de {formatCompetenceLabel(competence)}</caption>
             <thead className="bg-gray-50 text-gray-600 dark:bg-slate-800 dark:text-gray-300">
-              <tr><th className="px-4 py-3">Cliente</th><th className="px-4 py-3">Regime</th><th className="px-4 py-3">Situação</th><th className="px-4 py-3">Sem movimento</th><th className="px-4 py-3">Abertura</th><th className="px-4 py-3">Obrigações</th></tr>
+              <tr><th className="px-4 py-3">Cliente</th><th className="px-4 py-3">Regime</th><th className="px-4 py-3">Situação</th><th className="px-4 py-3">Sem movimento</th><th className="px-4 py-3">Abertura</th><th className="px-4 py-3">Triagem</th><th className="px-4 py-3">Obrigações</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
               {items.map((item) => {
-                const locked = item.status === "COMPLETED" && !canReopen;
+                const locked = item.status === "COMPLETED" && !canAuthorize;
                 const expanded = expandedId === item.id;
                 return (
                   <Fragment key={item.id}>
@@ -235,6 +255,7 @@ export function FiscalControlsSection({
                       />
                     </td>
                     <td className="px-4 py-3">{item.opening_reason ? <span title={item.opening_reason}>Excepcional: {item.opening_reason}</span> : "Automática"}</td>
+                    <td className="px-4 py-3">{formatTriagePending(item.triage_pending)}</td>
                     <td className="px-4 py-3">
                       <button type="button" onClick={() => setExpandedId(expanded ? null : item.id)} aria-expanded={expanded} aria-controls={`fiscal-obligations-${item.id}`} className="text-blue-700 hover:underline dark:text-blue-300">
                         {item.pending_obligations === 1 ? "1 pendente" : `${item.pending_obligations} pendentes`}
@@ -243,7 +264,8 @@ export function FiscalControlsSection({
                   </tr>
                   {expanded ? (
                     <tr id={`fiscal-obligations-${item.id}`}>
-                      <td colSpan={6} className="bg-gray-50 px-4 py-3 dark:bg-slate-800/50">
+                      <td colSpan={7} className="bg-gray-50 px-4 py-3 dark:bg-slate-800/50">
+                        <FiscalControlTriagePanel controlId={item.id} clientName={item.client_name} />
                         <FiscalControlObligationsPanel controlId={item.id} clientName={item.client_name} canEdit={canEdit} locked={item.status === "COMPLETED"} />
                       </td>
                     </tr>
@@ -259,20 +281,26 @@ export function FiscalControlsSection({
       <Dialog
         open={Boolean(reopen)}
         onOpenChange={(value) => { if (!value) setReopen(null); }}
-        title="Reabrir controle concluído"
-        description={reopen ? `${reopen.control.client_name}: Concluído → ${FISCAL_CONTROL_STATUS_LABELS[reopen.status]}. O motivo fica registrado na trilha.` : ""}
+        title={reopen?.kind === "complete" ? "Concluir com pendência na Triagem" : "Reabrir controle concluído"}
+        description={
+          reopen?.kind === "complete"
+            ? `${reopen.control.client_name}: ${formatTriagePending(reopen.control.triage_pending).toLowerCase()} na Triagem. A conclusão fica registrada como excepcional, com a sua justificativa; a Triagem não muda.`
+            : reopen
+              ? `${reopen.control.client_name}: Concluído → ${FISCAL_CONTROL_STATUS_LABELS[reopen.status]}. O motivo fica registrado na trilha.`
+              : ""
+        }
         preventClose={update.isPending}
         contentClassName="!w-[min(92vw,440px)]"
       >
         <form noValidate onSubmit={(event) => void confirmReopen(event)} className="grid gap-3">
           <label className="grid gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-            Motivo da reabertura
+            {reopen?.kind === "complete" ? "Justificativa da conclusão" : "Motivo da reabertura"}
             <textarea rows={3} maxLength={500} autoFocus value={reopenReason} onChange={(event) => setReopenReason(event.target.value)} aria-invalid={reopenError ? true : undefined} aria-describedby={reopenError ? "fiscal-control-reopen-error" : undefined} className={FISCAL_TEXTAREA_CLASSNAME} />
             {reopenError ? <span id="fiscal-control-reopen-error" role="alert" className={FISCAL_FIELD_ERROR_CLASSNAME}>{reopenError}</span> : null}
           </label>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setReopen(null)} disabled={update.isPending} className={FISCAL_CANCEL_BUTTON_CLASSNAME}>Cancelar</button>
-            <button type="submit" disabled={update.isPending} className={FISCAL_PRIMARY_BUTTON_CLASSNAME}>{update.isPending ? "Reabrindo..." : "Reabrir"}</button>
+            <button type="submit" disabled={update.isPending} className={FISCAL_PRIMARY_BUTTON_CLASSNAME}>{update.isPending ? "Salvando..." : reopen?.kind === "complete" ? "Concluir" : "Reabrir"}</button>
           </div>
         </form>
       </Dialog>

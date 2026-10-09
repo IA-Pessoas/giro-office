@@ -354,6 +354,12 @@ await runTest("fiscal control reopening needs level 3 and a reason", async () =>
   assert.equal(fiscalControlStatusChange("AWAITING_CLIENT", "IN_PROGRESS", false), "direct");
   assert.equal(fiscalControlStatusChange("COMPLETED", "IN_PROGRESS", false), "forbidden");
   assert.equal(fiscalControlStatusChange("COMPLETED", "PENDING", true), "reason");
+  // Concluir com pendência (ou sem registro) na Triagem pede nível 3 e justificativa.
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", false, 0), "direct");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", false, 2), "forbidden");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", true, 2), "reason");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "COMPLETED", true, null), "reason");
+  assert.equal(fiscalControlStatusChange("IN_PROGRESS", "AWAITING_CLIENT", false, 2), "direct");
   assert.equal(FISCAL_CONTROL_STATUS_LABELS.AWAITING_CLIENT, "Aguardando cliente");
 });
 
@@ -362,7 +368,7 @@ await runTest("fiscal monthly control tab keeps viewer read-only and reasons req
   const client = await readSource("./services/fiscalControlService.ts");
   assert.match(
     fiscalSources.shell,
-    /<FiscalControlsSection canEdit=\{canEdit\} canReopen=\{canDelete\} \/>/,
+    /<FiscalControlsSection canEdit=\{canEdit\} canAuthorize=\{canDelete\} \/>/,
   );
   assert.match(client, /api\.get\("\/fiscal\/monthly-controls"/);
   assert.match(client, /api\.post\("\/fiscal\/monthly-controls"/);
@@ -400,4 +406,21 @@ await runTest("fiscal obligations: actions follow status and lock with the contr
   assert.match(panel, /definition\.conditional \|\| trimmed\) && trimmed\.length < 3/);
   assert.match(panel, /max=\{todayInputDate\(\)\}/);
   assert.match(panel, /queryKey: FISCAL_MONTHLY_CONTROLS_QUERY_KEY/);
+});
+
+await runTest("fiscal control reads Triagem documents without editing them", async () => {
+  const { formatTriagePending } = await import("./utils/fiscalControl.ts");
+  assert.equal(formatTriagePending(null), "Sem registro");
+  assert.equal(formatTriagePending(0), "Em dia");
+  assert.equal(formatTriagePending(1), "1 pendente");
+
+  const panel = await readSource("./components/FiscalControlTriagePanel.tsx");
+  const section = await readSource("./components/FiscalControlsSection.tsx");
+  const client = await readSource("./services/fiscalControlService.ts");
+  assert.match(client, /api\.get\(`\/fiscal\/monthly-controls\/\$\{controlId\}\/triage`\)/);
+  // Só leitura: nenhum PATCH/POST para a Triagem a partir do Fiscal.
+  assert.doesNotMatch(panel, /useMutation|api\.(post|patch|put)/);
+  assert.match(section, /control\.triage_pending,/);
+  assert.match(section, /Concluir com pendência na Triagem/);
+  assert.match(section, /Há documentos pendentes na Triagem: concluir exige Fiscal nível 3 e justificativa\./);
 });
