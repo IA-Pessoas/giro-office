@@ -60,6 +60,8 @@ import {
   createClientFormInitialValues,
   getClientTaxRegime,
   buildClientRegimeOptions,
+  buildClientSegmentOptions,
+  describeClientSegment,
 } from "./utils/clientForm.ts";
 import { getDocumentIssue } from "../../shared/utils/documentIssue.ts";
 import { toDatetimeLocalValue, toHistoryIsoDate } from "./utils/historyDate.ts";
@@ -145,6 +147,42 @@ runTest("client form sends the selected tax regime on creation and update", () =
   );
   assert.equal(buildUpdateClientPayload({ ...values, regime: "" }).regime, null);
   assert.equal(buildUpdateClientPayload({ ...values, regime: "MEI" }).regime, "MEI");
+});
+
+runTest("client segment options come only from the catalog and keep the stored value", () => {
+  const catalog = [
+    { id: "s1", name: "Varejo", type: "comercio" },
+    { id: "s2", name: "Usinagem", type: "industria" },
+  ];
+  assert.deepEqual(buildClientSegmentOptions([]), []);
+  assert.deepEqual(buildClientSegmentOptions(catalog, "Varejo"), [
+    { value: "Varejo", label: "Varejo (Comércio)" },
+    { value: "Usinagem", label: "Usinagem (Indústria)" },
+  ]);
+  assert.deepEqual(buildClientSegmentOptions(catalog, "Contabilidade").at(-1), {
+    value: "Contabilidade",
+    label: "Contabilidade (fora do catálogo)",
+  });
+  assert.equal(describeClientSegment("Usinagem", catalog), "Usinagem (Indústria)");
+  assert.equal(describeClientSegment("Contabilidade", catalog), "Contabilidade");
+  assert.equal(describeClientSegment(null, catalog), "A definir");
+  assert.equal(createClientFormInitialValues({ segment: "Contabilidade" }).segment, "Contabilidade");
+  const values = { ...createClientFormInitialValues(), name: "Acme", cpf_cnpj: "1", segment: " Varejo " };
+  assert.equal(buildUpdateClientPayload(values).segment, "Varejo");
+  assert.equal(buildUpdateClientPayload({ ...values, segment: "" }).segment, null);
+});
+
+runTest("segment is edited in the canonical form and Regularize without a parallel list", () => {
+  const form = readFileSync("src/modules/clients/components/ClientForm.tsx", "utf8");
+  const regularize = readFileSync("src/modules/clients/components/ClientRegularizeForm.tsx", "utf8");
+  const detailPage = readFileSync("src/pages/clients/[id].tsx", "utf8");
+  for (const source of [form, regularize]) {
+    assert.match(source, /useClientSegments\(\)/);
+    assert.match(source, /name="segment"[\s\S]*?segmentOptions\.map/);
+  }
+  assert.doesNotMatch(regularize, /REGULARIZE_SEGMENT_OPTIONS|Contabilidade/);
+  assert.match(detailPage, /storedSegment=\{client\.segment\}/);
+  assert.match(detailPage, /label="Segmento"/);
 });
 
 runTest("client regime options join shared regimes, the catalog and the stored value", () => {

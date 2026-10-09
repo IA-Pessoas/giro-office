@@ -6,8 +6,12 @@ import { clientTextFieldClassName } from "../form/clientFormControls";
 import { ClientAddressFields } from "../form/ClientAddressFields";
 import { FormField } from "@shared/components/FormField";
 import type { ClientFormValues } from "../types";
-import { useClientRegimes } from "../hooks/useClients";
-import { buildClientRegimeOptions, getClientInternalName } from "../utils/clientForm";
+import { useClientRegimes, useClientSegments } from "../hooks/useClients";
+import {
+  buildClientRegimeOptions,
+  buildClientSegmentOptions,
+  getClientInternalName,
+} from "../utils/clientForm";
 import {
   formatCpfCnpjInput,
   validateCpfCnpjDocument,
@@ -20,6 +24,8 @@ interface ClientFormProps {
   showDocumentError?: boolean;
   /** Regime gravado no cliente; fica selecionável mesmo fora do catálogo. */
   storedRegime?: string | null;
+  /** Segmento gravado no cliente; fica selecionável mesmo fora do catálogo. */
+  storedSegment?: string | null;
   submitLabel: string;
   onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   onSubmit: () => void;
@@ -32,6 +38,7 @@ export function ClientForm({
   showPersonType = false,
   showDocumentError = false,
   storedRegime = null,
+  storedSegment = null,
   submitLabel,
   onChange,
   onSubmit,
@@ -43,6 +50,8 @@ export function ClientForm({
     (regimesQuery.data ?? []).map((regime) => regime.name),
     storedRegime,
   );
+  const segmentsQuery = useClientSegments();
+  const segmentOptions = buildClientSegmentOptions(segmentsQuery.data ?? [], storedSegment);
   const documentLabel = showPersonType ? (values.type === "PF" ? "CPF" : "CNPJ") : "CPF/CNPJ";
   // Erros do envio aparecem abaixo de cada campo, ligados por aria-describedby (#1367).
   const documentError = (showDocumentError || hasSubmitted) && values.cpf_cnpj
@@ -182,6 +191,23 @@ export function ClientForm({
           {regimesQuery.error ? (
             <span role="alert" className="block text-xs text-rose-700 dark:text-rose-300">
               Não foi possível carregar os regimes da organização.
+            </span>
+          ) : null}
+        </label>
+
+        <label className="space-y-1.5">
+          <span className="block text-sm font-medium text-slate-700 dark:text-white">Segmento</span>
+          <ClientNativeSelect name="segment" value={values.segment} onChange={onChange} disabled={disabled}>
+            <option value="">Selecione um segmento</option>
+            {segmentOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </ClientNativeSelect>
+          {segmentsQuery.error ? (
+            <span role="alert" className="block text-xs text-rose-700 dark:text-rose-300">
+              Não foi possível carregar os segmentos da organização.
             </span>
           ) : null}
         </label>

@@ -1,3 +1,5 @@
+import type { ClientSegmentType } from "@workspace/shared/regularize";
+
 export interface Client {
   id: string;
   dominio_code: string;
@@ -214,6 +216,12 @@ export interface ClientRegime {
   name: string;
 }
 
+export interface ClientSegment {
+  id: string;
+  name: string;
+  type: ClientSegmentType;
+}
+
 export interface ClientFormValues {
   type?: "PJ" | "PF";
   name: string;
@@ -223,6 +231,8 @@ export interface ClientFormValues {
   status: string;
   // Regime compartilhado, do catálogo da organização ou o valor já gravado (#1740).
   regime: string;
+  // Segmento do catálogo da organização ou o valor já gravado (#1741).
+  segment: string;
   service_unique: boolean;
   address: string;
   cep: string;
@@ -378,6 +388,7 @@ export interface CreateClientPayload {
   company_name?: string | null;
   fantasy_name?: string | null;
   regime?: string | null;
+  segment?: string | null;
   service_unique?: boolean;
   address?: string | null;
   cep?: string | null;
@@ -425,6 +436,7 @@ export interface UpdateClientPayload {
   company_name?: string | null;
   fantasy_name?: string | null;
   regime?: string | null;
+  segment?: string | null;
   service_unique?: boolean;
   address?: string | null;
   cep?: string | null;

@@ -6,7 +6,7 @@ import { Building2, Plus, Search } from "lucide-react";
 import { useModuleAccess } from "@modules/auth";
 import { ClientCreateModal } from "@modules/clients/components/ClientCreateModal";
 import { ClientGroupsPanel } from "@modules/clients/components/ClientGroupsPanel";
-import { ClientRegimesPanel } from "@modules/clients/components/ClientRegimesPanel";
+import { ClientCatalogPanel } from "@modules/clients/components/ClientCatalogPanel";
 import { useClients } from "@modules/clients/hooks/useClients";
 import { mapClientStatusFromApi } from "@modules/clients/utils/statusMapper";
 import { PaginationControls } from "@shared/components";
@@ -276,7 +276,8 @@ export function Clients() {
       </section>
 
       <ClientGroupsPanel canEdit={integracaoAccess.canEdit} />
-      <ClientRegimesPanel canEdit={integracaoAccess.canEdit} />
+      <ClientCatalogPanel kind="regime" canEdit={integracaoAccess.canEdit} />
+      <ClientCatalogPanel kind="segment" canEdit={integracaoAccess.canEdit} />
     </div>
   );
 }

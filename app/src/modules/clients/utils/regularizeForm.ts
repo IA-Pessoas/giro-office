@@ -112,12 +112,6 @@ export function getRegularizeRegimeOptions(current: string, catalog: readonly st
 
 export const REGULARIZE_SIZE_OPTIONS = ["DEMAIS", "EPP", "ME"] as const;
 
-export const REGULARIZE_SEGMENT_OPTIONS = [
-  "Contabilidade",
-  "Mercado",
-  "Infoproduto",
-] as const;
-
 export function createRegularizeInitialValues(client: Client): ClientRegularizeFormValues {
   return {
     type: client.type,
