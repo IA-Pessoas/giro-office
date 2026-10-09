@@ -81,3 +81,22 @@ export const marketingMonthlyBirthdaysResponseSchema = z.object({
 export type MarketingMonthlyBirthdaysResponse = z.infer<
   typeof marketingMonthlyBirthdaysResponseSchema
 >;
+
+export const marketingStockResponseSchema = z.object({
+  department: z.object({ id: z.string(), name: z.string() }),
+  totals: z.object({
+    items: z.number().int().nonnegative(),
+    quantity: z.number().int(),
+  }),
+  items: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      quantity: z.number().int(),
+      lastEntryAt: z.string().datetime().nullable(),
+      lastExitAt: z.string().datetime().nullable(),
+    }),
+  ),
+});
+
+export type MarketingStockResponse = z.infer<typeof marketingStockResponseSchema>;

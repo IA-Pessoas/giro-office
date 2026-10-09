@@ -1,9 +1,12 @@
+import { ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import {
   type MarketingDashboardResponse,
   type MarketingMonthlyBirthdaysResponse,
+  type MarketingStockResponse,
   marketingDashboardResponseSchema,
   marketingMonthlyBirthdaysResponseSchema,
+  marketingStockResponseSchema,
 } from "../schemas/marketingDashboard.schemas.js";
 
 interface BirthdayAggregate {
@@ -12,6 +15,8 @@ interface BirthdayAggregate {
 }
 
 const EMPTY_BIRTHDAYS: BirthdayAggregate = { total: 0, items: [] };
+/** Substitui o `departamento_id = 22` fixo do PHP: o departamento vem do cadastro pelo nome. */
+const MARKETING_DEPARTMENT_NAME = "marketing";
 const CLOSED_REQUEST_STATUSES = ["Resolved", "Closed"] as const;
 
 export function getCurrentMarketingCompetence(now: Date, timeZone: string): Date {
@@ -282,6 +287,53 @@ export class MarketingDashboardService {
       month,
       employees: { total: employees.length, items: employees },
       clients: { total: clients.length, items: clients },
+    });
+  }
+
+  /**
+   * Estoque canônico do departamento Marketing, achado pelo nome no cadastro de
+   * departamentos da organização (o legado fixava o ID 22). Somente leitura.
+   */
+  async getMarketingStock(organizationId: string): Promise<MarketingStockResponse> {
+    const [department] = await this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
+      SELECT department.id, btrim(department.name) AS name
+      FROM departments AS department
+      WHERE department.organization_id = ${organizationId}
+        AND lower(btrim(department.name)) = ${MARKETING_DEPARTMENT_NAME}
+      ORDER BY department.name, department.id
+      LIMIT 1
+    `;
+    if (!department) {
+      throw new ServiceError(404, "Departamento Marketing não encontrado.");
+    }
+
+    // Datas reais (timestamp) agregadas por item; a ordenação textual do legado não se repete.
+    const items = await this.prisma.$queryRaw<MarketingStockResponse["items"]>`
+      SELECT item.id, item.name, item.quantity,
+        to_char(
+          (SELECT max(entry.entry_date) FROM "stock.entries" AS entry
+            WHERE entry.stock_id = item.id AND entry.organization_id = ${organizationId}),
+          'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+        ) AS "lastEntryAt",
+        to_char(
+          (SELECT max(exit.exit_date) FROM "stock.exits" AS exit
+            WHERE exit.stock_id = item.id AND exit.organization_id = ${organizationId}),
+          'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+        ) AS "lastExitAt"
+      FROM stock AS item
+      WHERE item.department_id = ${department.id}
+        AND item.organization_id = ${organizationId}
+        AND item.status = true
+      ORDER BY item.name, item.id
+    `;
+
+    return marketingStockResponseSchema.parse({
+      department,
+      totals: {
+        items: items.length,
+        quantity: items.reduce((sum, item) => sum + item.quantity, 0),
+      },
+      items,
     });
   }
 }

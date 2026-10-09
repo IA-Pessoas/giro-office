@@ -162,6 +162,10 @@ const env = {
   marketingEventsSmokeEnabled:
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "true" ||
     process.env.MARKETING_EVENTS_SMOKE_ENABLED === "1",
+  // Opt in only when the smoke organization has a "Marketing" department.
+  marketingStockSmokeEnabled:
+    process.env.MARKETING_STOCK_SMOKE_ENABLED === "true" ||
+    process.env.MARKETING_STOCK_SMOKE_ENABLED === "1",
   jwtSecret: process.env.JWT_SECRET ?? "",
   auditEnabled: process.env.AUDIT_ENABLED === "true" || process.env.AUDIT_ENABLED === "1",
   regularizeSmokeEnabled:
@@ -354,6 +358,7 @@ const skipped = [];
 const actionExecutionRank = {
   marketingDashboard: 1050,
   marketingBirthdays: 1050,
+  marketingStock: 1050,
   marketingEventsList: 1051,
   marketingEventsCreate: 1052,
   marketingEventsUpdate: 1053,
@@ -1665,6 +1670,10 @@ async function platformHttpRequest(op, options = {}) {
 const handlers = {
   async marketingDashboard(op) {
     await httpRequest(op, { expectedStatus: [200] });
+  },
+
+  async marketingStock(op) {
+    await httpRequest(op, { expectedStatus: op.expectedStatus });
   },
 
   async marketingBirthdays(op) {
@@ -8295,6 +8304,9 @@ function matchesFilter(op) {
 function disabledConditionReason(condition) {
   if (condition === "marketingEventsSmokeEnabled" && !env.marketingEventsSmokeEnabled) {
     return "MARKETING_EVENTS_SMOKE_ENABLED is false";
+  }
+  if (condition === "marketingStockSmokeEnabled" && !env.marketingStockSmokeEnabled) {
+    return "MARKETING_STOCK_SMOKE_ENABLED is false";
   }
   if (condition === "platformImpersonationSmokeEnabled") {
     if (!env.platformImpersonationSmokeEnabled) {

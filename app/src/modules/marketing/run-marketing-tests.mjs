@@ -5,9 +5,11 @@ import {
   createBirthdayCsv,
   createMonthlyClientBirthdayCsv,
   createMonthlyEmployeeBirthdayCsv,
-} from "./utils/birthdayCsv.ts";
+  createMarketingStockCsv,
+} from "./utils/marketingCsv.ts";
 
 const dashboard = await readFile(new URL("./components/MarketingDashboard.tsx", import.meta.url), "utf8");
+const stockReport = await readFile(new URL("./components/MarketingStockReport.tsx", import.meta.url), "utf8");
 const birthdayReport = await readFile(new URL("./components/MarketingBirthdayReport.tsx", import.meta.url), "utf8");
 const events = await readFile(new URL("./components/MarketingEvents.tsx", import.meta.url), "utf8");
 const eventsService = await readFile(new URL("./services/marketingEventsService.ts", import.meta.url), "utf8");
@@ -147,8 +149,31 @@ assert.match(
   await readFile(new URL("./utils/printMarketingReport.ts", import.meta.url), "utf8"),
   /window\.print\(\)/,
 );
-assert.match(styles, /#marketing-birthday-report \*/);
+assert.match(styles, /\.marketing-print-report \*/);
+assert.match(birthdayReport, /marketing-print-report/);
 assert.match(page, /MarketingBirthdayReport/);
+assert.equal(
+  createMarketingStockCsv(
+    {
+      totals: { items: 2, quantity: 3 },
+      items: [
+        { id: "s-1", name: "Banner", quantity: 3, lastEntryAt: "2026-09-30T13:05:00.000Z", lastExitAt: null },
+        { id: "s-2", name: "-Caneta", quantity: 0, lastEntryAt: null, lastExitAt: "2026-10-01T09:30:00.000Z" },
+      ],
+    },
+    "UTC",
+  ),
+  '"Nome","Quantidade","Última entrada","Última saída"\r\n' +
+    '"Banner","3","30/09/2026, 13:05","Sem registro"\r\n' +
+    '"\'-Caneta","0","Sem registro","01/10/2026, 09:30"\r\n' +
+    '"Total: 2 itens","3","",""',
+);
+assert.match(stockReport, /useMarketingStock\(open\)/);
+assert.match(stockReport, /marketingStockRows\(stock\.items\)/);
+assert.match(stockReport, /printMarketingReport\("marketing-stock-report"\)/);
+assert.match(stockReport, /marketing-print-report/);
+assert.match(page, /MarketingStockReport/);
+assert.match(service, /"\/marketing\/stock"/);
 assert.match(service, /"\/marketing\/birthdays"/);
 assert.match(events, /query\.isLoading/);
 assert.match(events, /query\.isError/);
@@ -191,7 +216,7 @@ assert.match(editionReport, /duringEvent/);
 assert.match(editionReport, /afterEvent/);
 assert.match(editionReport, /feedback/);
 assert.match(styles, /@media print/);
-assert.match(styles, /marketing-event-edition-report/);
+assert.match(editionReport, /marketing-print-report/);
 assert.doesNotMatch(page, /notFound:\s*true/);
 assert.match(page, /MarketingDashboard/);
 assert.match(page, /MarketingEvents/);

@@ -157,3 +157,65 @@ describe("MarketingDashboardService.getMonthlyBirthdays", () => {
     expect(clientCall?.slice(1)).toEqual([organizationId, organizationId, organizationId, 5]);
   });
 });
+
+describe("MarketingDashboardService.getMarketingStock", () => {
+  it("lista o estoque do departamento Marketing do cadastro com as últimas movimentações", async () => {
+    const items = [
+      {
+        id: "s-1",
+        name: "Banner",
+        quantity: 3,
+        lastEntryAt: "2026-09-30T13:00:00.000Z",
+        lastExitAt: null,
+      },
+      {
+        id: "s-2",
+        name: "Caneta",
+        quantity: 40,
+        lastEntryAt: null,
+        lastExitAt: "2026-10-01T09:30:00.000Z",
+      },
+    ];
+    const prisma = {
+      $queryRaw: vi
+        .fn()
+        .mockResolvedValueOnce([{ id: "dep-mkt", name: "Marketing" }])
+        .mockResolvedValueOnce(items),
+    };
+
+    const report = await new MarketingDashboardService(prisma as never).getMarketingStock(
+      organizationId,
+    );
+
+    expect(report).toEqual({
+      department: { id: "dep-mkt", name: "Marketing" },
+      totals: { items: 2, quantity: 43 },
+      items,
+    });
+    const [departmentCall, stockCall] = prisma.$queryRaw.mock.calls;
+    const departmentSql = departmentCall?.[0]?.join("?") ?? "";
+    expect(departmentSql).toContain("lower(btrim(department.name)) = ?");
+    expect(departmentSql).not.toMatch(/\b22\b/);
+    expect(departmentCall?.slice(1)).toEqual([organizationId, "marketing"]);
+
+    const stockSql = stockCall?.[0]?.join("?") ?? "";
+    expect(stockSql).toContain("max(entry.entry_date)");
+    expect(stockSql).toContain("max(exit.exit_date)");
+    expect(stockSql).toContain("item.status = true");
+    expect(stockCall?.slice(1)).toEqual([
+      organizationId,
+      organizationId,
+      "dep-mkt",
+      organizationId,
+    ]);
+  });
+
+  it("responde 404 quando a organização não tem departamento Marketing", async () => {
+    const prisma = { $queryRaw: vi.fn().mockResolvedValueOnce([]) };
+
+    await expect(
+      new MarketingDashboardService(prisma as never).getMarketingStock(organizationId),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+});

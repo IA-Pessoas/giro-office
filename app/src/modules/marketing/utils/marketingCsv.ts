@@ -1,3 +1,5 @@
+import type { MarketingStock, MarketingStockItem } from "../types/marketingDashboard";
+
 export interface BirthdayCsvItem {
   name: string;
   day: number;
@@ -64,4 +66,49 @@ export function createMonthlyClientBirthdayCsv(
   items: Parameters<typeof clientBirthdayRows>[0],
 ): string {
   return createCsv([CLIENT_BIRTHDAY_COLUMNS, ...clientBirthdayRows(items)]);
+}
+
+// Tela, impressão e CSV usam as mesmas colunas e linhas.
+export const MARKETING_STOCK_COLUMNS = ["Nome", "Quantidade", "Última entrada", "Última saída"];
+
+function formatMovement(value: string | null, timeZone?: string): string {
+  if (!value) return "Sem registro";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone,
+  }).format(new Date(value));
+}
+
+export function marketingStockRows(
+  items: readonly MarketingStockItem[],
+  timeZone?: string,
+): string[][] {
+  return items.map((item) => [
+    item.name,
+    String(item.quantity),
+    formatMovement(item.lastEntryAt, timeZone),
+    formatMovement(item.lastExitAt, timeZone),
+  ]);
+}
+
+function itemCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "item" : "itens"}`;
+}
+
+export function marketingStockTotalsLabel(totals: MarketingStock["totals"]): string {
+  const units = `${totals.quantity} ${totals.quantity === 1 ? "unidade" : "unidades"}`;
+  return `${itemCountLabel(totals.items)} · ${units} em estoque`;
+}
+
+/** A última linha repete os totais exibidos na tela e na impressão. */
+export function createMarketingStockCsv(
+  stock: Pick<MarketingStock, "items" | "totals">,
+  timeZone?: string,
+): string {
+  return createCsv([
+    MARKETING_STOCK_COLUMNS,
+    ...marketingStockRows(stock.items, timeZone),
+    [`Total: ${itemCountLabel(stock.totals.items)}`, String(stock.totals.quantity), "", ""],
+  ]);
 }

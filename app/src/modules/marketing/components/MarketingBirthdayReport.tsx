@@ -13,10 +13,11 @@ import {
   downloadCsvFile,
   EMPLOYEE_BIRTHDAY_COLUMNS,
   employeeBirthdayRows,
-} from "../utils/birthdayCsv";
+} from "../utils/marketingCsv";
 import { printMarketingReport } from "../utils/printMarketingReport";
 import { marketingPrimaryButtonClass, marketingSecondaryButtonClass } from "./marketingButtonStyles";
 import { marketingFormControlClass } from "./marketingFormStyles";
+import { MarketingReportTable } from "./MarketingReportTable";
 
 const MONTHS = Array.from({ length: 12 }, (_, index) =>
   new Intl.DateTimeFormat("pt-BR", { month: "long", timeZone: "UTC" }).format(
@@ -24,57 +25,13 @@ const MONTHS = Array.from({ length: 12 }, (_, index) =>
   ),
 );
 
-function BirthdayTable({
-  title,
-  columns,
-  ids,
-  rows,
-}: {
-  title: string;
-  columns: readonly string[];
-  ids: readonly string[];
-  rows: readonly (readonly string[])[];
-}) {
-  return (
-    <section aria-label={title} className="space-y-2">
-      <h3 className="font-semibold text-gray-900 dark:text-white">
-        {title} · {rows.length} {rows.length === 1 ? "registro" : "registros"}
-      </h3>
-      {rows.length === 0 ? (
-        <p className="text-sm text-gray-500 dark:text-slate-400">Nenhum aniversariante neste mês.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-gray-200 text-gray-600 dark:border-slate-700 dark:text-slate-300">
-              <tr>
-                {columns.map((column) => (
-                  <th className="py-2 pr-3 font-medium" key={column} scope="col">{column}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-gray-800 dark:divide-slate-700 dark:text-slate-100">
-              {rows.map((row, rowIndex) => (
-                <tr key={ids[rowIndex]}>
-                  {row.map((cell, index) => (
-                    <td className="py-2 pr-3" key={columns[index]}>{cell}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
 function BirthdayReportContent({ report }: { report: MarketingMonthlyBirthdays }) {
   const monthName = MONTHS[report.month - 1];
   const slug = String(report.month).padStart(2, "0");
   return (
     <article
       aria-label={`Aniversariantes de ${monthName}`}
-      className="space-y-6 text-gray-900 dark:text-slate-100"
+      className="marketing-print-report space-y-6 text-gray-900 dark:text-slate-100"
       id="marketing-birthday-report"
     >
       <div className="hide-on-print flex flex-wrap justify-end gap-2">
@@ -117,16 +74,18 @@ function BirthdayReportContent({ report }: { report: MarketingMonthlyBirthdays }
         <h2 className="text-xl font-semibold capitalize">{monthName}</h2>
       </header>
 
-      <BirthdayTable
+      <MarketingReportTable
         columns={EMPLOYEE_BIRTHDAY_COLUMNS}
         ids={report.employees.items.map((item) => item.id)}
         rows={employeeBirthdayRows(report.employees.items)}
+        emptyMessage="Nenhum aniversariante neste mês."
         title="Colaboradores"
       />
-      <BirthdayTable
+      <MarketingReportTable
         columns={CLIENT_BIRTHDAY_COLUMNS}
         ids={report.clients.items.map((item) => item.id)}
         rows={clientBirthdayRows(report.clients.items)}
+        emptyMessage="Nenhum aniversariante neste mês."
         title="Clientes PF vinculados a empresas ativas"
       />
     </article>

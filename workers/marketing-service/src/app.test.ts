@@ -11,6 +11,7 @@ function services() {
     dashboard: {
       getDashboard: vi.fn(async () => ({ alerts: [] })),
       getMonthlyBirthdays: vi.fn(async () => ({ month: 5 })),
+      getMarketingStock: vi.fn(async () => ({ items: [] })),
     },
     controls: {},
     events: {
@@ -68,6 +69,16 @@ describe("marketing Worker", () => {
     expect(s.dashboard.getMonthlyBirthdays).toHaveBeenCalledWith(ORGANIZATION_ID, 5);
     expect(invalid.status).toBe(400);
     expect(s.dashboard.getMonthlyBirthdays).toHaveBeenCalledTimes(1);
+  });
+
+  it("serve o estoque do Marketing só para quem tem o módulo Marketing", async () => {
+    const { app, s } = setup();
+    const response = await app.request("/marketing/stock", { headers: gateway({ marketing: 1 }) });
+    const tiOnly = await app.request("/marketing/stock", { headers: gateway({ ti: 2 }) });
+
+    expect(response.status).toBe(200);
+    expect(s.dashboard.getMarketingStock).toHaveBeenCalledWith(ORGANIZATION_ID);
+    expect(tiOnly.status).toBe(403);
   });
 
   it("serve as rotas de credenciais, eventos e edições", async () => {

@@ -251,6 +251,11 @@ export function buildMarketingServiceOpenApiSpec(env: MarketingServiceEnv) {
           "Listar aniversariantes do mês (query `month` 1-12): colaboradores ativos e clientes PF vinculados a empresas ativas.",
         ),
       },
+      "/marketing/stock": {
+        get: protectedOperation(
+          "Consultar o estoque do departamento Marketing (cadastro Office) com quantidade e últimas entrada/saída.",
+        ),
+      },
       "/marketing/ai-usage-controls/users": {
         get: protectedOperation("Listar usuários ativos da organização elegíveis para pesquisa."),
       },

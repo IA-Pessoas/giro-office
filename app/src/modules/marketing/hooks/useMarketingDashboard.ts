@@ -10,6 +10,12 @@ export function useMarketingDashboard() {
   return useFetch(queryKey, () => marketingDashboardService.getDashboard());
 }
 
+export function useMarketingStock(enabled: boolean) {
+  const { user } = useAuth();
+  const queryKey = marketingQueryKey(["marketing", "stock"], user);
+  return useFetch(queryKey, () => marketingDashboardService.getStock(), { enabled });
+}
+
 export function useMarketingMonthlyBirthdays(month: number, enabled: boolean) {
   const { user } = useAuth();
   const queryKey = marketingQueryKey(["marketing", "birthdays", month], user);
