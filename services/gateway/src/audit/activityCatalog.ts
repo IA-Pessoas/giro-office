@@ -90,6 +90,21 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/client\/segments$/,
+    description: { action: "consultou", item: "a lista de segmentos" },
+  },
+  {
+    methods: ["POST"],
+    pattern: /^\/client\/segments$/,
+    description: { action: "cadastrou", item: "um novo segmento" },
+  },
+  {
+    methods: ["PATCH"],
+    pattern: /^\/client\/segments\/[^/]+$/,
+    description: { action: "atualizou", item: "um segmento" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/client\/coringa\/list$/,
     description: { action: "consultou", item: "a Lista Coringa de clientes" },
   },

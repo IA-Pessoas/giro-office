@@ -148,6 +148,40 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
     ).toBe(name);
   });
 
+  it("segmentos: cadastra com tipo, muda o tipo e seleciona pelo Regularize", async () => {
+    const name = `Smoke Segmento ${Date.now()}`;
+    const segment = expectOk(
+      await call("POST", "/client/segments", { name, type: "servico" }),
+      "POST /client/segments",
+    ).data;
+    expectOk(
+      await call("PATCH", `/client/segments/${segment.id}`, { type: "industria" }),
+      "PATCH /client/segments/:id",
+    );
+    const listed = expectOk(await call("GET", "/client/segments"), "GET /client/segments").data;
+    expect(listed.find((row: { id: string }) => row.id === segment.id)).toMatchObject({
+      name,
+      type: "industria",
+    });
+
+    const client = expectOk(
+      await call("POST", "/client/integration", {
+        organization_id: requireSmokeState().organizationId,
+        type: "PJ",
+        name: `Smoke Cliente Segmento ${Date.now()}`,
+        cpf_cnpj: uniqueCnpj(),
+      }),
+      "POST /client/integration (segmento)",
+    ).data;
+    expectOk(
+      await call("PATCH", `/client/${client.id}/regularize`, { segment: name.toLowerCase() }),
+      "PATCH /client/:id/regularize segmento",
+    );
+    expect(expectOk(await call("GET", `/client/${client.id}`), "GET segmento").data.segment).toBe(
+      name,
+    );
+  });
+
   it("integração: cria, lê, lista com filtros, atualiza, inativa e reativa", async () => {
     const cnpj = uniqueCnpj();
     const name = `Smoke Cliente ${Date.now()}`;
@@ -303,6 +337,12 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
         "POST /client",
       ).data as { id: string }
     ).id;
+    // Segmento vem do catálogo da organização (#1741).
+    const segmentName = `Smoke Contabilidade ${Date.now()}`;
+    expectOk(
+      await call("POST", "/client/segments", { name: segmentName, type: "servico" }),
+      "POST /client/segments (regularize)",
+    );
 
     // buildFinancePayload: só `contract`.
     const finance = expectOk(
@@ -341,7 +381,7 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
       opening_date: "2019-03-04",
       regime: "Lucro Presumido",
       size: "EPP",
-      segment: "Contabilidade",
+      segment: segmentName,
       contabil: true,
       fiscal: true,
       pessoal: false,
@@ -363,7 +403,7 @@ describe.skipIf(!smokeState)("client-service CRUD smoke (banco real)", () => {
       cnae: "6201-5/01",
       regime: "Lucro Presumido",
       size: "EPP",
-      segment: "Contabilidade",
+      segment: segmentName,
       contabil: true,
       fiscal: true,
       pessoal: false,

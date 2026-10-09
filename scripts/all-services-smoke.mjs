@@ -4225,6 +4225,29 @@ const handlers = {
     });
   },
 
+  async clientSegmentsList(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/segments" });
+  },
+
+  async clientSegmentCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      path: "/client/segments",
+      json: { name: uniqueText("Smoke Segmento"), type: "servico" },
+    });
+    if (!isBadExpectation(op)) {
+      state.clientSegmentId = pickFirst(response.body, "data.id");
+    }
+  },
+
+  async clientSegmentPatch(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/segments/${requireState("clientSegmentId")}`,
+      json: { type: "comercio" },
+    });
+  },
+
   async clientCoringaList(op) {
     await httpRequest(op, { expectedStatus: [200], query: { page: 1, limit: 5 } });
   },

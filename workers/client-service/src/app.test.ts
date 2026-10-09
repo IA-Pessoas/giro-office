@@ -94,6 +94,9 @@ function service(): ClientWorkerService {
     listRegimes: vi.fn(async () => [{ id: REGIME_ID, name: "MEI" }]),
     createRegime: vi.fn(async () => ({ id: REGIME_ID, name: "MEI" })),
     updateRegime: vi.fn(async () => ({ id: REGIME_ID, name: "Imune" })),
+    listSegments: vi.fn(async () => [{ id: REGIME_ID, name: "Varejo", type: "comercio" }]),
+    createSegment: vi.fn(async () => ({ id: REGIME_ID, name: "Varejo", type: "comercio" })),
+    updateSegment: vi.fn(async () => ({ id: REGIME_ID, name: "Atacado", type: "comercio" })),
   };
 }
 
@@ -190,6 +193,52 @@ describe("client Worker", () => {
     );
     expect(blank.status).toBe(400);
     expect(clientService.getById).not.toHaveBeenCalled();
+  });
+
+  it("serves typed segments and validates the legacy type", async () => {
+    const clientService = service();
+    const app = createClientWorkerApp({ env: env(), clientService });
+    const json = { ...headers(), "content-type": "application/json" };
+
+    const list = await app.request("https://client.test/client/segments", { headers: headers() });
+    const create = await app.request("https://client.test/client/segments", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: "Varejo", type: "comercio" }),
+    });
+    const invalidType = await app.request("https://client.test/client/segments", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name: "Varejo", type: "agro" }),
+    });
+    const update = await app.request(`https://client.test/client/segments/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({ type: "industria" }),
+    });
+    const empty = await app.request(`https://client.test/client/segments/${REGIME_ID}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({}),
+    });
+
+    expect(list.status).toBe(200);
+    expect(clientService.listSegments).toHaveBeenCalledWith(ORGANIZATION_ID, expect.anything());
+    expect(create.status).toBe(201);
+    expect(clientService.createSegment).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      { name: "Varejo", type: "comercio" },
+      expect.anything(),
+    );
+    expect(invalidType.status).toBe(400);
+    expect(update.status).toBe(200);
+    expect(clientService.updateSegment).toHaveBeenCalledWith(
+      REGIME_ID,
+      ORGANIZATION_ID,
+      { type: "industria" },
+      expect.anything(),
+    );
+    expect(empty.status).toBe(400);
   });
 
   it("preserves representative CRUD and validation behavior", async () => {

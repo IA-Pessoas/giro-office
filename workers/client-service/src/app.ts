@@ -25,6 +25,11 @@ import {
   updateClientRegimeBodySchema,
 } from "../../../services/client-service/src/schemas/clientRegime.schemas.js";
 import {
+  clientSegmentIdParamsSchema,
+  createClientSegmentBodySchema,
+  updateClientSegmentBodySchema,
+} from "../../../services/client-service/src/schemas/clientSegment.schemas.js";
+import {
   cnpjLookupQuerySchema,
   createClientPABodySchema,
   createHistoryBodySchema,
@@ -296,6 +301,32 @@ export function createClientWorkerApp(options: CreateClientWorkerAppOptions) {
       const { name } = parse(updateClientRegimeBodySchema, await jsonBody(c));
       return c.json(
         createSuccessResponse(await service.updateRegime(id, organizationId(c), name, authz(c))),
+      );
+    }),
+  );
+
+  app.get("/client/segments", async (c) =>
+    withService(c, async (service) =>
+      c.json(createSuccessResponse(await service.listSegments(organizationId(c), authz(c)))),
+    ),
+  );
+
+  app.post("/client/segments", async (c) =>
+    withService(c, async (service) => {
+      const body = parse(createClientSegmentBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.createSegment(organizationId(c), body, authz(c))),
+        201,
+      );
+    }),
+  );
+
+  app.patch("/client/segments/:id", async (c) =>
+    withService(c, async (service) => {
+      const id = pathParam(c, clientSegmentIdParamsSchema);
+      const body = parse(updateClientSegmentBodySchema, await jsonBody(c));
+      return c.json(
+        createSuccessResponse(await service.updateSegment(id, organizationId(c), body, authz(c))),
       );
     }),
   );
