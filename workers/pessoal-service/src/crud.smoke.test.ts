@@ -557,6 +557,11 @@ describe.skipIf(!smokeState)("pessoal-service CRUD smoke (banco real)", () => {
         `extract ${source.key}`,
       ).data;
       expect(Array.isArray(data.rows), source.key).toBe(true);
+      if (source.key === "pessoal.payroll") {
+        // client_name sai de client_id: Payroll não tem relação com Client no schema canônico.
+        expect(data.rows.length).toBeGreaterThan(0);
+        for (const row of data.rows) expect(typeof row.client_name).toBe("string");
+      }
     }
   });
 });
