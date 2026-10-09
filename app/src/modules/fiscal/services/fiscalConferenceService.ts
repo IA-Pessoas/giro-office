@@ -267,6 +267,24 @@ export interface FiscalIpiSpreadsheetConference {
   csv: string;
 }
 
+export interface FiscalInvoiceCandidate {
+  page: number;
+  label: string;
+  value: string;
+  line: string;
+}
+
+export interface FiscalInvoicePdfTotals {
+  status: "complete" | "partial";
+  supported_format: string;
+  totals: { value: string; invoices: number };
+  invoices: { file_name: string; pages: number; value: string; origin: { page: number; label: string; line: string } }[];
+  ambiguous: { file_name: string; reason: string; candidates: FiscalInvoiceCandidate[] }[];
+  not_processed: { file_name: string; reason: string }[];
+  file_name: string;
+  csv: string;
+}
+
 export const fiscalConferenceService = {
   /** Conferência Domínio × SEFAZ: nada é gravado no servidor. */
   async compareDocuments(files: Record<FiscalConferenceSource, File>): Promise<FiscalDocumentConference> {
@@ -334,5 +352,15 @@ export const fiscalConferenceService = {
       second: { file_name: files.second.name, content: second },
     });
     return unwrapFiscalEnvelope<FiscalIpiSpreadsheetConference>(response.data);
+  },
+
+  /** Totais de faturas em PDF: nada é gravado no servidor. */
+  async sumInvoicePdfs(files: File[]): Promise<FiscalInvoicePdfTotals> {
+    const payload = await Promise.all(
+      files.map(async (file) => ({ file_name: file.name, content_base64: await fileToBase64(file) })),
+    );
+    const api = setupAPIClient(undefined, undefined, undefined, { notifyServerErrors: false });
+    const response = await api.post("/fiscal/conferences/invoice-pdfs", { files: payload });
+    return unwrapFiscalEnvelope<FiscalInvoicePdfTotals>(response.data);
   },
 };
