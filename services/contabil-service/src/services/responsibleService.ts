@@ -7,6 +7,7 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
+import { AUDIT_UPDATE_ACTION } from "./auditHistoryService.js";
 
 export type ResponsibleServicePrisma = typeof prismaClient;
 
@@ -134,7 +135,7 @@ export class ResponsibleService {
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Atualização",
+        action: AUDIT_UPDATE_ACTION,
         referring: "contabil.responsibles",
         referringId: id,
         oldData: exists as unknown as Record<string, unknown>,

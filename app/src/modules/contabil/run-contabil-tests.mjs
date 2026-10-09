@@ -35,8 +35,8 @@ import {
 } from "./components/contabilRelationshipFields.ts";
 import {
   formatContabilControlHistoryValue,
-  getContabilControlHistoryPageCount,
-} from "./components/contabilControlHistory.helpers.ts";
+  getContabilHistoryPageCount,
+} from "./components/contabilHistory.helpers.ts";
 import {
   applyLocalContabilFieldValue,
   createContabilFieldStatusMap,
@@ -576,8 +576,8 @@ await (async () => {
     assert.equal(formatContabilControlHistoryValue("depreciation", null), "—");
     assert.equal(formatContabilControlHistoryValue("notes", ""), "(vazio)");
     assert.equal(formatContabilControlHistoryValue("notes", "Conferir"), "Conferir");
-    assert.equal(getContabilControlHistoryPageCount(0, 20), 1);
-    assert.equal(getContabilControlHistoryPageCount(41, 20), 3);
+    assert.equal(getContabilHistoryPageCount(0, 20), 1);
+    assert.equal(getContabilHistoryPageCount(41, 20), 3);
     assert.deepEqual(contabilControlHistoryQueryKey("client-1", "2026-09", 2), [
       "contabil",
       "control-history",

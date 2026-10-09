@@ -39,7 +39,7 @@ describe("listRelationshipHistory (#1723)", () => {
           organization_id: ORG,
           referring: "contabil.relationship",
           referring_id: RELATIONSHIP,
-          action: { in: ["Atualização"] },
+          action: { in: ["Cadastro", "Atualização"] },
           NOT: { changes_json: { equals: {} } },
         },
         skip: 0,
@@ -60,6 +60,7 @@ describe("listRelationshipHistory (#1723)", () => {
           bidding: { from: true, to: null },
           chart_accounts: { from: "Plano próprio", to: "Sim — Jonrick" },
           client_id: { from: "x", to: "y" },
+          tool: { to: null },
         },
       },
     ]);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { useContabilRelationshipHistory } from "../hooks";
-import { CONTABIL_CONTROL_HISTORY_PAGE_SIZE } from "./contabilControlHistory.helpers";
+import { CONTABIL_HISTORY_PAGE_SIZE } from "./contabilHistory.helpers";
 import { ContabilHistoryPanel } from "./ContabilHistoryPanel";
 import { formatContabilRelationshipHistoryValue } from "./contabilPartySection.helpers";
 import { getContabilRelationshipFieldLabel } from "./contabilRelationshipFields";
@@ -17,7 +17,7 @@ export function ContabilRelationshipHistory({
   const historyQuery = useContabilRelationshipHistory({
     clientId,
     page,
-    pageSize: CONTABIL_CONTROL_HISTORY_PAGE_SIZE,
+    pageSize: CONTABIL_HISTORY_PAGE_SIZE,
   });
 
   return (
@@ -27,7 +27,7 @@ export function ContabilRelationshipHistory({
       emptyMessage="Nenhuma alteração registrada na Relação Contábil."
       query={historyQuery}
       page={page}
-      pageSize={CONTABIL_CONTROL_HISTORY_PAGE_SIZE}
+      pageSize={CONTABIL_HISTORY_PAGE_SIZE}
       onPageChange={setPage}
       formatField={getContabilRelationshipFieldLabel}
       formatValue={formatContabilRelationshipHistoryValue}

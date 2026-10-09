@@ -85,13 +85,16 @@ describe("RelationshipService", () => {
         note: "n/a",
       },
     });
-    expect(audit.createLog).toHaveBeenCalledWith(
+    expect(audit.logUpdateIfChanged).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: USER_ID,
         organizationId: ORG_ID,
         permission: 1,
+        action: "Cadastro",
         referring: "contabil.relationship",
         referringId: RELATIONSHIP_ID,
+        oldData: {},
+        updatedData: baseRow,
       }),
     );
   });

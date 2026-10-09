@@ -1,6 +1,7 @@
 // Histórico de campos lido da auditoria (`audit_requests`), que guarda cada alteração com
 // valor anterior e novo e não tem prazo de retenção. Usado pelo serviço Node e pelo Worker.
 
+export const AUDIT_CREATE_ACTION = "Cadastro";
 export const AUDIT_UPDATE_ACTION = "Atualização";
 
 type AuditRow = {
@@ -32,13 +33,17 @@ export type AuditFieldHistoryQuery<F extends string> = AuditHistoryPage & {
 function fieldChanges<F extends string>(changes: unknown, fields: readonly F[]) {
   if (!changes || typeof changes !== "object" || Array.isArray(changes)) return [];
   const record = changes as Record<string, { from?: unknown; to?: unknown } | undefined>;
-  return fields
-    .filter((field) => record[field])
-    .map((field) => ({
-      field,
-      from: record[field]?.from ?? null,
-      to: record[field]?.to ?? null,
-    }));
+  return (
+    fields
+      .filter((field) => record[field])
+      .map((field) => ({
+        field,
+        from: record[field]?.from ?? null,
+        to: record[field]?.to ?? null,
+      }))
+      // No cadastro, campo ainda vazio chega como `undefined → null`: não é alteração.
+      .filter((change) => change.from !== change.to)
+  );
 }
 
 export async function listAuditFieldHistory<F extends string>(

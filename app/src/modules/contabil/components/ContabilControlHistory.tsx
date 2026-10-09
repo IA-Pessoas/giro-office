@@ -4,9 +4,9 @@ import { useContabilControlHistory } from "../hooks";
 import type { ContabilCompetence } from "../types";
 import { getContabilControlFieldLabel } from "./contabilControlFields";
 import {
-  CONTABIL_CONTROL_HISTORY_PAGE_SIZE,
+  CONTABIL_HISTORY_PAGE_SIZE,
   formatContabilControlHistoryValue,
-} from "./contabilControlHistory.helpers";
+} from "./contabilHistory.helpers";
 import { ContabilHistoryPanel } from "./ContabilHistoryPanel";
 
 interface ContabilControlHistoryProps {
@@ -25,7 +25,7 @@ export function ContabilControlHistory({
     clientId,
     competence,
     page,
-    pageSize: CONTABIL_CONTROL_HISTORY_PAGE_SIZE,
+    pageSize: CONTABIL_HISTORY_PAGE_SIZE,
   });
 
   return (
@@ -35,7 +35,7 @@ export function ContabilControlHistory({
       emptyMessage="Nenhuma alteração registrada nesta competência."
       query={historyQuery}
       page={page}
-      pageSize={CONTABIL_CONTROL_HISTORY_PAGE_SIZE}
+      pageSize={CONTABIL_HISTORY_PAGE_SIZE}
       onPageChange={setPage}
       formatField={getContabilControlFieldLabel}
       formatValue={formatContabilControlHistoryValue}

@@ -1,6 +1,7 @@
 // Histórico da Relação Contábil (#1723): campos do relacionamento do cliente, inclusive os
 // estados de licitação e plano de contas.
 import {
+  AUDIT_CREATE_ACTION,
   AUDIT_UPDATE_ACTION,
   type AuditHistoryPage,
   type AuditHistoryPrisma,
@@ -42,7 +43,8 @@ export async function listRelationshipHistory(
       organizationId: input.organizationId,
       referring: RELATIONSHIP_AUDIT_REFERRING,
       referringId: relationship.id,
-      actions: [AUDIT_UPDATE_ACTION],
+      // Cadastro grava os valores iniciais como `null → valor` (#1723).
+      actions: [AUDIT_CREATE_ACTION, AUDIT_UPDATE_ACTION],
       fields: RELATIONSHIP_HISTORY_FIELDS,
       page: input.page,
       pageSize: input.pageSize,

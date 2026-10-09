@@ -1,4 +1,4 @@
-export const CONTABIL_CONTROL_HISTORY_PAGE_SIZE = 20;
+export const CONTABIL_HISTORY_PAGE_SIZE = 20;
 
 export function formatContabilControlHistoryValue(field: string, value: unknown) {
   if (field === "notes") {
@@ -9,6 +9,6 @@ export function formatContabilControlHistoryValue(field: string, value: unknown)
   return "—";
 }
 
-export function getContabilControlHistoryPageCount(total: number, pageSize: number) {
+export function getContabilHistoryPageCount(total: number, pageSize: number) {
   return Math.max(1, Math.ceil(total / pageSize));
 }

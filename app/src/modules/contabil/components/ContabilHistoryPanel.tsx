@@ -5,7 +5,7 @@ import { formatDateTime } from "@shared/utils/dateFormat";
 
 import { getContabilErrorMessage } from "../services";
 import type { ContabilHistoryEntry } from "../types";
-import { getContabilControlHistoryPageCount } from "./contabilControlHistory.helpers";
+import { getContabilHistoryPageCount } from "./contabilHistory.helpers";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { CONTABIL_OUTLINE_ACTION_CLASS } from "./contabilUiClasses";
 
@@ -34,7 +34,7 @@ export function ContabilHistoryPanel<F extends string>({
   formatValue,
 }: ContabilHistoryPanelProps<F>) {
   const history = query.data;
-  const pageCount = getContabilControlHistoryPageCount(history?.total ?? 0, pageSize);
+  const pageCount = getContabilHistoryPageCount(history?.total ?? 0, pageSize);
 
   return (
     <section

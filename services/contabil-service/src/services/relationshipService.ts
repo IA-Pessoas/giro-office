@@ -7,7 +7,7 @@ import {
   logUpdateIfChanged,
 } from "../integrations/audit.js";
 import prismaClient from "../integrations/prisma.js";
-import { AUDIT_UPDATE_ACTION } from "./auditHistoryService.js";
+import { AUDIT_CREATE_ACTION, AUDIT_UPDATE_ACTION } from "./auditHistoryService.js";
 import {
   listRelationshipHistory,
   RELATIONSHIP_AUDIT_REFERRING,
@@ -86,14 +86,16 @@ export class RelationshipService {
         },
       });
 
-      await this.audit.createLog({
+      // Diff contra objeto vazio: o histórico mostra os valores iniciais como `null → valor`.
+      await this.audit.logUpdateIfChanged({
         userId: auth.userId,
         organizationId: auth.organizationId,
         permission: auth.permission ?? null,
-        action: "Cadastro",
-        referring: "contabil.relationship",
+        action: AUDIT_CREATE_ACTION,
+        referring: RELATIONSHIP_AUDIT_REFERRING,
         referringId: relationship.id,
-        changes: "{}",
+        oldData: {},
+        updatedData: relationship as unknown as Record<string, unknown>,
       });
 
       return relationship;
