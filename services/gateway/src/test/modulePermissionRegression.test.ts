@@ -233,6 +233,19 @@ describe("matriz de regressão das políticas modulares", () => {
     expect(canAccessRoute(authContext({ permission: 0, modules: {} }), policy)).toBe(false);
   });
 
+  it("libera licitantes e histórico de licitação para quem lê clientes pelo Regularize", () => {
+    const regularizeReader = authContext({ modules: { regularize: 1 } });
+    const noModule = authContext({ modules: {} });
+    for (const path of [
+      "/client/licitacao/bidders",
+      "/client/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/licitacao/history",
+    ]) {
+      const policy = requiredRoutePolicy("GET", path);
+      expect(canAccessRoute(regularizeReader, policy), `Regularize 1: ${path}`).toBe(true);
+      expect(canAccessRoute(noModule, policy), `sem módulo: ${path}`).toBe(false);
+    }
+  });
+
   it("libera os grupos de empresas para Integração e Regularize, e só para eles", () => {
     const regularizeReader = authContext({ modules: { regularize: 1 } });
     const regularizeEditor = authContext({ modules: { regularize: 2 } });

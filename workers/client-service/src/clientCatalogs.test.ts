@@ -48,7 +48,11 @@ function setup(options: {
     },
     clientRegime: catalogDelegate(options.regimes ?? [], "regime-new"),
     clientSegment: catalogDelegate(options.segments ?? [], "segment-new"),
+    $transaction: vi.fn(),
   };
+  prisma.$transaction.mockImplementation(async (callback: (tx: unknown) => unknown) =>
+    callback(prisma),
+  );
   const events: ClientAuditEvent[] = [];
   const service = new ClientService(
     prisma as unknown as PrismaClient,

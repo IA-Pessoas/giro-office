@@ -4248,6 +4248,17 @@ const handlers = {
     });
   },
 
+  async clientLicitacaoBidders(op) {
+    await httpRequest(op, { expectedStatus: [200], path: "/client/licitacao/bidders" });
+  },
+
+  async clientLicitacaoHistory(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      path: `/client/${requireState("primaryClientId")}/licitacao/history`,
+    });
+  },
+
   async clientCoringaList(op) {
     await httpRequest(op, { expectedStatus: [200], query: { page: 1, limit: 5 } });
   },

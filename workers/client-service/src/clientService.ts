@@ -181,6 +181,15 @@ export type ClientWorkerService = {
     clientIds: readonly string[],
     authorization: ClientAuthorization,
   ) => Promise<unknown>;
+  listLicitacaoHistory: (
+    clientId: string,
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
+  listLicitacaoBidders: (
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ) => Promise<unknown>;
   runCompetenceOutputUpdate: () => Promise<unknown>;
   applyCommercialProjection: (event: Record<string, unknown>) => Promise<unknown>;
   reportingCatalog: () => Promise<unknown>;
@@ -206,7 +215,9 @@ type WorkerModelName =
   | "pA"
   | "clientCommercialProjectionEvent"
   | "clientRegime"
-  | "clientSegment";
+  | "clientSegment"
+  | "clientLicitacaoHistory"
+  | "user";
 
 type WorkerModelDelegate = {
   findUnique: (args: unknown) => Promise<ClientRow | null>;
@@ -270,6 +281,9 @@ const clientSelect = {
   regime: true,
   size: true,
   segment: true,
+  coringa_status: true,
+  tecnologia: true,
+  licitacao: true,
   start_strike: true,
   end_strike: true,
   cnae: true,
@@ -358,6 +372,48 @@ const paDetailSelect = {
     },
   },
 } as const;
+
+const regularizeSelect = {
+  id: true,
+  dominio_code: true,
+  name: true,
+  company_name: true,
+  fantasy_name: true,
+  cpf_cnpj: true,
+  cnae_secondary: true,
+  cnae: true,
+  responsible: true,
+  cpf_responsible: true,
+  address: true,
+  cep: true,
+  neighborhood: true,
+  state: true,
+  city: true,
+  customer_since: true,
+  municipal_registration: true,
+  state_registration: true,
+  commercial_board_registration: true,
+  status: true,
+  competence_entry: true,
+  competence_output: true,
+  opening_date: true,
+  regime: true,
+  size: true,
+  segment: true,
+  coringa_status: true,
+  tecnologia: true,
+  licitacao: true,
+  contabil: true,
+  fiscal: true,
+  pessoal: true,
+  infoproduto: true,
+  consultoria: true,
+  start_strike: true,
+  end_strike: true,
+  deletion_date: true,
+} as const;
+
+const LICITACAO_BIDDER_STATUSES = ["Ativo", "Processo de Inativação"] as const;
 
 const OPEN_TASK_STATUSES = ["A Realizar", "Em andamento", "Em Espera", "Pendente"] as const;
 const CLIENT_DOMAIN_MODULES = [
@@ -1533,46 +1589,30 @@ export class ClientService implements ClientWorkerService {
     }
     if (data.cpf_responsible !== undefined)
       data.cpf_responsible = cleanDocument(String(data.cpf_responsible));
+    // Não informado (null), Sim e Não são valores distintos; toda troca entra no histórico.
+    const previousLicitacao = existing.licitacao ?? null;
+    const nextLicitacao = data.licitacao === undefined ? undefined : (data.licitacao ?? null);
+    const licitacaoChanged = nextLicitacao !== undefined && nextLicitacao !== previousLicitacao;
+    if (licitacaoChanged) changes.licitacao = { from: previousLicitacao, to: nextLicitacao };
     try {
-      const row = await this.db.client.update({
-        where: { id: clientId },
-        data,
-        select: {
-          id: true,
-          dominio_code: true,
-          name: true,
-          company_name: true,
-          fantasy_name: true,
-          cpf_cnpj: true,
-          cnae_secondary: true,
-          cnae: true,
-          responsible: true,
-          cpf_responsible: true,
-          address: true,
-          cep: true,
-          neighborhood: true,
-          state: true,
-          city: true,
-          customer_since: true,
-          municipal_registration: true,
-          state_registration: true,
-          commercial_board_registration: true,
-          status: true,
-          competence_entry: true,
-          competence_output: true,
-          opening_date: true,
-          regime: true,
-          size: true,
-          segment: true,
-          contabil: true,
-          fiscal: true,
-          pessoal: true,
-          infoproduto: true,
-          consultoria: true,
-          start_strike: true,
-          end_strike: true,
-          deletion_date: true,
-        },
+      const row = await this.db.$transaction(async (transaction) => {
+        const updated = await transaction.client.update({
+          where: { id: clientId },
+          data,
+          select: regularizeSelect,
+        });
+        if (licitacaoChanged) {
+          await transaction.clientLicitacaoHistory.create({
+            data: {
+              organization_id: organizationId,
+              client_id: clientId,
+              previous_value: previousLicitacao,
+              new_value: nextLicitacao,
+              actor_user_id: userId,
+            },
+          });
+        }
+        return updated;
       });
       await this.auditClientChanges(clientId, organizationId, { userId }, changes);
       return row;
@@ -1582,6 +1622,58 @@ export class ClientService implements ClientWorkerService {
       }
       throw error;
     }
+  }
+
+  async listLicitacaoHistory(
+    clientId: string,
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientListPermission(authorization);
+    await this.ensureClient(clientId, organizationId);
+    const rows = await this.db.clientLicitacaoHistory.findMany({
+      where: { organization_id: organizationId, client_id: clientId },
+      orderBy: { created_at: "desc" },
+      select: {
+        id: true,
+        previous_value: true,
+        new_value: true,
+        actor_user_id: true,
+        created_at: true,
+      },
+    });
+    const actorIds = [...new Set(rows.map((row) => String(row.actor_user_id)))];
+    const actors = actorIds.length
+      ? await this.db.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const actorName = new Map(actors.map((actor) => [String(actor.id), actor.name]));
+    return rows.map((row) => ({
+      id: row.id,
+      previous_value: row.previous_value ?? null,
+      new_value: row.new_value ?? null,
+      created_at: serialize(row.created_at),
+      actor: { id: row.actor_user_id, name: actorName.get(String(row.actor_user_id)) ?? null },
+    }));
+  }
+
+  // Lista de licitantes do legado: só "Sim" entre ativos ou em inativação da organização.
+  async listLicitacaoBidders(
+    organizationId: string,
+    authorization: ClientAuthorization,
+  ): Promise<unknown> {
+    requireClientListPermission(authorization);
+    return this.db.client.findMany({
+      where: {
+        organization_id: organizationId,
+        licitacao: true,
+        status: { in: [...LICITACAO_BIDDER_STATUSES] },
+      },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, company_name: true, cpf_cnpj: true, status: true },
+    });
   }
 
   async runCompetenceOutputUpdate(): Promise<unknown> {

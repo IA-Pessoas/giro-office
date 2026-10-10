@@ -174,6 +174,8 @@ const exactRoutePolicies = new Map<string, AuthPolicy>([
   // Ficha e Regularize leem o catálogo; criar e renomear seguem exigindo Integração.
   ["GET /client/regimes", clientListPolicy],
   ["GET /client/segments", clientListPolicy],
+  // Lista de licitantes do Regularize (#1743).
+  ["GET /client/licitacao/bidders", clientListPolicy],
   ["GET /user/me", authenticatedPolicy],
   ["GET /rh/notifications", rhModulePolicy],
   ["PUT /rh/notifications/read", rhModulePolicy],
@@ -199,6 +201,8 @@ const routePolicyMatchers: Array<{
   path: RegExp;
   policy: AuthPolicy;
 }> = [
+  // Histórico de licitação lido na ficha Regularize (#1743).
+  { method: "GET", path: /^\/client\/[^/]+\/licitacao\/history\/?$/, policy: clientListPolicy },
   { method: "GET", path: clientGroupsPath, policy: clientGroupsReadPolicy },
   { method: "ANY", path: clientGroupsPath, policy: clientGroupsEditPolicy },
   { method: "GET", path: integracaoClientPath, policy: integracaoClientPolicy },
