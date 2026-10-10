@@ -227,6 +227,14 @@ export const operations = [
   },
   {
     service: "triagem-service",
+    method: "GET",
+    path: "/triagem/solicitations/indicators",
+    action: "triagemSolicitationIndicators",
+    target: "gateway",
+    auth: "bearer",
+  },
+  {
+    service: "triagem-service",
     method: "PATCH",
     path: "/triagem/solicitations/{id}/close",
     action: "triagemSolicitationClose",

@@ -1311,6 +1311,11 @@ const EXPLICIT_RULES: ExplicitRule[] = [
   },
   {
     methods: ["GET"],
+    pattern: /^\/triagem\/solicitations\/indicators\/?$/,
+    description: { action: "consultou", item: "os indicadores das solicitações da Triagem" },
+  },
+  {
+    methods: ["GET"],
     pattern: /^\/triagem\/solicitations\/[^/]+\/?$/,
     description: { action: "consultou", item: "uma solicitação da Triagem" },
   },

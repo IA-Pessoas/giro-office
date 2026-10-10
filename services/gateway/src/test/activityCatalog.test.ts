@@ -134,6 +134,12 @@ describe("activityCatalog", () => {
     ["GET", "/triagem/solicitations", "consultou", "as solicitações da Triagem"],
     ["POST", "/triagem/solicitations", "cadastrou", "uma solicitação da Triagem"],
     ["GET", "/triagem/solicitations/request-1", "consultou", "uma solicitação da Triagem"],
+    [
+      "GET",
+      "/triagem/solicitations/indicators",
+      "consultou",
+      "os indicadores das solicitações da Triagem",
+    ],
     ["PATCH", "/triagem/solicitations/request-1/close", "fechou", "uma solicitação da Triagem"],
     [
       "GET",

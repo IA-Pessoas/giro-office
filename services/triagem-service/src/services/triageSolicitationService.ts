@@ -98,6 +98,22 @@ export interface ListTriageSolicitationInput {
 
 export type TriageSolicitationDto = Omit<SolicitationRecord, "organization_id">;
 
+type UserRef = { id: string; name: string; full_name: string | null };
+
+export interface TriageSolicitationIndicatorsInput {
+  competence: string;
+  status?: "OPEN" | "CLOSED";
+}
+
+export interface TriageSolicitationIndicatorsDto {
+  competence: string;
+  notes_by_responsible: Array<
+    TriageNoteCountsInput & { user: UserRef; clients: number; total: number }
+  >;
+  solicitations_by_requester: Array<{ user: UserRef; total: number }>;
+  totals: { solicitations: number; clients: number; notes: number };
+}
+
 export const TRIAGE_SOLICITATION_CATEGORY_KIND = "REQUEST_CATEGORY";
 const ADMIN_LEVEL = 3;
 
@@ -292,6 +308,90 @@ export class TriageSolicitationService {
       });
     });
     return { client_id, competence, ...saved };
+  }
+
+  // Notas por responsável e pedidos por solicitante na competência. Cada cliente entra uma
+  // vez por responsável (e uma vez no total), então pedidos repetidos não multiplicam notas.
+  async indicators(
+    input: TriageSolicitationIndicatorsInput,
+    auth: TriageSolicitationAuthContext,
+  ): Promise<TriageSolicitationIndicatorsDto> {
+    requireLevel(auth, 1);
+    const userSelect = { select: { id: true, name: true, full_name: true } } as const;
+    const solicitations = await this.withOrganization(auth, (transaction) =>
+      transaction.triageSolicitation.findMany({
+        where: {
+          organization_id: auth.organizationId,
+          competence: input.competence,
+          ...(input.status ? { status: input.status } : {}),
+          ...(isAdmin(auth) ? {} : { responsible_id: auth.userId }),
+        },
+        select: { client_id: true, requester: userSelect, responsible: userSelect },
+      }),
+    );
+    const clientIds = [...new Set(solicitations.map((item) => item.client_id))];
+    const counts = clientIds.length
+      ? await this.withOrganization(auth, (transaction) =>
+          transaction.triageNoteCount.findMany({
+            where: {
+              organization_id: auth.organizationId,
+              competence: input.competence,
+              client_id: { in: clientIds },
+            },
+            select: {
+              client_id: true,
+              xml_inbound: true,
+              xml_outbound: true,
+              nfse_issued: true,
+              nfse_received: true,
+            },
+          }),
+        )
+      : [];
+    const countByClient = new Map(counts.map((count) => [count.client_id, count]));
+
+    const responsibles = new Map<string, { user: UserRef; clients: Set<string> }>();
+    const requesters = new Map<string, { user: UserRef; total: number }>();
+    for (const item of solicitations) {
+      const responsible = responsibles.get(item.responsible.id) ?? {
+        user: item.responsible,
+        clients: new Set<string>(),
+      };
+      responsible.clients.add(item.client_id);
+      responsibles.set(item.responsible.id, responsible);
+      const requester = requesters.get(item.requester.id) ?? { user: item.requester, total: 0 };
+      requester.total += 1;
+      requesters.set(item.requester.id, requester);
+    }
+
+    const sumNotes = (ids: Iterable<string>) => {
+      const sum = { xml_inbound: 0, xml_outbound: 0, nfse_issued: 0, nfse_received: 0 };
+      for (const id of ids) {
+        const count = countByClient.get(id);
+        if (!count) continue;
+        sum.xml_inbound += count.xml_inbound;
+        sum.xml_outbound += count.xml_outbound;
+        sum.nfse_issued += count.nfse_issued;
+        sum.nfse_received += count.nfse_received;
+      }
+      return {
+        ...sum,
+        total: sum.xml_inbound + sum.xml_outbound + sum.nfse_issued + sum.nfse_received,
+      };
+    };
+
+    return {
+      competence: input.competence,
+      notes_by_responsible: [...responsibles.values()]
+        .map(({ user, clients }) => ({ user, clients: clients.size, ...sumNotes(clients) }))
+        .sort((a, b) => b.total - a.total),
+      solicitations_by_requester: [...requesters.values()].sort((a, b) => b.total - a.total),
+      totals: {
+        solicitations: solicitations.length,
+        clients: clientIds.length,
+        notes: sumNotes(clientIds).total,
+      },
+    };
   }
 
   // Pedido de outro responsável responde 404 ao operador comum, como se não existisse.

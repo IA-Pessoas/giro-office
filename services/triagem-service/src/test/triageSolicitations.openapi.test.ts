@@ -22,6 +22,8 @@ describe("contrato OpenAPI de solicitações da Triagem", () => {
     });
     expect(spec.components?.schemas).toHaveProperty("TriageSolicitation");
     expect(spec.components?.schemas).toHaveProperty("TriageNoteCounts");
+    expect(paths["/triagem/solicitations/indicators"]?.get).toBeDefined();
+    expect(spec.components?.schemas).toHaveProperty("TriageSolicitationIndicators");
     expect(JSON.stringify(spec)).toContain("REQUEST_CATEGORY");
   });
 });

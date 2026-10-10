@@ -263,6 +263,7 @@ describe("triagem Worker — solicitações", () => {
       close: vi.fn(async () => ({ id: ITEM_ID, status: "CLOSED" }) as never),
       getNoteCounts: vi.fn(async () => ({ xml_inbound: 0 }) as never),
       updateNoteCounts: vi.fn(async () => ({ xml_inbound: 3 }) as never),
+      indicators: vi.fn(async () => ({ totals: {} }) as never),
     };
     const app = createTriagemWorkerApp({ env: env(), solicitationService: solicitations });
     const body = {
@@ -312,6 +313,14 @@ describe("triagem Worker — solicitações", () => {
     expect([read.status, saved.status]).toEqual([200, 200]);
     expect(solicitations.getNoteCounts).toHaveBeenCalledWith(ITEM_ID, scope);
     expect(solicitations.updateNoteCounts).toHaveBeenCalledWith(ITEM_ID, counts, scope);
+
+    const indicators = await app.request(
+      "https://triagem.test/triagem/solicitations/indicators?competence=2026-09",
+      { headers: headers("1") },
+    );
+    expect(indicators.status).toBe(200);
+    expect(solicitations.indicators).toHaveBeenCalledWith({ competence: "2026-09" }, scope);
+    expect(solicitations.get).toHaveBeenCalledTimes(1);
   });
 });
 
