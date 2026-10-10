@@ -219,6 +219,25 @@ export const statementHistorySchema = z
   .refine((query) => !query.from || !query.to || query.from <= query.to, {
     message: "from deve ser anterior ou igual a to.",
   });
+// Referência externa: só http(s), para o link não virar `javascript:` na tela.
+const cloudLink = z
+  .string()
+  .trim()
+  .max(2_000)
+  .url("link inválido.")
+  .refine((value) => /^https?:\/\//iu.test(value), "link deve começar com http:// ou https://.");
+const cloudType = z.string().trim().min(1, "type é obrigatório.").max(100);
+export const cloudListSchema = z.object({ client_id: uuid("client_id") }).strict();
+export const cloudIdSchema = z.object({ id: uuid("id") }).strict();
+export const cloudCreateSchema = cloudListSchema
+  .extend({ type: cloudType, link: cloudLink })
+  .strict();
+export const cloudUpdateSchema = z
+  .object({ type: cloudType.optional(), link: cloudLink.optional() })
+  .strict()
+  .refine((body) => body.type !== undefined || body.link !== undefined, {
+    message: "Informe o tipo ou o link.",
+  });
 export const statementArchiveSchema = z
   .object({
     client_id: uuid("client_id"),

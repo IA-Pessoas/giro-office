@@ -45,6 +45,7 @@ export type ContabilPrisma = {
   triageConfig: Delegate;
   triageMonthly: Delegate;
   triageBankStatement: Delegate;
+  clientCloud: Delegate;
   triageResponsible: Delegate;
   triageCompetence: Delegate;
   triageCatalogItem: Delegate;
@@ -125,6 +126,9 @@ export type DocumentsService = {
   saveFiscalSettings(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   listStatements(input: JsonRecord, organizationId: string): Promise<unknown[]>;
   listStatementHistory(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  listClouds(input: JsonRecord, auth: AuthContext): Promise<unknown[]>;
+  createCloud(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
+  updateCloud(id: string, input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   upsertStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
   archiveStatement(input: JsonRecord, auth: AuthContext): Promise<JsonRecord>;
 };
@@ -928,6 +932,16 @@ async function canEdit(
   });
   if (!assigned)
     throw new ServiceError(403, "Permissão insuficiente para alterar pendências documentais.");
+}
+
+/** Dado do cliente compartilhado pelas rotinas: quem edita a Contábil ou a Fiscal altera. */
+async function canEditEitherRoutine(prisma: ContabilPrisma, clientId: string, auth: AuthContext) {
+  try {
+    await canEdit(prisma, clientId, auth, "CONTABIL");
+  } catch (error) {
+    if (!(error instanceof ServiceError) || error.statusCode !== 403) throw error;
+    await canEdit(prisma, clientId, auth, "FISCAL");
+  }
 }
 
 function initialItems(value: unknown): JsonRecord {
@@ -1803,6 +1817,62 @@ export function createDocumentsService(
           statements,
         })),
       };
+    },
+    async listClouds(input, auth) {
+      const clientId = String(input.client_id);
+      await assertClientInOrganization(prisma, clientId, auth.organizationId);
+      return prisma.clientCloud.findMany({
+        where: { organization_id: auth.organizationId, client_id: clientId },
+        select: { id: true, client_id: true, type: true, link: true, updated_at: true },
+        orderBy: [{ created_at: "asc" }, { id: "asc" }],
+      });
+    },
+    async createCloud(input, auth) {
+      const clientId = String(input.client_id);
+      await assertClientInOrganization(prisma, clientId, auth.organizationId);
+      await canEditEitherRoutine(prisma, clientId, auth);
+      // Só a referência (tipo e link): sem upload nem sincronização com o provedor.
+      const cloud = await prisma.clientCloud.create({
+        data: {
+          organization_id: auth.organizationId,
+          client_id: clientId,
+          type: String(input.type),
+          link: String(input.link),
+        },
+      });
+      await auditCreate(
+        audit,
+        auth,
+        "clientes.clouds",
+        String(cloud.id),
+        "Cadastrar nuvem do cliente",
+      );
+      return cloud;
+    },
+    async updateCloud(id, input, auth) {
+      const current = await prisma.clientCloud.findFirst({
+        where: { id, organization_id: auth.organizationId },
+      });
+      if (!current) throw new ServiceError(404, "Nuvem do cliente não encontrada.");
+      await canEditEitherRoutine(prisma, String(current.client_id), auth);
+      const updated = await prisma.clientCloud.update({
+        where: { id },
+        data: {
+          ...(typeof input.type === "string" ? { type: input.type } : {}),
+          ...(typeof input.link === "string" ? { link: input.link } : {}),
+        },
+      });
+      await audit.logUpdateIfChanged({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Atualizar nuvem do cliente",
+        referring: "clientes.clouds",
+        referringId: id,
+        oldData: current,
+        updatedData: updated,
+      });
+      return updated;
     },
     async upsertStatement(input, auth) {
       if (!validStatus(input.status))
