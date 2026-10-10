@@ -19,12 +19,21 @@ export function useTriageSolicitations(status: TriageSolicitationStatus) {
   );
 }
 
+export function triagemSolicitationIndicatorsQueryKey(
+  competence?: string,
+  status?: TriageSolicitationStatus,
+) {
+  return competence
+    ? (["triagem", "solicitations", "indicators", competence, status ?? "all"] as const)
+    : (["triagem", "solicitations", "indicators"] as const);
+}
+
 export function useTriageSolicitationIndicators(
   competence: string,
   status?: TriageSolicitationStatus,
 ) {
   return useFetch(
-    ["triagem", "solicitations", "indicators", competence, status ?? "all"],
+    triagemSolicitationIndicatorsQueryKey(competence, status),
     () => triagemSolicitationService.indicators(competence, status),
     { enabled: Boolean(competence) },
   );
@@ -47,7 +56,7 @@ export function useTriageNoteCounts(solicitation: TriageSolicitation) {
       triagemSolicitationService.updateNoteCounts(solicitation.id, input),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKey, data);
-      return queryClient.invalidateQueries({ queryKey: ["triagem", "solicitations", "indicators"] });
+      return queryClient.invalidateQueries({ queryKey: triagemSolicitationIndicatorsQueryKey() });
     },
   });
   return { query, update };

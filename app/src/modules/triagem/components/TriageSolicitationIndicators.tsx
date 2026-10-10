@@ -5,11 +5,8 @@ import { getContabilErrorMessage, getCurrentContabilCompetence } from "@modules/
 
 import { useTriageSolicitationIndicators } from "../hooks";
 import type { TriageSolicitationStatus } from "../services";
+import { triageUserLabel as userLabel } from "./triagem.helpers";
 import { TRIAGE_FIELD_CLASSNAME } from "./triagem.styles";
-
-function userLabel(user: { name: string | null; full_name: string | null }): string {
-  return user.name || user.full_name || "Não identificado";
-}
 
 function BarList({
   title,
@@ -99,6 +96,11 @@ export function TriageSolicitationIndicators({ status }: { status: TriageSolicit
           Não foi possível carregar os indicadores. {getContabilErrorMessage(query.error)}
         </p>
       ) : data ? (
+        <>
+        <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+          Cliente atendido por mais de um responsável conta para cada um; por isso a soma das
+          barras pode passar do total de notas.
+        </p>
         <div className="mt-3 grid gap-4 md:grid-cols-2">
           <BarList
             title="Notas por responsável"
@@ -120,6 +122,7 @@ export function TriageSolicitationIndicators({ status }: { status: TriageSolicit
             }))}
           />
         </div>
+        </>
       ) : null}
     </section>
   );

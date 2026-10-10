@@ -10,6 +10,7 @@ import { useTriageCatalogs, useTriageSolicitationMutations, useTriageSolicitatio
 import type { TriageSolicitation, TriageSolicitationStatus } from "../services";
 import { TriageSolicitationDetail } from "./TriageSolicitationDetail";
 import { TriageSolicitationIndicators } from "./TriageSolicitationIndicators";
+import { triageUserLabel as userLabel } from "./triagem.helpers";
 
 import {
   TRIAGE_BUTTON_CLASSNAME as BUTTON_CLASSNAME,
@@ -22,9 +23,6 @@ const TABS: Array<{ value: TriageSolicitationStatus; label: string }> = [
   { value: "CLOSED", label: "Fechadas" },
 ];
 
-function userLabel(user: { name: string | null; full_name: string | null } | null): string {
-  return user?.name || user?.full_name || "Não identificado";
-}
 
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("pt-BR");
