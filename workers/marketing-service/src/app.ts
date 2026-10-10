@@ -40,6 +40,7 @@ import {
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { createMarketingWorkerAudit } from "./audit.js";
 import { authenticateMarketingRequest, requireMarketingPermission } from "./auth.js";
 import type { MarketingWorkerEnv } from "./env.js";
 import { PrismaClient } from "./prisma.js";
@@ -47,11 +48,12 @@ import { PrismaClient } from "./prisma.js";
 /** Os serviços do marketing-service Node, montados como no `app.ts` dele. */
 export function createMarketingServices(prisma: unknown, env: MarketingWorkerEnv) {
   const db = prisma as never;
+  const audit = createMarketingWorkerAudit(env);
   return {
     dashboard: new MarketingDashboardService(db),
     controls: new MarketingAiUsageControlService(db),
-    events: new MarketingEventsService(db),
-    editions: new MarketingEventEditionsService(db),
+    events: new MarketingEventsService(db, audit),
+    editions: new MarketingEventEditionsService(db, audit),
     passwords: () => {
       if (!env.MTK_ENCRYPTION_KEY) {
         throw new ServiceError(503, "Credenciais de Marketing indisponíveis no momento.");
@@ -245,7 +247,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     "/marketing/events",
     handle(EDITOR, async (c, s, org) => {
       const body = parseWithZod(createMarketingEventBodySchema, await readJson(c));
-      return ok(c, await s.events.createEvent(org, body), 201);
+      return ok(c, await s.events.createEvent(org, body, c.get("auth").userId), 201);
     }),
   );
   app.put(
@@ -253,7 +255,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { id } = parseWithZod(marketingEventIdParamsSchema, c.req.param());
       const body = parseWithZod(updateMarketingEventBodySchema, await readJson(c));
-      const event = await s.events.updateEvent(org, id, body);
+      const event = await s.events.updateEvent(org, id, body, c.get("auth").userId);
       if (!event) throw new ServiceError(404, "Evento não encontrado.");
       return ok(c, event);
     }),
@@ -270,7 +272,7 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
     handle(EDITOR, async (c, s, org) => {
       const { eventId } = parseWithZod(marketingEventEditionParamsSchema, c.req.param());
       const body = parseWithZod(marketingEventEditionBodySchema, await readJson(c));
-      return ok(c, await s.editions.createEdition(org, eventId, body), 201);
+      return ok(c, await s.editions.createEdition(org, eventId, body, c.get("auth").userId), 201);
     }),
   );
   app.put(
@@ -281,7 +283,13 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
         c.req.param(),
       );
       const body = parseWithZod(marketingEventEditionBodySchema, await readJson(c));
-      const edition = await s.editions.updateEdition(org, eventId, editionId, body);
+      const edition = await s.editions.updateEdition(
+        org,
+        eventId,
+        editionId,
+        body,
+        c.get("auth").userId,
+      );
       if (!edition) throw new ServiceError(404, "Edição não encontrada.");
       return ok(c, edition);
     }),
@@ -294,7 +302,11 @@ export function createMarketingWorkerApp(options: MarketingWorkerOptions = {}) {
         c.req.param(),
       );
       const body = parseWithZod(marketingEventEditionFeedbackBodySchema, await readJson(c));
-      return ok(c, await s.editions.createEditionFeedback(org, eventId, editionId, body), 201);
+      return ok(
+        c,
+        await s.editions.createEditionFeedback(org, eventId, editionId, body, c.get("auth").userId),
+        201,
+      );
     }),
   );
   app.get(

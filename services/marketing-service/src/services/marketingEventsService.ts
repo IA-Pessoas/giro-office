@@ -1,5 +1,6 @@
 import { error as logError, ServiceError } from "@workspace/shared";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { changedFields, type MarketingAudit } from "../integrations/audit.js";
 import type { MarketingEvent, MarketingEventsProvider } from "../routes/marketingEvents.routes.js";
 import type {
   CreateMarketingEventInput,
@@ -73,8 +74,13 @@ function duplicateNameError(error: unknown): never {
   throw error;
 }
 
+const EVENT_REFERRING = "marketing.events";
+
 export class MarketingEventsService implements MarketingEventsProvider {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly audit: MarketingAudit,
+  ) {}
 
   async listEvents(organizationId: string): Promise<MarketingEvent[]> {
     const records = await this.prisma.marketingEvent.findMany({
@@ -88,23 +94,37 @@ export class MarketingEventsService implements MarketingEventsProvider {
   async createEvent(
     organizationId: string,
     input: CreateMarketingEventInput,
+    actorUserId: string,
   ): Promise<MarketingEvent> {
     const name = input.name;
     try {
-      const record = await this.prisma.marketingEvent.create({
-        data: {
-          organization_id: organizationId,
-          name,
-          name_key: nameKey(name),
-          logo: input.logo,
-          status: DEFAULT_MARKETING_EVENT_STATUS,
-          priority: input.priority,
-          objective: input.objective,
-          audience: input.audience,
-        },
-        select: marketingEventSelect,
+      return await this.prisma.$transaction(async (tx) => {
+        const event = mapMarketingEvent(
+          await tx.marketingEvent.create({
+            data: {
+              organization_id: organizationId,
+              name,
+              name_key: nameKey(name),
+              logo: input.logo,
+              status: DEFAULT_MARKETING_EVENT_STATUS,
+              priority: input.priority,
+              objective: input.objective,
+              audience: input.audience,
+            },
+            select: marketingEventSelect,
+          }),
+        );
+        const { id, ...created } = event;
+        await this.audit({
+          organizationId,
+          userId: actorUserId,
+          action: "Cadastro",
+          referring: EVENT_REFERRING,
+          referringId: id,
+          changes: changedFields({}, created),
+        });
+        return event;
       });
-      return mapMarketingEvent(record);
     } catch (error: unknown) {
       logError("Falha ao criar evento de Marketing.", { err: error });
       return duplicateNameError(error);
@@ -115,6 +135,7 @@ export class MarketingEventsService implements MarketingEventsProvider {
     organizationId: string,
     eventId: string,
     input: UpdateMarketingEventInput,
+    actorUserId: string,
   ): Promise<MarketingEvent | null> {
     const data = {
       ...input,
@@ -122,12 +143,32 @@ export class MarketingEventsService implements MarketingEventsProvider {
     };
 
     try {
-      const record = await this.prisma.marketingEvent.update({
-        where: { id: eventId, organization_id: organizationId },
-        data,
-        select: marketingEventSelect,
+      return await this.prisma.$transaction(async (tx) => {
+        const before = await tx.marketingEvent.findFirst({
+          where: { id: eventId, organization_id: organizationId },
+          select: marketingEventSelect,
+        });
+        if (!before) return null;
+        const event = mapMarketingEvent(
+          await tx.marketingEvent.update({
+            where: { id: eventId, organization_id: organizationId },
+            data,
+            select: marketingEventSelect,
+          }),
+        );
+        const changes = changedFields(before, event);
+        if (Object.keys(changes).length > 0) {
+          await this.audit({
+            organizationId,
+            userId: actorUserId,
+            action: "Edição",
+            referring: EVENT_REFERRING,
+            referringId: eventId,
+            changes,
+          });
+        }
+        return event;
       });
-      return mapMarketingEvent(record);
     } catch (error: unknown) {
       logError("Falha ao atualizar evento de Marketing.", { err: error });
       if (hasPrismaCode(error, "P2025")) return null;

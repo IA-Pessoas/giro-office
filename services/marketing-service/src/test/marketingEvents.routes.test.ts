@@ -152,13 +152,17 @@ describe("Marketing events routes", () => {
 
     expect(response.status).toBe(201);
     expect(response.body).toEqual({ success: true, data: event });
-    expect(service.createEvent).toHaveBeenCalledWith(organizationId, {
-      name: "Workshop",
-      logo: "",
-      priority: "Média",
-      objective: "",
-      audience: "",
-    });
+    expect(service.createEvent).toHaveBeenCalledWith(
+      organizationId,
+      {
+        name: "Workshop",
+        logo: "",
+        priority: "Média",
+        objective: "",
+        audience: "",
+      },
+      userId,
+    );
   });
 
   it("rejects a client-provided status during creation", async () => {
@@ -215,8 +219,13 @@ describe("Marketing events routes", () => {
       .send({ name: "Workshop atualizado" });
 
     expect(response.status).toBe(404);
-    expect(service.updateEvent).toHaveBeenCalledWith(organizationId, eventId, {
-      name: "Workshop atualizado",
-    });
+    expect(service.updateEvent).toHaveBeenCalledWith(
+      organizationId,
+      eventId,
+      {
+        name: "Workshop atualizado",
+      },
+      userId,
+    );
   });
 });
