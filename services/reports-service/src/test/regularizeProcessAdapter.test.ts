@@ -61,10 +61,8 @@ describe("RegularizeProcessAdapter", () => {
       "client_name",
       "description",
       "observation",
-      "financial_status",
       "responsible1_name",
-      "responsible2_name",
-      "responsible3_name",
+      "responsible_names",
       "entry_month",
       "completion_month",
     ]);

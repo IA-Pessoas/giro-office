@@ -52,10 +52,9 @@ export const regularizeProcessReportingCatalog = {
         field("client_name", "Cliente", "string", stringOperators),
         field("description", "Descrição", "string", stringOperators),
         field("observation", "Observação", "string", stringOperators),
-        field("financial_status", "Situação financeira", "string", stringOperators),
         field("responsible1_name", "Responsável principal", "string", stringOperators),
-        field("responsible2_name", "Responsável secundário", "string", stringOperators),
-        field("responsible3_name", "Responsável terciário", "string", stringOperators),
+        // Os três responsáveis em um texto só: "contém" acha a pessoa em qualquer posição.
+        field("responsible_names", "Responsáveis", "string", stringOperators),
         // Mês no formato AAAA-MM, para agrupar e filtrar por mês como no legado.
         field("entry_month", "Mês de entrada", "string", stringOperators),
         field("completion_month", "Mês de conclusão", "string", stringOperators),

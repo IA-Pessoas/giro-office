@@ -78,17 +78,20 @@ describe("Regularize process reporting service", () => {
     });
   });
 
-  it("monta o relatório de travamentos com cliente, responsável e mês", async () => {
+  it("monta o relatório de travamentos com cliente, responsáveis e mês", async () => {
+    const organization_id = "10000000-0000-4000-8000-000000000001";
     const findMany = vi.fn().mockResolvedValue([
       {
         id: "p1",
         description: "Aguardando documento do cliente",
         status: "Aberto",
-        locking_type: "Cliente",
+        locking_type: "Diretoria",
         entry_date: new Date("2026-03-10T00:00:00.000Z"),
-        clientPJ: { name: "Alfa", company_name: "Alfa Ltda" },
+        clientPJ: { name: "Alfa", company_name: "", organization_id },
         clientPF: null,
-        responsible1: { name: "Bruna" },
+        responsible1: { name: "Bruna", organization_id },
+        responsible2: null,
+        responsible3: { name: "Davi", organization_id },
       },
       {
         id: "p2",
@@ -97,8 +100,83 @@ describe("Regularize process reporting service", () => {
         locking_type: "  ",
         entry_date: null,
         clientPJ: null,
-        clientPF: { name: "Caio" },
+        clientPF: { name: "Caio", organization_id },
         responsible1: null,
+        responsible2: null,
+        responsible3: null,
+      },
+    ]);
+    const service = new RegularizeLicenseReportingService({
+      license: { findMany: vi.fn() },
+      process: { findMany },
+    });
+
+    await expect(
+      service.extract({
+        organizationId: organization_id,
+        source: "regularize.processes",
+        fields: [
+          "client_name",
+          "description",
+          "status",
+          "locking_type",
+          "locked",
+          "entry_month",
+          "responsible1_name",
+          "responsible_names",
+        ],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [
+        {
+          client_name: "Alfa",
+          description: "Aguardando documento do cliente",
+          status: "Andamento",
+          locking_type: "Diretoria",
+          locked: true,
+          entry_month: "2026-03",
+          responsible1_name: "Bruna",
+          responsible_names: "Bruna, Davi",
+        },
+        {
+          client_name: "Caio",
+          description: "",
+          status: "Protocolado",
+          locking_type: null,
+          locked: false,
+          entry_month: null,
+          responsible1_name: null,
+          responsible_names: null,
+        },
+      ],
+      reachedLimit: false,
+    });
+    const related = { select: { name: true, organization_id: true } };
+    expect(findMany.mock.calls[0]?.[0].select).toEqual({
+      id: true,
+      description: true,
+      status: true,
+      locking_type: true,
+      entry_date: true,
+      clientPJ: { select: { name: true, company_name: true, organization_id: true } },
+      clientPF: related,
+      responsible1: related,
+      responsible2: related,
+      responsible3: related,
+    });
+  });
+
+  it("não mostra cliente nem responsável de outra organização", async () => {
+    const foreign = "20000000-0000-4000-8000-000000000002";
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "p1",
+        clientPJ: { name: "Alheia", company_name: "Alheia Ltda", organization_id: foreign },
+        clientPF: null,
+        responsible1: { name: "Estranho", organization_id: foreign },
+        responsible2: null,
+        responsible3: null,
       },
     ]);
     const service = new RegularizeLicenseReportingService({
@@ -110,49 +188,40 @@ describe("Regularize process reporting service", () => {
       service.extract({
         organizationId: "10000000-0000-4000-8000-000000000001",
         source: "regularize.processes",
-        fields: [
-          "client_name",
-          "description",
-          "status",
-          "locking_type",
-          "locked",
-          "entry_month",
-          "responsible1_name",
-        ],
+        fields: ["client_name", "responsible1_name", "responsible_names"],
+        limit: 10,
+      }),
+    ).resolves.toEqual({
+      rows: [{ client_name: null, responsible1_name: null, responsible_names: null }],
+      reachedLimit: false,
+    });
+  });
+
+  it("lê a data de notificação migrada do legado como travamento por cliente", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      { id: "p1", locking_type: "2024-05-10" },
+      { id: "p2", locking_type: "0000-00-00" },
+      { id: "p3", locking_type: "Financeiro" },
+    ]);
+    const service = new RegularizeLicenseReportingService({
+      license: { findMany: vi.fn() },
+      process: { findMany },
+    });
+
+    await expect(
+      service.extract({
+        organizationId: "10000000-0000-4000-8000-000000000001",
+        source: "regularize.processes",
+        fields: ["locking_type", "locked"],
         limit: 10,
       }),
     ).resolves.toEqual({
       rows: [
-        {
-          client_name: "Alfa Ltda",
-          description: "Aguardando documento do cliente",
-          status: "Andamento",
-          locking_type: "Cliente",
-          locked: true,
-          entry_month: "2026-03",
-          responsible1_name: "Bruna",
-        },
-        {
-          client_name: "Caio",
-          description: "",
-          status: "Protocolado",
-          locking_type: null,
-          locked: false,
-          entry_month: null,
-          responsible1_name: null,
-        },
+        { locking_type: "Cliente", locked: true },
+        { locking_type: null, locked: false },
+        { locking_type: "Financeiro", locked: true },
       ],
       reachedLimit: false,
-    });
-    expect(findMany.mock.calls[0]?.[0].select).toEqual({
-      id: true,
-      description: true,
-      status: true,
-      locking_type: true,
-      entry_date: true,
-      clientPJ: { select: { name: true, company_name: true } },
-      clientPF: { select: { name: true } },
-      responsible1: { select: { name: true } },
     });
   });
 
@@ -199,6 +268,12 @@ describe("Regularize process reporting service", () => {
         aggregations: [{ field: "process_type", function: "count", alias: "total" }],
       }),
     ).resolves.toEqual({ rows: [{ total: 3 }], reachedLimit: false });
+    // Definição salva antes da normalização, com o alias legado, continua encontrando.
+    await expect(
+      extract({
+        filters: [{ field: "status", operator: "eq", parameter: "status", value: "Em andamento" }],
+      }),
+    ).resolves.toEqual({ rows: [{ process_type: "Baixa" }], reachedLimit: false });
     // Travados dentro da variante: só os que têm motivo de travamento.
     await expect(
       extract({
