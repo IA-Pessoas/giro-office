@@ -88,6 +88,7 @@ model Group {
   status          Boolean @default(true)
   organization_id String
   clients         ClientsGroup[]
+  savedMaps       RegularizeGroupSavedMap[]
 
   @@map("clients.group")
 }
@@ -101,6 +102,21 @@ model ClientsGroup {
   group           Group @relation(fields: [group_id], references: [id])
 
   @@map("clients.clientsGroup")
+}
+
+// Versão salva do mapa de um grupo (#1749). Uma versão por grupo.
+model RegularizeGroupSavedMap {
+  id                 String   @id @default(uuid())
+  organization_id    String
+  group_id           String
+  tree               Json
+  updated_by_user_id String
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  group              Group    @relation(fields: [group_id], references: [id])
+
+  @@unique([organization_id, group_id], map: "uq_regularize_group_map_group")
+  @@map("regularize.group_maps")
 }
 
 model ClientPF {

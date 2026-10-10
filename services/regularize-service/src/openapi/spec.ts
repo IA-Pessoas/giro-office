@@ -862,6 +862,29 @@ export function buildRegularizeServiceOpenApiSpec(
           responses: { "200": { description: "Mapa do grupo", ...successEnvelopeContent() } },
         },
       },
+      "/regularize/groups/{id}/map/saved": {
+        get: {
+          tags: ["Partners"],
+          summary: "Ler a versão salva do mapa de um grupo",
+          description: "Devolve a árvore como foi salva, ou null quando o grupo não tem versão.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: { "200": { description: "Versão salva", ...successEnvelopeContent() } },
+        },
+        put: {
+          tags: ["Partners"],
+          summary: "Salvar a versão editada do mapa de um grupo",
+          description:
+            "Substitui a versão do grupo pela árvore enviada (até 2.000 itens e 12 níveis). Gerar o mapa de novo não altera a versão salva.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: { "200": { description: "Versão salva", ...successEnvelopeContent() } },
+        },
+      },
       "/regularize/partner": {
         get: {
           tags: ["Partners"],

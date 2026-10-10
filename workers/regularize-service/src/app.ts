@@ -13,7 +13,10 @@ import {
   updateClientPfBodySchema,
 } from "@workspace/regularize-service/src/schemas/clientPf.schemas.js";
 import { regularizeDashboardQuerySchema } from "@workspace/regularize-service/src/schemas/dashboard.schemas.js";
-import { groupMapParamsSchema } from "@workspace/regularize-service/src/schemas/groupMap.schemas.js";
+import {
+  groupMapParamsSchema,
+  parseSaveGroupMapBody,
+} from "@workspace/regularize-service/src/schemas/groupMap.schemas.js";
 import {
   addGuidanceActivityBodySchema,
   addGuidancePartnerBodySchema,
@@ -152,7 +155,7 @@ export type RegularizePartnersService = Pick<
   PartnersService,
   "create" | "update" | "detail" | "list" | "remove"
 >;
-export type RegularizeGroupMapService = Pick<GroupMapService, "generate">;
+export type RegularizeGroupMapService = Pick<GroupMapService, "generate" | "getSaved" | "save">;
 export type RegularizePasswordService = Pick<
   PasswordService,
   "create" | "update" | "list" | "detail" | "createSite" | "updateSite" | "listSites" | "detailSite"
@@ -1003,6 +1006,36 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
       );
     }),
   );
+  app.get("/regularize/groups/:id/map/saved", async (c) =>
+    withGroupMapService(c, async (service) => {
+      const { id } = parseWithZod(groupMapParamsSchema, { id: c.req.param("id") });
+      return c.json(
+        createSuccessResponse(
+          await service.getSaved({ organizationId: c.get("auth").organizationId, groupId: id }),
+        ),
+      );
+    }),
+  );
+  app.put("/regularize/groups/:id/map/saved", async (c) => {
+    // Mesmo nível de escrita do Express (authorizeRegularize): salvar o mapa exige nível 2.
+    if (Number(c.get("auth").claims.permission ?? 0) < 2) {
+      throw new ServiceError(403, "Permissão insuficiente para salvar o mapa do grupo.");
+    }
+    return withGroupMapService(c, async (service) => {
+      const { id } = parseWithZod(groupMapParamsSchema, { id: c.req.param("id") });
+      const { tree } = parseSaveGroupMapBody(await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.save({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            groupId: id,
+            tree,
+          }),
+        ),
+      );
+    });
+  });
   app.delete("/regularize/partners/:id", async (c) =>
     withPartnersService(c, async (service) => {
       const { id } = parseWithZod(partnerIdParamsSchema, { id: c.req.param("id") });

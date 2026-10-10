@@ -48,6 +48,7 @@ Exemplos de paths publicos:
   - aceita `status`, `search`, `page` e `limit`; retorna uma página com `data`, `total` e `hasMore`.
 - `/regularize/partners`
 - `/regularize/groups/:id/map` - mapa gerado do grupo: cidade, sócio e empresas com vínculo societário vigente
+- `/regularize/groups/:id/map/saved` - lê (GET) ou substitui (PUT) a versão editada do mapa do grupo; gerar de novo não a altera
 - `/regularize/municipal-taxes`
 - `/regularize/process`
 - `/regularize/processes`

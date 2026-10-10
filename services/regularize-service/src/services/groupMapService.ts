@@ -1,7 +1,9 @@
 import { ServiceError } from "@workspace/shared";
 
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import type { GroupMapTreeNode } from "../schemas/groupMap.schemas.js";
 import { currentPartnerBondWhere } from "./partnersService.js";
+import { RegularizeLogService } from "./regularizeLogService.js";
 
 // Mapa gerado de grupo (#1748), como o regularize/pages/mapas/mapa.php do legado (?grupo=id):
 // grupo → cidade das empresas do grupo → sócios dessas empresas → empresas de cada sócio com
@@ -76,15 +78,35 @@ function toCompany(company: CompanyRow): GroupMapCompany {
   };
 }
 
+export type GroupSavedMap = {
+  tree: GroupMapTreeNode;
+  updated_at: Date;
+  updated_by_user_id: string;
+};
+
+const savedMapSelect = {
+  id: true,
+  tree: true,
+  updated_at: true,
+  updated_by_user_id: true,
+} as const;
+
+function toSavedMap(
+  saved: Prisma.RegularizeGroupSavedMapGetPayload<{ select: typeof savedMapSelect }>,
+): GroupSavedMap {
+  return {
+    // Só entra no banco pela validação de save().
+    tree: saved.tree as unknown as GroupMapTreeNode,
+    updated_at: saved.updated_at,
+    updated_by_user_id: saved.updated_by_user_id,
+  };
+}
+
 export class GroupMapService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async generate(input: { organizationId: string; groupId: string }): Promise<GroupMap> {
-    const group = await this.prisma.group.findFirst({
-      where: { id: input.groupId, organization_id: input.organizationId },
-      select: { id: true, name: true },
-    });
-    if (!group) throw new ServiceError(404, "Grupo não encontrado.");
+    const group = await this.requireGroup(input.organizationId, input.groupId);
 
     const members = await this.prisma.clientsGroup.findMany({
       where: { group_id: group.id, organization_id: input.organizationId },
@@ -149,5 +171,70 @@ export class GroupMapService {
       group,
       cities: [...cities.values()],
     };
+  }
+
+  // Versão salva do mapa do grupo (#1749), ou null quando o grupo ainda não tem uma.
+  async getSaved(input: {
+    organizationId: string;
+    groupId: string;
+  }): Promise<GroupSavedMap | null> {
+    await this.requireGroup(input.organizationId, input.groupId);
+    const saved = await this.prisma.regularizeGroupSavedMap.findUnique({
+      where: {
+        organization_id_group_id: {
+          organization_id: input.organizationId,
+          group_id: input.groupId,
+        },
+      },
+      select: savedMapSelect,
+    });
+    return saved ? toSavedMap(saved) : null;
+  }
+
+  // Grava a árvore como a pessoa editou. É a única escrita: gerar o mapa de novo não mexe aqui.
+  async save(input: {
+    organizationId: string;
+    userId: string;
+    groupId: string;
+    tree: GroupMapTreeNode;
+  }): Promise<GroupSavedMap> {
+    await this.requireGroup(input.organizationId, input.groupId);
+    const key = { organization_id: input.organizationId, group_id: input.groupId };
+    const tree = input.tree as unknown as Prisma.InputJsonValue;
+
+    return this.prisma.$transaction(async (transaction) => {
+      const existing = await transaction.regularizeGroupSavedMap.findUnique({
+        where: { organization_id_group_id: key },
+        select: { id: true },
+      });
+      const saved = await transaction.regularizeGroupSavedMap.upsert({
+        where: { organization_id_group_id: key },
+        create: { ...key, tree, updated_by_user_id: input.userId },
+        update: { tree, updated_by_user_id: input.userId },
+        select: savedMapSelect,
+      });
+      // O histórico registra quem salvou e quando; a árvore anterior não é guardada.
+      await new RegularizeLogService(transaction).createLog({
+        userId: input.userId,
+        organizationId: input.organizationId,
+        action: existing ? "Atualizacao" : "Cadastro",
+        referring: "regularize.group_maps",
+        referringId: saved.id,
+        changes: { group_id: input.groupId },
+      });
+      return toSavedMap(saved);
+    });
+  }
+
+  private async requireGroup(
+    organizationId: string,
+    groupId: string,
+  ): Promise<{ id: string; name: string }> {
+    const group = await this.prisma.group.findFirst({
+      where: { id: groupId, organization_id: organizationId },
+      select: { id: true, name: true },
+    });
+    if (!group) throw new ServiceError(404, "Grupo não encontrado.");
+    return group;
   }
 }
