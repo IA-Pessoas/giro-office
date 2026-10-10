@@ -80,6 +80,7 @@ describe("referências de Cloud por cliente (#1695)", () => {
         organizationId: ORG,
         referring: "clientes.clouds",
         referringId: CLOUD,
+        changes: JSON.stringify({ type: "OneDrive", link: "https://onedrive.example/pasta" }),
       }),
     );
   });

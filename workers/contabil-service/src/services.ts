@@ -1831,37 +1831,38 @@ export function createDocumentsService(
       const clientId = String(input.client_id);
       await assertClientInOrganization(prisma, clientId, auth.organizationId);
       await canEditEitherRoutine(prisma, clientId, auth);
+      const reference = { type: String(input.type), link: String(input.link) };
       // Só a referência (tipo e link): sem upload nem sincronização com o provedor.
       const cloud = await prisma.clientCloud.create({
-        data: {
-          organization_id: auth.organizationId,
-          client_id: clientId,
-          type: String(input.type),
-          link: String(input.link),
-        },
+        data: { organization_id: auth.organizationId, client_id: clientId, ...reference },
       });
-      await auditCreate(
-        audit,
-        auth,
-        "clientes.clouds",
-        String(cloud.id),
-        "Cadastrar nuvem do cliente",
-      );
+      await audit.createLog({
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        permission: auth.permission ?? null,
+        action: "Cadastrar nuvem do cliente",
+        referring: "clientes.clouds",
+        referringId: String(cloud.id),
+        changes: JSON.stringify(reference),
+      });
       return cloud;
     },
     async updateCloud(id, input, auth) {
-      const current = await prisma.clientCloud.findFirst({
-        where: { id, organization_id: auth.organizationId },
+      const data = {
+        ...(typeof input.type === "string" ? { type: input.type } : {}),
+        ...(typeof input.link === "string" ? { link: input.link } : {}),
+      };
+      const result = await prisma.$transaction(async (transaction) => {
+        await lock(transaction, `clientes.clouds:${id}`);
+        const current = await transaction.clientCloud.findFirst({
+          where: { id, organization_id: auth.organizationId },
+        });
+        if (!current) throw new ServiceError(404, "Nuvem do cliente não encontrada.");
+        await canEditEitherRoutine(transaction, String(current.client_id), auth);
+        const updated = await transaction.clientCloud.update({ where: { id }, data });
+        return { current, updated };
       });
-      if (!current) throw new ServiceError(404, "Nuvem do cliente não encontrada.");
-      await canEditEitherRoutine(prisma, String(current.client_id), auth);
-      const updated = await prisma.clientCloud.update({
-        where: { id },
-        data: {
-          ...(typeof input.type === "string" ? { type: input.type } : {}),
-          ...(typeof input.link === "string" ? { link: input.link } : {}),
-        },
-      });
+      const changed = result as { current: JsonRecord; updated: JsonRecord };
       await audit.logUpdateIfChanged({
         userId: auth.userId,
         organizationId: auth.organizationId,
@@ -1869,10 +1870,10 @@ export function createDocumentsService(
         action: "Atualizar nuvem do cliente",
         referring: "clientes.clouds",
         referringId: id,
-        oldData: current,
-        updatedData: updated,
+        oldData: changed.current,
+        updatedData: changed.updated,
       });
-      return updated;
+      return changed.updated;
     },
     async upsertStatement(input, auth) {
       if (!validStatus(input.status))
