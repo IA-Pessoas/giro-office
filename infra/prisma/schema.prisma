@@ -1437,14 +1437,19 @@ model Agenda {
   obs                   String?
   department_control_id String
   organization_id       String
+  // Ocorrência de uma recorrência mensal: uma por regra e competência (AAAA-MM).
+  recurring_agenda_id   String?
+  recurrence_month      String?
   client                Client?      @relation(fields: [client_id], references: [id])
   department_control    Department   @relation("department_control", fields: [department_control_id], references: [id])
   organization          Organization @relation(fields: [organization_id], references: [id])
   participant2          User?        @relation("participant2", fields: [participant_id_2], references: [id])
   participant3          User?        @relation("participant3", fields: [participant_id_3], references: [id])
   participant           User?        @relation("participant", fields: [participant_id], references: [id])
+  recurring_agenda      RecurringAgenda? @relation(fields: [recurring_agenda_id], references: [id], onDelete: SetNull)
   task                  Task?        @relation(fields: [task_id], references: [id])
 
+  @@unique([recurring_agenda_id, recurrence_month], map: "uq_agenda_recurrence_occurrence")
   @@map("agenda")
 }
 
@@ -1461,8 +1466,11 @@ model RecurringAgenda {
   obs                   String?
   department_control_id String
   organization_id       String
+  // Última competência (AAAA-MM) já gerada; nulo = regra legada, fora do gerador.
+  generated_through     String?
   client                Client?      @relation(fields: [client_id], references: [id])
   department_control    Department   @relation("department_control", fields: [department_control_id], references: [id])
+  occurrences           Agenda[]
   organization          Organization @relation(fields: [organization_id], references: [id])
   participant2          User?        @relation("participant2", fields: [participant_id_2], references: [id])
   participant3          User?        @relation("participant3", fields: [participant_id_3], references: [id])

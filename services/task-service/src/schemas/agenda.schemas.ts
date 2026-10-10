@@ -12,6 +12,7 @@ const eventFields = {
   status: z.enum(AGENDA_STATUSES),
   obs: optionalText(2000),
   location: optionalText(200),
+  recurrent: z.boolean(),
 };
 
 export const agendaListQuerySchema = z
@@ -27,6 +28,7 @@ export const agendaCreateBodySchema = z
     department_id: zNonEmptyText("department_id").optional(),
     ...eventFields,
     status: eventFields.status.optional(),
+    recurrent: eventFields.recurrent.optional(),
   })
   .strict();
 
