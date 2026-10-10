@@ -51,7 +51,10 @@ const catalogItem = {
   required: ["id", "kind", "code", "label", "url", "archived_at", "created_at", "updated_at"],
   properties: {
     id: { type: "string", format: "uuid" },
-    kind: { type: "string", enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"] },
+    kind: {
+      type: "string",
+      enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE", "REQUEST_CATEGORY"],
+    },
     code: { type: "string", minLength: 1, maxLength: TRIAGE_CATALOG_CODE_MAX_LENGTH },
     label: { type: "string", minLength: 1, maxLength: 255 },
     url: { type: ["string", "null"], format: "uri", pattern: "^https://" },
@@ -94,6 +97,128 @@ const externalLink = {
     archived_at: { type: ["string", "null"], format: "date-time" },
     created_at: { type: "string", format: "date-time" },
     updated_at: { type: "string", format: "date-time" },
+  },
+} as const;
+
+const solicitation = {
+  type: "object",
+  required: [
+    "id",
+    "client_id",
+    "competence",
+    "category_id",
+    "description",
+    "requester_id",
+    "responsible_id",
+    "status",
+    "closed_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    client_id: { type: "string", format: "uuid" },
+    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    category_id: { type: "string", format: "uuid" },
+    description: { type: "string", minLength: 1, maxLength: 2000 },
+    requester_id: { type: "string", format: "uuid" },
+    responsible_id: { type: "string", format: "uuid" },
+    status: { type: "string", enum: ["OPEN", "CLOSED"] },
+    closed_at: { type: ["string", "null"], format: "date-time" },
+    created_at: { type: "string", format: "date-time" },
+    updated_at: { type: "string", format: "date-time" },
+    client: {
+      type: "object",
+      properties: { id: { type: "string", format: "uuid" }, name: { type: "string" } },
+    },
+    category: {
+      type: "object",
+      properties: {
+        id: { type: "string", format: "uuid" },
+        code: { type: "string" },
+        label: { type: "string" },
+      },
+    },
+    requester: { $ref: "#/components/schemas/TriageUserRef" },
+    responsible: { $ref: "#/components/schemas/TriageUserRef" },
+  },
+} as const;
+
+const noteCountProperty = { type: "integer", minimum: 0, maximum: 1_000_000 } as const;
+
+const noteCounts = {
+  type: "object",
+  required: [
+    "client_id",
+    "competence",
+    "xml_inbound",
+    "xml_outbound",
+    "nfse_issued",
+    "nfse_received",
+    "updated_at",
+    "updated_by",
+  ],
+  properties: {
+    client_id: { type: "string", format: "uuid" },
+    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    xml_inbound: noteCountProperty,
+    xml_outbound: noteCountProperty,
+    nfse_issued: noteCountProperty,
+    nfse_received: noteCountProperty,
+    updated_at: { type: ["string", "null"], format: "date-time" },
+    updated_by: {
+      oneOf: [{ $ref: "#/components/schemas/TriageUserRef" }, { type: "null" }],
+    },
+  },
+} as const;
+
+const solicitationIndicators = {
+  type: "object",
+  required: ["competence", "notes_by_responsible", "solicitations_by_requester", "totals"],
+  properties: {
+    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    notes_by_responsible: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          user: { $ref: "#/components/schemas/TriageUserRef" },
+          clients: { type: "integer", minimum: 0 },
+          xml_inbound: { type: "integer", minimum: 0 },
+          xml_outbound: { type: "integer", minimum: 0 },
+          nfse_issued: { type: "integer", minimum: 0 },
+          nfse_received: { type: "integer", minimum: 0 },
+          total: { type: "integer", minimum: 0 },
+        },
+      },
+    },
+    solicitations_by_requester: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          user: { $ref: "#/components/schemas/TriageUserRef" },
+          total: { type: "integer", minimum: 0 },
+        },
+      },
+    },
+    totals: {
+      type: "object",
+      properties: {
+        solicitations: { type: "integer", minimum: 0 },
+        clients: { type: "integer", minimum: 0 },
+        notes: { type: "integer", minimum: 0 },
+      },
+    },
+  },
+} as const;
+
+const userRef = {
+  type: "object",
+  properties: {
+    id: { type: "string", format: "uuid" },
+    name: { type: ["string", "null"] },
+    full_name: { type: ["string", "null"] },
   },
 } as const;
 
@@ -186,6 +311,10 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
       { name: "Catalogs", description: "Catálogos operacionais da Triagem" },
       { name: "ExternalLinks", description: "Links externos por competência" },
       { name: "UrgentRequests", description: "Solicitações urgentes por competência" },
+      {
+        name: "Solicitations",
+        description: "Solicitações legadas por cliente e competência, distintas das urgentes",
+      },
       { name: "Overview", description: "Painel operacional consolidado" },
       { name: "Audit", description: "Histórico append-only da Triagem" },
     ],
@@ -475,7 +604,13 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
               in: "query",
               schema: {
                 type: "string",
-                enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
+                enum: [
+                  "JUSTIFICATION",
+                  "LINK_TYPE",
+                  "DELIVERY_METHOD",
+                  "STATE_SITE",
+                  "REQUEST_CATEGORY",
+                ],
               },
             },
             { name: "include_archived", in: "query", schema: { type: "boolean" } },
@@ -512,7 +647,13 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   properties: {
                     kind: {
                       type: "string",
-                      enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
+                      enum: [
+                        "JUSTIFICATION",
+                        "LINK_TYPE",
+                        "DELIVERY_METHOD",
+                        "STATE_SITE",
+                        "REQUEST_CATEGORY",
+                      ],
                     },
                     code: {
                       type: "string",
@@ -557,7 +698,13 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
                   properties: {
                     kind: {
                       type: "string",
-                      enum: ["JUSTIFICATION", "LINK_TYPE", "DELIVERY_METHOD", "STATE_SITE"],
+                      enum: [
+                        "JUSTIFICATION",
+                        "LINK_TYPE",
+                        "DELIVERY_METHOD",
+                        "STATE_SITE",
+                        "REQUEST_CATEGORY",
+                      ],
                     },
                     code: {
                       type: "string",
@@ -903,6 +1050,206 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
           },
         },
       },
+      "/triagem/solicitations": {
+        get: {
+          tags: ["Solicitations"],
+          summary: "Listar solicitações",
+          description:
+            "Administrador (nível 3) vê todas da organização; operador comum só as sob sua responsabilidade.",
+          security: bearer,
+          parameters: [
+            { name: "status", in: "query", schema: { type: "string", enum: ["OPEN", "CLOSED"] } },
+            { name: "client_id", in: "query", schema: { type: "string", format: "uuid" } },
+            {
+              name: "competence",
+              in: "query",
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description: "Solicitações",
+              ...successEnvelope({
+                type: "array",
+                items: { $ref: "#/components/schemas/TriageSolicitation" },
+              }),
+            },
+            "400": { description: "Filtros inválidos" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+          },
+        },
+        post: {
+          tags: ["Solicitations"],
+          summary: "Criar solicitação",
+          security: bearer,
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: [
+                    "client_id",
+                    "competence",
+                    "category_id",
+                    "description",
+                    "responsible_id",
+                  ],
+                  properties: {
+                    client_id: { type: "string", format: "uuid" },
+                    competence: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+                    category_id: {
+                      type: "string",
+                      format: "uuid",
+                      description: "Item ativo do catálogo REQUEST_CATEGORY da organização",
+                    },
+                    description: { type: "string", minLength: 1, maxLength: 2000 },
+                    responsible_id: { type: "string", format: "uuid" },
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "201": {
+              description: "Criada",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageSolicitation" }),
+            },
+            "400": { description: "Entrada inválida" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Cliente, responsável ou categoria não encontrado" },
+            "409": { description: "Competência arquivada" },
+          },
+        },
+      },
+      "/triagem/solicitations/indicators": {
+        get: {
+          tags: ["Solicitations"],
+          summary: "Indicadores das solicitações e notas na competência",
+          description:
+            "Notas por responsável (cada cliente conta uma vez por responsável, sem multiplicar pedidos repetidos) e pedidos por solicitante. Operador comum vê só os pedidos sob sua responsabilidade.",
+          security: bearer,
+          parameters: [
+            {
+              name: "competence",
+              in: "query",
+              required: true,
+              schema: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+            },
+            { name: "status", in: "query", schema: { type: "string", enum: ["OPEN", "CLOSED"] } },
+          ],
+          responses: {
+            "200": {
+              description: "Indicadores",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageSolicitationIndicators" }),
+            },
+            "400": { description: "Filtros inválidos" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+          },
+        },
+      },
+      "/triagem/solicitations/{id}": {
+        get: {
+          tags: ["Solicitations"],
+          summary: "Consultar solicitação",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Solicitação",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageSolicitation" }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Solicitação não encontrada" },
+          },
+        },
+      },
+      "/triagem/solicitations/{id}/close": {
+        patch: {
+          tags: ["Solicitations"],
+          summary: "Fechar solicitação",
+          description: "Idempotente: fechar de novo mantém a data de fechamento original.",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Fechada",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageSolicitation" }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Solicitação não encontrada" },
+            "409": { description: "Competência arquivada" },
+          },
+        },
+      },
+      "/triagem/solicitations/{id}/note-counts": {
+        get: {
+          tags: ["Solicitations"],
+          summary: "Consultar contadores de notas do pedido",
+          description:
+            "Contadores do cliente e competência do pedido; todos os pedidos da mesma competência veem os mesmos valores.",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description: "Contadores (zeros quando ainda não informados)",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageNoteCounts" }),
+            },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Solicitação não encontrada" },
+          },
+        },
+        put: {
+          tags: ["Solicitations"],
+          summary: "Atualizar contadores de notas do pedido",
+          security: bearer,
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["xml_inbound", "xml_outbound", "nfse_issued", "nfse_received"],
+                  properties: {
+                    xml_inbound: noteCountProperty,
+                    xml_outbound: noteCountProperty,
+                    nfse_issued: noteCountProperty,
+                    nfse_received: noteCountProperty,
+                  },
+                  additionalProperties: false,
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Contadores atualizados",
+              ...successEnvelope({ $ref: "#/components/schemas/TriageNoteCounts" }),
+            },
+            "400": { description: "Contador inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Solicitação não encontrada" },
+            "409": { description: "Solicitação fechada ou competência arquivada" },
+          },
+        },
+      },
     },
     components: {
       securitySchemes: {
@@ -914,6 +1261,10 @@ export function buildTriagemServiceOpenApiSpec(env: TriagemServiceEnv): OpenApiD
         TriageCatalogItem: catalogItem,
         TriageExternalLink: externalLink,
         TriageUrgentRequest: urgentRequest,
+        TriageSolicitation: solicitation,
+        TriageUserRef: userRef,
+        TriageNoteCounts: noteCounts,
+        TriageSolicitationIndicators: solicitationIndicators,
         TriageOverviewItem: overviewItem,
         TriageOverviewIndicators: overviewIndicators,
       },

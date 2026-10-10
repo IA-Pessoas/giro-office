@@ -3,6 +3,8 @@ import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
+import { EMPTY_SOLICITATION_INDICATORS } from "../triagem/triagemSmokeFixtures.mjs";
+
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 const port = process.env.TRIAGE_EXTERNAL_LINKS_SMOKE_PORT ?? "3124";
 const baseUrl = configuredBaseUrl ?? `http://127.0.0.1:${port}`;
@@ -164,6 +166,9 @@ async function runBrowserProof() {
     }
     if (request.method() === "GET" && apiPath === "/triagem/statements") return json(route, []);
     if (request.method() === "GET" && apiPath === "/triagem/closing") return json(route, null);
+    if (request.method() === "GET" && apiPath === "/triagem/solicitations/indicators") {
+      return json(route, EMPTY_SOLICITATION_INDICATORS);
+    }
     return json(route, []);
   });
 

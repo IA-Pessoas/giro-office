@@ -37,6 +37,10 @@ import {
   type TriageOverviewRouteDeps,
 } from "./routes/triageOverview.routes.js";
 import {
+  createTriageSolicitationRoutes,
+  type TriageSolicitationRouteDeps,
+} from "./routes/triageSolicitation.routes.js";
+import {
   createTriageUrgentRequestRoutes,
   type TriageUrgentRequestRouteDeps,
 } from "./routes/triageUrgentRequest.routes.js";
@@ -45,6 +49,7 @@ import { TriageCatalogService } from "./services/triageCatalogService.js";
 import { TriageCompetenceService } from "./services/triageCompetenceService.js";
 import { TriageExternalLinkService } from "./services/triageExternalLinkService.js";
 import { TriageOverviewService } from "./services/triageOverviewService.js";
+import { TriageSolicitationService } from "./services/triageSolicitationService.js";
 import { TriageUrgentRequestService } from "./services/triageUrgentRequestService.js";
 
 function triagemServiceErrorLogContext(request: Request): Record<string, unknown> | undefined {
@@ -68,6 +73,7 @@ export interface CreateTriagemAppOptions {
   triageExternalLinkRouteDeps?: TriageExternalLinkRouteDeps;
   triageCatalogRouteDeps?: TriageCatalogRouteDeps;
   triageUrgentRequestRouteDeps?: TriageUrgentRequestRouteDeps;
+  triageSolicitationRouteDeps?: TriageSolicitationRouteDeps;
   triageOverviewRouteDeps?: TriageOverviewRouteDeps;
   triageAuditRouteDeps?: TriageAuditRouteDeps;
 }
@@ -80,6 +86,7 @@ export function createTriagemApp({
   triageExternalLinkRouteDeps,
   triageCatalogRouteDeps,
   triageUrgentRequestRouteDeps,
+  triageSolicitationRouteDeps,
   triageOverviewRouteDeps,
   triageAuditRouteDeps,
 }: CreateTriagemAppOptions): express.Express {
@@ -93,6 +100,7 @@ export function createTriagemApp({
   );
   const externalLinkService = new TriageExternalLinkService(prisma);
   const urgentRequestService = new TriageUrgentRequestService(prisma);
+  const solicitationService = new TriageSolicitationService(prisma);
   const overviewService = new TriageOverviewService(prisma);
   const auditService = new TriageAuditService(prisma, createTriageAuditDispatcher(env, logger));
 
@@ -131,6 +139,10 @@ export function createTriagemApp({
   app.use(
     "/triagem",
     createTriageUrgentRequestRoutes(triageUrgentRequestRouteDeps ?? urgentRequestService),
+  );
+  app.use(
+    "/triagem",
+    createTriageSolicitationRoutes(triageSolicitationRouteDeps ?? solicitationService),
   );
   app.use("/triagem", createTriageOverviewRoutes(triageOverviewRouteDeps ?? overviewService));
   app.use("/triagem", createTriageAuditRoutes(triageAuditRouteDeps ?? auditService));

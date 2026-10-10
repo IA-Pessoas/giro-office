@@ -24,11 +24,14 @@ Endpoints públicos principais via gateway:
 - `GET|POST /triagem/catalogs`
 - `PATCH /triagem/catalogs/<id>` e `PATCH /triagem/catalogs/<id>/archive`
 - `GET|POST /triagem/external-links`
+- `GET|POST /triagem/solicitations`, `GET /triagem/solicitations/<id>` e `PATCH /triagem/solicitations/<id>/close`
+- `GET|PUT /triagem/solicitations/<id>/note-counts` para os quatro contadores de notas do cliente na competência
+- `GET /triagem/solicitations/indicators` com totais por situação e responsável
 - `GET /triagem/overview` com filtros de cliente, competência e status, paginação e indicadores
 - `GET /triagem/competencies/<id>/history` para timeline append-only da competência
 - `POST /internal/triagem/audit/reconcile` para reconciliação e despacho idempotentes do outbox interno
 
-Os catálogos aceitam `JUSTIFICATION`, `LINK_TYPE`, `DELIVERY_METHOD` e `STATE_SITE`, sempre
+Os catálogos aceitam `JUSTIFICATION`, `LINK_TYPE`, `DELIVERY_METHOD`, `STATE_SITE` e `REQUEST_CATEGORY`, sempre
 escopados à organização. Competências preservam os valores catalogados em snapshots imutáveis;
 arquivar uma opção impede novos usos fora do snapshot, sem apagar o histórico.
 
