@@ -20,6 +20,26 @@ export const TRIAGE_PENDING_DOCUMENT_STATUSES = [
   "UNDER_REVIEW",
 ] as const satisfies readonly TriageDocumentStatus[];
 
+/**
+ * Status do cadastro de cliente inativado (client-service, `inactivate`), que também grava
+ * `deletion_date` com a data da inativação.
+ */
+export const CLIENT_INACTIVE_STATUS = "Inativo";
+
+/** Itens do checklist da rotina contábil da Triagem. */
+export const TRIAGE_ACCOUNTING_CHECKLIST_FIELDS = [
+  "financial_transactions",
+  "triaged_transactions",
+  "inventory_control",
+  "accounts_payable_report",
+  "accounts_receivable_report",
+  "card_statements",
+  "loan_agreements",
+  "bank_reconciliation",
+  "bank_investments",
+  "card_sales_report",
+] as const;
+
 /** Itens do checklist da rotina fiscal da Triagem. */
 export const TRIAGE_FISCAL_CHECKLIST_FIELDS = [
   "inbound_report",

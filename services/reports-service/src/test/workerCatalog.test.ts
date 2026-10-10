@@ -39,11 +39,13 @@ describe("createWorkerSourceCatalog", () => {
   });
 
   it.each([
-    "contabil.triage_clouds",
-    "contabil.triage_movement",
-    "contabil.triage_responsibles",
-    "contabil.triage_competence_responsibles",
-  ])("registra %s só para quem acessa a Triagem", (source) => {
+    ["contabil.triage_clouds", "company_name"],
+    ["contabil.triage_movement", "company_name"],
+    ["contabil.triage_responsibles", "responsible_name"],
+    ["contabil.triage_competence_responsibles", "responsible_name"],
+    ["contabil.triage_accounting_metric", "completion_percent"],
+    ["contabil.triage_sgq", "not_sent"],
+  ])("registra %s só para quem acessa a Triagem", (source, field) => {
     const catalog = createWorkerSourceCatalog(
       parseReportsServiceEnv({
         DATABASE_URL: "postgresql://reports:reports@localhost:5432/reports",
@@ -53,7 +55,7 @@ describe("createWorkerSourceCatalog", () => {
     const scope = (modules: Record<string, number>) => ({
       organization_id: "10000000-0000-0000-0000-000000000001",
       modules,
-      grant: { sources: { [source]: ["company_name"] }, relations: [] },
+      grant: { sources: { [source]: [field] }, relations: [] },
     });
 
     expect(catalog.findAdapterForSources([source], scope({ triagem: 1 }))).toBeDefined();

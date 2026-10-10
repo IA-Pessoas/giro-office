@@ -1,4 +1,5 @@
 import {
+  TRIAGE_ACCOUNTING_CHECKLIST_FIELDS,
   TRIAGE_FISCAL_CHECKLIST_FIELDS,
   TRIAGE_FISCAL_CONFIGURABLE_FIELDS,
   TRIAGE_PORTFOLIO_DOCUMENT_STATUSES,
@@ -21,18 +22,7 @@ export const closingUpdateSchema = closingQuerySchema
   })
   .strict();
 
-const documentFields = [
-  "financial_transactions",
-  "triaged_transactions",
-  "inventory_control",
-  "accounts_payable_report",
-  "accounts_receivable_report",
-  "card_statements",
-  "loan_agreements",
-  "bank_reconciliation",
-  "bank_investments",
-  "card_sales_report",
-] as const;
+const documentFields = TRIAGE_ACCOUNTING_CHECKLIST_FIELDS;
 const fiscalChecklistFields = [
   "inbound_report",
   "outbound_report",

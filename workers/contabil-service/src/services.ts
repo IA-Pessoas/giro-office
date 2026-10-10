@@ -1,4 +1,5 @@
 import {
+  CLIENT_INACTIVE_STATUS,
   executeReportingQuery,
   getContabilReportingFields,
   normalizeTriageDocumentStatus,
@@ -242,9 +243,6 @@ function competenceInterval(competence: string): { start: Date; end: Date } {
     end: new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)),
   };
 }
-
-/** Status do cadastro de cliente inativado (client-service, `inactivate`). */
-const CLIENT_INACTIVE_STATUS = "Inativo";
 
 /**
  * Janela de elegibilidade da carteira na competência: entrada até o fim do mês, saída e
