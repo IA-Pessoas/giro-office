@@ -9,6 +9,7 @@ import { InternalReportingService as Pessoal } from "../../../pessoal-service/sr
 import { InternalReportingService as Project } from "../../../project-service/src/services/internalReportingService.js";
 import {
   RegularizeMunicipalTaxesReportingService as Municipal,
+  RegularizePortfolioReportingService as Portfolio,
   RegularizeLicenseReportingService as Regularize,
 } from "../../../regularize-service/src/reporting/internalReportingService.js";
 import { InternalReportingService as Rh } from "../../../rh-service/src/reporting/internalReportingService.js";
@@ -72,7 +73,8 @@ for (const source of reportingSources.filter(
   (source) =>
     source.key !== "rh.attendance" &&
     source.key !== "marketing.budgets" &&
-    source.key !== "integracao.client_groups",
+    source.key !== "integracao.client_groups" &&
+    source.key !== "regularize.client_groups",
 )) {
   describe(source.key, () => {
     it("orders the entire authorized set before the output cap", async () => {
@@ -161,7 +163,9 @@ for (const source of reportingSources.filter(
                             ? Ti
                             : source.key === "regularize.municipal_taxes"
                               ? Municipal
-                              : Regularize;
+                              : source.key === "regularize.clients"
+                                ? Portfolio
+                                : Regularize;
       const service = new Service(prisma as never);
       const output = await service.extract({
         source: source.key,
