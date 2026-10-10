@@ -70,7 +70,9 @@ runTest("detalhe usa checklist Fiscal da competência e contadores do cliente (#
   const detail = readSource("./components/TriageSolicitationDetail.tsx");
   const hooks = readSource("./hooks/useTriageSolicitations.ts");
   assert.match(detail, /<TriageDocumentsSection[\s\S]*documentType="FISCAL"/);
-  assert.match(detail, /initialCompetence=\{solicitation\.competence/);
+  assert.match(detail, /fixedCompetence=\{solicitation\.competence/);
+  const checklist = readSource("../contabil/components/TriageDocumentsSection.tsx");
+  assert.match(checklist, /fixedCompetence \? \(/);
   for (const label of ["XML entradas", "XML saídas", "NFSE prestadas", "NFSE tomadas"]) {
     assert.match(detail, new RegExp(label));
   }
