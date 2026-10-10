@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { auditUnavailable } from "../integrations/audit.js";
 import {
   createIntegrationClient,
   updateIntegrationClient,
@@ -13,17 +14,22 @@ function createPrisma() {
   const findFirst = vi.fn().mockResolvedValue({ id: CLIENT_ID, type: "PJ", cpf_cnpj: "" });
   const update = vi.fn().mockResolvedValue({ id: CLIENT_ID, instagram: "@acme" });
   const create = vi.fn();
+  const audit = vi.fn(async () => {});
+  const client = { findFirst, update, create };
+  const $transaction = vi.fn((run: (tx: unknown) => unknown) => run({ client }));
   return {
-    prisma: { client: { findFirst, update, create } } as unknown as PrismaClient,
+    prisma: { client, $transaction } as unknown as PrismaClient,
     findFirst,
     update,
     create,
+    audit,
+    $transaction,
   };
 }
 
 describe("updateIntegrationClient Instagram binding", () => {
   it("allows a Marketing editor to update only the canonical Instagram field", async () => {
-    const { prisma, findFirst, update } = createPrisma();
+    const { prisma, findFirst, update, audit } = createPrisma();
 
     await expect(
       updateIntegrationClient(
@@ -32,6 +38,7 @@ describe("updateIntegrationClient Instagram binding", () => {
         ORGANIZATION_ID,
         { instagram: "@acme" },
         { userId: "user-1", level: 0, isOwner: false, marketingLevel: 2 },
+        audit,
       ),
     ).resolves.toMatchObject({ id: CLIENT_ID, instagram: "@acme" });
 
@@ -44,12 +51,12 @@ describe("updateIntegrationClient Instagram binding", () => {
     );
     expect(findFirst).toHaveBeenCalledWith({
       where: { id: CLIENT_ID, organization_id: ORGANIZATION_ID },
-      select: { id: true, type: true, cpf_cnpj: true },
+      select: { id: true, type: true, cpf_cnpj: true, instagram: true },
     });
   });
 
   it("denies Marketing editors changes to fields beyond Instagram", async () => {
-    const { prisma, findFirst, update } = createPrisma();
+    const { prisma, findFirst, update, audit } = createPrisma();
 
     await expect(
       updateIntegrationClient(
@@ -58,6 +65,7 @@ describe("updateIntegrationClient Instagram binding", () => {
         ORGANIZATION_ID,
         { instagram: "@acme", name: "Outro nome" },
         { userId: "user-1", level: 0, isOwner: false, marketingLevel: 2 },
+        audit,
       ),
     ).rejects.toMatchObject({ statusCode: 403 });
 
@@ -66,7 +74,7 @@ describe("updateIntegrationClient Instagram binding", () => {
   });
 
   it("denies Marketing viewers Instagram edits", async () => {
-    const { prisma, findFirst, update } = createPrisma();
+    const { prisma, findFirst, update, audit } = createPrisma();
 
     await expect(
       updateIntegrationClient(
@@ -75,6 +83,7 @@ describe("updateIntegrationClient Instagram binding", () => {
         ORGANIZATION_ID,
         { instagram: "@acme" },
         { userId: "user-1", level: 0, isOwner: false, marketingLevel: 1 },
+        audit,
       ),
     ).rejects.toMatchObject({ statusCode: 403 });
 
@@ -83,7 +92,7 @@ describe("updateIntegrationClient Instagram binding", () => {
   });
 
   it("updates the profile on the canonical client and requires Office edit permission", async () => {
-    const { prisma, findFirst, update } = createPrisma();
+    const { prisma, findFirst, update, audit } = createPrisma();
 
     await expect(
       updateIntegrationClient(
@@ -92,12 +101,13 @@ describe("updateIntegrationClient Instagram binding", () => {
         ORGANIZATION_ID,
         { instagram: "@acme" },
         { userId: "user-1", level: 2, isOwner: false },
+        audit,
       ),
     ).resolves.toMatchObject({ id: CLIENT_ID, instagram: "@acme" });
 
     expect(findFirst).toHaveBeenCalledWith({
       where: { id: CLIENT_ID, organization_id: ORGANIZATION_ID },
-      select: { id: true, type: true, cpf_cnpj: true },
+      select: { id: true, type: true, cpf_cnpj: true, instagram: true },
     });
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: CLIENT_ID }, data: { instagram: "@acme" } }),
@@ -105,7 +115,7 @@ describe("updateIntegrationClient Instagram binding", () => {
   });
 
   it("does not edit a client when the Office permission is below editor", async () => {
-    const { prisma, findFirst, update } = createPrisma();
+    const { prisma, findFirst, update, audit } = createPrisma();
 
     await expect(
       updateIntegrationClient(
@@ -114,6 +124,7 @@ describe("updateIntegrationClient Instagram binding", () => {
         ORGANIZATION_ID,
         { instagram: "@acme" },
         { userId: "user-1", level: 1, isOwner: false },
+        audit,
       ),
     ).rejects.toMatchObject({ statusCode: 403 });
 
@@ -122,7 +133,7 @@ describe("updateIntegrationClient Instagram binding", () => {
   });
 
   it("does not edit a client outside the authenticated organization", async () => {
-    const { prisma, findFirst, update } = createPrisma();
+    const { prisma, findFirst, update, audit } = createPrisma();
     findFirst.mockResolvedValue(null);
 
     await expect(
@@ -132,10 +143,89 @@ describe("updateIntegrationClient Instagram binding", () => {
         ORGANIZATION_ID,
         { instagram: "@acme" },
         { userId: "user-1", level: 2, isOwner: false },
+        audit,
       ),
     ).rejects.toMatchObject({ statusCode: 404 });
 
     expect(update).not.toHaveBeenCalled();
+  });
+  it("records actor, organization, client and previous profile of a Marketing Instagram edit", async () => {
+    const { prisma, findFirst, audit } = createPrisma();
+    findFirst.mockResolvedValue({ id: CLIENT_ID, type: "PJ", cpf_cnpj: "", instagram: "@antigo" });
+
+    await updateIntegrationClient(
+      prisma,
+      CLIENT_ID,
+      ORGANIZATION_ID,
+      { instagram: "@acme" },
+      { userId: "user-1", level: 0, isOwner: false, marketingLevel: 2 },
+      audit,
+    );
+
+    expect(audit).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      userId: "user-1",
+      action: "update",
+      referring: "clients",
+      referringId: CLIENT_ID,
+      changes: { instagram: { from: "@antigo", to: "@acme" } },
+    });
+  });
+
+  it("leaves no trail for denied or cross-organization Instagram edits", async () => {
+    const denied = createPrisma();
+    await expect(
+      updateIntegrationClient(
+        denied.prisma,
+        CLIENT_ID,
+        ORGANIZATION_ID,
+        { instagram: "@acme" },
+        { userId: "user-1", level: 0, isOwner: false, marketingLevel: 1 },
+        denied.audit,
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(denied.audit).not.toHaveBeenCalled();
+
+    const foreign = createPrisma();
+    foreign.findFirst.mockResolvedValue(null);
+    await expect(
+      updateIntegrationClient(
+        foreign.prisma,
+        CLIENT_ID,
+        ORGANIZATION_ID,
+        { instagram: "@acme" },
+        { userId: "user-1", level: 0, isOwner: false, marketingLevel: 2 },
+        foreign.audit,
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(foreign.audit).not.toHaveBeenCalled();
+  });
+
+  it("does not report success for an Instagram edit whose trail cannot be written", async () => {
+    const { prisma, audit, $transaction } = createPrisma();
+    audit.mockRejectedValueOnce(auditUnavailable());
+
+    await expect(
+      updateIntegrationClient(
+        prisma,
+        CLIENT_ID,
+        ORGANIZATION_ID,
+        { instagram: "@acme" },
+        { userId: "user-1", level: 0, isOwner: false, marketingLevel: 2 },
+        audit,
+      ),
+    ).rejects.toMatchObject({ statusCode: 503, expose: true });
+    expect($transaction).toHaveBeenCalledTimes(1);
+
+    await expect(
+      updateIntegrationClient(
+        prisma,
+        CLIENT_ID,
+        ORGANIZATION_ID,
+        { instagram: "@acme" },
+        { userId: "user-1", level: 0, isOwner: false, marketingLevel: 2 },
+      ),
+    ).rejects.toMatchObject({ statusCode: 503 });
   });
 });
 
@@ -198,7 +288,7 @@ describe("integration tax regime persistence", () => {
   });
 
   it("persists and returns the tax regime on client update", async () => {
-    const { prisma, update } = createPrisma();
+    const { prisma, update, audit } = createPrisma();
     update.mockResolvedValue({ id: CLIENT_ID, regime: "Lucro Real" });
 
     await expect(
@@ -208,6 +298,7 @@ describe("integration tax regime persistence", () => {
         ORGANIZATION_ID,
         { regime: "Lucro Real" },
         { userId: "user-1", level: 2, isOwner: false },
+        audit,
       ),
     ).resolves.toMatchObject({ regime: "Lucro Real" });
 
