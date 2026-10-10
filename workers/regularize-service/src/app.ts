@@ -16,6 +16,8 @@ import { regularizeDashboardQuerySchema } from "@workspace/regularize-service/sr
 import {
   importDteBodySchema,
   listDteImportsQuerySchema,
+  listDteNoticesQuerySchema,
+  updateDteNoticeReadingBodySchema,
 } from "@workspace/regularize-service/src/schemas/dte.schemas.js";
 import {
   addGuidanceActivityBodySchema,
@@ -72,6 +74,7 @@ import {
 import { buildLicenseStatusFilter } from "@workspace/regularize-service/src/schemas/status.schemas.js";
 import { ClientPfService } from "@workspace/regularize-service/src/services/clientPfService.js";
 import { DteImportService } from "@workspace/regularize-service/src/services/dteImportService.js";
+import { DteNoticeService } from "@workspace/regularize-service/src/services/dteNoticeService.js";
 import {
   GuidanceService,
   type GuidanceService as GuidanceServiceType,
@@ -148,6 +151,7 @@ export type RegularizeMunicipalTaxesService = Pick<
   "create" | "update" | "detail" | "list"
 >;
 export type RegularizeDteImportService = Pick<DteImportService, "importNotices" | "listImports">;
+export type RegularizeDteNoticeService = Pick<DteNoticeService, "list" | "setReading">;
 export type RegularizeClientPfService = Pick<
   ClientPfService,
   "create" | "update" | "detail" | "list"
@@ -196,6 +200,7 @@ type RegularizeOptions = {
   processService?: RegularizeProcessService;
   municipalTaxesService?: RegularizeMunicipalTaxesService;
   dteImportService?: RegularizeDteImportService;
+  dteNoticeService?: RegularizeDteNoticeService;
   clientPfService?: RegularizeClientPfService;
   partnersService?: RegularizePartnersService;
   passwordService?: RegularizePasswordService;
@@ -462,6 +467,15 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
     if (options.municipalTaxesService) return callback(options.municipalTaxesService);
     return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
       callback(new MunicipalTaxesService(client as never)),
+    );
+  };
+  const withDteNoticeService = async <T>(
+    c: RegularizeContext,
+    callback: (service: RegularizeDteNoticeService) => Promise<T>,
+  ) => {
+    if (options.dteNoticeService) return callback(options.dteNoticeService);
+    return withWorkerPrisma(options.env ?? c.env, PrismaClient, (client) =>
+      callback(new DteNoticeService(client as never)),
     );
   };
   const withDteImportService = async <T>(
@@ -923,6 +937,32 @@ export function createRegularizeWorkerApp(options: RegularizeOptions = {}) {
           }),
         ),
         201,
+      );
+    });
+  });
+  app.get("/regularize/dte/notices", async (c) =>
+    withDteNoticeService(c, async (service) => {
+      const query = parseWithZod(listDteNoticesQuerySchema, c.req.query());
+      return c.json(
+        createSuccessResponse(
+          await service.list({ organizationId: c.get("auth").organizationId, ...query }),
+        ),
+      );
+    }),
+  );
+  app.put("/regularize/dte/notices/reading", async (c) => {
+    requireWritePermission(c, "Permissão insuficiente para alterar a leitura do aviso DTE.");
+    return withDteNoticeService(c, async (service) => {
+      const body = parseWithZod(updateDteNoticeReadingBodySchema, await c.req.json());
+      return c.json(
+        createSuccessResponse(
+          await service.setReading({
+            organizationId: c.get("auth").organizationId,
+            userId: c.get("auth").userId,
+            id: body.id,
+            pendingReading: body.pending_reading,
+          }),
+        ),
       );
     });
   });
