@@ -131,6 +131,9 @@ function services() {
       saveFiscalSettings: vi.fn(async () => ({ priority: true, delivery_method: null })),
       listStatements: vi.fn(async () => []),
       listStatementHistory: vi.fn(async () => ({ client_id: CLIENT, competences: [] })),
+      listClouds: vi.fn(async () => []),
+      createCloud: vi.fn(async () => ({ id: ID })),
+      updateCloud: vi.fn(async () => ({ id: ID })),
       upsertStatement: vi.fn(async () => ({ id: ID })),
       archiveStatement: vi.fn(async () => ({ id: ID })),
     },
@@ -452,6 +455,48 @@ describe("contabil Worker remainder routes", () => {
     ]);
     expect(deps.triageDocumentsService.listStatementHistory).toHaveBeenCalledExactlyOnceWith(
       { client_id: CLIENT, from: "2026-01", to: "2026-09", pending: true },
+      expect.objectContaining({ organizationId: ORG }),
+    );
+  });
+
+  it("nuvens do cliente validam link e usam a organização do token (#1695)", async () => {
+    const deps = services();
+    const app = createContabilWorkerApp({ env: env(), ...deps });
+    const send = (method: string, path: string, body?: unknown, auth = true) =>
+      app.request(`https://contabil.test${path}`, {
+        method,
+        headers: auth ? { ...headers("2"), "content-type": "application/json" } : {},
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    const created = await send("POST", "/triagem/clouds", {
+      client_id: CLIENT,
+      type: "Google Drive",
+      link: "https://drive.example/pasta",
+    });
+    const script = await send("POST", "/triagem/clouds", {
+      client_id: CLIENT,
+      type: "Drive",
+      link: "javascript:alert(1)",
+    });
+    const updated = await send("PATCH", `/triagem/clouds/${ID}`, { type: "OneDrive" });
+    const listed = await send("GET", `/triagem/clouds?client_id=${CLIENT}`);
+    const anonymous = await send("GET", `/triagem/clouds?client_id=${CLIENT}`, undefined, false);
+
+    expect([
+      created.status,
+      script.status,
+      updated.status,
+      listed.status,
+      anonymous.status,
+    ]).toEqual([201, 400, 200, 200, 401]);
+    expect(deps.triageDocumentsService.createCloud).toHaveBeenCalledExactlyOnceWith(
+      { client_id: CLIENT, type: "Google Drive", link: "https://drive.example/pasta" },
+      expect.objectContaining({ organizationId: ORG, userId: USER }),
+    );
+    expect(deps.triageDocumentsService.updateCloud).toHaveBeenCalledExactlyOnceWith(
+      ID,
+      { type: "OneDrive" },
       expect.objectContaining({ organizationId: ORG }),
     );
   });

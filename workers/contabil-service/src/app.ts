@@ -55,6 +55,10 @@ import {
 import {
   closingQuerySchema,
   closingUpdateSchema,
+  cloudCreateSchema,
+  cloudIdSchema,
+  cloudListSchema,
+  cloudUpdateSchema,
   contabilPortfolioSchema,
   documentItemSchema,
   documentsBulkSchema,
@@ -642,6 +646,28 @@ export function createContabilWorkerApp(options: ContabilOptions = {}) {
     const query = parseWithZod(monthlySchema, c.req.query());
     const data = await withDocuments(c, (service) =>
       service.listStatements(query, c.get("auth").organizationId),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.get("/triagem/clouds", async (c) => {
+    const query = parseWithZod(cloudListSchema, c.req.query());
+    const data = await withDocuments(c, (service) =>
+      service.listClouds(query, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data));
+  });
+  app.post("/triagem/clouds", async (c) => {
+    const body = parseWithZod(cloudCreateSchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.createCloud(body, authContext(c.get("auth"))),
+    );
+    return c.json(createSuccessResponse(data), 201);
+  });
+  app.patch("/triagem/clouds/:id", async (c) => {
+    const params = parseWithZod(cloudIdSchema, { id: c.req.param("id") });
+    const body = parseWithZod(cloudUpdateSchema, await readJson(c));
+    const data = await withDocuments(c, (service) =>
+      service.updateCloud(params.id, body, authContext(c.get("auth"))),
     );
     return c.json(createSuccessResponse(data));
   });

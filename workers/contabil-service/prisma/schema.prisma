@@ -108,6 +108,18 @@ model ResponsibleContabil {
   @@map("contabil.responsibles")
 }
 
+model ClientCloud {
+  id              String   @id @default(uuid())
+  client_id       String
+  type            String
+  link            String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  organization_id String
+
+  @@map("clientes.clouds")
+}
+
 model TriageConfig {
   id              String   @id @default(uuid())
   client_id       String
