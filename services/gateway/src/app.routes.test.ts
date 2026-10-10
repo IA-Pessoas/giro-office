@@ -2313,6 +2313,8 @@ it("serves the aggregated OpenAPI JSON from the gateway", async () => {
     expect(body.paths["/fiscal/ncm"]).toBeTruthy();
     expect(body.paths["/contabil/controls"]).toBeTruthy();
     expect(body.paths["/contabil/controls/list"]).toBeTruthy();
+    expect(body.paths["/contabil/noah"]).toBeTruthy();
+    expect(body.paths["/contabil/noah/{id}/csv"]).toBeTruthy();
     expect(body.paths["/contabil/contingency"]).toBeTruthy();
     expect(body.paths["/ti/requests/list"]).toBeTruthy();
     expect(body.paths["/certificate/pj/list"]).toBeTruthy();
@@ -5221,6 +5223,59 @@ it("denies Fiscal routes when the user lacks the module read level", async () =>
     expect(response.status).toBe(403);
     expect(seenPermission).toBeUndefined();
     expect(seenInternalToken).toBeUndefined();
+  } finally {
+    await stopServer(gateway);
+    await stopServer(upstream);
+  }
+});
+
+it("encaminha bytes ZIP Noah e devolve CSV privado sem alterar o conteúdo", async () => {
+  const token = createToken({
+    user_id: "user-1",
+    organization_id: "org-1",
+    permission: 2,
+    modules: { contabil: 2 },
+  });
+  const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff, 0x80]);
+  const csv = "FORNECEDOR;DATA;VALOR;ARQUIVO\r\n";
+  let received = Buffer.alloc(0);
+  let seenPath = "";
+  const upstream = createServer(async (request, response) => {
+    if (request.method === "POST") {
+      seenPath = request.url ?? "";
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      received = Buffer.concat(chunks);
+      response.writeHead(201, { "content-type": "application/json" });
+      response.end(JSON.stringify({ success: true, data: { id: "conversion" } }));
+    } else {
+      response.writeHead(200, {
+        "content-type": "text/csv",
+        "content-disposition": "attachment; filename=NOAH.csv",
+        "cache-control": "no-store",
+      });
+      response.end(csv);
+    }
+  });
+  const contabilServiceUrl = await startServer(upstream);
+  const gateway = createServer(createApp(createEnv({ contabilServiceUrl }), createTestLogger()));
+  const url = await startServer(gateway);
+  try {
+    const created = await fetch(`${url}/contabil/noah?filename=noah.zip`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/zip" },
+      body: zip,
+    });
+    expect(created.status).toBe(201);
+    expect(received).toEqual(zip);
+    expect(seenPath).toBe("/contabil/noah?filename=noah.zip");
+    const downloaded = await fetch(`${url}/contabil/noah/conversion/csv`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(downloaded.status).toBe(200);
+    expect(downloaded.headers.get("cache-control")).toBe("no-store");
+    expect(downloaded.headers.get("content-disposition")).toContain("attachment");
+    expect(await downloaded.text()).toBe(csv);
   } finally {
     await stopServer(gateway);
     await stopServer(upstream);

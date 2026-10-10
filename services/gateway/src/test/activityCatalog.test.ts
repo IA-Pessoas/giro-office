@@ -4,6 +4,13 @@ import { classifyActivity, describeActivity } from "../audit/activityCatalog.js"
 
 describe("activityCatalog", () => {
   it.each([
+    ["POST", "/contabil/noah?filename=arquivo.zip", "converteu", "comprovantes Noah em CSV"],
+    [
+      "GET",
+      "/contabil/noah/9a68a809-9a78-4ef9-94d0-b9bb9787ad2e/csv",
+      "baixou",
+      "um CSV da conversão Noah",
+    ],
     [
       "POST",
       "/contabil/contingency?filename=balancete.xls",

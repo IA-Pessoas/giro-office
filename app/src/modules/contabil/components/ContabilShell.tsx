@@ -20,8 +20,9 @@ import { ContabilResponsibleSection } from "./ContabilResponsibleSection";
 import { ContabilRelationshipSection } from "./ContabilRelationshipSection";
 import { ContabilStateBox } from "./ContabilStateBox";
 import { TriageDocumentsSection } from "./TriageDocumentsSection";
+import { ContabilNoahSection } from "./ContabilNoahSection";
 
-type ContabilTabId = "control" | "responsible" | "relationship" | "documents" | "contingency";
+type ContabilTabId = "control" | "responsible" | "relationship" | "documents" | "noah" | "contingency";
 
 interface ContabilShellProps {
   clientId?: string;
@@ -63,6 +64,7 @@ export function ContabilShell({
       icon: Waypoints,
     },
     { id: "documents", label: "Documentos", icon: FileText },
+    { id: "noah", label: "Noah", icon: FileText },
     { id: "contingency", label: "Contingência", icon: Calculator },
   ];
 
@@ -187,6 +189,13 @@ function ContabilActiveTabPanel({
   pickedClientId: string;
   onPickClient: (clientId: string) => void;
 }) {
+  if (activeTab === "noah") {
+    return (
+      <div role="tabpanel" id="contabil-panel-noah" aria-labelledby="contabil-tab-noah">
+        <ContabilNoahSection canEdit={canEdit} />
+      </div>
+    );
+  }
   if (!clientId) {
     if (activeTab === "control") {
       return (

@@ -262,6 +262,62 @@ export function buildContabilServiceOpenApiSpec(env: ContabilServiceEnv): OpenAp
           },
         },
       },
+      "/contabil/noah": {
+        post: {
+          tags: ["Noah"],
+          summary: "Converter ZIP Noah e registrar resultado e auditoria",
+          description:
+            "Exige edição no Contábil. Até 5 MiB, 100 entradas, 1 MiB por HTML e 10 MiB expandidos. O ZIP não é persistido. Rejeições individuais acompanham o resultado. Não altera lançamentos nem Controle.",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "filename",
+              in: "query",
+              required: true,
+              schema: { type: "string", maxLength: 255, example: "noah.zip" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: { "application/zip": { schema: { type: "string", format: "binary" } } },
+          },
+          responses: {
+            "201": {
+              description:
+                "Conversão salva com id, source_name, source_sha256, result_sha256, created_by, created_at, row_count, file_count e rejections[{file, reason}]",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/SuccessEnvelope" } },
+              },
+            },
+            "400": { description: "Nome, arquivo ZIP, caminho ou limites internos inválidos" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem permissão de edição" },
+            "413": { description: "ZIP maior que 5 MiB" },
+            "415": { description: "Esperado application/zip" },
+          },
+        },
+      },
+      "/contabil/noah/{id}/csv": {
+        get: {
+          tags: ["Noah"],
+          summary: "Baixar CSV Noah da organização autenticada",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          ],
+          responses: {
+            "200": {
+              description:
+                "CSV UTF-8, separado por ponto e vírgula: FORNECEDOR, DATA, VALOR, ARQUIVO. Download privado com Cache-Control: no-store.",
+              content: { "text/csv": { schema: { type: "string" } } },
+            },
+            "400": { description: "Identificador inválido" },
+            "401": { description: "Não autenticado" },
+            "403": { description: "Sem acesso ao Contábil" },
+            "404": { description: "Conversão ausente ou de outra organização" },
+          },
+        },
+      },
       "/internal/reporting/catalog": {
         get: {
           tags: ["Health"],

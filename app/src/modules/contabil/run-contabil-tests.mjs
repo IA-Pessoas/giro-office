@@ -67,6 +67,9 @@ function readWorkspaceSource(relativePath) {
 }
 
 const contabilServiceSources = {
+  permissions: readWorkspaceSource(
+    "../../../../services/contabil-service/src/constants/permissions.ts",
+  ),
   authMiddleware: readWorkspaceSource(
     "../../../../services/contabil-service/src/middlewares/isAuthenticated.ts",
   ),
@@ -302,6 +305,7 @@ await (async () => {
   });
 
   await runTest("contabil-service blocks viewer writes and allows editor writes", () => {
+    assert.match(contabilServiceSources.permissions, /const CONTABIL_WRITE_PERMISSION = 2;/);
     assert.match(contabilServiceSources.authMiddleware, /import \{ CONTABIL_WRITE_PERMISSION \} from "\.\.\/constants\/permissions\.js"/);
     assert.match(contabilServiceSources.authMiddleware, /requireContabilWritePermission/);
 

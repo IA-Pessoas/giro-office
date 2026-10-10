@@ -5413,6 +5413,34 @@ const handlers = {
     });
   },
 
+  async contabilNoahCreate(op) {
+    const response = await httpRequest(op, {
+      expectedStatus: [201],
+      query: { filename: "noah-synthetic.zip" },
+      headers: { "content-type": "application/zip" },
+      raw: await fs.promises.readFile(path.join(__dirname, "fixtures/noah/synthetic.zip")),
+    });
+    if (!isBadExpectation(op)) {
+      if (response.body?.data?.row_count !== 1)
+        throw new Error("Noah deve extrair um pagamento sintético.");
+      state.contabilNoahId = response.body.data.id;
+    }
+  },
+
+  async contabilNoahDownload(op) {
+    const response = await httpRequest(op, {
+      path: `/contabil/noah/${requireState("contabilNoahId")}/csv`,
+      expectedStatus: [200],
+      expectEnvelope: false,
+    });
+    if (
+      !isBadExpectation(op) &&
+      !response.text.includes("Fornecedor Sintético;09/10/2026;100,00;comprovante.html")
+    ) {
+      throw new Error("CSV Noah diverge do comprovante sintético.");
+    }
+  },
+
   async contabilContingencySimulate(op) {
     let company = { name: "Smoke Client", cpf_cnpj: uniqueCnpj("primary-client") };
     if (!isBadExpectation(op)) {

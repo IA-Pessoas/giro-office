@@ -166,6 +166,7 @@ model Organization {
   clientsPF                     ClientPF[]
   clientTerminations            ClientTermination[]
   controlsContabil              ControlContabil[]
+  noahConversions               NoahConversion[]
   relationshipsContabil         RelationshipContabil[]
   responsiblesContabil          ResponsibleContabil[]
   departments                   Department[]
@@ -1606,6 +1607,24 @@ model CertificatePF {
   @@index([organization_id, expiration_date, name], map: "idx_cert_pf_org_exp_name")
   @@index([organization_id, has_certificate, expiration_date, name], map: "idx_cert_pf_org_has_exp_name")
   @@map("certificate.pf")
+}
+
+model NoahConversion {
+  id              String       @id @default(uuid())
+  organization_id String
+  created_by      String
+  created_at      DateTime     @default(now())
+  source_name     String
+  source_sha256   String
+  result_sha256   String
+  csv             String
+  row_count       Int
+  file_count      Int
+  rejections      Json
+  organization    Organization @relation(fields: [organization_id], references: [id])
+
+  @@index([organization_id, created_at])
+  @@map("contabil.noah_conversions")
 }
 
 model ControlContabil {

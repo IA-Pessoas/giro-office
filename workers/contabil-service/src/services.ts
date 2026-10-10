@@ -7,6 +7,7 @@ import {
   withReportingSnapshot,
 } from "@workspace/shared";
 import type { ContingencyPrisma } from "../../../services/contabil-service/src/services/contingencyService.js";
+import type { NoahServicePrisma } from "../../../services/contabil-service/src/services/noahService.js";
 import type { AuditParams, AuditUpdateParams } from "./audit.js";
 import {
   type TriageDocumentStatus,
@@ -36,6 +37,7 @@ export type ContabilPrisma = {
     options?: QueryArgs,
   ): Promise<T | unknown[]>;
   client: Delegate & Pick<ContingencyPrisma["client"], "findFirst">;
+  noahConversion: NoahServicePrisma["noahConversion"];
   controlContabil: Delegate;
   triageClosing: Delegate;
   relationshipContabil: Delegate;
