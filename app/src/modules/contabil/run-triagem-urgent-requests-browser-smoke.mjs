@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
 import { browserSmokeEnv } from "../../shared/testing/browserSmokeEnv.mjs";
+import { EMPTY_SOLICITATION_INDICATORS } from "../triagem/triagemSmokeFixtures.mjs";
 
 const configuredBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, "");
 const port = process.env.TRIAGE_URGENT_REQUESTS_SMOKE_PORT ?? "3128";
@@ -134,6 +135,9 @@ async function runBrowserProof() {
     if (request.method() === "GET" && apiPath === "/triagem/monthly") return json(route, null);
     if (request.method() === "GET" && apiPath === "/triagem/statements") return json(route, []);
     if (request.method() === "GET" && apiPath === "/triagem/closing") return json(route, null);
+    if (request.method() === "GET" && apiPath === "/triagem/solicitations/indicators") {
+      return json(route, EMPTY_SOLICITATION_INDICATORS);
+    }
     return json(route, []);
   });
 
@@ -142,22 +146,24 @@ async function runBrowserProof() {
     await page.getByRole("button", { name: "Selecionar cliente" }).click();
     await page.getByRole("option", { name: /Cliente Demonstração/ }).click();
     await expect(page.getByRole("heading", { name: "Solicitações urgentes" })).toBeVisible();
+    // A página também tem a seção de solicitações (#1696); restringe à região das urgentes.
+    const urgent = page.getByRole("region", { name: "Solicitações urgentes" });
 
-    await page.getByLabel("Código de urgência").selectOption("HIGH");
-    await page.getByLabel("Responsável da solicitação urgente").selectOption(user.id);
-    await page.getByLabel("Descrição da solicitação urgente").fill("Validar documento urgente.");
-    await page.getByRole("button", { name: "Registrar solicitação" }).click();
-    await expect(page.getByText("Validar documento urgente.")).toBeVisible();
+    await urgent.getByLabel("Código de urgência").selectOption("HIGH");
+    await urgent.getByLabel("Responsável da solicitação urgente").selectOption(user.id);
+    await urgent.getByLabel("Descrição da solicitação urgente").fill("Validar documento urgente.");
+    await urgent.getByRole("button", { name: "Registrar solicitação" }).click();
+    await expect(urgent.getByText("Validar documento urgente.")).toBeVisible();
     assert.ok(requestLog.some((item) => item.method === "POST" && item.path === "/triagem/urgent-requests"));
 
-    await page.getByRole("button", { name: "Fechar", exact: true }).click();
-    await page.getByLabel("Nota de resolução").fill("Documento validado.");
-    await page.getByRole("button", { name: "Confirmar fechamento" }).click();
-    await expect(page.getByText(/Fechada/)).toBeVisible();
+    await urgent.getByRole("button", { name: "Fechar", exact: true }).click();
+    await urgent.getByLabel("Nota de resolução").fill("Documento validado.");
+    await urgent.getByRole("button", { name: "Confirmar fechamento" }).click();
+    await expect(urgent.getByText(/Fechada/)).toBeVisible();
     assert.ok(requestLog.some((item) => item.method === "PATCH" && item.path.endsWith("/close")));
 
-    await page.getByRole("button", { name: "Reabrir", exact: true }).click();
-    await expect(page.getByText(/Aberta/)).toBeVisible();
+    await urgent.getByRole("button", { name: "Reabrir", exact: true }).click();
+    await expect(urgent.getByText(/Aberta/)).toBeVisible();
     assert.ok(requestLog.some((item) => item.method === "PATCH" && item.path.endsWith("/reopen")));
 
     await page.screenshot({ path: screenshotPath, fullPage: true });
