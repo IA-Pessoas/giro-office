@@ -6583,6 +6583,30 @@ const handlers = {
     });
   },
 
+  // Dia fixo e antigo, sem gravar nada: "sem_registro" em quem não tem registro e uma lista só
+  // com documento desconhecido.
+  async regularizeDteQueriesGrid(op) {
+    await httpRequest(op, { expectedStatus: [200], query: { date: "2000-01-01" } });
+  },
+
+  async regularizeDteQueryStatusUpdate(op) {
+    await httpRequest(op, {
+      expectedStatus: [200],
+      json: {
+        client_id: requireState("primaryClientId"),
+        date: "2000-01-01",
+        status: "sem_registro",
+      },
+    });
+  },
+
+  async regularizeDteQueryListsImport(op) {
+    await httpRequest(op, {
+      expectedStatus: [201],
+      json: { date: "2000-01-01", done: "00000000000191", not_done: "" },
+    });
+  },
+
   async taskIntegrationCreate(op) {
     const response = await httpRequest(op, {
       expectedStatus: [201],

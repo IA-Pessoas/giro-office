@@ -21,6 +21,14 @@ export const regularizePanelClassName =
 export const regularizePanelLabelClassName =
   "block text-sm font-medium text-slate-700 dark:text-slate-200";
 
+export const regularizePanelTableCellClassName = "px-3 py-2 align-top";
+
+export const regularizePanelAlertClassName =
+  "mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200";
+
+export const regularizePanelSuccessClassName =
+  "mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100";
+
 export const regularizeSecondaryButtonClassName =
   "rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700";
 

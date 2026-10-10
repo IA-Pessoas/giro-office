@@ -56,6 +56,7 @@ import { RegularizeGuidancePartnerForm } from "./RegularizeGuidancePartnerForm";
 import { RegularizeLicenseForm } from "./RegularizeLicenseForm";
 import { RegularizeDteInbox } from "./RegularizeDteInbox";
 import { RegularizeDtePanel } from "./RegularizeDtePanel";
+import { RegularizeDteQueries } from "./RegularizeDteQueries";
 import { RegularizeMunicipalTaxesForm } from "./RegularizeMunicipalTaxesForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import { RegularizePartnerForm } from "./RegularizePartnerForm";
@@ -2930,10 +2931,12 @@ export function RegularizePage() {
       {activeTab === "bidders" ? <ClientLicitacaoBiddersPanel /> : null}
 
       {activeTab === "dte" ? (
-        // Caixa de avisos (#1745) e importação (#1744) são fluxos separados na mesma aba.
+        // Caixa de avisos (#1745), importação (#1744) e consultas diárias (#1746) são fluxos
+        // separados na mesma aba.
         <div className="space-y-4">
           <RegularizeDteInbox canEdit={regularizeAccess.canEdit} />
           <RegularizeDtePanel canEdit={regularizeAccess.canEdit} />
+          <RegularizeDteQueries canEdit={regularizeAccess.canEdit} />
         </div>
       ) : null}
 

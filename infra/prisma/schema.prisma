@@ -234,6 +234,7 @@ model Organization {
   proceduralGuidances           ProceduralGuidance[]
   dteImports                    RegularizeDteImport[]
   dteNotices                    RegularizeDteNotice[]
+  dteQueries                    RegularizeDteQuery[]
   processes                     Process[]
   holidays                      Holidays[]
   pointsConfig                  PointsConfig[]
@@ -811,6 +812,7 @@ model Client {
   passPessoal                   PasswordPessoal[]
   situationsPessoal             SituationsPessoal[]
   licenses                      License[]
+  dteQueries                    RegularizeDteQuery[]
   municipalTaxes                MunicipalTaxes[]
   partners                      Partners[]
   passRegularize                PasswordRegularize[]
@@ -2793,6 +2795,26 @@ model RegularizeDteNotice {
   @@unique([organization_id, dedupe_key], map: "uq_regularize_dte_notice_dedupe")
   @@index([organization_id, created_at], map: "idx_regularize_dte_notice_org_created")
   @@map("regularize.dte_notices")
+}
+
+// Consulta diária ao DTE por cliente (#1746). O legado (tb_regularize.dte_status) guardava
+// duas listas de CPF/CNPJ por dia; aqui é uma linha por cliente e dia, então o cliente não
+// tem como estar em "feitas" e "não feitas" ao mesmo tempo. Sem linha = sem registro.
+model RegularizeDteQuery {
+  id                 String       @id @default(uuid())
+  organization_id    String
+  client_id          String
+  date               DateTime     @db.Date
+  done               Boolean
+  updated_by_user_id String
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+  organization       Organization @relation(fields: [organization_id], references: [id])
+  client             Client       @relation(fields: [client_id], references: [id])
+
+  @@unique([organization_id, client_id, date], map: "uq_regularize_dte_query_client_date")
+  @@index([organization_id, date], map: "idx_regularize_dte_query_org_date")
+  @@map("regularize.dte_queries")
 }
 
 model TasksIntegrationRegularize {

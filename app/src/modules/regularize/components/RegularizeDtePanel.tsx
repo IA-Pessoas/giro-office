@@ -13,8 +13,10 @@ import type {
 import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import {
+  regularizePanelAlertClassName,
   regularizePanelClassName,
   regularizePanelLabelClassName,
+  regularizePanelSuccessClassName,
   regularizePrimaryButtonClassName,
   regularizeTextareaClassName,
 } from "./regularizeFormControls";
@@ -143,7 +145,7 @@ export function RegularizeDtePanel({ canEdit }: { canEdit: boolean }) {
         {importMutation.isError ? (
           <p
             role="alert"
-            className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+            className={regularizePanelAlertClassName}
           >
             {getRegularizeMutationErrorMessage(
               importMutation.error,
@@ -154,7 +156,7 @@ export function RegularizeDtePanel({ canEdit }: { canEdit: boolean }) {
         {importMutation.isSuccess ? (
           <div
             role="status"
-            className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"
+            className={regularizePanelSuccessClassName}
           >
             Importação concluída: <ImportSummary item={importMutation.data} />
             <ImportDetails item={importMutation.data} />

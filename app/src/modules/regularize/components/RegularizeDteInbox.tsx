@@ -19,8 +19,10 @@ import {
 import { getRegularizeMutationErrorMessage } from "../utils/regularizeForm";
 import { RegularizeNativeSelect } from "./RegularizeNativeSelect";
 import {
+  regularizePanelAlertClassName,
   regularizePanelClassName,
   regularizePanelLabelClassName,
+  regularizePanelTableCellClassName as cellClassName,
   regularizeSecondaryButtonClassName,
   regularizeTextFieldClassName,
 } from "./regularizeFormControls";
@@ -40,7 +42,6 @@ const TIPO_OPTIONS: Array<{ value: string; label: string; variant: StatusBadgeVa
   { value: "badge-inverse", label: "Preto", variant: "neutral" },
 ];
 
-const cellClassName = "px-3 py-2 align-top";
 
 function initialFilters(): RegularizeDteNoticeListFilters {
   return {
@@ -153,7 +154,7 @@ export function RegularizeDteInbox({ canEdit }: { canEdit: boolean }) {
       {readingMutation.isError ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200"
+          className={regularizePanelAlertClassName}
         >
           {getRegularizeMutationErrorMessage(
             readingMutation.error,
