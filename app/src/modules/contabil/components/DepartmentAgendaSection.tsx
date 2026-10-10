@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, Pencil, Plus, Trash2, UserCheck } from "lucide-react";
+import { CalendarDays, Pencil, Plus, Repeat, Trash2, UserCheck } from "lucide-react";
 
 import { ConfirmationDialog } from "@shared/components";
 import { useFetch } from "@shared/hooks";
@@ -58,13 +58,16 @@ export function DepartmentAgendaSection({
 
   const save = useMutation({
     mutationFn: (payload: AgendaEventPayload) => {
-      if (!editing || editing === "new") return agendaService.create(module, payload);
+      const { date, status, recurrent, ...rest } = payload;
+      if (!editing || editing === "new") {
+        return agendaService.create(module, { ...rest, date, status, ...(recurrent ? { recurrent } : {}) });
+      }
       // Só o que mudou: evento legado mantém o horário e o estado que já tinha.
-      const { date, status, ...rest } = payload;
       return agendaService.update(module, editing.id, {
         ...rest,
         ...(agendaDay(date) === agendaDay(editing.date) ? {} : { date }),
         ...(status === editing.status ? {} : { status }),
+        ...(recurrent === Boolean(editing.recurring_agenda_id) ? {} : { recurrent }),
       });
     },
     onSuccess: async () => {
@@ -93,6 +96,7 @@ export function DepartmentAgendaSection({
       date: agendaDateToIso(String(form.get("date"))),
       status: form.get("status") as AgendaStatus,
       obs: String(form.get("obs")).trim() || null,
+      recurrent: form.get("recurrent") === "on",
     });
   };
 
@@ -190,6 +194,24 @@ export function DepartmentAgendaSection({
               ))}
             </select>
           </div>
+          <div className="space-y-1 sm:col-span-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300">
+              <input
+                type="checkbox"
+                name="recurrent"
+                defaultChecked={Boolean(current?.recurring_agenda_id)}
+                aria-describedby={`${module}-agenda-recurrent-help`}
+              />
+              Repetir todo mês
+            </label>
+            <p
+              id={`${module}-agenda-recurrent-help`}
+              className="text-sm text-gray-600 dark:text-slate-400"
+            >
+              Um novo evento é criado a cada mês, no mesmo dia. Sábado e domingo são
+              antecipados para a sexta. Desmarcar encerra a repetição e mantém os eventos já criados.
+            </p>
+          </div>
           {save.error && (
             <p role="alert" className="text-sm text-red-600 dark:text-red-400 sm:col-span-2">
               {getContabilErrorMessage(save.error)}
@@ -252,6 +274,12 @@ export function DepartmentAgendaSection({
                   </p>
                 )}
               </div>
+              {event.recurring_agenda_id && (
+                <span className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-slate-400">
+                  <Repeat className="h-4 w-4" aria-hidden="true" />
+                  Mensal
+                </span>
+              )}
               <span className="text-sm text-gray-600 dark:text-slate-400">
                 {event.status ?? "Sem estado"}
               </span>
@@ -289,7 +317,11 @@ export function DepartmentAgendaSection({
           if (!open) setRemoving(null);
         }}
         title="Remover evento"
-        description={`Remover "${removing?.agenda ?? ""}" da agenda?`}
+        description={
+          removing?.recurring_agenda_id
+            ? `Remover "${removing.agenda}" da agenda? Só este evento sai: a repetição mensal continua. Para encerrá-la, edite o evento e desmarque Repetir todo mês.`
+            : `Remover "${removing?.agenda ?? ""}" da agenda?`
+        }
         onConfirm={() => {
           if (removing) remove.mutate(removing);
         }}

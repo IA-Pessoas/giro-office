@@ -26,6 +26,7 @@ model Organization {
   status                        status                        @default(active)
   timezone                      String                        @default("UTC")
   agendas                       Agenda[]
+  recurringAgendas              RecurringAgenda[]
   clients                       Client[]
   pas                           PA[]
   clientsPF                     ClientPF[]
@@ -64,6 +65,7 @@ model Department {
   solution                  Boolean?
   organization_id           String
   agenda_controls           Agenda[]          @relation("department_control")
+  agenda_recurring_controls RecurringAgenda[] @relation("department_control")
   organization              Organization      @relation(fields: [organization_id], references: [id])
   tasks                     Task[]
   tasksModel                TaskModel[]
@@ -630,15 +632,40 @@ model Agenda {
   obs                   String?
   department_control_id String
   organization_id       String
+  recurring_agenda_id   String?
+  recurrence_month      String?
   client                Client?      @relation(fields: [client_id], references: [id])
   department_control    Department   @relation("department_control", fields: [department_control_id], references: [id])
   organization          Organization @relation(fields: [organization_id], references: [id])
   participant2          User?        @relation("participant2", fields: [participant_id_2], references: [id])
   participant3          User?        @relation("participant3", fields: [participant_id_3], references: [id])
   participant           User?        @relation("participant", fields: [participant_id], references: [id])
+  recurring_agenda      RecurringAgenda? @relation(fields: [recurring_agenda_id], references: [id], onDelete: SetNull)
   task                  Task?        @relation(fields: [task_id], references: [id])
 
+  @@unique([recurring_agenda_id, recurrence_month], map: "uq_agenda_recurrence_occurrence")
   @@map("agenda")
+}
+
+model RecurringAgenda {
+  id                    String       @id @default(uuid())
+  agenda                String
+  day                   Int
+  recurrence            String
+  client_id             String?
+  location              String?
+  participant_id        String?
+  participant_id_2      String?
+  participant_id_3      String?
+  obs                   String?
+  department_control_id String
+  organization_id       String
+  generated_through     String?
+  department_control    Department   @relation("department_control", fields: [department_control_id], references: [id])
+  occurrences           Agenda[]
+  organization          Organization @relation(fields: [organization_id], references: [id])
+
+  @@map("agenda.recurring")
 }
 
 model License {
