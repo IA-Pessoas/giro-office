@@ -10,6 +10,7 @@ const appRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const screenshotPath =
   process.env.CONTABIL_BROWSER_SCREENSHOT_PATH ??
   "output/playwright/contabil-portfolio-dashboard.png";
+const agendaScreenshotPath = "output/playwright/contabil-agenda.png";
 const now = new Date();
 const competence = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 const checklistFields = [
@@ -64,6 +65,17 @@ const user = {
   type: "admin",
   modules: { contabil: 2 },
 };
+
+const agendaEvents = [
+  {
+    id: "e1000000-0000-4000-8000-000000000001",
+    agenda: "Fechamento mensal",
+    date: `${competence}-10T12:00:00.000Z`,
+    status: "Pendente",
+    obs: "Conferir balancete",
+    location: null,
+  },
+];
 
 function json(route, data, status = 200) {
   return route.fulfill({
@@ -121,6 +133,15 @@ async function runBrowserProof() {
       return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({
         success: false, error: "A simulação mudou. Confira novamente.", code: "CONFLICT",
       }) });
+    }
+    if (apiPath === "/task/agenda") {
+      if (method === "GET") return json(route, agendaEvents);
+      const body = request.postDataJSON();
+      if (method === "POST") agendaEvents.push({ id: "e2", location: null, ...body });
+      if (method === "DELETE") {
+        agendaEvents.splice(agendaEvents.findIndex((event) => event.id === body.agenda_id), 1);
+      }
+      return json(route, { id: body.agenda_id ?? "e2" });
     }
     if (method === "GET" && apiPath === "/user/me") return json(route, user);
     if (method === "GET" && apiPath === "/contabil/controls/list") {
@@ -206,6 +227,30 @@ async function runBrowserProof() {
     await page.getByRole("tab", { name: "Documentos" }).click();
     await expect(page.getByLabel("Empresa")).toHaveValue(betaId);
     await expect(page.getByRole("heading", { name: "Pendências documentais" })).toBeVisible();
+
+    // Agenda: visão do departamento na agenda compartilhada, sem escolher empresa.
+    await page.getByRole("tab", { name: "Agenda", exact: true }).click();
+    await expect(page.getByText("Fechamento mensal", { exact: true })).toBeVisible();
+    const agendaList = requests.find((request) => request.path === "/task/agenda");
+    assert.equal(agendaList.method, "GET");
+    await page.getByRole("button", { name: "Novo evento", exact: true }).click();
+    await page.getByLabel("Título", { exact: true }).fill("Entrega da ECD");
+    await page.getByLabel("Data", { exact: true }).fill(`${competence}-20`);
+    await page.getByLabel("Estado", { exact: true }).selectOption("Realizado");
+    await page.getByRole("button", { name: "Salvar", exact: true }).click();
+    await expect(page.getByText("Entrega da ECD", { exact: true })).toBeVisible();
+    assert.deepEqual(requests.find((request) => request.method === "POST" && request.path === "/task/agenda").body, {
+      module: "contabil",
+      agenda: "Entrega da ECD",
+      date: `${competence}-20T12:00:00.000Z`,
+      status: "Realizado",
+      obs: null,
+    });
+    await page.screenshot({ path: agendaScreenshotPath, fullPage: true });
+    await page.getByRole("button", { name: "Remover Fechamento mensal", exact: true }).click();
+    await page.getByRole("button", { name: "Remover", exact: true }).click();
+    await expect(page.getByText("Fechamento mensal", { exact: true })).toBeHidden();
+    console.log("PASS agenda do Contábil lista, cria e remove na agenda compartilhada");
 
     // Outra sessão recalculou o rascunho: o 409 binário precisa invalidar a confirmação local.
     await page.getByRole("tab", { name: "Contingência", exact: true }).click();

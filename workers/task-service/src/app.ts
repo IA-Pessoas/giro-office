@@ -1,5 +1,6 @@
 import { type WorkerAuthContext, withWorkerPrisma } from "@workspace/runtime";
 import {
+  type ModulePermissionKey,
   normalizeModulePermission,
   parseWithZod,
   reportingQueryFields,
@@ -16,6 +17,12 @@ import {
   serializeError,
 } from "@workspace/shared/http";
 import { validateUploadFileSignature } from "@workspace/shared/upload";
+import {
+  agendaCreateBodySchema,
+  agendaDeleteBodySchema,
+  agendaListQuerySchema,
+  agendaUpdateBodySchema,
+} from "@workspace/task-service/src/schemas/agenda.schemas.js";
 import { commercialProspectingCloseEventSchema } from "@workspace/task-service/src/schemas/commercialProspectingClose.schemas.js";
 import { commercialTaskBillingEventSchema } from "@workspace/task-service/src/schemas/commercialTaskBilling.schemas.js";
 import {
@@ -81,6 +88,7 @@ import {
 } from "@workspace/task-service/src/schemas/taskModelList.schemas.js";
 import { parseTaskModelResponsibleSequence } from "@workspace/task-service/src/schemas/taskModelResponsibleSequence.schemas.js";
 import { taskOperationalNotificationReadBodySchema } from "@workspace/task-service/src/schemas/taskOperationalNotification.schemas.js";
+import { AGENDA_LEVEL } from "@workspace/task-service/src/services/agendaService.js";
 import {
   TASK_ATTACHMENT_MIME_TYPES,
   type TaskAttachmentMimeType,
@@ -167,6 +175,17 @@ function taskRequest(c: Context<TaskContext>, body: Record<string, unknown>): Ta
 
 const integracao = (r: TaskRequest) => normalizeModulePermission(r.modules?.integracao);
 const isOwner = (r: TaskRequest) => r.user_type === "owner";
+
+/** Escopo da agenda compartilhada: o nível vem do módulo pedido, nunca de outro. */
+function agendaScope(r: TaskRequest, module: ModulePermissionKey) {
+  const { user_id, organization_id } = requireAuthenticatedRequestContext(r);
+  return {
+    userId: user_id,
+    organizationId: organization_id,
+    module,
+    level: isOwner(r) ? AGENDA_LEVEL.OWNER : normalizeModulePermission(r.modules?.[module]),
+  };
+}
 
 /**
  * `multer({ limits, fileFilter }).single(field)`: mesmos erros e na mesma ordem. Campos de
@@ -1339,6 +1358,42 @@ export function createTaskWorkerApp(options: TaskOptions = {}) {
       });
       const { department_id } = parseWithZod(taskModelOptionsQuerySchema, r.query);
       return s.deps().listTaskModelOptions(organization_id, department_id);
+    }),
+  );
+
+  // --- agenda compartilhada: uma agenda só, vista pelo departamento do módulo pedido.
+  app.get(
+    "/task/agenda",
+    route(async (r, s) => {
+      const { module, month } = parseWithZod(agendaListQuerySchema, r.query);
+      return s.agenda().list(agendaScope(r, module), month);
+    }),
+  );
+
+  app.post(
+    "/task/agenda",
+    route(
+      async (r, s) => {
+        const { module, ...event } = parseWithZod(agendaCreateBodySchema, r.body);
+        return s.agenda().create(agendaScope(r, module), event);
+      },
+      { status: 201 },
+    ),
+  );
+
+  app.put(
+    "/task/agenda",
+    route(async (r, s) => {
+      const { module, agenda_id, ...event } = parseWithZod(agendaUpdateBodySchema, r.body);
+      return s.agenda().update(agendaScope(r, module), agenda_id, event);
+    }),
+  );
+
+  app.delete(
+    "/task/agenda",
+    route(async (r, s) => {
+      const { module, agenda_id } = parseWithZod(agendaDeleteBodySchema, r.body);
+      return s.agenda().remove(agendaScope(r, module), agenda_id);
     }),
   );
 
